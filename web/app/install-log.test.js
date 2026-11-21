@@ -44,20 +44,31 @@ test("installFromLibrary: library.install's log (the bundle ID it installs as) r
 
 test("F361 start(): the entry is saved running before the run ends, each line as it comes", () => {
   const st = memStorage();
-  const logs = createRunLog(st);
+  let t = 1000;
+  const timers = [];
+  const logs = createRunLog(st, { now: () => t, later: (f, ms) => timers.push([f, ms]), cancel: () => {} });
   const run = logs.start({ title: "Install Delta" });
   assert.equal(logs.list()[0].state, "running");
   assert.equal(runStatusText(logs.list()[0]), "Running…");
+  const kept = () => JSON.parse(st.getItem("ifizbox.consoleLogs"))[0].text; // what a fresh read sees (after a crash)
   run.line("Downloading");
+  assert.equal(kept(), "Downloading"); // the first line at once
   run.line("Signing");
-  // what a fresh read of the same storage sees (another page, or after a crash)
-  assert.equal(JSON.parse(st.getItem("ifizbox.consoleLogs"))[0].text, "Downloading\nSigning");
+  run.line("Installing");
+  assert.equal(kept(), "Downloading"); // the next ones within 250 ms: one save for both
+  assert.equal(timers.length, 1);
+  t += 250;
+  timers[0][0]();
+  assert.equal(kept(), "Downloading\nSigning\nInstalling");
+  run.line("Signing");
+  run.line("Installing");
+  run.end({ code: 0 });
+  assert.equal(kept(), "Downloading\nSigning\nInstalling\nSigning\nInstalling"); // end() saves what was waiting
   run.end({ code: 0 });
   run.line("after the end"); // ignored
   const e = logs.get(run.id);
   assert.equal(e.state, "done");
   assert.equal(e.ok, true);
-  assert.equal(e.text, "Downloading\nSigning");
   assert.equal(runStatusText(e), "Completed");
 });
 
@@ -89,7 +100,7 @@ test("F361 a run left running by an earlier launch reads Stopped, with its lines
 });
 
 test("F361 loggedBridge: a signing.install that never ends is in the logs, Running…, with the shell's lines", async () => {
-  const logs = createRunLog(memStorage());
+  const logs = createRunLog(memStorage(), { flushMs: 0 });
   let finish;
   const native = fakeNative({
     "signing.install": (p, on) => {
@@ -163,8 +174,20 @@ test("F361 Re-sign All and the sign-ahead's install get their titles; callWithSt
   assert.match(logs.get(list[0].id).text, /^Re-signing com\.example\.delta/);
 });
 
+test("F361 runIpaConsole: an install that throws ends Failed, not Running", async () => {
+  const logs = createRunLog(memStorage(), { flushMs: 0 });
+  const closers = [];
+  const page = { line() {}, status() {}, progress() {}, finish() {}, stoppable() {}, close() {}, onClose: (f) => closers.push(f) };
+  await assert.rejects(runIpaConsole({ url: "https://example.com/Delta.ipa" }, { open: () => page, logs,
+    install: async () => { throw new Error("the bridge went away"); } }));
+  const [e] = logs.list();
+  assert.equal(runStatusText(e), "Failed");
+  assert.match(logs.get(e.id).text, /E: the bridge went away/);
+  for (const f of closers) f(); // the console's flag back for the next test
+});
+
 test("F361 runIpaConsole: an IPA install that never ends is in the logs from its first line", async () => {
-  const logs = createRunLog(memStorage());
+  const logs = createRunLog(memStorage(), { flushMs: 0 });
   let finish;
   const closers = [];
   const page = { line() {}, status() {}, progress() {}, finish() {}, stoppable() {}, close() {}, onClose: (f) => closers.push(f) };

@@ -255,7 +255,10 @@ export function runStatusText(e) {
 }
 
 // storage: a localStorage-like { getItem, setItem, removeItem }; none (or one that throws) keeps logs in memory.
-export function createRunLog(storage = null, { max = LOG_MAX, chars = LOG_CHARS, now = () => Date.now(), session = SESSION } = {}) {
+// flushMs: a running entry's lines are saved at most this often (the first at once, the rest within flushMs), so a
+// long apt run doesn't rewrite the whole list once per line; end() saves what is left.
+export function createRunLog(storage = null, { max = LOG_MAX, chars = LOG_CHARS, now = () => Date.now(), session = SESSION,
+  flushMs = 250, later = setTimeout, cancel = clearTimeout } = {}) {
   let mem = null;
   const read = () => {
     if (mem) return mem;
@@ -302,13 +305,21 @@ export function createRunLog(storage = null, { max = LOG_MAX, chars = LOG_CHARS,
       const entry = put({ id: newId(at), at, title: run.title ?? "", jobs: run.jobs ?? [], code: null, ok: false,
         state: "running", session, text: trimLog(lines.join("\n"), chars) });
       let over = false;
+      let timer = null;
+      let saved = 0; // when the lines were last saved
       const save = (patch) => change(entry.id, (e) => ({ ...e, ...patch }));
+      const flush = () => {
+        if (timer != null) { cancel(timer); timer = null; }
+        saved = now();
+        save({ text: trimLog(lines.join("\n"), chars) });
+      };
       return {
         id: entry.id,
         line(text) {
           if (over || text == null) return;
           lines.push(String(text));
-          save({ text: trimLog(lines.join("\n"), chars) });
+          if (flushMs <= 0 || now() - saved >= flushMs) flush();
+          else if (timer == null) timer = later(() => { timer = null; if (!over) flush(); }, flushMs);
         },
         set(patch = {}) {
           if (over) return;
@@ -320,6 +331,7 @@ export function createRunLog(storage = null, { max = LOG_MAX, chars = LOG_CHARS,
         end(result = {}) {
           if (over) return null;
           over = true;
+          if (timer != null) { cancel(timer); timer = null; }
           const code = result.code ?? (result.cancelled ? null : -1);
           const text = result.text != null ? String(result.text) : lines.join("\n");
           return save({ code, ok: code === 0 && !result.cancelled, state: stateOf({ ...result, code }),

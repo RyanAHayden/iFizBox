@@ -29,6 +29,14 @@
   `logs-running.png`: the lines so far. The first try had the update banner over the top rows (fake version
   0.9.8); rerun with APP_VERSION=99.0.
 
+## Spec review
+
+A fresh subagent read the diff and the brief. Fixed: line saves are batched (the first at once, then at most every
+250 ms, end() saves the rest; `flushMs`), so a long apt run doesn't rewrite the whole list per line; runIpaConsole
+ends its entry as Failed when the install throws instead of leaving it Running. Kept on purpose: the Console Logs
+page redraws each second while a run is going (without it a running log never shows new lines), and the Settings
+footer is worded per build (the jailbreak's "install, upgrade and removal" is wrong for the sideload app).
+
 ## Not verified
 
 - On a real phone (15 Pro / iPhone 7): not run. The change is web/app only and the fake bridge emits the same
@@ -38,5 +46,8 @@
   the app.
 - `screens/queuerun.js` (Confirm's F234 queue run) still writes its log only at the end: it is outside this
   task's files and its retry loop adds several entries per run; filed as F363.
+- `screens/queue.js` runConsole (rollback, paid install) has no never-finishing unit test: the module pulls in the
+  catalog and the progress page; it uses the same start()/line()/end() covered above.
+- A re-sign whose stall limit fires (callWithStall) stays Running until the shell answers signing.cancel.
 - `signing.progress` (iOS's install log after a sign-ahead's signing.open) is not logged: it would add a third
   entry per app; the open's own entry ends when iOS has the link.

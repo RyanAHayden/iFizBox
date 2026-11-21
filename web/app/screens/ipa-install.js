@@ -213,7 +213,14 @@ export async function runIpaConsole({ url, name = "", onInstalled = () => {}, na
     progress(pct) { page.progress(pct); },
   };
 
-  const r = await install({ url, name: title }, view,{ ...(native ? { native } : {}), signal: ctl.signal });
+  let r;
+  try {
+    r = await install({ url, name: title }, view, { ...(native ? { native } : {}), signal: ctl.signal });
+  } catch (e) {
+    run.line(`E: ${e?.message || String(e)}`);
+    run.end({ code: -1 });
+    throw e;
+  }
   if (r.bundleId) run.set({ jobs: [{ op: "install", id: r.bundleId, version: null, mode: "ipa" }] });
   run.end({ code: r.ok ? 0 : -1, cancelled: Boolean(r.cancelled), text: r.log });
   if (r.declined) page.close(); // B113: Cancel on This Download Is Not Secure: back where Install was tapped
