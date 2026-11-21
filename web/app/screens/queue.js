@@ -614,6 +614,8 @@ async function readyToInstall(jobs = []) {
 // failure (its alert already shown) stops the run and leaves the rest queued. -> how many were installed.
 // B264: Changes counts its badge (and the icon's) again, as an app's re-sign or install ends (screens/changes.js).
 export const recountChanges = () => import("./changes.js").then((m) => m.recountBadge()).catch(() => {});
+// B310: a package run has ended: Changes' badge and the icon's drop what it installed or removed at once.
+export const countAfterRun = (ids) => import("./changes.js").then((m) => m.badgeAfterRun(ids)).catch(() => {});
 
 export async function runAppQueue(jobs, { queue = appQueue, install = installApp, record = recordApp, ready = readyToInstall, recount = recountChanges } = {}) {
   if (appRunning) return 0;
@@ -811,6 +813,7 @@ async function runQueueRun({ jobs, plan, ids }) {
   return runQueue({ jobs, plan }, {
     backend: getBackend(), catalog, queue: installQueue, runLogs, names, finishAction,
     setBadge: (text) => ctxRef?.setBadge?.("installed", text),
+    onEnd: (result) => countAfterRun((result?.rows ?? []).filter((r) => r.state === "installed").map((r) => r.id)), // B310
     onClose: (result) => {
       running = false;
       updateChrome();
@@ -941,6 +944,7 @@ async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = n
   const waiters = keepQueue ? [] : takeWaiters(ids);
   // A run that went through empties the queue; one apt stopped keeps it, so Confirm can show what's left to fix.
   if (ok && !keepQueue) installQueue.clearAll();
+  if (ok) countAfterRun(jobs.map((j) => j.id)); // B310
   const reloaded = catalog.reloadInstalled?.().catch(() => {});
 
   page.onClose(() => { running = false; updateChrome(); });
