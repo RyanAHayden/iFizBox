@@ -96,6 +96,13 @@ keychain, put it on the search list (`security list-keychains -d user -s tmp.key
   drawing the old icon on notifications (old and new ones) until the phone restarts: `ui-15.sh ME reboot` (about a
   minute; it brings WDA back and unlocks) before judging a notification's icon. The first push right after a
   restart can take a minute to arrive.
+- **The Home Screen icon changes at once** after an alternate-icon switch: no restart needed. Only notification
+  icons wait for one (above).
+- **Dark mode alone keeps the Home Screen's icons light.** While Home Screen > Edit > Customize is on Default,
+  iOS 27 draws every icon's light look in Dark mode; only the wallpaper dims. To check a Home Screen icon "in
+  Dark", set Customize > Dark > Auto as well as Dark mode, and put Customize back to Default afterwards.
+- **WebDriverAgent switches Light/Dark mode**: `curl -X POST 127.0.0.1:8100/wda/device/appearance -d
+  '{"name":"dark"}'` (or `"light"`). Put the phone back in the mode you found it in.
 - **Test push**: `curl -X POST https://ifizbox.com/api/push/test -H 'Content-Type: application/json' -d
   '{"token":"<token>"}'`. The token is in the push database: `npx wrangler d1 execute ifizbox-push --remote -c
   wrangler.ifizbox.toml --command "SELECT token, version, ios, updated FROM push_devices ORDER BY updated DESC"`
