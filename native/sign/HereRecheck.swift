@@ -144,9 +144,9 @@ enum HereRecheck {
     /// "18.2 MB/s in front, 14.2 MB/s in the background, 42 s waiting for the connection", for the log.
     /// B293: only the time a chunk was moving counts toward a speed. `gap` is the time since the chunk before it
     /// landed, across a drop and its reconnect (the first chunk after a reconnect carries the stall, the pauses and
-    /// the new connection). Once `warmup` chunks have landed, the part of a gap beyond `stallFactor` times the median
-    /// of the last `window` moving gaps (never under `stallFloor`) is waiting, not copying: a chunk that took 15 s
-    /// with the VPN off moved for a normal chunk's time and waited the rest.
+    /// the new connection). Once `warmup` chunks have landed, a gap over `stallFactor` times the median of the last
+    /// `window` moving gaps (never under `stallFloor`) is a stall: a chunk that took 15 s with the VPN off moved for
+    /// the median's time and waited the rest. Time the app was suspended counts as waiting too.
     struct CopySpeed {
         static let stallFloor: TimeInterval = 1
         static let stallFactor: Double = 4
@@ -159,17 +159,21 @@ enum HereRecheck {
         private(set) var paces: [TimeInterval] = []
         private(set) var landed = 0
 
-        /// How long a chunk may take before the rest of its gap counts as waiting (nil: no pace yet).
-        var stallAfter: TimeInterval? {
+        /// A normal chunk's time: the median of the last moving gaps (nil: no pace yet).
+        var pace: TimeInterval? {
             guard landed >= Self.warmup, !paces.isEmpty else { return nil }
             let s = paces.sorted()
-            return max(Self.stallFloor, s[s.count / 2] * Self.stallFactor)
+            return s[s.count / 2]
         }
+
+        /// How long a chunk may take before it counts as stalled (nil: no pace yet).
+        var stallAfter: TimeInterval? { pace.map { max(Self.stallFloor, $0 * Self.stallFactor) } }
 
         mutating func add(_ bytes: Int, _ gap: TimeInterval, front: Bool) {
             let gap = max(0, gap)
             var moving = gap
-            if let cap = stallAfter, gap > cap { moving = cap; waitSecs += gap - cap }
+            // a stalled chunk moved for a normal chunk's time and waited the rest
+            if let cap = stallAfter, let p = pace, gap > cap { moving = p; waitSecs += gap - p }
             landed += 1
             paces.append(moving)
             if paces.count > Self.window { paces.removeFirst(paces.count - Self.window) }

@@ -475,14 +475,14 @@ test("Copy speed counts stalls as waiting (B293)") {
     for _ in 0..<5 { v.add(mb, 0.1, front: false) }
     v.add(mb, 15, front: false)
     check(v.stallAfter == 1, "stall limit at the 1 s floor: \(String(describing: v.stallAfter))")
-    check(v.summary == "10.0 MB/s in front, 4.0 MB/s in the background, 14 s waiting for the connection", "VPN off: \(v.summary)")
+    check(v.summary == "10.0 MB/s in front, 10.0 MB/s in the background, 15 s waiting for the connection", "VPN off: \(v.summary)")
     // R53 run 2: stalled as the app went to the background, 40 s until the first chunk after the reconnect
     var s = HereRecheck.CopySpeed()
     for _ in 0..<20 { s.add(mb, 0.5, front: true) }
     s.add(mb, 40, front: false)
     for _ in 0..<9 { s.add(mb, 0.5, front: false) }
-    check(abs(s.waitSecs - 38) < 0.001, "the stall beyond 2 s (4 x 0.5) waits: \(s.waitSecs)")
-    check(s.summary == "2.0 MB/s in front, 1.5 MB/s in the background, 38 s waiting for the connection", "stall: \(s.summary)")
+    check(abs(s.waitSecs - 39.5) < 0.001, "all but a normal chunk's 0.5 s waits: \(s.waitSecs)")
+    check(s.summary == "2.0 MB/s in front, 2.0 MB/s in the background, 40 s waiting for the connection", "stall: \(s.summary)")
     // a slow route's own pace is not a stall
     var slow = HereRecheck.CopySpeed()
     for g in [2.0, 3.0, 2.5, 2.0, 3.5, 2.5] { slow.add(mb, g, front: true) }
