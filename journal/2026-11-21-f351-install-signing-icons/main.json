@@ -1,0 +1,12 @@
+[
+ {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.style', ERA); localStorage.setItem('ifizbox.appearance', TONE); 'ok'"},
+ {"nav": "#/home", "ms": 2000},
+ {"nav": "#/home/settings/signing", "ms": 5000},
+ {"shot": "server"},
+ {"eval": "localStorage.setItem('ifizbox.installRoute', 'iphone'); 'ok'"},
+ {"nav": "#/home/settings/installation/with", "ms": 3000},
+ {"shot": "with"},
+ {"nav": "#/home", "ms": 1500},
+ {"nav": "#/home/settings/signing", "ms": 5000},
+ {"shot": "iphone"}
+]

@@ -29,7 +29,8 @@ import { ringStyle, vpnWaitText } from "../core/installroute.js";
 import { tailscaleRoute } from "../core/installroute.js";
 import { leaveQuestion, LEAVE } from "../core/installroute.js";
 import { tailscaleVPNOn, installStatus, CHECKING, CHECKING_SERVER, STATUS_ACTIONS } from "../core/installroute.js";
-import { NAME } from "../brand.js";
+import { NAME, DOMAIN } from "../brand.js";
+import { rowIcon } from "../icons/rowicons.js";
 import { showHUD } from "../nav/hud.js";
 import { slideChange } from "../nav/slide.js";
 import { go as navGo, back as navBack } from "../nav/go.js";
@@ -138,7 +139,7 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
   tsReading = reading, refreshing = {}, late = {}, testing = false } = {}) {
   const groups = [{
     header: "Install Apps With",
-    rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", checked: o.value === choice, onClick: () => pick(o.value),
+    rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", icon: rowIcon(ROUTE_ROW[o.value].icon), checked: o.value === choice, onClick: () => pick(o.value),
       ...(picking && o.value === choice ? { spin: true } : {}) })),
     footer: choice === "iphone"
       ? `Signed apps go straight to iOS through ${vpnList()}. When it's off, installs use the Signing Server.`
@@ -530,13 +531,18 @@ async function openVPN(native, alert) {
 // `checkServer` is Settings' Check Server and `host()` the Signing Server's host.
 export const MAIN_ROWS = ["status", "action", "with", "certificate", "apps", "help"];
 
-// F300: Install Apps With's detail on the main page: the route, and This iPhone's pairing once idevice.status said
-// (`st` undefined: not answered yet; null: it failed).
+// F300/F351: Install Apps With's detail on the main page: This iPhone's pairing once idevice.status said (`st`
+// undefined: not answered yet; null: it failed). The route itself is the row's label, subtitle and icon (ROUTE_ROW).
 export function withDetail(choice, st) {
-  if (choice !== "iphone") return "Signing Server";
-  if (!st) return "This iPhone";
-  return `This iPhone · ${st.paired ? "Paired" : "Not Paired"}`;
+  if (choice !== "iphone" || !st) return "";
+  return st.paired ? "Paired" : "Not Paired";
 }
+// F351: each route's row: its icon (icons/rowicons.js), its name and one line under it, on the main page and the
+// Install Apps With page.
+const ROUTE_ROW = {
+  server: { icon: "signingServer", label: "Signing Server", sub: `iOS installs each app from ${DOMAIN}` },
+  iphone: { icon: "installation", label: "This iPhone", sub: "Straight onto this iPhone, no popup" },
+};
 
 function slotOf(node, waitText = null) {
   const value = el("span", "slot-value");
@@ -561,9 +567,12 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
   };
   const sections = [
     { rows: [{ label: "", subtitle: " ", cls: "install-status" }, { label: STATUS_ACTIONS.check, cls: "install-action", onClick: act }] },
-    { header: "Installation", rows: [{ label: "Install Apps With", detail: "", href: links.with }] },
-    { header: "Signing", rows: [{ label: "Certificate", detail: "", href: links.certificate }, { label: "Signed Apps", detail: "", href: links.apps }] },
-    { rows: [{ label: "How Signing Works", href: links.help }] },
+    // F351: the chosen route is the row (its icon, its name, what it does), under the question as the header
+    { header: "Install Apps With", rows: [{ label: ROUTE_ROW.server.label, subtitle: ROUTE_ROW.server.sub, detail: "", href: links.with, icon: rowIcon(ROUTE_ROW.server.icon) }],
+      footer: "Tap to choose how signed apps reach iOS." },
+    { header: "Signing", rows: [{ label: "Certificate", detail: "", href: links.certificate, icon: rowIcon("signing") },
+      { label: "Signed Apps", detail: "", href: links.apps, icon: rowIcon("websiteApps") }] },
+    { rows: [{ label: "How Signing Works", href: links.help, icon: rowIcon("help") }] },
   ];
   box.append(grouped(sections));
   const cells = [...box.querySelectorAll(".cell-inner")];
@@ -577,6 +586,13 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
   const checkButton = checkMark(actionCell); // B135: Check Connection's answer on the action row
   actionCell.classList.add("is-dim");
   actionCell.setAttribute("aria-disabled", "true");
+  const withCell = cells[2];
+  const showRoute = (c) => {
+    const r = ROUTE_ROW[c === "iphone" ? "iphone" : "server"];
+    withCell.querySelector(".cell-label").textContent = r.label;
+    withCell.querySelector(".cell-subtitle").textContent = r.sub;
+    withCell.querySelector(".cell-icon img").src = rowIcon(r.icon).src;
+  };
   const slots = {};
   ["with", "certificate", "apps"].forEach((k, i) => { slots[k] = slotOf(cells[i + 2].querySelector(".cell-detail")); });
 
@@ -599,6 +615,7 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
   const refresh = async () => {
     const n = ++asked;
     const choice = store.get(ROUTE_KEY);
+    showRoute(choice);
     const h = host();
     // B250: the Signing Server route says nothing until signing.status first answers (no Ready without a certificate)
     const cell = (c, st) => (c !== "iphone" ? (certRead ? installStatus(c, undefined, { host: h, certificate }) : CHECKING_SERVER)

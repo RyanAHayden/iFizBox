@@ -139,6 +139,7 @@ export const ROW_ICONS = {
   share: [C.blue, "share"], copy: [C.grey, "copy"], saveFile: [C.teal, "save"], qr: [C.dark, "qr"],
   fromFile: [C.teal, "file"], fromClipboard: [C.brown, "clipboard"],
   installation: [C.blue, "phone"], // Settings > Installation (Signing Server / This iPhone)
+  signingServer: [C.purple, "cloud"], // Installation & Signing: Install Apps With > Signing Server
 };
 
 // core/settings.js's setting keys -> their row's icon. A key not here is a row with no icon (Appearance's choices).
