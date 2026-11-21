@@ -945,8 +945,17 @@ export const isOwnIcon = (v) => typeof v === "string" && OWN_ICON.test(v);
 
 // F323: what the shell's app.icon takes: the icon for a light and for a dark Home Screen, and the one of the tone on
 // screen now (iOS 15-17 show only that one; native/Sources/AppIcon.swift picks the set).
+// B289 (user 2026-11-21): the Home Screen follows Theme > Mode, not only the iPhone's: Mode Light or Dark gives both
+// slots that tone's icon (its App Icon pick when Match Theme is off), so a dark Home Screen keeps a Light Mode's
+// icon; Automatic keeps the light/dark pair.
 export function iconState(get, onScreen) {
-  return { light: iconFor("light", get), dark: iconFor("dark", get), onScreen: iconFor(onScreen === "dark" ? "dark" : "light", get) };
+  const mode = get("appearance");
+  const fixed = mode === "light" || mode === "dark" ? iconFor(mode, get) : null;
+  return {
+    light: fixed ?? iconFor("light", get),
+    dark: fixed ?? iconFor("dark", get),
+    onScreen: fixed ?? iconFor(onScreen === "dark" ? "dark" : "light", get),
+  };
 }
 
 // F323: Theme > App Icon > Light / Dark's grid: "Themes", that tone's themes; "Special", Clear and the other tone's
