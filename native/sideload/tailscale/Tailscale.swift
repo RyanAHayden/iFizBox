@@ -13,7 +13,7 @@
 //                         while the sign-in starts or waits for approval
 //   tailscale.test        RemotePairing's handshake to this phone through the tailnet: {ok, code, detail, peer, ms}; {verify: true}
 //                         then checks the kept pairing through it (idevice.verify): {verified} or code verify_failed
-//   tailscale.signOut     logs the node out and deletes its state (the Keychain's copy too) -> status
+//   tailscale.signOut     logs the node out and deletes its state but the machine key (the Keychain's copy too) -> status
 //   tailscale.keepRoute   {value: "iphone"|"server"}: B218, Install Apps With kept in the Keychain beside the node
 //   tailscale.keptRoute   -> the kept Install Apps With, or null (core/installroute.js keepRoute takes it on a fresh start)
 import Darwin
@@ -110,11 +110,14 @@ enum Tailscale {
         TailscaleKeep.keepState()
     }
 
-    /// Only an explicit Sign Out comes here: the node's state goes, in the container and in the Keychain.
+    /// Only an explicit Sign Out comes here: the node's login goes, in the container and in the Keychain. B301: its
+    /// machine key stays (the state is cut down to it), so the next Sign In comes back as the same machine in the
+    /// tailnet instead of adding another "ifizbox-on-iphone-N". With no machine key to keep, the whole state goes.
     static func forget() {
         UserDefaults.standard.removeObject(forKey: nodeKey)
-        try? FileManager.default.removeItem(at: stateDir)
-        TailscaleKeep.forgetNode()
+        let kept = TailscaleKeep.keepMachineKeyOnly()
+        if !kept { try? FileManager.default.removeItem(at: stateDir) }
+        TailscaleKeep.forgetNode(keepState: kept)
     }
 
     // ---- Installing (IDevice.Session, on IDevice.queue's thread)
@@ -355,7 +358,8 @@ enum TailscaleBridge {
 /// after one) comes back as it was: the node's state file (its machine and node keys: the same device returns to the
 /// tailnet instead of a new one each time), {name, keyExpiry}, Connect With and Install Apps With. This device only,
 /// never in a backup, readable after the first unlock, as the account key (Account.swift). The Keychain outlives the
-/// app's container while the signing team stays the same. Only Sign Out deletes the node's part.
+/// app's container while the signing team stays the same. Only Sign Out deletes the node's part, all of it but the
+/// machine key (B301).
 enum TailscaleKeep {
     static let service = "com.ryha.ifizbox.tailscale"
     static let stateAccount = "state", nodeAccount = "node", connectAccount = "connect", routeAccount = "route"
@@ -425,8 +429,38 @@ enum TailscaleKeep {
         }
     }
 
-    static func forgetNode() {
-        write(stateAccount, nil)
+    /// `keepState`: the state account holds only the machine key now (keepMachineKeyOnly), so it stays.
+    static func forgetNode(keepState: Bool = false) {
+        if !keepState { write(stateAccount, nil) }
         write(nodeAccount, nil)
+    }
+
+    /// tsnet's FileStore key for the machine key (tailscale.com ipn.MachineKeyStateKey). Logout keeps it in the store
+    /// and deletes only the login's profile (its node key); a Sign In with it is the same machine to the tailnet.
+    static let machineKeyEntry = "_machinekey"
+
+    /// B301, at Sign Out (the node stopped): the state file's machine key (or the Keychain copy's, when the file has
+    /// none), written back to the container and the Keychain as the whole state. A store with no profile in it starts
+    /// a fresh login (tailscale.com ipnlocal newProfileManager). False, with nothing written, when there is no machine
+    /// key to keep: the caller deletes the state then.
+    @discardableResult
+    static func keepMachineKeyOnly() -> Bool {
+        let url = stateURL // stateDir creates the folder, so the write below has somewhere to go
+        func machineKey(_ d: Data?) -> String? {
+            guard let d = d, let all = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
+                  let k = all[machineKeyEntry] as? String, !k.isEmpty else { return nil }
+            return k
+        }
+        guard let key = machineKey(try? Data(contentsOf: url)) ?? machineKey(read(stateAccount)),
+              let kept = try? JSONSerialization.data(withJSONObject: [machineKeyEntry: key]) else { return false }
+        do {
+            try kept.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        } catch {
+            Tailscale.log("machine key not kept: \(error)")
+            return false
+        }
+        write(stateAccount, kept)
+        Tailscale.log("signed out; machine key kept for the next sign-in")
+        return true
     }
 }

@@ -46,12 +46,34 @@ class Keep(unittest.TestCase):
         self.assertIn("TailscaleKeep.write(TailscaleKeep.connectAccount", body(self.src, 'b.on("tailscale.setConnect")'))
 
     def test_only_sign_out_deletes_it(self):
-        self.assertIn("TailscaleKeep.forgetNode()", body(self.src, "static func forget()"))
+        self.assertIn("TailscaleKeep.forgetNode(", body(self.src, "static func forget()"))
         callers = re.findall(r"Tailscale\.forget\(\)", self.src)
         self.assertEqual(len(callers), 1)
         self.assertIn("Tailscale.forget()", body(self.src, 'b.on("tailscale.signOut")'))
         # the state dir is removed nowhere else
         self.assertEqual(self.src.count("removeItem(at: stateDir)"), 1)
+
+    def test_sign_out_keeps_the_machine_key(self):
+        # B301: tsnet's Logout leaves ipn.MachineKeyStateKey ("_machinekey") in the store and deletes the login's
+        # profile; Sign Out keeps that one entry (container and Keychain) so the next Sign In is the same machine.
+        self.assertIn('machineKeyEntry = "_machinekey"', self.src)
+        forget = body(self.src, "static func forget()")
+        keep = forget.index("TailscaleKeep.keepMachineKeyOnly()")
+        # read before anything is deleted, and the state dir goes only when there is no machine key
+        self.assertLess(keep, forget.index("removeItem(at: stateDir)"))
+        self.assertLess(keep, forget.index("TailscaleKeep.forgetNode("))
+        self.assertIn("if !kept { try? FileManager.default.removeItem(at: stateDir) }", forget)
+        self.assertIn("forgetNode(keepState: kept)", forget)
+        only = body(self.src, "static func keepMachineKeyOnly()")
+        self.assertIn("[machineKeyEntry: key]", only)
+        # the file's key first, then the Keychain copy's
+        self.assertIn("machineKey(try? Data(contentsOf: url)) ?? machineKey(read(stateAccount))", only)
+        self.assertIn("write(stateAccount, kept)", only)
+        self.assertIn("if !keepState { write(stateAccount, nil) }", body(self.src, "static func forgetNode("))
+        # the node is logged out first and stopped before the state is cut down
+        out = body(self.src, 'b.on("tailscale.signOut")')
+        self.assertLess(out.index("TSLogout()"), out.index("Tailscale.stop()"))
+        self.assertLess(out.index("Tailscale.stop()"), out.index("Tailscale.forget()"))
 
     def test_this_device_only_never_backed_up(self):
         keep = body(self.src, "enum TailscaleKeep")
