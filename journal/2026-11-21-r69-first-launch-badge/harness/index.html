@@ -1,0 +1,29 @@
+<!doctype html>
+<!-- R69: a stand-in for web/index.html on the iPhone 7 (same app origin, so the shell's bridge is there).
+     Shows app.notifyStatus on load and sets the icon badge through app.badge from big buttons; read by screenshot. -->
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{font:20px -apple-system,Helvetica;margin:0;padding:50px 16px;background:#fff;color:#000}
+button{font-size:28px;width:46%;height:90px;margin:1%}
+pre{font-size:15px;white-space:pre-wrap;word-break:break-all}
+</style></head><body>
+<div>R69 badge harness <span id="t"></span></div>
+<button data-n="5">badge 5</button><button data-n="3">badge 3</button>
+<button data-n="0">badge 0</button><button id="st">status</button>
+<pre id="log"></pre>
+<script>
+const log = (s) => { document.getElementById("log").textContent += new Date().toISOString().slice(11, 23) + " " + s + "\n"; };
+const nb = () => globalThis.ifizboxNative;
+async function status() {
+  try { log("status " + JSON.stringify(await nb().call("app.notifyStatus", {}))); } catch (e) { log("status err " + e); }
+}
+async function badge(n) {
+  try { const r = await nb().call("app.badge", { count: n }); log("badge " + n + " -> " + JSON.stringify(r ?? null)); }
+  catch (e) { log("badge " + n + " err " + e); }
+}
+document.querySelectorAll("button[data-n]").forEach((b) => b.onclick = () => badge(+b.dataset.n));
+document.getElementById("st").onclick = status;
+document.getElementById("t").textContent = typeof nb()?.call;
+const m = /badge=(\d+)/.exec(location.hash);
+status().then(() => m && badge(+m[1]));
+</script></body></html>
