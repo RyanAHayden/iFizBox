@@ -39,6 +39,7 @@ import { openProgress, openOn, RETURN_LABEL, CLOSING_LABEL, WAITING_LABEL, TRY_A
 import { fitFileNames } from "../core/midtrunc.js";
 import { appRows, createAppRun, rowStatus, summaryLine, runStatus, runPercent, ended, isSelf, DIDNT_DOWNLOAD, barOf } from "../core/apprun.js";
 import { recordWhen } from "../core/apprun.js"; // B136
+import { HERE_PARALLEL } from "../core/apprun.js"; // F359
 import { apps as appStore, undoRecord } from "../core/installed.js"; // B170
 import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, HERE_CLOSING_LINE, DOWNLOAD_HINT, DOWNLOAD_BY_HAND } from "../signing/selfupdate.js";
 import { nativeBridge, hasNativeCall } from "../native.js";
@@ -358,6 +359,8 @@ export async function runAppRun(jobs, deps) {
     discard: (r) => lanes.discard(r),
     ...(lanes.reprompt ? { reprompt: (r) => lanes.reprompt(r) } : {}),
     ...(lanes.local ? { local: (r) => lanes.local(r) } : {}), // B137: This iPhone: no iOS prompt to tap
+    // F359: the sideload app's run signs every app up front and installs up to HERE_PARALLEL at once on This iPhone
+    ...(lanes.local ? { ahead: deps.ahead ?? Infinity, parallel: deps.parallel ?? HERE_PARALLEL } : {}),
     ...(deps.stallMs ? { stallMs: deps.stallMs } : {}),
     ...(deps.later ? { later: deps.later, clear: deps.clear } : {}),
     keepAwake: deps.keepAwake ?? screenAwake, // F287: the screen stays on while the run works
