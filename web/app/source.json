@@ -19,6 +19,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.19.0",
+          "date": "2026-11-21T18:27:52Z",
+          "localizedDescription": "A Glass app icon, wide package rows like Cydia's, and steadier This iPhone copies\nTheme > App Icon > Special offers Glass: Classic in Light, Gunmetal in Dark, drawn with the system's glass\nInstalled and section lists show wide package rows; Install IPAs is a plain row above A in Installed\nAuthor pages open again; price buttons match the iOS 7 and iOS 13 themes\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.19.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.19.0/iFizBox.ipa",
+          "size": 38807499,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.18.4",
           "date": "2026-11-21T16:42:00Z",
           "localizedDescription": "Re-sign without downloading again: each app keeps the IPA it was installed from, and Add Tweaks lists only tweaks for that app.\nRe-sign, Re-sign All and the queue sign from the IPA kept at install when it still matches, and each app goes to iOS as soon as it is signed.\nAdd Tweaks lists tweaks made for the app first (Works in: <app>), then ones for every app; paid Havoc and Chariz tweaks find their seller.\nHold Install on a package or app page to pick which version to install.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.18.4",
@@ -168,14 +176,6 @@
           "localizedDescription": "Version 0.9.7\nSearch: one character searches too\nR20: archive ticked tasks\nR20: convert Teehan+Lax iOS 7/8 kits into ref/teehanlax/ios7, ios8; journal lists their controls, the iOS 8 vs 7 differences and what the sketch .ai is\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.7",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.9.7/iFizBox.ipa",
           "size": 5160809,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.9.6",
-          "date": "2026-11-18T21:54:22Z",
-          "localizedDescription": "Version 0.9.6\nF204: archive ticked tasks\nF204 Top notices stop moving the page: banner under the nav bar (5s/8s timer line, pause on touch, tap/swipe up), reload bar on top of the tab bar, scrollers get 44pt room; no has-banner/has-reload push\nB41 App page: Related tab icons fill their tile over the letter fallback; header icon and Share inset 21px like the grouped rows\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.6",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.9.6/iFizBox.ipa",
-          "size": 5154509,
           "minOSVersion": "15.0"
         }
       ]
