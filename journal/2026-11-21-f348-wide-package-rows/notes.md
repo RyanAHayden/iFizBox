@@ -21,12 +21,14 @@ with the 4S shot (name cap top 25-27px into the row, the same x offsets).
 ## Decisions
 - **Author, not source.** Cydia's line reads `from <source label> (<section>)`; the task asks for
   `from <Author> (<Section>)` ("who made it"), so the row's author (Author field, else Maintainer, as the catalog
-  already gives) is used. No author: `from Unknown`, Cydia's word. The section is left out when it equals the name.
+  already gives) is used. No author: `from Unknown`, Cydia's word. The section is left out when it equals the author's
+  name (Cydia leaves it out when it equals the source label). The `.search-results` part of the index selector is
+  Installed's pinned list, not Search.
 - **No chevron** on wide rows: neither 4S reference shows one in the tall cell; the version sits at the name's right.
 
 ## Not verified
 - On a phone (iPhone 7 jailbreak app / 15 Lite): not tried. The task's files are web only; the check was a static
   Chromium render of the CSS, not the live list with real catalog data, and 120 Hz scrolling was not measured (the
   change keeps a fixed row height and absolute layout, the same approach as the compact row).
-- iOS 7 / iOS 13 eras: ios7.css draws the package keyline from 51px (the compact row's name); on wide rows the name
-  starts at 48px, so the line starts 3px right of the name. Not checked by render.
+- iOS 7 / iOS 13 eras: ios7.css draws the package keyline from 51px (the compact row's name); packages.css moves it
+  to 48px for wide rows (found in spec review). Neither era was rendered.
