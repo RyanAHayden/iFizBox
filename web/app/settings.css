@@ -32,6 +32,7 @@
 .theme-preview-grip::after { content: ""; position: absolute; left: calc(50% - 21.5px); top: 0; width: 43px; height: 17px; }
 .theme-preview-bar { position: relative; display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 5px; }
 .theme-preview-bar .nav-title { flex: 1; }
+.theme-preview-bar::before { content: none; } /* a sample bar mid-screen: no status-bar strip over it */
 .theme-preview-seg { margin: 10px; }
 .theme-preview-buttons { display: flex; align-items: center; gap: 10px; padding: 0 10px; }
 /* ==== look-only { ==== Signing's warning, Theme's Mode and swatches, the theme preview and its grip */
