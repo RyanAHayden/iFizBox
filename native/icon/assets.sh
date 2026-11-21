@@ -8,7 +8,8 @@
 #   native/icon/assets.sh <host>   from Linux: builds the catalogs here, compiles them on <host> over ssh, copies back
 #
 # Each catalog (icon/alternates.py catalog) holds AppIcon, Info.plist's CFBundleIconName (Classic, with Gunmetal as
-# its dark appearance), and every alternate set Info.plist's CFBundleAlternateIcons lists (F323: the icon follows the
+# its dark appearance and the globe alone, icon/glass/AppIconTinted1024.png, as its tinted one: iOS 26+ Clear and
+# Tinted), and every alternate set Info.plist's CFBundleAlternateIcons lists (F323: the icon follows the
 # theme, Sources/AppIcon.swift). iOS reads AppIcon from Assets.car for notifications, Settings and Spotlight; with the
 # name set and no catalog it shows a blank placeholder there. native/test_icons.py checks every set and size.
 # F324: glass.py's CAR_SETS (the Glass icon, Icon-glass) go in as Icon Composer documents, so iOS 26+ draws them in
