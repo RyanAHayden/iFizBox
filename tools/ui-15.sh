@@ -19,6 +19,9 @@
 #   tools/ui-15.sh ME source          the frontmost app's accessibility tree (XML)
 #   tools/ui-15.sh unlock ME          release it; always do this when done, even after a failure
 # ME is your task ID. A lock unused for 30 minutes is stale and can be taken over. Setup: docs/iphone15.md.
+# Take it only for what Chromium (tools/readme_shots.py, fake bridge) and node --test can't check (AGENTS.md), and
+# keep `trap 'tools/ui-15.sh unlock ME' EXIT` beside it in a script. When a session ends or is dropped, the runner
+# frees its task's locks (runner.toml on_exit: tools/ui-release.sh).
 set -eu
 lock=${XDG_RUNTIME_DIR:-/tmp}/ifizbox-15-ui.lock  # outside the repo: shared by every worktree on this machine
 run=${XDG_RUNTIME_DIR:-/tmp}/ifizbox-15           # logs of the background tunnel, WDA and port forward

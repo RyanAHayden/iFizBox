@@ -15,6 +15,10 @@ Cydia look reference only and never runs iFizBox.
 ## Rules
 
 - Touch it only when your task says so. It is the only modern jailbroken phone.
+- Only when Chromium or a local check can't do it. Changes to `web/app/` are checked in Chromium (the
+  `tools/readme_shots.py` / `capture.mjs` route, with the fake bridge) and with `node --test`. The phone is for what
+  needs the real device: the native shell and root helper, installing, iOS-only WebKit bugs (iOS 15 JavaScript
+  syntax), Home Screen icons, notifications. Write in the journal why Chromium couldn't do it.
 - Drive its screen only through `tools/ui-7.sh`, under its lock (below). `ssh`, `dpkg -s`, reading files and pulling
   logs need no lock.
 - No `apt upgrade` of system packages, no removing palera1n, Sileo, ElleKit or openssh. Installing and removing
@@ -54,7 +58,9 @@ tools/ui-7.sh unlock $ID              # always, also after a failure
 - Tapping a notification in Notification Centre through phonectl does nothing; a person checks notification taps.
 - `lock-button` presses the side button (sleeps or wakes the screen). If a screenshot is all black, the screen is
   asleep: `home` wakes it. The phone has no passcode, so `home` again opens it from the lock screen.
-- A lock unused for 30 minutes is stale and can be taken over.
+- A lock unused for 30 minutes is stale and can be taken over. Give it back as soon as you're done (in a script,
+  `trap 'tools/ui-7.sh unlock $ID' EXIT` after `lock`); when a runner session ends or is dropped, the runner frees
+  every phone lock its task holds (`runner.toml` `on_exit` runs `tools/ui-release.sh`).
 
 ### `phonectl` (what ui-7.sh calls)
 

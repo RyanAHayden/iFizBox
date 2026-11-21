@@ -3,6 +3,18 @@
 The iPhone 15 Pro (iPhone16,1, iOS 27, no jailbreak) is the test phone for the sideload build (Lite IPA). It sits on
 the Linux desktop's USB, and agents drive it from there with no Mac and no person: `tools/ui-15.sh`, under its lock.
 
+## When to use it
+
+Only when Chromium or a local check can't do it. Changes to `web/app/` are checked in Chromium (the
+`tools/readme_shots.py` / `capture.mjs` route, with the fake bridge) and with `node --test`. The phone is for what
+needs the real device: the native shell, signing and installing, iOS-only WebKit bugs, Home Screen icons and
+notifications. Write in the journal why Chromium couldn't do it.
+
+Hold the lock only while you drive the screen, and give it back even after a failure: in a script, put
+`trap 'tools/ui-15.sh unlock T99' EXIT` right after `lock`. When a runner session ends or is dropped, the runner
+frees every phone lock its task holds (`runner.toml` `on_exit` runs `tools/ui-release.sh`). A lock nobody gives back
+blocks every other phone task until it goes stale after 30 minutes.
+
 ## How it works
 
 - **go-ios** (`ios`, a single Go binary on `PATH`) runs the iOS 17+ tunnel in user space (no root), mounts the
