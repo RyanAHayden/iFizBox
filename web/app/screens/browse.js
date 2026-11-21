@@ -89,6 +89,17 @@ import { loadRowsIndex } from "./tweaks.js"; // F344
 export const sideloadListRows = (rows, mode = detectMode()) => (mode === "sideload" ? addableTweakRows(rows) : rows);
 
 const ROW_HEIGHT = 58;
+// F348: Cydia's tall package cell (Installed and a source's section lists): name, 'from <Author> (<Section>)', then the
+// description across the whole row. One height for every wide row, so the virtualised list keeps placing by index.
+export const WIDE_ROW_HEIGHT = 73;
+
+// F348: a wide row's second line. Cydia says "Unknown" when it has no name to give; the section is left out when it
+// says the same as the name (Cydia's rule for its source label).
+export function fromLine({ author = "", section = "" } = {}) {
+  const who = `from ${String(author || "").trim() || "Unknown"}`;
+  const s = String(section || "").trim();
+  return s && s !== String(author || "").trim() ? `${who} (${s})` : who;
+}
 
 // Section Visibility (F24): the hidden sections live on the device (core/settings.js hiddenSections) and reach
 // the worker's catalog before its next answer, so every list, Search and Changes leave them out.
@@ -329,6 +340,16 @@ function paintArt(r, item) {
   if (badge && r.badge.dataset.url !== badge) { r.badge.dataset.url = badge; r.badge.src = badge; }
 }
 
+// F348: the wide row is the same row with the 'from' line between the name and the description (packages.css .wide).
+function createWideRow() {
+  const row = createRow();
+  row.classList.add("wide");
+  const from = el("span", "pkg-from");
+  row._.desc.before(from);
+  row._.from = from;
+  return row;
+}
+
 function createRow() {
   const row = el("div", "pkg-row");
   const a = el("a", "cell-inner pkg");
@@ -358,6 +379,7 @@ function bindRow(row, item, route) {
   r.a.href = deeper(route, token("package", item.id));
   r.name.textContent = item.name;
   r.version.textContent = item.version;
+  if (r.from) r.from.textContent = fromLine(item); // F348
   // Works on my phone (F17): the worker's code for this row, drawn as a mark (F35); rows never judged get none.
   setMark(r.compat, item.compat);
   // Search's exact match that can't work (F35): its name in red, the reason in place of the description.
@@ -420,17 +442,20 @@ function loadIcon(row, item) {
 
 // A virtualised package list. `letters`: Cydia's A–Z headers (lists sorted by name; search results aren't).
 // `rows` may hold { header } items of their own when `letters` is off. `decorate(row, item)` runs after each bind.
-export function packageList(body, route, rows, { letters = true, decorate = null } = {}) {
+// `wide` (F348): Cydia's tall rows (WIDE_ROW_HEIGHT), for Installed and a source's section lists; Search keeps the
+// compact ones.
+export function packageList(body, route, rows, { letters = true, decorate = null, wide = false } = {}) {
   rememberNames(rows.filter((r) => r.id));
   const items = letters ? withLetterHeaders(rows, (r) => indexLetter(r.name)) : rows;
   let swipe = null; // F193: a recycled row drops any swipe it was in
   const list = createVList(body, {
-    items, rowHeight: ROW_HEIGHT, headerHeight: 23,
-    createRow,
+    items, rowHeight: wide ? WIDE_ROW_HEIGHT : ROW_HEIGHT, headerHeight: 23,
+    createRow: wide ? createWideRow : createRow,
     bindRow: (row, item) => { swipe?.reset(row); bindRow(row, item, route); decorate?.(row, item); },
     idle: loadIcon,
   });
   list.el.classList.add("pkg-vlist"); // placeholder rows show through wherever real rows aren't drawn yet
+  list.el.classList.toggle("wide", wide); // F348: the placeholders at the wide rows' height
   attachRowMenu(list.el, route); // F192: hold a row for Install / Share / Source
   swipe = attachQueueSwipe(list.el, route); // F193: swipe a row left to queue it
   // Sorted by name with A–Z headers: Cydia's index down the right edge, instead of the scroll indicator.
@@ -868,7 +893,7 @@ async function renderList(body, route, fetchRows, letters, after = null) {
   }
   body.replaceChildren();
   if (!rows.length) { body.append(note("No packages.")); return; }
-  const list = packageList(body, route, rows, { letters });
+  const list = packageList(body, route, rows, { letters, wide: true }); // F348: a source's section lists, Cydia's tall rows
   body.append(list.el);
   after?.(body, list, rows);
 }
