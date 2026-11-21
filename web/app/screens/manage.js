@@ -361,7 +361,9 @@ export async function addSource(ctx, prefill = null, edit = null) {
     await showAlert({ title: error.title || "Verification Error", message: error.message, buttons: ["OK"] });
     return null;
   }
-  changed(ctx);
+  // B306: an add from a link (incoming.js: another app's source link, ifizbox://add) brings only a HUD, no screen's
+  // ctx: the Sources tab loads the new source with its own (sources.js), under the reload bar and the badge.
+  changed(ctx.fromLink ? undefined : ctx);
   const body = document.querySelector(".page.is-top .manage-list")?.closest(".page-body");
   if (body) renderSources(body);
   return saved;
