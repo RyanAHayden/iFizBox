@@ -36,7 +36,7 @@ tools/ui-15.sh unlock T99
 
 ## Remote control for a person
 
-`tools/remote-15.py` serves a page on this machine's Tailscale IP (port 8098) that mirrors the screen once a second
+`tools/remote-15.py` serves a page on this machine's Tailscale IP (port 8098) that mirrors the screen live (small JPEGs, only when it changes; needs Pillow)
 and forwards taps, drags, typing, Home and Wake. Use it when a login or other person-only step blocks an agent: the
 page's actions borrow whoever holds the UI lock, so the person types while the agent waits. With the lock free it
 takes it as `USER` and gives it back after 5 idle minutes. Anyone on the tailnet can drive the phone while it runs.
