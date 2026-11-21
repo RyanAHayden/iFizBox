@@ -12,3 +12,17 @@ _Said_: shared tweak index
 _On screen_: Works in: <app>
 _In code_: core/tweakindex.js, worker/src/tweakindex.js, GET /api/tweaks, loadTweakIndex
 _Avoid_: tweak database, tweak cache
+
+**Details**:
+The page for one package or app: its header, then Details, Reviews and Related, with the Details pane in Cydia's style
+_Said_: package page, app page, details page
+_On screen_: Details
+_In code_: screens/details.js, renderPackage, renderApp, DETAILS_TITLE
+_Avoid_: package page, app page, info page
+
+**Preview**:
+The sideways strip of pictures on a Details page: screenshots, banners or a repo's pictures
+_Said_: screenshots, gallery
+_On screen_: Preview
+_In code_: PREVIEW_HEADER, previewSlot, galleryGroup
+_Avoid_: Screenshots

@@ -24,6 +24,7 @@ html[data-style="ios7"] {
   --settings-seg-margin: 0 15px;                                   /* Theme's Mode, inset like a label */
   --settings-seg-h: 29px;                                          /* Theme's Mode at the kit's 29pt control, not a 44pt row */
   --home-inset: 0px; --home-tile-pad: 0 15px;                      /* Home's tiles edge to edge, content 15pt in */
+  --cy-desc-inset: 15px;                                           /* F350: Details' dashed box off the screen's edges */
 }
 /* Home's tiles take the tables' flat edges: square, the table hairline (Home sets these on .home). */
 html[data-style="ios7"] .home { --tile-radius: 0; --tile-edge: var(--table-edge); }
@@ -525,3 +526,8 @@ html[data-style="ios7"][data-theme] .manage-toolbar .bar-button.manage-delete:no
 html[data-style="ios7"][data-theme] .manage-toolbar .bar-button.manage-delete:not(.back):not(.done):is(:active, .is-pressed) {
   color: var(--i7-red); border-color: transparent; background: none; box-shadow: none;
 }
+
+/* F350: the Details page's footer (id · source - section) stays centred as Cydia's, whatever iOS 7's footers do; the
+   description's dashed box in the keyline's grey. */
+html[data-style="ios7"] .group-footer.cy-foot { text-align: center; }
+html[data-style="ios7"] { --cy-desc-edge: var(--keyline); }
