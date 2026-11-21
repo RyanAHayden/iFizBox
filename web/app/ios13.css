@@ -481,8 +481,7 @@ html[data-style="ios13"][data-theme] {
   --progress-seg: #1c1c1e; --progress-seg-selected: #636366; --progress-seg-edge: #1c1c1e;
   --progress-seg-divider: inset 1px 0 0 #3a3a3c; --progress-seg-shadow: none; --progress-seg-emboss: none;
   --progress-seg-text: #fff;
-  --qr-bar: linear-gradient(#3a3a3c, #3a3a3c) center / 100% 4px no-repeat;
-  --qr-fill: linear-gradient(var(--i13-console-tint), var(--i13-console-tint)) center / 100% 4px no-repeat;
+  --qr-bar: #3a3a3c padding-box; --qr-fill: var(--i13-console-tint);
   --progress-track: #3a3a3c content-box; --progress-track-edge: transparent;
   --progress-fill: var(--i13-console-tint);
   --progress-finish: #2c2c2e; --progress-finish-pressed: #3a3a3c; --progress-finish-ring: none;
@@ -503,6 +502,9 @@ html[data-style="ios13"] .progress-seg-item.selected {
   border-radius: 8px; font-weight: 600; box-shadow: inset 0 0 0 1px #1c1c1e, 0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04);
 }
 html[data-style="ios13"] .progress-seg-item.selected + .progress-seg-item { box-shadow: none; }
-html[data-style="ios13"] .qr-bar, html[data-style="ios13"] .qr-fill { border-radius: 2px; }
-html[data-style="ios13"] .progress-track, html[data-style="ios13"] .progress-fill { border-radius: 2px; }
+/* the 4pt bar with round ends inside the rows' 9pt box: transparent 2.5pt borders above and below, so the box's
+   padding edge (where the track paints and the fill is clipped) is the 4pt bar, its corners 4.5 - 2.5 = 2pt; the
+   foot's track the same through its 1pt border and 3pt padding (6pt corners, 2pt at the content edge) */
+html[data-style="ios13"] .qr-bar { border: solid transparent; border-width: 2.5px 0; border-radius: 2px / 4.5px; }
+html[data-style="ios13"] .qr-fill, html[data-style="ios13"] .progress-fill { border-radius: 2px; }
 html[data-style="ios13"] .progress-finish { border-radius: 13px; font-size: 20px; font-weight: 600; }
