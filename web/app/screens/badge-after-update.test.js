@@ -40,6 +40,7 @@ test("the recount after a run goes on the icon through the after-run setter, the
     m.init({ setBadge: (tab, n) => { if (tab === "changes") seen.push(["set", n]); },
       badgeAfterRun: (tab, n) => { if (tab === "changes") seen.push(["run", n]); } });
     await new Promise((f) => setTimeout(f, 50));
+    await m.recountBadge(); // takes the after-run mark the test above left (or init's count did)
     await m.recountBadge();
     assert.deepEqual(seen.at(-1), ["set", 2]);
 
