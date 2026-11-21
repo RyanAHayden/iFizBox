@@ -12,7 +12,10 @@
 // Lists come from the catalog in the parse worker (catalog.js); long ones are virtualised (nav/vlist.js).
 import { grouped, placeholder, el, segments, note } from "../nav/ui.js";
 import { rowIcon } from "../icons/rowicons.js"; // concept: Cydia's Details rows
-import { loadStyle } from "../nav/motion.js"; // concept: the price button (myipas.css) for Version's Change
+import { loadStyle } from "../nav/motion.js";
+import { segmented } from "../nav/ui.js";
+import { TAB_LABELS } from "./storepage.js";
+import { headerShareButton } from "./handoff.js"; // concept: the price button (myipas.css) for Version's Change
 import { createVList, withLetterHeaders } from "../nav/vlist.js";
 import { createSectionIndex } from "../nav/sectionindex.js";
 import { onPageOpen } from "../nav/pagestate.js";
@@ -133,7 +136,7 @@ export function parseToken(seg) {
   const s = String(seg ?? "");
   const i = s.indexOf(":");
   const kind = i > 0 ? s.slice(0, i) : "";
-  return ["section", "package", "author", "versions", "info", "pkgsettings", "reviews"].includes(kind) ? { kind, value: s.slice(i + 1) } : { kind: "unknown", value: s };
+  return ["section", "package", "author", "versions", "info", "pkgsettings", "reviews", "related"].includes(kind) ? { kind, value: s.slice(i + 1) } : { kind: "unknown", value: s };
 }
 
 export const token = (kind, value) => `${kind}:${value}`;
@@ -170,6 +173,7 @@ export function nav(route, sourceName = () => null) {
     case "info": return { title: "More Information" };
     case "pkgsettings": return { title: "Settings", style: "plain" };
     case "reviews": return { title: "Reviews" };
+    case "related": return { title: "Related", style: "plain" };
     case "package": return { title: "Details",
       right: { label: "Install", onClick: (e) => packageActions(route, e.currentTarget),
         onHold: () => installVersionHold(route).catch(() => {}) } }; // F346: a hold picks the version
@@ -188,6 +192,7 @@ export function render(body, route, ctx) {
     case "package": return renderDetails(body, route, p.key, p.value, ctx);
     case "info": return renderInfo(body, route, p.key, p.value);
     case "reviews": return renderReviewsPage(body, p.value);
+    case "related": return catalog.package(p.value, p.key).then((pkg) => pkg ? relatedPane(body, route, pkg, p.value) : body.append(note("Nothing here.")));
     case "pkgsettings": return renderPkgSettings(body, p.value);
     case "versions": return renderVersions(body, route, p.key, p.value);
     default:
@@ -1297,6 +1302,23 @@ async function renderPackage(body, route, key, id, ctx) {
   }
 }
 
+
+// Concept v4: the top of Details: today's store header (big icon, name, author, stars, "Version · size · price",
+// Share) and under it Details | Reviews | Related, Details marked; Reviews and Related open as their own pages.
+function cyTop(route, id, { art, name, author = null, authorHref = null, line = "", mark = null, action = null, reviewId }) {
+  const header = storeHeader({ art, name, author, authorHref, line, mark, action });
+  const control = segmented(TAB_LABELS, { onSelect: (i) => {
+    if (i === 1) location.hash = deeper(route, token("reviews", reviewId));
+    if (i === 2) location.hash = deeper(route, token("related", id));
+    control.mark(0);
+  } });
+  control.mark(0);
+  control.bar.classList.add("cy-tabs");
+  const api = getBackend().reviews ?? reviewsApi({ base: reviewsBase(detectMode()) });
+  api.list(reviewId, 0).catch(() => null).then((ours) => header.setRating(mergeReviews({ ours, depiction: null }).rating)).catch(() => {});
+  return [header.head, control.bar];
+}
+
 // Concept v2: one Details page after Cydia's (the 4S, 2026-11-21), with everything today's page shows, made simpler:
 // the header (icon, name, version, size), icon rows for every option, the screenshots, the description in a dashed
 // box (a long one or a depiction opens More Information, its only subpage besides Version History and Reviews),
@@ -1319,7 +1341,6 @@ async function renderDetails(body, route, key, id, ctx) {
   const text = desc.long || desc.short || "";
   const pid = st.package || id;
 
-  const head = el("div", "cy-head");
   const art = createArt(true);
   paintArt(art, { ...pkg.row, icon: st.iconUrl ?? pkg.row.icon });
   const src = st.iconUrl && mediaUrl(st.iconUrl);
@@ -1328,11 +1349,14 @@ async function renderDetails(body, route, key, id, ctx) {
     art.img.onerror = () => art.img.remove();
     art.img.src = src;
   } else art.img.remove();
-  const words = el("div", "cy-head-text");
-  words.append(el("div", "cy-name", name), el("div", "cy-version", st.version ?? ""));
-  head.append(art.art, words);
   const size = formatSize(st.size);
-  if (size && !pkg.installedOnly) head.append(el("div", "cy-size", size));
+  const headAuthor = parseAuthor(st.author) || parseAuthor(st.maintainer);
+  const headMark = el("span", "compat-mark large");
+  { const f = compat(st, currentDevice()); setMark(headMark, f.status === "no" ? f.reason : f.status); }
+  const topNodes = cyTop(route, id, { art: art.art, name, mark: headMark, author: headAuthor?.name ?? null,
+    authorHref: headAuthor ? deeper(route, token("author", headAuthor.name)) : null,
+    line: headerLine({ version: st.version, size, price: pkg.installedOnly ? null : isPaid(st) ? "Paid" : "Free" }),
+    action: shareHeadButton(() => showPackageShare({ id, key: pkg.key, kind: st.kind }, source)), reviewId: pid });
 
   const [installedRows, history, depReport] = await Promise.all([
     catalog.installed().catch(() => []), catalog.history(id, key).catch(() => null), catalog.deps(id, key).catch(() => null)]);
@@ -1342,13 +1366,12 @@ async function renderDetails(body, route, key, id, ctx) {
   const fit = compat(st, currentDevice());
   const fitCode = fit.status === "no" ? fit.reason : fit.status;
 
-  const nodes = [head];
+  const nodes = [...topNodes];
   const piracy = piracyBanner(packageWarning({ key: pkg.key, source: source?.uri }));
   if (piracy) nodes.push(piracy);
   // Options: Change Package Settings, Author (and Maintainer when it's someone else).
   const top = [];
   if (inst) top.push({ label: "Change Package Settings", icon: rowIcon("pkgSettings"), href: deeper(route, token("pkgsettings", pid)) });
-  if (author || maint) top.push({ label: "Author", detail: (author || maint).name, icon: rowIcon("pkgAuthor"), href: deeper(route, token("author", (author || maint).name)) });
   if (author && maint && maint.name.toLowerCase() !== author.name.toLowerCase()) top.push({ label: "Maintainer", detail: maint.name, icon: rowIcon("pkgAuthor"), href: deeper(route, token("author", maint.name)) });
   if (top.length) nodes.push(grouped([{ rows: top }]));
   if (isSideloadTweak(st)) nodes.push(worksInGroup(st).el);
@@ -1403,7 +1426,6 @@ async function renderDetails(body, route, key, id, ctx) {
   if (isz > 0) info.push({ label: "Installed Size", detail: formatSize(isz * 1024), icon: rowIcon("pkgSize") });
   const rels = [...parseRelations(st["pre-depends"]), ...parseRelations(st.depends)];
   if (rels.length) info.push({ label: "Depends", detail: rels.map((g) => g[0].name).join(", "), icon: rowIcon("pkgDepends"), cls: "store-info-long" });
-  info.push({ label: "Reviews", detail: "No Ratings", icon: rowIcon("pkgReviews"), href: deeper(route, token("reviews", id)) });
   nodes.push(grouped([{ header: "Information", rows: info, footer: fit.detail }]));
 
   const links = packageLinks(st, null);
@@ -1425,20 +1447,14 @@ async function renderAppDetails(body, route, key, id, pkg, sources) {
   const v = app.versions[0] ?? {};
   const source = sources.find((s) => s.key === pkg.key);
   names.set(id, app.name);
-  const head = el("div", "cy-head");
-  const icon = el("span", "pkg-icon large alt-app-icon cy-app-icon");
+  const icon = el("span", "pkg-icon large alt-app-icon");
   icon.append(el("span", "pkg-letter", app.name.charAt(0).toUpperCase()));
   if (app.iconURL) { const im = el("img"); im.alt = ""; im.onload = () => im.classList.add("loaded"); im.onerror = () => im.remove(); im.src = mediaUrl(app.iconURL) || app.iconURL; icon.append(im); }
-  const words = el("div", "cy-head-text");
-  words.append(el("div", "cy-name", app.name), el("div", "cy-version", `${v.version ?? ""}${v.buildVersion ? ` (${v.buildVersion})` : ""}`));
-  head.append(icon, words);
   const size = formatSize(v.size);
-  if (size) head.append(el("div", "cy-size", size));
-  const nodes = [head];
+  const nodes = cyTop(route, id, { art: icon, name: app.name, author: app.developerName || null,
+    line: headerLine({ version: `${v.version ?? ""}${v.buildVersion ? ` (${v.buildVersion})` : ""}`, size, price: "Free" }),
+    action: headerShareButton(source ?? { key: pkg.key }, { app: true }), reviewId: appBundleId(app, pkg.row?.id) });
 
-  const top = [];
-  if (app.developerName) top.push({ label: "Developer", detail: app.developerName, icon: rowIcon("pkgAuthor") });
-  if (top.length) nodes.push(grouped([{ rows: top }]));
   if (detectMode() === "sideload" && app.bundleIdentifier) {
     const tw = addTweaksGroup({ bundleId: app.bundleIdentifier, name: app.name }).el;
     const c = tw.querySelector?.(".cell-inner");
@@ -1484,7 +1500,6 @@ async function renderAppDetails(body, route, key, id, pkg, sources) {
     { label: "Works On", detail: osRange(v) || fit.range || "Any iOS", icon: rowIcon("worksOnMyPhone") },
     ...(size ? [{ label: "Size", detail: size, icon: rowIcon("pkgSize") }] : []),
     { label: "Bundle ID", detail: app.bundleIdentifier, icon: rowIcon("pkgVersion"), cls: "store-info-long" },
-    { label: "Reviews", detail: "No Ratings", icon: rowIcon("pkgReviews"), href: deeper(route, token("reviews", appBundleId(app, pkg.row?.id))) },
   ];
   nodes.push(grouped([{ header: "Information", rows: info }]));
   const links = appLinks(app);

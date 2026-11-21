@@ -273,7 +273,8 @@
   function appPath(u) {
     if (u == null) return null;
     u = String(u).trim();
-    if (u.indexOf("concept://app/") === 0) u = u.slice(14);
+    if (u.indexOf("https://concept.sample/") === 0) u = "img/concept/" + u.slice(23); // concept: sample pictures
+    else if (u.indexOf("concept://app/") === 0) u = u.slice(14);
     else if (/^[a-z][a-z0-9+.-]*:/i.test(u) || u.indexOf("//") === 0) return null;
     u = u.replace(/[?#].*$/, "").replace(/^(\.\/)+/, "").replace(/^\/+/, "");
     return u;

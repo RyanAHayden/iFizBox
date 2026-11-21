@@ -14,7 +14,7 @@
       "developerName": "Ryan Hayden",
       "subtitle": "Packages and apps with the iOS 6 look",
       "localizedDescription": "iFizBox lists apps from AltStore-style sources and, on a jailbroken iPhone, tweaks and themes from APT repos, with the iOS 6 look. The app signs apps on your iPhone with your own certificate (no server) and scrolls at 120Hz. Free and open source (GPL-3.0-or-later).",
-      "iconURL": "https://ifizbox.com/icons/icon-180.png",
+      "iconURL": "https://concept.sample/icon.png",
       "tintColor": "#37a94a",
       "category": "utilities",
       "versions": [
@@ -178,6 +178,11 @@
           "size": 5154509,
           "minOSVersion": "15.0"
         }
+      ],
+      "screenshotURLs": [
+        "https://concept.sample/shot4.jpg",
+        "https://concept.sample/shot2.jpg",
+        "https://concept.sample/shot1.jpg"
       ]
     }
   ],

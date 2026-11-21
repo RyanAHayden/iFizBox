@@ -38,8 +38,7 @@ Description: Animated table scrolling
 Icon: https://img.chariz.cloud/icon/cask-3/icon@3x.png
 Depiction: https://chariz.com/get/cask-3
 Tag: compatible_min::ios14.0
-SileoDepiction: https://chariz.com/api/sileo/package/com.ryannair05.cask3/depiction.json
-Header: https://cdn.chariz.cloud/sileo-banner/cask-3.jpg
+Screenshots: https://concept.sample/shot1.jpg https://concept.sample/shot3.jpg https://concept.sample/shot2.jpg
 Filename: debs/8LpbWHP2MsggsR8yKYMOgQUFIbxi_ZIaUbBqBSF-tMHO828AEEB1zkQig9e98bkv0ldyl-J_zGH1xxtwLPKeVQ/com.ryannair05.cask3_1.0.1_iphoneos-arm64.deb
 SHA256: 3015a266f5164ed6d94803c7035048970959f46eee0095c3f34165806806a4e6
 MD5Sum: 0de69376fb7922b2176b2aac68f88377
