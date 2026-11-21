@@ -796,6 +796,8 @@ function attachRowGestures(ul) {
   let start = null;   // the pointer that may become a swipe
   let swiped = false; // the click that ends a swipe opens nothing
   ul.addEventListener("click", (e) => {
+    // B315: a swipe that starts on the minus ends in its click, which would undo the swipe's arm
+    if (swiped && e.target.closest(".del-toggle")) { swiped = false; e.preventDefault(); e.stopPropagation(); return; }
     if (e.target.closest(".del-toggle, .del-confirm")) return;
     const armed = ul.querySelector(".source-row.armed");
     // B177: a row whose refresh failed opens its page like any other (the error and Refresh Source are there,
