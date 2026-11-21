@@ -6,7 +6,8 @@ later `setTitle` only changed the shown title.
 
 ## What changed
 
-- `web/app/nav/backlabel.js` `backFollowsTitle(entry)`: wraps the page handle's `setTitle` so a new title also
+- `web/app/nav/go.js` `backFollowsTitle(entry)` (first tried as its own module, nav/backlabel.js: that put app.js's
+  startup closure at 117 modules and failed module-graph.test.js's cap, so it sits beside pageHandle instead): wraps the page handle's `setTitle` so a new title also
   becomes `entry.back` (only while `entry.back` still equals the old title, so a screen's own `back` stays), and
   the back button of the page right above (the next `.nav-item` in the tab's nav stack), when it still reads the
   old title, takes the new one and its aria-label.

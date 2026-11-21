@@ -6,8 +6,7 @@ import assert from "node:assert/strict";
 import { fakeDocument } from "../fakes.test-helper.js";
 
 globalThis.document = fakeDocument();
-const { pageHandle } = await import("./go.js");
-const { backFollowsTitle } = await import("./backlabel.js");
+const { pageHandle, backFollowsTitle } = await import("./go.js");
 
 // One tab's nav stack, with pages drawn as app.js makePage/navParts draws them.
 const stack = document.createElement("div");

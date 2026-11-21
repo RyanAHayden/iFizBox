@@ -28,7 +28,6 @@ import * as home from "./screens/home.js";
 import * as settingsScreen from "./screens/settings.js";
 import { sourceFilter } from "./core/sources.js";
 import { getBackend } from "./backend.js";
-import { backFollowsTitle } from "./nav/backlabel.js";
 import { appSchemeFor, openOutside } from "./core/applinks.js";
 import { launchURL } from "./launch.js";
 import { isAddPath, parseAddLink } from "./core/handoff.js";
@@ -46,7 +45,7 @@ import { showNotIphone } from "./screens/notiphone.js";
 import { handoffRecent } from "./handoffclock.js";
 import { navButtons, MOVED_CLASS } from "./nav/navbuttons.js";
 import { holdButton } from "./nav/menu.js"; // F346
-import { setNavigator, pageHandle } from "./nav/go.js";
+import { setNavigator, pageHandle, backFollowsTitle } from "./nav/go.js";
 
 // F266: a Mac, PC or Android phone gets the Not-an-iPhone page first, and the app only starts once it's left (Look
 // Around Anyway, or What Is …? onto the FAQ). Decided by user agent before anything is drawn, so an iPhone, an iPad
@@ -144,7 +143,7 @@ function makePage(tab, path) {
 
   // back: the label pages above it show; handle: the page's own nav item for its screen (nav/go.js pageHandle)
   const entry = { el: page, body, shade, item, title: "", back: "", handle: pageHandle(item, body) };
-  backFollowsTitle(entry); // a name the screen learns later is also the back label above (nav/backlabel.js)
+  backFollowsTitle(entry); // a name the screen learns later is also the back label above (nav/go.js)
   drawPage(entry, route, below);
   return entry;
 }
