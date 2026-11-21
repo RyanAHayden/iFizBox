@@ -837,9 +837,9 @@ html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], 
    block (Sepia sets UIKit's, since every light palette sets every --lt-*). */
 
 /* F325: Brushed Metal's silver bars take dark etched text (white emboss below) on the title and on the silver
-   buttons; the blue Done, the red button and My IPAs' red Delete keep their white text, and so does the console
-   (queue.css: its own black bar and grey buttons in every theme). */
-html[data-theme="light"][data-palette="metal"] :is(.nav-title, .bar-button:not(.done):not(.red):not(.manage-delete), .scope-segment, .scope-filter:not(.done), .search-cancel):not(.console *) {
+   buttons; the blue Done, the red and green buttons and My IPAs' red Delete keep their white text, and so does the
+   console (queue.css: its own black bar and grey buttons in every theme). */
+html[data-theme="light"][data-palette="metal"] :is(.nav-title, .bar-button:not(.done):not(.red):not(.green):not(.manage-delete), .scope-segment, .scope-filter:not(.done), .search-cancel):not(.console *) {
   color: #2f343b; text-shadow: 0 1px 0 rgba(255,255,255,.7);
 }
 /* and their glyph buttons (Share, the Installed mark, the queue toggle: white glyphs) darkened the same way */

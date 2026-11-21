@@ -209,6 +209,11 @@ html[data-style="ios7"] .bar-button.done { font-weight: 600; }
 html[data-style="ios7"] .bar-button:active, html[data-style="ios7"] .bar-button.is-pressed { opacity: .3; }
 html[data-style="ios7"] .bar-button.back:active, html[data-style="ios7"] .bar-button.back.is-pressed { opacity: .3; filter: none; }
 html[data-style="ios7"] .bar-button.red:not(.back):not(.done) { color: var(--i7-red); }
+/* F347: the green bar button (ios6.css .bar-button.green) is green text with no box, both tones */
+html[data-style="ios7"] {
+  --lt-green-edge: transparent; --lt-green-edge-top: transparent; --lt-green: none; --lt-green-pressed: none;
+}
+html[data-style="ios7"] .bar-button.green:not(.back):not(.done) { color: var(--i7-green); }
 html[data-style="ios7"] .bar-button.share-button::before {
   filter: none;
   background-color: var(--i7-tint);

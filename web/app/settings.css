@@ -32,9 +32,19 @@
 .theme-preview-grip::after { content: ""; position: absolute; left: calc(50% - 21.5px); top: 0; width: 43px; height: 17px; }
 .theme-preview-bar { position: relative; display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 5px; }
 .theme-preview-bar .nav-title { flex: 1; }
-.theme-preview-bar::before { content: none; } /* a sample bar mid-screen: no status-bar strip over it */
+/* a sample bar mid-screen: no status-bar strip over it (F347: heavier than style.css's and ios6.css's
+   html[data-shell="app"] .navbar::before, which painted over Back / Preview / Edit and the icon under it) */
+html[data-shell] .theme-preview .navbar.theme-preview-bar::before, .theme-preview .navbar.theme-preview-bar::before { content: none; }
 .theme-preview-seg { margin: 10px; }
 .theme-preview-buttons { display: flex; align-items: center; gap: 10px; padding: 0 10px; }
+/* F347: the top bar (divider, the sample's nav bar and its search bar) is the handle that moves the split; the
+   search field is a picture, not typeable. The sample under it scrolls and works. */
+.theme-preview-top { flex: none; touch-action: none; cursor: row-resize; }
+.theme-preview-top .search-field, .theme-preview-top input { pointer-events: none; }
+.theme-preview-home { padding-top: 12px; }
+.theme-preview-body { scrollbar-width: none; }
+.theme-preview-buttons > button { font-family: inherit; cursor: pointer; }
+.theme-preview-colours { margin-top: 10px; }
 /* ==== look-only { ==== Signing's warning, Theme's Mode and swatches, the theme preview and its grip */
 /* A problem with the certificate or profile, in the Certificate group's footer (signsheet.css's red, which only
    loads with Signed Apps). */
@@ -64,6 +74,12 @@
   --preview-grip-radius: 0 0 3px 3px;
 }
 .theme-preview { background: var(--preview-ground); box-shadow: var(--preview-shadow); }
+/* F347: the divider's strip as dark as its tab (the tab's own #333435 under a lighter top row, a #121212 line at the
+   bottom), not the pinstripe ground */
+.theme-preview-grip { background: linear-gradient(#5a5b5d, #333435 2px) #333435; box-shadow: inset 0 -1px #121212; }
+/* F347: the preview's store buttons pressed (packages.css's a:active .store-btn, for a button) */
+.theme-preview-buttons > .store-btn:is(:active, .preview-pressed) {
+  background: linear-gradient(#d6dbe3, #eceff3); background-origin: border-box; box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
 .theme-preview-grip::after {
   border-radius: var(--preview-grip-radius); box-shadow: var(--preview-grip-edge);
   background: var(--preview-grip);
