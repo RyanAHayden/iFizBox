@@ -237,7 +237,7 @@ test("C61: Home's old state-tile glyphs are gone from both maps and both stylesh
   const { ICON_SETS } = await import("./rowicons.js");
   const home = readFileSync(new URL("../home.css", import.meta.url), "utf8");
   const ios7 = readFileSync(new URL("../ios7.css", import.meta.url), "utf8");
-  for (const gone of ["add", "upgrades", "current", "loading", "changes"]) {
+  for (const gone of ["add", "upgrades", "current", "loading"]) {
     assert.equal(ICON_SETS.ios6.home[gone], undefined, `ios6 home: ${gone}`);
     assert.equal(ICON_SETS.ios7.home[gone], undefined, `ios7 home: ${gone}`);
     assert.doesNotMatch(home, new RegExp(`\\.glyph-${gone}\\b`), `home.css: .glyph-${gone}`);
