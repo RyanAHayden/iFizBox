@@ -162,6 +162,14 @@ test("openRow: Open <app> after one app installed on This iPhone, not for iFizBo
   assert.equal(openRow([row({})], {}), null);
 });
 
+test("openRow: a single-app upgrade on This iPhone offers Open <app> too; a re-sign doesn't", () => {
+  const lanes = { open: () => {} };
+  const row = (patch) => ({ id: "a", name: "Alpha", mode: "upgrade", state: "installed", here: true, unsure: false, bundleId: "a", ...patch });
+  assert.equal(openRow([row({})], lanes)?.label, "Open Alpha");
+  assert.equal(openRow([row({ mode: "resign" })], lanes), null);
+  assert.equal(openRow([row({ state: "failed" })], lanes), null);
+});
+
 // A progressHUD stand-in: what the single install's page was told.
 function fakeHud() {
   const said = [];
