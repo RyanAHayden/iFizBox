@@ -66,6 +66,8 @@ class Keep(unittest.TestCase):
         self.assertIn("forgetNode(keepState: kept)", forget)
         only = body(self.src, "static func keepMachineKeyOnly()")
         self.assertIn("[machineKeyEntry: key]", only)
+        # the file's key first, then the Keychain copy's
+        self.assertIn("machineKey(try? Data(contentsOf: url)) ?? machineKey(read(stateAccount))", only)
         self.assertIn("write(stateAccount, kept)", only)
         self.assertIn("if !keepState { write(stateAccount, nil) }", body(self.src, "static func forgetNode("))
         # the node is logged out first and stopped before the state is cut down

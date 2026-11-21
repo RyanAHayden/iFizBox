@@ -439,15 +439,19 @@ enum TailscaleKeep {
     /// and deletes only the login's profile (its node key); a Sign In with it is the same machine to the tailnet.
     static let machineKeyEntry = "_machinekey"
 
-    /// B301, at Sign Out (the node stopped): the state file (or, with none in the container, the Keychain's copy) cut
-    /// down to its machine key, written back to the container and the Keychain. False, with nothing written, when
-    /// there is no machine key to keep: the caller deletes the state then.
+    /// B301, at Sign Out (the node stopped): the state file's machine key (or the Keychain copy's, when the file has
+    /// none), written back to the container and the Keychain as the whole state. A store with no profile in it starts
+    /// a fresh login (tailscale.com ipnlocal newProfileManager). False, with nothing written, when there is no machine
+    /// key to keep: the caller deletes the state then.
     @discardableResult
     static func keepMachineKeyOnly() -> Bool {
-        let url = stateURL
-        guard let d = (try? Data(contentsOf: url)) ?? read(stateAccount),
-              let all = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
-              let key = all[machineKeyEntry] as? String, !key.isEmpty,
+        let url = stateURL // stateDir creates the folder, so the write below has somewhere to go
+        func machineKey(_ d: Data?) -> String? {
+            guard let d = d, let all = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
+                  let k = all[machineKeyEntry] as? String, !k.isEmpty else { return nil }
+            return k
+        }
+        guard let key = machineKey(try? Data(contentsOf: url)) ?? machineKey(read(stateAccount)),
               let kept = try? JSONSerialization.data(withJSONObject: [machineKeyEntry: key]) else { return false }
         do {
             try kept.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])

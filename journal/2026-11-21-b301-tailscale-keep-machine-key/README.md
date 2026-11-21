@@ -24,6 +24,16 @@ the app as signed in, since the node account is gone.
 Tests: `test_tailscale_keep.py` gains `test_sign_out_keeps_the_machine_key` (order: kept before anything is
 deleted, state dir only removed when nothing was kept, Logout and stop before forget).
 
+A store holding only `_machinekey` starts cleanly: `newProfileManagerWithGOOS` treats a missing
+`_current-profile` / `_profiles` as no profiles and makes a fresh one (read in `ipn/ipnlocal/profiles.go`).
+
+## Review
+
+The spec review raised: the Keychain fallback writing into a missing state dir (not a bug: `stateURL` goes through
+`stateDir`, which creates the folder; noted in a comment); a container file with no machine key hiding the Keychain
+copy's (fixed: each is tried in turn); whether tsnet starts from a machine-key-only store (checked, above). The
+test edit sits outside the brief's file list but is this file's own test.
+
 ## Not verified
 
 - **On a phone**: the Swift was not run. Sign Out then Sign In on the iPhone 15 Pro needs the owner to type the
