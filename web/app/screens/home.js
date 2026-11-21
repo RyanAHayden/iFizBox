@@ -2,10 +2,10 @@
 //   - iFizBox's icon beside "Welcome to iFizBox" and a by-line
 //   - tile rows: GitHub | Sources as one outlined pair (Cydia: Facebook | Twitter), then Featured and Themes as two
 //     white half-width tiles
-//   - a full-width green tile for the current state (stateTile: Add a Source, n Upgrades Available, ...; Cydia's
-//     Manage Account)
+//   - a full-width green tile in Cydia's Manage Account place: always More Sources (MORE_SOURCES_TILE; F327:
+//     Recommended and finding more, screens/moresources.js)
 //   - a grouped list like Cydia's help links: Upgrading & Jailbreaking Help (our page), Find Extensions for
-//     Applications (Search), More Sources (F327: Recommended and finding more, screens/moresources.js); User Guides (screens/guides.js); Credits
+//     Applications (Search); User Guides (screens/guides.js); Credits
 // Every tile and row is a .cell-inner link, so it gets the table cells' held look (blue selection) from ios6.css
 // and app.js. No featured banners above the tiles (F154: Browse's Tweak of the Day card instead).
 //
@@ -18,7 +18,7 @@ import { format, settingsRoute, parse, rootOn } from "../router.js";
 import { getBackend } from "../backend.js";
 import { showAlert } from "../nav/alert.js";
 import { popupOpen, whenNoPopup } from "../nav/popups.js";
-import { sourceKey, sourcesFor } from "../core/sources.js";
+import { sourceKey } from "../core/sources.js";
 import { settings } from "../settings-store.js";
 import { nativeIcons, iconImage } from "../appicon.js"; // F323: Home's header shows the app's icon now
 import { pullToRefresh } from "../nav/pullrefresh.js";
@@ -66,42 +66,18 @@ export const CURATED_SOURCES = [
   { name: "palera1n", uri: "https://repo.palera.in/", blurb: "palera1n's own packages" },
 ].map((s) => ({ ...s, key: sourceKey({ uri: s.uri, dist: "./" }) }));
 
-// B169: Home's links to Changes push it onto Home's stack (it slides in, Back returns to Home), as every other page
-// opens; a plain #/changes would switch tabs without a slide.
-export const CHANGES_HREF = format(rootOn("changes"));
-// B172: and so do its links to Sources (the green tile's Loading Sources / Sources Failed states) and Search (Find
-// Extensions for Applications); Help's Refresh Sources pushes Sources above Help.
-export const SOURCES_HREF = format(rootOn("sources"));
+// B172: Home's link to Search (Find Extensions for Applications) pushes it onto Home's stack (it slides in, Back
+// returns to Home), as every other page opens; a plain #/search would switch tabs without a slide.
 export const SEARCH_HREF = format(rootOn("search"));
 const HELP_ROUTE = { tab: "home", path: ["help"] };
 
-// The green tile: what Home suggests next, from the source list and the upgrade count.
-//   sources: the backend's list, or null while it loads; upgrades: a count, or null where nothing knows it yet
-//   (the site has no installed list). Returns { kind, label, href }.
-export function stateTile({ sources = null, upgrades = null, refreshing = 0 } = {}) {
-  if (sources == null) return { kind: "loading", label: "Loading Sources", href: SOURCES_HREF };
-  if (!sources.length) return { kind: "add", label: "Add a Source", href: format({ tab: "home", path: ["sources"] }) };
-  if (upgrades > 0) {
-    return { kind: "upgrades", label: `${upgrades} ${upgrades === 1 ? "Upgrade" : "Upgrades"} Available`, href: CHANGES_HREF };
-  }
-  // While a refresh runs, its errors aren't known yet: no "failed" until a source has actually failed this time.
-  // The tile keeps what it said (no "Refreshing Sources": user 2026-11-18, it's distracting); the bar shows the refresh.
-  const failed = refreshing > 0 ? 0 : sources.filter((s) => s.error).length;
-  if (failed) {
-    return { kind: "failed", label: `${failed} ${failed === 1 ? "Source" : "Sources"} Failed to Load`, href: SOURCES_HREF };
-  }
-  if (upgrades === 0) return { kind: "current", label: "Everything Up to Date", href: CHANGES_HREF };
-  // B266 (user 2026-11-21): where it said See What's New, More Sources takes the slot, highlighted in the green row
-  // with its own blue plus (paintTile), and its row in Home's list goes away (MORE_SOURCES_ROW).
-  return { kind: "more", label: "More Sources", href: MORE_SOURCES_HREF };
-}
-
 // F327: More Sources (screens/moresources.js), with the Sources tab's plus tile, on Home's own stack (router
-// mountLink): Back comes home. Home's list row and, B266, the state tile in its More Sources state.
+// mountLink): Back comes home.
 export const MORE_SOURCES_HREF = format({ tab: "sources", path: ["more"] });
-export const MORE_SOURCES_ROW = "home-more-sources";
-// B266: the More Sources row shows in Home's list unless the state tile is More Sources.
-export const showsMoreSourcesRow = (tileKind) => tileKind !== "more";
+// B295 (user 2026-11-21): the green row under the tiles is always More Sources, highlighted with its own blue plus
+// (.glyph-more); it no longer follows the sources or upgrades (the Changes badge and the Sources tab show those), and
+// Home's list has no More Sources row.
+export const MORE_SOURCES_TILE = { label: "More Sources", href: MORE_SOURCES_HREF, glyph: "more" };
 
 // F79: Home's Install IPAs tile, beside Browse: the Installed tab's Install IPAs page (screens/myipas.js). F212: in the
 // jailbreak app too, now that the page lists /var/mobile/Documents' IPAs there and installs them with the helper.
@@ -171,8 +147,6 @@ export function homeLinks() {
     rows: [
       { label: "Upgrading & Jailbreaking Help", href: format({ tab: "home", path: ["help"] }) },
       { label: "Find Extensions for Applications", href: SEARCH_HREF, chevron: true },
-      // F327: More Sources (MORE_SOURCES_HREF); B266: hidden while the state tile is More Sources (paintTile).
-      { label: "More Sources", href: MORE_SOURCES_HREF, icon: rowIcon("moreSources"), cls: MORE_SOURCES_ROW },
     ],
   }, { header: "User Guides", rows: guideRows(format, guidesLite()) },
   { rows: [{ label: "Credits / Thank You", href: format({ tab: "home", path: ["credits"] }) }] }];
@@ -203,7 +177,7 @@ export function lockHomeLinks(groups, links) {
   return marked;
 }
 // Repaints the row tiles Home's link groups drew (groups, as lockHomeLinks) with links' icons: homeLinks() read again
-// after Theme > Style changes, so Settings' gear and More Sources' tile are the new Style's at once. Returns how many.
+// after Theme > Style changes, so Settings' gear is the new Style's at once. Returns how many.
 export function repaintLinkIcons(groups, links) {
   let n = 0;
   links.forEach((section, i) => {
@@ -481,48 +455,8 @@ export function followBrowseLock({ wasLocked, locked, alive = () => true, redraw
 // ---- state shared by the root page and the pages that change it ------------------------------------------
 
 // redraw: set by the root page, Reload's in-place update of its content (renderRoot).
-const state = { tile: null, seq: 0, redraw: null };
-
-export function init() {
-  // Sources tells when a refresh starts and each time one ends (screens/sources.js markLoading): repaint the tile.
-  globalThis.addEventListener?.("ifizbox:refreshing", () => refreshState());
-  // F96: no question at launch (user 2026-11-18); Home's rows below the iFizBox App card are locked instead (renderRoot).
-  // The root page stays in the stack while other tabs add or remove sources: look again whenever Home shows.
-  globalThis.addEventListener?.("hashchange", () => {
-    if (/^#\/home\/?$/.test(globalThis.location.hash)) refreshState();
-  });
-}
-
-async function refreshState() {
-  if (!state.tile) return;
-  const seq = ++state.seq;
-  let sources = [];
-  let upgrades = null;
-  try {
-    const backend = getBackend();
-    sources = await backend.sources();
-    // No backend counts upgrades yet (it needs the installed list); the tile picks it up once one does.
-    if (typeof backend.upgrades === "function") upgrades = (await backend.upgrades()).length ?? null;
-  } catch {
-    // a broken source store reads as no sources: the tile then offers to add one
-  }
-  // only the sources this device type shows (Not Jailbroken hides APT ones, and their errors with them)
-  const shown = sourcesFor(sources, settings.deviceType()).shown;
-  if (seq === state.seq) paintTile(stateTile({ sources: shown, upgrades, refreshing: globalThis.ifizboxRefreshing ?? 0 }));
-}
-
-function paintTile(t) {
-  const a = state.tile;
-  if (!a) return;
-  a.href = t.href;
-  a.dataset.state = t.kind;
-  a.querySelector(".cell-label").textContent = t.label;
-  // B266: .glyph-more is More Sources' blue plus (icons/rowicons.js home tiles), kept blue in the green row.
-  a.querySelector(".cell-icon").className = "cell-icon home-glyph glyph-" + t.kind;
-  state.tileKind = t.kind;
-  const row = state.moreRow;
-  if (row) row.hidden = !showsMoreSourcesRow(t.kind); // nav/slide.js slides the rows under it
-}
+// F96: no question at launch (user 2026-11-18); Home's rows below the iFizBox App card are locked instead (renderRoot).
+const state = { redraw: null };
 
 // ---- DOM -------------------------------------------------------------------------------------------------
 
@@ -805,10 +739,7 @@ function renderRoot(body) {
     href: format({ tab: "home", path: ["browse"] }), glyph: "browse" }));
   const ipasRow = ipas ? tileRow("halves", tile({ label: ipas.label, href: ipas.href, glyph: "install" })) : null;
 
-  const stateRow = tileRow("green", tile({ label: "", href: SOURCES_HREF, glyph: "loading" }));
-  state.tile = stateRow.querySelector("a");
-  state.moreRow = null; // set once Home's list is drawn below
-  paintTile(stateTile());
+  const stateRow = tileRow("green", tile(MORE_SOURCES_TILE));
   // Locked Home (the website before iFizBox is installed): Signing full width at the top, Browse down among the
   // locked rows (user 2026-11-18); unlocked, Browse is the first row under GitHub | Discord.
 
@@ -836,9 +767,6 @@ function renderRoot(body) {
   for (const group of groups) group.classList.add("home-links");
   links.forEach((l, i) => { if (l.pair) groups[i].querySelector(".table")?.classList.add("home-pair"); });
   home.append(list);
-  // B266: the More Sources row goes while the state tile is More Sources (paintTile keeps it in step).
-  state.moreRow = home.querySelector("." + MORE_SOURCES_ROW);
-  if (state.moreRow) state.moreRow.hidden = !showsMoreSourcesRow(state.tileKind);
   // Theme > Style swaps the Why tile's and the link rows' icons at once, without a reload (iOS 6 <-> iOS 7).
   followStyle(home, () => { why.ensureWhyStyle(); repaintLinkIcons(groups, homeLinks()); });
   // The website before iFizBox is installed: everything below the iFizBox App card is locked; a tap asks first. Not
@@ -862,16 +790,14 @@ function renderRoot(body) {
   // F270: pull Home down past its top: Reload, as the nav button (its spinner and all; a tap on it while it spins
   // does nothing, and neither does a pull).
   pullToRefresh(body, { onRefresh: () => state.reloadButton?.click(), busy: () => Boolean(state.reloadButton?.disabled), settings });
-  refreshState();
-  // F82: Reload's redraw. Everything stays on screen; each part is updated where it is: the green tile and the
-  // Install iFizBox App offer at once.
+  // F82: Reload's redraw. Everything stays on screen; each part is updated where it is: the hint, the Install
+  // iFizBox App offer and the signing row at once.
   state.redraw = async () => {
     if (!home.isConnected) return;
     drawHint();
     drawThemes();
     drawApp();
     slotRow.recheck?.();
-    await refreshState();
   };
 }
 
@@ -1112,7 +1038,6 @@ function renderSources(body, ctx) {
     }
     if (error) await showAlert({ title: error.title || "Verification Error", message: error.message, buttons: ["OK"] });
     await draw();
-    refreshState();
   }
   draw();
 }

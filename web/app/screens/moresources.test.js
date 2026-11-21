@@ -140,13 +140,12 @@ test("F327: the Sources list's groups are named by what they hold", () => {
   assert.ok(!readFileSync(new URL("./sources.js", import.meta.url), "utf8").includes("AltStore Sources"));
 });
 
-test("F327: Home's Recommended Sources row is More Sources, with the same plus tile, opening #/sources/more", async () => {
-  const { homeLinks } = await import("./home.js");
-  const row = homeLinks().flatMap((g) => g.rows).find((r) => r.label === "More Sources");
-  assert.ok(row);
-  assert.equal(row.href, "#/sources/more");
-  assert.equal(row.icon.src, rowIcon("moreSources").src);
-  assert.ok(!homeLinks().flatMap((g) => g.rows).some((r) => r.label === "Recommended Sources"));
+test("F327/B295: Home opens More Sources from its green tile, not a list row, at #/sources/more", async () => {
+  const { homeLinks, MORE_SOURCES_TILE } = await import("./home.js");
+  assert.equal(MORE_SOURCES_TILE.label, "More Sources");
+  assert.equal(MORE_SOURCES_TILE.href, "#/sources/more");
+  const rows = homeLinks().flatMap((g) => g.rows);
+  assert.ok(!rows.some((r) => r.label === "More Sources" || r.label === "Recommended Sources"));
 });
 
 test("F327: every recommended app source is tagged dev or modded; no source on the piracy list", () => {

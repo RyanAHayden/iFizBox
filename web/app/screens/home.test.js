@@ -1,25 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GUIDES, guideRows } from "./guides.js";
-import { stateTile, nav, CURATED_SOURCES, deviceHint, DEVICE_HINT, showsThemes, versionLimits } from "./home.js";
+import { nav, CURATED_SOURCES, deviceHint, DEVICE_HINT, showsThemes, versionLimits } from "./home.js";
 
-const src = (extra = {}) => ({ key: "deb:https://a/:./", uri: "https://a/", ...extra });
-
-test("Home state tile: the text and target follow the sources and upgrades", () => {
-  assert.deepEqual(stateTile(), { kind: "loading", label: "Loading Sources", href: "#/home/~sources" });
-  assert.deepEqual(stateTile({ sources: [] }), { kind: "add", label: "Add a Source", href: "#/home/sources" });
-  assert.deepEqual(stateTile({ sources: [], upgrades: 4 }).kind, "add"); // nothing to upgrade from without sources
-  assert.deepEqual(stateTile({ sources: [src()], upgrades: 3 }), { kind: "upgrades", label: "3 Upgrades Available", href: "#/home/~changes" });
-  assert.equal(stateTile({ sources: [src()], upgrades: 1 }).label, "1 Upgrade Available");
-  // Upgrades come before broken sources; a broken source comes before the all-clear.
-  assert.equal(stateTile({ sources: [src({ error: "x" })], upgrades: 2 }).kind, "upgrades");
-  assert.deepEqual(stateTile({ sources: [src({ error: "x" }), src({ error: "y" })], upgrades: 0 }),
-    { kind: "failed", label: "2 Sources Failed to Load", href: "#/home/~sources" });
-  assert.equal(stateTile({ sources: [src({ error: "x" })] }).label, "1 Source Failed to Load");
-  assert.deepEqual(stateTile({ sources: [src()], upgrades: 0 }), { kind: "current", label: "Everything Up to Date", href: "#/home/~changes" });
-  // Unknown upgrade count (the site has no installed list): never claims up to date.
-  // B266: More Sources takes See What's New's place, opening Sources > More on Home's stack (router mountLink).
-  assert.deepEqual(stateTile({ sources: [src()], upgrades: null }), { kind: "more", label: "More Sources", href: "#/sources/more" });
+test("B295: Home's green row is always More Sources, opening Sources > More on Home's stack", async () => {
+  const { MORE_SOURCES_TILE } = await import("./home.js");
+  assert.deepEqual(MORE_SOURCES_TILE, { label: "More Sources", href: "#/sources/more", glyph: "more" });
+  const { readFileSync } = await import("node:fs");
+  const js = readFileSync(new URL("./home.js", import.meta.url), "utf8");
+  assert.match(js, /tileRow\("green", tile\(MORE_SOURCES_TILE\)\)/);
+  // no state tile left: none of its words, and nothing repaints the row from the sources or upgrades
+  for (const gone of ["stateTile", "paintTile", "Loading Sources", "Add a Source", "Upgrades Available", "Failed to Load",
+    "Everything Up to Date"]) assert.ok(!js.includes(gone), gone);
 });
 
 test("Home pages: titles below the root, and curated sources are flat repos with Cydia keys", () => {
@@ -112,30 +104,15 @@ test("F123: every Settings link in the screens goes through settingsRoute (Home'
   }
 });
 
-test("a refresh leaves the green tile as it was, and hides old failures meanwhile", () => {
-  const src = (o = {}) => ({ uri: "https://a/", ...o });
-  assert.equal(stateTile({ sources: [src()], refreshing: 2 }).label, "More Sources");
-  assert.equal(stateTile({ sources: [src({ error: "x" })], refreshing: 1 }).label, "More Sources");
-  assert.equal(stateTile({ sources: [src()], upgrades: 0, refreshing: 1 }).kind, "current");
-});
-
 test("the Home icon tells the website and Lite what they can't do; the jailbreak app has no popup", () => {
   assert.match(versionLimits("web").message, /tweaks/);
   assert.match(versionLimits("sideload").message, /update itself/);
   assert.equal(versionLimits("jailbreak"), null);
 });
 
-test("B266: the More Sources row leaves Home's list only while the state tile is More Sources", async () => {
-  const { homeLinks, showsMoreSourcesRow, MORE_SOURCES_HREF, MORE_SOURCES_ROW, openWhileLocked } = await import("./home.js");
-  const row = homeLinks().flatMap((g) => g.rows).find((r) => r.cls === MORE_SOURCES_ROW);
-  assert.equal(row.label, "More Sources");
-  assert.equal(row.href, MORE_SOURCES_HREF);
-  const src = (o = {}) => ({ uri: "https://a/", ...o });
-  const kinds = [stateTile(), stateTile({ sources: [] }), stateTile({ sources: [src()], upgrades: 2 }),
-    stateTile({ sources: [src({ error: "x" })] }), stateTile({ sources: [src()], upgrades: 0 })].map((t) => t.kind);
-  assert.deepEqual(kinds, ["loading", "add", "upgrades", "failed", "current"]);
-  for (const k of kinds) assert.equal(showsMoreSourcesRow(k), true, k);
-  assert.equal(showsMoreSourcesRow(stateTile({ sources: [src()] }).kind), false);
-  // the locked website keeps More Sources locked, as row and as tile
+test("B295: Home's list has no More Sources row; the locked website keeps the tile locked", async () => {
+  const { homeLinks, MORE_SOURCES_HREF, openWhileLocked } = await import("./home.js");
+  const rows = homeLinks().flatMap((g) => g.rows);
+  assert.equal(rows.find((r) => r.label === "More Sources" || r.href === MORE_SOURCES_HREF), undefined);
   assert.equal(openWhileLocked(MORE_SOURCES_HREF), false);
 });
