@@ -13,8 +13,8 @@
    circle. backdrop-filter blurs every frame the content under it moves, so it sits in two tokens per tone
    (--i26-glass, --i26-glass-blur): if a phone drops frames scrolling under it, the fallback is a solid translucent
    fill (--i26-glass-blur: none and a less see-through --i26-glass) in one place. The bar buttons sit on the nav bar's
-   own opaque ground, so they get the capsule's fill and edge with no blur. The app draws no bars of its own, so these
-   show there too, as on the website and the Home Screen app (native/test_web_bars.py).
+   own opaque ground, so they get the capsule's fill and edge with no blur. In the app the shell draws native bars
+   (html.native hides these), so the glass is the website's and the Home Screen app's.
 
    Clean as docs/eras.md defines it, the way ios13.css is: geometry only through style.css's hooks, colours and
    decorations through ios6.css's and packages.css's tokens, and look-only rules for what no token carries.

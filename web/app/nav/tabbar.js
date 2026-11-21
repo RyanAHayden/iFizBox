@@ -40,7 +40,7 @@ export function createTabbar(el, tabs, titleOf) {
 // circle beside it; the screens scroll under both. All of it is layout in style.css behind the attribute (--tab-h
 // becomes the pill's height plus its gap to the bottom, so every scroller's end room and the bars that sit on the
 // tab bar follow); the markup is the same either way. Off (iOS 6, the default) the attribute is absent and nothing
-// changes. The app shows this same bar (its shell draws no UITabBar), so the pill is there too.
+// changes. The app draws its own UITabBar (html.native hides this one), so there it is the shell's job.
 export const FLOAT_OWN_TAB = "search";
 
 export const floatingTabbarOn = (doc = globalThis.document) =>

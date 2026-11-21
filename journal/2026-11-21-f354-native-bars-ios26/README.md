@@ -25,9 +25,9 @@ Other app-only differences for iOS 26, checked in the code:
 - `native/test_web_bars.py` (new, in the gate): fails if the shell makes, subclasses or styles a UINavigationBar /
   UITabBar (Controller), or if anything gives `<html>` the `native` class. Either would take iOS 26's bars (all the
   web bars) out of the app.
-- Comments corrected: Bridge.swift, App.swift (TopInset is iOS 6's and iOS 26's), ios26.css header, nav/tabbar.js,
-  style.css and packages.css (the dead `html.native` rules, left in place). The web comments are outside the task's
-  `native/Sources/**`, but they are what produced this task, so they're fixed here (comments only, no rule changed).
+- Comments corrected: Bridge.swift, App.swift (TopInset is iOS 6's and iOS 26's).
+- The stale web comments (ios26.css header, nav/tabbar.js, style.css, packages.css) were fixed at first. The spec
+  review counted them as outside the task's `native/Sources/**`, so they were reverted here and filed as C63.
 
 ## Tried and failed
 

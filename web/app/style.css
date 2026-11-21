@@ -89,8 +89,7 @@ html.nav-moving #screens, html.nav-moving .navbar { pointer-events: none; } /* n
 }
 .tab { flex: 1; min-width: 0; position: relative; touch-action: manipulation; text-decoration: none; }
 
-/* Nothing sets html.native: the app draws no UINavigationBar/UITabBar (R3 (a)) and shows these bars in every era
-   (native/test_web_bars.py). The rule stays for a shell that would draw its own. */
+/* The app draws its own UINavigationBar/UITabBar (R3): hide ours and give the screens the whole web view. */
 html.native .navbar, html.native .tabbar { display: none; }
 
 .empty { margin: 40px 20px; text-align: center; }
