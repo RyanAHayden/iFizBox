@@ -7,9 +7,11 @@ web/app/ios6.css with data-shell="app"):
   any iPhone) and 1 pt tall: the storyboard stretches it down the screen at its own width, from the left edge as .boot
   draws them, so the stripes line up with the page's. (A full-screen image is too big: SplashBoard refuses a launch
   screen whose estimated size is over 25,000,000 bytes, and 1800x3600 px of RGBA was 25,924,736.)
-- LaunchNavTop / LaunchNavBottom: the nav bar's gloss (#bdcbdc to #597498) cut at its half. The top half is
-  stretched over the status-bar strip and the bar's top 22 pt, the bottom half fills the bar's last 22 pt, as
-  .navbar::before does in the app.
+- LaunchStatusStrip: the status-bar strip, from the screen top to the safe area top: plain black in every iOS 6 set,
+  as the page's iOS 6 era draws it (ios6.css --site-strip under .navbar::before), and the bar's own flat colour in
+  the iOS 7 and iOS 13 sets, whose page runs the bar up through the strip. 1 pt of one colour, stretched.
+- LaunchNavTop / LaunchNavBottom: the nav bar's gloss (#bdcbdc to #597498) cut at its half: the top half fills the
+  bar's first 22 pt (from the safe area top), the bottom half its last 22 pt.
 - LaunchTabGloss: the tab bar's 48 pt gloss (#2f2f2f, #151515 at 49.5 %, then #000), pixel for pixel.
 - LaunchNavShadow / LaunchTabShadow: the bars' 2.5 pt shadows, black at 18 % fading out.
 
@@ -37,6 +39,7 @@ PIN_DARK, PIN_LIGHT = (0xCB, 0xD0, 0xDA), (0xCE, 0xD3, 0xDC)
 STRIPES_PT = (600, 1)  # wider than any iPhone; stretched down the screen
 NAV_GLOSS = ((0xBD, 0xCB, 0xDC), (0x59, 0x74, 0x98))
 TAB_GLOSS = ((0x2F, 0x2F, 0x2F), (0x15, 0x15, 0x15), 0.495, (0, 0, 0))
+STATUS_STRIP = "000000"  # the iOS 6 era's status-bar strip in every theme (ios6.css --site-strip)
 GLOSS_PX = 512  # rows in a stretched gloss image
 STORYBOARD = "LaunchScreen.storyboardc"
 VIEW_NIB = "Lvc-00-000-view-Lrt-00-000.nib"  # the root view's nib: every colour view is in it
@@ -54,6 +57,7 @@ def stops(*pairs):
 # Each theme's empty frame (B203). Keys are Settings' palette values (web/app/core/settings.js): the light palettes
 # (classic, sepia, solarized, legalpad, metal) and the dark ones (oled, gunmetal, midnight, linen, nord, dracula,
 # leather, felt, wood).
+#   strip:      the status-bar strip's colour, when not STATUS_STRIP's black (the iOS 7 and iOS 13 sets: their bar's)
 #   pins:       the ground's --pin-dark, --pin-light (Linen: its weave's base twice, a stripe can't draw the weave)
 #   nav_line:   the nav bar's bottom edge; nav_hi: its 1 pt top highlight (rrggbb, alpha)
 #   nav_gloss:  the bar's 44 pt gloss; nav_shadow: the alpha its 2.5 pt shadow starts at (OLED Black has none)
@@ -109,20 +113,20 @@ THEMES = {
     # B231: iOS 7's White (web/app/ios7.css), the light theme of the iOS 7 and iOS 13 styles: a flat #efeff4 ground,
     # flat #f7f7f7 bars with no highlight, gloss or shadows. Their .5 pt hairline (black at 30 %) is drawn as the
     # storyboard's 1 pt line views, flattened over the bar: #adadad.
-    "white": dict(pins=("efeff4", "efeff4"), nav_line="adadad", nav_hi=("f7f7f7", 1),
+    "white": dict(strip="f7f7f7", pins=("efeff4", "efeff4"), nav_line="adadad", nav_hi=("f7f7f7", 1),
                   nav_gloss=stops((0, "f7f7f7"), (1, "f7f7f7")), nav_shadow=0, tab_line=("adadad", 1),
                   tab_gloss=stops((0, "f7f7f7"), (1, "f7f7f7")), tab_base="f7f7f7", tab_shadow=0),
     # B237: iOS 13's White (ios13.css; core/settings.js STYLE_LAUNCH): a #f2f2f7 ground, flat #f9f9f9 bars, and their
     # rgba(0,0,0,.3) hairline over the bar (#aeaeae) as the 1 pt line.
-    "white13": dict(pins=("f2f2f7", "f2f2f7"), nav_line="aeaeae", nav_hi=("f9f9f9", 1),
+    "white13": dict(strip="f9f9f9", pins=("f2f2f7", "f2f2f7"), nav_line="aeaeae", nav_hi=("f9f9f9", 1),
                     nav_gloss=stops((0, "f9f9f9"), (1, "f9f9f9")), nav_shadow=0, tab_line=("aeaeae", 1),
                     tab_gloss=stops((0, "f9f9f9"), (1, "f9f9f9")), tab_base="f9f9f9", tab_shadow=0),
     # B235: iOS 7's and iOS 13's OLED Black (ios7.css, ios13.css; core/settings.js STYLE_LAUNCH): a flat #000 ground and
     # bars, no highlight, gloss or shadows, and the bars' hairline (#262626, #38383a) as the 1 pt line views.
-    "oled7": dict(pins=("000000", "000000"), nav_line="262626", nav_hi=("000000", 1),
+    "oled7": dict(strip="000000", pins=("000000", "000000"), nav_line="262626", nav_hi=("000000", 1),
                   nav_gloss=stops((0, "000000"), (1, "000000")), nav_shadow=0, tab_line=("262626", 1),
                   tab_gloss=stops((0, "000000"), (1, "000000")), tab_base="000000", tab_shadow=0),
-    "oled13": dict(pins=("000000", "000000"), nav_line="38383a", nav_hi=("000000", 1),
+    "oled13": dict(strip="000000", pins=("000000", "000000"), nav_line="38383a", nav_hi=("000000", 1),
                    nav_gloss=stops((0, "000000"), (1, "000000")), nav_shadow=0, tab_line=("38383a", 1),
                    tab_gloss=stops((0, "000000"), (1, "000000")), tab_base="000000", tab_shadow=0),
 }
@@ -200,6 +204,7 @@ def images(theme="classic"):
     for s in (2, 3):
         x = "@%dx" % s
         out["LaunchStripes" + x] = stripes(s, pins)
+        out["LaunchStatusStrip" + x] = column([hexrgb(th.get("strip", STATUS_STRIP))] * s, s)
         out["LaunchNavTop" + x] = nav_half(True, th["nav_gloss"])
         out["LaunchNavBottom" + x] = nav_half(False, th["nav_gloss"])
         out["LaunchTabGloss" + x] = tab_gloss(s, th["tab_gloss"])

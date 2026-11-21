@@ -13,7 +13,8 @@ UILaunchScreen (iOS's own background, white or black with the iPhone's appearanc
 
 STORYBOARD = "LaunchScreen"
 # Every image LaunchScreen.storyboard names (its <resources>).
-IMAGES = ("LaunchStripes", "LaunchNavTop", "LaunchNavBottom", "LaunchTabGloss", "LaunchNavShadow", "LaunchTabShadow")
+IMAGES = ("LaunchStripes", "LaunchNavTop", "LaunchNavBottom", "LaunchTabGloss", "LaunchNavShadow", "LaunchTabShadow",
+          "LaunchStatusStrip")
 VIEW_NIB = "Lvc-00-000-view-Lrt-00-000.nib"  # the storyboard's root view, the nib make.py recolours per theme
 THEMES = "LaunchThemes/"
 # Every theme Settings offers (web/app/core/settings.js; native/test_launch_grounds.py keeps this in step).

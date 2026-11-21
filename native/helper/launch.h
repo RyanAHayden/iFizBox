@@ -31,6 +31,7 @@ static const char *const helper_launch_files[] = {
     "LaunchStripes@2x.png", "LaunchStripes@3x.png", "LaunchNavTop@2x.png", "LaunchNavTop@3x.png",
     "LaunchNavBottom@2x.png", "LaunchNavBottom@3x.png", "LaunchTabGloss@2x.png", "LaunchTabGloss@3x.png",
     "LaunchNavShadow@2x.png", "LaunchNavShadow@3x.png", "LaunchTabShadow@2x.png", "LaunchTabShadow@3x.png",
+    "LaunchStatusStrip@2x.png", "LaunchStatusStrip@3x.png",
     HELPER_LAUNCH_STORYBOARD "/Lvc-00-000-view-Lrt-00-000.nib", NULL};
 
 static int helper_launch_key_ok(const char *key) {
