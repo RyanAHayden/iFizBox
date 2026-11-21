@@ -83,6 +83,25 @@ worktree's `ref/15/screens/f345d-*.png` (gitignored: iOS's status bar). Afterwar
 - **On show** the native bar appears once the slide has fully ended and the shell answered, so for a moment after a
   pop the CSS bar shows, then the native one takes over in place: the two look nearly the same (ios26.css's capsule).
 
+## After the spec review
+
+- Fixed: **a page load left the old page's controls over the new page** (a reload, e.g. a style change saved and
+  reloaded): `NativeSegments` watches the web view's `isLoading` and closes every bar when a load starts; an update
+  for a bar the shell no longer has answers an error and the page opens it again. Checked on the 15 Pro with a
+  rebuilt IPA: Search with the native bar up, `ifizbox.style` set to ios6 and the page reloaded: no native bar left
+  over the iOS 6 Search page (`f345d-r-after.png`). Hash navigations (a push and Back) don't start a load: the same
+  run's log shows no error and no reopen across them.
+- Fixed: **any slide anywhere hid the bar**: only a running Web Animation on an element that holds the bar (its page
+  moving) counts now; something else sliding over it is caught by the hit test or the popup check. A re-check waits
+  on each slide once (it added a listener per sync before).
+- Fixed: **one refusal counted for good**: only "unknown method" (an older shell) keeps the CSS bar for good; any
+  other error (no window, the app in the background) tries again after a second.
+- Fixed: Swift's `apply` kept the selection when an update sends new items without `selected`.
+- Kept, though the review counted them as not asked: the `docs/eras.md` row (the Native controls table lists each
+  native swap, as parts 2–3 did) and the "Scope bar" glossary entry (the run's rules ask for one for a new thing).
+- Not changed: rotation still can't be checked here (portrait-only iPhone app, no iPad), and the lag at a slide's
+  start was not filmed (see Not verified).
+
 ## Tried and failed
 
 - My first Chromium run showed no calls at all: the app put the style back to iOS 6 (nothing saved), so the hook was

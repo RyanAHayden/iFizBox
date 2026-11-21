@@ -208,14 +208,20 @@ function popupUp(doc) {
   return [...(doc.querySelectorAll?.(POPUP) ?? [])].some((el) => !el.getClientRects || el.getClientRects().length > 0);
 }
 
-// A push, pop or sheet in flight (nav/transition.js and sheet.js run Web Animations on transform; the edge swipe sets
-// an inline transform on the page each frame): the native bar can't follow it, so the CSS bar shows meanwhile.
-const sliding = (a) => a.playState === "running" && a.effect?.getTiming?.().iterations !== Infinity &&
-  (a.effect?.getKeyframes?.() ?? []).some((k) => k.transform != null);
+// The bar's page in flight (nav/transition.js runs Web Animations on transform for a push or pop; the edge swipe sets
+// an inline transform on the page each frame): the native bar can't follow it, so the CSS bar shows meanwhile. Only
+// a slide that moves the bar counts; one elsewhere that comes over it is caught by covered() or the popup check.
+const sliding = (a, seg) => a.playState === "running" && a.effect?.getTiming?.().iterations !== Infinity &&
+  a.effect?.target?.contains?.(seg) && (a.effect.getKeyframes?.() ?? []).some((k) => k.transform != null);
+const awaited = new WeakSet(); // slides a re-check already waits on
 function moving(seg, doc) {
   for (let p = seg; p && p !== doc.body; p = p.parentElement) if (p.style?.transform) return true;
-  const anims = (doc.getAnimations?.() ?? []).filter(sliding);
-  if (anims.length) Promise.allSettled(anims.map((a) => a.finished)).then(scheduleSegmentsSync);
+  const anims = (doc.getAnimations?.() ?? []).filter((a) => sliding(a, seg));
+  for (const a of anims) {
+    if (awaited.has(a)) continue;
+    awaited.add(a);
+    Promise.resolve(a.finished).catch(() => {}).then(scheduleSegmentsSync);
+  }
   return anims.length > 0;
 }
 
@@ -236,7 +242,7 @@ export function syncSegments(doc = globalThis.document, native = nativeBridge(),
   for (const seg of [...openSegments]) if (!live.has(seg)) closeSegments(seg, native);
   for (const seg of live) {
     const st = seg.nativeBar;
-    if (!st || st.failed) continue;
+    if (!st || st.failed || st.retryAt > Date.now()) continue;
     const snap = segmentsSnapshot(seg, doc, win);
     if (!snap) { if (st.open) closeSegments(seg, native); continue; }
     // While hidden its place doesn't matter: a slide moving it sends nothing until it shows again.
@@ -255,19 +261,29 @@ export function syncSegments(doc = globalThis.document, native = nativeBridge(),
           const shown = seg.buttons.map((b, i) => [b, i]).filter(([b]) => !b.hidden);
           if (shown[e.pick]) st.pick(shown[e.pick][1]);
         }
-      }).then(() => { /* closed */ }, () => {
-        // An older shell ("unknown method ui.segments") or no window: the CSS bar from now on.
-        st.failed = true;
-        st.open = false;
-        openSegments.delete(seg);
-        seethrough(seg, false);
+      }).then(() => { /* closed */ }, (e) => {
+        // An older shell ("unknown method ui.segments"): the CSS bar from now on. Anything else (no window while the
+        // app is in the background): the CSS bar, and another try a second later at the next change.
+        if (/unknown method/.test(e?.message ?? "")) st.failed = true;
+        else st.retryAt = Date.now() + 1000;
+        lost(seg);
       });
     } else {
       native.call("ui.segments", { op: "update", key: st.key, ...snap }).then(() => {
         if (st.sent === key && st.ready) seethrough(seg, !snap.hidden);
-      }, () => {});
+      }, () => { lost(seg); scheduleSegmentsSync(); }); // the shell no longer has it (a page load closed it): open again
     }
   }
+}
+
+// The shell's bar is gone without a close from here: forget it, so the next sync opens a new one.
+function lost(seg) {
+  const st = seg.nativeBar;
+  st.open = false;
+  st.ready = false;
+  st.sent = null;
+  openSegments.delete(seg);
+  seethrough(seg, false);
 }
 
 function closeSegments(seg, native) {

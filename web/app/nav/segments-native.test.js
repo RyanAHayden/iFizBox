@@ -134,12 +134,15 @@ test("hidden while a popup is up, another page covers the bar, or a slide runs; 
   syncSegments(doc, native, win);
   assert.equal(calls.at(-1).hidden, false, "back from the push");
 
-  doc.getAnimations = () => [{ playState: "running", finished: Promise.resolve(),
-    effect: { getTiming: () => ({ iterations: Infinity }), getKeyframes: () => [{ transform: "rotate(1turn)" }] } }];
-  assert.equal(segmentsSnapshot(seg, doc, win).hidden, false, "a spinner never hides it");
-  doc.getAnimations = () => [{ playState: "running", finished: Promise.resolve(),
-    effect: { getTiming: () => ({ iterations: 1 }), getKeyframes: () => [{ transform: "translate3d(100%,0,0)" }] } }];
-  assert.equal(segmentsSnapshot(seg, doc, win).hidden, true, "a push in flight hides it");
+  const pageEl = seg.parentNode;
+  const anim = (target, iterations) => ({ playState: "running", finished: Promise.resolve(),
+    effect: { target, getTiming: () => ({ iterations }), getKeyframes: () => [{ transform: "translate3d(100%,0,0)" }] } });
+  doc.getAnimations = () => [anim(pageEl, Infinity)];
+  assert.equal(segmentsSnapshot(seg, doc, win).hidden, false, "an endless animation (a spinner) never hides it");
+  doc.getAnimations = () => [anim(doc.createElement("div"), 1)];
+  assert.equal(segmentsSnapshot(seg, doc, win).hidden, false, "a slide elsewhere that doesn't move the bar");
+  doc.getAnimations = () => [anim(pageEl, 1)];
+  assert.equal(segmentsSnapshot(seg, doc, win).hidden, true, "its page sliding (a push or pop) hides it");
   delete doc.getAnimations;
   seg.parentNode.style.transform = "translate3d(-10%,0,0)";
   assert.equal(segmentsSnapshot(seg, doc, win).hidden, true, "the edge swipe moving its page hides it");
@@ -200,6 +203,36 @@ test("an old shell refuses ui.segments: the CSS bar stays, and it is not asked a
   assert.equal(seg.style.opacity, "");
   syncSegments(doc, native, win);
   assert.equal(calls.length, 1);
+});
+
+test("no window for now: the CSS bar, and it opens again later; a bar the shell lost (a page load) opens again", async (t) => {
+  reset();
+  let refuse = true;
+  const calls = [];
+  const native = { call(method, params, onEvent) {
+    calls.push(params);
+    if (params.op === "open" && refuse) return Promise.reject(new Error("internal: no web view to show the scope bar in"));
+    if (params.op === "open") { onEvent({ ready: true }); return new Promise(() => {}); }
+    if (params.op === "update") return Promise.reject(new Error("no scope bar"));
+    return Promise.resolve(null);
+  } };
+  const { seg, setCover } = page(native);
+  syncSegments(doc, native, win);
+  await tick();
+  assert.equal(seg.style.opacity, "");
+  syncSegments(doc, native, win);
+  assert.equal(calls.length, 1, "not again within the second");
+  const later = Date.now() + 2000;
+  t.mock.method(Date, "now", () => later);
+  refuse = false;
+  syncSegments(doc, native, win);
+  assert.equal(calls.at(-1).op, "open", "tried again after it");
+  setCover(doc.createElement("div"));
+  syncSegments(doc, native, win);
+  assert.equal(calls.at(-1).op, "update");
+  await tick();
+  syncSegments(doc, native, win);
+  assert.equal(calls.at(-1).op, "open", "the update said it's gone: opened again");
 });
 
 test("Swift: ui.segments is registered and handles open/update/close with a UISegmentedControl", () => {

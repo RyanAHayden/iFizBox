@@ -69,7 +69,20 @@ enum NativeSegments {
         }, for: .valueChanged)
         web.addSubview(control)
         bars[key] = bar
+        watchLoads(web)
         c.emit([["ready": true]])
+    }
+
+    // A new page load (a reload, the self-update's) starts a page with no bars: the old page's controls go, or they
+    // would stay over the new page. The page reopens what it still wants (an update for a key that went answers
+    // "not found", and the page opens it again).
+    private static var loads: NSKeyValueObservation?
+    private static func watchLoads(_ web: WKWebView) {
+        guard loads == nil else { return }
+        loads = web.observe(\.isLoading, options: [.new]) { _, change in
+            guard change.newValue == true else { return }
+            DispatchQueue.main.async { for key in Array(bars.keys) { close(key) } }
+        }
     }
 
     private static func close(_ key: String) {
@@ -80,13 +93,14 @@ enum NativeSegments {
 
     private static func apply(_ p: [String: Any], to bar: Bar) {
         let control = bar.control
+        let was = control.selectedSegmentIndex // removeAllSegments() drops it
         if let items = (p["items"] as? [Any])?.map({ "\($0)" }), items != bar.items {
             control.removeAllSegments()
             for (i, title) in items.enumerated() { control.insertSegment(withTitle: title, at: i, animated: false) }
             bar.items = items
         }
         if p["items"] != nil || p["selected"] != nil {
-            let s = (p["selected"] as? NSNumber)?.intValue ?? control.selectedSegmentIndex
+            let s = (p["selected"] as? NSNumber)?.intValue ?? was
             control.selectedSegmentIndex = (0..<control.numberOfSegments).contains(s) ? s : UISegmentedControl.noSegment
         }
         if let r = NativeMenus.rect(p["rect"]) { control.frame = r }
