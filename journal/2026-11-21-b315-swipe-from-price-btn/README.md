@@ -10,7 +10,14 @@
     armed the row and the minus's own click then disarmed it. The click after a swipe that lands on the minus is
     now swallowed.
   - `installed.js` attachRowGestures: not affected. Its rows have no button but the minus and Delete; swipes are off
-    while editing (when the minus shows), and Delete can't start one. Left as is.
+    while editing (when the minus shows), and Delete can't start one. Left as is. (The brief says "app.js
+    attachRowGestures": `web/app/app.js` has none; Installed's is this one.)
+  - `signed-apps.js`: its rows' only button is Delete, which can't start a swipe. Not affected.
+  - `nav/rowswipe.js` (Search/package rows): no button is excluded from starting a swipe, and its click eating
+    doesn't return early for any button. Not affected.
+- The click capture is registered with `true` (capture phase), so swallowing it stops the button's own listener.
+  In the node test the fake DOM doesn't carry a click from the list to the button, so "on.price not called after a
+  swipe" is shown there as the click being stopped; the Chromium check counts on.price calls directly.
 - `b136-swipe.test.js`: new case: a tap on the button goes through to `on.price`; a swipe from the button arms
   Delete and the click that ends it is swallowed.
 - Chromium check (`check.mjs`): the app's own `libraryGroup` and CSS in headless Chromium, real CDP mouse events.
