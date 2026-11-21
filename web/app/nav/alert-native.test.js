@@ -33,13 +33,11 @@ const shell = (answer) => {
 
 test("F345b: in the app under the native hook, showAlert sends ui.alert and resolves {index, value} from its answer", async () => {
   const native = shell(() => ({ index: 1, value: "https://repo.test/" }));
-  let tapped = null;
   const { out, made } = await withPage({ native }, () => showAlert({
     title: "Enter APT URL", message: "Type it", input: { placeholder: "https://", value: "https://", type: "url", paste: (t) => t },
-    buttons: ["Cancel", "Add Source"], cancel: 0, colors: { 1: "green", 0: "red", 5: "red", 2: "blue" }, onTap: (i) => { tapped = i; },
+    buttons: ["Cancel", "Add Source"], cancel: 0, colors: { 1: "green", 0: "red", 5: "red", 2: "blue" },
   }));
   assert.deepEqual(out, { index: 1, value: "https://repo.test/" });
-  assert.equal(tapped, 1, "onTap still runs");
   assert.deepEqual(native.calls, [["ui.alert", {
     title: "Enter APT URL", message: "Type it", buttons: ["Cancel", "Add Source"], cancel: 0,
     colors: { 0: "red", 1: "green" }, // only known colours on real buttons
@@ -73,6 +71,8 @@ test("F345b: countdown alerts, the site, other styles and old shells keep the CS
 
   for (const [name, page, opts] of [
     ["countdown", { native }, { countdown: { button: 1, seconds: 5 } }],
+    // onTap opens a link or window, which WebKit allows only inside the tap: the bridge answers after it
+    ["onTap", { native }, { onTap: () => {} }],
     ["no hook (iOS 6, 7, 13, or iOS 26 on old WebKit)", { native, controls: null }, {}],
     ["the site", { native: null }, {}],
   ]) {

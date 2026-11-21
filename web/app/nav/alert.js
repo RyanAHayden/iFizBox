@@ -17,7 +17,8 @@
 //
 // F345b: in the app under the native controls hook (<html data-controls="native">, native-controls.js) the alert is
 // the shell's own UIAlertController (bridge call ui.alert, native/Sources/NativeAlerts.swift): same options, same
-// {index, value} answer. A countdown alert stays the CSS one (UIAlertAction titles can't count down), `input.paste`
+// {index, value} answer. A countdown alert stays the CSS one (UIAlertAction titles can't count down), so does one
+// with `onTap` (the bridge's answer comes after the tap, outside the user gesture its window.open or link needs), `input.paste`
 // is dropped (the native field has Paste in its own menu), and a shell without ui.alert, the site and every other
 // style get the CSS alert.
 import { nativeBridge, hasNativeCall } from "../native.js";
@@ -27,21 +28,21 @@ export const alertOK = (title, message, alert = showAlert) => alert({ title, mes
 export function showAlert(opts = {}) {
   const native = nativeBridge();
   if (!wantsNativeAlert(opts, native)) return cssAlert(opts);
-  const { title = "", message = "", input = null, buttons = ["OK"], cancel = 0, colors = {}, onTap = null } = opts;
+  const { title = "", message = "", input = null, buttons = ["OK"], cancel = 0, colors = {} } = opts;
   const params = { title: String(title ?? ""), message: String(message ?? ""), buttons: buttons.map((b) => String(b)),
     cancel: buttons.length > 1 && Number.isInteger(cancel) ? cancel : -1, colors: nativeColors(colors, buttons.length) };
   if (input) params.input = { placeholder: String(input.placeholder ?? ""), value: String(input.value ?? ""), type: String(input.type || "text") };
   return native.call("ui.alert", params).then((r) => {
     const index = Number.isInteger(r?.index) && r.index >= 0 && r.index < buttons.length ? r.index : (params.cancel >= 0 ? params.cancel : 0);
     const value = input ? String(r?.value ?? "") : undefined;
-    onTap?.(index);
     return { index, value };
   }, () => cssAlert(opts)); // an older shell ("unknown method ui.alert") or no window to show it in
 }
 
-// The native alert only in the app (the bridge takes calls), under the native controls hook, and never for a countdown.
-export function wantsNativeAlert({ countdown = null } = {}, native = nativeBridge(), doc = globalThis.document) {
-  return hasNativeCall(native) && !countdown && doc?.documentElement?.getAttribute?.("data-controls") === "native";
+// The native alert only in the app (the bridge takes calls), under the native controls hook, and never for a countdown
+// or an `onTap` (it must run inside the tap itself).
+export function wantsNativeAlert({ countdown = null, onTap = null } = {}, native = nativeBridge(), doc = globalThis.document) {
+  return hasNativeCall(native) && !countdown && !onTap && doc?.documentElement?.getAttribute?.("data-controls") === "native";
 }
 
 // {index: "red" | "green"} as the shell takes it: string keys, known colours, indexes inside the buttons.

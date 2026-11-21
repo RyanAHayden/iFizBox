@@ -277,7 +277,6 @@ markup gets `ios26.css`'s look-alikes.
   | Switches (`nav/switch.js` `createSwitch`) | `<input type=checkbox switch>`, WebKit's switch, in `--sw-w` x `--sw-h` (71 x 31, WebKit's own box) | the button art, in the same box |
   | Fixed-choice menus | a real `<select>`: iOS 26's pull-down button and its glass menu | (none built yet) |
   | The run page's bar (`nav/progress.js`) | `<progress class="progress-bar">` | the drawn track and fill |
-  | Alerts (`nav/alert.js` `showAlert`), app only | the shell's UIAlertController (bridge `ui.alert`, `NativeAlerts.swift`): `cancel` is its cancel action, red buttons destructive, the green one preferred, one text field; a countdown alert keeps the CSS one and `input.paste` is dropped (the field's own menu has Paste) | the CSS alert (also on the site and with a shell without `ui.alert`) |
 
   `appearance` (and `-webkit-appearance`) is look: it is in the test's `LOOK` list.
 

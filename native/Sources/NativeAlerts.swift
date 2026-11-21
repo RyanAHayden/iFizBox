@@ -42,7 +42,8 @@ enum NativeAlerts {
         var preferred: UIAlertAction?
         for (i, label) in buttons.enumerated() {
             let color = colors[String(i)] as? String
-            // UIKit allows one .cancel action; a second would throw, so only `cancel` gets it.
+            // UIKit allows one .cancel action; a second would throw, so only `cancel` gets it. A red cancel button
+            // stays .cancel (no alert in the page has one).
             let style: UIAlertAction.Style = i == cancel ? .cancel : color == "red" ? .destructive : .default
             let action = UIAlertAction(title: label, style: style) { [weak vc] _ in
                 guard !replied else { return }

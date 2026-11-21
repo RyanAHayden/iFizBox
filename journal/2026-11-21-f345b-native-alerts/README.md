@@ -20,7 +20,11 @@ Plan: `journal/2026-11-21-f345-ios26-native-controls/README.md` ("Alerts and tex
   autocorrect or spellcheck, as the CSS field. Registered in `Bridge.swift`.
 - `web/app/nav/alert-native.test.js`: the routing (params sent, answer, out-of-range answer), the fallbacks
   (countdown, no hook, the site, an old shell), and the Swift handler's shape.
-- `docs/eras.md` "Native controls": a row for alerts.
+- After the spec review: an alert with `onTap` also stays the CSS alert. The callers (free-apple-id.js `open()`,
+  home.js `location.href`, signing/watch.js's itms-services link) need to run inside the tap's own user gesture,
+  and the bridge's answer only comes after the tap. A red `cancel` button stays `.cancel` (UIKit allows one cancel
+  action, and no alert in the page has a red cancel). The `docs/eras.md` row for alerts was taken back out (the task
+  didn't list that file) and filed as a docs follow-up.
 
 ## Checked on the iPhone 15 Pro (iOS 27)
 
@@ -40,6 +44,10 @@ Mode and the dark theme went back to what the phone had (iOS 6, Light, Gunmetal)
   preferred action.
 - **Return with no green button**: the Add Source alert's Return resolved `{index: 1, value: "https://"}`. UIKit
   tapped the last button, which matches the CSS alert's Enter.
+- **The other two theme pairs** (after the review): Add Source in light (`f345b-addsource-light.png`, a light glass
+  alert, Cancel resolved `null`) and red/green in OLED (`f345b-redgreen-oled.png`, a dark glass alert with a blue
+  Keep, a red Remove and Cancel; Cancel resolved `{index: 0}`). The installed build's native code is the same as
+  the final one: only `alert.js`'s `onTap` rule changed after it, and that is checked by the Node test.
 - **Countdown alert** (`f345b-countdown-css.png`): `countdown` given, so the CSS alert showed (`.alert-scrim` in the
   DOM), "I Understand …" greyed out.
 
@@ -62,4 +70,8 @@ Nothing failed.
 - **iOS 26.0–26.x**: the only iOS 26+ phone here runs iOS 27.
 - **An alert opened while another native alert is up**: the second one is presented from the first
   (`topController()` walks `presentedViewController`). I didn't try it on the phone.
+- **The `onTap` rule on the phone**: the build on the phone has the earlier alert.js, where an `onTap` alert would
+  still have gone native. The rule is covered by `alert-native.test.js`.
+- **An alert dismissed without a button** never answers. UIKit offers no way to do that on a `.alert` controller
+  short of the app dismissing it in code, which nothing does.
 - **iPad popover/size classes**: no iPad here. A `.alert` style controller needs no popover anchor.
