@@ -75,11 +75,19 @@ UI concepts (a screen proposed before it's built) go through the concept skill, 
 - The iPhone 7 (iOS 15.8.8, palera1n rootless) is the test phone for the jailbreak app (.deb): `ssh 7` (user
   `mobile`; `sudo -n` works, passwordless since 2026-11-18; if it fails, ask the user). Read `docs/iphone7.md` before using it. Touch it only when
   your task says so; drive its screen only through `tools/ui-7.sh` under its own lock. If `ssh 7` fails or
-  `/var/jb` is missing, it rebooted: stop and ask the user to re-jailbreak it.
+  `/var/jb` is missing, it rebooted: stop and ask the user to re-jailbreak it. Phone only when Chromium/local can't
+  check (the rule under the iPhone 15 Pro, below).
 - The iPhone 15 Pro (iOS 27, no jailbreak, on this desktop's USB) is the test phone for the sideload build (Lite
   IPA). Agents may install, launch and tap on it without the user, only through `tools/ui-15.sh` under its own
   lock (go-ios + WebDriverAgent from Linux; read `docs/iphone15.md` first). If it isn't listed (`ios list`), it's
   unplugged or untrusted: ask the user.
+- **Phone only when Chromium/local can't check** (both phones; user, 2026-11-21). Web and app changes in `web/app/`
+  are checked in Chromium (the `tools/readme_shots.py` / `capture.mjs` route with the fake bridge) and with
+  `node --test`. Take a phone's lock only for what needs the real device: the native shell, signing and installing,
+  iOS-only WebKit bugs, Home Screen icons, notifications. Say in the journal why Chromium couldn't do it. Give the
+  lock back as soon as you're done (`trap 'tools/ui-15.sh unlock ME' EXIT` in a script); when a session ends or is
+  dropped, the runner frees its task's locks (`runner.toml` `on_exit`: `tools/ui-release.sh`). A lock left behind
+  stalls every phone task for its 30-minute stale timeout.
 - License: GPL-3.0-or-later. Code taken from GPLv3 projects (Cydia) is fine; never copy code under a license GPLv3 can't include.
 - Write findings worth keeping to `journal/<ID>/notes.md`.
 

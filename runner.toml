@@ -15,6 +15,9 @@ untested = ["*.md", "docs/*", "journal/*", "LICENSE*"]
 # The native build (tools/check.sh) needs these two; they come from the shell that starts the runner (~/.bashrc),
 # so no machine paths live in the repo. Without them the gate skips the native build with a note.
 pass_env = ["SWIFT_TOOLCHAIN", "IOS_SDK"]
+# A session that ends or is dropped gives back the phone UI locks its task holds (iPhone 15, 7, 4S), so none
+# waits out the 30-minute stale timeout.
+on_exit = "tools/ui-release.sh"
 
 [git]
 push = "origin"
