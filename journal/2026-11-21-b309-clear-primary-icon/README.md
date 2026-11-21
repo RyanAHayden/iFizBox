@@ -29,7 +29,13 @@ in-app pick and no reboot (the Home Screen redrew the icon when its look changed
 | Clear, Dark | the globe on the dark glass tile |
 | Tinted | the globe in the tint colour on the tinted glass tile |
 
-Shots: `a-*.png` in this folder (taken from the swapped-car test build; the final build's are `final-*.png`).
+Shots: `a-*.jpg` in this folder (taken from the swapped-car test build; the final build's are `final-*.jpg`).
+
+How see-through it is next to the older Clear pictures: icon/clear/ is all opaque (a frosted fill, a frosted rim and
+a smoked slate sphere, glass.py's CLEAR colours); the Icon-glass alternate in Clear showed an opaque white disc (rim
+plus sphere) on its tile (F324's `glass-looks-15pro.png`). The tinted picture has no fill and no rim, only the white
+lines and a face at 18% opacity, so in `a-clear-light.jpg` / `final-clearlight.jpg` the wallpaper shows through the
+whole tile and the globe's face; only the lines are solid.
 
 ## What I built
 
