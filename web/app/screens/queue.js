@@ -38,7 +38,7 @@ import { getBackend } from "../backend.js";
 import { catalog } from "../catalog.js";
 import { installQueue, runLogs } from "../queue.js";
 import { MODES, MODE_LABEL, changeCount, runTitle, createRepeatFilter, CONFFILE_TITLE,
-  CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine, debUrlOf, debLinkOf, mergePlans } from "../core/queue.js";
+  CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine, debUrlOf, debLinkOf, mergePlans, runStatusText } from "../core/queue.js";
 import { appQueue } from "../app-queue.js";
 import { appPlan, runOrder, sizeText, SELF_ID, customParams, APP_MODES, APP_MODE_LABEL } from "../core/appqueue.js";
 import { NAME } from "../brand.js";
@@ -841,10 +841,14 @@ async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = n
   page.cancellable(canCancel);
 
   const log = [];
+  // F361: kept in Console Logs from the start, each line saved as it comes (a run that hangs or is killed keeps its log)
+  const logJobs = jobs.map((j) => ({ op: j.op, id: j.id, version: j.version, mode: j.mode }));
+  const live = runLogs.start({ title: title ? title({}) : runTitle(jobs), jobs: logJobs });
   const fresh = createRepeatFilter(); // C6: apt's "Retrieving file 1 of N" shows once, not once per percent
   const line = (type, text) => {
     if (!fresh(type, text)) return;
     log.push(type === "info" ? text : type === "error" ? `E: ${text}`.replace(/^E: E: /, "E: ") : type === "warning" ? text : `» ${text}`);
+    live.line(log[log.length - 1]);
     page.line(type === "status" ? "step" : type === "info" ? "raw" : type, text);
   };
   page.progress(0);
@@ -938,8 +942,8 @@ async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = n
   }
 
   const choice = chooseFinish({ ok, levels: [...levels, ...selfLevels(jobs)], kinds });
-  runLogs.add({ title: title ? title(names) : runTitle(jobs.map((j) => ({ ...j, name: j.name || names[j.id] }))), jobs: jobs.map((j) => ({ op: j.op, id: j.id, version: j.version, mode: j.mode })),
-    code: error ? -1 : result.code, finish: choice.level, text: log.join("\n") });
+  live.set({ title: title ? title(names) : runTitle(jobs.map((j) => ({ ...j, name: j.name || names[j.id] }))) });
+  live.end({ code: error ? -1 : result.code, cancelled: stopped, finish: choice.level, text: log.join("\n") });
   // F189: what waited on a package of this run (whenQueueRuns), out before clearAll would cancel it.
   const waiters = keepQueue ? [] : takeWaiters(ids);
   // A run that went through empties the queue; one apt stopped keeps it, so Confirm can show what's left to fix.
@@ -1013,35 +1017,50 @@ export function logsTitle(id) {
   return id ? "Console Log" : "Console Logs";
 }
 
-// The root of Settings: one row to the list (only where runs happen: the jailbreak build, or logs exist).
-export function logsSection(mode) {
-  const list = runLogs.list();
-  if (mode !== "jailbreak" && !list.length) return document.createDocumentFragment();
+// The root of Settings: one row to the list, in both builds (F361: the sideload build's signs and installs are kept
+// too, and a row that shows only once a log exists hides the one place to look when an install hangs).
+export function logsSection(mode, { logs = runLogs } = {}) {
+  const list = logs.list();
   return grouped([{ header: "Console", rows: [{ label: "Console Logs", detail: list.length ? String(list.length) : "None", href: format(settingsRoute([LOGS])), icon: rowIcon("logs") }],
-    footer: "The output of every install, upgrade and removal, kept on this iPhone." }]);
+    footer: mode === "jailbreak" ? "The output of every install, upgrade and removal, kept on this iPhone."
+      : "The output of every app signed, installed and re-signed, kept on this iPhone." }]);
 }
 
 const when = (t) => new Date(t).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
-export function logsPage(id, redraw = () => {}) {
+// F361: while a run on the page is still going, the page draws again each LIVE_MS, so its lines come in as they're
+// saved. It stops once the page is gone (another route drew over it) or nothing on it is running.
+export const LIVE_MS = 1000;
+function followRunning(frag, running, redraw, later) {
+  if (!running) return;
+  const mark = el("span", "console-live");
+  mark.hidden = true;
+  frag.append(mark);
+  later(() => { if (mark.isConnected) redraw(); }, LIVE_MS);
+}
+
+export function logsPage(id, redraw = () => {}, { logs = runLogs, later = setTimeout } = {}) {
   if (id) {
-    const e = runLogs.get(decodeURIComponent(id));
+    const e = logs.get(decodeURIComponent(id));
     if (!e) return grouped([{ rows: [{ label: "This log is gone" }], footer: "Logs past the newest 20 are dropped." }]);
     const frag = document.createDocumentFragment();
-    frag.append(grouped([{ rows: [{ label: e.title || "Run", subtitle: when(e.at), detail: e.ok ? "Completed" : `Failed (${e.code})` }] }]));
+    frag.append(grouped([{ rows: [{ label: e.title || "Run", subtitle: when(e.at), detail: runStatusText(e) }] }]));
     const g = el("div", "group");
-    g.append(el("pre", "table grouped console-log", e.text || "(no output)"));
+    g.append(el("pre", "table grouped console-log", e.text || (e.state === "running" ? "(waiting for output)" : "(no output)")));
     frag.append(g);
+    followRunning(frag, e.state === "running", redraw, later);
     return frag;
   }
-  const list = runLogs.list();
-  if (!list.length) return grouped([{ rows: [{ label: "No Logs Yet" }], footer: "Each run of the install queue keeps its console output here." }]);
-  return grouped([
-    { rows: list.map((e) => ({ label: e.title || "Run", subtitle: `${when(e.at)} · ${e.ok ? "Completed" : `Failed (${e.code})`}`,
+  const list = logs.list();
+  if (!list.length) return grouped([{ rows: [{ label: "No Logs Yet" }], footer: "Each install, re-sign and queue run keeps its console output here." }]);
+  const frag = grouped([
+    { rows: list.map((e) => ({ label: e.title || "Run", subtitle: `${when(e.at)} · ${runStatusText(e)}`,
       href: format(settingsRoute([LOGS, e.id])) })), footer: "The newest 20 runs." },
     { rows: [{ label: "Clear Logs", onClick: async () => {
       const i = await showActionSheet({ buttons: ["Clear Logs"], destructive: 0 });
-      if (i === 0) { runLogs.clear(); redraw(); }
+      if (i === 0) { logs.clear(); redraw(); }
     } }] },
   ]);
+  followRunning(frag, list.some((e) => e.state === "running"), redraw, later);
+  return frag;
 }

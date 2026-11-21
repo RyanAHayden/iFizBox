@@ -4,7 +4,7 @@ import { detectMode } from "../core/settings.js";
 import { showAlert } from "../nav/alert.js";
 import { isInsecure, INSECURE_IPA_ALERT, INSTALL_ANYWAY } from "../core/insecureipa.js";
 import { malwareHashes, rememberSigned } from "../core/malicious.js";
-import { APP_SERVER, normalizeServer, LEGACY_SERVER } from "../core/signing.js";
+import { APP_SERVER, normalizeServer, LEGACY_SERVER, loggedBridge } from "../core/signing.js";
 import { GITHUB_REPO, NAME } from "../brand.js";
 import { nativeBridge } from "../native.js";
 
@@ -69,7 +69,7 @@ export const localSigning = () => detectMode() === "sideload";
 export const bridge = (native) => {
   const n = native ?? nativeBridge();
   if (!n?.call) throw Object.assign(new Error("This build has no signer."), { code: "internal" });
-  return n;
+  return loggedBridge(n); // F361: each sign and install kept in Console Logs as it goes
 };
 
 // The shell (native CloseForUpdate) closes iFizBox only once iOS has fetched the whole new IPA from the Signing
