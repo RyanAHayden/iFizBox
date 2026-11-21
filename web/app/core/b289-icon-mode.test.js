@@ -66,3 +66,17 @@ test("a Mode change sends app.icon again", () => {
     delete globalThis.ifizboxNative;
   }
 });
+
+test("picks win per mode on either screen tone", () => {
+  const s = store();
+  const get = (k) => s.get(k);
+  s.set("iconMatch", false);
+  s.set("lightIcon", "clear");
+  s.set("darkIcon", "oled");
+  s.set("appearance", "light");
+  assert.deepEqual(iconState(get, "dark"), { light: "clear", dark: "clear", onScreen: "clear" });
+  s.set("appearance", "dark");
+  assert.deepEqual(iconState(get, "light"), { light: "oled", dark: "oled", onScreen: "oled" });
+  s.set("appearance", "auto");
+  assert.deepEqual(iconState(get, "dark"), { light: "clear", dark: "oled", onScreen: "oled" });
+});
