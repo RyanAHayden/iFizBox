@@ -338,7 +338,7 @@ enum TailscaleBridge {
             Thread.sleep(forTimeInterval: 1)
             st = Tailscale.current()
         }
-        throw IDevice.Failure(code: "timeout", text: "the sign-in didn't finish in 10 minutes")
+        throw IDevice.Failure(code: "timeout", text: "The sign-in didn't finish in 10 minutes. Tap Sign In to try again.")
     }
 
     /// RemotePairing's handshake to this phone's own Tailscale address, through the tailnet.
