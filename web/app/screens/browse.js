@@ -339,10 +339,11 @@ function createRow() {
   const top = el("span", "pkg-top");
   const compatEl = el("span", "compat-mark"); // F35: the check, X or ? (F17's text badge is on the package page)
   top.append(el("span", "pkg-name"), compatEl, el("span", "pkg-version"));
-  text.append(top, el("span", "pkg-desc"));
+  const from = el("span", "pkg-from"); // concept F348: Cydia's "from Author (Section)" line, tall lists only
+  text.append(top, from, el("span", "pkg-desc"));
   a.append(art, text);
   row.append(a);
-  row._ = { a, art, icon, img, badge, name: top.firstChild, compat: compatEl, version: top.lastChild, desc: text.lastChild };
+  row._ = { a, art, icon, img, badge, name: top.firstChild, compat: compatEl, version: top.lastChild, from, desc: text.lastChild };
   return row;
 }
 
@@ -358,6 +359,8 @@ function bindRow(row, item, route) {
   r.a.href = deeper(route, token("package", item.id));
   r.name.textContent = item.name;
   r.version.textContent = item.version;
+  const who = item.author ? String(item.author).replace(/\s*<[^>]*>/, "") : "";
+  r.from.textContent = who ? `from ${who}${item.section ? ` (${item.section})` : ""}` : item.section ? `(${item.section})` : "";
   // Works on my phone (F17): the worker's code for this row, drawn as a mark (F35); rows never judged get none.
   setMark(r.compat, item.compat);
   // Search's exact match that can't work (F35): its name in red, the reason in place of the description.
@@ -420,16 +423,18 @@ function loadIcon(row, item) {
 
 // A virtualised package list. `letters`: Cydia's A–Z headers (lists sorted by name; search results aren't).
 // `rows` may hold { header } items of their own when `letters` is off. `decorate(row, item)` runs after each bind.
-export function packageList(body, route, rows, { letters = true, decorate = null } = {}) {
+const TALL_HEIGHT = 74; // concept F348: Cydia's PackageCell with its description line (146 px at 2x on the 4S)
+export function packageList(body, route, rows, { letters = true, decorate = null, tall = letters } = {}) {
   rememberNames(rows.filter((r) => r.id));
   const items = letters ? withLetterHeaders(rows, (r) => indexLetter(r.name)) : rows;
   let swipe = null; // F193: a recycled row drops any swipe it was in
   const list = createVList(body, {
-    items, rowHeight: ROW_HEIGHT, headerHeight: 23,
+    items, rowHeight: tall ? TALL_HEIGHT : ROW_HEIGHT, headerHeight: 23,
     createRow,
     bindRow: (row, item) => { swipe?.reset(row); bindRow(row, item, route); decorate?.(row, item); },
     idle: loadIcon,
   });
+  list.el.classList.toggle("tall", tall);
   list.el.classList.add("pkg-vlist"); // placeholder rows show through wherever real rows aren't drawn yet
   attachRowMenu(list.el, route); // F192: hold a row for Install / Share / Source
   swipe = attachQueueSwipe(list.el, route); // F193: swipe a row left to queue it
