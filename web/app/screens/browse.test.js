@@ -29,7 +29,10 @@ test("titles: source name, All Packages, section, author", () => {
   assert.equal(nav({ tab: "sources", path: ["*", "section:*"] }).title, "All Packages");
   assert.equal(nav({ tab: "sources", path: ["*", "section:Tweaks"] }).title, "Tweaks");
   assert.equal(nav({ tab: "search", path: ["author:Jane"] }).title, "Jane");
-  assert.equal(nav({ tab: "search", path: ["package:com.unseen"] }).title, "com.unseen", "id until the name is known");
+  assert.equal(nav({ tab: "search", path: ["package:com.unseen"] }).title, "Details", "F350: Cydia's title, not the name");
+  assert.equal(nav({ tab: "search", path: ["package:x", "info:x"] }).title, "More Information");
+  assert.equal(nav({ tab: "search", path: ["package:x", "pkgsettings:x"] }).title, "Settings");
+  assert.equal(nav({ tab: "search", path: ["package:x", "files:x"] }).title, "Files");
 });
 
 test("sizes, letter headers and proxied depiction HTML", () => {

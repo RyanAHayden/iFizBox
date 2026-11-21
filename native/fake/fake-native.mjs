@@ -86,6 +86,17 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
       return read(join(prefix, "var/lib/apt/lists", name));
     },
     "apt.dpkgStatus": () => read(join(prefix, "var/lib/dpkg/status")),
+    // F350: Apt.swift packageFiles: the paths var/lib/dpkg/info/<id>[:arch].list names, "/." left out; null without one.
+    "apt.files"({ id }) {
+      if (typeof id !== "string" || !id || id.includes("/") || id.startsWith(".")) return fail("bad_url: bad package id");
+      const dir = join(prefix, "var/lib/dpkg/info");
+      let text = read(join(dir, `${id}.list`));
+      if (text == null && existsSync(dir)) {
+        const name = readdirSync(dir).find((n) => n.startsWith(`${id}:`) && n.endsWith(".list"));
+        if (name) text = read(join(dir, name));
+      }
+      return text == null ? null : text.split("\n").filter((l) => l && l !== "/.");
+    },
     // F104: Apt.swift installDates: { package: mtime seconds } of var/lib/dpkg/info/<pkg>[:arch].list.
     "apt.installDates"() {
       const dir = join(prefix, "var/lib/dpkg/info");

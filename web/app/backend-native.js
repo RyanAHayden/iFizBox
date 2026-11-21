@@ -5,6 +5,7 @@
 //   apt.sources                 -> [{ path, text }]  sources.list, sources.list.d/*.list and *.sources
 //   apt.list { name }           -> text | null       a file in apt's lists directory (after apt-get update)
 //   apt.dpkgStatus              -> text | null       dpkg's status file
+//   apt.files { id }            -> [path] | null     an installed package's files, from dpkg's info/<id>.list (F350)
 //   net.fetch { url }           -> { status, headers, body }   body base64; the shell fetches (no CORS, no proxy)
 //   net.packages { dir }        -> { text, source }  Packages.xz, .gz or plain in dir, decompressed by the shell
 //   helper.run { words, stream } -> { code, stdout, stderr }  ifizbox-helper <words> as root; stream events
@@ -209,6 +210,9 @@ export function createNativeBackend({ native = globalThis.ifizboxNative, sourceO
     // ifizbox-helper <words>; onEvent({ fd, line }) sees its output as it comes. Resolves { code, stdout, stderr }.
     helper: (words, onEvent) => call("helper.run", { words, stream: Boolean(onEvent) }, onEvent),
     dpkgStatus: async () => (await call("apt.dpkgStatus")) ?? null,
+    // F350: an installed package's files (Details > Filesystem Content), dpkg's list for it; null when it has none.
+    // The jailbreak build only: the sideload build has no dpkg, and the site never has this call.
+    ...((sourceOptions.mode ?? detectMode()) === "jailbreak" ? { packageFiles: async (id) => (await call("apt.files", { id })) ?? null } : {}),
     // F219: which of these apps iOS has (apps.isInstalled, native/Sources/Sideload.swift: LSApplicationWorkspace
     // applicationIsInstalled: as B46's signing.isInstalled, which the jailbreak build refuses)
     // -> { bundleId: true | false | null }, null where iOS can't be asked. Cached for the session: a package manager

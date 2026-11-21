@@ -49,6 +49,14 @@ enum Apt {
             }
         }
         b.on("apt.dpkgStatus") { c in work(c) { () throws -> Any? in readText(Jailbreak.path("/var/lib/dpkg/status")) } }
+        // F350: apt.files { id } -> [path] | null, an installed package's Filesystem Content (its Details page).
+        b.on("apt.files") { c in
+            work(c) { () throws -> Any? in
+                guard let id = c.params["id"] as? String, !id.isEmpty, !id.contains("/"), !id.hasPrefix(".")
+                else { throw BridgeError("bad_url", "bad package id") }
+                return packageFiles(id)
+            }
+        }
         // F104: when each package was installed or last upgraded, as Installed's Recent sort needs it.
         b.on("apt.installDates") { c in work(c) { () throws -> Any? in installDates() } }
         // F130: the packages apt marked as installed only to satisfy another's dependency, for Installed's User mode.
@@ -134,6 +142,18 @@ enum Apt {
     }
 
     // ---- files
+
+    // F350: the paths dpkg's info/<id>.list (info/<id>:<arch>.list on multiarch) names, as dpkg -L prints them, minus
+    // "/." ; nil when dpkg has no list for it (not installed, or the sideload build).
+    static func packageFiles(_ id: String) -> [String]? {
+        let dir = Jailbreak.path("/var/lib/dpkg/info")
+        var text = readText(dir + "/" + id + ".list")
+        if text == nil, let names = try? FileManager.default.contentsOfDirectory(atPath: dir) {
+            if let name = names.first(where: { $0.hasPrefix(id + ":") && $0.hasSuffix(".list") }) { text = readText(dir + "/" + name) }
+        }
+        guard let text else { return nil }
+        return text.split(separator: "\n").map(String.init).filter { !$0.isEmpty && $0 != "/." }
+    }
 
     // F104: { package: seconds since 1970 } from the mtime of dpkg's info/<pkg>.list (info/<pkg>:<arch>.list on
     // multiarch), which dpkg rewrites on every install or upgrade of the package.
