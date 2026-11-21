@@ -31,7 +31,9 @@ html[data-style="ios26"] {
   --cell-min-h: 48px; --cell-pad: 0 16px; --cell-gap: 12px;
   --seg-h: 32px; --seg-margin: 10px 16px 0;
   --large-title-pad: 3px 16px 8px;
-  --sw-w: 51px; --sw-h: 31px; --sw-knob-size: 31px; --sw-travel: 20px; /* iOS 7's 51 x 31 switch, as iOS 13's */
+  /* F345a: WebKit's iOS 26 switch box (70.84 x 31 on the 15 Pro, unstyled), so a row doesn't move between the native
+     switch and this look-alike; the look-alike's round knob travels the rest */
+  --sw-w: 71px; --sw-h: 31px; --sw-knob-size: 31px; --sw-travel: 40px;
   /* the floating tab bar (style.css, used under html[data-tabbar="float"]): a 64pt pill 14pt in from the sides,
      the Search circle 8pt to its right */
   --tabbar-float-h: 64px; --tabbar-float-pad: 4px; --tabbar-float-inset: 14px; --tabbar-float-gap: 8px;
@@ -323,6 +325,42 @@ html[data-style="ios26"] .switch.is-held .sw-knob,
 html[data-style="ios26"][data-theme] .switch.is-held .sw-knob {
   background: linear-gradient(var(--i26-knob-held), var(--i26-knob-held)) padding-box, var(--i26-ring);
 }
+
+/* ---- F345a: native controls (html[data-controls="native"], native-controls.js; docs/eras.md "Native controls") ----
+   Where WebKit draws iOS 26's own controls, the page leaves them to it: appearance auto, and ios6.css's and
+   packages.css's paint on them reverted to the browser's (a border or background of the page's own would make
+   WebKit draw a plain box instead). Sizes stay style.css's and packages.css's, so nothing moves between this and the
+   look-alikes above. */
+/* The switch: an <input type=checkbox switch> (nav/switch.js), WebKit's wide-knob switch in the 71 x 31 box. */
+html[data-style="ios26"][data-controls="native"] .switch.is-native {
+  appearance: auto; -webkit-appearance: auto; border: revert; background: revert; accent-color: auto;
+}
+/* The search field: WebKit's grey capsule and magnifier on the <input type=search>; the label behind it paints
+   nothing. 17pt, UIKit's body size (16pt or more also keeps Safari from zooming on focus), and no focus ring: the
+   caret shows the focus, as UISearchBar's. */
+html[data-style="ios26"][data-controls="native"] .search-field,
+html[data-style="ios26"][data-controls="native"][data-theme] .search-field {
+  background: none; border: 0; box-shadow: none;
+}
+html[data-style="ios26"][data-controls="native"] .search-field input,
+html[data-style="ios26"][data-controls="native"][data-theme] .search-field input {
+  appearance: auto; -webkit-appearance: auto; border: revert; background: revert; color: revert;
+  font-size: 17px; outline: none;
+}
+html[data-style="ios26"][data-controls="native"] .search-field input::-webkit-search-decoration { -webkit-appearance: revert; }
+/* WebKit on iOS draws no clear button, focused or not (the 15 Pro, iOS 27): packages.css's drawn one stays, moved
+   inside the capsule's right end there. */
+/* Text fields in cells (Signing's rows, Add Source, Settings): plain borderless inputs, as UIKit's cell fields;
+   WebKit's caret and keyboard, its own colour for the text. */
+html[data-style="ios26"][data-controls="native"] .cell-inner input:not([type="checkbox"]):not([type="search"]) {
+  appearance: auto; -webkit-appearance: auto; border: 0; background: none; font-size: 17px; outline: none;
+}
+/* Fixed-choice menus are real <select>s: the capsule is iOS 26's pull-down button, a tap opens the glass UIMenu. */
+html[data-style="ios26"][data-controls="native"] select {
+  appearance: auto; -webkit-appearance: auto; border: revert; background: revert; font-size: 17px;
+}
+/* The run page's bar (nav/progress.js): WebKit's <progress>, iOS 26's UIProgressView. */
+html[data-style="ios26"][data-controls="native"] progress { appearance: auto; -webkit-appearance: auto; }
 
 /* Signature pills (packages.css .sig-pill, whose fills the tokens above make flat): semibold white text, no tracking. */
 html[data-style="ios26"] .sig-pill,

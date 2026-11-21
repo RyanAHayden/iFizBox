@@ -142,7 +142,9 @@ test("B191: no transition in web/app/*.css animates a layout property", () => {
 // C44, docs/eras.md "Definition of clean": an era is one stylesheet of look plus the named hooks, never a layout rule.
 // Look properties are the paint and type ones below; everything else (box, position, flex/grid, overflow, wrapping,
 // touch and cursor behaviour) is layout and lives in style.css, moved only through its "Era hooks" tokens.
-export const LOOK = /^(--.+|color|color-scheme|accent-color|caret-color|opacity|filter|-webkit-backdrop-filter|-webkit-box-reflect|backdrop-filter|box-shadow|text-shadow|content|background(-[a-z]+)*|border(-[a-z]+)*|outline(-[a-z]+)*|-webkit-mask(-[a-z]+)*|mask(-[a-z]+)*|font(-[a-z]+)*|line-height|letter-spacing|word-spacing|text-align|text-transform|text-decoration(-[a-z]+)*|-webkit-font-smoothing|-webkit-text-stroke(-[a-z]+)*|fill|stroke(-[a-z]+)*|list-style(-[a-z]+)*)$/;
+// F345a: appearance (and its -webkit- spelling) is look too: it hands a control's paint to the browser (the native
+// controls hook, ios26.css) and sizes nothing the page's own rules don't.
+export const LOOK = /^(--.+|(-webkit-)?appearance|color|color-scheme|accent-color|caret-color|opacity|filter|-webkit-backdrop-filter|-webkit-box-reflect|backdrop-filter|box-shadow|text-shadow|content|background(-[a-z]+)*|border(-[a-z]+)*|outline(-[a-z]+)*|-webkit-mask(-[a-z]+)*|mask(-[a-z]+)*|font(-[a-z]+)*|line-height|letter-spacing|word-spacing|text-align|text-transform|text-decoration(-[a-z]+)*|-webkit-font-smoothing|-webkit-text-stroke(-[a-z]+)*|fill|stroke(-[a-z]+)*|list-style(-[a-z]+)*)$/;
 const splitDecls = (decl) => { // on ";" outside quotes and parentheses (data: URIs hold both)
   const out = [];
   let depth = 0, quote = "", cur = "";

@@ -25,6 +25,16 @@
   root.setAttribute("data-style", era);
   if (era === "ios13" || era === "ios26") root.setAttribute("data-sheet", "card");
   if (era === "ios26") root.setAttribute("data-tabbar", "float");
+  // F345a: the native controls hook, as native-controls.js drawsIos26Controls() (which corrects it in the app once
+  // app.info answers): iOS 26's form controls are WebKit's own only on an iPhone or iPad whose WebKit is 26 or later,
+  // by Safari's Version/ or else by anchor positioning (first in WebKit 26).
+  if (era === "ios26") {
+    var nav = window.navigator || {}, ua = nav.userAgent || "", ver = /\bVersion\/(\d+)/.exec(ua);
+    var onIos = /\b(iPhone|iPad|iPod)\b/.test(ua) || (/\bMacintosh\b/.test(ua) && (nav.maxTouchPoints || 0) > 1);
+    var css = window.CSS, f26 = false;
+    try { f26 = !!(css && css.supports && css.supports("anchor-name: --a")); } catch (e) { /* no CSS.supports */ }
+    if (onIos && (ver ? Number(ver[1]) >= 26 : f26)) root.setAttribute("data-controls", "native");
+  }
   root.setAttribute("data-theme", dark ? "dark" : "light");
   // Each tone's themes, in core/settings.js's order, and the default (its `default`: Gunmetal, Classic): a new theme
   // adds its name here, beside its ios6.css or palettes.css block (F200), and its top-bar colour below.
