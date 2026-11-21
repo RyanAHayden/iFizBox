@@ -198,13 +198,15 @@ class Alternates(unittest.TestCase):
         lite = {r["file"] for rs in carfile.icon_sets(read("AssetsLite.car")).values() for r in rs}
         self.assertFalse([f for f in plain if "-lite-" in f or f.startswith("AppIconLite")])
         self.assertTrue(any(f.startswith("clear-") for f in lite), "Clear has no sash in the Lite build")
-        self.assertFalse([f for f in lite if "-" in f and not f.startswith(("clear-", "AppIcon")) and "-lite-" not in f])
+        # F324: the Glass icon's .icon renders are one picture for both builds (no sash)
+        self.assertFalse([f for f in lite if "-" in f and not f.startswith(("clear-", "AppIcon", alternates.GLASS_SET))
+                          and "-lite-" not in f])
 
     def test_info_plist_lists_every_set(self):
         info = plistlib.loads(plist())
         alts = info["CFBundleIcons"]["CFBundleAlternateIcons"]
         own = [alternates.own_set(s) for s in alternates.OWN_SLOTS]  # F329: your own icon's loose sets
-        self.assertEqual(list(alts), list(alternates.sets()) + own)
+        self.assertEqual(list(alts), list(alternates.sets()) + [alternates.GLASS_SET] + own)  # F324: the Glass icon
         for name, d in alts.items():
             if name in own:
                 self.assertEqual(d, {"CFBundleIconFiles": [alternates.own_stem(name[-1], pt) for pt in alternates.OWN_SIZES]})
@@ -262,7 +264,7 @@ class Alternates(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as d:
             alternates.thumbs(d, lite=True)
-            self.assertEqual(sorted(os.listdir(d)), sorted(i + ".png" for i in alternates.icons()))
+            self.assertEqual(sorted(os.listdir(d)), sorted(i + ".png" for i in alternates.icons() + [alternates.GLASS]))
             with open(os.path.join(d, "sepia.png"), "rb") as f:
                 self.assertEqual(f.read(), read(os.path.join("themes", "sepia", "AppIconLite60x60@3x.png")))
 
@@ -287,7 +289,7 @@ class Glass(unittest.TestCase):
             return json.load(f)
 
     def test_one_document_per_set(self):
-        want = ["AppIcon"] + list(alternates.sets())
+        want = ["AppIcon"] + list(alternates.sets()) + [alternates.GLASS_SET]
         self.assertEqual(list(glass.all_sets()), want)
         self.assertEqual(sorted(n[:-5] for n in os.listdir(self.tmp.name)), sorted(want))
 
@@ -338,6 +340,24 @@ class Glass(unittest.TestCase):
         """The .icon documents assets.sh compiles are named sets (each costs ~3 MB of Assets.car, journal F324)."""
         self.assertFalse(set(glass.CAR_SETS) - set(glass.all_sets()))
         self.assertLessEqual(len(glass.CAR_SETS), 4, "each .icon adds ~3 MB to both .car files")
+
+    def test_glass_icon_is_its_own_set(self):
+        """User 2026-11-21: every theme keeps its PNG set (an .icon would replace it, LITE sash and all); the glass
+        one is an extra set, Classic in Light and Gunmetal in Dark, with no PNG set, that only the .icon fills."""
+        self.assertEqual(glass.CAR_SETS, (alternates.GLASS_SET,))
+        self.assertNotIn(alternates.GLASS_SET, alternates.sets())
+        self.assertEqual(glass.all_sets()[alternates.GLASS_SET], alternates.PRIMARY)
+        # Sources/AppIcon.swift's one-icon name for the page's "glass" pick, and the page offers it
+        self.assertEqual("Icon-%s" % alternates.GLASS, alternates.GLASS_SET)
+        with open(os.path.join(os.path.dirname(HERE), "web", "app", "core", "settings.js")) as f:
+            self.assertIn('{ value: "%s", label: "Glass", tone: null }' % alternates.GLASS, f.read())
+        self.assertEqual(carfile.png_size(read(os.path.join("glass", "AppIcon60x60@3x.png"))), (180, 180))
+
+    def test_glass_icon_in_both_cars(self):
+        """actool compiled the .icon: the set is in each .car (iOS 26+ draws its layers, older iOS its flat render)."""
+        for car in ("Assets.car", "AssetsLite.car"):
+            with self.subTest(car=car):
+                self.assertIn(alternates.GLASS_SET, carfile.icon_sets(read(car)))
 
     def test_svg_layers_are_well_formed(self):
         import xml.etree.ElementTree as ET
