@@ -16,6 +16,12 @@
   index.html): `/add?url=https://repo.example.com/` ends at `/#/sources`, the Sources tab button is the selected
   one, Enter Source URL's alert is over the Sources list with the URL filled in, no page errors.
 
+## Spec review
+
+- Nothing missing or wrong. It listed the new test file as outside the brief's files: kept, it is this change's
+  regression test (source-text checks on app.js, as `incoming-handoff.test.js` and `websign-launch-refresh.test.js`
+  already do, since app.js runs only in a browser).
+
 ## Not verified
 
 - Tapping Add Source in Chromium and watching the new source load: the probe has no reachable source to add (no
