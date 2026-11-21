@@ -28,6 +28,7 @@ import * as home from "./screens/home.js";
 import * as settingsScreen from "./screens/settings.js";
 import { sourceFilter } from "./core/sources.js";
 import { getBackend } from "./backend.js";
+import { backFollowsTitle } from "./nav/backlabel.js";
 import { appSchemeFor, openOutside } from "./core/applinks.js";
 import { launchURL } from "./launch.js";
 import { isAddPath, parseAddLink } from "./core/handoff.js";
@@ -143,6 +144,7 @@ function makePage(tab, path) {
 
   // back: the label pages above it show; handle: the page's own nav item for its screen (nav/go.js pageHandle)
   const entry = { el: page, body, shade, item, title: "", back: "", handle: pageHandle(item, body) };
+  backFollowsTitle(entry); // a name the screen learns later is also the back label above (nav/backlabel.js)
   drawPage(entry, route, below);
   return entry;
 }
