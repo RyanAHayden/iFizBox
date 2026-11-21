@@ -88,6 +88,8 @@ import { DETAILS_TITLE, packageRows, moreInfoShown, detailRows, descGroup, chang
   detailsFooter, MORE_INFO_LABEL } from "./details.js"; // F350
 import { rowIcon } from "../icons/rowicons.js";
 import { appInfoNodes } from "./altstore.js"; // F350: an app's More Information
+import { loadStyle } from "../nav/motion.js"; // F352: Add Tweaks' price button (myipas.css)
+import { liteTweaks } from "../core/tweakindex.js"; // F352: Add Tweaks' background check
 
 // B269: in the sideload build a Tweak Source's list leaves out the tweaks already checked and refused on this device.
 export const sideloadListRows = (rows, mode = detectMode()) => (mode === "sideload" ? addableTweakRows(rows) : rows);
@@ -146,7 +148,7 @@ export function parseToken(seg) {
   const s = String(seg ?? "");
   const i = s.indexOf(":");
   const kind = i > 0 ? s.slice(0, i) : "";
-  return ["section", "package", "author", "versions", "info", "pkgsettings", "files"].includes(kind) ? { kind, value: s.slice(i + 1) } : { kind: "unknown", value: s };
+  return ["section", "package", "author", "versions", "info", "pkgsettings", "files", "addtweaks"].includes(kind) ? { kind, value: s.slice(i + 1) } : { kind: "unknown", value: s };
 }
 
 export const token = (kind, value) => `${kind}:${value}`;
@@ -165,6 +167,9 @@ export function pageOf(route) {
     const key = route.path[0];
     if (route.path.length === 1) return { key, page: "sections" };
     const t = parseToken(route.path.at(-1));
+    // F352: a tweak opened from an app's Add Tweaks is in its Tweak Source, not the app's ("package:<id>@<key>")
+    const at = t.kind === "package" ? t.value.indexOf("@") : -1;
+    if (at > 0) return { key: t.value.slice(at + 1), page: t.kind, value: t.value.slice(0, at) };
     return { key, page: t.kind, value: t.value };
   }
   const t = parseToken(route.path.at(-1));
@@ -192,6 +197,7 @@ export function nav(route, sourceName = () => null) {
       right: { label: "Install", onClick: (e) => packageActions(route, e.currentTarget),
         onHold: () => installVersionHold(route).catch(() => {}) } }; // F346: a hold picks the version
     case "versions": return { title: "Versions" };
+    case "addtweaks": return { title: "Add Tweaks", style: "plain" }; // F352
     default: return { title: "Not Found" };
   }
 }
@@ -208,6 +214,7 @@ export function render(body, route, ctx) {
     case "pkgsettings": return renderPackageSettings(body, p.value);
     case "files": return renderFiles(body, p.value);
     case "versions": return renderVersions(body, route, p.key, p.value);
+    case "addtweaks": return renderAddTweaks(body, route, p.value); // F352
     default:
       body.append(note("Nothing here."));
   }
@@ -949,6 +956,59 @@ export async function renderSearchableList(body, route, fetchRows, { letters = f
   };
   draw(bar.input.value);
   bar.onQuery(draw);
+}
+
+// F352: Add Tweaks, a page of its own under an app's Details ("addtweaks:<bundle id>"): the grey search bar, then the
+// tweaks for the app as Search draws packages (icon, name, version, description) with the price button at the end
+// (tweaks.js addTweakButton: ADD checks and keeps the .deb, ADDED offers Remove, a paid one Sign In / Buy), grouped
+// Added / Made for <app> / Works in Any App (tweaks.js addTweaksItems). A row opens the tweak's page in its Tweak
+// Source; back comes here. Then More Tweaks: Browse Tweak Sources, Search All Repos, From Files, one footer.
+async function renderAddTweaks(body, route, bundleId) {
+  const tw = await import("./tweaks.js");
+  const appName = tw.addTweaksAppName(bundleId) || names.get(bundleId) || "";
+  const bar = listSearchBar("Search tweaks");
+  const none = note();
+  none.hidden = true;
+  const ph = placeholder("list");
+  body.append(bar.el, none, ph);
+  loadStyle("myipas.css"); // the price button
+  let made = [], any = [], kept = [], list = null, checking = null;
+  const l = await tw.appTweakRows(bundleId).catch(() => ({ made: [], any: [], rows: [], infoOf: () => null }));
+  ({ made, any } = l);
+  const reload = async () => { kept = await tw.savedTweaks(bundleId).catch(() => []); draw(bar.input.value); };
+  const decorate = (row, item) => {
+    row._.add?.remove();
+    const a = row._.a;
+    if (item.file) a.removeAttribute("href"); // from Files: no page of its own
+    else a.href = deeper(route, keyedToken(item.id, item.key));
+    const b = tw.addTweakButton(item, { bundleId, on: Boolean(item.added), cls: "price-btn tw-row-add", onCls: "added", busyCls: "adding",
+      onChange: reload });
+    a.append(b);
+    row._.add = b;
+  };
+  const more = tw.moreTweaksGroup({ bundleId, name: appName, onChange: reload });
+  const draw = (q) => {
+    if (!body.isConnected && list) { checking?.stop(); return; }
+    const items = tw.addTweaksItems({ made, any, kept, query: q, appName });
+    none.textContent = items.length ? "" : q.trim() ? "No tweaks match your search." : `No tweaks for ${appName || "this app"} in your Tweak Sources yet.`;
+    none.hidden = items.length > 0;
+    if (!list) {
+      ph.remove();
+      list = packageList(body, route, items, { letters: false, decorate });
+      body.append(list.el, more);
+    } else list.setItems(items);
+  };
+  kept = await tw.savedTweaks(bundleId).catch(() => []);
+  draw("");
+  bar.onQuery(draw);
+  // the tweaks no index or earlier look has checked: checked here in the background, listed as they pass (F344)
+  if (l.rows?.length) {
+    checking = tw.checkForApp(l.rows, bundleId, { name: appName, onChecked: (r, info) => {
+      if (!info?.ok) return;
+      const next = liteTweaks(l.rows, bundleId, l.infoOf);
+      if (next.made.length !== made.length || next.any.length !== any.length) { ({ made, any } = next); draw(bar.input.value); }
+    } });
+  }
 }
 
 // The grey search bar alone (Changes' and Search's look, packages.css), for a list's own filter.

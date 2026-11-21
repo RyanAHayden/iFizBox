@@ -89,7 +89,7 @@ test("the app page's Add Tweaks row counts the tweaks made for the app, then the
   const g = addTweaksGroup({ bundleId: "com.x.tube", name: "Tube", rows, store, storage: s, open: async () => {} });
   await g.ready;
   assert.equal(g.el.all("cell-detail")[0].textContent, "1 for This App");
-  assert.match(g.el.all("group-footer")[0].textContent, /From your sources: YTLite/);
+  assert.equal(g.el.all("group-footer")[0].textContent, ""); // F352: no footer naming the tweaks
   await saveTweaks("com.x.tube", [{ name: "com.t.yt_2.deb", data: new Uint8Array([1]), title: "YTLite" }], { store });
   await g.refresh();
   assert.equal(g.el.all("cell-detail")[0].textContent, "1 Added");
