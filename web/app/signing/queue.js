@@ -130,6 +130,8 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
     if (ev?.log) log(ev.log);
     if (handed) return;
     if (ev?.served === true) { handed = true; release(); }
+    else if (ev?.busy === true) progress("busy", 0); // B312: iOS is installing this app for another app
+    else if (ev?.busy === false) progress("asking", 0);
     else if (ev?.phase === "installing") progress("installing", Number(ev.progress) || 0);
   }, { tag, signal });
   let r;
@@ -137,6 +139,7 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
     r = await Promise.race([watched, sent.then(() => SENT)]);
   } catch (e) {
     if (e?.code === "cancelled") throw e;
+    if (e?.code === "install_busy" || e?.code === "install_stalled") throw rowError(e, name); // B312: says why
     return { installed: null, expires: opened?.expires ?? null }; // iOS can't be asked: the prompt was shown
   }
   if (r === SENT) {

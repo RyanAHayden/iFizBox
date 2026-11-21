@@ -134,3 +134,17 @@ test("needsResign: an app with an older signer stamp (or none, as 0.18.0's recor
   assert.equal(olderSigner({ bundleId: "y", signer: { version: 1, groupFix: "bbbb" } }, { version: 1, groupFix: null }), false);
   assert.equal(olderSigner({ bundleId: "y", signer: { version: 1, groupFix: "bbbb" } }, null), false);
 });
+
+test("B312: iOS already installing the same app for another app: the row's words and the failure's", async () => {
+  const { deviceError, busyText, busyStuckText } = await import("./signing.js");
+  assert.equal(busyText("uMod"), "iOS is already installing uMod for another app. Wait for it to finish.");
+  const busy = deviceError(Object.assign(new Error("iOS is already installing com.x.umod for another app, …"), { code: "install_busy" }), "uMod");
+  assert.equal(busy.title, "Couldn't Install uMod");
+  assert.equal(busy.message, busyStuckText("uMod"));
+  assert.match(busy.message, /Wait for it to finish, then install uMod again\.$/);
+  assert.equal(busy.open, null);
+  const stalled = deviceError(Object.assign(new Error("iOS didn't install com.x.umod: …"), { code: "install_stalled" }), "uMod");
+  assert.equal(stalled.message, "iOS didn't install uMod: nothing moved for a minute. Try again.");
+  // no name: still a sentence, never the bundle ID's raw native text
+  assert.equal(deviceError({ code: "install_busy", message: "x" }).message, busyStuckText("the app"));
+});
