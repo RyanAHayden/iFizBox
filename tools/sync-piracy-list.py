@@ -70,12 +70,11 @@ SOFTWARE."""
 HOST = re.compile(r"^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$")
 
 
-def api_headers(env=None):
+def api_headers():
     """Headers for api.github.com. With GH_TOKEN set (tools/release.sh exports the owner's), it goes out as
     Authorization: anonymous calls share a 60-an-hour limit per machine that other agents can use up (HTTP 403)."""
-    env = os.environ if env is None else env
     headers = {"Accept": "application/vnd.github+json", "User-Agent": "sync-piracy-list"}
-    token = env.get("GH_TOKEN", "").strip()
+    token = os.environ.get("GH_TOKEN", "").strip()
     if token:
         headers["Authorization"] = "Bearer " + token
     return headers
