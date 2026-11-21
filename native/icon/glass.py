@@ -27,6 +27,7 @@ Settings and notifications come from the .icon too).
     python3 native/icon/glass.py car DIR        only the CAR_SETS ones (icon/assets.sh hands them to actool)
     python3 native/icon/glass.py show <icon>    the colours one icon's layers take, as JSON
     python3 native/icon/glass.py thumb          icon/glass/AppIcon60x60@3x.png, the page's thumbnail (rsvg-convert)
+    python3 native/icon/glass.py tinted         icon/glass/AppIconTinted1024.png, AppIcon's tinted look (rsvg-convert)
     python3 native/icon/glass.py sources        one digest of everything `write` makes (icon/assets.sources)
 
 Stdlib only: the gate (native/test_icons.py) writes them too.
@@ -213,6 +214,35 @@ def thumb():
     return THUMB
 
 
+# The primary icon set's tinted appearance (alternates.primary_files): iOS 18+ draws it for the Home Screen's Tinted
+# look, and iOS 26+ for Clear and Tinted too, as glass on the Home Screen's own tile (an icon without one gets iOS's
+# own one-colour copy of the whole picture: the light starburst became an opaque white tile in Clear). So it is the
+# globe only, on nothing: Clear's bold white lines and a faint face, which the system turns into its glass and tints.
+# The same picture in both builds (no LITE sash, like Clear). The PNG set stays, so iOS 15-25 keep the pictures.
+TINTED = alternates.TINTED
+TINTED_FACE = 0.18  # the sphere's opacity: enough to show the globe's face, little enough to stay see-through
+
+
+def tinted_svg():
+    """The globe only, white on transparent, at 1024 px: the tinted appearance's picture."""
+    inner = lambda s: s.split("\n", 1)[1].rsplit("\n</svg>", 1)[0]  # noqa: E731
+    face = '  <circle cx="%d" cy="%d" r="%d" fill="#ffffff" fill-opacity="%s"/>' % (CX, CY, R_SPHERE, TINTED_FACE)
+    return svg(face + "\n" + inner(layer_svgs(alternates.CLEAR)["grid"]))
+
+
+def tinted():
+    """icon/glass/AppIconTinted1024.png from tinted_svg (needs rsvg-convert)."""
+    import subprocess
+    import tempfile
+    with tempfile.NamedTemporaryFile("w", suffix=".svg", delete=False) as f:
+        f.write(tinted_svg())
+    try:
+        subprocess.run(["rsvg-convert", "-w", "1024", "-h", "1024", f.name, "-o", TINTED], check=True)
+    finally:
+        os.unlink(f.name)
+    return TINTED
+
+
 def write(dest, names=None):
     """dest/<set>.icon for the sets named (default: every set)."""
     os.makedirs(dest, exist_ok=True)
@@ -248,6 +278,8 @@ def main(argv):
             print(p)
     elif argv == ["thumb"]:
         print(thumb())
+    elif argv == ["tinted"]:
+        print(tinted())
     elif argv == ["sources"]:
         for path, digest in sources().items():
             print("%s  %s" % (digest, path))
