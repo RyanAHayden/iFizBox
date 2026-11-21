@@ -40,7 +40,8 @@ lists the ones that do.
 Look is what paints: `color`, `background*`, `border*` (including radius, image and width), `box-shadow`,
 `text-shadow`, `filter`, `backdrop-filter`, `-webkit-box-reflect`, `opacity`, `mask*`, `outline*`, `font*`, `line-height`,
 `letter-spacing`, `word-spacing`, `text-align`, `text-transform`, `text-decoration*`, `caret-color`,
-`color-scheme`, `content`, `fill`, `stroke*`, `list-style*`. The test's `LOOK` pattern is the list.
+`color-scheme`, `content`, `fill`, `stroke*`, `list-style*`, `appearance` (and `-webkit-appearance`: it hands a
+control's paint to the browser, "Native controls" below). The test's `LOOK` pattern is the list.
 
 Everything else is layout: the box (`display`, size, `margin`, `padding`, `box-sizing`), position (`position`,
 insets, `z-index`, `transform`), flex and grid, `overflow`, wrapping and truncation (`white-space`, `text-overflow`,
@@ -253,6 +254,31 @@ iOS 13 and iOS 26 need three, each off in iOS 6:
   | `--sheet-bar-top` | safe top | 0px | the status bar's room inside the sheet's bar |
   | `--sheet-radius` (look) | 0px | 10px | the sheet's top corners |
   | `--sheet-behind-scale`, `--sheet-behind-shift`, `--sheet-behind-opacity` | not used | 0.92, 0, 0.75 | the page behind (shift in px, down) |
+
+### Native controls
+
+iOS 26 adds a fourth hook: `<html data-controls="native">`, set only under `data-style="ios26"` and only where the
+web view draws iOS 26's own form controls. Under it the page hands those controls to WebKit; without it the same
+markup gets `ios26.css`'s look-alikes.
+
+- **When it is on** (`native-controls.js` `drawsIos26Controls()`; `theme-boot.js` runs the same rule before first
+  paint): in the app, the shell's `app.info` `ios` is 26 or later; on an iPhone or iPad (an iPad asking for the
+  desktop page counts) whose user agent has Safari's `Version/`, that version is 26 or later; otherwise, on an
+  iPhone or iPad, CSS anchor positioning is supported (first in WebKit 26). A web view's user agent freezes the OS
+  version (the iPhone 15 Pro on iOS 27 says `iPhone OS 18_7`), so the app's first paint uses the feature test and
+  `app.info` corrects it. Desktop browsers never get it. A change after first paint (Theme > Style, the app's
+  answer) redraws the switches on screen in the other kind (`nav/switch.js` `redrawSwitches`).
+- **What it swaps** (look in `ios26.css`, `appearance: auto` with the page's paint reverted; sizes unchanged):
+
+  | Control | Under the hook | Without it |
+  |---|---|---|
+  | Search bar field (`nav/searchbar.js`) | WebKit's capsule and magnifier, 17pt, no focus ring; `packages.css` drops the drawn magnifier's room | the CSS capsule, magnifier and clear |
+  | Text fields in cells | plain borderless inputs | the same, styled by the era |
+  | Switches (`nav/switch.js` `createSwitch`) | `<input type=checkbox switch>`, WebKit's switch, in `--sw-w` x `--sw-h` (71 x 31, WebKit's own box) | the button art, in the same box |
+  | Fixed-choice menus | a real `<select>`: iOS 26's pull-down button and its glass menu | (none built yet) |
+  | The run page's bar (`nav/progress.js`) | `<progress class="progress-bar">` | the drawn track and fill |
+
+  `appearance` (and `-webkit-appearance`) is look: it is in the test's `LOOK` list.
 
 ### Overlays (nav/)
 

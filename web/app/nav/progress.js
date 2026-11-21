@@ -104,9 +104,12 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
   jump.hidden = true;
   const foot = el("div", "progress-foot");
   const statusText = el("div", "progress-status", "Preparing");
-  const track = el("div", "progress-track");
+  // F345a: under the native controls hook (native-controls.js) the bar is WebKit's own <progress>, iOS 26's
+  // UIProgressView; otherwise the drawn track and fill.
+  const native = globalThis.document?.documentElement?.getAttribute?.("data-controls") === "native";
+  const track = native ? Object.assign(el("progress", "progress-bar"), { max: 100, value: 0 }) : el("div", "progress-track");
   const fill = el("div", "progress-fill");
-  track.append(fill);
+  if (!native) track.append(fill);
   const finishButton = el("button", "progress-finish");
   finishButton.type = "button";
   finishButton.hidden = true;
@@ -174,7 +177,11 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
   const closers = [];
   let segNode = null;      // B303: page.segmented's control, in the title's place
   const setTitle = (t) => { if (!segNode) h1.textContent = t; sheet.setAttribute("aria-label", t); };
-  const setProgress = (pct) => { fill.style.transform = `scaleX(${Math.max(0, Math.min(100, Number(pct) || 0)) / 100})`; };
+  const setProgress = (pct) => {
+    const p = Math.max(0, Math.min(100, Number(pct) || 0));
+    if (native) track.value = p;
+    else fill.style.transform = `scaleX(${p / 100})`;
+  };
   setProgress(0);
 
   cancel.addEventListener("click", () => { if (!cancel.disabled && onCancel) onCancel(); });
