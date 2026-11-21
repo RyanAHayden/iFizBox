@@ -693,3 +693,62 @@ test("F315: Keep Bundle IDs' footer by state, one sentence, the guide row only w
     }
   }
 });
+
+// F347: Theme > Light / Dark's preview: a top bar (the divider, the sample's nav bar and its search bar) is the handle
+// over a sample that scrolls on its own and works; a Remove / Install / Done row; the green button's tokens.
+test("F347: the preview's top bar is the handle; the sample under it works and has Remove, Install and Done", async () => {
+  globalThis.document = settingsDoc();
+  const { render, toggleCheck } = await import("./settings.js");
+  const all = (n, pred, out = []) => { for (const c of n.children ?? []) { if (pred(c)) out.push(c); all(c, pred, out); } return out; };
+  const has = (n, cls) => String(n.className).split(" ").includes(cls);
+  const root = fakeElement("div");
+  render(root, { tab: "home", path: ["theme", "lightTheme"] });
+  const [pane] = all(root, (n) => has(n, "theme-preview"));
+  const [top, body] = pane.children;
+  assert.ok(has(top, "theme-preview-top"));
+  assert.ok(has(body, "theme-preview-body"));
+  assert.deepEqual(top.children.map((c) => c.className), ["theme-preview-grip", "navbar theme-preview-bar", "search-bar"]);
+  const inputs = all(top, (n) => n.type === "search");
+  assert.equal(inputs.length, 1);
+  assert.equal(inputs[0].readOnly, true);
+  assert.equal(body.inert, undefined); // not inert any more
+  assert.equal(all(body, (n) => has(n, "navbar") || has(n, "search-bar")).length, 0);
+  const [colours] = all(body, (n) => has(n, "theme-preview-colours"));
+  assert.deepEqual(colours.children.map((c) => [c.className, c.textContent]),
+    [["bar-button red", "Remove"], ["bar-button green", "Install"], ["bar-button done", "Done"]]);
+  // the Checked row toggles its mark
+  const inner = fakeElement("button");
+  inner.append(Object.assign(fakeElement("span"), { className: "cell-check" }));
+  assert.equal(toggleCheck(inner), false);
+  assert.equal(inner.children.length, 0);
+  assert.equal(toggleCheck(inner), true);
+  assert.equal(inner.children[0].className, "cell-check");
+  const { readFile } = await import("node:fs/promises");
+  const src = await readFile(new URL("./settings.js", import.meta.url), "utf8");
+  assert.match(src, /querySelector\("\.theme-preview-top"\)\?\.addEventListener\?\.\("pointerdown"/);
+  assert.match(src, /loadStyle\("sources\.css"\)/);
+});
+
+test("F347: the green bar button's tokens in ios6.css, each era's own, Metal's white text, no strip over the sample bar", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const css = async (f) => readFile(new URL(`../${f}`, import.meta.url), "utf8");
+  const ios6 = await css("ios6.css");
+  assert.match(ios6, /--lt-green-edge: #1d6a1c; --lt-green-edge-top: #30363e;/);
+  assert.match(ios6, /--lt-green: linear-gradient\(#8fd68d, #51b14f 49%, #3ba739 51%, #3ca83a\);/);
+  assert.match(ios6, /--lt-green-pressed: linear-gradient\(#72b870, #3d9a3b 49%, #2a8a28 51%, #2b8b29\);/);
+  for (const rule of [".bar-button.green:not(.back):not(.done), html[data-theme] .bar-button.green:not(.back):not(.done) {",
+    "html[data-theme] .bar-button.green:not(.back):not(.done):is(:active, .is-pressed) {"]) {
+    const at = ios6.indexOf(rule);
+    assert.ok(at >= 0, rule);
+    assert.match(ios6.slice(at, ios6.indexOf("}", at)), /background-origin: border-box/);
+  }
+  for (const [era, green] of [["ios7", "--i7-green"], ["ios13", "--i13-green"], ["ios26", "--i26-green"]]) {
+    const src = await css(`${era}.css`);
+    assert.match(src, new RegExp(`html\\[data-style="${era}"\\] \\{\\s*--lt-green-edge: [^;]+; --lt-green-edge-top: [^;]+; --lt-green: `), era);
+    assert.ok(src.includes(`html[data-style="${era}"] .bar-button.green:not(.back):not(.done) { color: var(${green}); }`), era);
+  }
+  assert.match(await css("palettes.css"), /\.bar-button:not\(\.done\):not\(\.red\):not\(\.green\):not\(\.manage-delete\)/);
+  const settingsCss = await css("settings.css");
+  assert.ok(settingsCss.includes('html[data-shell] .theme-preview .navbar.theme-preview-bar::before'));
+  assert.match(settingsCss, /\.theme-preview-grip \{ background: linear-gradient\(#5a5b5d, #333435 2px, #2a2b2c\); box-shadow: inset 0 -1px #121212; \}/);
+});

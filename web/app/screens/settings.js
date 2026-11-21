@@ -410,7 +410,8 @@ export const splitNow = (geo) => splitHeight(geo, split);
 function splitPane(box, space, list) {
   Object.assign(split, { box, space, list });
   if (split.h != null) setSplit(box, space, split.h); // a redraw: keep the height on screen, then move from it
-  box.querySelector(".theme-preview-grip")?.addEventListener?.("pointerdown", (e) => dragSplit(e, box, space));
+  // F347: the whole top bar (divider, the sample's nav bar and search bar) is the handle, not just the grip
+  box.querySelector(".theme-preview-top")?.addEventListener?.("pointerdown", (e) => dragSplit(e, box, space));
   layoutSoon();
 }
 
@@ -530,20 +531,27 @@ export function pick(d, value, store = settings) {
 }
 
 // Theme > Light / Dark: a sample of the app's controls in the theme showing, pinned over the page's bottom half
-// (settings.css .theme-preview). Inert: nothing in it does anything.
+// (settings.css .theme-preview). F347: it works as a sample: buttons show their pressed state, the switch, the
+// segmented control and the Checked row toggle; nothing else happens.
 function themePreview(tone) {
   const make = (tag, cls, text) => Object.assign(document.createElement(tag), { className: cls, textContent: text ?? "" });
   loadStyle("appicon.css");
-  // F215: the pane holds the divider (a grip to drag) and the sample, which scrolls on its own under it.
+  loadStyle("sources.css"); // .bar-button.done's blue
+  // F347: the pane is a top bar (the divider, the sample's nav bar and its search bar, pinned: the handle that moves
+  // the split) over the sample, which scrolls on its own.
   const pane = make("div", "theme-preview");
+  const top = make("div", "theme-preview-top");
+  top.setAttribute("aria-hidden", "true");
   const grip = make("div", "theme-preview-grip");
-  grip.setAttribute("aria-hidden", "true");
   const box = make("div", "theme-preview-body");
-  pane.append(grip, box);
-  box.inert = true;
-  box.setAttribute("aria-hidden", "true");
+  pane.append(top, box);
   const bar = make("div", "navbar theme-preview-bar");
   bar.append(make("span", "bar-button back", "Back"), make("span", "nav-title", "Preview"), make("span", "bar-button", "Edit"));
+  const search = make("div", "search-bar");
+  const field = make("label", "search-field");
+  field.append(Object.assign(document.createElement("input"), { type: "search", placeholder: "Search", readOnly: true, tabIndex: -1 }));
+  search.append(field);
+  top.append(grip, bar, search);
   // F323: in the apps, a small Home header, its icon the one this theme (or Theme > App Icon's pick) gives the app.
   // The website's preview stays as it was (its icon never changes).
   const home = document.createDocumentFragment();
@@ -555,26 +563,42 @@ function themePreview(tone) {
     head.append(icon, make("span", "theme-preview-home-title", `Welcome to ${NAME}`));
     home.append(head);
   }
-  const search = make("div", "search-bar");
-  const field = make("label", "search-field");
-  field.append(Object.assign(document.createElement("input"), { type: "search", placeholder: "Search" }));
-  search.append(field);
-  const seg = segmented(["Details", "Reviews", "Related"]).bar;
-  seg.classList.add("theme-preview-seg");
+  const seg = segmented(["Details", "Reviews", "Related"], { onSelect: (i) => seg.mark(i) });
+  seg.bar.classList.add("theme-preview-seg");
+  const btn = (cls, text) => Object.assign(make("button", cls, text), { type: "button" });
   const buttons = make("div", "theme-preview-buttons");
-  buttons.append(make("span", "store-btn", "FREE"), make("span", "store-btn", "$0.99"), make("span", "badge", "3"));
+  buttons.append(btn("store-btn", "FREE"), btn("store-btn", "$0.99"), make("span", "badge", "3"));
+  pressable(buttons, ".store-btn"); // app.js presses bar buttons and rows; the store buttons press here
+  const colours = make("div", "theme-preview-buttons theme-preview-colours");
+  colours.append(btn("bar-button red", "Remove"), btn("bar-button green", "Install"), btn("bar-button done", "Done"));
+  const nothing = () => {};
   const groups = grouped([{ header: "Sample", rows: [
-    { label: "Sources", detail: "12", chevron: true, icon: rowIcon(PAGE_ICONS.general) },
-    { label: "Upgrades", badge: "3", chevron: true, icon: rowIcon(PAGE_ICONS.updates) },
+    { label: "Sources", detail: "12", chevron: true, icon: rowIcon(PAGE_ICONS.general), onClick: nothing },
+    { label: "Upgrades", badge: "3", chevron: true, icon: rowIcon(PAGE_ICONS.updates), onClick: nothing },
     { label: "Switch" },
-    { label: "Checked", checked: true },
-    { label: "Package", subtitle: "A row with a subtitle", detail: "1.0" },
+    { label: "Checked", checked: true, onClick: (e) => toggleCheck(e.currentTarget) },
+    { label: "Package", subtitle: "A row with a subtitle", detail: "1.0", onClick: nothing },
   ], footer: "A group footer reads like this." }]);
   const sw = groups.querySelectorAll(".cell-inner")[2];
   sw.append(createSwitch({ label: "Switch", checked: true }));
   sw.classList.add("has-switch");
-  box.append(bar, home, search, seg, buttons, groups);
+  box.append(home, seg.bar, buttons, colours, groups);
   return pane;
+}
+
+// F347: the preview's Checked row: a tap takes its check mark off, the next puts it back.
+export function toggleCheck(inner) {
+  const mark = inner.querySelector(".cell-check");
+  if (mark) mark.remove();
+  else inner.append(Object.assign(document.createElement("span"), { className: "cell-check" }));
+  return !mark;
+}
+
+// F347: .is-pressed on a `sel` element of `root` while a finger is on it (:active alone is unreliable on iOS).
+function pressable(root, sel) {
+  const off = () => root.querySelector(".is-pressed")?.classList.remove("is-pressed");
+  root.addEventListener("pointerdown", (e) => { off(); e.target.closest?.(sel)?.classList.add("is-pressed"); });
+  for (const type of ["pointerup", "pointercancel", "pointerleave"]) root.addEventListener(type, off);
 }
 
 // ---- F323: Theme > App Icon ----------------------------------------------------------------------------------

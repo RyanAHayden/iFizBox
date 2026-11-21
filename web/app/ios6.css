@@ -31,6 +31,11 @@
   --lt-red: linear-gradient(#d4848b, #b01a27);
   --lt-red-pressed-edge: #521c20; --lt-red-pressed-edge-top: #3d3031;
   --lt-red-pressed: linear-gradient(#b28b8e, #70272d);
+  /* F347: the green bar button (.bar-button.green). UIKit has no green bar art: .bar-button.done's gloss in the kit's
+     Add Icon (green) colours; pressed darkened by the steps Done's pressed blue takes; one set for both tones */
+  --lt-green-edge: #1d6a1c; --lt-green-edge-top: #30363e;
+  --lt-green: linear-gradient(#8fd68d, #51b14f 49%, #3ba739 51%, #3ca83a);
+  --lt-green-pressed: linear-gradient(#72b870, #3d9a3b 49%, #2a8a28 51%, #2b8b29);
 }
 /* Dark: our own themes in the iOS 6 spirit. <html data-theme> is the tone (light or dark), <html data-palette> the
    palette inside it (F198): "oled" (OLED Black, the default dark one, user 2026-11-18) or "gunmetal" (F13's dark,
@@ -331,6 +336,17 @@ html[data-theme="dark"] .bar-button.red:not(.back):not(.done) {
 html[data-theme="dark"] .bar-button.red:not(.back):not(.done):is(:active, .is-pressed) {
   border-color: var(--dk-red-pressed-edge); border-top-color: var(--dk-red-pressed-edge-top);
   background: var(--dk-red-pressed); background-origin: border-box;
+}
+/* F347: the green bar button (Theme's preview: Install), its --lt-green* tokens at the end of :root. Like the blue
+   Done it is the same in both tones and keeps its edges when pressed; the dark selector only matches the weight of
+   the dark bar-button rule. */
+.bar-button.green:not(.back):not(.done), html[data-theme] .bar-button.green:not(.back):not(.done) {
+  border-color: var(--lt-green-edge); border-top-color: var(--lt-green-edge-top);
+  background: var(--lt-green); background-origin: border-box;
+}
+.bar-button.green:not(.back):not(.done):is(:active, .is-pressed),
+html[data-theme] .bar-button.green:not(.back):not(.done):is(:active, .is-pressed) {
+  background: var(--lt-green-pressed); background-origin: border-box;
 }
 /* ==== } look-only ==== */
 

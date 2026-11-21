@@ -234,6 +234,12 @@ html[data-style="ios26"] .bar-button { font-size: 15px; font-weight: 500; line-h
 html[data-style="ios26"] .bar-button.done,
 html[data-style="ios26"][data-theme] .bar-button.done { font-weight: 600; color: #fff; }
 html[data-style="ios26"] .bar-button.red:not(.back):not(.done) { color: var(--i26-red); }
+/* F347: the green bar button (ios6.css .bar-button.green): the glass capsule with green text, as the red one */
+html[data-style="ios26"] {
+  --lt-green-edge: var(--i26-glass-rim); --lt-green-edge-top: var(--i26-glass-rim); --lt-green: var(--i26-capsule);
+  --lt-green-pressed: var(--i26-capsule-pressed);
+}
+html[data-style="ios26"] .bar-button.green:not(.back):not(.done) { color: var(--i26-green); }
 /* The back button: its chevron stays ios6.css's border-image (the --bar-back token), the capsule is its background. */
 html[data-style="ios26"] .bar-button.back,
 html[data-style="ios26"][data-theme] .bar-button.back {
