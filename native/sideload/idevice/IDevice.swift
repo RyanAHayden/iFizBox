@@ -342,7 +342,7 @@ enum IDevice {
         static let tunnel: TimeInterval = 30   // RPPairing verify, the tunnel, the RSD handshake (or lockdown)
         static let service: TimeInterval = 20  // connecting to AFC or installation_proxy through RSD
         static let afcStep: TimeInterval = 20  // one AFC request (mkdir, open, close, remove)
-        static let upload: TimeInterval = 30   // one 1 MB chunk
+        static let upload: TimeInterval = HereRecheck.CopyQuiet.ceiling // one 1 MB chunk; B292: shorter once chunks land fast
         static let install: TimeInterval = 180 // installd's next percentage (a big app verifies for a while)
         static let grace: TimeInterval = 10    // after closing the tunnel, for the stuck call to come back
     }
@@ -381,6 +381,12 @@ enum IDevice {
         }
         var stopRequest: String? { lock.lock(); defer { lock.unlock() }; return stopWhy }
         func alive(_ d: String? = nil) { lock.lock(); last = Date(); if let d = d { detail = d }; lock.unlock() }
+        /// B292: a new quiet limit for the step running now (the copy's, from how fast chunks land).
+        func setLimit(_ l: TimeInterval) { lock.lock(); limit = l; lock.unlock() }
+        /// B292: how often the watchdog saw the app suspended; the copy leaves such gaps out of its pace.
+        private var suspendedCount = 0
+        func noteSuspended() { lock.lock(); suspendedCount += 1; lock.unlock() }
+        var suspensions: Int { lock.lock(); defer { lock.unlock() }; return suspendedCount }
         var now: (step: String, limit: TimeInterval, quiet: TimeInterval) {
             lock.lock(); defer { lock.unlock() }
             return (step, limit, Date().timeIntervalSince(last))
@@ -428,6 +434,7 @@ enum IDevice {
             if gap > 5 {
                 ilog("the app was suspended for \(Int(gap)) s (\(AppFront.now ? "in front" : "in the background") now); \(w.now.step) gets its time again")
                 w.alive()
+                w.noteSuspended()
                 continue
             }
             if let why = w.stopRequest {
@@ -1224,6 +1231,7 @@ enum IDevice {
         if run.copyStart == nil { run.copyStart = Date() }
         let t0 = Date()
         var last = Date()
+        var quiet = HereRecheck.CopyQuiet(), shown = Limit.upload, suspensions = w.suspensions
         do {
             while let d = try fh.read(upToCount: chunk), !d.isEmpty {
                 try d.withUnsafeBytes { try check(afc_file_write(file, $0.baseAddress?.assumingMemoryBound(to: UInt8.self), d.count), "upload_failed") }
@@ -1231,7 +1239,19 @@ enum IDevice {
                 run.sent = sent
                 let now = Date()
                 run.speed.add(d.count, now.timeIntervalSince(last), front: AppFront.now)
+                // B292: notice a dead route sooner than 30 s when chunks have been landing fast
+                // after a suspension the pace starts over: the watchdog may count it only after the chunk whose gap
+                // spans it was added, so that gap goes too
+                let s = w.suspensions
+                if s != suspensions { quiet = HereRecheck.CopyQuiet() } else { quiet.add(now.timeIntervalSince(last)) }
+                suspensions = s
                 last = now
+                let limit = quiet.limit
+                w.setLimit(limit)
+                if abs(limit - shown) >= 5 {
+                    ilog("AFC: quiet limit \(Int(limit)) s (from how fast chunks land)")
+                    shown = limit
+                }
                 w.alive("\(mb(sent)) of \(mb(total)) copied")
                 if sent - logged >= 8 * chunk || sent == total {
                     logged = sent

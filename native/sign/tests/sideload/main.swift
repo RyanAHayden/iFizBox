@@ -509,6 +509,44 @@ test("This iPhone: a second look while installd is quiet (B251)") {
     check(HereRecheck.SecondLook.ends(.installed), "the new copy listed: installed")
 }
 
+test("This iPhone: the copy's quiet limit follows how fast chunks land (B292)") {
+    typealias Q = HereRecheck.CopyQuiet
+    var q = Q()
+    check(q.limit == Q.ceiling, "nothing landed yet: the full \(Q.ceiling) s")
+    for _ in 1..<Q.warmup { q.add(0.5) }
+    check(q.limit == Q.ceiling, "still warming up: the full limit")
+    q.add(0.5)
+    check(q.limit == Q.floor, "chunks every 0.5 s: a stall is a drop after \(Q.floor) s, got \(q.limit)")
+    // a slow route keeps a limit that fits its pace
+    var slow = Q()
+    for _ in 0..<Q.warmup { slow.add(4) }
+    check(slow.limit == 16, "chunks every 4 s: 16 s, got \(slow.limit)")
+    for _ in 0..<Q.warmup { slow.add(12) }
+    check(slow.limit == Q.ceiling, "never over \(Q.ceiling) s, got \(slow.limit)")
+    // one slow chunk in the window holds the limit up until it leaves the window
+    var dip = Q()
+    for _ in 0..<Q.warmup { dip.add(0.1) }
+    dip.add(3)
+    check(dip.limit == 12, "a 3 s chunk: 12 s, got \(dip.limit)")
+    for _ in 0..<Q.window - 1 { dip.add(0.1) }
+    check(dip.limit == 12, "still in the window")
+    dip.add(0.1)
+    check(dip.limit == Q.floor, "out of the window: back to \(Q.floor) s, got \(dip.limit)")
+    // a gap that spans the app being suspended would hold the limit up: the copy starts a new pace instead
+    var sus = Q()
+    for _ in 0..<Q.warmup { sus.add(0.5) }
+    sus.add(60)
+    check(sus.limit == Q.ceiling, "a 60 s gap in the pace: the full limit, got \(sus.limit)")
+    sus = Q()
+    for _ in 0..<Q.warmup { sus.add(0.5) }
+    check(sus.limit == Q.floor, "the new pace is short again after \(Q.warmup) chunks, got \(sus.limit)")
+    // a negative gap (the clock moved back) is counted but isn't a pace
+    var back = Q()
+    for _ in 0..<Q.warmup { back.add(-1) }
+    check(back.limit == Q.ceiling, "no gaps to go on: the full limit, got \(back.limit)")
+    check(HereRecheck.CopyQuiet.ceiling < 180, "installd's long limit (180 s) is not the copy's")
+}
+
 test("the IPA kept for Re-sign (F343)") {
     let dir = work.appendingPathComponent("kept-ipas", isDirectory: true)
     try? FileManager.default.removeItem(at: dir)
