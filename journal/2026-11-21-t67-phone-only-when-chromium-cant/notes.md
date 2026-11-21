@@ -27,6 +27,12 @@
 
 - The on_exit hook firing in a real run: I can't end a slot's session from inside one. agent-runner may read
   runner.toml only when the run starts, so it may take effect from the next run start.
-- A race: the runner starts on_exit (Popen, not waited for) and then saves leftovers and cleans the worktree. If
-  the clean switched the branch before `git rev-parse` ran, the script sees no task and frees nothing (the lock then
-  goes stale after 30 minutes as before). I did not change agent-runner (another repo) to pass the task ID.
+- The spec review found a race: the runner starts on_exit (Popen, not waited for) and then saves leftovers and
+  cleans the worktree, so reading the branch can come too late. Fixed without touching agent-runner: `ui-15.sh lock`
+  also writes `slot` (the session's `AGENT_SLOT`, which the runner also sets for on_exit), and `ui-release.sh`
+  with no ID frees any lock whose `slot` matches, then falls back to the branch. `ui-7.sh` and `ui-4s.sh` don't
+  write `slot` yet (outside this task's files), so their locks still rely on the branch: filed as a follow-up.
+
+## Spec review
+
+Fixed: the on_exit race (slot file, above). Kept as part of the ask: runner.toml on_exit, ui-release.sh and its test, and the 4S lock in the release (same rule, one loop). Stale timeout left at 30 min on purpose (Choices). Filed T68: the slot file for ui-7.sh and ui-4s.sh. The gate runs in `run done`.
