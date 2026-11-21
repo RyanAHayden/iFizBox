@@ -1240,8 +1240,10 @@ enum IDevice {
                 let now = Date()
                 run.speed.add(d.count, now.timeIntervalSince(last), front: AppFront.now)
                 // B292: notice a dead route sooner than 30 s when chunks have been landing fast
+                // after a suspension the pace starts over: the watchdog may count it only after the chunk whose gap
+                // spans it was added, so that gap goes too
                 let s = w.suspensions
-                quiet.add(now.timeIntervalSince(last), suspended: s != suspensions)
+                if s != suspensions { quiet = HereRecheck.CopyQuiet() } else { quiet.add(now.timeIntervalSince(last)) }
                 suspensions = s
                 last = now
                 let limit = quiet.limit

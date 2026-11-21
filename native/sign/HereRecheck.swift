@@ -124,12 +124,12 @@ enum HereRecheck {
         private(set) var gaps: [TimeInterval] = []
         private(set) var landed = 0
 
-        /// A chunk landed `gap` seconds after the one before it (or after the copy started). A gap that spans the app
-        /// being suspended (the watchdog gives such a step its time again) is not the route's pace: leave it out with
-        /// `suspended`.
-        mutating func add(_ gap: TimeInterval, suspended: Bool = false) {
+        /// A chunk landed `gap` seconds after the one before it (or after the copy started). After the app was
+        /// suspended, start a new CopyQuiet: a gap that spans the suspension is not the route's pace, and the watchdog
+        /// may notice the suspension only after that chunk has been added.
+        mutating func add(_ gap: TimeInterval) {
             landed += 1
-            guard !suspended, gap >= 0 else { return }
+            guard gap >= 0 else { return }
             gaps.append(gap)
             if gaps.count > Self.window { gaps.removeFirst(gaps.count - Self.window) }
         }

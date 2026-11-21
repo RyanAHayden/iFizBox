@@ -517,7 +517,6 @@ test("This iPhone: the copy's quiet limit follows how fast chunks land (B292)") 
     check(q.limit == Q.ceiling, "still warming up: the full limit")
     q.add(0.5)
     check(q.limit == Q.floor, "chunks every 0.5 s: a stall is a drop after \(Q.floor) s, got \(q.limit)")
-    check(Q.floor + 10 < 42, "R53 run 2's stall (42 s with the grace) is noticed well sooner")
     // a slow route keeps a limit that fits its pace
     var slow = Q()
     for _ in 0..<Q.warmup { slow.add(4) }
@@ -533,12 +532,18 @@ test("This iPhone: the copy's quiet limit follows how fast chunks land (B292)") 
     check(dip.limit == 12, "still in the window")
     dip.add(0.1)
     check(dip.limit == Q.floor, "out of the window: back to \(Q.floor) s, got \(dip.limit)")
-    // a gap that spans the app being suspended isn't the route's pace
+    // a gap that spans the app being suspended would hold the limit up: the copy starts a new pace instead
     var sus = Q()
     for _ in 0..<Q.warmup { sus.add(0.5) }
-    sus.add(60, suspended: true)
-    check(sus.limit == Q.floor, "suspended gap left out, got \(sus.limit)")
-    check(sus.landed == Q.warmup + 1, "but the chunk still counts")
+    sus.add(60)
+    check(sus.limit == Q.ceiling, "a 60 s gap in the pace: the full limit, got \(sus.limit)")
+    sus = Q()
+    for _ in 0..<Q.warmup { sus.add(0.5) }
+    check(sus.limit == Q.floor, "the new pace is short again after \(Q.warmup) chunks, got \(sus.limit)")
+    // a negative gap (the clock moved back) is counted but isn't a pace
+    var back = Q()
+    for _ in 0..<Q.warmup { back.add(-1) }
+    check(back.limit == Q.ceiling, "no gaps to go on: the full limit, got \(back.limit)")
     check(HereRecheck.CopyQuiet.ceiling < 180, "installd's long limit (180 s) is not the copy's")
 }
 

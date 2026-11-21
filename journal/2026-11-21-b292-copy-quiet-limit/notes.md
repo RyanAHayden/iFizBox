@@ -9,8 +9,10 @@ copy waited its 30 s quiet limit, then 10 s for the stuck call, before reconnect
   After 4 chunks, the limit is 4 × the slowest of the last 16 gaps between chunks, clamped to 8…30 s. A copy at its
   usual pace (chunks every 0.06-0.5 s) now counts a stall as a drop after 8 s instead of 30 s; a slow route (DERP, a
   weak network: chunks every 4 s) gets 16 s; nothing ever waits longer than before (30 s).
-- A gap that spans the app being suspended is left out of the pace: the watchdog now counts suspensions
-  (`Watch.noteSuspended` / `suspensions`), and the copy compares the count per chunk.
+- A gap that spans the app being suspended must not hold the limit up: the watchdog now counts suspensions
+  (`Watch.noteSuspended` / `suspensions`), and when the count moves the copy starts a new pace (the full 30 s for 4
+  chunks, then short again). First try left only the suspended gap out; the spec review pointed out the watchdog can
+  notice the suspension after that chunk was already added, so the pace is now restarted instead.
 - `Watch.setLimit` changes the running step's limit; the copy loop sets it after every chunk and logs
   "AFC: quiet limit N s" when it moves by 5 s or more (so the log shows when the short limit took over).
 - installd's 180 s limit, the AFC request limits and the tunnel limits are unchanged.
