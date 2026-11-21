@@ -82,6 +82,16 @@ export async function runQueue({ jobs, plan }, deps) {
   // plain output may repeat on purpose (C6's rule).
   const steps = new Set();
   let pass = 0;
+  // F363: each pass is kept in Console Logs from its first line (runLogs.start), each line saved as it comes, so a
+  // run that hangs or is killed still leaves its log; a retry pass is an entry of its own, holding that pass's lines.
+  const runJobs = jobs.map((j) => ({ op: j.op, id: j.id, version: j.version, mode: j.mode }));
+  const titleNow = () => runTitle(jobs.map((j) => ({ ...j, name: j.name || names[j.id] })));
+  let live = null;
+  let passFrom = 0; // where this pass's lines start in `log`
+  const entry = () => {
+    if (!live) { passFrom = log.length; live = runLogs.start({ title: titleNow(), jobs: runJobs }); }
+    return live;
+  };
   const line = (kind, text, pkg = null) => {
     if (!text) return;
     if (kind === "step") {
@@ -89,7 +99,9 @@ export async function runQueue({ jobs, plan }, deps) {
       if (steps.has(key)) return;
       steps.add(key);
     }
+    const kept = entry();
     log.push(kind === "raw" ? text : kind === "error" ? `E: ${text}`.replace(/^E: E: /, "E: ") : kind === "warning" ? text : `» ${text}`);
+    kept.line(log[log.length - 1]);
     page.line(kind, text, pkg);
   };
 
@@ -214,7 +226,6 @@ export async function runQueue({ jobs, plan }, deps) {
   closeB.addEventListener("click", () => page.close());
   retryAll.addEventListener("click", () => { const p = run.retryAll(); if (p) drive(p); });
   const retry = (id) => { const wasRunning = run.running; const p = run.retry(id); if (p && !wasRunning) drive(p); };
-
   // ---- Hide's strip, under every tab's nav bar ----
   const strip = (() => {
     let node = null;
@@ -241,6 +252,7 @@ export async function runQueue({ jobs, plan }, deps) {
   let latest = null;
   async function drive(promise) {
     pass++;
+    entry(); // kept as running from the pass's start, even before its first line
     page.reopen({ title: "Running", status: runStatus(rows, names) });
     cancel.disabled = false;
     summary.hidden = true;
@@ -265,8 +277,10 @@ export async function runQueue({ jobs, plan }, deps) {
     if (auto.length) await backend.markAuto?.(auto);
     const instKinds = installed.map((r) => kinds[r.id]?.kind ?? (kinds[r.id]?.restart ? "tweak" : "package"));
     const choice = chooseFinish({ ok: installed.length > 0, levels: installed.length ? [...levels, ...selfLevels(installed.map((r) => ({ id: r.id, op: r.op })))] : [], kinds: instKinds });
-    runLogs.add({ title: runTitle(jobs.map((j) => ({ ...j, name: j.name || names[j.id] }))), jobs: jobs.map((j) => ({ op: j.op, id: j.id, version: j.version, mode: j.mode })),
-      code: bad.length ? 1 : 0, finish: choice.level, text: log.join("\n") });
+    const kept = entry();
+    live = null;
+    kept.set({ title: titleNow() });
+    kept.end({ code: bad.length ? 1 : 0, cancelled: wasCancel, finish: choice.level, text: log.slice(passFrom).join("\n") });
     const reloaded = catalog.reloadInstalled?.().catch(() => {});
     const result = { ok: !bad.length, stopped: wasCancel, rows, installed: installed.length, reloaded };
     if (!first) first = result;
