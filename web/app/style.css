@@ -8,7 +8,13 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 /* --safe-bottom: the bottom inset, plus --vgap from theme-boot.js when iOS 15 has left the Home Screen app's view
    hanging off the bottom of the screen after a rotation. */
 :root { --safe-bottom: calc(env(safe-area-inset-bottom) + var(--vgap, 0px)); }
-:root { --nav-h: calc(44px + env(safe-area-inset-top)); --tab-h: calc(49px + var(--safe-bottom)); }
+:root { --nav-h: calc(44px + var(--top-inset, env(safe-area-inset-top))); --tab-h: calc(49px + var(--safe-bottom)); }
+/* --top-inset: where the nav bar starts, the top safe area unless the app says otherwise. In the iOS 6 era the app
+   (native/Sources/App.swift, --status-bar-bottom on <html>) starts it at the bottom of iOS's status bar, which on
+   Dynamic Island iPhones is above the safe area's top; the other eras and the website keep the safe area. */
+html[data-shell="app"]:not([data-style="ios7"]):not([data-style="ios13"]) {
+  --top-inset: var(--status-bar-bottom, env(safe-area-inset-top));
+}
 body {
   overscroll-behavior: none;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -29,7 +35,7 @@ a, img { -webkit-user-drag: none; }
 
 /* Nav bar: 44px below the status bar (or the notch). */
 .navbar { position: fixed; top: 0; left: 0; right: 0; z-index: 3; height: var(--nav-h); }
-.nav-stack { position: absolute; left: 0; right: 0; top: env(safe-area-inset-top); height: 44px; }
+.nav-stack { position: absolute; left: 0; right: 0; top: var(--top-inset, env(safe-area-inset-top)); height: 44px; }
 .nav-item {
   position: absolute; inset: 0; visibility: hidden;
   display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 4px;
@@ -153,14 +159,16 @@ html[data-nav="large"] .large-title {
 html[data-nav="large"] .page-body > .large-title:first-child + .empty:last-child {
   display: flex; align-items: center; justify-content: center; height: 72%; margin: 0 20px;
 }
-/* Nav bar: a 2.5pt band under it (its shadow, if the style draws one) and the status-bar strip above the 44 pt bar. */
+/* Nav bar: a 2.5pt band under it (its shadow, if the style draws one) and the status-bar strip above the 44 pt bar.
+   The strip is the top inset's height: iOS's status bar, black (ios6.css). In the app's iOS 7 and iOS 13 eras it
+   runs 22 pt into the bar instead, a layer that carries the bar's own art up over the strip. */
 .navbar::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 2.5px; pointer-events: none; }
-html[data-shell="app"] .navbar::before {
-  content: ""; position: absolute; left: 0; right: 0; top: 0; height: calc(env(safe-area-inset-top) + 22px);
+.navbar::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: var(--top-inset, env(safe-area-inset-top));
   pointer-events: none;
 }
-html:not([data-shell="app"]) .navbar::before {
-  content: ""; position: absolute; left: 0; right: 0; top: 0; height: env(safe-area-inset-top); pointer-events: none;
+html[data-shell="app"]:is([data-style="ios7"], [data-style="ios13"]) .navbar::before {
+  height: calc(var(--top-inset, env(safe-area-inset-top)) + 22px);
 }
 /* Bar buttons */
 .bar-button {

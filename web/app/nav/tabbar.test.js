@@ -154,7 +154,7 @@ const rulesOf = (src) => [...src.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{
 test("C52: style.css floats the bar only behind html[data-tabbar=float]; iOS 6's --tab-h and bar stay as they were", () => {
   const rules = rulesOf(css);
   // iOS 6: the 49 pt bar edge to edge, its height --tab-h
-  assert.match(css, /:root \{ --nav-h: calc\(44px \+ env\(safe-area-inset-top\)\); --tab-h: calc\(49px \+ var\(--safe-bottom\)\); \}/);
+  assert.match(css, /:root \{ --nav-h: calc\(44px \+ var\(--top-inset, env\(safe-area-inset-top\)\)\); --tab-h: calc\(49px \+ var\(--safe-bottom\)\); \}/);
   const base = rules.find((r) => r.sel === ".tabbar");
   assert.match(base.decl, /left: 0; right: 0; bottom: 0;/);
   assert.match(base.decl, /height: var\(--tab-h\)/);

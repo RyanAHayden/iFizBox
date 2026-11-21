@@ -232,7 +232,24 @@ final class WebController: UIViewController, WKNavigationDelegate, WKUIDelegate 
         super.viewDidLoad()
         web.navigationDelegate = self
         web.uiDelegate = self // B8: window.open goes out of the app (LinkOut)
+        if let top = TopInset.now(UIApplication.shared.connectedScenes.first as? UIWindowScene) {
+            sentTop = top
+            web.configuration.userContentController.addUserScript(WKUserScript(
+                source: TopInset.script(top), injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page))
+        }
         web.load(URLRequest(url: AppScheme.url("index.html")))
+    }
+
+    // The nav bar's top (TopInset) follows rotation and status bar changes.
+    private var sentTop: CGFloat?
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        sendTop()
+    }
+    private func sendTop(force: Bool = false) {
+        guard let top = TopInset.now(view.window?.windowScene), force || top != sentTop else { return }
+        sentTop = top
+        web.evaluateJavaScript(TopInset.script(top))
     }
 
     // B180: the launch screen (Launch.cover) on the window, over the web view, until the page has drawn #boot under
@@ -251,7 +268,10 @@ final class WebController: UIViewController, WKNavigationDelegate, WKUIDelegate 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { dropCover() }
     // F287: a page that loads again (a reload, WebKit's content process restarting) holds no job yet; on commit,
     // before its scripts run, so a job the new page starts keeps its hold
-    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) { KeepAwake.reset() }
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        KeepAwake.reset()
+        sendTop(force: true) // a page loaded again: the document-start value may be from another orientation
+    }
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { dropCover() }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         dropCover()
@@ -288,9 +308,38 @@ final class WebController: UIViewController, WKNavigationDelegate, WKUIDelegate 
         }
     }
 
-    // The nav bar under the status bar is iOS 6 blue (or a dark palette's), so light text; B221: dark text on a light
-    // bar (iOS 7's White), as the page's app.theme says (Theme.darkText).
+    // Light text: the iOS 6 era's status-bar strip is black in every theme (web/app/ios6.css), and the other eras'
+    // bars are blue or dark too; B221: dark text on a light bar (iOS 7's White), as the page's app.theme says
+    // (Theme.darkText).
     override var preferredStatusBarStyle: UIStatusBarStyle { Theme.darkText ? .darkContent : .lightContent }
+}
+
+// Where the nav bar starts, for the iOS 6 era (web/app/style.css --top-inset, from --status-bar-bottom on <html>):
+// the bottom of iOS's status bar, with its black strip above the bar, when that leaves at least `margin` under the
+// resting Dynamic Island (room for it to grow when touched, and for compact Live Activities); otherwise, and on
+// every phone whose status bar is the safe area (notch, Home button), the safe area's top. iOS puts the safe area
+// 32/3 pt under the resting island. On the iPhone 15 Pro the status bar ends at 54 pt and the island at 48.33, 5.67 pt
+// apart, so the bar stays at the safe area (59 pt); a 16 Pro's island sits lower still.
+enum TopInset {
+    static let islandBelowSafe: CGFloat = 32.0 / 3
+    static let margin: CGFloat = 6
+
+    static func value(statusBar: CGFloat, safe: CGFloat) -> CGFloat {
+        guard statusBar > 0, statusBar < safe else { return safe }
+        return statusBar - (safe - islandBelowSafe) >= margin ? statusBar : safe
+    }
+
+    static func now(_ scene: UIWindowScene?) -> CGFloat? {
+        guard let scene, let w = scene.windows.first else { return nil }
+        let safe = w.safeAreaInsets.top
+        let bar = scene.statusBarManager?.statusBarFrame.height ?? 0
+        guard safe > 0 || scene.interfaceOrientation.isLandscape else { return nil } // not laid out yet
+        return value(statusBar: bar, safe: safe)
+    }
+
+    static func script(_ top: CGFloat) -> String {
+        "document.documentElement.style.setProperty('--status-bar-bottom', '\(top)px')"
+    }
 }
 
 enum Web {
@@ -299,8 +348,9 @@ enum Web {
         c.setURLSchemeHandler(AppScheme(), forURLScheme: AppScheme.scheme)
         c.userContentController.addScriptMessageHandler(bridge, contentWorld: .page, name: "ifizbox")
         Apt.installScript(c.userContentController) // ifizboxNative, before any page script (native/bridge.js)
-        // The app's look where it differs from the website's, before first paint: ios6.css draws the nav bar's art
-        // through the status-bar strip here (on the website the strip stays plain black). Both builds.
+        // The app's look where it differs from the website's, before first paint: in the iOS 7 and iOS 13 eras
+        // ios6.css draws the nav bar's art through the status-bar strip here, and the iOS 6 era's nav bar starts at
+        // TopInset's line. Both builds.
         c.userContentController.addUserScript(WKUserScript(
             source: "document.documentElement.setAttribute('data-shell', 'app')",
             injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page))

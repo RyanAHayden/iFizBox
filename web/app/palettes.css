@@ -35,7 +35,7 @@ html[data-theme="dark"][data-palette="midnight"] {
   --dk-ground: #0a1424;
   --dk-nav-bar:
     linear-gradient(#050a14, #050a14) bottom / 100% 1px no-repeat,
-    linear-gradient(rgba(255,255,255,.18), rgba(255,255,255,.18)) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,.18), rgba(255,255,255,.18)) 0 var(--top-inset, env(safe-area-inset-top)) / 100% 1px no-repeat,
     linear-gradient(#2c3d5f, #18253e 50%, #0f1a2f 51%, #0a1424) bottom / 100% 44px no-repeat,
     #0a1424;
   --dk-nav-shadow: linear-gradient(rgba(0,0,0,.5), rgba(0,0,0,0));
@@ -106,7 +106,7 @@ html[data-theme="dark"][data-palette="linen"] {
   --dk-ground: #36383d;
   --dk-nav-bar: /* the kit's black bar: #4c4c4c to black, split at half */
     linear-gradient(#000, #000) bottom / 100% 1px no-repeat,
-    linear-gradient(rgba(255,255,255,.18), rgba(255,255,255,.18)) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,.18), rgba(255,255,255,.18)) 0 var(--top-inset, env(safe-area-inset-top)) / 100% 1px no-repeat,
     linear-gradient(#4c4c4c, #262626 50%, #141414 51%, #000) bottom / 100% 44px no-repeat,
     #000;
   --dk-nav-shadow: linear-gradient(rgba(0,0,0,.5), rgba(0,0,0,0));
@@ -189,7 +189,7 @@ html[data-theme="dark"][data-palette="nord"] {
   --dk-ground: #2e3440;
   --dk-nav-bar:
     linear-gradient(#1f232c, #1f232c) bottom / 100% 1px no-repeat,
-    linear-gradient(rgba(255,255,255,.15), rgba(255,255,255,.15)) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,.15), rgba(255,255,255,.15)) 0 var(--top-inset, env(safe-area-inset-top)) / 100% 1px no-repeat,
     linear-gradient(#4c566a, #3b4252 50%, #343a48 51%, #2b303b) bottom / 100% 44px no-repeat,
     #2e3440;
   --dk-nav-shadow: linear-gradient(rgba(0,0,0,.35), rgba(0,0,0,0));
@@ -269,7 +269,7 @@ html[data-theme="dark"][data-palette="dracula"] {
   --dk-ground: #282a36;
   --dk-nav-bar:
     linear-gradient(#15161c, #15161c) bottom / 100% 1px no-repeat,
-    linear-gradient(rgba(255,255,255,.15), rgba(255,255,255,.15)) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,.15), rgba(255,255,255,.15)) 0 var(--top-inset, env(safe-area-inset-top)) / 100% 1px no-repeat,
     linear-gradient(#4f5268, #383b4c 50%, #2c2e3b 51%, #21222c) bottom / 100% 44px no-repeat,
     #21222c;
   --dk-nav-shadow: linear-gradient(rgba(0,0,0,.4), rgba(0,0,0,0));
@@ -326,7 +326,7 @@ html[data-theme="dark"][data-palette="dracula"] {
 
 /* F325: three textures from iOS 6's own apps, drawn in CSS (no Apple artwork), each painted where Linen's weave goes
    (--weave, the rule after Linen's block). None moves: no animated texture (120 Hz). The textured nav bars keep the
-   four layers every bar has (ios6.css html[data-shell="app"] .navbar::before stretches them over the status strip):
+   four layers every bar has (the bar's art stays under the black status strip):
    Leather's first layer is its stitch line (its base line is the gloss's last pixel), Felt's and Wood's gloss is
    see-through over a wood grain fill. */
 
@@ -359,7 +359,7 @@ html[data-theme="dark"][data-palette="leather"] {
   --dk-ground: #3b2819;
   --dk-nav-bar:
     repeating-linear-gradient(90deg, rgba(241,220,180,.75) 0 6px, rgba(0,0,0,0) 6px 10px) 0 calc(100% - 5px) / 100% 1.5px no-repeat,
-    linear-gradient(rgba(255,235,200,.3), rgba(255,235,200,.3)) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(rgba(255,235,200,.3), rgba(255,235,200,.3)) 0 var(--top-inset, env(safe-area-inset-top)) / 100% 1px no-repeat,
     linear-gradient(#8f633f, #5e3d24 50%, #553620 51%, #4a2e1a calc(100% - 1px), #1c1007 calc(100% - 1px)) bottom / 100% 44px no-repeat,
     #4a2e1a;
   --dk-nav-shadow: linear-gradient(rgba(0,0,0,.5), rgba(0,0,0,0));
@@ -442,7 +442,7 @@ html[data-theme="dark"][data-palette="felt"] {
   --dk-ground: #2c6834;
   --dk-nav-bar:
     linear-gradient(#1e0f04, #1e0f04) bottom / 100% 1px no-repeat,
-    linear-gradient(rgba(255,235,200,.3), rgba(255,235,200,.3)) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(rgba(255,235,200,.3), rgba(255,235,200,.3)) 0 var(--top-inset, env(safe-area-inset-top)) / 100% 1px no-repeat,
     linear-gradient(rgba(255,255,255,.18), rgba(255,255,255,.04) 50%, rgba(0,0,0,.08) 51%, rgba(0,0,0,.28)) bottom / 100% 44px no-repeat,
     repeating-linear-gradient(2deg, #7a4e28 0 7px, #6a4220 7px 11px, #7a4e28 11px 19px);
   --dk-nav-shadow: linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,0));
@@ -524,7 +524,7 @@ html[data-theme="dark"][data-palette="wood"] {
   --dk-ground: #66401f;
   --dk-nav-bar:
     linear-gradient(#1a0c03, #1a0c03) bottom / 100% 1px no-repeat,
-    linear-gradient(rgba(255,230,190,.25), rgba(255,230,190,.25)) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(rgba(255,230,190,.25), rgba(255,230,190,.25)) 0 var(--top-inset, env(safe-area-inset-top)) / 100% 1px no-repeat,
     linear-gradient(rgba(255,255,255,.12), rgba(255,255,255,.02) 50%, rgba(0,0,0,.1) 51%, rgba(0,0,0,.35)) bottom / 100% 44px no-repeat,
     repeating-linear-gradient(2deg, #4e2f15 0 7px, #42270f 7px 11px, #4e2f15 11px 19px);
   --dk-nav-shadow: linear-gradient(rgba(0,0,0,.5), rgba(0,0,0,0));
@@ -606,7 +606,7 @@ html[data-theme="light"][data-palette="sepia"] {
   --lt-ground: #d2bf9c;
   --lt-nav-bar:
     linear-gradient(#3e2e1a, #3e2e1a) bottom / 100% 1px no-repeat,
-    linear-gradient(#f5ecdc, #f5ecdc) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(#f5ecdc, #f5ecdc) 0 var(--top-inset, env(safe-area-inset-top)) / 100% 1px no-repeat,
     linear-gradient(#d2bf9c, #8c6c43) bottom / 100% 44px no-repeat,
     linear-gradient(#7a5c36, #6a4e2c);
   --lt-btn-edge: #5a4224;
@@ -659,7 +659,7 @@ html[data-theme="light"][data-palette="solarized"] {
   --lt-ground: #9fcbea;
   --lt-nav-bar:
     linear-gradient(#0f3d5c, #0f3d5c) bottom / 100% 1px no-repeat,
-    linear-gradient(#e6f2fa, #e6f2fa) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(#e6f2fa, #e6f2fa) 0 var(--top-inset, env(safe-area-inset-top)) / 100% 1px no-repeat,
     linear-gradient(#9fcbea, #2f7fb8) bottom / 100% 44px no-repeat,
     linear-gradient(#2a74a8, #22679b);
   --lt-btn-edge: #1d4f73;
@@ -713,7 +713,7 @@ html[data-theme="light"][data-palette="legalpad"] {
   --lt-ground: #8a5530;
   --lt-nav-bar:
     repeating-linear-gradient(90deg, rgba(243,217,166,.75) 0 6px, rgba(0,0,0,0) 6px 10px) 0 calc(100% - 5px) / 100% 1.5px no-repeat,
-    linear-gradient(#b07a4c, #b07a4c) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(#b07a4c, #b07a4c) 0 var(--top-inset, env(safe-area-inset-top)) / 100% 1px no-repeat,
     linear-gradient(#8a5530, #5a3218 calc(100% - 1px), #2a1608 calc(100% - 1px)) bottom / 100% 44px no-repeat,
     linear-gradient(#5a3218, #5a3218);
   --lt-btn-edge: #2e1808;
@@ -770,7 +770,7 @@ html[data-theme="light"][data-palette="metal"] {
   --lt-ground: #eef0f3;
   --lt-nav-bar:
     repeating-linear-gradient(0deg, rgba(255,255,255,.35) 0 1px, rgba(0,0,0,0) 1px 2px, rgba(0,0,0,.04) 2px 3px, rgba(0,0,0,0) 3px 5px) bottom / 100% 44px no-repeat,
-    linear-gradient(#fff, #fff) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(#fff, #fff) 0 var(--top-inset, env(safe-area-inset-top)) / 100% 1px no-repeat,
     linear-gradient(#eef0f3, #b9bec6 calc(100% - 1px), #6d737c calc(100% - 1px)) bottom / 100% 44px no-repeat,
     linear-gradient(#9aa0a9, #9aa0a9);
   --lt-btn-edge: #6d737c;

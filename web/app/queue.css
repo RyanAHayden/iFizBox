@@ -9,7 +9,7 @@
   /* the console's black bar and its bar buttons, and pressed */
   --console-bar:
     linear-gradient(rgba(0,0,0,.7), rgba(0,0,0,.7)) bottom / 100% 1px no-repeat,
-    linear-gradient(rgba(255,255,255,.2), rgba(255,255,255,.2)) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,.2), rgba(255,255,255,.2)) 0 var(--top-inset, env(safe-area-inset-top)) / 100% 1px no-repeat,
     linear-gradient(#4c4c4c, #000 52%) bottom / 100% 44px no-repeat,
     #000;
   --console-btn: linear-gradient(#4a4f58, #24272c);

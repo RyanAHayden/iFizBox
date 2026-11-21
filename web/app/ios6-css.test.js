@@ -391,3 +391,24 @@ test("F341: action sheet and alert geometry are era hooks; iOS 7 sets the kit's"
   // the sheet's separators are the buttons' own .5pt lines (a .5pt flex gap lands on half pixels and Chromium drops some)
   assert.match(ios7, /\.action-title \+ \.action-list > \.action-button:first-child \{ box-shadow: inset 0 \.5px 0 var\(--i7-action-line\); \}/);
 });
+
+// The status-bar strip is plain black and only the top inset tall, in the app as on the website, in the iOS 6 era;
+// the app's iOS 7 and iOS 13 eras keep the bar's art stretched 22 pt into the bar. The iOS 6 era alone takes the
+// shell's --status-bar-bottom as its top inset, and every top-inset use falls back to the safe area.
+test("iOS 6's status-bar strip is black, the top inset tall; only that era takes the shell's line", () => {
+  const strip = rules.filter((x) => x.sel === ".navbar::before");
+  assert.ok(strip.some((r) => /height\s*:\s*var\(--top-inset, env\(safe-area-inset-top\)\)\s*;/.test(r.decl)), "height");
+  assert.ok(strip.some((r) => /background\s*:\s*var\(--site-strip\)/.test(r.decl)), "background");
+  assert.match(css, /--site-strip:\s*#000/);
+  const later = rules.filter((x) => /navbar::before/.test(x.sel) && x.sel !== ".navbar::before");
+  for (const r of later) assert.match(r.sel, /^html\[data-shell="app"\]:is\(\[data-style="ios7"\], \[data-style="ios13"\]\) \.navbar::before$/, r.sel);
+  const era = rules.filter((x) => /--top-inset\s*:/.test(x.decl));
+  assert.deepEqual(era.map((r) => r.sel), ['html[data-shell="app"]:not([data-style="ios7"]):not([data-style="ios13"])']);
+  assert.match(era[0].decl, /--top-inset:\s*var\(--status-bar-bottom, env\(safe-area-inset-top\)\)/);
+  const dir = new URL("./", import.meta.url);
+  for (const f of readdirSync(dir).filter((x) => x.endsWith(".css"))) {
+    const src = readFileSync(new URL(f, dir), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    const bare = src.replace(/var\(--(top-inset|status-bar-bottom), env\(safe-area-inset-top(, 0px)?\)\)/g, "");
+    assert.doesNotMatch(bare, /safe-area-inset-top/, `${f}: use var(--top-inset, env(safe-area-inset-top))`);
+  }
+});
