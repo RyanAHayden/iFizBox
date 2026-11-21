@@ -14,14 +14,19 @@ and tapping it only brought the Can't Take This Tweak alert.
 - Hidden, not disabled: the group already says why, and a dead button would just look broken.
 - Ordering: there is no `await` between the group being made and `rememberPackage` setting the label to Add to
   App, so the `.then` always runs after the label is set (even with a cached check).
+- Spec review found the first version only followed the first check: a paid tweak re-checked after Sign In / Buy
+  kept the button. Fixed with a small additive `onCheck(info | null)` option on `worksInGroup`
+  (`web/app/screens/tweaks.js`), called after every check (the first, and the one after Sign In / Buy); the
+  package page passes `addToAppFollowsCheck` to it. Its `check`/`ready` still return the same results.
 - `web/app/screens/browse-addtoapp.test.js`: hidden for can't/library, kept for ok and for null, other labels and
-  no button untouched, plus a wiring check on the package page.
+  no button untouched; worksInGroup with Comet (a library) through a tiny fake DOM hears onCheck and hides the
+  button; plus wiring checks. The test file and the tweaks.js hook are outside the brief's file list (only
+  browse.js); both are additive.
 
 ## Not verified
 
 - On the iPhone 15 Pro (Chariz betterAlarm): not run; the change is small and covered by the unit test. The
   button's hiding relies on the UA `[hidden]` rule; `.bar-button` sets no `display` for text buttons (only
   `.bar-icon` does), so it applies.
-- A paid tweak that becomes "can't go into an app" only after Buy (the group re-checks itself inside
-  screens/tweaks.js) keeps the button until the page is opened again: that re-check isn't exposed outside
-  tweaks.js, which this task's files don't cover.
+- The paid path after Buy (onCheck from the re-check) is covered by the wiring check only, not run end to end:
+  a real paid-tweak purchase needs a seller account.

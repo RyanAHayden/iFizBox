@@ -31,7 +31,36 @@ test("another label (Install, Modify) or no button: nothing changes", () => {
   assert.equal(addToAppFollowsCheck({}, { ok: false }, { button: () => null }), false);
 });
 
-test("wiring: the package page passes worksInGroup's check to the nav bar button", () => {
-  const src = readFileSync(new URL("./browse.js", import.meta.url), "utf8");
-  assert.match(src, /works\.ready\.then\(\(info\) => addToAppFollowsCheck\(body, info\)/);
+// A DOM just big enough for worksInGroup's rows (no document.head: loadStyle skips the stylesheet).
+const fakeDom = () => {
+  const node = (tag) => ({ tag, children: [], classList: { add() {} }, className: "", textContent: "", dataset: {},
+    append(...k) { this.children.push(...k); }, replaceChildren(...k) { this.children = k; }, addEventListener() {} });
+  return { createElement: node };
+};
+
+test("worksInGroup's onCheck hears the check (Comet: a library), so the page can hide Add to App", async () => {
+  const { worksInGroup } = await import("./tweaks.js");
+  const saved = globalThis.document;
+  globalThis.document = fakeDom();
+  try {
+    const comet = { package: "com.ginsu.comet", name: "Comet", version: "2.0.1", section: "Tweaks",
+      description: "A SwiftUI Prefs Framework", depends: "dev.theos.orion14", debUrl: "https://repo.chariz.com/debs/comet.deb" };
+    const m = new Map();
+    const storage = { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)) };
+    const heard = [];
+    const b = fake();
+    const g = worksInGroup(comet, { storage, apps: async () => [], fetchDeb: async () => new Uint8Array(0),
+      onCheck: (info) => { heard.push(info); addToAppFollowsCheck({}, info, { button: () => b }); } });
+    const info = await g.ready;
+    assert.equal(info.ok, false);
+    assert.deepEqual(heard, [info]);
+    assert.equal(b.hidden, true);
+  } finally { globalThis.document = saved; }
+});
+
+test("wiring: the package page hands every check to the nav bar button, the one after Buy too", () => {
+  const browse = readFileSync(new URL("./browse.js", import.meta.url), "utf8");
+  assert.ok(browse.includes("worksInGroup(st, { onCheck: (info) => addToAppFollowsCheck(body, info) })"));
+  const tweaks = readFileSync(new URL("./tweaks.js", import.meta.url), "utf8");
+  assert.ok(tweaks.includes("await checked();"), "Sign In / Buy re-check goes through onCheck");
 });

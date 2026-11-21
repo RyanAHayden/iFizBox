@@ -1266,10 +1266,10 @@ async function renderPackage(body, route, key, id, ctx) {
   // F302: a Tweak Source's tweak in the sideload app: Works In (its filter's apps, read from the .deb on first open,
   // cached) and Add to App…, in Install's place.
   if (isSideloadTweak(st)) {
-    const works = worksInGroup(st);
-    details.append(works.el);
-    // B296: a tweak that can't go into an app (or a library) loses the nav bar's Add to App, which only led to an alert.
-    works.ready.then((info) => addToAppFollowsCheck(body, info), () => {});
+    // B296: a tweak that can't go into an app (or a library) loses the nav bar's Add to App, which only led to an
+    // alert; every check tells it, the one after Sign In / Buy too. The first check's result always comes after
+    // rememberPackage below has set the label (no await in between).
+    details.append(worksInGroup(st, { onCheck: (info) => addToAppFollowsCheck(body, info) }).el);
   }
   // F20: price; in the app Sign In, Buy, Install. B11: in the app its state also drives the nav bar button.
   // F308: a paid sideload tweak's Price, Sign In and Buy are in its Add to an App group (worksInGroup) instead.

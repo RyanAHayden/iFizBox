@@ -568,7 +568,9 @@ const needsHookLib = (st) => /(mobilesubstrate|cydia-substrate|ellekit)/i.test(`
 // open, then "Works In: <apps>" and Add to App…, or why it can't go into an app.
 // F308: a paid tweak not bought yet (or signed out) gets Price and Sign In to <seller> / Buy for <price> instead, and
 // is checked again once that's done.
-export function worksInGroup(st, { paid = null, onAdd = () => addToApp(st, { paid }), apps = signableApps, fetchDeb, storage } = {}) {
+// B296: `onCheck(info | null)` hears every check's result, the one after Sign In / Buy too (null: not finished).
+export function worksInGroup(st, { paid = null, onAdd = () => addToApp(st, { paid }), apps = signableApps, fetchDeb, storage,
+  onCheck = () => {} } = {}) {
   style();
   const g = el("div", "group tweak-works");
   g.append(el("h2", "group-header", "Add to an App"));
@@ -598,7 +600,7 @@ export function worksInGroup(st, { paid = null, onAdd = () => addToApp(st, { pai
     const act = async (job) => {
       let done = false;
       try { done = await job(); } catch (err) { foot.textContent = String(err?.message ?? err); return; }
-      if (done) { ul.replaceChildren(spin); foot.textContent = ""; await check(); }
+      if (done) { ul.replaceChildren(spin); foot.textContent = ""; await checked(); }
     };
     if (e.need === "unavailable") {
       ul.replaceChildren(row("Price", price));
@@ -630,8 +632,9 @@ export function worksInGroup(st, { paid = null, onAdd = () => addToApp(st, { pai
     foot.textContent = String(e?.message ?? e);
     return null;
   });
-  const ready = check();
-  return { el: g, ready, check };
+  const checked = () => check().then((info) => { try { onCheck(info); } catch { /* the group still stands */ } return info; });
+  const ready = checked();
+  return { el: g, ready, check: checked };
 }
 
 // "From a Source…" in Inject Tweaks: the Tweak Sources' tweaks in a sheet, those whose checked filter names this app
