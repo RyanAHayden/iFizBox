@@ -50,6 +50,7 @@ import * as why from "./why.js"; // F303: Why <NAME> (#/home/why)
 import { NAME } from "../brand.js";
 import { rowIcon, PAGE_ICONS } from "../icons/rowicons.js";
 import { nativeBridge } from "../native.js";
+import { routeFailure, ROUTE_KEY } from "../core/installroute.js"; // B316
 
 const DISCORD_URL = "https://discord.gg/3XASvpjbgp"; // Home's pair: GitHub | Discord (Cydia: Facebook | Twitter)
 
@@ -570,6 +571,16 @@ export function slotTile(mode, slot, { get, now, certShown = showsCertTile(mode)
   return t;
 }
 export const CERT_STEP_LEFT = "Import your certificate to install"; // fits the tile at 320pt
+// B316: the sideload app installing through This iPhone, with the last check or install failed to reach it (core
+// installroute.js routeFailure, kept until a check passes): the slot names the failure, red, and opens Installation &
+// Signing, where the status says it with the fix. A signing problem that stops every install (gone) stays first; a
+// coming expiry gives way to it.
+export const ROUTE_TILE_SUBTITLE = "Installs are failing · Fix in Settings"; // fits the tile at 320pt
+export function routeTile(mode, failure, choice) {
+  if (mode !== "sideload" || choice !== "iphone" || !failure?.title) return null;
+  return { stage: "close", kind: "route", title: failure.title, subtitle: ROUTE_TILE_SUBTITLE };
+}
+export function slotOrRoute(t, route) { return t?.stage === "gone" ? t : route ?? t; }
 // The Signing Server when installs can use it (an https:// address, as screens/signing.js serverReady), else null.
 // Settings > Signing has two steps (certificate, server), so with this set, not set up means no certificate.
 export function httpsServer(server) {
@@ -585,7 +596,11 @@ function certRow() {
   if (!showsSigningSlot(settings.mode)) return row;
   let seq = 0;
   let last = null;
-  const draw = (slot) => { seq++; last = slot; paintCert(row, slotTile(settings.mode, slot)); };
+  const draw = (slot) => {
+    seq++; last = slot;
+    paintCert(row, slotOrRoute(slotTile(settings.mode, slot), routeTile(settings.mode, routeFailure(), settings.get(ROUTE_KEY)))); // B316
+  };
+  const onRoute = () => { if (alive()) { seq++; paintCert(row, slotOrRoute(slotTile(settings.mode, last), routeTile(settings.mode, routeFailure(), settings.get(ROUTE_KEY)))); } };
   const check = async () => {
     const mine = ++seq;
     const slot = await signingSlot(settings.mode);
@@ -608,12 +623,14 @@ function certRow() {
     if (!seen) return true;
     removeEventListener("hashchange", onHash);
     removeEventListener("ifizbox:signing-status", onStatus);
+    removeEventListener("ifizbox:route-failure", onRoute);
     document.removeEventListener("visibilitychange", onVis);
     offSettings();
     return false;
   };
   addEventListener("hashchange", onHash);
   addEventListener("ifizbox:signing-status", onStatus);
+  addEventListener("ifizbox:route-failure", onRoute); // B316: an install or a check set or cleared the route's failure
   document.addEventListener("visibilitychange", onVis);
   row.recheck = () => { if (alive()) check(); }; // Reload (state.redraw)
   check();

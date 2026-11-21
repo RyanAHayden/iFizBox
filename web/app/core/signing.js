@@ -13,6 +13,7 @@ import { DOMAIN, SIGN_HOST, NAME, BUNDLE_ID } from "../brand.js";
 import { isAts, ATS_TITLE, atsText, INSECURE_IPA_ALERT, insecureText } from "./insecureipa.js"; // B104
 import { signingPage } from "./signingpage.js"; // C15: the sideload build's page is Installation & Signing
 import { developerModeFailure } from "./installroute.js"; // F300
+import { routeFailureOf } from "./installroute.js"; // B316
 
 const bytesOf = (b) => (b instanceof Uint8Array ? b : new Uint8Array(b));
 
@@ -470,6 +471,12 @@ export function deviceError(err, name = "") {
   if (isAts(err)) return { title: ATS_TITLE, open: null, message: atsText(name) };
   const dm = developerModeFailure(err); // F300: Developer Mode has no Settings row: the failure itself says what to do
   if (dm) return { ...dm, open: null };
+  // B316: This iPhone's route broken by Tailscale or refusing everything: the route's words and its fix (`fix`, the
+  // alert's second button `button`), not the pairing's. signing/route.js re-words the rest with idevice.status.
+  if (code === "tailscale_signed_out" || code === "route_refused") {
+    const f = routeFailureOf(err);
+    if (f) return { title: f.title, open: null, message: f.message, fix: f.fix, button: f.button };
+  }
   return { title: name ? `Couldn't Install ${name}` : "Couldn't Install", open: null, message };
 }
 

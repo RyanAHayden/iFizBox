@@ -68,3 +68,10 @@ _Said_: scope bar, segments
 _On screen_: All | Tweaks | Themes | Apps
 _In code_: segments(), .scope-segments, ui.segments, NativeSegments
 _Avoid_: tab bar, filter tabs
+
+**Route Failure**:
+The last check or install on This iPhone couldn't reach the phone; it is shown as the broken state, with its fix, until a check passes
+_Said_: installs being refused, pairing broken
+_On screen_: Tailscale Is Signed Out / Tailscale Refused / Pair Again (red status, Home tile: Installs are failing · Fix in Settings)
+_In code_: routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, ifizbox.routeFailure
+_Avoid_: pairing error, connection error

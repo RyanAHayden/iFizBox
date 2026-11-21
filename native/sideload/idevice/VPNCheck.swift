@@ -74,7 +74,41 @@ enum VPNCheck {
             let a = probe(ports[i], timeout: probeTimeout)
             lock.lock(); answers[i] = a; lock.unlock()
         }
-        let local = answers.contains { $0 != .silent }
-        return ["localDevVPN": local, "otherVPN": !local, "tunnels": up]
+        // B316: a refusal proves LocalDevVPN only when 10.7.0.1 is routed into a tunnel. Off Wi-Fi with Tailscale on,
+        // it goes out over cellular, where the carrier's network can refuse it at once: that read as LocalDevVPN on,
+        // and every pairing check and install went to 10.7.0.1 ("refused on every port: pair again").
+        let via = routeInterface()
+        let tunnelRoute = via.map { n in tunnelPrefixes.contains(where: n.hasPrefix) } ?? false
+        let local = answers.contains(.connected) || (tunnelRoute && answers.contains(.refused))
+        return ["localDevVPN": local, "otherVPN": !local, "tunnels": up, "route": via ?? NSNull()]
+    }
+
+    /// B316: the interface the system sends `host` (10.7.0.1) through: a UDP connect sends nothing, and the source
+    /// address it picks names the interface. nil when there's no route.
+    static func routeInterface(_ host: String = IDevice.address) -> String? {
+        let fd = socket(AF_INET, SOCK_DGRAM, 0)
+        guard fd >= 0 else { return nil }
+        defer { close(fd) }
+        var a = IDevice.sockaddr4(IDevice.lockdownPort, host: host)
+        let rc = withUnsafePointer(to: &a) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
+        }
+        guard rc == 0 else { return nil }
+        var local = sockaddr_in()
+        var len = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let got = withUnsafeMutablePointer(to: &local) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { getsockname(fd, $0, &len) } }
+        guard got == 0 else { return nil }
+        let want = local.sin_addr.s_addr
+        var head: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&head) == 0 else { return nil }
+        defer { freeifaddrs(head) }
+        var p = head
+        while let i = p {
+            defer { p = i.pointee.ifa_next }
+            guard let addr = i.pointee.ifa_addr, addr.pointee.sa_family == sa_family_t(AF_INET) else { continue }
+            let s = addr.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { $0.pointee.sin_addr.s_addr }
+            if s == want { return String(cString: i.pointee.ifa_name) }
+        }
+        return nil
     }
 }

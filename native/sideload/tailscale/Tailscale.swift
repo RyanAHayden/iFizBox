@@ -163,6 +163,17 @@ enum Tailscale {
         TailscaleKeep.forgetNode(keepState: kept)
     }
 
+    /// B316: the tailnet logged the node out (its key expired, or it was removed in the admin console): the app no
+    /// longer says it's signed in (tailscale.status signedIn false, useForInstall false), so every page shows Sign In
+    /// instead of Ready to Install. The node's state stays (its machine key with it), so the next Sign In comes back
+    /// as the same machine, as after Sign Out (B301).
+    static func signedOutByTailnet() {
+        guard node != nil else { return }
+        UserDefaults.standard.removeObject(forKey: nodeKey)
+        TailscaleKeep.forgetNode(keepState: true)
+        log("the tailnet signed this node out; Sign In needed")
+    }
+
     // ---- Installing (IDevice.Session, on IDevice.queue's thread)
 
     private static let lock = NSLock()
@@ -180,7 +191,8 @@ enum Tailscale {
         case "NeedsMachineAuth":
             stop(); throw IDevice.Failure(code: "connect_failed", text: "Tailscale: approve this device in the tailnet's admin console")
         case "NeedsLogin":
-            stop(); throw IDevice.Failure(code: "connect_failed", text: "Tailscale: sign in again in Settings > Installation (the device key expired)")
+            stop(); signedOutByTailnet()
+            throw IDevice.Failure(code: "tailscale_signed_out", text: "Tailscale signed \(Brand.name) out (its device key expired or was removed). Sign in again in Settings > Installation & Signing > Install Apps With")
         case let s:
             stop(); throw IDevice.Failure(code: "connect_failed", text: "Tailscale didn't connect (\(s.isEmpty ? "no answer" : s)); check the internet connection")
         }
@@ -353,15 +365,22 @@ enum TailscaleBridge {
         let st = Tailscale.start()
         if let e = st["error"] as? String, !e.isEmpty { return ["ok": false, "code": "not_running", "detail": e] }
         if st["state"] as? String == "Running" { Tailscale.remember(st) }
+        // B316: logged out by the tailnet: say so before probing (a probe through a node with no login says nothing)
+        if st["state"] as? String == "NeedsLogin" || st["expired"] as? Bool == true {
+            Tailscale.signedOutByTailnet()
+            return ["ok": false, "code": "needs_login", "address": own]
+        }
         // B220: the port RemotePairing listens on now (it isn't always 49152); every advertised port refused means
         // this phone no longer serves the pairing: the page says to pair again.
         let port: UInt16
-        do { port = try IDevice.findRemotePairingPort { Tailscale.probe($0, host: own) } } catch let e as IDevice.Failure where e.code == "refused" {
+        // B316: "route_refused" when lockdown's port is refused too: the phone turns down everything from the tailnet.
+        do { port = try IDevice.findRemotePairingPort(via: "Tailscale") { Tailscale.probe($0, host: own) } } catch let e as IDevice.Failure where e.code == "refused" || e.code == "route_refused" {
             Tailscale.log("test \(own): \(e.text)")
-            return ["ok": false, "code": "refused", "detail": e.text, "address": own, "name": st["name"] ?? NSNull()]
+            return ["ok": false, "code": e.code, "detail": e.text, "address": own, "name": st["name"] ?? NSNull()]
         }
         let h = strdup(own); defer { free(h) }
         var r = Tailscale.json(TSTest(h, Int32(port)))
+        if let code = r["code"] as? String, code == "expired" || code == "needs_login" { Tailscale.signedOutByTailnet() } // B316
         r["address"] = own
         r["name"] = st["name"] ?? NSNull()
         // B246: remotepairingd accepts the connection and then resets it when this phone has no paired host at all
