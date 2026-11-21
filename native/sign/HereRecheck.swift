@@ -141,13 +141,39 @@ enum HereRecheck {
         }
     }
 
-    /// "18.2 MB/s in front, 17.3 MB/s in the background", for the log.
+    /// "18.2 MB/s in front, 14.2 MB/s in the background, 42 s waiting for the connection", for the log.
+    /// B293: only the time a chunk was moving counts toward a speed. `gap` is the time since the chunk before it
+    /// landed, across a drop and its reconnect (the first chunk after a reconnect carries the stall, the pauses and
+    /// the new connection). Once `warmup` chunks have landed, the part of a gap beyond `stallFactor` times the median
+    /// of the last `window` moving gaps (never under `stallFloor`) is waiting, not copying: a chunk that took 15 s
+    /// with the VPN off moved for a normal chunk's time and waited the rest.
     struct CopySpeed {
+        static let stallFloor: TimeInterval = 1
+        static let stallFactor: Double = 4
+        static let window = 16
+        static let warmup = 4
+
         private(set) var frontBytes = 0, backBytes = 0
         private(set) var frontSecs: TimeInterval = 0, backSecs: TimeInterval = 0
+        private(set) var waitSecs: TimeInterval = 0
+        private(set) var paces: [TimeInterval] = []
+        private(set) var landed = 0
 
-        mutating func add(_ bytes: Int, _ secs: TimeInterval, front: Bool) {
-            if front { frontBytes += bytes; frontSecs += secs } else { backBytes += bytes; backSecs += secs }
+        /// How long a chunk may take before the rest of its gap counts as waiting (nil: no pace yet).
+        var stallAfter: TimeInterval? {
+            guard landed >= Self.warmup, !paces.isEmpty else { return nil }
+            let s = paces.sorted()
+            return max(Self.stallFloor, s[s.count / 2] * Self.stallFactor)
+        }
+
+        mutating func add(_ bytes: Int, _ gap: TimeInterval, front: Bool) {
+            let gap = max(0, gap)
+            var moving = gap
+            if let cap = stallAfter, gap > cap { moving = cap; waitSecs += gap - cap }
+            landed += 1
+            paces.append(moving)
+            if paces.count > Self.window { paces.removeFirst(paces.count - Self.window) }
+            if front { frontBytes += bytes; frontSecs += moving } else { backBytes += bytes; backSecs += moving }
         }
 
         static func rate(_ b: Int, _ s: TimeInterval) -> String {
@@ -158,6 +184,8 @@ enum HereRecheck {
             var parts: [String] = []
             if frontBytes > 0 { parts.append("\(Self.rate(frontBytes, frontSecs)) in front") }
             if backBytes > 0 { parts.append("\(Self.rate(backBytes, backSecs)) in the background") }
+            let wait = Int(waitSecs.rounded())
+            if wait > 0 { parts.append("\(wait) s waiting for the connection") }
             return parts.joined(separator: ", ")
         }
     }

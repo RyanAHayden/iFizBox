@@ -508,6 +508,7 @@ enum IDevice {
         var copied = false      // the whole IPA is in PublicStaging
         var speed = HereRecheck.CopySpeed()
         var copyStart: Date?
+        var lastLanded: Date?   // B293: when the last chunk landed, kept across reconnects for the speed summary
         var installSent = false // installation_proxy got the install
         var askUntil: Date?     // after a drop, how long to keep asking iOS for the app (one deadline per install)
         var lookedInstalled = false // B251: a second look found the new copy while installd's step was quiet
@@ -1238,7 +1239,10 @@ enum IDevice {
                 sent += d.count
                 run.sent = sent
                 let now = Date()
-                run.speed.add(d.count, now.timeIntervalSince(last), front: AppFront.now)
+                // B293: the gap since the last chunk landed, a drop and its reconnect included: CopySpeed counts
+                // its stalled part as waiting
+                run.speed.add(d.count, now.timeIntervalSince(run.lastLanded ?? t0), front: AppFront.now)
+                run.lastLanded = now
                 // B292: notice a dead route sooner than 30 s when chunks have been landing fast
                 // after a suspension the pace starts over: the watchdog may count it only after the chunk whose gap
                 // spans it was added, so that gap goes too
