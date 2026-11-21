@@ -1,0 +1,13 @@
+{"name":"home tile (signing)","tapped":true,"from":"#/home","hash":"#/home/settings/signing","frames":104,"movingFrames":21,"xs":[0,390,-11,353,-24,311,-39,259,-58,196,-77,133],"title":"iFizBox"}
+{"name":"settings row (signing)","tapped":true,"from":"#/home/settings","hash":"#/home/settings/signing","frames":104,"movingFrames":21,"xs":[0,390,-11,354,-24,311,-39,259,-58,196,-77,133],"title":"iF
+{"name":"home > settings row (signing)","tapped":true,"from":"#/home/settings","hash":"#/home/settings/signing","frames":104,"movingFrames":22,"xs":[0,390,-11,353,-24,311,-39,259,-58,196,-77,133],"tit
+{"name":"home > install IPAs tile > set up","tapped":true,"from":"#/home/~installed/myipas","hash":"#/home/settings/signing","frames":95,"movingFrames":0,"xs":[],"title":"iFizBox"}
+{"name":"installed tab > install IPAs > set up","tapped":true,"from":"#/installed/myipas","hash":"#/installed/myipas/~settings/signing","frames":95,"movingFrames":22,"xs":[0,390,-11,354,-24,311,-39,25
+{"name":"why > set up signing","tapped":true,"from":"#/home/why","hash":"#/home/why/~home/settings/signing","frames":104,"movingFrames":22,"xs":[0,390,-11,354,-24,311,-39,259,-58,196,-77,133],"title":
+{"name":"install redirect from installed/myipas","tapped":true,"from":"#/installed/myipas","hash":"#/installed/myipas/~settings/signing","frames":95,"movingFrames":22,"xs":[0,390,-11,354,-24,311,-39,2
+{"name":"install redirect from home/~installed/myipas","tapped":true,"from":"#/home/~installed/myipas","hash":"#/home/settings/signing","frames":95,"movingFrames":0,"xs":[],"title":"iFizBox"}
+{"name":"install redirect from home","tapped":true,"from":"#/home","hash":"#/home/settings/signing","frames":95,"movingFrames":21,"xs":[0,390,-11,353,-24,311,-39,259,-58,196,-77,133],"title":"iFizBox"
+{"name":"install redirect from home/settings","tapped":true,"from":"#/home/settings","hash":"#/home/settings/signing","frames":96,"movingFrames":22,"xs":[0,390,-11,354,-24,311,-39,259,-58,196,-77,133]
+{"name":"installApp from home","tapped":true,"from":"#/home","hash":"#/home/settings/signing","frames":92,"movingFrames":23,"xs":[0,390,0,390,-11,354,-24,311,-39,259,-58,197],"title":"iFizBox"}
+
+[exited with code 0]

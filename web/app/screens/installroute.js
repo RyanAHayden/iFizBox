@@ -18,7 +18,7 @@
 //   installation once paired.
 // The idevice.* bridge calls are native/sideload/idevice/IDeviceBridge.swift's, tailscale.* native/sideload/tailscale's.
 import { grouped, el } from "../nav/ui.js";
-import { format, settingsRoute } from "../router.js";
+import { format, settingsRoute, mounted, parse } from "../router.js";
 import { showAlert } from "../nav/alert.js";
 import { copyText } from "../nav/menu.js";
 import { toBase64 } from "../core/signing.js";
@@ -801,7 +801,10 @@ export function pairGuide(guide = PAIR_GUIDE) {
 // While pairing, the app is in the background (the code is typed in Settings) and events sent then may never reach
 // the page: coming back, it reads the pairing from native, or rechecks the VPN while it waits for one. Leaving the
 // page ends the pairing.
-function onPairPage() { return location.hash.replace(/^#/, "") === route("pair").replace(/^#/, ""); }
+// B300: by the page the hash shows, so the Pairing page opened on another page's stack (Install IPAs' Set Up Signing:
+// #/home/~installed/myipas/~settings/installation/pair) is the Pairing page too. Pure (hash in), for the tests.
+export const isPairHash = (hash) => format(mounted(parse(hash))) === format(mounted(parse(route("pair"))));
+function onPairPage() { return isPairHash(location.hash); }
 async function reread() {
   if (!shown || document.visibilityState !== "visible") return;
   const { native, redraw } = shown;
