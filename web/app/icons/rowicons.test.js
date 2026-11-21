@@ -201,7 +201,7 @@ test("F339: home.css's tile glyphs are the map's iOS 6 home tiles, and none is d
   const css = readFileSync(new URL("../home.css", import.meta.url), "utf8");
   const lines = homeGlyphRules("ios6").split("\n");
   for (const line of lines) assert.ok(css.split("\n").includes(line), `home.css: ${line.slice(0, 60)}`);
-  // every .glyph-* rule painting a background is one of them (.glyph-loading's opacity is no glyph)
+  // every .glyph-* rule painting a background is one of them
   const painted = css.split("\n").filter((l) => /^\.glyph-[a-z]+.*background/.test(l));
   assert.deepEqual(painted.filter((l) => !lines.includes(l)), []);
 });
@@ -231,4 +231,17 @@ test("F339: every glyph Home's tiles name is in the map", async () => {
   names.add("theme"); // THEME_ICON
   assert.ok(names.size > 8, [...names].join(" "));
   for (const n of names) assert.ok(ICON_SETS.ios6.home[n] && ICON_SETS.ios7.home[n], n);
+});
+
+test("C61: Home's old state-tile glyphs are gone from both maps and both stylesheets; the cert row's and More Sources' stay", async () => {
+  const { ICON_SETS } = await import("./rowicons.js");
+  const home = readFileSync(new URL("../home.css", import.meta.url), "utf8");
+  const ios7 = readFileSync(new URL("../ios7.css", import.meta.url), "utf8");
+  for (const gone of ["add", "upgrades", "current", "loading", "changes"]) {
+    assert.equal(ICON_SETS.ios6.home[gone], undefined, `ios6 home: ${gone}`);
+    assert.equal(ICON_SETS.ios7.home[gone], undefined, `ios7 home: ${gone}`);
+    assert.doesNotMatch(home, new RegExp(`\\.glyph-${gone}\\b`), `home.css: .glyph-${gone}`);
+    assert.doesNotMatch(ios7, new RegExp(`\\.glyph-${gone}\\b`), `ios7.css: .glyph-${gone}`);
+  }
+  for (const kept of ["failed", "more"]) assert.ok(ICON_SETS.ios6.home[kept] && ICON_SETS.ios7.home[kept], kept);
 });
