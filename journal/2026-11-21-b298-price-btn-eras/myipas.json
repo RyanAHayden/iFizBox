@@ -1,0 +1,12 @@
+[
+ {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.style', ERA); localStorage.setItem('ifizbox.appearance', TONE); 'ok'"},
+ {"nav": "#/home", "ms": 2000},
+ {"nav": "#/installed/myipas", "ms": 6000},
+ {"eval": "import('./screens/myipas.js').then((m) => { const b = [...document.querySelectorAll('.page.is-top .price-btn')]; if (b[1]) m.paintPrice(b[1], { kind: 'confirm', label: 'INSTALL', green: true }); if (b[2]) m.paintPrice(b[2], { kind: 'busy', label: 'SIGNING', fill: 0.45 }); if (b[3]) m.paintPrice(b[3], { kind: 'open', label: 'OPEN' }); if (b[4]) { b[4].disabled = true; } return b.length + ' ' + document.documentElement.dataset.style + ' ' + document.documentElement.dataset.theme + ' ' + document.documentElement.dataset.palette; })"},
+ {"wait": 800},
+ {"shot": "myipas"},
+ {"nav": "#/sources/manage/find", "ms": 9000},
+ {"shot": "find"},
+ {"nav": "#/sources/more/apps", "ms": 8000},
+ {"shot": "more"}
+]

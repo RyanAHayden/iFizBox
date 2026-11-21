@@ -1,0 +1,15 @@
+[
+ {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.style', ERA); localStorage.setItem('ifizbox.appearance', TONE); 'ok'"},
+ {"nav": "#/home", "ms": 2000},
+ {"nav": "#/installed/myipas", "ms": 6000},
+ {"eval": "import('./screens/myipas.js').then((m) => { const b = [...document.querySelectorAll('.page.is-top .price-btn')]; m.paintPrice(b[1], { kind: 'confirm', label: 'INSTALL', green: true }); return 'ok'; })"},
+ {"wait": 500},
+ {"press": ".page.is-top .price-btn", "nth": 0, "shot": "held-sign"},
+ {"eval": "import('./screens/myipas.js').then((m) => { const b = [...document.querySelectorAll('.page.is-top .price-btn')]; m.paintPrice(b[1], { kind: 'confirm', label: 'INSTALL', green: true }); return 'ok'; })"},
+ {"wait": 500},
+ {"press": ".page.is-top .price-btn", "nth": 1, "shot": "held-go"},
+ {"nav": "#/sources/manage/find", "ms": 9000},
+ {"eval": "(() => { const b = [...document.querySelectorAll('.page.is-top .find-add')]; b[0].classList.add('added'); b[0].disabled = true; b[0].textContent = 'ADDED'; b[1].classList.add('adding'); b[1].disabled = true; b[1].textContent = ''; const s = document.createElement('span'); s.className = 'loading-spinner find-spinner'; b[1].append(s); return b.length; })()"},
+ {"wait": 500},
+ {"shot": "find-states"}
+]
