@@ -98,8 +98,9 @@ export const SETTINGS = [
     key: "style", section: "style", kind: "choice", feature: "appearance", modes: ALL, default: "ios6",
     label: "Style",
     // F202: iOS 13 (ios13.css), inset grouped with large titles and card sheets (STYLE_HOOKS)
-    options: [{ value: "ios6", label: "iOS 6" }, { value: "ios7", label: "iOS 7" }, { value: "ios13", label: "iOS 13" }],
-    footer: "iOS 7 and iOS 13 have two themes of their own: White, and OLED Black in Dark mode.",
+    options: [{ value: "ios6", label: "iOS 6" }, { value: "ios7", label: "iOS 7" }, { value: "ios13", label: "iOS 13" },
+      { value: "ios26", label: "iOS 26" }], // F203: Liquid Glass (ios26.css), large titles, card sheets, floating tab bar
+    footer: "iOS 7, iOS 13 and iOS 26 have two themes of their own: White, and OLED Black in Dark mode.",
   },
   {
     // F199: Theme's Mode, drawn as an iOS 6 segmented control. Kept under its old key (ifizbox.appearance) so a
@@ -913,7 +914,8 @@ export function themeState({ style = "ios6", appearance, lightTheme, darkTheme, 
 export const STYLES = byKey.get("style").options.map((o) => o.value);
 export const STYLE_DEFAULT = byKey.get("style").default;
 export const STYLE_KEY = "ifizbox.style";
-export const STYLE_PALETTES = { ios7: { light: "white", dark: "oled" }, ios13: { light: "white", dark: "oled" } };
+export const STYLE_PALETTES = { ios7: { light: "white", dark: "oled" }, ios13: { light: "white", dark: "oled" },
+  ios26: { light: "white", dark: "oled" } };
 
 // B235: the launch set (native/launch/make.py THEMES) an era's own theme opens on, where the iOS 6 set of the same
 // name draws other bars: iOS 7's and iOS 13's OLED Black have flat #000 bars with a hairline (#262626, #38383a), not
@@ -926,8 +928,9 @@ export const launchKey = (style, palette) => STYLE_LAUNCH[style]?.[palette] ?? p
 // F202: the nav hooks an era turns on (docs/eras.md, "Nav hooks"): `nav: "large"` puts <html data-nav="large"> (large
 // titles, nav/navbar.js setLargeTitles), `sheet: "card"` puts <html data-sheet="card"> (card sheets, nav/sheet.js).
 // iOS 6 and iOS 7 turn none on. screens/settings.js applyTheme sets them with the style.
-export const STYLE_HOOKS = { ios13: { nav: "large", sheet: "card" } };
-export const hooksOf = (style) => ({ nav: null, sheet: null, ...STYLE_HOOKS[style] });
+// F203: `tabbar: "float"` puts <html data-tabbar="float"> (the floating tab bar, nav/tabbar.js setFloatingTabbar).
+export const STYLE_HOOKS = { ios13: { nav: "large", sheet: "card" }, ios26: { nav: "large", sheet: "card", tabbar: "float" } };
+export const hooksOf = (style) => ({ nav: null, sheet: null, tabbar: null, ...STYLE_HOOKS[style] });
 
 // F323: the app icon a tone ("light" or "dark") gets: with Match Theme on, that tone's theme's icon; off, the tone's
 // pick (lightIcon, darkIcon), its theme's own while that is "theme". `get` reads a setting (settings.get).

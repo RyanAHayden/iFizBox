@@ -42,7 +42,8 @@ function boot({ appearance = null, lightTheme = null, darkTheme = null, systemDa
   ctx.window = ctx;
   runInNewContext(read("theme-boot.js"), ctx);
   const out = { theme: attrs["data-theme"], palette: attrs["data-palette"], color: meta.attrs.content };
-  return withStyle ? { ...out, style: attrs["data-style"], ...(attrs["data-sheet"] ? { sheet: attrs["data-sheet"] } : {}) } : out;
+  return withStyle ? { ...out, style: attrs["data-style"], ...(attrs["data-sheet"] ? { sheet: attrs["data-sheet"] } : {}),
+    ...(attrs["data-tabbar"] ? { tabbar: attrs["data-tabbar"] } : {}) } : out; // F203
 }
 
 test("theme-boot.js agrees with themeFor and paletteFor for every Appearance, dark theme and system", () => {
@@ -167,9 +168,9 @@ test("F202: iOS 13's White and OLED Black and its card sheets, the same in theme
     assert.deepEqual(boot({ style: "ios13", appearance, lightTheme: "sepia", darkTheme: "nord", systemDark, hash, withStyle: true }),
       { theme: got.theme, palette: got.palette, color: THEME_COLORS[got.palette], style: "ios13", sheet: "card" }, what);
   }
-  assert.deepEqual(STYLES, ["ios6", "ios7", "ios13"]);
+  assert.deepEqual(STYLES, ["ios6", "ios7", "ios13", "ios26"]); // F203: iOS 26 the fourth
   assert.deepEqual([hooksOf("ios13"), hooksOf("ios7"), hooksOf("ios6")],
-    [{ nav: "large", sheet: "card" }, { nav: null, sheet: null }, { nav: null, sheet: null }]);
+    [{ nav: "large", sheet: "card", tabbar: null }, { nav: null, sheet: null, tabbar: null }, { nav: null, sheet: null, tabbar: null }]);
 });
 
 // F202: ios13.css is linked after palettes.css and ios7.css, before wide.css, and every rule in it is scoped to
@@ -186,6 +187,48 @@ test("F202: ios13.css is linked after palettes.css and only styles html[data-sty
   assert.doesNotMatch(css, /--glyph:/, "filled tabs: ios6.css's glyphs");
   // 120 Hz: nothing that animates or blurs
   assert.doesNotMatch(css, /transition|animation|backdrop-filter|will-change/);
+});
+
+// F203: iOS 26 has the same pair and turns on card sheets and the floating tab bar before first paint (its large
+// titles wait for the app's nav/navbar.js); themeState and theme-boot.js agree for every Mode, system and preview.
+test("F203: iOS 26's White and OLED Black, card sheets and floating tab bar, the same in themeState and theme-boot.js", () => {
+  const previews = [[null, ""], ["light", "#/home/settings/theme/lightTheme"], ["dark", "#/home/settings/theme/darkTheme"]];
+  for (const appearance of [null, "auto", "light", "dark"]) for (const systemDark of [false, true]) for (const [preview, hash] of previews) {
+    const store = createSettings({ storage: mem({ "ifizbox.style": "ios26", "ifizbox.appearance": appearance }) });
+    const got = themeState({ style: store.get("style"), appearance: store.get("appearance"), lightTheme: "sepia", darkTheme: "nord", preview }, systemDark);
+    const tone = appearance === "dark" || (appearance !== "light" && systemDark) ? "dark" : "light";
+    const what = JSON.stringify({ appearance, systemDark, preview });
+    assert.deepEqual(got, { theme: tone, palette: tone === "dark" ? "oled" : "white", style: "ios26" }, what);
+    assert.deepEqual(boot({ style: "ios26", appearance, lightTheme: "sepia", darkTheme: "nord", systemDark, hash, withStyle: true }),
+      { theme: got.theme, palette: got.palette, color: THEME_COLORS[got.palette], style: "ios26", sheet: "card", tabbar: "float" }, what);
+  }
+  assert.deepEqual(hooksOf("ios26"), { nav: "large", sheet: "card", tabbar: "float" });
+  // the other eras leave the tab bar where iOS 6 has it
+  for (const style of ["ios6", "ios7", "ios13"]) assert.equal(boot({ style, withStyle: true }).tabbar, undefined, style);
+});
+
+// F203: ios26.css is linked after ios13.css, before wide.css, every rule in it is scoped to html[data-style="ios26"],
+// and its glass holds the frame budget: nothing animates, backdrop-filter only on the tab pill and the Search circle
+// (where the page scrolls under them) and only through the one --i26-glass-blur token per tone, the fallback's switch.
+test("F203: ios26.css is linked after ios13.css, only styles html[data-style=ios26] and blurs only the tab bar", () => {
+  const links = [...read("index.html").matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(links.indexOf("ios26.css") > links.indexOf("ios13.css"));
+  assert.ok(links.indexOf("ios26.css") < links.indexOf("wide.css"));
+  const css = read("ios26.css").replace(/\/\*[\s\S]*?\*\//g, "");
+  const rules = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].map((m) => [m[1].trim(), m[2]]);
+  assert.ok(rules.length > 20);
+  for (const [sel] of rules) for (const one of sel.split(/,(?![^(]*\))/)) assert.match(one.trim(), /^html\[data-style="ios26"\]/, one);
+  assert.doesNotMatch(css, /transition|animation|will-change/);
+  assert.doesNotMatch(css, /--glyph:/, "filled tabs: ios6.css's glyphs");
+  const blurring = rules.filter(([, body]) => /backdrop-filter/.test(body));
+  assert.equal(blurring.length, 2);
+  for (const [sel, body] of blurring) {
+    assert.match(sel, /\.tabbar|\.tab\[data-tab="search"\]/, sel);
+    for (const m of body.matchAll(/backdrop-filter:\s*([^;]+)/g)) assert.equal(m[1].trim(), "var(--i26-glass-blur)", sel);
+  }
+  // 22pt table corners, capsule bar buttons
+  assert.match(css, /html\[data-style="ios26"\] \.table\.grouped \{[^}]*border-radius: 22px/);
+  assert.match(css, /html\[data-style="ios26"\] \.bar-button \{[^}]*border-radius: 19px/);
 });
 
 // F325: the textured themes (Leather, Felt, Wood; Legal Pad, Brushed Metal): a texture drawn in CSS where Linen's
