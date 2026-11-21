@@ -750,5 +750,5 @@ test("F347: the green bar button's tokens in ios6.css, each era's own, Metal's w
   assert.match(await css("palettes.css"), /\.bar-button:not\(\.done\):not\(\.red\):not\(\.green\):not\(\.manage-delete\)/);
   const settingsCss = await css("settings.css");
   assert.ok(settingsCss.includes('html[data-shell] .theme-preview .navbar.theme-preview-bar::before'));
-  assert.match(settingsCss, /\.theme-preview-grip \{ background: linear-gradient\(#5a5b5d, #333435 2px, #2a2b2c\); box-shadow: inset 0 -1px #121212; \}/);
+  assert.match(settingsCss, /\.theme-preview-grip \{ background: linear-gradient\(#5a5b5d, #333435 2px\) #333435; box-shadow: inset 0 -1px #121212; \}/);
 });

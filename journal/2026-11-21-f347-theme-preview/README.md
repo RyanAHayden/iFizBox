@@ -30,13 +30,31 @@ Ported the approved concept (branch concept/theme-preview) into the app, with th
   tools/concept/check.mjs, mouse as finger): drags up on the nav bar title, the search bar and the grip each grow the
   split by ~60px; a drag in the sample scrolls it 0 -> 236 with the split unchanged; a tap on Checked takes the mark
   off; `::before` content on the sample bar is `none`. Shot looked at: dark strip, pinned bars, the three buttons.
-- tools/concept/check.mjs over light:classic, light:metal, dark:gunmetal, ios7 light/dark, ios13 light, ios26 light
-  (see results below).
+- The same probe holds Edit (in the top bar), Install and a store button: each shows its pressed class and art.
+- Shots with the split dragged tall, every palette and era: light Classic / Sepia / Solarized / Legal Pad / Metal,
+  dark OLED / Gunmetal / Wood (from the Dark list), iOS 7 / 13 / 26 light and dark. iOS 6: green gloss button with
+  white text (Metal included); iOS 7 / 13: green text; iOS 26: green text in the glass capsule.
+- tools/concept/check.mjs (jailbreak + site, light:classic, light:metal, ios7/ios13/ios26 light): see the last line.
+
+## Review fixes
+
+- Divider strip: flat #333435 under the 2px lighter top row (was fading on to #2a2b2c).
+- The sample keeps aria-hidden (it is a picture of the controls; only its touch behaviour changed).
+- Store buttons pressed: app.js's pointerdown takes `.is-pressed` off everything it did not press itself, so the
+  store buttons use their own `.preview-pressed`.
+- A press on the sample's Back / Edit lost its pressed look when the sample was scrolled: dragSplit laid the pane out
+  tall on the press, the resize scrolled the sample, and app.js lets go of a pressed button on any scroll. The tall
+  layout now waits for the first move.
+- Kept, though the review listed them as not asked: the rows' press (no-op onClick) and the small style extras come
+  from the approved concept; ios26.css because the brief asks every era to be checked.
 
 ## Tried / failed
 
 - The first drag probe pressed below the pane (the sample's group was off screen at 283px): moved the press point
   into the body. A tap right after a fling only stopped the glide (as on iOS): waited it out.
+- A first check.mjs run that included dark themes on #/settings/theme/lightTheme reported 14 failures (its output
+  was cut by a tail; opening the Light list switches Mode to light, so a dark theme can't match there, F231). Re-run
+  with light themes only; dark ones were shot from the Dark list instead.
 
 ## Not verified
 

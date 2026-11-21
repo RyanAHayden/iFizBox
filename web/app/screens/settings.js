@@ -501,10 +501,12 @@ function dragSplit(e, box, space) {
   const y0 = e.clientY;
   let h = h0;
   split.moving = split.dragging = true;
-  box.style.height = tall + "px";
-  box.style.transform = `translateY(${tall - h0}px)`;
+  // F347: laid out tall at the first move, not on the press: a press on the sample's Back or Edit that doesn't move
+  // keeps the sample's scroll (a resize scrolls it, and a scroll lets go of the pressed button)
+  let tallNow = false;
   const move = (m) => {
     if (m.pointerId !== e.pointerId) return;
+    if (!tallNow) { tallNow = true; box.style.height = tall + "px"; }
     h = clampSplit(h0 - (m.clientY - y0), geo);
     box.style.transform = `translateY(${tall - h}px)`;
   };
@@ -545,6 +547,7 @@ function themePreview(tone) {
   const grip = make("div", "theme-preview-grip");
   const box = make("div", "theme-preview-body");
   pane.append(top, box);
+  box.setAttribute("aria-hidden", "true"); // a picture of the controls: it works to the finger, not to VoiceOver
   const bar = make("div", "navbar theme-preview-bar");
   bar.append(make("span", "bar-button back", "Back"), make("span", "nav-title", "Preview"), make("span", "bar-button", "Edit"));
   const search = make("div", "search-bar");
@@ -594,10 +597,11 @@ export function toggleCheck(inner) {
   return !mark;
 }
 
-// F347: .is-pressed on a `sel` element of `root` while a finger is on it (:active alone is unreliable on iOS).
+// F347: .preview-pressed on a `sel` element of `root` while a finger is on it (:active alone is unreliable on iOS).
+// Not .is-pressed: app.js's own pointerdown, after this one, takes that off everything it didn't press.
 function pressable(root, sel) {
-  const off = () => root.querySelector(".is-pressed")?.classList.remove("is-pressed");
-  root.addEventListener("pointerdown", (e) => { off(); e.target.closest?.(sel)?.classList.add("is-pressed"); });
+  const off = () => root.querySelector(".preview-pressed")?.classList.remove("preview-pressed");
+  root.addEventListener("pointerdown", (e) => { off(); e.target.closest?.(sel)?.classList.add("preview-pressed"); });
   for (const type of ["pointerup", "pointercancel", "pointerleave"]) root.addEventListener(type, off);
 }
 
