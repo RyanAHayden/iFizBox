@@ -27,7 +27,10 @@ case $1 in
       fi
       echo "taking over from $(holder)" >&2
     fi
-    echo "$2" > "$lock/owner"; exit 0 ;;
+    echo "$2" > "$lock/owner"
+    # the runner slot that holds it, so tools/ui-release.sh frees it when that slot's session ends
+    if [ -n "${AGENT_SLOT:-}" ]; then echo "$AGENT_SLOT" > "$lock/slot"; else rm -f "$lock/slot"; fi
+    exit 0 ;;
   unlock)
     [ "$(holder)" = "$2" ] && rm -rf "$lock"; exit 0 ;;
 esac
