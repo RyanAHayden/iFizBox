@@ -17,6 +17,88 @@
       "iconURL": "https://ifizbox.com/icons/icon-180.png",
       "tintColor": "#37a94a",
       "category": "utilities",
+      "screenshots": [
+        {
+          "imageURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/HEAD/docs/img/jb-home.png",
+          "width": 588,
+          "height": 1254
+        },
+        {
+          "imageURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/HEAD/docs/img/jb-package.png",
+          "width": 588,
+          "height": 1254
+        },
+        {
+          "imageURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/HEAD/docs/img/jb-log.png",
+          "width": 588,
+          "height": 1254
+        },
+        {
+          "imageURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/HEAD/docs/img/web-home.png",
+          "width": 588,
+          "height": 1254
+        },
+        {
+          "imageURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/HEAD/docs/img/web-sources.png",
+          "width": 588,
+          "height": 1254
+        },
+        {
+          "imageURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/HEAD/docs/img/web-app.png",
+          "width": 588,
+          "height": 1254
+        },
+        {
+          "imageURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/HEAD/docs/img/web-changes.png",
+          "width": 588,
+          "height": 1254
+        },
+        {
+          "imageURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/HEAD/docs/img/jb-sources.png",
+          "width": 588,
+          "height": 1254
+        },
+        {
+          "imageURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/HEAD/docs/img/web-search.png",
+          "width": 588,
+          "height": 1254
+        },
+        {
+          "imageURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/HEAD/docs/img/web-installed-manage.png",
+          "width": 588,
+          "height": 1254
+        },
+        {
+          "imageURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/HEAD/docs/img/web-myipas.png",
+          "width": 588,
+          "height": 1254
+        },
+        {
+          "imageURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/HEAD/docs/img/web-theme.png",
+          "width": 588,
+          "height": 1254
+        },
+        {
+          "imageURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/HEAD/docs/img/web-manage.png",
+          "width": 588,
+          "height": 1254
+        },
+        {
+          "imageURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/HEAD/docs/img/web-settings.png",
+          "width": 588,
+          "height": 1254
+        },
+        {
+          "imageURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/HEAD/docs/img/web-signing.png",
+          "width": 588,
+          "height": 1254
+        },
+        {
+          "imageURL": "https://raw.githubusercontent.com/RyanAHayden/iFizBox/HEAD/docs/img/jb-installed.png",
+          "width": 588,
+          "height": 1254
+        }
+      ],
       "versions": [
         {
           "version": "0.19.1",

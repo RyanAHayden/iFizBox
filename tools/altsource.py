@@ -109,8 +109,28 @@ def app_entry(versions):
         "iconURL": ICON_URL,
         "tintColor": "#37a94a",
         "category": "utilities",
+        "screenshots": screenshots(),
         "versions": versions,
     }
+
+
+# The app page's gallery: the README's phone-framed shots (docs/img/web-*.png and jb-*.png, each with its caption
+# in the picture), in README order, none of its cropped pictures (crop-*.png). Listed in the source so the app page
+# never falls back to the README's images (web/app/core/previews.js readmeShots). raw.githubusercontent.com loads
+# from the phone; the site doesn't serve docs/. A fixed list, not read from the README at run time (release tests
+# run this from a partial copy of the repo); tools/test_altsource.py keeps it equal to the README and docs/img.
+SHOTS_BASE = f"https://raw.githubusercontent.com/{BRAND['BRAND_GITHUB_REPO']}/HEAD/docs/img/"
+SHOT_NAMES = (
+    "jb-home.png", "jb-package.png", "jb-log.png", "web-home.png", "web-sources.png", "web-app.png",
+    "web-changes.png", "jb-sources.png", "web-search.png", "web-installed-manage.png", "web-myipas.png",
+    "web-theme.png", "web-manage.png", "web-settings.png", "web-signing.png", "jb-installed.png",
+)
+SHOT_SIZE = (588, 1254)  # every phone-framed shot's PNG size
+
+
+def screenshots():
+    width, height = SHOT_SIZE
+    return [{"imageURL": SHOTS_BASE + name, "width": width, "height": height} for name in SHOT_NAMES]
 
 
 def rebrand(data):
