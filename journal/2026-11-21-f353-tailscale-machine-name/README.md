@@ -37,7 +37,7 @@ Code and the table check are done. Tailscale's own naming on the 15 Pro is not c
 ## Not verified
 
 - The iPhone 18 line (autumn 2026) and any 17e are not in the table: their identifiers came out after what I know
-  and I could not check them here. They fall back to the identifier (e.g. `ifizbox-on-iphone19-1`) until they are
+  and I could not check them here. They fall back to the identifier (e.g. `ifizbox-on-iphone191`: Tailscale drops the comma) until they are
   added.
 - The Python copy of the selection rules is tied to the Swift only by text checks, not by running the Swift (there
   is no Swift toolchain on Linux).

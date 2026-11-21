@@ -14,8 +14,13 @@
 
 ## Correction to F353's journal
 `journal/2026-11-21-f353-tailscale-machine-name/README.md` gives `ifizbox-on-iphone19-1` as the fallback label for
-an unknown model. Tailscale drops the comma, so the label is `ifizbox-on-iphone191`. I left that journal as written
-(it is a record of that task, and outside this task's files) and note the right value here.
+an unknown model. Tailscale drops the comma, so the label is `ifizbox-on-iphone191`; that one example is corrected in
+place (the task asked for it).
+
+## Spec review
+- It asked for the F353 journal fix in place instead of only noting it here: done.
+- It said the 63-byte cut should come after the trim. The pinned Go source cuts `end` to 63 before it trims, and so
+  does the port, so I made no change.
 
 ## Tried and failed
 - A `find /` for the dnsname source ran past the time limit; the module cache is at
