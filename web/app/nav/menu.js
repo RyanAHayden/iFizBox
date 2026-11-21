@@ -5,14 +5,52 @@
 //   longPress(element, selector, (target, e) => ...)  a HOLD_MS hold that doesn't move or scroll; the click ending it is eaten
 import { haptic } from "./haptic.js";
 import { guarded } from "./tapguard.js";
-import { nativeBridge } from "../native.js";
+import { nativeBridge, hasNativeCall } from "../native.js";
+
+// The native controls hook, read inline as nav/alert.js does: importing actionsheet.js's wantsNativeControls would
+// load it at startup (module-graph.test.js's budget).
+const wantsNativeControls = (native, doc = globalThis.document) =>
+  hasNativeCall(native) && doc?.documentElement?.getAttribute?.("data-controls") === "native";
 
 export const HOLD_MS = 550; // B48: a little longer than 500, nearer iOS's own, so a finger resting before a slow scroll doesn't hold
 export const HOLD_SLOP = 10;
 
 let open = null; // the menu on screen: { close() }
 
-export function showMenu(anchor, items, { x = null } = {}) {
+// F345c: in the app under the native controls hook the menu is the shell's own UIMenu at the anchor's rect (bridge call
+// ui.menu, native/Sources/NativeMenus.swift), answering the chosen item's index (-1: put away). A shell without ui.menu,
+// the site and every other style get the CSS callout. Returns close(): it stops a native menu's answer from running
+// anything (the menu itself goes with the next touch).
+export function showMenu(anchor, items, opts = {}) {
+  const native = nativeBridge();
+  if (!wantsNativeControls(native)) return cssMenu(anchor, items, opts);
+  open?.close();
+  const r = anchor.getBoundingClientRect();
+  const params = { items: items.map((it) => String(it.label)),
+    rect: { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) } };
+  if (Number.isFinite(opts.x)) params.x = Math.round(opts.x);
+  anchor.classList.add("is-held");
+  const close = () => {
+    if (open !== ctl) return;
+    open = null;
+    anchor.classList.remove("is-held");
+  };
+  const ctl = { close };
+  open = ctl;
+  native.call("ui.menu", params).then((res) => {
+    if (open !== ctl) return;
+    close();
+    const i = res?.index;
+    if (Number.isInteger(i) && i >= 0 && i < items.length) items[i].onClick();
+  }, () => {
+    if (open !== ctl) return;
+    close();
+    cssMenu(anchor, items, opts); // an older shell ("unknown method ui.menu"), or no menu opened
+  });
+  return close;
+}
+
+function cssMenu(anchor, items, { x = null } = {}) {
   open?.close();
   const menu = document.createElement("div");
   menu.className = "menu";
@@ -77,10 +115,13 @@ export function showMenu(anchor, items, { x = null } = {}) {
 }
 
 // Copy text, with the old execCommand path where the async clipboard isn't allowed.
-export async function copyText(text) {
+// F345c: in the app a refused write goes to the shell's clipboard.write (UIPasteboard) before that: a native menu's
+// Copy runs after the shell's answer, outside the touch WebKit wants for a clipboard write.
+export async function copyText(text, native = nativeBridge()) {
   try {
     await navigator.clipboard.writeText(text);
   } catch {
+    if (native?.call) try { await native.call("clipboard.write", { text: String(text ?? "") }); return; } catch { /* older shell */ }
     const t = Object.assign(document.createElement("textarea"), { value: text });
     t.style.cssText = "position:fixed;opacity:0";
     document.body.append(t);

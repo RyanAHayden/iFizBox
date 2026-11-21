@@ -8,9 +8,59 @@
 //   // destructive: one index or a list of them (red buttons)
 //
 // All text goes in through textContent.
+//
+// F345c: in the app under the native controls hook (<html data-controls="native">) the sheet is the shell's own
+// UIAlertController (.actionSheet, bridge call ui.actionSheet, native/Sources/NativeMenus.swift): same options, same
+// answer. Its popover (iOS 26+ shows one on the iPhone too) points at the element the last touch went down on, when
+// that touch was recent. A shell without ui.actionSheet, the site and every other style get the CSS sheet.
 import { EASE, DURATION } from "./motion.js";
+import { nativeBridge, hasNativeCall } from "../native.js";
 
-export function showActionSheet({ title = "", buttons = [], cancel = "Cancel", destructive = -1 } = {}) {
+export function showActionSheet(opts = {}) {
+  const native = nativeBridge();
+  if (!wantsNativeControls(native)) return cssSheet(opts);
+  const { title = "", buttons = [], cancel = "Cancel", destructive = -1 } = opts;
+  const labels = buttons.map((b) => String(b));
+  const params = { title: String(title ?? ""), buttons: labels, cancel: cancel ? String(cancel) : "",
+    destructive: [].concat(destructive).filter((i) => Number.isInteger(i) && i >= 0 && i < labels.length) };
+  const rect = tapRect();
+  if (rect) params.rect = rect;
+  return native.call("ui.actionSheet", params).then((r) => {
+    const i = r?.index;
+    return Number.isInteger(i) && i >= 0 && i < labels.length ? i : -1;
+  }, () => cssSheet(opts)); // an older shell ("unknown method ui.actionSheet") or no window to show it in
+}
+
+// F345c: the native sheets and menus only in the app (the bridge takes calls) under the native controls hook.
+export function wantsNativeControls(native = nativeBridge(), doc = globalThis.document) {
+  return hasNativeCall(native) && doc?.documentElement?.getAttribute?.("data-controls") === "native";
+}
+
+// The element the last touch went down on and when (a capture listener on the document), for the popover's arrow.
+export const TAP_FRESH_MS = 3000; // a sheet later than this after the touch (a timer, a slow answer) points at no row
+let lastTap = null;
+let lastTapAt = 0;
+let watching = null;
+export function watchTaps(doc = globalThis.document) {
+  if (!doc?.addEventListener || watching === doc) return;
+  watching = doc;
+  doc.addEventListener("pointerdown", (e) => { lastTap = e.target; lastTapAt = Date.now(); }, true);
+}
+watchTaps();
+
+// {x, y, width, height} in CSS px from the viewport's top left (the web view's own points: the page isn't zoomed), of
+// the button/row the last touch went down on; null when there was none in the last TAP_FRESH_MS or it left the page.
+export function tapRect(now = Date.now()) {
+  if (!lastTap || now - lastTapAt > TAP_FRESH_MS) return null;
+  const el = lastTap.closest?.("button, a, .cell, li, [role=button]") ?? lastTap;
+  if (!el?.getBoundingClientRect || el.isConnected === false) return null;
+  const r = el.getBoundingClientRect();
+  if (!(r.width > 0 && r.height > 0)) return null;
+  return { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) };
+}
+
+// The CSS sheet: iOS 6's UIActionSheet, restyled by each era's stylesheet.
+function cssSheet({ title = "", buttons = [], cancel = "Cancel", destructive = -1 } = {}) {
   return new Promise((resolve) => {
     const scrim = document.createElement("div");
     scrim.className = "action-scrim";

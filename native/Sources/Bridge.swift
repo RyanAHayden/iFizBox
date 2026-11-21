@@ -73,6 +73,15 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         KeepAwake.register(self) // F287: app.keepAwake, the screen stays on while work runs (KeepAwake.swift)
         AppIcon.register(self) // F323: app.icon, the Home Screen icon follows the theme (AppIcon.swift)
         NativeAlerts.register(self) // F345b: ui.alert, the iOS 26 style's UIAlertController (NativeAlerts.swift)
+        NativeMenus.register(self) // F345c: ui.actionSheet and ui.menu, its sheets and UIMenus (NativeMenus.swift)
+        // F345c: {text}, a copy straight to UIPasteboard, for nav/menu.js copyText when WebKit refuses the write (a
+        // native menu's Copy runs after the touch WebKit wants).
+        on("clipboard.write") { c in
+            DispatchQueue.main.async {
+                UIPasteboard.general.string = c.params["text"] as? String ?? ""
+                c.reply(nil, nil)
+            }
+        }
     }
 
     func on(_ method: String, _ h: @escaping Handler) { methods[method] = h }
