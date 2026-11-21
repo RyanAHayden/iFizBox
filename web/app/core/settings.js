@@ -922,7 +922,9 @@ export const STYLE_PALETTES = { ios7: { light: "white", dark: "oled" }, ios13: {
 // iOS 6's glossed ones. The page keeps data-palette "oled" (ios7.css and ios13.css draw it by data-style); only the
 // shell's app.theme (screens/settings.js) carries the launch key, for its ground and its next splash.
 // B237: iOS 13's White likewise (#f2f2f7 ground, #f9f9f9 bars; iOS 7's White set has #efeff4 and #f7f7f7).
-export const STYLE_LAUNCH = { ios7: { oled: "oled7" }, ios13: { oled: "oled13", white: "white13" } };
+// F203: iOS 26 opens on iOS 13's sets: the same #f2f2f7 / #000 grounds (its bars have no hairline, a 1pt difference).
+export const STYLE_LAUNCH = { ios7: { oled: "oled7" }, ios13: { oled: "oled13", white: "white13" },
+  ios26: { oled: "oled13", white: "white13" } };
 export const launchKey = (style, palette) => STYLE_LAUNCH[style]?.[palette] ?? palette;
 
 // F202: the nav hooks an era turns on (docs/eras.md, "Nav hooks"): `nav: "large"` puts <html data-nav="large"> (large

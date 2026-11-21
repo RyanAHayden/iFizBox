@@ -826,6 +826,7 @@ export function applyStyleHooks(style, doc = document) {
   }
   if (sheet) root.setAttribute?.("data-sheet", sheet);
   else root.removeAttribute?.("data-sheet");
+  // (a real <html> always has removeAttribute; some tests' fake roots don't)
   if (root.removeAttribute) setFloatingTabbar(hooksOf(style).tabbar === "float", doc); // F203: iOS 26's pill and Search circle
   return done;
 }

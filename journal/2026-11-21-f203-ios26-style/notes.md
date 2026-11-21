@@ -72,6 +72,16 @@ package page (openMX: capsule back, check and Install), Settings, Settings > The
 - The nav bar is the grouped ground (#f2f2f7) on every page, also over plain white lists (Changes): iOS 26 shows the
   page's own colour there, which needs per-page knowledge (a `:has()` on the root, not in iOS 15.0–15.3).
 
+## Spec review (fresh subagent, diff + brief only)
+
+- Fixed: iOS 26 had no `STYLE_LAUNCH` entry, so the app's splash fell back to the White/OLED sets of another era;
+  it now opens on iOS 13's (`white13`, `oled13`: the same grounds). Commented the `removeAttribute` guard.
+- Filed F354: the app's native bars don't follow the era (the pill and capsules are web-only by the hook's design,
+  docs/eras.md); a Swift shell change outside this task's files.
+- Kept: `screens/settings.js` and `theme-boot.js` outside the brief's file list (the only way to turn the hook on, and
+  before first paint); card sheets (iOS 26 sheets are cards too, and the hook was already there).
+- "120 Hz on the iPhone 7": the 7's panel is 60 Hz, so this was measured at 60 Hz; see Not verified.
+
 ## Not verified
 
 - **120 Hz**: the iPhone 7 is a 60 Hz panel; the run shows glass and solid equal at 60 Hz. No ProMotion phone runs
