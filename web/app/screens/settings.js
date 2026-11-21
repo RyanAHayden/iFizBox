@@ -21,6 +21,7 @@ import { settings } from "../settings-store.js";
 import { createSwitch } from "../nav/switch.js";
 import { detectMode, themeState, paletteFor, DARK_THEME_KEY, SETTINGS, SIGNING_GROUPS } from "../core/settings.js";
 import { hooksOf } from "../core/settings.js"; // F202
+import { setFloatingTabbar } from "../nav/tabbar.js"; // F203 (app.js loads it at startup already)
 import { launchKey } from "../core/settings.js"; // B235
 import { showAlert, alertOK } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
@@ -825,6 +826,8 @@ export function applyStyleHooks(style, doc = document) {
   }
   if (sheet) root.setAttribute?.("data-sheet", sheet);
   else root.removeAttribute?.("data-sheet");
+  // (a real <html> always has removeAttribute; some tests' fake roots don't)
+  if (root.removeAttribute) setFloatingTabbar(hooksOf(style).tabbar === "float", doc); // F203: iOS 26's pill and Search circle
   return done;
 }
 

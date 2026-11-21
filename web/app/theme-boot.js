@@ -16,12 +16,15 @@
   var m = /^#\/(?:home\/)?settings\/(?:(?:theme|display)\/)?(lightTheme|darkTheme)\/?$/.exec((window.location && window.location.hash) || "");
   // F201: iOS 7 has its own two themes (core/settings.js STYLE_PALETTES) and no theme lists to preview.
   // F202: iOS 13 the same, and its card sheets (STYLE_HOOKS; its large titles wait for the app's nav/navbar.js).
-  var era = s === "ios7" || s === "ios13" ? s : "ios6";
+  // F203: iOS 26 the same as iOS 13, plus its floating tab bar (nav/tabbar.js setFloatingTabbar), set here so the
+  // bars don't move after first paint.
+  var era = s === "ios7" || s === "ios13" || s === "ios26" ? s : "ios6";
   var own = era !== "ios6"; // an era with its own White / OLED Black pair
   if (m && !own) dark = m[1] === "darkTheme";
   var root = document.documentElement;
   root.setAttribute("data-style", era);
-  if (era === "ios13") root.setAttribute("data-sheet", "card");
+  if (era === "ios13" || era === "ios26") root.setAttribute("data-sheet", "card");
+  if (era === "ios26") root.setAttribute("data-tabbar", "float");
   root.setAttribute("data-theme", dark ? "dark" : "light");
   // Each tone's themes, in core/settings.js's order, and the default (its `default`: Gunmetal, Classic): a new theme
   // adds its name here, beside its ios6.css or palettes.css block (F200), and its top-bar colour below.

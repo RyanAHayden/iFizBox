@@ -1,0 +1,528 @@
+/* iOS 26 (F203): the fourth era, Liquid Glass, drawn over ios6.css when <html data-style="ios26"> (Theme > Style;
+   theme-boot.js sets it before first paint). It starts from ios13.css (inset grouped on #f2f2f7, the system font,
+   uppercase group headers, iOS 13's segmented control and switch, UIAlertController) and changes what iOS 26 changed:
+   tables with 22pt corners; no bar backgrounds (the nav bar is the page's ground fading out at its foot, with no
+   hairline); bar buttons as 38pt glass capsules (the back button too, its chevron inside); and the floating tab bar,
+   a glass pill inset from the screen's edges with the chosen tab a soft grey capsule, and Search as its own glass
+   circle beside it (no label), the screens scrolling under both. The era turns on three nav hooks (core/settings.js
+   STYLE_HOOKS, docs/eras.md "Nav hooks"): large titles (nav/navbar.js), card sheets (nav/sheet.js) and the floating
+   tab bar (nav/tabbar.js setFloatingTabbar; style.css lays it out). Two themes of its own: White (data-palette
+   "white") and OLED Black (data-palette "oled"), as iOS 13's. Mockup: the "iOS eras" set in the theme concepts.
+
+   Glass is a translucent fill plus backdrop-filter, only where the page scrolls under it: the tab pill and the Search
+   circle. backdrop-filter blurs every frame the content under it moves, so it sits in two tokens per tone
+   (--i26-glass, --i26-glass-blur): if a phone drops frames scrolling under it, the fallback is a solid translucent
+   fill (--i26-glass-blur: none and a less see-through --i26-glass) in one place. The bar buttons sit on the nav bar's
+   own opaque ground, so they get the capsule's fill and edge with no blur. In the app the shell draws native bars
+   (html.native hides these), so the glass is the website's and the Home Screen app's.
+
+   Clean as docs/eras.md defines it, the way ios13.css is: geometry only through style.css's hooks, colours and
+   decorations through ios6.css's and packages.css's tokens, and look-only rules for what no token carries.
+   ios6-css.test.js fails if a rule here sets layout. Hooks go on html[data-style="ios26"] (both tones); colours on
+   [data-theme="light"] / [data-theme="dark"]. Linked after ios13.css (index.html). */
+
+/* ---- Geometry hooks (style.css "Era hooks"): the same in both tones ---- */
+html[data-style="ios26"] {
+  --bar-btn-h: 38px; --bar-btn-min-w: 38px; --bar-btn-pad: 0 14px; /* the glass capsule */
+  --bar-back-h: 38px; --bar-back-pad: 0 14px 0 4px; /* the chevron in the border's 13px slot, the label after it */
+  --tab-item-h: 100%; --tab-item-margin: 0; --tab-item-pad-top: 6px; --tab-icon-size: 26px; --tab-label-gap: 2px;
+  --group-margin: 20px 16px 0; --group-gap: 35px; --group-first-head: 0px; /* inset grouped: 16pt from the sides */
+  --group-head-margin: 0 20px 7px; --group-foot-margin: 7px 20px 0;
+  --cell-min-h: 48px; --cell-pad: 0 16px; --cell-gap: 12px;
+  --seg-h: 32px; --seg-margin: 10px 16px 0;
+  --large-title-pad: 3px 16px 8px;
+  --sw-w: 51px; --sw-h: 31px; --sw-knob-size: 31px; --sw-travel: 20px; /* iOS 7's 51 x 31 switch, as iOS 13's */
+  /* the floating tab bar (style.css, used under html[data-tabbar="float"]): a 64pt pill 14pt in from the sides,
+     the Search circle 8pt to its right */
+  --tabbar-float-h: 64px; --tabbar-float-pad: 4px; --tabbar-float-inset: 14px; --tabbar-float-gap: 8px;
+}
+/* Search's own circle has no label (below), so nothing goes under its glyph either. */
+html[data-style="ios26"] .tab[data-tab="search"] { --tab-label-gap: 0px; }
+
+/* ---- White ---- */
+html[data-style="ios26"][data-theme="light"] {
+  color-scheme: light;
+  /* era colours the look-only rules below read */
+  --i26-tint: #007aff; --i26-red: #ff3b30; --i26-green: #34c759;
+  --i26-bar: #f2f2f7; --i26-hairline: rgba(0,0,0,.3); --i26-label: #000;
+  /* Liquid Glass: the pill and circle's fill, blur, rim and float shadow; the bar buttons' capsule (no blur: they sit
+     on the nav bar's opaque ground); the chosen tab's capsule */
+  --i26-glass: rgba(255,255,255,.62); --i26-glass-blur: blur(14px) saturate(1.8);
+  --i26-glass-rim: rgba(255,255,255,.85);
+  --i26-glass-shadow: 0 8px 28px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.9), inset 0 -1px 2px rgba(0,0,0,.05);
+  --i26-capsule: rgba(255,255,255,.78); --i26-capsule-pressed: rgba(228,228,234,.9);
+  --i26-capsule-shadow: 0 2px 12px rgba(0,0,0,.08), inset 0 0 0 .5px rgba(0,0,0,.06);
+  --i26-back-shadow: 0 2px 12px rgba(0,0,0,.08), 0 0 0 .5px rgba(0,0,0,.06); /* outside: its border is the chevron's slot */
+  --i26-tab-chosen: rgba(0,0,0,.07);
+  --i26-sw-track: #e9e9eb; --i26-knob: #fff;
+  --i26-knob-shadow: 0 3px 8px rgba(0,0,0,.15), 0 3px 1px rgba(0,0,0,.06), 0 0 0 .5px rgba(0,0,0,.04);
+  --i26-knob-held: #f2f2f2;
+  --i26-seg-track: #e3e3e8; --i26-seg-pill: #fff; --i26-seg-text: #000; --i26-seg-divider: #c7c7cc;
+  --i26-seg-pressed: #d6d6db;
+  --i26-seg-pill-shadow: 0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04);
+  /* ios6.css's shared tokens */
+  --pin-dark: #f2f2f7; --pin-light: #f2f2f7; /* every pinstripe ground goes flat */
+  --head: #6d6d72; --emboss: none; --detail: #8a8a8e; --subtitle: #8a8a8e;
+  --text: #000; --field-text: #000; --field-hint: #c4c4c6;
+  --table: #fff; --table-edge: transparent; --table-inset: transparent;
+  --divider: #c6c6c8; --divider-hi: transparent;
+  --select: #d1d1d6; --count: #8e8e93; --plain: #fff; --keyline: #c6c6c8;
+  --category: #f2f2f7;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 13'%3E%3Cpath d='M1.6 1.3 6.8 6.5 1.6 11.7' fill='none' stroke='%23c4c4c6' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  /* nav bar */
+  /* nav bar: no bar of its own, the page's ground fading out over its last 12pt, no hairline */
+  --nav-bar: linear-gradient(#f2f2f7 calc(100% - 12px), rgba(242,242,247,0));
+  --nav-shadow: none; --nav-title: #000; --nav-title-emboss: none; --site-strip: #f2f2f7;
+  /* bar buttons: glass capsules with label-coloured text (the look rules below give the radius) */
+  --bar-btn-text: #000; --bar-btn-emboss: none;
+  --bar-btn-edge: var(--i26-glass-rim); --bar-btn-edge-top: var(--i26-glass-rim); --bar-btn: var(--i26-capsule);
+  --bar-btn-shadow: var(--i26-capsule-shadow);
+  --bar-btn-pressed: var(--i26-capsule-pressed); --bar-btn-pressed-edge: var(--i26-glass-rim);
+  --bar-btn-pressed-edge-top: var(--i26-glass-rim);
+  --lt-red-edge: var(--i26-glass-rim); --lt-red-edge-top: var(--i26-glass-rim); --lt-red: var(--i26-capsule);
+  --lt-red-pressed-edge: var(--i26-glass-rim); --lt-red-pressed-edge-top: var(--i26-glass-rim);
+  --lt-red-pressed: var(--i26-capsule-pressed);
+  /* the back chevron, in the 13px slot ios6.css's border-image gives the arrow (pre-squashed like ios13.css's: on
+     screen a 10 x 21pt chevron with round ends), label-coloured inside its capsule */
+  --bar-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='60'%3E%3Cpath d='M22 17 6 30l16 13' fill='none' stroke='%23000' stroke-width='5.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --bar-back-pressed: var(--bar-back);
+  /* tab bar: the glass pill (the look rules below give its shape) */
+  --tabbar: var(--i26-glass);
+  --tabbar-shadow: none;
+  --tab-text: #1c1c1e; --tab-text-active: #007aff; --tab-active: var(--i26-tab-chosen); --tab-active-edge: none;
+  --tab-icon: currentColor; --tab-icon-active: currentColor; --tab-icon-emboss: none; --tab-icon-emboss-active: none;
+  --badge-ring: 0 solid transparent; --badge: #ff3b30; --badge-shadow: none;
+  /* grouped tables */
+  --grouped-ground: #f2f2f7;
+  /* the done bar button (settings.css, the sheets, the reload, undo and banner bars): iOS 26's prominent capsule,
+     filled with the tint (white text: the look rules below) */
+  --done-btn: var(--i26-tint); --done-btn-edge: var(--i26-tint); --done-btn-edge-top: var(--i26-tint);
+  --done-btn-pressed: linear-gradient(rgba(0,0,0,.18), rgba(0,0,0,.18)), var(--i26-tint);
+  /* packages.css: search bar and scope bar */
+  --search-bar: #f9f9f9;
+  --search-bar-scoped: #f9f9f9;
+  --search-field: #e9e9eb url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='6.5' cy='6.5' r='5.2' fill='none' stroke='%238e8e93' stroke-width='1.8'/%3E%3Cpath d='m10.4 10.4 4.2 4.2' stroke='%238e8e93' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 9px 50% / 14px 14px no-repeat;
+  --search-field-edge: transparent; --search-field-edge-top: transparent; --search-field-shadow: none;
+  --search-text: #000; --search-hint: #8e8e93;
+  --search-clear: #8e8e93 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M2.5 2.5l5 5M7.5 2.5l-5 5' stroke='%23fff' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") center / 9px 9px no-repeat;
+  --search-cancel: none; --search-cancel-pressed: none;
+  --search-cancel-edge: transparent; --search-cancel-edge-top: transparent; --search-cancel-edge-bottom: transparent;
+  --search-cancel-text: #007aff; --search-cancel-emboss: none; --search-cancel-shadow: none;
+  --search-scope: linear-gradient(var(--i26-hairline), var(--i26-hairline)) bottom / 100% .5px no-repeat, #f9f9f9;
+  --scope-seg: #e3e3e8; --scope-seg-edge: #e3e3e8; --scope-seg-edge-top: #e3e3e8; --scope-seg-edge-bottom: #e3e3e8;
+  --scope-seg-divider: #c7c7cc; --scope-seg-text: #000; --scope-seg-emboss: none; --scope-seg-shadow: none;
+  --scope-seg-selected: #fff; --scope-seg-selected-edge: #e3e3e8; --scope-seg-selected-edge-top: #e3e3e8;
+  --scope-seg-selected-edge-bottom: #e3e3e8; --scope-seg-selected-divider: #e3e3e8;
+  --scope-done: none; --scope-done-pressed: none; --scope-done-edge: transparent; --scope-done-edge-top: transparent;
+  --filter-shadow: none;
+  /* ios6.css's segmented control (App Store tabs, Theme's Mode) */
+  --seg: #e3e3e8; --seg-edge: #e3e3e8; --seg-shadow: none; --seg-divider: #c7c7cc;
+  --seg-text: #000; --seg-emboss: none; --seg-pressed: #d6d6db;
+  --seg-selected: #fff; --seg-selected-text: #000; --seg-selected-emboss: none; --seg-selected-edge: #e3e3e8;
+  /* packages.css: the action sheet, iOS 13's rounded grouped buttons over a dimmed page */
+  --action-dim: rgba(0,0,0,.4); --action-sheet: none;
+  --action-title: #8a8a8e; --action-title-emboss: none;
+  --action-btn: rgba(255,255,255,.96); --action-btn-text: #007aff; --action-btn-emboss: none;
+  --action-btn-edge: transparent; --action-btn-shadow: none;
+  --action-btn-pressed: #e5e5ea; --action-btn-pressed-text: #007aff; --action-btn-pressed-emboss: none;
+  --action-destructive: rgba(255,255,255,.96); --action-destructive-text: #ff3b30; --action-destructive-emboss: none;
+  --action-cancel: #fff; --action-cancel-pressed: #e5e5ea;
+  --action-cancel-text: #007aff; --action-cancel-emboss: none;
+  --store-head: #fff; --store-head-edge: #c6c6c8; --store-head-emboss: none;
+  /* packages.css .sig-pill (B241): flat systemGreen / systemOrange / systemRed / systemGray, no gloss or shadow;
+     tweaks.css's tweak pills the same way */
+  --sig-pill: #34c759; --sig-pill-soon: #ff9500; --sig-pill-expired: #ff3b30; --sig-pill-unknown: #8e8e93;
+  --sig-pill-shadow: none;
+  --tweak-pill: #8e8e93; --tweak-pill-up: #34c759; --tweak-pill-shadow: none;
+  /* packages.css .row-failed-badge (Sources' failed row), flat systemRed */
+  --row-failed-badge: #ff3b30; --row-failed-badge-shadow: none;
+  /* the notification banner (nav/banner.js), flat: the bars' #f9f9f9 over a hairline, black text, no embosses */
+  --banner: #f9f9f9; --banner-shadow: none; --banner-edge: var(--i26-hairline); --banner-icon-shadow: none;
+  --banner-emboss: none; --banner-title: #000; --banner-text: #000; --banner-timer: rgba(0,0,0,.2);
+  /* the reload bar (nav/reloadbar.js): the tab bar's #f9f9f9 under a hairline, black text, the grey spinner */
+  --reload-bar: linear-gradient(var(--i26-hairline), var(--i26-hairline)) top / 100% .5px no-repeat, #f9f9f9;
+  --reload-text: #000; --reload-emboss: none; --i26-reload-spinner: var(--spinner-gray);
+}
+
+/* ---- OLED Black: the same shapes, white on black; ios6.css's dark rules read the --dk-* tokens ---- */
+html[data-style="ios26"][data-theme="dark"] {
+  color-scheme: dark;
+  --i26-tint: #0a84ff; --i26-red: #ff453a; --i26-green: #30d158;
+  --i26-bar: #000; --i26-hairline: #38383a; --i26-label: #fff;
+  /* Liquid Glass on black: a dark smoked fill with a faint light rim */
+  --i26-glass: rgba(40,40,44,.6); --i26-glass-blur: blur(14px) saturate(1.8);
+  --i26-glass-rim: rgba(255,255,255,.14);
+  --i26-glass-shadow: 0 8px 28px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.12);
+  --i26-capsule: #1c1c1e; --i26-capsule-pressed: #2c2c2e;
+  --i26-capsule-shadow: inset 0 0 0 .5px rgba(255,255,255,.1);
+  --i26-back-shadow: 0 0 0 .5px rgba(255,255,255,.1);
+  --i26-tab-chosen: rgba(255,255,255,.12);
+  --i26-sw-track: #39393d; --i26-knob: #fff;
+  --i26-knob-shadow: 0 3px 8px rgba(0,0,0,.3), 0 3px 1px rgba(0,0,0,.1);
+  --i26-knob-held: #e5e5e5;
+  --i26-seg-track: #1c1c1e; --i26-seg-pill: #636366; --i26-seg-text: #fff; --i26-seg-divider: #3a3a3c;
+  --i26-seg-pressed: #2c2c2e;
+  --i26-seg-pill-shadow: 0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04);
+  --pin-dark: #000; --pin-light: #000;
+  --head: #8d8d93; --emboss: none; --detail: #8d8d93; --subtitle: #8d8d93;
+  --text: #fff; --field-text: #fff; --field-hint: #5a5a5f;
+  --table: #1c1c1e; --table-edge: transparent; --table-inset: transparent;
+  --divider: #38383a; --divider-hi: transparent;
+  --select: #3a3a3c; --count: #48484e; --plain: #000; --keyline: #38383a;
+  --category: #1c1c1e;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 13'%3E%3Cpath d='M1.6 1.3 6.8 6.5 1.6 11.7' fill='none' stroke='%235a5a5f' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --nav-title: #fff; --nav-title-emboss: none; --site-strip: #000;
+  --dk-ground: #000;
+  --dk-nav-bar: linear-gradient(#000 calc(100% - 12px), rgba(0,0,0,0));
+  --dk-nav-shadow: none;
+  --dk-tabbar: var(--i26-glass);
+  --bar-btn-text: #fff; --bar-btn-emboss: none; --bar-btn-shadow: var(--i26-capsule-shadow);
+  --bar-btn-edge: var(--i26-glass-rim); --bar-btn-edge-top: var(--i26-glass-rim); --bar-btn-pressed: var(--i26-capsule-pressed);
+  --bar-btn-pressed-edge: var(--i26-glass-rim); --bar-btn-pressed-edge-top: var(--i26-glass-rim);
+  --dk-btn-edge: var(--i26-glass-rim); --dk-btn: var(--i26-capsule); --dk-btn-pressed: var(--i26-capsule-pressed);
+  --dk-red-edge: var(--i26-glass-rim); --dk-red-edge-top: var(--i26-glass-rim); --dk-red: var(--i26-capsule);
+  --dk-red-pressed-edge: var(--i26-glass-rim); --dk-red-pressed-edge-top: var(--i26-glass-rim);
+  --dk-red-pressed: var(--i26-capsule-pressed);
+  --dk-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='60'%3E%3Cpath d='M22 17 6 30l16 13' fill='none' stroke='%23fff' stroke-width='5.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --dk-ctl-hi: transparent; --dk-seg: #1c1c1e; --dk-seg-pressed: #2c2c2e;
+  --done-btn: var(--i26-tint); --done-btn-edge: var(--i26-tint); --done-btn-edge-top: var(--i26-tint);
+  --done-btn-pressed: linear-gradient(rgba(0,0,0,.25), rgba(0,0,0,.25)), var(--i26-tint);
+  /* tokens both tones' rules read, which ios6.css / packages.css define only on :root */
+  --tabbar-shadow: none; --filter-shadow: none; --dk-store-head: #000;
+  --scope-done: none; --scope-done-pressed: none; --scope-done-edge: transparent; --scope-done-edge-top: transparent;
+  --tab-text: #fff; --tab-text-active: #0a84ff; --tab-active: var(--i26-tab-chosen); --tab-active-edge: none;
+  --tab-icon: currentColor; --tab-icon-active: currentColor; --tab-icon-emboss: none; --tab-icon-emboss-active: none;
+  --badge-ring: 0 solid transparent; --badge: #ff453a; --badge-shadow: none;
+  --grouped-ground: #000;
+  --dk-search-line: #000; --dk-search-bar: #000; --dk-search-fill: #000;
+  --dk-field: #1c1c1e; --dk-field-edge: transparent; --dk-clear: #8d8d93;
+  --search-cancel-text: #0a84ff; --search-cancel-emboss: none; --search-cancel-shadow: none;
+  --search-field-shadow: none;
+  --search-field: #1c1c1e url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='6.5' cy='6.5' r='5.2' fill='none' stroke='%238d8d93' stroke-width='1.8'/%3E%3Cpath d='m10.4 10.4 4.2 4.2' stroke='%238d8d93' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 9px 50% / 14px 14px no-repeat;
+  --scope-seg-text: #fff; --scope-seg-emboss: none; --scope-seg-shadow: none;
+  --seg-text: #fff; --seg-emboss: none; --seg-shadow: none;
+  --seg-selected: #636366; --seg-selected-text: #fff; --seg-selected-emboss: none; --seg-selected-edge: #1c1c1e;
+  --dk-action-sheet: none; --dk-action-btn: #1c1c1e; --dk-action-cancel: #2c2c2e;
+  --action-dim: rgba(0,0,0,.6); --action-title: #8d8d93; --action-title-emboss: none;
+  --action-btn-text: #0a84ff; --action-btn-emboss: none; --action-btn-edge: transparent; --action-btn-shadow: none;
+  --action-btn-pressed: #2c2c2e; --action-btn-pressed-text: #0a84ff; --action-btn-pressed-emboss: none;
+  --action-destructive: #1c1c1e; --action-destructive-text: #ff453a; --action-destructive-emboss: none;
+  --action-cancel-text: #0a84ff; --action-cancel-emboss: none; --action-cancel-pressed: #3a3a3c;
+  --sig-pill: #30d158; --sig-pill-soon: #ff9f0a; --sig-pill-expired: #ff453a; --sig-pill-unknown: #8e8e93;
+  --sig-pill-shadow: none;
+  --tweak-pill: #8e8e93; --tweak-pill-up: #30d158; --tweak-pill-shadow: none;
+  --row-failed-badge: #ff453a; --row-failed-badge-shadow: none;
+  --banner: #1c1c1e; --banner-shadow: none; --banner-edge: var(--i26-hairline); --banner-icon-shadow: none;
+  --banner-emboss: none; --banner-title: #fff; --banner-text: #fff; --banner-timer: rgba(255,255,255,.3);
+  --reload-bar: linear-gradient(var(--i26-hairline), var(--i26-hairline)) top / 100% .5px no-repeat, #000;
+  --reload-text: #fff; --reload-emboss: none; --i26-reload-spinner: var(--spinner-white);
+}
+
+/* ---- Look-only rules: type, and the shapes no token carries ---- */
+/* The system font (SF on an iPhone), in place of iOS 6's Helvetica Neue. */
+html[data-style="ios26"] body,
+html[data-style="ios26"] .store-segment,
+html[data-style="ios26"] .sign-pw-txt { font-family: -apple-system, system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif; }
+
+/* Large title (the nav hook draws it; style.css sets its 34pt bold type): the label colour, on the page's ground. */
+html[data-style="ios26"] .large-title { color: var(--i26-label); letter-spacing: .01em; }
+
+/* Nav bar: a 17pt semibold title; bar buttons are 38pt capsules (the tokens above fill them), 15pt medium
+   label-coloured text, a held one a shade darker; Done the tint capsule with white text. */
+html[data-style="ios26"] .nav-title { font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+html[data-style="ios26"] .bar-button { font-size: 15px; font-weight: 500; line-height: 36px; letter-spacing: -.01em; border-radius: 19px; }
+html[data-style="ios26"] .bar-button.done,
+html[data-style="ios26"][data-theme] .bar-button.done { font-weight: 600; color: #fff; }
+html[data-style="ios26"] .bar-button.red:not(.back):not(.done) { color: var(--i26-red); }
+/* The back button: its chevron stays ios6.css's border-image (the --bar-back token), the capsule is its background. */
+html[data-style="ios26"] .bar-button.back,
+html[data-style="ios26"][data-theme] .bar-button.back {
+  line-height: 38px; border-radius: 19px; background: var(--i26-capsule); box-shadow: var(--i26-back-shadow);
+}
+html[data-style="ios26"] .bar-button.back:active, html[data-style="ios26"] .bar-button.back.is-pressed,
+html[data-style="ios26"][data-theme] .bar-button.back:active, html[data-style="ios26"][data-theme] .bar-button.back.is-pressed {
+  background: var(--i26-capsule-pressed); filter: none;
+}
+html[data-style="ios26"] .bar-button.share-button::before {
+  filter: none;
+  background-color: var(--i26-label);
+  background-image: none;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 26'%3E%3Cpath d='M7 9H3.5a1 1 0 0 0-1 1v13.5a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1V10a1 1 0 0 0-1-1H13' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round'/%3E%3Cpath d='M10 16.5V1.8M5.8 5.8 10 1.6l4.2 4.2' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 17px 22px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 26'%3E%3Cpath d='M7 9H3.5a1 1 0 0 0-1 1v13.5a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1V10a1 1 0 0 0-1-1H13' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round'/%3E%3Cpath d='M10 16.5V1.8M5.8 5.8 10 1.6l4.2 4.2' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 17px 22px no-repeat;
+}
+
+/* Tab bar: the floating glass pill (style.css lays it out under the floating tab bar hook): a translucent fill
+   blurred over the page, a light rim and a soft float shadow. 10pt medium labels under ios6.css's filled glyphs,
+   label-coloured, the chosen tab tinted on a grey capsule. Search is its own glass circle, glyph only. */
+html[data-style="ios26"] .tabbar,
+html[data-style="ios26"][data-theme] .tabbar {
+  border: 1px solid var(--i26-glass-rim); border-radius: 32px; box-shadow: var(--i26-glass-shadow);
+  -webkit-backdrop-filter: var(--i26-glass-blur); backdrop-filter: var(--i26-glass-blur);
+}
+html[data-style="ios26"] .tab { font-weight: 500; letter-spacing: .01em; border-radius: 28px; }
+html[data-style="ios26"] .tab[data-tab="search"],
+html[data-style="ios26"] .tab[data-tab="search"].active {
+  border: 1px solid var(--i26-glass-rim); border-radius: 50%; background: var(--i26-glass); box-shadow: var(--i26-glass-shadow);
+  -webkit-backdrop-filter: var(--i26-glass-blur); backdrop-filter: var(--i26-glass-blur);
+}
+html[data-style="ios26"] .tab[data-tab="search"] .tab-label { font-size: 0; line-height: 0; }
+html[data-style="ios26"] .badge { font-size: 14px; font-weight: 400; line-height: 20px; letter-spacing: 0; }
+
+/* Card sheets (nav/sheet.js under data-sheet="card"): iOS 26's rounder top corners. */
+html[data-style="ios26"][data-sheet="card"] { --sheet-radius: 22px; }
+
+/* Inset grouped tables: no outline, 22pt corners, separators inset 16pt (drawn on the cell, so the pressed grey
+   covers them as iOS hides a selected row's lines), uppercase 13pt headers, left-aligned 13pt footers. */
+html[data-style="ios26"] .group-header { font-size: 13px; font-weight: 400; line-height: 16px; letter-spacing: 0; text-transform: uppercase; }
+html[data-style="ios26"] .group-footer { font-size: 13px; line-height: 17px; text-align: left; }
+html[data-style="ios26"] .table.grouped { border-width: 0; border-radius: 22px; box-shadow: none; }
+html[data-style="ios26"] .grouped .cell + .cell {
+  border-top-width: 0;
+  background: linear-gradient(var(--divider), var(--divider)) 16px 0 / calc(100% - 16px) .5px no-repeat;
+}
+html[data-style="ios26"] .grouped .cell + .cell > .cell-inner { box-shadow: none; }
+html[data-style="ios26"] .cell-label { font-size: 17px; font-weight: 400; letter-spacing: -.02em; }
+html[data-style="ios26"] .cell-subtitle { font-size: 13px; }
+html[data-style="ios26"] .cell-detail { letter-spacing: -.02em; }
+html[data-style="ios26"] .cell-count { font-weight: 400; }
+html[data-style="ios26"] .cell-check::after { font-weight: 600; color: var(--i26-tint); }
+html[data-style="ios26"] .cell-inner.is-pressed { color: var(--text); }
+html[data-style="ios26"] .cell-inner.is-pressed:not(:where(.managing .manage-row > *)) * { color: inherit; } /* a Manage row keeps its look held */
+html[data-style="ios26"] .cell-inner.is-pressed .cell-subtitle { color: var(--subtitle); }
+html[data-style="ios26"] .cell-inner.is-pressed .cell-detail { color: var(--detail); }
+html[data-style="ios26"] .cell-inner.chevron.is-pressed::after { background-image: var(--chevron); }
+
+/* Plain tables: the flat grey section bar with a 15pt semibold label. */
+html[data-style="ios26"] .section-header { font-size: 15px; font-weight: 600; color: var(--i26-label); text-shadow: none; }
+
+/* Switch: flat, iOS 13's green with a white knob and no ON / OFF, in iOS 7's 51 x 31 box (the hooks above). The knob
+   is drawn 2pt inside its 31pt box: a 2pt ring in the track's own colour (green when on, the grey track when off; a
+   transparent ring would show the off track's grey beside an on knob), so the track shows round it as on iOS 13. */
+html[data-style="ios26"] .sw-track,
+html[data-style="ios26"][data-theme] .sw-track {
+  border: 1.5px solid var(--i26-sw-track); border-radius: 15.5px; background: var(--i26-sw-track); box-shadow: none;
+}
+html[data-style="ios26"] .switch[aria-checked="true"] .sw-track { border-color: var(--i26-green); }
+html[data-style="ios26"] .sw-track::before,
+html[data-style="ios26"][data-theme] .sw-track::before { content: ""; text-shadow: none; background: var(--i26-green); }
+html[data-style="ios26"] .sw-track::after { content: ""; }
+html[data-style="ios26"] .sw-knob,
+html[data-style="ios26"][data-theme] .sw-knob {
+  --i26-ring: var(--i26-sw-track); border: 2px solid var(--i26-ring); box-shadow: var(--i26-knob-shadow);
+  /* the ring's colour under the knob too, so no green seam shows where the two meet */
+  background: linear-gradient(var(--i26-knob), var(--i26-knob)) padding-box, var(--i26-ring);
+}
+html[data-style="ios26"] .switch[aria-checked="true"] .sw-knob { --i26-ring: var(--i26-green); }
+html[data-style="ios26"] .switch.is-held .sw-knob,
+html[data-style="ios26"][data-theme] .switch.is-held .sw-knob {
+  background: linear-gradient(var(--i26-knob-held), var(--i26-knob-held)) padding-box, var(--i26-ring);
+}
+
+/* Signature pills (packages.css .sig-pill, whose fills the tokens above make flat): semibold white text, no tracking. */
+html[data-style="ios26"] .sig-pill,
+html[data-style="ios26"] .cell[class*="sig-row-"] .cell-detail,
+html[data-style="ios26"] .pkg-row[data-change="resign"] .pkg-version { font-weight: 600; letter-spacing: 0; }
+/* a held row greys its detail (the pressed rules above); the pill keeps its white text */
+html[data-style="ios26"] .cell-inner.is-pressed .cell-detail.sig-pill,
+html[data-style="ios26"] .cell[class*="sig-row-"] .cell-inner.is-pressed .cell-detail { color: #fff; }
+
+/* The bars over the page: the banner's Upgrade is semibold tinted text centred in its 30pt box (the 44pt line-height
+   of the bar buttons above pushed it down); the banner's title semibold, its icon iOS 13's rounder corner; the
+   reload bar's status line semibold over the grey spinner in White. */
+html[data-style="ios26"] .banner .banner-action { font-size: 15px; font-weight: 600; line-height: 28px; color: var(--i26-tint); }
+html[data-style="ios26"] .banner-text strong { font-weight: 600; }
+html[data-style="ios26"] .banner-icon { border-radius: 7px; }
+html[data-style="ios26"] .reload-text { font-size: 15px; font-weight: 600; }
+html[data-style="ios26"] .reload-spinner { background-image: var(--i26-reload-spinner); }
+
+/* Segmented control: iOS 13's grey track with the chosen segment a white pill (the track's colour as a 1pt ring
+   inside it, so the pill sits 2pt in from the track's edge), black 13pt text, semibold when chosen. The
+   [data-theme] copies tie with ios6.css's dark rules and win by order. */
+html[data-style="ios26"] .store-segmented,
+html[data-style="ios26"][data-theme] .store-segmented,
+html[data-style="ios26"] .store-segmented:has(.store-segment.selected) {
+  border-color: var(--i26-seg-track); border-radius: 9px; box-shadow: none; background: var(--i26-seg-track);
+}
+html[data-style="ios26"] .store-segment,
+html[data-style="ios26"] .store-segment:not(.selected),
+html[data-style="ios26"][data-theme] .store-segment:not(.selected) {
+  font-size: 13px; font-weight: 400; color: var(--i26-seg-text); text-shadow: none; background: var(--i26-seg-track);
+}
+html[data-style="ios26"] .store-segment + .store-segment,
+html[data-style="ios26"][data-theme] .store-segment + .store-segment { border-left-color: var(--i26-seg-divider); }
+html[data-style="ios26"] .store-segment.selected + .store-segment,
+html[data-style="ios26"] .store-segment + .store-segment.selected,
+html[data-style="ios26"][data-theme] .store-segment.selected + .store-segment,
+html[data-style="ios26"][data-theme] .store-segment + .store-segment.selected { border-left-color: var(--i26-seg-track); }
+html[data-style="ios26"] .store-segment:active:not(.selected),
+html[data-style="ios26"][data-theme] .store-segment:active:not(.selected) { background: var(--i26-seg-pressed); }
+html[data-style="ios26"] .store-segment.selected,
+html[data-style="ios26"][data-theme] .store-segment.selected {
+  font-weight: 600; color: var(--i26-seg-text); background: var(--i26-seg-pill); border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--i26-seg-track), var(--i26-seg-pill-shadow);
+}
+
+/* Scope bar (Changes' All / Installed, Installed's title, Search's scopes): the same grey track and white pill. */
+html[data-style="ios26"] .scope-segments,
+html[data-style="ios26"][data-theme] .scope-segments { border-radius: 9px; box-shadow: none; background: var(--i26-seg-track); }
+html[data-style="ios26"] .scope-segment, html[data-style="ios26"] .scope-filter,
+html[data-style="ios26"][data-theme] .scope-segment, html[data-style="ios26"][data-theme] .scope-filter {
+  font-size: 13px; font-weight: 400; color: var(--i26-seg-text); text-shadow: none;
+  border-color: var(--i26-seg-track); background: var(--i26-seg-track);
+}
+html[data-style="ios26"] .scope-segment:first-child { border-radius: 9px 0 0 9px; }
+html[data-style="ios26"] .scope-segment:last-child { border-radius: 0 9px 9px 0; }
+html[data-style="ios26"] .scope-filter { border-radius: 9px; }
+html[data-style="ios26"] .scope-segment + .scope-segment,
+html[data-style="ios26"][data-theme] .scope-segment + .scope-segment { border-left-color: var(--i26-seg-divider); }
+html[data-style="ios26"][data-theme] .scope-segment.selected + .scope-segment,
+html[data-style="ios26"][data-theme] .scope-segment + .scope-segment.selected { border-left-color: var(--i26-seg-track); }
+html[data-style="ios26"] .scope-segment:active, html[data-style="ios26"] .scope-filter:active,
+html[data-style="ios26"][data-theme] .scope-segment:active, html[data-style="ios26"][data-theme] .scope-filter:active {
+  border-color: var(--i26-seg-track); background: var(--i26-seg-pressed);
+}
+html[data-style="ios26"] .scope-segment.selected, html[data-style="ios26"] .scope-filter.selected,
+html[data-style="ios26"][data-theme] .scope-segment.selected, html[data-style="ios26"][data-theme] .scope-filter.selected {
+  font-weight: 600; color: var(--i26-seg-text); border-color: var(--i26-seg-track); background: var(--i26-seg-pill);
+  border-radius: 8px; box-shadow: inset 0 0 0 1px var(--i26-seg-track), var(--i26-seg-pill-shadow);
+}
+html[data-style="ios26"] .nav-segments .scope-segments { box-shadow: none; }
+
+/* Search bar: the field is a grey capsule; Cancel is tinted text. */
+html[data-style="ios26"] .search-field { border-radius: 18px; }
+html[data-style="ios26"] .search-cancel { font-size: 17px; font-weight: 400; }
+html[data-style="ios26"][data-theme="dark"] .search-cancel { background: none; }
+
+/* Action sheet: 13pt rounded buttons, regular weight, Cancel semibold. */
+html[data-style="ios26"] .action-button { font-size: 20px; font-weight: 400; border-radius: 13px; }
+html[data-style="ios26"] .action-button.cancel { font-weight: 600; }
+html[data-style="ios26"][data-theme="dark"] .action-button.destructive { background: var(--action-destructive); }
+
+/* The price button (myipas.css .price-btn: My IPAs' SIGN / INSTALL / OPEN, the confirm tap's INSTALL .go, and
+   More Sources' and Find More's ADD / ADDED, sources.css .rec-add, which wears .price-btn too): the iOS 13 App
+   Store's GET, a grey capsule with bold tinted text and no outline, darker while held; the confirm tap's INSTALL
+   the tint capsule with white text; disabled (and ADDED) keeps the capsule with grey text; busy keeps the tinted
+   label over a pale tint fill growing from the left. [data-theme] so myipas.css (lazy) can't win back. Every class
+   a price button can wear needs a rule here: price-btn-eras.test.js checks it. */
+html[data-style="ios26"][data-theme="light"] {
+  --i26-get: #eff0f5; --i26-get-pressed: #d8d9df; --i26-get-dim-text: #8e8e93;
+  --i26-get-fill: rgba(0, 122, 255, .18); --i26-get-go-held: rgba(0, 0, 0, .2);
+}
+html[data-style="ios26"][data-theme="dark"] {
+  --i26-get: #2c2c2e; --i26-get-pressed: #3a3a3c; --i26-get-dim-text: #8e8e93;
+  --i26-get-fill: rgba(10, 132, 255, .3); --i26-get-go-held: rgba(0, 0, 0, .3);
+}
+html[data-style="ios26"][data-theme] .price-btn {
+  font-size: 13px; font-weight: 700; color: var(--i26-tint); text-shadow: none;
+  border: 1px solid var(--i26-get); border-radius: 12px; background: var(--i26-get); box-shadow: none;
+}
+html[data-style="ios26"][data-theme] .price-btn:active:not(:disabled) {
+  border-color: var(--i26-get-pressed); background: var(--i26-get-pressed); box-shadow: none;
+}
+html[data-style="ios26"][data-theme] .price-btn.go { color: #fff; border-color: var(--i26-tint); background: var(--i26-tint); }
+html[data-style="ios26"][data-theme] .price-btn.go:active:not(:disabled) {
+  border-color: var(--i26-tint); background: var(--i26-tint); box-shadow: inset 0 0 0 99px var(--i26-get-go-held);
+}
+html[data-style="ios26"][data-theme] .price-btn.added,
+html[data-style="ios26"][data-theme] .price-btn:disabled:not(.busy):not(.adding) {
+  color: var(--i26-get-dim-text); border-color: var(--i26-get); background: var(--i26-get); box-shadow: none;
+}
+html[data-style="ios26"][data-theme] .price-btn.busy { color: var(--i26-tint); border-color: var(--i26-get); background: var(--i26-get); }
+html[data-style="ios26"][data-theme] .price-btn.busy::before { background: var(--i26-get-fill); }
+html[data-style="ios26"][data-theme] .price-btn.adding { color: var(--i26-tint); }
+
+/* ---- B270: the leftovers that still drew iOS 6 ---- */
+/* Home's tiles: inset 16pt like the grouped tables under them (the Settings | Theme pair and the help links), white
+   22pt cards with no outline, like the tables. The GitHub | Discord pair gets the card's fill (iOS 6 leaves it empty
+   for the pinstripes), and both pairs are split by a .5pt separator with no stray top line (the grouped tables'
+   inset separator, drawn on a second cell, sat 16pt into the right half). */
+html[data-style="ios26"] { --home-inset: 16px; }
+html[data-style="ios26"] .home { --tile: var(--table); --tile-edge: transparent; --tile-radius: 22px; }
+html[data-style="ios26"] .home-row > .table { border-width: 0; }
+html[data-style="ios26"] .home-row.pair > .table { background: var(--tile); }
+html[data-style="ios26"] .home-row .home-pair > .cell + .cell,
+html[data-style="ios26"] .home-links .home-pair > .cell + .cell {
+  border-top-width: 0; border-left: .5px solid var(--divider); background: none;
+}
+html[data-style="ios26"] .home-links .table.grouped,
+html[data-style="ios26"][data-theme="dark"] .home-links .table.grouped { border-width: 0; background: var(--table); }
+
+/* Installed's and Install IPAs' Manage: iOS 13's multi-select circle, a 1.5pt grey ring, picked a tinted disc with a
+   white tick and no rim or shadow; a picked row the light grey selection, not iOS 6's pale blue. */
+html[data-style="ios26"][data-theme="light"] { --i26-check-ring: #c7c7cc; --i26-picked: #e5e5ea; }
+html[data-style="ios26"][data-theme="dark"] { --i26-check-ring: #545458; --i26-picked: #2c2c2e; }
+html[data-style="ios26"][data-theme] .manage-check { border: 1.5px solid var(--i26-check-ring); box-shadow: none; background: none; }
+html[data-style="ios26"][data-theme] .manage-row.picked .manage-check {
+  border-color: var(--i26-tint); box-shadow: none;
+  background: var(--i26-tint) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Cpath d='M6.3 11.4 9.6 14.6 15.9 7.6' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat border-box;
+}
+/* On the row only (My IPAs' rows wear .manage-row too), held the same as picked: packages.css's rule, in this era's grey. */
+html[data-style="ios26"][data-theme] .managing .manage-row.picked,
+html[data-style="ios26"][data-theme] .managing .manage-row:has(> .cell-inner.is-pressed) { background-color: var(--i26-picked); }
+/* Manage's toolbar: the bars' flat #f9f9f9 (black in OLED Black) under a hairline; Delete is red text like the other
+   bar buttons' tinted text, dimming while held, with no glossy red box. */
+html[data-style="ios26"][data-theme] .manage-toolbar {
+  background: linear-gradient(var(--i26-hairline), var(--i26-hairline)) top / 100% .5px no-repeat, var(--i26-bar);
+}
+html[data-style="ios26"][data-theme] .manage-toolbar .bar-button.manage-delete:not(.back):not(.done),
+html[data-style="ios26"][data-theme] .manage-toolbar .bar-button.manage-delete:not(.back):not(.done):is(:active, .is-pressed) {
+  color: var(--i26-red); border-color: transparent; background: none; box-shadow: none;
+}
+
+/* Alerts and prompts (nav/alert.js: About, Add Source's field, every showAlert): UIAlertController's box, 270pt wide
+   with 14pt corners, white (#1c1c1e in OLED Black) all but opaque where iOS blurs (no backdrop-filter: the era
+   holds 120 Hz, theme-palette.test.js), a 17pt semibold title and 13pt message, a rounded
+   field, then 44pt flat tinted buttons edge to edge under .5pt separators, a .5pt line between two side by side; the
+   preferred (last) button semibold, a destructive one red. The row meets the box's sides and bottom (its margin
+   undoes the 16pt padding), so each button draws its own lines, and the bottom ones take the box's corners. */
+html[data-style="ios26"] {
+  --alert-w: 270px; --alert-pad: 19px 16px 0;
+  --alert-buttons-margin: 15px -16px 0; --alert-buttons-gap: 0px; --alert-stacked-gap: 0px; --alert-button-h: 44px;
+}
+html[data-style="ios26"][data-theme="light"] {
+  --i26-alert: rgba(250,250,250,.97); --i26-alert-line: rgba(60,60,67,.29); --i26-alert-pressed: rgba(0,0,0,.08);
+  --i26-alert-dim: rgba(60,60,67,.3); --i26-alert-field: #fff; --i26-alert-field-edge: rgba(60,60,67,.29);
+  --i26-scrim: rgba(0,0,0,.2);
+}
+html[data-style="ios26"][data-theme="dark"] {
+  --i26-alert: rgba(28,28,30,.97); --i26-alert-line: rgba(84,84,88,.65); --i26-alert-pressed: rgba(255,255,255,.1);
+  --i26-alert-dim: rgba(235,235,245,.3); --i26-alert-field: #2c2c2e; --i26-alert-field-edge: #3a3a3c;
+  --i26-scrim: rgba(0,0,0,.48);
+}
+html[data-style="ios26"] .alert-scrim { background: var(--i26-scrim); }
+html[data-style="ios26"] .alert {
+  border: 0; border-radius: 14px; box-shadow: none; color: var(--i26-label); text-shadow: none;
+  background: var(--i26-alert);
+}
+html[data-style="ios26"] .alert::before { background: none; }
+html[data-style="ios26"] .alert-title { font-size: 17px; line-height: 22px; font-weight: 600; }
+html[data-style="ios26"] .alert-message { font-size: 13px; line-height: 16px; }
+html[data-style="ios26"] .alert-field {
+  border-radius: 7px; font-size: 14px; color: var(--i26-label);
+  background: var(--i26-alert-field); border: .5px solid var(--i26-alert-field-edge); box-shadow: none;
+}
+html[data-style="ios26"] .alert-paste,
+html[data-style="ios26"] .alert-paste:active {
+  border: 0; border-radius: 0; font-size: 15px; font-weight: 400; color: var(--i26-tint); text-shadow: none; background: none;
+}
+html[data-style="ios26"] .alert-paste:active { opacity: .3; }
+html[data-style="ios26"] .alert-button,
+html[data-style="ios26"] .alert-button.cancel,
+html[data-style="ios26"] .alert-button.green,
+html[data-style="ios26"] .alert-button.red,
+html[data-style="ios26"] .alert-button.blue,
+html[data-style="ios26"] .alert-button:disabled {
+  border: 0; border-radius: 0; box-shadow: inset 0 .5px 0 var(--i26-alert-line); text-shadow: none; background: none;
+  font-size: 17px; font-weight: 400; color: var(--i26-tint);
+}
+html[data-style="ios26"] .alert-buttons:not(.stacked) > .alert-button + .alert-button {
+  box-shadow: inset 0 .5px 0 var(--i26-alert-line), inset .5px 0 0 var(--i26-alert-line);
+}
+html[data-style="ios26"] .alert-buttons:not(.stacked) > .alert-button:first-child { border-bottom-left-radius: 14px; }
+html[data-style="ios26"] .alert-buttons:not(.stacked) > .alert-button:last-child { border-bottom-right-radius: 14px; }
+html[data-style="ios26"] .alert-buttons.stacked > .alert-button:last-child { border-radius: 0 0 14px 14px; }
+html[data-style="ios26"] .alert-button:last-child:not(.cancel) { font-weight: 600; }
+html[data-style="ios26"] .alert-button.red { color: var(--i26-red); }
+html[data-style="ios26"] .alert-button:disabled { color: var(--i26-alert-dim); opacity: 1; }
+html[data-style="ios26"] .alert-button:active:not(:disabled),
+html[data-style="ios26"] .alert-button.is-pressed { background: var(--i26-alert-pressed); }
