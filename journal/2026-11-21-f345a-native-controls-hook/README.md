@@ -73,9 +73,14 @@ Chromium, light and dark, from the same markup: the 71 x 31 look-alike switch an
   for its user agents; anchor positioning first shipped in WebKit 26. The fallback's look is ios26.css's existing
   look-alikes (only the switch box grew to 71 x 31), checked in Chromium per AGENTS.md's "phone only when Chromium
   can't check".
-- **The real build on the 15 Pro.** The phone runs an older iFizBox; I injected this branch's CSS and markup, not
-  its JS. So `createSwitch`'s input, `redrawSwitches` on a live Theme > Style change, `nav/progress.js`'s
-  `<progress>` and the `app.info` correction ran only in node tests, not on the phone.
+- **The real build on the 15 Pro.** The phone runs an older iFizBox. After the spec review I loaded this branch's
+  `nav/switch.js` as a blob module in the app's web view under the hook: `createSwitch` gave an `<input>` with
+  `switch` true and `appearance: auto`, `.click()` checked it, fired `change` (aria-checked "true", onToggle heard
+  `true`), and `setAttribute("aria-checked", "false")` unchecked it without onToggle. Not run there:
+  `redrawSwitches` on a live Theme > Style change, `nav/progress.js`'s `<progress>` and the `app.info` correction
+  (node tests only).
+- **A run page already open when the style changes** keeps the bar kind it was opened with (only switches are
+  redrawn); the next run page picks the right one. Left as is: the page lasts one run.
 - **The native switch's drag and the select's UIMenu** in this layout were not tapped (the F345 research tapped the
   select in the app and saw the glass menu).
 - **iOS 26.0–26.x**: no such phone here; the rule assumes anchor positioning and the controls arrived together in

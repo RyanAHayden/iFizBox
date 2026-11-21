@@ -78,7 +78,8 @@ export function initNativeControls(doc = globalThis.document) {
   const n = nativeBridge();
   if (hasNativeCall(n)) {
     n.call("app.info", {}).then((info) => {
-      if (typeof info?.ios === "string" && info.ios) { nativeIos = info.ios; update(doc); }
+      const ios = info?.ios; // Bridge.swift sends UIDevice's systemVersion string; a number counts too
+      if ((typeof ios === "string" && ios) || typeof ios === "number") { nativeIos = String(ios); update(doc); }
     }).catch(() => {});
   }
 }
