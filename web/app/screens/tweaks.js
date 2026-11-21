@@ -846,7 +846,7 @@ export async function madeForRows(bundleId, { rows = sourceTweakRows, storage, i
   const list = await rows().catch(() => []);
   if (index) await index(list).catch(() => 0);
   // a paid tweak's guessed app (unverified) isn't counted: whether its source names a seller isn't asked here
-  const infoOf = (r) => { const i = cachedTweakInfo({ package: r.id, version: r.version }, { storage }); return i?.unverified ? null : i; };
+  const infoOf = (r) => { const i = conceptInfo(r) ?? cachedTweakInfo({ package: r.id, version: r.version }, { storage }); return i?.unverified ? null : i; };
   return liteTweaks(list, bundleId, infoOf).made;
 }
 
@@ -929,7 +929,17 @@ export async function sellerKeys(rows, { sources = rowSources, text = null } = {
   return out;
 }
 
+// Concept: the sample Tweak Source's targets (what the index would answer), so the list fills without a server.
+const CONCEPT_ANY = new Set(["com.cydiageek.clearpipbg", "com.flex.flexing", "com.alpha.darkmodeforce"]);
+function conceptInfo(r) {
+  if (!/^com\.(poomsmart|joshuaseltzer|cercube|ps|cydiageek|flex|alpha)\./.test(r?.id ?? "")) return null;
+  return CONCEPT_ANY.has(r.id) ? { v: 1, ok: true, bundles: [], anyApp: true, indexed: true }
+    : { v: 1, ok: true, bundles: ["com.google.ios.youtube"], anyApp: false, indexed: true };
+}
+
 export function rowInfo(r, { storage, sellers = new Set() } = {}) {
+  const ci = conceptInfo(r);
+  if (ci) return ci;
   const info = cachedTweakInfo({ package: r?.id, version: r?.version }, { storage });
   const paid = Boolean(r?.paid) || Boolean(info?.paid);
   if (paid && !sellers.has(r?.key)) return info?.unverified ? null : info; // no seller named: not offered
@@ -1004,12 +1014,15 @@ export function addTweaksGroup({ bundleId, name = "", open = (o) => openAddTweak
   async function refresh() {
     const [kept, made] = await Promise.all([savedTweaks(bundleId, { store }), madeForRows(bundleId, { rows, storage })]);
     detail.textContent = kept.length ? `${kept.length} Added` : made.length ? `${made.length} for This App` : "";
-    foot.textContent = kept.length ? `Goes in when it's signed: ${kept.map(tweakTitle).join(", ")}.`
-      : made.length ? `From your sources: ${made.map((r) => r.name || r.id).join(", ")}.`
-      : "Tweaks from your Tweak Sources or Files go into the app when it's signed.";
+    foot.textContent = kept.length ? "They go in the next time it's signed." : made.length ? "" : "Tweaks from your Tweak Sources or Files go into the app when it's signed.";
+    foot.hidden = !foot.textContent;
     return { kept, made };
   }
-  b.addEventListener("click", async () => { await open({ bundleId, name, rows, store, storage }); refresh(); });
+  // Concept: Add Tweaks is a page of its own under the app's (browse.js renderAddTweaks), pushed like every page.
+  b.addEventListener("click", () => {
+    const h = location.hash.replace(/\/$/, "");
+    location.hash = `${h}/${encodeURIComponent(`addtweaks:${bundleId}`)}`;
+  });
   const ready = refresh().catch(() => null);
   return { el: g, ready, refresh };
 }

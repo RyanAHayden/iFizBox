@@ -39,6 +39,8 @@ APT = {
         FIX / "remote/lists/apt.procurs.us_dists_1800_main_binary-iphoneos-arm64_Packages",
     "https://havoc.app/Release": FIX / "remote/lists/havoc.app_._InRelease",
     "https://havoc.app/Packages": FIX / "remote/lists/havoc.app_._Packages",
+    "https://concept.sample/repo/Release": SRC / "concept-tweaks-Release",
+    "https://concept.sample/repo/Packages": SRC / "concept-tweaks-Packages",
     "https://repo.chariz.com/Release": SRC / "apt-flat-Release",
     "https://repo.chariz.com/Packages": SRC / "apt-flat-Packages",
 }

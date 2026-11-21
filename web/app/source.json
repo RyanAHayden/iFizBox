@@ -179,6 +179,24 @@
           "minOSVersion": "15.0"
         }
       ]
+    },
+    {
+      "name": "YouTube",
+      "bundleIdentifier": "com.google.ios.youtube",
+      "developerName": "Google",
+      "subtitle": "Watch, listen, stream",
+      "localizedDescription": "Sample app for the concept.",
+      "iconURL": "",
+      "category": "entertainment",
+      "versions": [
+        {
+          "version": "21.45.4",
+          "date": "2026-11-20",
+          "size": 132700000,
+          "downloadURL": "https://concept.sample/youtube.ipa",
+          "minOSVersion": "15.0"
+        }
+      ]
     }
   ],
   "news": []

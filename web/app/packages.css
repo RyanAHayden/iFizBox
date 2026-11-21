@@ -1223,3 +1223,7 @@ html[data-theme="dark"] .dep-piracy .dep-review-title { color: var(--dk-bad); }
   box-shadow: var(--row-failed-badge-shadow);
 }
 /* ==== } look-only ==== */
+/* Concept: Add Tweaks' rows are Search's package rows with the price button at the end */
+.pkg-row .tw-row-add { position: absolute; right: 10px; top: 50%; margin-top: -12px; z-index: 1; }
+.pkg-row:has(.tw-row-add) .pkg-text { padding-right: 78px; }
+.tw-more { margin-top: 8px; }

@@ -11,6 +11,7 @@
 //
 // Lists come from the catalog in the parse worker (catalog.js); long ones are virtualised (nav/vlist.js).
 import { grouped, placeholder, el, segments, note } from "../nav/ui.js";
+import { loadStyle } from "../nav/motion.js"; // concept: the price button for ADD
 import { createVList, withLetterHeaders } from "../nav/vlist.js";
 import { createSectionIndex } from "../nav/sectionindex.js";
 import { onPageOpen } from "../nav/pagestate.js";
@@ -142,7 +143,7 @@ export function parseToken(seg) {
   const s = String(seg ?? "");
   const i = s.indexOf(":");
   const kind = i > 0 ? s.slice(0, i) : "";
-  return ["section", "package", "author", "versions"].includes(kind) ? { kind, value: s.slice(i + 1) } : { kind: "unknown", value: s };
+  return ["section", "package", "author", "versions", "addtweaks"].includes(kind) ? { kind, value: s.slice(i + 1) } : { kind: "unknown", value: s };
 }
 
 export const token = (kind, value) => `${kind}:${value}`;
@@ -179,6 +180,7 @@ export function nav(route, sourceName = () => null) {
       right: { label: "Install", onClick: (e) => packageActions(route, e.currentTarget),
         onHold: () => installVersionHold(route).catch(() => {}) } }; // F346: a hold picks the version
     case "versions": return { title: "Versions" };
+    case "addtweaks": return { title: "Add Tweaks", style: "plain" }; // concept
     default: return { title: "Not Found" };
   }
 }
@@ -192,6 +194,7 @@ export function render(body, route, ctx) {
     case "author": return renderAuthor(body, route, p.value);
     case "package": return renderPackage(body, route, p.key, p.value, ctx);
     case "versions": return renderVersions(body, route, p.key, p.value);
+    case "addtweaks": return renderAddTweaks(body, route, p.value);
     default:
       body.append(note("Nothing here."));
   }
@@ -935,6 +938,73 @@ export async function renderSearchableList(body, route, fetchRows, { letters = f
   bar.onQuery(draw);
 }
 
+
+// Concept: Add Tweaks as a page of its own, pushed from the app's page: the grey search bar, then the tweaks as the
+// Search tab draws packages (icon, name, version, description), grouped Added / Made for <app> / Works in Any App,
+// each with ADD at its end; a tap on a row opens that tweak's page (back comes here). Then Browse Tweak Sources,
+// Search All Repos and From Files, and one short footer.
+const conceptAdded = new Set(); // concept: ADD only marks the row here; the build keeps tweaks.js's real ADD
+async function renderAddTweaks(body, route, bundleId) {
+  const appName = names.get(bundleId) || (bundleId === "com.google.ios.youtube" ? "YouTube" : "This App");
+  const bar = listSearchBar("Search tweaks");
+  const none = note();
+  none.hidden = true;
+  const ph = placeholder("list");
+  body.append(bar.el, none, ph);
+  const tw = await import("./tweaks.js");
+  const l = await tw.appTweakRows(bundleId).catch(() => ({ made: [], any: [] }));
+  ph.remove();
+  const asItem = (r) => ({ ...r, short: r.short || "" });
+  const itemsFor = (q) => {
+    const made = filterRows(l.made.map(asItem), { query: q }), any = filterRows(l.any.map(asItem), { query: q });
+    const added = [...made, ...any].filter((r) => conceptAdded.has(r.id));
+    const rest = (rs) => rs.filter((r) => !conceptAdded.has(r.id));
+    const out = [];
+    if (added.length) out.push({ header: "Added" }, ...added);
+    if (rest(made).length) out.push({ header: `Made for ${appName}` }, ...rest(made));
+    if (rest(any).length) out.push({ header: "Works in Any App" }, ...rest(any));
+    return out;
+  };
+  const decorate = (row, item) => {
+    let b = row._.add;
+    if (!b) {
+      loadStyle("myipas.css");
+      b = el("button", "price-btn tw-row-add", "ADD");
+      b.type = "button";
+      b.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const id = row._item?.id;
+        if (!id) return;
+        if (conceptAdded.has(id)) conceptAdded.delete(id); else conceptAdded.add(id);
+        draw(bar.input.value);
+      });
+      row._.a.append(b);
+      row._.add = b;
+    }
+    const on = conceptAdded.has(item.id);
+    b.textContent = on ? "ADDED" : "ADD";
+    b.classList.toggle("on", on);
+  };
+  let list = null;
+  const more = el("div", "tw-more");
+  more.append(grouped([{ header: "More Tweaks", rows: [
+    { label: "Browse Tweak Sources", chevron: true, onClick: () => tw.pickSourceTweak({ bundleId, onPick: () => {} }) },
+    { label: "Search All Repos", detail: "Canister", chevron: true, onClick: () => tw.openSearchAllRepos({ appName, ctx: null }) },
+    { label: "From Files…", chevron: true, onClick: () => {} },
+  ], footer: `Only tweaks that work in ${appName} without a jailbreak are listed.` }]));
+  const draw = (q) => {
+    const items = itemsFor(q);
+    none.textContent = items.length ? "" : q.trim() ? "No tweaks match your search." : `No tweaks for ${appName} in your sources yet.`;
+    none.hidden = items.length > 0;
+    if (!list) {
+      list = packageList(body, route, items, { letters: false, decorate });
+      body.append(list.el, more);
+    } else list.setItems(items);
+  };
+  draw("");
+  bar.onQuery(draw);
+}
+
 // The grey search bar alone (Changes' and Search's look, packages.css), for a list's own filter.
 function listSearchBar(label) {
   const form = el("form", "search-bar list-search");
@@ -1079,6 +1149,8 @@ async function renderPackage(body, route, key, id, ctx) {
   try {
     await catalog.ensure();
     [pkg, sources] = await Promise.all([catalog.package(id, key), getBackend().sources()]);
+    // concept: a tweak opened from an app's Add Tweaks lives in a Tweak Source, not the app's source
+    if (!pkg) { const r = (await (await import("./tweaks.js")).sourceTweakRows().catch(() => [])).find((x) => x.id === id); if (r) { pkg = await catalog.package(id, r.key); key = r.key; } }
   } catch (e) {
     body.replaceChildren(note(e.message));
     return;

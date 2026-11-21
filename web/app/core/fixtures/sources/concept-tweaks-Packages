@@ -1,0 +1,131 @@
+Package: com.poomsmart.returnyoutubedislike
+Name: Return YouTube Dislike
+Version: 1.14.2
+Architecture: iphoneos-arm64
+Section: Tweaks
+Author: PoomSmart
+Maintainer: PoomSmart
+Depends: mobilesubstrate
+Description: Shows dislike counts again, from the Return YouTube Dislike API.
+Filename: debs/com.poomsmart.returnyoutubedislike_1.14.2_iphoneos-arm64.deb
+Size: 120000
+
+Package: com.poomsmart.youpip
+Name: YouPiP
+Version: 1.8.19
+Architecture: iphoneos-arm64
+Section: Tweaks
+Author: PoomSmart
+Maintainer: PoomSmart
+Depends: mobilesubstrate
+Description: Picture in Picture for every video, with or without Premium.
+Filename: debs/com.poomsmart.youpip_1.8.19_iphoneos-arm64.deb
+Size: 120000
+
+Package: com.poomsmart.ytuhd
+Name: YTUHD
+Version: 1.6.6
+Architecture: iphoneos-arm64
+Section: Tweaks
+Author: PoomSmart
+Maintainer: PoomSmart
+Depends: mobilesubstrate
+Description: Unlocks 1440p and 2160p playback on every device.
+Filename: debs/com.poomsmart.ytuhd_1.6.6_iphoneos-arm64.deb
+Size: 120000
+
+Package: com.poomsmart.youchoosequality
+Name: YouChooseQuality
+Version: 1.0.11
+Architecture: iphoneos-arm64
+Section: Tweaks
+Author: PoomSmart
+Maintainer: PoomSmart
+Depends: mobilesubstrate
+Description: Pick the default video quality on Wi-Fi and cellular.
+Filename: debs/com.poomsmart.youchoosequality_1.0.11_iphoneos-arm64.deb
+Size: 120000
+
+Package: com.joshuaseltzer.ytholdforspeed
+Name: YTHoldForSpeed
+Version: 1.3.0
+Architecture: iphoneos-arm64
+Section: Tweaks
+Author: joshuaseltzer
+Maintainer: joshuaseltzer
+Depends: mobilesubstrate
+Description: Hold anywhere on a video to play it at 2x.
+Filename: debs/com.joshuaseltzer.ytholdforspeed_1.3.0_iphoneos-arm64.deb
+Size: 120000
+
+Package: com.poomsmart.noytpremium
+Name: NoYTPremium
+Version: 1.0.7
+Architecture: iphoneos-arm64
+Section: Tweaks
+Author: PoomSmart
+Maintainer: PoomSmart
+Depends: mobilesubstrate
+Description: Hides the Premium offers and banners.
+Filename: debs/com.poomsmart.noytpremium_1.0.7_iphoneos-arm64.deb
+Size: 120000
+
+Package: com.cercube.cercube
+Name: Cercube for YouTube
+Version: 6.3.0
+Architecture: iphoneos-arm64
+Section: Tweaks
+Author: cercube
+Maintainer: cercube
+Depends: mobilesubstrate
+Description: Downloads, background play and a cleaner player.
+Filename: debs/com.cercube.cercube_6.3.0_iphoneos-arm64.deb
+Size: 120000
+
+Package: com.ps.ytabconfig
+Name: YTABConfig
+Version: 1.9.2
+Architecture: iphoneos-arm64
+Section: Tweaks
+Author: PoomSmart
+Maintainer: PoomSmart
+Depends: mobilesubstrate
+Description: Turns YouTube's hidden experiments on and off.
+Filename: debs/com.ps.ytabconfig_1.9.2_iphoneos-arm64.deb
+Size: 120000
+
+Package: com.cydiageek.clearpipbg
+Name: ClearPiPBG
+Version: 1.0.0
+Architecture: iphoneos-arm64
+Section: Tweaks
+Author: CydiaGeek
+Maintainer: CydiaGeek
+Depends: mobilesubstrate
+Description: Clears the black background behind Picture in Picture.
+Filename: debs/com.cydiageek.clearpipbg_1.0.0_iphoneos-arm64.deb
+Size: 120000
+
+Package: com.flex.flexing
+Name: FLEXing
+Version: 1.4.0
+Architecture: iphoneos-arm64
+Section: Tweaks
+Author: NSExceptional
+Maintainer: NSExceptional
+Depends: mobilesubstrate
+Description: Hold the status bar to open FLEX, an in-app debugger.
+Filename: debs/com.flex.flexing_1.4.0_iphoneos-arm64.deb
+Size: 120000
+
+Package: com.alpha.darkmodeforce
+Name: DarkModeForce
+Version: 1.2.1
+Architecture: iphoneos-arm64
+Section: Tweaks
+Author: alpha
+Maintainer: alpha
+Depends: mobilesubstrate
+Description: Forces dark mode in apps that don't have it.
+Filename: debs/com.alpha.darkmodeforce_1.2.1_iphoneos-arm64.deb
+Size: 120000
