@@ -49,8 +49,13 @@ sideload IPA built from this branch (`make -C native ipa`: 0.18.4 (3695), instal
      through Tailscale (RemotePairing).
    - The first stand-in quit at launch: it had no UIScene life cycle, which iOS 27 requires for apps built with the
      27.1 SDK. That was my app, not iFizBox. Version 1.1 with a scene delegate went in as an **Upgrade** of the same
-     app, and iFizBox added the tweak again from that app's kept list (the same path a re-sign takes).
-   - Launched, the app showed and logged `Clock`, `Frameworks/YouTubeDislikesReturn.dylib`,
+     app, and iFizBox added the tweak again from that app's kept list: the tweaks Add to App saved for the bundle ID
+     (screens/tweaks.js `addDebTo`/`savedTweaks`, IndexedDB). The Re-sign button reads that same list. A paid tweak's
+     copy goes into that list too, so a re-sign never asks Chariz. PaidTweaks (finding 3) is read only when the .deb
+     is needed again (`tweakDeb`: reopening the page after a relaunch, Add to App again, a tweak update). This run
+     used a free tweak, so this step didn't go through the paid path.
+   - Launched, the app showed and logged `Clock` (the stand-in's own executable name, left over from its first try as
+     a Clock stand-in; the app is the YouTube-ID test app, not Apple's Clock), `Frameworks/YouTubeDislikesReturn.dylib`,
      `Frameworks/libellekit.dylib` (`R45STANDIN` in `pymobiledevice3 syslog live`). So the tweak and ElleKit **load** in
      an app iFizBox signed on iOS 27.
 5. **The Add to an App group, in pixels, for a paid tweak not bought (Glint, $3.99):** `Price  $3.99`,
@@ -72,6 +77,7 @@ sideload IPA built from this branch (`make -C native ipa`: 0.18.4 (3695), instal
 - Havoc's `package/<id>/info` answers "Bad Request" without `udid`/`device` in the body. With them it answers as
   iFizBox's client sends.
 - The first stand-in (no UIScene) quit at launch, as above.
+- I put the B296/B297 ids into this file with one `sed -i`, which this repo's rules forbid; the edit itself is right.
 
 ## Cleanup
 
@@ -84,7 +90,12 @@ the IPAs I put in Documents. Kept: the Chariz source (it was there before), the 
 
 - **Chariz sign-in and everything after it**: the signed-in `authorize_download` with a token, and the **Buy** row
   that follows Sign In. Chariz's login offers only Apple or Google. The 15 has no Apple ID, and both need the owner's
-  account. The task is blocked on that one step.
+  account. So the brief's "signs in to Chariz, downloads through authorize_download" is shown only signed out (F318's
+  tokenless path, finding 2), not signed in. The task blocks on that one step (`run done --blocked "BLOCKED: …"`):
+  the owner signs in on the 15 (iFizBox › Chariz › Glint › Sign In to Chariz), then a run checks the Buy row and a
+  signed-in betterAlarm download.
+- **The brief's own example**: "Add to App into Clock" can't work by design (finding 1). Any later run should use a
+  tweak for an App Store app, as this one did.
 - **A paid tweak that goes into an app, end to end**: no such tweak is FREE on Chariz or Havoc, and buying one costs
   money. The paid download + kept-.deb path (3) and the inject + load path (4) were each checked on the phone. Joined
   together (a bought tweak injected and loading) they weren't.
