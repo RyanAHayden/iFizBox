@@ -19,6 +19,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.19.1",
+          "date": "2026-11-21T19:16:10Z",
+          "localizedDescription": "Cydia-style Details page for packages and apps, and Source links that land on Sources\nPackages and apps open a Details page like Cydia's: icon rows, Preview, More Information, Filesystem Content\nWebsite add-source links open the Sources tab with the new source loading there\nHome Screen icon follows Theme > Mode; Tailscale names the machine after the phone model\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.19.1",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.19.1/iFizBox.ipa",
+          "size": 38817394,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.19.0",
           "date": "2026-11-21T18:27:52Z",
           "localizedDescription": "A Glass app icon, wide package rows like Cydia's, and steadier This iPhone copies\nTheme > App Icon > Special offers Glass: Classic in Light, Gunmetal in Dark, drawn with the system's glass\nInstalled and section lists show wide package rows; Install IPAs is a plain row above A in Installed\nAuthor pages open again; price buttons match the iOS 7 and iOS 13 themes\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.19.0",
@@ -168,14 +176,6 @@
           "localizedDescription": "Installed Manage mode, Install IPAs on one page, and Re-sign for installed apps\nScrolling no longer starts installs, and Home always opens at the top\nMalware check against Canister's piracy list; block packages and authors\nSix new themes with a live preview, and Delete in the jailbreak app uninstalls\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.8",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.9.8/iFizBox.ipa",
           "size": 5273001,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.9.7",
-          "date": "2026-11-18T22:15:02Z",
-          "localizedDescription": "Version 0.9.7\nSearch: one character searches too\nR20: archive ticked tasks\nR20: convert Teehan+Lax iOS 7/8 kits into ref/teehanlax/ios7, ios8; journal lists their controls, the iOS 8 vs 7 differences and what the sketch .ai is\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.7",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.9.7/iFizBox.ipa",
-          "size": 5160809,
           "minOSVersion": "15.0"
         }
       ]
