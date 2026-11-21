@@ -45,7 +45,7 @@ import { showNotIphone } from "./screens/notiphone.js";
 import { handoffRecent } from "./handoffclock.js";
 import { navButtons, MOVED_CLASS } from "./nav/navbuttons.js";
 import { holdButton } from "./nav/menu.js"; // F346
-import { setNavigator, pageHandle } from "./nav/go.js";
+import { setNavigator, pageHandle, backFollowsTitle } from "./nav/go.js";
 
 // F266: a Mac, PC or Android phone gets the Not-an-iPhone page first, and the app only starts once it's left (Look
 // Around Anyway, or What Is …? onto the FAQ). Decided by user agent before anything is drawn, so an iPhone, an iPad
@@ -143,6 +143,7 @@ function makePage(tab, path) {
 
   // back: the label pages above it show; handle: the page's own nav item for its screen (nav/go.js pageHandle)
   const entry = { el: page, body, shade, item, title: "", back: "", handle: pageHandle(item, body) };
+  backFollowsTitle(entry); // a name the screen learns later is also the back label above (nav/go.js)
   drawPage(entry, route, below);
   return entry;
 }
@@ -187,6 +188,7 @@ function navParts(info, below, title) {
   if (bar.back) {
     const back = button({ label: below.page.back, onClick: () => goBack() }, "bar-button back");
     back.setAttribute("aria-label", "Back to " + below.page.back);
+    below.page.backButton = back; // the newest page above's: a later title of below's renames it (nav/go.js backFollowsTitle)
     left.append(back);
   } else if (bar.left) left.append(button(bar.left, "bar-button"));
   const h1 = document.createElement("h1");

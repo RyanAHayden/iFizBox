@@ -51,5 +51,29 @@ export function pageHandle(item, body = null) {
   return page;
 }
 
+// A page's title set after it opened (a package or app page opened by its id, which learns the name once it loads:
+// screens/browse.js setTitle) is also the label pages above it show on their back button, unless the screen gave a
+// back label of its own (nav()'s `back`). The page right above, already drawn with the old label, takes the new one
+// at once. entry: app.js makePage's { item, title, back, handle, backButton }; backButton is the back button app.js
+// navParts last drew with this page's label (the page right above; a popped page's item may linger until idle, so
+// the next sibling item is not always it).
+export function backFollowsTitle(entry) {
+  const setTitle = entry.handle.setTitle;
+  entry.handle.setTitle = (text) => {
+    setTitle(text);
+    const old = entry.title;
+    if (text === old) return;
+    if (entry.back === old) {
+      entry.back = text;
+      const back = entry.backButton;
+      if (back?.isConnected && back.textContent === old) {
+        back.textContent = text;
+        back.setAttribute("aria-label", "Back to " + text);
+      }
+    }
+    entry.title = text;
+  };
+}
+
 // The handle of the page `body` belongs to, or null (a body no page holds: a test's stub, a detached sheet).
 export const handleOf = (body) => (body && pages.get(body)) || null;
