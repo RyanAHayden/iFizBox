@@ -1265,7 +1265,12 @@ async function renderPackage(body, route, key, id, ctx) {
   }) }]));
   // F302: a Tweak Source's tweak in the sideload app: Works In (its filter's apps, read from the .deb on first open,
   // cached) and Add to App…, in Install's place.
-  if (isSideloadTweak(st)) details.append(worksInGroup(st).el);
+  if (isSideloadTweak(st)) {
+    const works = worksInGroup(st);
+    details.append(works.el);
+    // B296: a tweak that can't go into an app (or a library) loses the nav bar's Add to App, which only led to an alert.
+    works.ready.then((info) => addToAppFollowsCheck(body, info), () => {});
+  }
   // F20: price; in the app Sign In, Buy, Install. B11: in the app its state also drives the nav bar button.
   // F308: a paid sideload tweak's Price, Sign In and Buy are in its Add to an App group (worksInGroup) instead.
   const payBox = pkg.installedOnly || isSideloadTweak(st) ? null : paymentGroup(st, source, ctx, { onState: (s) => paidButton(body, s) });
@@ -1450,6 +1455,16 @@ function rememberPackage(body, route, page) {
 // Add to App (screens/tweaks.js addToApp), not Install.
 export const ADD_TO_APP = "Add to App";
 export const isSideloadTweak = (st, mode = detectMode()) => Boolean(st?.injectable) && st.kind !== "ipa" && mode === "sideload";
+
+// B296: the Add to an App group's check (screens/tweaks.js tweakInfo: { ok, library, why }) says the tweak can't go
+// into an app: the nav bar's Add to App is hidden, as the group already says why. A check that couldn't finish
+// (null: paid, or the .deb unreadable) keeps it. `button(body)` -> the page's right button.
+export function addToAppFollowsCheck(body, info, { button = (b) => handleOf(b)?.rightButton() } = {}) {
+  const b = button(body);
+  if (!b || b.textContent !== ADD_TO_APP) return false;
+  b.hidden = Boolean(info && info.ok === false);
+  return b.hidden;
+}
 
 // B11: a paid package a vendor sells (extras.js paidNav) shows its price on the button until it's bought, as Cydia
 // did; Install once the vendor lets this account download it; Modify once it's installed, as for any package.
