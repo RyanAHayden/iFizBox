@@ -109,8 +109,38 @@ def app_entry(versions):
         "iconURL": ICON_URL,
         "tintColor": "#37a94a",
         "category": "utilities",
+        "screenshots": screenshots(),
         "versions": versions,
     }
+
+
+# The app page's gallery: the README's phone-framed shots (docs/img/web-*.png and jb-*.png, each with its caption
+# in the picture), in README order, none of its cropped pictures (crop-*.png). Listed in the source so the app page
+# never falls back to the README's images (web/app/core/previews.js readmeShots). raw.githubusercontent.com loads
+# from the phone; the site doesn't serve docs/.
+SHOT_RE = re.compile(r"docs/img/((?:web|jb)-[\w-]+\.png)")
+SHOTS_BASE = f"https://raw.githubusercontent.com/{BRAND['BRAND_GITHUB_REPO']}/HEAD/docs/img/"
+
+
+def screenshot_names(readme=os.path.join(ROOT, "README.md")):
+    """The web-*/jb-* file names the README shows, first appearance order, each once."""
+    with open(readme) as f:
+        found = SHOT_RE.findall(f.read())
+    return list(dict.fromkeys(found))
+
+
+def png_size(path):
+    with open(path, "rb") as f:
+        head = f.read(24)
+    return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
+
+
+def screenshots():
+    out = []
+    for name in screenshot_names():
+        width, height = png_size(os.path.join(ROOT, "docs", "img", name))
+        out.append({"imageURL": SHOTS_BASE + name, "width": width, "height": height})
+    return out
 
 
 def rebrand(data):

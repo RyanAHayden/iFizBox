@@ -47,6 +47,27 @@ class SourceTest(unittest.TestCase):
         self.assertEqual(self.data.get("sourceURL"), altsource.SOURCE_URL)
 
 
+class ScreenshotsTest(unittest.TestCase):
+    """iFizBox's app page shows the phone-framed shots (docs/img/web-*.png, jb-*.png), never the crop-* pictures."""
+
+    def test_source_lists_exactly_phone_shots(self):
+        with open(altsource.SOURCE) as f:
+            shots = json.load(f)["apps"][0]["screenshots"]
+        urls = [s["imageURL"] for s in shots]
+        self.assertTrue(all(u.startswith("https://raw.githubusercontent.com/") for u in urls), urls)
+        names = [u.rsplit("/", 1)[1] for u in urls]
+        on_disk = sorted(n for n in os.listdir(os.path.join(ROOT, "docs", "img"))
+                         if re.match(r"(web|jb)-.*\.png$", n))
+        self.assertEqual(sorted(names), on_disk)
+        self.assertEqual(len(names), len(set(names)))
+        self.assertFalse([n for n in names if n.startswith("crop-")])
+        self.assertTrue(all(s["width"] > 0 and s["height"] > s["width"] for s in shots))
+
+    def test_build_carries_screenshots(self):
+        data = altsource.build("1.0.0", 10, "2026-11-21T00:00:00Z")
+        self.assertEqual(data["apps"][0]["screenshots"], altsource.screenshots())
+
+
 class UpdateTest(unittest.TestCase):
     def test_update_points_at_release(self):
         with tempfile.TemporaryDirectory() as d:
