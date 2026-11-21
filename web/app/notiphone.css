@@ -3,7 +3,7 @@
    The type, the hero's ink and the icon's shadow are in the look-only stretch at the end (docs/eras.md). */
 .notiphone { position: fixed; inset: 0; z-index: 50; }
 /* The nav bar: ios6.css's, alone (no nav stack), its title in the 44px under the status bar */
-.notiphone-bar { padding-top: env(safe-area-inset-top); }
+.notiphone-bar { padding-top: var(--top-inset, env(safe-area-inset-top)); }
 .notiphone-bar-title { max-width: none; padding: 0 12px; }
 /* No tab bar under this page: only the closing 20px at the bottom */
 .notiphone-body.page-body { padding-bottom: calc(var(--safe-bottom) + 20px); touch-action: pan-y; }

@@ -68,7 +68,7 @@ html[data-theme="dark"] {
   --dk-ground: #000;
   --dk-nav-bar:
     linear-gradient(#1a1a1c, #1a1a1c) bottom / 100% 1px no-repeat,
-    linear-gradient(rgba(255,255,255,.16), rgba(255,255,255,.16)) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,.16), rgba(255,255,255,.16)) 0 var(--top-inset, env(safe-area-inset-top)) / 100% 1px no-repeat,
     linear-gradient(#333336, #151517 50%, #070708 51%, #000) bottom / 100% 44px no-repeat,
     #000;
   --dk-nav-shadow: none;
@@ -158,7 +158,7 @@ html[data-theme="dark"][data-palette="gunmetal"] {
   --dk-ground: #5f656f;
   --dk-nav-bar: /* glossy split at half, light top edge, near-black base line */
     linear-gradient(#0b0c0e, #0b0c0e) bottom / 100% 1px no-repeat,
-    linear-gradient(#7a808a, #7a808a) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
+    linear-gradient(#7a808a, #7a808a) 0 var(--top-inset, env(safe-area-inset-top)) / 100% 1px no-repeat,
     linear-gradient(#5f656f, #3b4048 50%, #30343b 51%, #23262b) bottom / 100% 44px no-repeat,
     #23262b;
   --dk-nav-shadow: linear-gradient(rgba(0,0,0,.5), rgba(0,0,0,0));
@@ -214,13 +214,13 @@ body { color: var(--text); background: #000; }
   /* Nav bar: "Menu Bar (Blue)" and, under the notch, "Status Bar (Blue)" */
   --nav-bar:
     linear-gradient(#2d3642, #2d3642) bottom / 100% 1px no-repeat,              /* bottom edge */
-    linear-gradient(#eff2f7, #eff2f7) 0 env(safe-area-inset-top) / 100% 1px no-repeat, /* top highlight, 1px */
+    linear-gradient(#eff2f7, #eff2f7) 0 var(--top-inset, env(safe-area-inset-top)) / 100% 1px no-repeat, /* top highlight, 1px */
     linear-gradient(#bdcbdc, #597498) bottom / 100% 44px no-repeat,              /* background: Cydia on the 4S */
     linear-gradient(#4f698b, #3f5b7f);                                           /* status bar */
   --nav-shadow: linear-gradient(rgba(0,0,0,.18), rgba(0,0,0,0)); /* 2.5px of black at 18% fading down over the screen */
   --nav-title: #fff;
   --nav-title-emboss: 0 -1px 0 rgba(0,0,0,.5);
-  --site-strip: #000; /* the website's status-bar strip */
+  --site-strip: #000; /* the status-bar strip (the website, and the app in this era) */
   /* Bar buttons: UINavigationBarDefaultButton and ...Pressed (4S UIKit art) */
   --bar-btn-text: #fff;
   --bar-btn-emboss: 0 -1px 0 rgba(0,0,0,.45);
@@ -264,22 +264,19 @@ body { color: var(--text); background: #000; }
 html[data-theme="dark"] .navbar { background: var(--dk-nav-bar); } /* the palette's (F198): OLED Black or gunmetal */
 html[data-theme="dark"] .navbar::after { background: var(--dk-nav-shadow); }
 html[data-theme="dark"] .tabbar { background: var(--dk-tabbar); }
-/* The status-bar strip above the nav bar (env(safe-area-inset-top)). In the app (native/Sources/App.swift puts
-   data-shell="app" on <html>, both builds) it is part of the nav bar: a layer over the strip and the bar's top half
-   takes the bar's own background (every theme's nav bar, and the console's, has the same four layers: base line,
-   highlight, gloss, status-bar fill) and stretches the gloss's top half over itself, highlight at the very top. The
-   bar's lower half, and the hard split of the dark glosses, stay where the kit has them; the colours meet at the
-   half, so there is no line or step where the strip was. (Stretching the whole gloss put the dark split on the
-   strip's edge.) */
-html[data-shell="app"] .navbar::before {
+/* The status-bar strip above the nav bar (--top-inset, style.css): plain black, as iOS 6's opaque black status bar,
+   on the website and in the app alike, whatever the theme; the nav bar is its own 44 pt bar under it (the console's
+   too). In the app's iOS 7 and iOS 13 eras the strip is part of the nav bar instead: a layer over the strip and the
+   bar's top half takes the bar's own background (every theme's nav bar has the same four layers: base line,
+   highlight, gloss, status-bar fill) and stretches the gloss's top half over itself, highlight at the very top; the
+   colours meet at the half, so there is no line or step where the strip was. */
+.navbar::before { background: var(--site-strip); }
+html[data-shell="app"]:is([data-style="ios7"], [data-style="ios13"]) .navbar::before {
   background: inherit;
   background-repeat: no-repeat;
   background-position: 0 0, top, top, 0 0;
   background-size: 0 0, 100% 1px, 100% 200%, 0 0;
 }
-/* On the website the strip stays plain black, as iOS's opaque black status bar (index.html) draws it: the nav bar
-   starts below it. */
-html:not([data-shell="app"]) .navbar::before { background: var(--site-strip); }
 
 /* Bar buttons and the back arrow, from the 4S's UIKit art (UINavigationBarDefaultButton, ...Pressed, ...Back), the
    versions the user picked (2026-11-17). background-origin: border-box matters: without

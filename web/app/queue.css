@@ -11,7 +11,7 @@
      #303030 -> #101010 down the top half, a hard step to flat #070707, a #141414 line at the bottom, then the page */
   --console-bar:
     linear-gradient(#141414, #141414) bottom / 100% 1px no-repeat,
-    linear-gradient(#464646, #464646) 0 env(safe-area-inset-top) / 100% .5px no-repeat,
+    linear-gradient(#464646, #464646) 0 var(--top-inset, env(safe-area-inset-top)) / 100% .5px no-repeat,
     linear-gradient(#303030, #101010 50%, #080808 50%, #070707) bottom / 100% 44px no-repeat,
     #000;
   --console-btn: linear-gradient(#4a4f58, #24272c);

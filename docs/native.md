@@ -24,6 +24,15 @@ The UI never knows which backend it has. Both expose the same calls (`sources()`
 come from apt's own lists on disk (after `apt-get update` through the helper), and installing goes through the
 helper. Parsing, Changes, upgrades and search all run in `core/` in both places.
 
+**The status bar.** In the iOS 6 era the strip above the nav bar is plain black in every theme, with white
+status-bar text (`preferredStatusBarStyle`), and the nav bar is its own 44 pt bar under it. The page lays its top
+out with `var(--top-inset, env(safe-area-inset-top))` (`web/app/style.css`). For the iOS 6 era the shell sets
+`--status-bar-bottom` on `<html>` at document start and again on rotation (`TopInset` in `App.swift`). It is the
+bottom of iOS's status bar when that leaves at least 6 pt under the resting Dynamic Island, so the island can grow
+when touched without reaching the bar; otherwise it is the safe area. On the iPhone 15 Pro the status bar ends at
+54 pt, only 5.67 pt under the island, so the bar starts at the safe area (59 pt). Notch and Home-button phones have
+a status bar as tall as the safe area. The iOS 7 and iOS 13 eras and the website keep the safe area.
+
 ## Feel: 120 Hz or it's wrong
 
 - `CADisableMinimumFrameDurationOnPhone = YES` in the app's Info.plist. Without it, WKWebView animations are capped
