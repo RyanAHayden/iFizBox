@@ -18,6 +18,12 @@
 
 **Shipped: 0.19.0** (build 3788), <https://github.com/RyanAHayden/iFizBox/releases/tag/v0.19.0>.
 
+- Spec review: the notes covered only since v0.18.4 where the task says "since 0.17.1". Added a "Since 0.17.1"
+  paragraph summing up 0.18.0–0.18.4 (from their published notes) and updated the release body with
+  `gh release edit v0.19.0 --notes-file`; the first 4 lines (all the app and source.json use) did not change,
+  so the tagged `source.json` stays right. Also made the price-button wording match. The review also saw
+  `source.json` drop 0.9.6: that is `tools/altsource.py update` keeping at most 20 versions, not a choice made here.
+
 ## Checks
 - release.sh's own check: all 7 assets listed; `latest/download/iFizBox.ipa` redirects to v0.19.0's (206).
 - `tools/release.sh --verify-live 0.19.0`: https://ifizbox.com/repo/source.json lists 0.19.0 first;
