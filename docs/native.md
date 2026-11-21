@@ -321,9 +321,11 @@ launch storyboard lays its views out with Auto Layout against the safe area, so 
 - `Info.plist`: `UILaunchStoryboardName` `LaunchScreen`, and no `UILaunchScreen`.
 
 The storyboard can only pin the strip to the safe area. The page's iOS 6 strip is `--top-inset` tall ("The status
-bar" above): the safe area on notch and Home-button phones and on the iPhone 15 Pro, but the status bar's bottom on
-a Dynamic Island phone whose status bar clears the island by 6 pt. On such a phone the page's bar starts a few
-points higher than the splash's.
+bar" above), and on every current iPhone that is the safe area too, so the splash's and the page's strips end on the
+same row. On the iOS 26.3 Simulator every Dynamic Island model has a 54 pt status bar and a 59, 62 or 68 pt safe
+area, which leaves at most 5.67 pt under the island, short of the 6 pt `TopInset` needs to pick the status bar's
+bottom. A future phone whose status bar clears the island by 6 pt would get the status bar's bottom, and there the
+page's bar would start a few points higher than the splash's.
 
 **Keep the images small.** SplashBoard refuses a launch screen whose estimated size is over 25,000,000 bytes, and
 the app then launches to black. The estimate is about width × height × 4 of the images, summed. A full-screen
