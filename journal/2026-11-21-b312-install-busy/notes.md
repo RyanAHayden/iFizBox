@@ -66,7 +66,21 @@ desktop (installd, so "another app's install" as SideDrop's would be). Seen:
 - First gate: `native/test_sideload.py` HandoffSourceTest forbids `return finish(` inside `watch` (every end goes
   through `done()`, so B76's lost-sight rule applies). The stuck fallback now calls `done(nil)`.
 
+## Spec review
+
+- Fixed: busy ended on the first nil read; iOS drops an install's progress for a moment between steps (B28), so a
+  blink would have reset the watch and shown the other install's percent as ours again. Busy now ends only after
+  `nilGrace` (6 s) of nil in a row, as the watch's own end does. (So on the phone `{busy: false}` now comes ~6 s
+  after the other install ends, not the 0.5 s seen in the run above, which was before this fix.)
+- Checked, fine: the served flag (`Handoff.reset`) is cleared when each IPA starts serving, before its watch.
+- Left as is, on purpose: no progress at all keeps the existing waits (`ask`, the Install tap's wait in the queue;
+  a prompt not yet answered isn't "no progress"), and after iOS has the whole IPA the row is handed off at once
+  (B200), so neither leaves the page spinning. An install of the same app that starts after the watch began can't
+  be told from ours by bundle ID alone; the 60 s stuck limit still ends it if it sits still.
+
 ## Not verified
+
+- The nil-grace fix for the busy end: built by the gate, not run on the phone again.
 
 - The stuck ends (`install_busy`, `install_stalled`) on a device: needs an install of the same bundle ID that sits
   still for a minute; the desktop's installd install finished in seconds. Covered by node tests on the page side

@@ -1023,9 +1023,14 @@ enum Sideload {
                 if progress != nil && !Handoff.wasServed(bid) { busy = true; onBusy?(true) }
             }
             if busy && progress == nil {
-                // B312: the other install ended: watch for ours from here, with the whole `ask` again
-                busy = false; seen = false; last = -1; nilSince = nil; moved = -1; start = Date()
-                onBusy?(false)
+                // B312: the other install ended (nil for `nilGrace` in a row, as B28: iOS drops the progress for a
+                // moment between steps): watch for ours from here, with the whole `ask` again
+                let since = nilSince ?? Date()
+                nilSince = since
+                if Date().timeIntervalSince(since) >= nilGrace {
+                    busy = false; seen = false; last = -1; nilSince = nil; moved = -1; start = Date()
+                    onBusy?(false)
+                }
             } else if let p = progress {
                 seen = true
                 nilSince = nil
