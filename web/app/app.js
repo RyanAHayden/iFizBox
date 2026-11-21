@@ -487,10 +487,12 @@ if (startAt) history.replaceState(null, "", startAt);
 // param, then asks Install iFizBox First, Not Now / Install iFizBox (F217: not the browse gate; below, once the
 // router started). Website only.
 const installLink = takeInstallParam(window, { mode: detectMode() });
-// F8: a /add?url=… link (core/handoff.js) opens Sources > Manage > Sources with Add Source's alert filled in.
+// F8: a /add?url=… link (core/handoff.js) opens the Sources tab at its root with Add Source's alert filled in, as the
+// app's own source links do (B306, incoming.js addFromLink); once added, the new source loads in that list with the
+// tab's own ctx (fromLink, below).
 const addFrom = isAddPath(location.pathname) ? parseAddLink(location.search) : null;
 if (isAddPath(location.pathname)) {
-  history.replaceState(null, "", location.pathname.replace(/add\/?$/, "") + format({ tab: "sources", path: ["manage", "sources"] }));
+  history.replaceState(null, "", location.pathname.replace(/add\/?$/, "") + format({ tab: "sources" }));
 }
 // The Home Screen web app opens outside links in a sheet over itself, address bar on top. x-safari-https://… makes
 // iOS hand them to Safari instead, and from there to their own apps (Discord, GitHub). The app's shell sends them
@@ -539,7 +541,7 @@ if (nativeBridge()) {
 upgradeNotices.start();
 createPrefsMirror({ settings: settingsScreen.settings }).start(); // F70: N7's settings to the daemon
 keepRoute({ settings: settingsScreen.settings, native: nativeBridge() }); // B218: Install Apps With kept in the Keychain (sideload)
-if (addFrom) requestAnimationFrame(() => load("manage").then((m) => m.addSource(ctx, addFrom)).catch(() => {}));
+if (addFrom) requestAnimationFrame(() => load("manage").then((m) => m.addSource({ showHUD: ctx.showHUD, fromLink: true }, addFrom)).catch(() => {}));
 
 // Refresh Sources on Launch (Settings): in the background, no HUD; the Sources tab shows the result when it next loads.
 // Refresh on Launch: in the background, with the Sources tab's spinning red badge (screens/sources.js).
