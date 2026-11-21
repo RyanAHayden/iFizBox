@@ -76,14 +76,9 @@ html[data-theme="dark"] .home {
 .glyph-send { background-color: #2c9b3c; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M3 11h12.2l-4.6-4.6L12 5l7 7-7 7-1.4-1.4 4.6-4.6H3z'/%3E%3C/svg%3E"); }
 .home-row.green .home-glyph { background-color: var(--tile-glyph-green); }
 html[data-theme="dark"] .glyph-github { background-color: var(--dk-glyph); }
-.glyph-add { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z'/%3E%3C/svg%3E"); }
-.glyph-upgrades { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M12 2 3 11h6v10h6V11h6z'/%3E%3C/svg%3E"); }
 .glyph-failed { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M10 3h4l-.6 12h-2.8zm0 15h4v3h-4z'/%3E%3C/svg%3E"); }
-.glyph-current { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 12.5 5 5L20 6.5'/%3E%3C/svg%3E"); }
-.glyph-loading { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3.5 2.5'/%3E%3C/svg%3E"); }
-.glyph-loading { opacity: .6; }
 .glyph-more { background-color: #3f80e0; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M10.2 3h3.6v7.2H21v3.6h-7.2V21h-3.6v-7.2H3v-3.6h7.2z'/%3E%3C/svg%3E"); }
-/* B266: More Sources keeps its blue in the green row (which colours the other state glyphs) */
+/* B266: More Sources keeps its blue in the green row (whose glyph colour it would otherwise take) */
 .home-row.green .home-glyph.glyph-more { background-color: #3f80e0; }
 /* ==== } look-only ==== */
 
