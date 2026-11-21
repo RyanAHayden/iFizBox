@@ -91,8 +91,26 @@ def machine_name(device_name, model, machine, table):
 
 
 def tailscale_label(hostname):
-    """Roughly what Tailscale makes of a hostname for the machine name: lower case, runs of other characters to '-'."""
-    return re.sub(r"[^a-z0-9]+", "-", hostname.lower()).strip("-")
+    """What Tailscale makes of a hostname for the machine name (util/dnsname SanitizeHostname, tailscale.com v1.104.7):
+    trim to 63 bytes and to the first and last letter or digit, lower case, a space . @ _ inside to '-', keep '-',
+    drop every other character (so 'iPhone19,2' becomes 'iphone192', not 'iphone19-2')."""
+    for suffix in (".local", ".localdomain", ".lan"):
+        if hostname.endswith(suffix):
+            hostname = hostname[:-len(suffix)]
+    label = hostname.encode()[:63]
+    alnum = [i for i, c in enumerate(label) if chr(c).isascii() and chr(c).isalnum()]
+    if not alnum:
+        return ""
+    start, end = alnum[0], alnum[-1] + 1
+    out = []
+    for i in range(start, end):
+        c = chr(label[i])
+        boundary = i in (start, end - 1)
+        if not boundary and c in " .@_":
+            out.append("-")
+        elif c == "-" or (c.isascii() and c.isalnum()):
+            out.append(c.lower())
+    return "".join(out)
 
 
 class MachineName(unittest.TestCase):
@@ -130,6 +148,13 @@ class MachineName(unittest.TestCase):
                         .endswith("-on-iphone-15-pro"))
         self.assertTrue(tailscale_label("X on " + machine_name("iPhone", "iPhone", "iPhone19,2", t))
                         .endswith("-on-iphone-18-pro"))
+
+    def test_label_drops_punctuation(self):
+        # seen on Tailscale: an iPhone19,2 with no model name registered as ifizbox-on-iphone192
+        self.assertEqual(tailscale_label("iFizBox on iPhone19,2"), "ifizbox-on-iphone192")
+        self.assertEqual(tailscale_label("iFizBox on iPhone 15 Pro"), "ifizbox-on-iphone-15-pro")
+        self.assertEqual(tailscale_label("Sam's iPhone"), "sams-iphone")
+        self.assertEqual(tailscale_label("  a__b-c.local"), "a--b-c")
 
     def test_swift_uses_it(self):
         s = read("Tailscale.swift")

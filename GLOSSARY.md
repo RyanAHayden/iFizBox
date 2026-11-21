@@ -40,3 +40,10 @@ _Said_: install log, run log
 _On screen_: Console Logs, Console Log; Running…, Completed, Failed, Cancelled, Stopped
 _In code_: runLogs, createRunLog, start(), runStatusText, loggedBridge
 _Avoid_: history, transcript
+
+**Status-bar strip**:
+The band at the top of the screen behind iOS's clock and battery, above the nav bar; plain black in the iOS 6 style
+_Said_: status-bar strip
+_On screen_: (none)
+_In code_: --site-strip, --top-inset, LaunchStatusStrip
+_Avoid_: status bar area, notch strip
