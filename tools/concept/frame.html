@@ -65,7 +65,9 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
   font: 15px var(--text); display: flex; align-items: center; justify-content: center; }
 .safari.dark .url { color: #f2f2f7; }
 @media (max-width: 720px) {
-  .wrap { grid-template-columns: 1fr; grid-template-rows: auto minmax(560px, 1fr); height: auto; min-height: 100%; }
+  /* on a phone: the phone first, nearly a screen tall, the controls under it */
+  .wrap { grid-template-columns: 1fr; grid-template-rows: auto auto; height: auto; min-height: 100%; }
+  .stage { order: -1; height: calc(100svh - 24px); min-height: 480px; }
   .panel { overflow: visible; }
 }
 @media (prefers-reduced-motion: no-preference) { .seg button { transition: background-color .15s; } }
