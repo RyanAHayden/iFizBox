@@ -271,7 +271,8 @@ test("another tab's pages inside this one: mounted, prefixes and parent skip the
     { tab: "home", path: ["~installed", "myipas", "category:Games"] });
   assert.deepEqual(mountLink({ tab: "changes", path: ["x"] }, { tab: "installed", path: ["myipas"] }),
     { tab: "changes", path: ["x", "~installed", "myipas"] });
-  assert.equal(mountLink(r, { tab: "home", path: ["about"] }), null); // same tab
+  // B300: a page of the same tab that the route doesn't stand on pushes on top (it slides in), Back comes back here
+  assert.deepEqual(mountLink(r, { tab: "home", path: ["about"] }), { tab: "home", path: ["~installed", "myipas", "apps", "~home", "about"] });
   assert.equal(mountLink(r, { tab: "sources", path: [] }), null); // a tab's root: a switch
 });
 
