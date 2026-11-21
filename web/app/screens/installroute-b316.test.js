@@ -9,7 +9,7 @@ import { fakeDocument } from "../fakes.test-helper.js";
 const mem = new Map();
 globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
 globalThis.document ??= fakeDocument();
-const { autoCheck, AUTO_CHECK, installationGroups, hudHooks } = await import("./installroute.js");
+const { autoCheck, AUTO_CHECK, installationGroups, hudHooks, withDetail, FAILING, TIMEOUTS } = await import("./installroute.js");
 const { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf } = await import("../core/installroute.js");
 hudHooks.show = () => () => {};
 hudHooks.delay = 0;
@@ -57,6 +57,30 @@ test("no failure, or the Signing Server route: nothing runs", () => {
   assert.equal(autoCheck(native, async () => ({}), () => {}, { get: () => "server" }, null, 500000), null);
   assert.deepEqual(native.calls, []);
   clearRouteFailure();
+});
+
+test("Paired turns to a red Failing while a failure is kept (main page's row and Install Apps With's Pairing)", () => {
+  const f = routeFailureOf(refused, TS_FINE);
+  assert.equal(withDetail("iphone", TS_FINE), "Paired");
+  assert.equal(withDetail("iphone", TS_FINE, f), FAILING);
+  assert.equal(withDetail("iphone", { paired: false }, f), "Not Paired");
+  assert.equal(withDetail("server", TS_FINE, f), "");
+  const pairing = installationGroups("iphone", TS_FINE, { failure: f }).find((x) => x.header === "This iPhone").rows[0];
+  assert.equal(pairing.detail, FAILING);
+  assert.equal(installationGroups("iphone", null).find((x) => x.header === "This iPhone").rows[0].detail, "Not Paired");
+});
+
+test("a check that gets no answer in time is kept too (Check Again)", async () => {
+  clearRouteFailure();
+  rememberRouteFailure(routeFailureOf(refused, TS_FINE));
+  AUTO_CHECK.last = 0;
+  TIMEOUTS.verify = 5;
+  try {
+    const native = { call: (m) => (m === "idevice.status" ? Promise.resolve(TS_FINE) : new Promise(() => {})) };
+    await autoCheck(native, async () => ({}), () => {}, iphone, null, 300000);
+    assert.equal(routeFailure().title, "Not Responding");
+    assert.equal(routeFailure().fix, "check");
+  } finally { TIMEOUTS.verify = 20000; clearRouteFailure(); }
 });
 
 test("Install Apps With: the failure in This iPhone's footer, its fix row in the group", () => {

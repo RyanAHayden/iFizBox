@@ -29,7 +29,7 @@ import { ringStyle, vpnWaitText } from "../core/installroute.js";
 import { tailscaleRoute } from "../core/installroute.js";
 import { leaveQuestion, LEAVE } from "../core/installroute.js";
 import { tailscaleVPNOn, installStatus, CHECKING, CHECKING_SERVER, STATUS_ACTIONS } from "../core/installroute.js";
-import { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf } from "../core/installroute.js"; // B316
+import { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, NO_ANSWER_FAILURE } from "../core/installroute.js"; // B316
 import { NAME, DOMAIN } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
 import { showHUD } from "../nav/hud.js";
@@ -168,7 +168,7 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
       rows: [
         devLate ? { label: "Pairing", detail: NOT_RESPONDING, href: route("pair") }
           : reading ? { label: "Pairing", detail: "Checking…", href: route("pair"), spin: true }
-          : { label: "Pairing", detail: st?.paired ? "Paired" : "Not Paired", href: route("pair"), ...(devAgain ? { spin: true } : {}) },
+          : { label: "Pairing", detail: withDetail("iphone", st ?? {}, failure), href: route("pair"), ...(devAgain ? { spin: true } : {}) },
         ...(viaTs ? [] : [
           devLate ? { label: VPN, detail: NOT_RESPONDING }
             : { label: VPN, detail: reading ? "Checking…" : vpnDetail(st), ...(reading || devAgain ? { spin: true } : {}) },
@@ -294,7 +294,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
     const shown = subGroups(sections, sub);
     patchGroups(el, shown, (s) => {
       const frag = spinRows(warnFooters(s), s);
-      for (const d of frag.querySelectorAll?.(".cell-detail") ?? []) if (d.textContent === "Another VPN" || d.textContent === NOT_RESPONDING) d.classList.add("install-red");
+      for (const d of frag.querySelectorAll?.(".cell-detail") ?? []) if (d.textContent === "Another VPN" || d.textContent === NOT_RESPONDING || d.textContent === FAILING) d.classList.add("install-red");
       return frag;
     });
   };
@@ -473,8 +473,9 @@ export async function recheckPairing(native, alert, redraw) {
   const st = await status(native);
   if (!st?.paired || !vpnOn(st)) return "skipped";
   const verify = async () => {
-    try { await within(call(native, "idevice.verify"), TIMEOUTS.verify); return null; } catch (e) { return isLate(e) ? { late: true } : verifyFailure(e); }
+    try { await within(call(native, "idevice.verify"), TIMEOUTS.verify); return null; } catch (e) { lastErr = e; return isLate(e) ? { late: true } : verifyFailure(e, st); }
   };
+  let lastErr = null; // B316: what the failed check is kept as
   const why = await busy("Checking Pairing", async () => {
     const first = await verify();
     if (!first?.unusable) return first;
@@ -482,7 +483,7 @@ export async function recheckPairing(native, alert, redraw) {
     return verify();
   });
   if (!why) { clearRouteFailure(); return "ok"; } // B316: after a sign-in or a new way in, the pairing answered: green again
-  if (!why.unusable) return "failed";
+  if (!why.unusable) { rememberRouteFailure(why.late ? NO_ANSWER_FAILURE : routeFailureOf(lastErr, st)); return "failed"; } // B316
   await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {}));
   forgetStatus();
   if (visit) visit.started = false;
@@ -501,7 +502,9 @@ async function tailscaleTest(native, alert, ended = () => {}) {
   try { r = await within(call(native, "tailscale.test", { verify: true }), ms); } catch (e) { r = isLate(e) ? { ok: false, code: "not_responding" } : { ok: false, code: "error", detail: e?.message }; }
   ended();
   if (r?.ok && r.verified) clearRouteFailure(); // B316: the pairing answered through Tailscale
-  else if (r?.code === "route_refused" || r?.code === "needs_login" || r?.code === "expired") rememberRouteFailure(routeFailureOf({ code: r.code, message: `${r.code}: ${r.detail || "Tailscale"}` }));
+  else if (r?.code === "not_responding") rememberRouteFailure(NO_ANSWER_FAILURE);
+  else if (r?.code === "verify_failed") rememberRouteFailure(routeFailureOf({ message: String(r.detail || "connect_failed: Tailscale") }));
+  else if (["refused", "route_refused", "needs_login", "expired", "not_paired"].includes(r?.code)) rememberRouteFailure(routeFailureOf({ code: r.code, message: `${r.code}: ${r.detail || "Tailscale"}` }));
   return testAlert(alert, r, { native, ms });
 }
 
@@ -554,9 +557,12 @@ export const MAIN_ROWS = ["status", "action", "with", "certificate", "apps", "he
 
 // F300/F351: Install Apps With's detail on the main page: This iPhone's pairing once idevice.status said (`st`
 // undefined: not answered yet; null: it failed). The route itself is the row's label, subtitle and icon (ROUTE_ROW).
-export function withDetail(choice, st) {
+// B316: paired, with the last check or install failed (`failure`, core routeFailure): "Failing", red, until a check
+// passes (the user's page said a green Paired while every install was refused).
+export const FAILING = "Failing";
+export function withDetail(choice, st, failure = null) {
   if (choice !== "iphone" || !st) return "";
-  return st.paired ? "Paired" : "Not Paired";
+  return st.paired ? (failure ? FAILING : "Paired") : "Not Paired";
 }
 // F351: each route's row: its icon (icons/rowicons.js), its name and one line under it, on the main page and the
 // Install Apps With page.
@@ -635,12 +641,14 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
   let asked = 0, statusShown = 0, signingShown = 0, appsShown = 0, lastChoice = null;
   // B316: the remembered failure set or cleared (an install, a check on another page): the cell repaints at once
   let cellOf = null;
+  const showWith = (c, st) => { const f = routeFailure(); const t = withDetail(c, st, f); slots.with.set(t, { red: t === FAILING }); };
   const onFailure = () => {
     if (box.isConnected === false && cellOf) { globalThis.removeEventListener?.("ifizbox:route-failure", onFailure); return; }
-    if (cellOf && statusShown && now.state !== "checking") paintStatus(cellOf(store.get(ROUTE_KEY), known));
+    if (cellOf && statusShown && now.state !== "checking") { const c = store.get(ROUTE_KEY); paintStatus(cellOf(c, known)); if (c === "iphone") showWith(c, known); }
   };
   globalThis.addEventListener?.("ifizbox:route-failure", onFailure);
-  const refresh = async () => {
+  // B316: `auto` false: the redraw after a check (a tap's, or the automatic one) never starts another automatic check
+  const refresh = async ({ auto = true } = {}) => {
     const n = ++asked;
     const choice = store.get(ROUTE_KEY);
     showRoute(choice);
@@ -651,7 +659,7 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
     cellOf = cell;
     if (choice !== "iphone") { paintStatus(cell(choice)); slots.with.set(withDetail(choice)); }
     else if (lastChoice && lastChoice !== choice) { paintStatus(CHECKING); title.wait(); subtitle.wait(); slots.with.wait(); } // just picked
-    else if (!lastChoice && lastStatus) { paintStatus(cell(choice, lastStatus)); slots.with.set(withDetail(choice, lastStatus)); } // F301: the last answer at once
+    else if (!lastChoice && lastStatus) { paintStatus(cell(choice, lastStatus)); showWith(choice, lastStatus); } // F301: the last answer at once
     lastChoice = choice;
     const reads = [
       status(native).then((st) => {
@@ -661,9 +669,9 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
         rememberStatus(st);
         const c = store.get(ROUTE_KEY);
         paintStatus(cell(c, st));
-        slots.with.set(withDetail(c, st));
+        showWith(c, st);
         // B316: opened after a failure: Check Connection runs by itself (its button spins), quietly
-        if (c === "iphone" && st?.paired && box.isConnected !== false) autoCheck(native, alert, refresh, store, checkButton);
+        if (auto && c === "iphone" && st?.paired && box.isConnected !== false) autoCheck(native, alert, after, store, checkButton);
       }),
       Promise.resolve().then(signing).catch(() => null).then((v) => {
         if (n < signingShown) return;
@@ -688,8 +696,9 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
     ];
     await Promise.all(reads);
   };
+  const after = () => refresh({ auto: false });
   const runAction = async (a) => {
-    if (a === "check") return check(native, alert, refresh, store, checkButton).then(refresh);
+    if (a === "check") return check(native, alert, after, store, checkButton).then(after);
     if (a === "checkServer") return checkServer();
     if (a === "openVPN") return openVPN(native, alert).then(refresh);
     if (a === "pair") return goTo("pair");
@@ -1084,7 +1093,8 @@ export const AUTO_CHECK = { gapMs: 15000, last: 0 };
 export function autoCheck(native, alert, redraw, store, mark = null, now = Date.now()) {
   if (!routeFailure() || store.get(ROUTE_KEY) !== "iphone" || checking || now - AUTO_CHECK.last < AUTO_CHECK.gapMs) return null;
   AUTO_CHECK.last = now;
-  return check(native, alert, redraw, store, mark, { quiet: true });
+  // the gap counts from the end too: a slow check (up to TIMEOUTS.verify) isn't followed by another at once
+  return check(native, alert, redraw, store, mark, { quiet: true }).finally(() => { AUTO_CHECK.last = Math.max(AUTO_CHECK.last, Date.now()); });
 }
 async function fixAction(fix, native, alert) {
   if (fix === "signIn") return goTo("with");
@@ -1110,7 +1120,7 @@ async function checkOnce(native, alert, redraw, store, mark = null, { quiet = fa
     const why = isLate(e)
       ? { title: NOT_RESPONDING, message: `This iPhone didn't answer in ${TIMEOUTS.verify / 1000} seconds. Check that ${st ? verifyVPN(st) : `${VPN} (or Tailscale)`} is on, then check again.`, again: false }
       : verifyFailure(e, st);
-    if (!isLate(e)) rememberRouteFailure(routeFailureOf(e, st)); // B316
+    rememberRouteFailure(isLate(e) ? NO_ANSWER_FAILURE : routeFailureOf(e, st)); // B316
     mark?.show(false);
     if (quiet) { mark?.expire(); redraw(); return undefined; }
     try {

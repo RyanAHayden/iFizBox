@@ -405,6 +405,9 @@ export function tailscaleProblem(st) {
   const ts = st?.tailscale;
   if (!ts || ts.connect === "localdevvpn") return null;
   if (ts.connect !== "tailscale" && !tailscaleVPNOn(st)) return null;
+  // Automatic with LocalDevVPN really on (VPNCheck counts a refusal only through a tunnel): the connect went to
+  // 10.7.0.1, so a refusal there is the pairing's, not Tailscale's
+  if (ts.connect !== "tailscale" && st.localDevVPN && !ts.use) return null;
   if (!ts.signedIn) return "signedOut";
   if (!tailscaleVPNOn(st)) return "off";
   return null;
@@ -472,6 +475,10 @@ export function clearRouteFailure(storage = globalThis.localStorage) {
   try { had = storage?.getItem(FAILURE_KEY) != null; storage?.removeItem(FAILURE_KEY); } catch { /* storage off */ }
   if (had) tell();
 }
+
+// A check that got no answer in time (screens' Not Responding): kept too, with Check Again as its fix.
+export const NO_ANSWER_FAILURE = { title: "Not Responding", message: "This iPhone didn't answer the last check. Check that the VPN is on, then check again.",
+  short: "This iPhone didn't answer the last check.", fix: "check", button: "Check Again" };
 
 // The status cell for a remembered failure: red, with the fix as its action row.
 const FIX_ACTIONS = { signIn: "signIn", openTailscale: "openTailscale", openVPN: "openVPN", pair: "pair", check: "check" };

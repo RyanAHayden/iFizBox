@@ -141,6 +141,29 @@ unit tests pass; the IPA built (`make -C native package`).
   but no log line was read to confirm when it ran (Web Inspector shows no network for bridge calls).
 - **signedOutByTailnet** (the tailnet logging the node out): needs a signed-in node to expire; R71.
 
+## Spec review
+
+Fixed:
+- Tailscale was blamed when LocalDevVPN really was the route (Automatic, Tailscale's VPN on, iFizBox signed out,
+  10.7.0.1 answering): `tailscaleProblem` now returns null then, so a refusal there is Pair Again.
+- Not every failed check was kept: a check with no answer in time (Not Responding: `NO_ANSWER_FAILURE`, Check Again),
+  a refused / not paired / verify_failed Test Connection, and a sign-in's failed pairing recheck are kept now.
+- "Paired" stayed green while installs failed: the main page's Install Apps With detail and Install Apps With's
+  Pairing row say a red "Failing" while a failure is kept.
+- The automatic check could repeat while the main page stayed open: the redraw after a check never starts another,
+  and the 15 s gap counts from the check's end too.
+
+Kept, with the reasons:
+- The native extras (VPNCheck's tunnel-route rule, the lockdownd control probe and `route_refused`,
+  `signedOutByTailnet`): the person running the run asked for the real cause to be found and fixed; these are that
+  cause (the false LocalDevVPN, the route refusing everything) and the "Tailscale is signed out" state the brief asks
+  pages to show and re-check.
+- Install Apps With's footer is the title plus the short line, not the alert's whole message: iOS 6 footers stay one
+  or two short sentences (AGENTS.md, Hints); the words are the same failure's.
+- plan/TODO.md changed only through `run plan add` (R70, R71), not by hand.
+- The main page's listener is dropped on the first event after the page leaves; a small leak until then, as other
+  pages' listeners here.
+
 ## Log
 
 - Tried Tailscale's "block incoming connections" as the cause: the iOS app has no such setting.

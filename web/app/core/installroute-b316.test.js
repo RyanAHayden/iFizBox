@@ -58,6 +58,10 @@ test("tailscaleProblem: only when Tailscale is the way in", () => {
   assert.equal(tailscaleProblem(LDV), null);
   assert.equal(tailscaleProblem({ paired: "rp", localDevVPN: true, tailscale: { connect: "auto", signedIn: false, address: null } }), null, "Automatic, Tailscale's VPN off: LocalDevVPN's route");
   assert.equal(tailscaleProblem(null), null);
+  // Automatic, Tailscale's VPN on and iFizBox signed out, but LocalDevVPN really on: the connect went to 10.7.0.1
+  const both = { ...TS_SIGNED_OUT, localDevVPN: true, otherVPN: false };
+  assert.equal(tailscaleProblem(both), null);
+  assert.equal(routeFailureOf(refused, both).fix, "pair", "a refusal over LocalDevVPN is the pairing's");
 });
 
 test("the shell's own codes: tailscale_signed_out, and every connection refused (not the pairing)", () => {
