@@ -186,13 +186,9 @@ const HOME_TILES = {
   signing: { colour: "#8e44ad", svg: `${HOME_SVG} fill='#fff'><path d='M4 3h12l4 4v8.5a5 5 0 0 0-2-1.2V8h-3V5H6v14h6.6a5 5 0 0 0 .7 2H4zm14 13a3.5 3.5 0 1 1-1.5 6.7L15 24v-3.4A3.5 3.5 0 0 1 18 16zM8 9h7v2H8zm0 4h5v2H8z'/></svg>` },
   install: { colour: "#2c9b3c", svg: `${HOME_SVG} fill='#fff'><path d='M11 3h2v9.6l3.3-3.3 1.4 1.4L12 16.4l-5.7-5.7 1.4-1.4 3.3 3.3zM4 18h16v2H4z'/></svg>` },
   send: { colour: "#2c9b3c", svg: `${HOME_SVG} fill='#fff'><path d='M3 11h12.2l-4.6-4.6L12 5l7 7-7 7-1.4-1.4 4.6-4.6H3z'/></svg>` },
-  // the green row's state tile (screens/home.js stateTile): the row colours them
-  add: { svg: `${HOME_SVG} fill='#fff'><path d='M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z'/></svg>` },
-  upgrades: { svg: `${HOME_SVG} fill='#fff'><path d='M12 2 3 11h6v10h6V11h6z'/></svg>` },
+  // the certificate tile (screens/home.js): no colour of its own, the row's stage ink colours it
   failed: { svg: `${HOME_SVG} fill='#fff'><path d='M10 3h4l-.6 12h-2.8zm0 15h4v3h-4z'/></svg>` },
-  current: { svg: `${HOME_SVG} fill='none' stroke='#fff' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'><path d='m4 12.5 5 5L20 6.5'/></svg>` },
-  loading: { svg: `${HOME_SVG} fill='none' stroke='#fff' stroke-width='2.6' stroke-linecap='round'><circle cx='12' cy='12' r='9'/><path d='M12 7v5l3.5 2.5'/></svg>` },
-  // B266: More Sources in the state tile's slot: its row tile's blue and white plus (ROW_ICONS moreSources), which
+  // B266: More Sources in the green row's slot: its row tile's blue and white plus (ROW_ICONS moreSources), which
   // home.css keeps over the green row's glyph colour
   more: { colour: C.blue, svg: `${HOME_SVG} fill='#fff'><path d='M10.2 3h3.6v7.2H21v3.6h-7.2V21h-3.6v-7.2H3v-3.6h7.2z'/></svg>` },
   // an open padlock (jailbreak's usual sign; not anyone's artwork) on a purple gradient
@@ -329,12 +325,8 @@ const HOME_TILES_7 = {
     ln("M15.4 17.8 14.8 22l2.2-1.1 2.2 1.1-.6-4.2")]),
   install: home7(C7.green, GLYPHS_7.install),
   send: home7(C7.green, [ln("M4 12h15M13 6l6 6-6 6")]),
-  add: home7(null, GLYPHS_7.plus),
-  upgrades: home7(null, [ln("M12 20V4.5M6 10.5l6-6 6 6")]),
   failed: home7(null, [ln("M12 4v10", 2.2), dot(12, 19, 1.4)]),
-  current: home7(null, GLYPHS_7.check),
-  loading: home7(null, GLYPHS_7.clock),
-  more: home7(C7.blue, GLYPHS_7.plus), // B266: More Sources in the state tile's slot, its row tile's blue plus
+  more: home7(C7.blue, GLYPHS_7.plus), // B266: More Sources in the green row's slot, its row tile's blue plus
   jailbreak: home7(C7.purple, [ln("M5.5 11h13v9.5h-13z"), ln("M8.5 11V7.8a3.5 3.5 0 0 1 6.8-1.2"), ln("M12 14.5v2.5")]),
   theme: home7(C7.indigo, GLYPHS_7.contrast),
 };
