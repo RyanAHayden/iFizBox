@@ -2,9 +2,9 @@
 
 ## Outcome
 
-**Fails the brief's rule: every Sign Out then Sign In adds a machine.** The tailnet went from five
-`ifizbox-on-iphone*` nodes to six with the owner's first new login, and the second Sign Out left that new node
-listed too (expired), so the next login would make seven. B301 (keep the machine key across Sign Out) is the fix;
+**Fails the brief's rule: a Sign Out then Sign In added a machine.** The tailnet went from five
+`ifizbox-on-iphone*` nodes to six with the owner's first new login (seen once), and the second Sign Out left that
+new node listed too (expired), so the next login is expected to make seven (not seen). B301 (keep the machine key across Sign Out) is the fix;
 this run confirms what it predicted.
 
 - **Round 1** (owner typed the login, 2026-11-21 about 18:32 UTC, during R48's window): Sign Out had left
@@ -57,8 +57,9 @@ iFizBox on the 15 wait for the next login (B301's check will need one anyway).
 | `ifizbox-on-iphone-4` | 2026-11-21 03:49 | 2026-11-21 17:43 | **expired** (shown as 2026-11-20 17:42) |
 | `ifizbox-on-iphone-5` | 2026-11-21 18:32 | 2026-11-21 18:50 | **expired** (shown as 2026-11-20 18:46) |
 
-Both expiries read exactly a day before the Sign Out that caused them (17:42 and 18:46:11): that is how the
-tailnet marks a logged-out key. Nothing was deleted.
+Both expiries read exactly a day before the Sign Out that caused them (17:42 and 18:46:11); my guess (not
+checked) is that this is how the tailnet marks a logged-out key. Nothing was deleted. `-5`'s "last seen 18:50"
+is what the 18:46:30 query returned, ahead of the clock; copied as reported, not explained.
 
 `-3` still shows recent "last seen" times while the 15's app was signed out, so something else runs `-3`'s state
 (another install of the app, a Simulator, or an older Keychain copy). Not followed up; it does not change the
