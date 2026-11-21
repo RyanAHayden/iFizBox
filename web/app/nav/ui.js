@@ -239,7 +239,8 @@ export function syncSegments(doc = globalThis.document, native = nativeBridge(),
     if (!st || st.failed) continue;
     const snap = segmentsSnapshot(seg, doc, win);
     if (!snap) { if (st.open) closeSegments(seg, native); continue; }
-    const key = JSON.stringify(snap);
+    // While hidden its place doesn't matter: a slide moving it sends nothing until it shows again.
+    const key = JSON.stringify(snap.hidden ? { ...snap, rect: null } : snap);
     if (key === st.sent) continue;
     const wasShown = st.sent && !JSON.parse(st.sent).hidden;
     st.sent = key;
