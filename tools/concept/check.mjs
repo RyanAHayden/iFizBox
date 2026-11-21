@@ -140,9 +140,13 @@ async function tap(css) {
 // one on the page with a height, and what's on screen at a row's centre is that row (nothing blank over it).
 const HOME_ROWS = `const home = d.querySelector(".page.is-top .home"); if (!home) return null;
   const sc = home.closest(".page-body"), box = sc.getBoundingClientRect();
+  // The list runs on behind the tab bar (and, on a phone with a home indicator, its inset below it): a row counts as
+  // on screen only above the tab bar's top, measured, not a fixed 60 px off the list's bottom.
+  const bar = [...d.querySelectorAll(".tabbar")].find((t) => t.getClientRects().length);
+  const above = bar ? Math.min(box.bottom, bar.getBoundingClientRect().top) : box.bottom - 60;
   return [...home.children].filter((c) => !c.hidden && !c.matches(".why") && c.getClientRects().length && c.textContent.trim())
     .map((c) => { const r = c.getBoundingClientRect(), y = r.top + Math.min(r.height / 2, 10);
-      const onScreen = r.top >= box.top && y < box.bottom - 60; // above the tab bar
+      const onScreen = r.top >= box.top && y < above;
       const hit = onScreen ? d.elementFromPoint(r.left + r.width / 2, y) : null;
       const cs = w.getComputedStyle(c), seen = cs.visibility !== "hidden" && Number(cs.opacity) > 0; // below the screen too
       return { cls: String(c.className).split(" ").slice(0, 3).join("."), h: Math.round(r.height), onScreen, painted: seen && (!onScreen || c.contains(hit)) }; });`;
@@ -163,8 +167,7 @@ async function homeRetap(name) {
   const after = await inApp(HOME_ROWS);
   const lost = (before ?? []).filter((b) => !after?.some((a) => a.cls === b.cls)).map((b) => b.cls);
   const flat = (after ?? []).filter((a) => !a.h).map((a) => a.cls);
-  const blank = (after ?? []).filter((a) => !a.painted).map((a) => a.cls);
-  check(Array.isArray(after) && after.length === before.length && !lost.length && !flat.length && !blank.length,
+  const blank = (after ?? []).filter((a) => !a.painted).map((a) => a.cls);  check(Array.isArray(after) && after.length === before.length && !lost.length && !flat.length && !blank.length,
     `${name}: Home tab from "${pushed}" draws all ${before.length} rows again (${after?.length ?? "no Home"}` +
     (lost.length ? `; missing ${lost.join(", ")}` : "") + (flat.length ? `; no height ${flat.join(", ")}` : "") +
     (blank.length ? `; covered ${blank.join(", ")}` : "") + ")");
