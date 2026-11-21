@@ -92,14 +92,21 @@ export function detailRows(rows, actions = {}) {
 }
 
 // The description in Cydia's dashed box: its first LINES lines (packages.css .cy-desc-text clamps it), or the whole
-// text on More Information (`full`). URLs in it stay links (description.js linkified).
-export function descGroup(text, { full = false } = {}) {
+// text on More Information (`full`). URLs in it stay links (description.js linkified). `onOverflow`: called once the
+// box is on screen when its text runs past the clamp after all (longText only estimates), so the page can add More
+// Information.
+export function descGroup(text, { full = false, onOverflow = null } = {}) {
   const g = el("div", "group cy-desc-group");
   const box = el("div", full ? "cy-desc cy-desc-full" : "cy-desc");
   const t = linkified(text);
   t.classList.add("cy-desc-text");
   box.append(t);
   g.append(box);
+  if (onOverflow && !full && typeof requestAnimationFrame === "function") {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (t.isConnected && t.scrollHeight > t.clientHeight + 1) onOverflow();
+    }));
+  }
   return g;
 }
 

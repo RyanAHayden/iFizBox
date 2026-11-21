@@ -1225,10 +1225,12 @@ async function renderPackage(body, route, key, id, ctx) {
   if (!sileo) drawPreviews(null);
 
   // F350: the description in Cydia's dashed box, its first lines; More Information has the rest and the depiction.
-  if (descText) details.append(descGroup(descText));
-  if (moreInfoShown({ text: descText, depiction: Boolean(sileo || html) })) {
-    details.append(grouped([{ rows: [{ label: MORE_INFO_LABEL, icon: rowIcon("pkgMore"), href: deeper(route, token("info", id)) }] }]));
-  }
+  const moreSlot = el("div");
+  const showMore = () => moreSlot.replaceChildren(grouped([{ rows: [{ label: MORE_INFO_LABEL, icon: rowIcon("pkgMore"),
+    href: deeper(route, token("info", id)) }] }]));
+  if (descText) details.append(descGroup(descText, { onOverflow: () => { if (!moreSlot.firstChild) showMore(); } }));
+  details.append(moreSlot);
+  if (moreInfoShown({ text: descText, depiction: Boolean(sileo || html) })) showMore();
 
   // Installed Package (or Version): Version with CHANGE (Install Which Version?), Version History, Filesystem Content.
   const versionBox = grouped([{ header: plan.versionHeader, rows: detailRows(plan.version, {

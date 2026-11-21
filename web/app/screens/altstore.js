@@ -836,11 +836,12 @@ export function renderApp(body, route, pkg, source, { related = null, onChange =
   const descSlot = el("div");
   const moreSlot = el("div");
   details.append(descSlot, moreSlot);
+  const showMore = () => moreSlot.replaceChildren(grouped([{ rows: [{ label: MORE_INFO_LABEL, icon: rowIcon("pkgMore"),
+    href: deeper(route, `info:${pkg.row.id}`) }] }]));
   const drawText = (text) => {
-    descSlot.replaceChildren(...(text ? [descGroup(text)] : []));
-    const more = moreInfoShown({ text, whatsNew: Boolean(v.localizedDescription), permissions: nPerm });
-    moreSlot.replaceChildren(...(more ? [grouped([{ rows: [{ label: MORE_INFO_LABEL, icon: rowIcon("pkgMore"),
-      href: deeper(route, `info:${pkg.row.id}`) }] }])] : []));
+    descSlot.replaceChildren(...(text ? [descGroup(text, { onOverflow: () => { if (!moreSlot.firstChild) showMore(); } })] : []));
+    if (moreInfoShown({ text, whatsNew: Boolean(v.localizedDescription), permissions: nPerm })) showMore();
+    else moreSlot.replaceChildren();
   };
   drawText(app.localizedDescription || "");
   if (!app.localizedDescription) merged.then((m) => { if (m.description && body.isConnected) drawText(m.description); });
@@ -956,7 +957,7 @@ export function renderApp(body, route, pkg, source, { related = null, onChange =
     href: route.tab === "sources" && route.path[0] === pkg.key ? null : format({ tab: "sources", path: [pkg.key] }) };
   const linksBox = el("div");
   const drawLinks = (store, sourceWebsite) => linksBox.replaceChildren(appLinksGroup(pageLinks({ ownLinks, store, source: sourceRow,
-    sourceWebsite, appUrls: [app.sourceUrl] }), sourceRow));
+    sourceWebsite, appUrls: [app.sourceUrl] })));
   drawLinks(null, null);
   details.append(linksBox);
   Promise.all([looked, catalog.altSource(pkg.key).then((m) => m?.website ?? null, () => null)])
@@ -1049,9 +1050,11 @@ function ipaCompatText(v, info) {
 }
 
 // F161: core/applookup.js pageLinks' rows as the Links group: a link row opens out, the source row opens its page.
-function appLinksGroup(links, sourceRow) {
-  const rows = links.map((l) => (l.kind === "source" ? { ...sourceRow, chevron: true }
-    : { label: l.label, subtitle: l.detail || l.url, icon: rowIcon("pkgLink"), onClick: () => openOut(l.url), chevron: true }));
+// F350: the source isn't repeated here: it is Information's Source row on the Details page.
+function appLinksGroup(links) {
+  const rows = links.filter((l) => l.kind !== "source")
+    .map((l) => ({ label: l.label, subtitle: l.detail || l.url, icon: rowIcon("pkgLink"), onClick: () => openOut(l.url), chevron: true }));
+  if (!rows.length) return document.createDocumentFragment();
   const g = grouped([{ header: "Links", rows }]);
   g.firstElementChild?.classList.add("links-group");
   return g;

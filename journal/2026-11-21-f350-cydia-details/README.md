@@ -50,6 +50,15 @@ concept.sample mapping) are not in this branch; they were used only in a scratch
 - The concept's v4 Reviews / Related pages (`reviews:` / `related:` tokens) were left out: v5 shows both in place.
 - Nav title of Change Package Settings: "Settings"; of Filesystem Content: "Files".
 
+## Spec review
+
+A fresh reviewer read the diff and the brief. Fixed here: an app's Links no longer repeats the source (it is
+Information's Source row, as on the package page), and the dashed box adds More Information once it is on screen if
+its text overflows the 6-line clamp even though the length estimate called it short (`descGroup` `onOverflow`).
+Kept as decided above: the shell reads dpkg's lists rather than the helper, CHANGE greyed, the kept groups. Kept:
+no Maintainer row when there's no Author (the header already names the maintainer then); More Information draws the
+whole Sileo depiction, its own pictures and reviews included, since that page has no gallery or Reviews tab.
+
 ## Checks
 
 - `node --test web/app/`: all pass (new `screens/details.test.js`: rows per state, installed / not, paid,
