@@ -473,18 +473,14 @@ function draw(state) {
   const top = [appCount ? appsRow(state.route, appCount) : null].filter(Boolean);
   if (!recordsApps()) top.unshift(installIpasRow(state.route, ipaRowState.counts)); // F269: above the Apps row
   if (!rows.length) {
-    body.replaceChildren(...(top.length ? [ipaTagged(grouped([{ rows: top }]), state.route)] : []), note("No packages."));
+    body.replaceChildren(...(top.length ? [topTable(top, state.route)] : []), note("No packages."));
     return;
   }
   body.replaceChildren();
   // F127: the search bar and kinds go in before the list measures where it starts. C10: they stay put (nav/searchbar.js
   // pinned); the Apps row and the list scroll under them.
   state.results = pinned(body, ...filterControls(state, { types: true, onChange: () => drawList(state) }));
-  if (top.length) {
-    const g = ipaTagged(grouped([{ rows: top }]), state.route);
-    g.firstElementChild?.classList.add("installed-top"); // F127: stops short of the A–Z index (packages.css)
-    state.results.append(g);
-  }
+  if (top.length) state.results.append(topTable(top, state.route));
   state.tail = [];
   drawList(state);
 }
@@ -520,7 +516,15 @@ function appsRow(route, n) {
   return { label: "Apps", subtitle: appsRowSubtitle(n), href: format({ tab: route.tab, path: [...route.path, APPS] }), cls: "installed-apps-row" };
 }
 
-// F269: the jailbreak app's top group: its Install IPAs cell keeps its tab for paintIpaRows.
+// B291: the jailbreak app's rows above the package list (Install IPAs, Apps) as plain rows of the list, edge to edge
+// at the package rows' height above the first letter header, not a rounded grouped card (packages.css .installed-top).
+export function topTable(rows, route) {
+  const ul = ipaTagged(plain([{ rows }]), route);
+  ul.classList.add("installed-top");
+  return ul;
+}
+
+// F269: the jailbreak app's top rows: the Install IPAs cell keeps its tab for paintIpaRows.
 function ipaTagged(frag, route) {
   for (const li of frag.querySelectorAll?.(".install-ipas-row") ?? []) li.dataset.tab = route.tab;
   return frag;

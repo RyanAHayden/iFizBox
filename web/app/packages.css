@@ -665,10 +665,8 @@ html.has-manage-toolbar .search-results::after { content: ""; }
 /* With the A–Z index down the right edge (User, Expert), the rows and the search bar above the list stop short of it,
    as UISearchBar does over an indexed table on iOS 6. */
 .page-body[data-section-index] > .installed-search, .page-body[data-section-index] > .installed-scope { padding-right: 24px; }
-.page-body[data-section-index] > .installed-top { margin-right: 24px; }
 /* C10: pinned (nav/searchbar.js), the index is the results scroller's: the bars over it end short of it too. */
 .search-root:has(> .search-results[data-section-index]) > :is(.search-bar, .search-scope) { padding-right: 24px; }
-.search-results[data-section-index] > .installed-top { margin-right: 24px; }
 .page-body[data-section-index] > .list-search { padding-right: 24px; } /* F124: Browse's list search ends before the A–Z index */
 /* ==== look-only { ==== Installed's segmented title and Wish List button */
 .nav-title.nav-title-view { line-height: normal; }
@@ -1131,6 +1129,22 @@ html[data-theme="dark"] .store-review-response { background: var(--dk-inset-box)
    Settings rows' 3pt nudge); gone while Manage is on. */
 .install-ipas-top .install-ipas-row .cell-icon.row-icon { margin: 0; }
 .install-ipas-row[hidden] { display: none; }
+/* B291: the jailbreak app's Install IPAs (and Apps) row above the first letter header (screens/installed.js topTable):
+   a plain row of the list like the wide package rows under it, edge to edge, 73px high, the tile where their icon is
+   (32px from 9px), the title from 48px as their name, the grey line under it, the chevron, the keyline under the row;
+   it ends before the A–Z index as they do. */
+.table.installed-top > .cell > .cell-inner { height: 73px; min-height: 0; gap: 7px; padding: 0 12px 0 9px; }
+:is(.page-body, .search-results)[data-section-index] > .table.installed-top > .cell > .cell-inner { padding-right: 26px; }
+.table.installed-top .cell-icon.row-icon { width: 32px; height: 32px; margin: 0; }
+.table.installed-top .cell-icon.row-icon img { width: 32px; height: 32px; }
+.table.installed-top .cell-text { gap: 2px; }
+/* ==== look-only { ==== the rows above the package list */
+.table.installed-top .cell-label { font-size: 18px; font-weight: bold; line-height: 22px; }
+.table.installed-top .cell-subtitle { font-size: 14px; line-height: 17px; color: var(--subtitle); }
+html[data-style="ios7"] .table.installed-top > .cell { /* the era's keyline from the title, as the wide rows' */
+  background-position: 48px 0; background-size: calc(100% - 48px) 100%;
+}
+/* ==== } look-only ==== */
 /* The toolbar: My IPAs' edit toolbar (myipas.css .myipa-toolbar, which loads only with My IPAs, so its rules are
    repeated here): the navigation bar's colours as a 44pt UIToolbar docked above the tab bar, sliding up from behind
    it. Re-sign is the blue Done button, Update a plain bar button, Delete the alert's red; one with nothing to act on

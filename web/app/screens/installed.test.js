@@ -619,16 +619,31 @@ test("Remove from List on a remembered app iFizBox signed forgets the signature 
 });
 
 // ---- B52: the root's Apps count follows a Delete on the Apps page ------------------------------------------------
-import { refreshAppCount, appsRowSubtitle } from "./installed.js";
+import { refreshAppCount, appsRowSubtitle, topTable } from "./installed.js";
+
+test("B291: the jailbreak app's Install IPAs row is a plain row of the list, not a grouped card, its tab kept", () => withDom(() => {
+  const ul = topTable([{ label: "Install IPAs", subtitle: "3 IPAs", href: "#/installed/myipas", cls: "install-ipas-row" }], { tab: "home", path: [] });
+  assert.equal(ul.tagName, "UL");
+  assert.ok(ul.classList.contains("plain") && ul.classList.contains("installed-top"));
+  assert.ok(!ul.classList.contains("grouped"), "no rounded card");
+  const li = ul.querySelector(".install-ipas-row");
+  assert.equal(li.dataset.tab, "home", "paintIpaRows redraws it on its own tab");
+  assert.ok(li.querySelector(".cell-subtitle") && li.querySelector(".chevron"), "grey line and chevron as a package row");
+}));
+
+test("B291: packages.css draws the top rows at the wide package rows' height, edge to edge", async () => {
+  const { readFileSync } = await import("node:fs");
+  const css = readFileSync(new URL("../packages.css", import.meta.url), "utf8");
+  const { WIDE_ROW_HEIGHT } = await import("./browse.js");
+  assert.match(css, new RegExp(`\\.table\\.installed-top > \\.cell > \\.cell-inner \\{ height: ${WIDE_ROW_HEIGHT}px;`));
+  assert.doesNotMatch(css, /\.installed-top \{ margin-right/, "no inset card beside the A–Z index");
+});
 
 test("B52: a Delete under the Apps page updates the root's Apps count; the cell goes at 0", async () => {
-  const { grouped } = await import("../nav/ui.js");
-  const body = withDom(() => { // the root's Apps cell as draw() makes it
+  const body = withDom(() => { // the root's Apps cell as draw() makes it (B291: topTable)
     const b = document.createElement("div");
-    const g = grouped([{ rows: [{ label: "Install IPAs", subtitle: "3 IPAs", href: "#/installed/myipas", cls: "install-ipas-row" }, // F269
-      { label: "Apps", subtitle: appsRowSubtitle(2), href: "#/installed/apps", cls: "installed-apps-row" }] }]);
-    g.children[0].classList.add("installed-top");
-    b.append(g);
+    b.append(topTable([{ label: "Install IPAs", subtitle: "3 IPAs", href: "#/installed/myipas", cls: "install-ipas-row" }, // F269
+      { label: "Apps", subtitle: appsRowSubtitle(2), href: "#/installed/apps", cls: "installed-apps-row" }], { tab: "installed", path: [] }));
     return b;
   });
   const sub = () => body.querySelector(".installed-top").querySelector(".installed-apps-row").querySelector(".cell-subtitle").textContent;
