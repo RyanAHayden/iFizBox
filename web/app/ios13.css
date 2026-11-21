@@ -341,14 +341,14 @@ html[data-style="ios13"][data-theme="dark"] .action-button.destructive { backgro
    grey text. [data-theme] so myipas.css's .price-btn, which may load later, can't win back. */
 html[data-style="ios13"][data-theme="light"] { --i13-get: #eff0f5; --i13-get-pressed: #d8d9df; --i13-get-dim-text: #8e8e93; }
 html[data-style="ios13"][data-theme="dark"] { --i13-get: #2c2c2e; --i13-get-pressed: #3a3a3c; --i13-get-dim-text: #8e8e93; }
-html[data-style="ios13"][data-theme] .rec-add {
+html[data-style="ios13"][data-theme] .rec-add, html[data-style="ios13"][data-theme] .price-btn {
   font-size: 13px; font-weight: 700; color: var(--i13-tint); text-shadow: none;
   border: 1px solid var(--i13-get); border-radius: 12px; background: var(--i13-get); box-shadow: none;
 }
-html[data-style="ios13"][data-theme] .rec-add:active:not(:disabled) {
+html[data-style="ios13"][data-theme] .rec-add:active:not(:disabled), html[data-style="ios13"][data-theme] .price-btn:active:not(:disabled) {
   border-color: var(--i13-get-pressed); background: var(--i13-get-pressed); box-shadow: none;
 }
-html[data-style="ios13"][data-theme] .rec-add.added, html[data-style="ios13"][data-theme] .rec-add:disabled { color: var(--i13-get-dim-text); }
+html[data-style="ios13"][data-theme] .rec-add.added, html[data-style="ios13"][data-theme] .rec-add:disabled, html[data-style="ios13"][data-theme] .price-btn:disabled { color: var(--i13-get-dim-text); }
 html[data-style="ios13"][data-theme] .rec-add.adding { color: var(--i13-tint); }
 
 /* ---- B270: the leftovers that still drew iOS 6 ---- */
@@ -446,3 +446,10 @@ html[data-style="ios13"] .alert-button.red { color: var(--i13-red); }
 html[data-style="ios13"] .alert-button:disabled { color: var(--i13-alert-dim); opacity: 1; }
 html[data-style="ios13"] .alert-button:active:not(:disabled),
 html[data-style="ios13"] .alert-button.is-pressed { background: var(--i13-alert-pressed); }
+
+/* Concept: every price button is iOS 13's GET capsule (above, with .rec-add); the confirm tap's INSTALL (.go) is the
+   App Store's blue capsule with white text. */
+html[data-style="ios13"][data-theme] .price-btn.go { color: #fff; background: var(--i13-tint); border-color: var(--i13-tint); text-shadow: none; box-shadow: none; }
+html[data-style="ios13"][data-theme] .price-btn.go:active { opacity: .7; background: var(--i13-tint); }
+/* Concept: the Details footer (id · source) stays centred as Cydia's, whatever the era's footers do. */
+html[data-style="ios13"] .group-footer.cy-foot { text-align: center; }

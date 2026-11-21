@@ -483,12 +483,12 @@ html[data-style="ios7"] .queue-hint-text { border-width: 0; border-radius: 8px; 
    win back. */
 html[data-style="ios7"][data-theme="light"] { --i7-get-dim: #c7c7cc; --i7-get-dim-text: #8e8e93; }
 html[data-style="ios7"][data-theme="dark"] { --i7-get-dim: #3a3a3c; --i7-get-dim-text: #8e8e93; }
-html[data-style="ios7"][data-theme] .rec-add {
+html[data-style="ios7"][data-theme] .rec-add, html[data-style="ios7"][data-theme] .price-btn {
   font-size: 13px; font-weight: 500; color: var(--i7-tint); text-shadow: none;
   border: 1px solid var(--i7-tint); border-radius: 4px; background: none; box-shadow: none;
 }
-html[data-style="ios7"][data-theme] .rec-add:active:not(:disabled) { color: var(--i7-tint-text); background: var(--i7-tint); box-shadow: none; }
-html[data-style="ios7"][data-theme] .rec-add.added, html[data-style="ios7"][data-theme] .rec-add:disabled {
+html[data-style="ios7"][data-theme] .rec-add:active:not(:disabled), html[data-style="ios7"][data-theme] .price-btn:active:not(:disabled) { color: var(--i7-tint-text); background: var(--i7-tint); box-shadow: none; }
+html[data-style="ios7"][data-theme] .rec-add.added, html[data-style="ios7"][data-theme] .rec-add:disabled, html[data-style="ios7"][data-theme] .price-btn:disabled {
   color: var(--i7-get-dim-text); border-color: var(--i7-get-dim); background: none;
 }
 html[data-style="ios7"][data-theme] .rec-add.adding { color: var(--i7-tint); border-color: var(--i7-tint); }
@@ -514,3 +514,9 @@ html[data-style="ios7"][data-theme] .manage-toolbar .bar-button.manage-delete:no
 html[data-style="ios7"][data-theme] .manage-toolbar .bar-button.manage-delete:not(.back):not(.done):is(:active, .is-pressed) {
   color: var(--i7-red); border-color: transparent; background: none; box-shadow: none;
 }
+
+/* Concept: every price button is iOS 7's (above, with .rec-add); the confirm tap's INSTALL (.go) filled with the tint. */
+html[data-style="ios7"][data-theme] .price-btn.go, html[data-style="ios7"][data-theme] .price-btn.go:active {
+  color: var(--i7-tint-text); background: var(--i7-tint); border-color: var(--i7-tint); text-shadow: none; box-shadow: none;
+}
+html[data-style="ios7"] .cell-inner.has-change { padding-right: 15px; }

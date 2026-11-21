@@ -1147,7 +1147,7 @@ function galleryGroup(pics0) {
   const g = el("div", "group shots-group");
   const dots = el("div", "shot-dots");
   dots.setAttribute("aria-hidden", "true");
-  g.append(el("h2", "group-header", "Screenshots"), strip, dots);
+  g.append(el("h2", "group-header", "Preview"), strip, dots); // concept: not always screenshots
   const pics = () => [...strip.querySelectorAll(".alt-shot")];
   const drawDots = () => {
     const n = pics().length;
@@ -1186,7 +1186,7 @@ export function zoomShots(list, index = 0) {
   if (!list.length || typeof document === "undefined" || !document.body) return null;
   const layer = el("div", "shot-zoom");
   layer.setAttribute("role", "dialog");
-  layer.setAttribute("aria-label", "Screenshots");
+  layer.setAttribute("aria-label", "Preview");
   const track = el("div", "shot-zoom-track");
   for (const p of list) {
     const page = el("div", "shot-zoom-page");

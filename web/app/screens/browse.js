@@ -1303,20 +1303,19 @@ async function renderPackage(body, route, key, id, ctx) {
 }
 
 
-// Concept v4: the top of Details: today's store header (big icon, name, author, stars, "Version · size · price",
-// Share) and under it Details | Reviews | Related, Details marked; Reviews and Related open as their own pages.
-function cyTop(route, id, { art, name, author = null, authorHref = null, line = "", mark = null, action = null, reviewId }) {
+// Concept v5: the top of Details: today's store header (big icon, name, author, stars, "Version · size · price",
+// Share) and Details | Reviews | Related under it; Reviews and Related show in Details' place, on the same page.
+function cyTop(route, id, pkg, { art, name, author = null, authorHref = null, line = "", mark = null, action = null, reviewId, version = "" }) {
   const header = storeHeader({ art, name, author, authorHref, line, mark, action });
-  const control = segmented(TAB_LABELS, { onSelect: (i) => {
-    if (i === 1) location.hash = deeper(route, token("reviews", reviewId));
-    if (i === 2) location.hash = deeper(route, token("related", id));
-    control.mark(0);
-  } });
-  control.mark(0);
-  control.bar.classList.add("cy-tabs");
   const api = getBackend().reviews ?? reviewsApi({ base: reviewsBase(detectMode()) });
-  api.list(reviewId, 0).catch(() => null).then((ours) => header.setRating(mergeReviews({ ours, depiction: null }).rating)).catch(() => {});
-  return [header.head, control.bar];
+  const first = api.list(reviewId, 0).catch(() => null);
+  first.then((ours) => header.setRating(mergeReviews({ ours, depiction: null }).rating)).catch(() => {});
+  const tabs = storeTabs({
+    reviews: (pane) => reviewsTab(pane, { id: reviewId, version, depiction: Promise.resolve(null), first, api,
+      renderText: (rv) => reviewBody(rv, { open: openSileoSheet }), onRating: (r) => header.setRating(r) }),
+    related: (pane) => relatedPane(pane, route, pkg, id),
+  });
+  return { nodes: [header.head, ...tabs.nodes], details: tabs.panes.details };
 }
 
 // Concept v2: one Details page after Cydia's (the 4S, 2026-11-21), with everything today's page shows, made simpler:
@@ -1353,10 +1352,10 @@ async function renderDetails(body, route, key, id, ctx) {
   const headAuthor = parseAuthor(st.author) || parseAuthor(st.maintainer);
   const headMark = el("span", "compat-mark large");
   { const f = compat(st, currentDevice()); setMark(headMark, f.status === "no" ? f.reason : f.status); }
-  const topNodes = cyTop(route, id, { art: art.art, name, mark: headMark, author: headAuthor?.name ?? null,
+  const hdr = cyTop(route, id, pkg, { art: art.art, name, mark: headMark, author: headAuthor?.name ?? null,
     authorHref: headAuthor ? deeper(route, token("author", headAuthor.name)) : null,
     line: headerLine({ version: st.version, size, price: pkg.installedOnly ? null : isPaid(st) ? "Paid" : "Free" }),
-    action: shareHeadButton(() => showPackageShare({ id, key: pkg.key, kind: st.kind }, source)), reviewId: pid });
+    action: shareHeadButton(() => showPackageShare({ id, key: pkg.key, kind: st.kind }, source)), reviewId: pid, version: st.version ?? "" });
 
   const [installedRows, history, depReport] = await Promise.all([
     catalog.installed().catch(() => []), catalog.history(id, key).catch(() => null), catalog.deps(id, key).catch(() => null)]);
@@ -1366,7 +1365,7 @@ async function renderDetails(body, route, key, id, ctx) {
   const fit = compat(st, currentDevice());
   const fitCode = fit.status === "no" ? fit.reason : fit.status;
 
-  const nodes = [...topNodes];
+  const nodes = [];
   const piracy = piracyBanner(packageWarning({ key: pkg.key, source: source?.uri }));
   if (piracy) nodes.push(piracy);
   // Options: Change Package Settings, Author (and Maintainer when it's someone else).
@@ -1433,8 +1432,9 @@ async function renderDetails(body, route, key, id, ctx) {
   const blk = blockGroup({ id: pid, name, author: (author || maint)?.name ?? null });
   for (const c of blk.querySelectorAll?.(".cell-inner") ?? []) { const i = el("span", "cell-icon row-icon"); const im = el("img"); im.alt = ""; im.src = rowIcon("pkgBlock").src; im.onload = () => im.classList.add("loaded"); i.append(im); c.prepend(i); }
   nodes.push(blk);
-  nodes.push(grouped([{ footer: `${st.package}\n· ${[sourceName, pkg.row.section === NO_SECTION ? null : pkg.row.section].filter(Boolean).join(" - ")}` }]));
-  body.replaceChildren(...nodes);
+  { const f = grouped([{ footer: `${st.package}\n· ${[sourceName, pkg.row.section === NO_SECTION ? null : pkg.row.section].filter(Boolean).join(" - ")}` }]); f.querySelector(".group-footer")?.classList.add("cy-foot"); nodes.push(f); }
+  body.replaceChildren(...hdr.nodes);
+  hdr.details.append(...nodes);
   rememberPackage(body, route, { id, key, pkg, source, history, payBox });
 }
 
@@ -1451,9 +1451,10 @@ async function renderAppDetails(body, route, key, id, pkg, sources) {
   icon.append(el("span", "pkg-letter", app.name.charAt(0).toUpperCase()));
   if (app.iconURL) { const im = el("img"); im.alt = ""; im.onload = () => im.classList.add("loaded"); im.onerror = () => im.remove(); im.src = mediaUrl(app.iconURL) || app.iconURL; icon.append(im); }
   const size = formatSize(v.size);
-  const nodes = cyTop(route, id, { art: icon, name: app.name, author: app.developerName || null,
+  const hdr = cyTop(route, id, pkg, { art: icon, name: app.name, author: app.developerName || null,
     line: headerLine({ version: `${v.version ?? ""}${v.buildVersion ? ` (${v.buildVersion})` : ""}`, size, price: "Free" }),
-    action: headerShareButton(source ?? { key: pkg.key }, { app: true }), reviewId: appBundleId(app, pkg.row?.id) });
+    action: headerShareButton(source ?? { key: pkg.key }, { app: true }), reviewId: appBundleId(app, pkg.row?.id), version: v.version ?? "" });
+  const nodes = [];
 
   if (detectMode() === "sideload" && app.bundleIdentifier) {
     const tw = addTweaksGroup({ bundleId: app.bundleIdentifier, name: app.name }).el;
@@ -1509,8 +1510,9 @@ async function renderAppDetails(body, route, key, id, pkg, sources) {
     wish.querySelector?.(".cell-label")?.replaceChildren(wishLabel(wishlist().has(id)));
   } }] }]);
   nodes.push(wish);
-  nodes.push(grouped([{ footer: `${app.bundleIdentifier}\n· ${source ? displayName(source) : ""}` }]));
-  body.replaceChildren(...nodes);
+  { const f = grouped([{ footer: `${app.bundleIdentifier}\n· ${source ? displayName(source) : ""}` }]); f.querySelector(".group-footer")?.classList.add("cy-foot"); nodes.push(f); }
+  body.replaceChildren(...hdr.nodes);
+  hdr.details.append(...nodes);
   rememberPackage(body, route, { id, key, pkg, source, history: await catalog.history(id, key).catch(() => null) });
 }
 
