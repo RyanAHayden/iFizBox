@@ -5,8 +5,12 @@
 //   longPress(element, selector, (target, e) => ...)  a HOLD_MS hold that doesn't move or scroll; the click ending it is eaten
 import { haptic } from "./haptic.js";
 import { guarded } from "./tapguard.js";
-import { nativeBridge } from "../native.js";
-import { wantsNativeControls } from "./actionsheet.js";
+import { nativeBridge, hasNativeCall } from "../native.js";
+
+// The native controls hook, read inline as nav/alert.js does: importing actionsheet.js's wantsNativeControls would
+// load it at startup (module-graph.test.js's budget).
+const wantsNativeControls = (native, doc = globalThis.document) =>
+  hasNativeCall(native) && doc?.documentElement?.getAttribute?.("data-controls") === "native";
 
 export const HOLD_MS = 550; // B48: a little longer than 500, nearer iOS's own, so a finger resting before a slow scroll doesn't hold
 export const HOLD_SLOP = 10;

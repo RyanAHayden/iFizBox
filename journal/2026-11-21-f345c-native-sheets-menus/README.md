@@ -86,6 +86,10 @@ the late-show and empty-sheet paths changed, and neither ran in that check.
 
 ## Tried and failed
 
+- menu.js first imported `wantsNativeControls` from actionsheet.js. That put actionsheet.js into app.js's startup
+  modules and broke `module-graph.test.js`'s 117-module budget in the gate. menu.js now reads the hook inline, as
+  alert.js does.
+
 - My first test of the CSS-callout fallback ran into `innerWidth` missing in Node and then into the callout's
   next-turn listeners landing after the fake document was put back; the test now sets `innerWidth` and waits a turn.
 
