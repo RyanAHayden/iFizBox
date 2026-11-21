@@ -107,6 +107,40 @@ enum HereRecheck {
         return chunk > 0 ? have / chunk * chunk : have
     }
 
+    /// B292: the copy's quiet limit, from how fast chunks have been landing. Over Tailscale the path between the app's
+    /// node and the phone's can drop mid-copy (R53 run 2: the phone's node fell back to DERP, handshakes went
+    /// unanswered, AFC stalled): with chunks landing every fraction of a second, waiting the full `ceiling` (30 s)
+    /// before reconnecting loses most of a minute. Once `warmup` chunks have landed, the limit is `factor` times the
+    /// slowest of the last `window` gaps between chunks, never under `floor` nor over `ceiling`: a fast copy that
+    /// stops is a drop after `floor`; a slow route (DERP, a weak network) keeps a limit that fits its pace. installd's
+    /// own long limit is not this one.
+    struct CopyQuiet {
+        static let floor: TimeInterval = 8
+        static let ceiling: TimeInterval = 30
+        static let factor: Double = 4
+        static let window = 16
+        static let warmup = 4
+
+        private(set) var gaps: [TimeInterval] = []
+        private(set) var landed = 0
+
+        /// A chunk landed `gap` seconds after the one before it (or after the copy started). A gap that spans the app
+        /// being suspended (the watchdog gives such a step its time again) is not the route's pace: leave it out with
+        /// `suspended`.
+        mutating func add(_ gap: TimeInterval, suspended: Bool = false) {
+            landed += 1
+            guard !suspended, gap >= 0 else { return }
+            gaps.append(gap)
+            if gaps.count > Self.window { gaps.removeFirst(gaps.count - Self.window) }
+        }
+
+        /// The quiet limit for the next chunk.
+        var limit: TimeInterval {
+            guard landed >= Self.warmup, let slowest = gaps.max() else { return Self.ceiling }
+            return min(Self.ceiling, max(Self.floor, slowest * Self.factor))
+        }
+    }
+
     /// "18.2 MB/s in front, 17.3 MB/s in the background", for the log.
     struct CopySpeed {
         private(set) var frontBytes = 0, backBytes = 0
