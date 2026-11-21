@@ -146,6 +146,9 @@ export function parseToken(seg) {
 }
 
 export const token = (kind, value) => `${kind}:${value}`;
+// B305: a package page in one source outside the Sources tab ("package:<id>@<key>"): Installed's row for RyukGram
+// opens RyukGram's entry, not the newest app on any source under com.burbn.instagram (Instagram). IDs have no "@".
+export const keyedToken = (id, key) => token("package", key && key !== ALL ? `${id}@${key}` : id);
 
 // Names seen in lists, so a package page's title (and the next page's back button) is ready before the worker
 // answers. A deep link falls back to the id.
@@ -161,6 +164,8 @@ export function pageOf(route) {
     return { key, page: t.kind, value: t.value };
   }
   const t = parseToken(route.path.at(-1));
+  const at = t.kind === "package" ? t.value.indexOf("@") : -1;
+  if (at > 0) return { key: t.value.slice(at + 1), page: t.kind, value: t.value.slice(0, at) };
   return { key: ALL, page: t.kind, value: t.value };
 }
 
