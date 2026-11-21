@@ -245,3 +245,15 @@ test("C61: Home's old state-tile glyphs are gone from both maps and both stylesh
   }
   for (const kept of ["failed", "more"]) assert.ok(ICON_SETS.ios6.home[kept] && ICON_SETS.ios7.home[kept], kept);
 });
+
+test("C62: Home's send glyph is gone from both maps and both stylesheets, and home.js names no send tile", async () => {
+  const { ICON_SETS } = await import("./rowicons.js");
+  const home = readFileSync(new URL("../home.css", import.meta.url), "utf8");
+  const ios7 = readFileSync(new URL("../ios7.css", import.meta.url), "utf8");
+  const screen = readFileSync(new URL("../screens/home.js", import.meta.url), "utf8");
+  assert.equal(ICON_SETS.ios6.home.send, undefined, "ios6 home: send");
+  assert.equal(ICON_SETS.ios7.home.send, undefined, "ios7 home: send");
+  assert.doesNotMatch(home, /\.glyph-send\b/, "home.css: .glyph-send");
+  assert.doesNotMatch(ios7, /\.glyph-send\b/, "ios7.css: .glyph-send");
+  assert.doesNotMatch(screen, /glyph: "send"/, "screens/home.js: a send tile");
+});

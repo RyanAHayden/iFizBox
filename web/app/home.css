@@ -73,7 +73,6 @@ html[data-theme="dark"] .home {
 .glyph-browse { background-color: #f39c12; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z'/%3E%3C/svg%3E"); }
 .glyph-signing { background-color: #8e44ad; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M4 3h12l4 4v8.5a5 5 0 0 0-2-1.2V8h-3V5H6v14h6.6a5 5 0 0 0 .7 2H4zm14 13a3.5 3.5 0 1 1-1.5 6.7L15 24v-3.4A3.5 3.5 0 0 1 18 16zM8 9h7v2H8zm0 4h5v2H8z'/%3E%3C/svg%3E"); }
 .glyph-install { background-color: #2c9b3c; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M11 3h2v9.6l3.3-3.3 1.4 1.4L12 16.4l-5.7-5.7 1.4-1.4 3.3 3.3zM4 18h16v2H4z'/%3E%3C/svg%3E"); }
-.glyph-send { background-color: #2c9b3c; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M3 11h12.2l-4.6-4.6L12 5l7 7-7 7-1.4-1.4 4.6-4.6H3z'/%3E%3C/svg%3E"); }
 .home-row.green .home-glyph { background-color: var(--tile-glyph-green); }
 html[data-theme="dark"] .glyph-github { background-color: var(--dk-glyph); }
 .glyph-failed { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M10 3h4l-.6 12h-2.8zm0 15h4v3h-4z'/%3E%3C/svg%3E"); }
