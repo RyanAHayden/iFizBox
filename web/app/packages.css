@@ -185,6 +185,12 @@ html[data-style="ios7"] .pkg-row.wide { /* the era's keyline from the name, whic
   -webkit-appearance: none; appearance: none;
 }
 .search-field input::-webkit-search-decoration { -webkit-appearance: none; }
+/* F345a: under the native controls hook (ios26.css) WebKit's capsule fills the field and holds its own magnifier:
+   no room left for the drawn one, the input's padding WebKit's. */
+html[data-controls="native"] .search-field { padding: 0; }
+html[data-controls="native"] .search-field input { padding: revert; padding-right: 30px; }
+/* the drawn clear button (below) inside the capsule's right end: WebKit on iOS draws none of its own */
+html[data-controls="native"] .search-field::after { margin: 0 6px 0 -25px; }
 /* Its Cancel, from the 4S's UISearchBarCancelButton(Pressed): shown while the field is focused or holds text. */
 .search-cancel {
   display: none; flex: none; height: 30px; margin: 0 0 0 6px; padding: 0 9px; cursor: pointer;

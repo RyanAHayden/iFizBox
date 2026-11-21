@@ -26,3 +26,10 @@ _Said_: screenshots, gallery
 _On screen_: Preview
 _In code_: PREVIEW_HEADER, previewSlot, galleryGroup
 _Avoid_: Screenshots
+
+**Native controls**:
+In the iOS 26 style, on phones whose browser draws iOS 26's own form controls, the page uses those (switch, search field, menus, progress bar) instead of its drawn copies
+_Said_: the actual native input boxes
+_On screen_: (none: the iOS 26 style draws them)
+_In code_: data-controls="native", native-controls.js, drawsIos26Controls
+_Avoid_: real controls, system controls
