@@ -199,6 +199,7 @@ html[data-style="ios26"][data-theme="dark"] {
   --dk-search-line: #000; --dk-search-bar: #000; --dk-search-fill: #000;
   --dk-field: #1c1c1e; --dk-field-edge: transparent; --dk-clear: #8d8d93;
   --search-cancel-text: #0a84ff; --search-cancel-emboss: none; --search-cancel-shadow: none;
+  --search-cancel-edge: transparent; --search-cancel-edge-top: transparent; --search-cancel-edge-bottom: transparent;
   --search-field-shadow: none;
   --search-field: #1c1c1e url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='6.5' cy='6.5' r='5.2' fill='none' stroke='%238d8d93' stroke-width='1.8'/%3E%3Cpath d='m10.4 10.4 4.2 4.2' stroke='%238d8d93' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 9px 50% / 14px 14px no-repeat;
   --scope-seg-text: #fff; --scope-seg-emboss: none; --scope-seg-shadow: none;
@@ -435,7 +436,8 @@ html[data-style="ios26"] .nav-segments .scope-segments { box-shadow: none; }
 /* Search bar: the field is a grey capsule; Cancel is tinted text. */
 html[data-style="ios26"] .search-field { border-radius: 18px; }
 html[data-style="ios26"] .search-cancel { font-size: 17px; font-weight: 400; }
-html[data-style="ios26"][data-theme="dark"] .search-cancel { background: none; }
+/* packages.css's dark rule boxes Cancel in --dk-btn-edge (the glass rim here); tinted text has no box */
+html[data-style="ios26"][data-theme="dark"] .search-cancel { background: none; border-color: transparent; }
 
 /* Action sheet: 13pt rounded buttons, regular weight, Cancel semibold. */
 html[data-style="ios26"] .action-button { font-size: 20px; font-weight: 400; border-radius: 13px; }
