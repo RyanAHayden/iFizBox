@@ -1,0 +1,9 @@
+[
+  { "wait": 2000 },
+  { "eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.installRoute','iphone'); 'ok'" },
+  { "nav": "#/home/settings/installation/with", "ms": 6000 },
+  { "eval": "location.hash + '\\n' + [...document.querySelectorAll('.page.is-top .group-header, .page.is-top .group-footer')].map(e => e.className.split(' ')[0] + ': ' + e.textContent.trim().replace(/\\s+/g, ' ').slice(0, 200)).join('\\n')" },
+  { "eval": "[...document.querySelectorAll('.page.is-top .group-footer')].pop().scrollIntoView({block: 'center'}); 'scrolled'" },
+  { "wait": 500 },
+  { "shot": "with" }
+]

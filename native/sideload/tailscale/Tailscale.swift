@@ -5,7 +5,8 @@
 // idevice's tunnel_set_port_map), each connection dialed over the tailnet to the phone's own Tailscale address.
 //
 // Bridge calls (TailscaleBridge below):
-//   tailscale.status      {address, signedIn, name, keyExpiry, connect, use}: quick, doesn't start the node
+//   tailscale.status      {address, signedIn, name, keyExpiry, connect, use, hostname}: quick, doesn't start the node;
+//                         hostname is the name the node joins as ("<brand> on <model>")
 //   tailscale.setConnect  {value: "auto"|"localdevvpn"|"tailscale"} -> status (Settings > Installation's Connect With)
 //   tailscale.signIn      starts the node; emits [{step: "login"}] and opens the login page when it needs one,
 //                         [{step: "approval"}] when the tailnet wants it approved; replies status once it's in
@@ -119,7 +120,8 @@ enum Tailscale {
     static func status() -> [String: Any] {
         let n = node
         return ["address": ownAddress() ?? NSNull(), "signedIn": n != nil, "name": n?["name"] ?? NSNull(),
-                "keyExpiry": n?["keyExpiry"] ?? NSNull(), "connect": connect, "use": useForInstall()]
+                "keyExpiry": n?["keyExpiry"] ?? NSNull(), "connect": connect, "use": useForInstall(),
+                "hostname": hostname]
     }
 
     static func json(_ p: UnsafeMutablePointer<CChar>?) -> [String: Any] {
