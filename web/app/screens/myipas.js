@@ -66,6 +66,7 @@ import { storedKeep, originalState, originalNote, OLD_WAY_ALERT, OLD_WAY_TEXT } 
 import { loadStyle } from "../nav/motion.js";
 import { go as navGo, back, handleOf } from "../nav/go.js";
 import { nativeBridge } from "../native.js";
+import { storedRoute, vpnList } from "../core/installroute.js"; // B294
 
 export { MYIPAS };
 
@@ -1105,7 +1106,7 @@ async function renderIpa(body, route, file) {
   const groups = [
     { rows: status, footer: entry.error ? `This file can't be signed: ${entry.error}` : !identity ? `Add your certificate in ${signingPage()} to sign it.` : "" },
   ];
-  if (!entry.error) groups.push({ rows: actions, footer: "Signing happens on this iPhone and works offline. Installing needs a connection only for the Signing Server's install manifest." });
+  if (!entry.error) groups.push({ rows: actions, footer: actionsFooter(storedRoute()) });
   groups.push({ header: "Details", rows: details });
   groups.push({ rows: [{ label: "Delete", onClick: () => confirmDelete(entry) }] });
   body.append(grouped(groups));
@@ -1149,6 +1150,15 @@ function markDelete(body) {
 const optionsChanged = (o) => Boolean(o && (o.name || o.bundleId || o.icon || o.removeExtensions?.length || o.fixArm64e === false
   || o.tweaks?.length // F288
   || o.keepBundleId === false)); // F243: the old way (or Sign Options saved before Keep Bundle IDs)
+
+// B294: the footer under Sign Now / Save Signed IPA says what installing needs on the Install Apps With route
+// (core/installroute.js storedRoute): This iPhone's VPN, or the Signing Server's install manifest.
+export function actionsFooter(route) {
+  const needs = route === "iphone"
+    ? `only the VPN to this iPhone (${vpnList()}), no Signing Server`
+    : "a connection only for the Signing Server's install manifest";
+  return `Signing happens on this iPhone and works offline. Installing needs ${needs}.`;
+}
 
 function rerender(body, route) {
   if (!body?.isConnected) return; // F208: a hold's Sign Now from the list has no page to redraw
