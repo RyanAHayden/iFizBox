@@ -170,9 +170,13 @@ export function keyDaysLeft(keyExpiry, now = Date.now()) {
   return Number.isFinite(t) ? Math.floor((t - now) / 86400000) : null;
 }
 
-// The Tailscale group's footer from tailscale.status.
+// The Tailscale group's footer from tailscale.status. Signed out, it names the device the app will join as
+// (status.hostname, e.g. "iFizBox on iPhone 15 Pro"); an older shell without it gets no name.
 export function tailscaleFooter(ts, now = Date.now()) {
-  if (!ts?.signedIn) return `${NAME} joins your tailnet as its own device ("${NAME} on iPhone") and reaches this iPhone through it, so Tailscale can stay on.`;
+  if (!ts?.signedIn) {
+    const host = typeof ts?.hostname === "string" && ts.hostname.trim() ? ` ("${ts.hostname.trim()}")` : "";
+    return `${NAME} joins your tailnet as its own device${host} and reaches this iPhone through it, so Tailscale can stay on.`;
+  }
   const days = keyDaysLeft(ts.keyExpiry, now);
   if (days != null && days < 0) return "This device's key expired. Sign out and sign in again.";
   if (days != null && days <= 14) return `This device's key expires in ${days} day${days === 1 ? "" : "s"}. Sign in again, or turn off key expiry for it in the admin console.`;

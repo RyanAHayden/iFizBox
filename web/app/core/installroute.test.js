@@ -181,6 +181,11 @@ test("Tailscale's footer warns ahead of key expiry", () => {
   assert.match(tailscaleFooter({ signedIn: true, keyExpiry: "2026-11-01T00:00:00Z" }, now), /expired/);
   assert.match(tailscaleFooter({ signedIn: true, keyExpiry: "2027-05-01T00:00:00Z", address: "100.1.2.3" }, now), /100\.1\.2\.3/);
   assert.match(tailscaleFooter({ signedIn: false }, now), /joins your tailnet/);
+  // B313: signed out, the footer names the device the app will join as, never "on iPhone" by itself
+  assert.match(tailscaleFooter({ signedIn: false, hostname: "iFizBox on iPhone 15 Pro" }, now), /its own device \("iFizBox on iPhone 15 Pro"\) and/);
+  assert.match(tailscaleFooter({ signedIn: false }, now), /its own device and reaches/);
+  assert.doesNotMatch(tailscaleFooter({ signedIn: false, hostname: "" }, now), /on iPhone"|\(""\)/);
+  assert.doesNotMatch(tailscaleFooter(null, now), /on iPhone"/);
 });
 
 // B120: the way to connect is decided from the VPN apps installed (idevice.vpnApps) before sending anyone anywhere.
