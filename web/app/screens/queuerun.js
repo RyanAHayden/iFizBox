@@ -226,6 +226,7 @@ export async function runQueue({ jobs, plan }, deps) {
   closeB.addEventListener("click", () => page.close());
   retryAll.addEventListener("click", () => { const p = run.retryAll(); if (p) drive(p); });
   const retry = (id) => { const wasRunning = run.running; const p = run.retry(id); if (p && !wasRunning) drive(p); };
+
   // ---- Hide's strip, under every tab's nav bar ----
   const strip = (() => {
     let node = null;

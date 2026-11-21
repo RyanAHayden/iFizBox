@@ -21,3 +21,8 @@ Nothing.
 
 - No device or browser run: the change is the log calls only, covered by the node tests over the real run log store;
   the phone check would only show the same entries in Console Logs.
+
+## Review
+
+Spec review: nothing missing or wrong. It flagged a blank line I had dropped (put back) and the Cancelled state as
+unasked; kept, as F361's runConsole ends its entry the same way and "end on each pass" means the handle's end.
