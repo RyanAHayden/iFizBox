@@ -135,6 +135,32 @@
 .pkg-desc { font-size: 14px; line-height: 17px; color: var(--subtitle); }
 /* ==== } look-only ==== */
 
+/* F348: Cydia's tall package cell (Installed, a source's section lists), measured off the 4S (ctl-installed): 73px, the
+   icon centred at 25,25, the name in 18px bold from 48,8 with the version at its right, 'from <Author> (<Section>)'
+   in 12px from 58,29, the description in 14px from 12,46 across the row. No chevron, as Cydia's cell. Every piece is
+   placed absolutely, so binding a row never changes its layout (browse.js WIDE_ROW_HEIGHT). */
+.pkg-row.wide { height: 73px; --wide-end: 12px; }
+:is(.page-body, .search-results)[data-section-index] .pkg-row.wide { --wide-end: 26px; } /* clear of the index */
+.pkg-row.wide > .cell-inner { display: block; position: relative; padding: 0; }
+.pkg-row.wide > .cell-inner::after { display: none; }
+.pkg-row.wide .pkg-art { position: absolute; left: 9px; top: 9px; }
+.pkg-row.wide .pkg-text { position: absolute; inset: 0; display: block; }
+.pkg-row.wide .pkg-top { position: absolute; left: 48px; right: var(--wide-end); top: 8px; height: 22px; }
+.pkg-row.wide .pkg-from, .pkg-row.wide .pkg-desc {
+  position: absolute; right: var(--wide-end); overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.pkg-row.wide .pkg-from { left: 58px; top: 29px; }
+.pkg-row.wide .pkg-desc { left: 12px; top: 46px; }
+/* ==== look-only { ==== wide package rows */
+.pkg-row.wide .pkg-name { font-size: 18px; line-height: 22px; }
+.pkg-row.wide .pkg-from { font-size: 12px; line-height: 15px; }
+.pkg-row.wide .pkg-desc { font-size: 14px; line-height: 17px; }
+.pkg-vlist.wide {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='73'%3E%3Cg fill='%23808080'%3E%3Crect x='9' y='9' width='32' height='32' rx='7' fill-opacity='.22'/%3E%3Crect x='48' y='12' width='130' height='13' rx='4' fill-opacity='.2'/%3E%3Crect x='58' y='31' width='110' height='9' rx='3' fill-opacity='.13'/%3E%3Crect x='12' y='50' width='230' height='9' rx='3' fill-opacity='.13'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 260px 73px repeat-y,
+    linear-gradient(transparent 72px, var(--keyline) 72px) 0 0 / 100% 73px repeat-y, var(--plain);
+}
+/* ==== } look-only ==== */
+
 /* ---- loading ---- */
 .loading { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 40px 20px; }
 .loading-spinner { /* UIActivityIndicatorViewStyleGray (nav/spinner.js), turned a spoke at a time */

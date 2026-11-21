@@ -506,7 +506,7 @@ function drawList(state) {
     return;
   }
   // Cydia: A–Z headers and the index for User and Expert, day headers for Recent.
-  state.list = browse.packageList(results, state.route, items, { letters: mode !== "recent" });
+  state.list = browse.packageList(results, state.route, items, { letters: mode !== "recent", wide: true }); // F348: Cydia's tall rows
   state.tail = [state.list.el];
   results.append(state.list.el);
 }
