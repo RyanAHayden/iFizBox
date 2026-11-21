@@ -18,6 +18,11 @@
   from raw.githubusercontent.com; `build` carries the list.
 - Checked `parseAltSource` (core/altstore.js) on the new source.json: 16 screenshots, URL and size read.
 
+## Tried and changed
+- First version read the README and the PNG headers when `altsource.py` ran. The gate failed: tools/test_release.py
+  runs `update` from a partial copy of the repo with no README.md (FileNotFoundError). Now `SHOT_NAMES` and
+  `SHOT_SIZE` are fixed in altsource.py, and the test checks them against the README order and each PNG's size.
+
 ## Not verified
 - The live page on a phone: ifizbox.com/repo/source.json serves the latest release's source.json, so the new list
   reaches the app only with the next release; not checked on the 15 Pro for that reason.
