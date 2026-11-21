@@ -494,7 +494,7 @@ export async function runAppRun(jobs, deps) {
     // B49: iFizBox's own IPA is with iOS, which closes iFizBox to install it: nothing to tap
     const fin = sentSelf ? null : deps.finish?.(result); // B71a: the jailbreak run's (AppSync Unified's respring)
     const opener = sentSelf || fin ? null : openRow(rows, lanes); // B111: one app installed on This iPhone
-    const server = sentSelf || fin || opener ? null : offerServer(); // F366
+    const server = sentSelf ? null : offerServer(); // F366: the Log's offer whatever the bottom shows
     if (sentSelf) followSelf(text);
     else if (fin) page.finish({ label: fin.label, status: text, action: fin.action ?? (() => false) });
     else if (opener) page.finish({ label: RETURN_LABEL, status: text, action: () => false, also: opener });
