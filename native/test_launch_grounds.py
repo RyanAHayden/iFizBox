@@ -11,6 +11,7 @@ import sys
 import tempfile
 import shutil
 import unittest
+import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -194,7 +195,8 @@ class LaunchThemes(unittest.TestCase):
             self.assertEqual(self.var(b, dk + "nav-shadow"), "none")
             self.assertEqual(self.var(b, "tabbar-shadow"), "none")
             flat = make.stops((0, bar), (1, bar))
-            return dict(pins=(ground, hex6(self.var(b, "pin-light"))), nav_line=line, nav_hi=(bar, 1), nav_gloss=flat,
+            # F358: the era runs its flat bar up through the status-bar strip, so the strip is the bar's colour
+            return dict(strip=bar, pins=(ground, hex6(self.var(b, "pin-light"))), nav_line=line, nav_hi=(bar, 1), nav_gloss=flat,
                         nav_shadow=0, tab_line=(line, 1), tab_gloss=flat, tab_base=bar, tab_shadow=0)
         if key == "classic":
             root = self.block(self.ios6, ":root")
@@ -240,6 +242,38 @@ class LaunchThemes(unittest.TestCase):
             want["nav_hi"] = (want["nav_hi"][0], float(want["nav_hi"][1]))
             want["tab_line"] = (want["tab_line"][0], float(want["tab_line"][1]))
             self.assertEqual(have, want, key)
+
+    def test_f358_status_strip_is_black_in_ios6_sets(self):
+        """The page's iOS 6 era draws a plain black strip the top inset tall (.navbar::before, --site-strip) with the
+        44 pt bar under it; only the iOS 7 and iOS 13 eras run the bar up through it. The launch sets do the same:
+        LaunchStatusStrip from the screen top to the safe area top, the gloss from there."""
+        self.assertIn(".navbar::before { background: var(--site-strip); }", self.ios6)
+        self.assertEqual(hex6(re.search(r"--site-strip: (#[0-9a-f]+);", self.ios6).group(1)), make.STATUS_STRIP)
+        self.assertIn('html[data-shell="app"]:is([data-style="ios7"], [data-style="ios13"]) .navbar::before {', self.ios6)
+        eras = ("white", "white13", "oled7", "oled13")
+        for key, th in make.THEMES.items():
+            want = th["nav_gloss"][0][1] if key in eras else make.hexrgb(make.STATUS_STRIP)
+            if key in eras:
+                self.assertEqual(th["nav_gloss"][0][1], th["nav_gloss"][-1][1], key)  # a flat bar
+            else:
+                self.assertNotIn("strip", th, key)
+            for s in (2, 3):
+                png = make.images(key)["LaunchStatusStrip@%dx.png" % s]
+                w, h = struct.unpack(">II", png[16:24])
+                raw = zlib.decompress(png[png.index(b"IDAT") + 4:png.index(b"IEND") - 8])
+                self.assertEqual((w, h), (1, s), key)  # 1 pt
+                self.assertEqual(raw, (b"\x00" + bytes(want)) * h, key)
+        sb = read("native", "launch", "LaunchScreen.storyboard")
+        for pin in ('firstItem="Lss-00-000" firstAttribute="top" secondItem="Lrt-00-000" secondAttribute="top"',
+                    'firstItem="Lss-00-000" firstAttribute="bottom" secondItem="Lsa-00-000" secondAttribute="top" id=',
+                    'firstItem="Lnt-00-000" firstAttribute="top" secondItem="Lsa-00-000" secondAttribute="top" id=',
+                    'firstItem="Lnt-00-000" firstAttribute="bottom" secondItem="Lsa-00-000" secondAttribute="top" '
+                    'constant="22"',
+                    'firstItem="Lnh-00-000" firstAttribute="top" secondItem="Lsa-00-000" secondAttribute="top" id='):
+            self.assertIn(pin, sb)
+        # drawn under the nav bar's views: the strip comes right after the pinstripes
+        self.assertLess(sb.index('id="Lst-00-000"'), sb.index('id="Lss-00-000"'))
+        self.assertLess(sb.index('id="Lss-00-000"'), sb.index('id="Lnt-00-000"'))
 
     def test_every_settings_palette_has_a_launch_theme(self):
         self.assertEqual(sorted(settings_palettes()), sorted(make.THEMES))

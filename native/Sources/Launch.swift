@@ -23,7 +23,7 @@ enum Splash {
     static let viewNib = "LaunchScreen.storyboardc/Lvc-00-000-view-Lrt-00-000.nib"
     // What the helper copies (launch.h's helper_launch_files; native/test_launch_grounds.py keeps them in step).
     static let files: [String] = ["LaunchStripes", "LaunchNavTop", "LaunchNavBottom", "LaunchTabGloss",
-                                  "LaunchNavShadow", "LaunchTabShadow"].flatMap { ["\($0)@2x.png", "\($0)@3x.png"] }
+                                  "LaunchNavShadow", "LaunchTabShadow", "LaunchStatusStrip"].flatMap { ["\($0)@2x.png", "\($0)@3x.png"] }
                                  + [viewNib]
     private static let queue = DispatchQueue(label: "ifizbox.splash")
 
