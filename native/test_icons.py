@@ -207,6 +207,21 @@ class Alternates(unittest.TestCase):
         self.assertEqual(png[16:24], (1024).to_bytes(4, "big") * 2)
         self.assertIn(glass.TINTED, [f[1] for f in alternates.primary_files(True)])
 
+    def test_every_set_tinted_is_the_globe_alone(self):
+        """F360: a theme's icon set on screen (Match Theme) also goes see-through in iOS 26+ Clear and Tinted: each
+        Icon-* set has the globe alone (AppIcon's tinted picture) as its tinted appearance at 60pt @2x and @3x."""
+        for car, lite in (("Assets.car", False), ("AssetsLite.car", True)):
+            got = carfile.icon_sets(read(car))
+            for name in alternates.sets():
+                with self.subTest(car=car, set=name):
+                    tinted = {(r["file"], r["width"]) for r in got[name] if r["appearance"] == "ISAppearanceTintable"}
+                    self.assertEqual(tinted, {(alternates.alt_name(alternates.TINTED_ICON, pt, s, lite), pt * s)
+                                              for pt, s in alternates.ALT_SIZES})
+        for pt, s in alternates.ALT_SIZES:
+            png = read(os.path.relpath(alternates.tinted_src(pt, s), ICON))
+            self.assertEqual(png[25], 6, "RGBA, so the background is transparent")
+            self.assertEqual(png[16:24], (pt * s).to_bytes(4, "big") * 2)
+
     def test_lite_files_only_in_the_lite_car(self):
         plain = {r["file"] for rs in carfile.icon_sets(read("Assets.car")).values() for r in rs}
         lite = {r["file"] for rs in carfile.icon_sets(read("AssetsLite.car")).values() for r in rs}

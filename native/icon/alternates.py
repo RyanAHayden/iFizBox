@@ -9,6 +9,8 @@ draws an icon set's dark appearance when the Home Screen is dark, so a set is a 
   Icon-<light>-<dark>   a pair: every light theme or Clear, with every dark theme or Clear
   Icon-<icon>           one icon in both appearances, for every icon: iOS 15-17, and pairs not listed above
 
+Every Icon-* set also has the globe alone as its tinted appearance at 60pt (F360), like AppIcon's.
+
 Every light x dark pair of all 15 icons would be 225 sets. Measured on the MBA (actool, Xcode 26.3): a pair set at
 60pt @2x and @3x costs about 244 KB of Assets.car and a one-icon set half that, so all 225 would make each build's
 car about 55 MB. The pairs the themes and Clear give (58) and the 15 one-icon sets come to about 16 MB. A Light or
@@ -42,6 +44,12 @@ ALT_SIZES = ((60, 2), (60, 3))  # alternates: the Home Screen's; iOS scales thos
 GLASS = "glass"
 GLASS_SET = "Icon-glass"
 TINTED = os.path.join(ICON, "glass", "AppIconTinted1024.png")  # AppIcon's tinted appearance (glass.py tinted)
+TINTED_ICON = "tinted"  # F360: the alternate sets' tinted appearance in the catalog: tinted[-lite]-60x60@2x.png
+
+
+def tinted_src(pt, scale):
+    """The tinted picture (the globe alone, glass.py tinted) at an alternate set's size: the same in both builds."""
+    return os.path.join(ICON, "glass", "AppIconTinted%dx%d@%dx.png" % (pt, pt, scale))
 
 
 def themes():
@@ -118,6 +126,11 @@ def set_files(name, lite):
             continue
         for pt, s in ALT_SIZES:
             out.append((alt_name(icon, pt, s, lite), src(icon, pt, s, lite), look, "%dx%d" % (pt, pt), s))
+    # F360: the tinted appearance, the globe alone as AppIcon's (B309), so iOS 26+ Clear and Tinted draw any theme's
+    # icon as glass on the Home Screen's tile instead of an opaque one-colour copy; at the Home Screen's 60pt only
+    # (a 1024 px picture in all 73 sets would add about 2 MB per car)
+    for pt, s in ALT_SIZES:
+        out.append((alt_name(TINTED_ICON, pt, s, lite), tinted_src(pt, s), "tinted", "%dx%d" % (pt, pt), s))
     return out
 
 
