@@ -1076,8 +1076,9 @@ export function isAppPage(route, mode = detectMode()) {
 }
 
 // Where a row goes: the source's package page when a source still lists the app, else its installed-app page.
+// B305: in the candidate's source (the record's own when it still lists it), so RyukGram's row opens RyukGram's entry.
 export function appRowHref(r, cands, route) {
-  const seg = cands?.has?.(r.id) ? `package:${r.id}` : appToken(r.id);
+  const seg = cands?.has?.(r.id) ? browse.keyedToken(r.id, cands.get(r.id)?.key) : appToken(r.id);
   return format({ tab: route.tab, path: [...route.path, seg] });
 }
 
