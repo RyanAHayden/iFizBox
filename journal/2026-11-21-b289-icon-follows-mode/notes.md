@@ -20,4 +20,22 @@
 - `web/app/core/b289-icon-mode.test.js`: Automatic keeps the pair; Mode Light gives the Light theme's icon in both
   slots on a dark or light screen, and the Light pick when Match Theme is off; Mode Dark likewise; a Mode change
   makes `tellIcon` send `app.icon` again (pair -> single -> pair).
+- `web/app/core/b289-icon-mode-apply.test.js`: the app's own path. With a jailbreak bridge, a Mode change from
+  Automatic to Light on a dark iPhone makes `applyTheme` send the pair, then one icon; `init`'s
+  `settings.onChange` still runs `applyTheme` on `appearance` (source check). It has its own file because the
+  settings store reads the bridge when it is first imported.
 - The existing icon and theme tests (`appicon.test.js`, `screens/appicon.test.js`, `theme-palette.test.js`) pass.
+
+## Tried
+
+- The phone check: I waited about 45 minutes for the 15 Pro's UI lock (`tools/ui-15.sh lock B289`). R53 held it
+  first, then R45, and I never got it. My plan for it: set Mode Light in the installed app, send the new
+  `app.icon {classic, classic, classic}` over Web Inspector, reboot, and look at the dark Home Screen.
+
+## Not verified
+
+- On the 15 Pro: Mode Light with the iPhone in Dark shows the Light icon after a reboot (and Mode Dark the reverse).
+  Not run because the UI lock stayed held by other tasks (R53, R45) the whole session. Filed as R63, to run
+  after this lands. The native side was read, not changed: `AppIcon.setName` maps light == dark to `Icon-<icon>`,
+  and `alternates.py` builds that set for every icon.
+- Spec review: fixed the missing coverage it found (picks on a dark screen, Mode change through `applyTheme`).
