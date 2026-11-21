@@ -427,12 +427,13 @@ export const TAILSCALE_VPN_OFF = {
   short: "Turn on the Tailscale app's VPN.",
 };
 // The phone refused every connection through the route, lockdown's port too (the shell's route_refused): not the
-// pairing. Over Tailscale it was the user's phone on cellular; over LocalDevVPN a stale tunnel.
+// pairing. Over Tailscale it is the phone on cellular: iOS takes RemotePairing (49152) and lockdownd (62078) from
+// the network only on Wi-Fi, and on cellular refuses every port; over LocalDevVPN a stale tunnel.
 export function routeRefused(vpn = VPNS[0]) {
   if (vpn === VPNS[1]) {
     return { title: "Tailscale Refused", again: false, fix: "openTailscale", button: "Open Tailscale",
-      message: `This iPhone refused every connection through Tailscale, so it isn't the pairing. Check that the Tailscale app says Connected; on cellular, try on Wi-Fi.`,
-      short: "Every connection was refused. Check the Tailscale app." };
+      message: `This iPhone takes installs through Tailscale only on Wi-Fi: on cellular, iOS refuses every connection, so it isn't the pairing. Join Wi-Fi, or use the Signing Server.`,
+      short: "Tailscale installs need Wi-Fi. Join Wi-Fi, or use the Signing Server." };
   }
   return { title: `${VPNS[0]} Refused`, again: false, fix: "openVPN", button: `Open ${VPNS[0]}`,
     message: `This iPhone refused every connection through ${VPNS[0]}, so it isn't the pairing. Turn ${VPNS[0]} off and on, then try again.`,

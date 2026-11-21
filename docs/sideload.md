@@ -284,7 +284,9 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   installing. An install through it hands idevice a 127.0.0.1 relay per port (49152, then the tunnel's port via
   idevice's `tunnel_set_port_map`), each dialed through tsnet to the phone's own 100.x address; iOS resets plain
   sockets to the phone's own addresses but answers ones that arrive through the Tailscale app's node. Tailscale
-  needs the internet; LocalDevVPN works offline. Pairing is the same one-time step.
+  needs the internet; LocalDevVPN works offline. The phone must be on Wi-Fi: iOS takes RemotePairing (49152) and
+  lockdownd (62078) from the network only on Wi-Fi, and on cellular refuses every port, so an install there ends in
+  Tailscale Refused (join Wi-Fi, or use the Signing Server). Pairing is the same one-time step.
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`.
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and

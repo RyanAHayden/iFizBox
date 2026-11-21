@@ -72,6 +72,12 @@ test("the shell's own codes: tailscale_signed_out, and every connection refused 
   assert.equal(f.title, "Tailscale Refused");
   assert.equal(f.fix, "openTailscale");
   assert.match(f.message, /isn't the pairing/);
+  // B318: the rule, not a hedge: Tailscale installs only on Wi-Fi; the way out is Wi-Fi or the Signing Server
+  assert.match(f.message, /through Tailscale only on Wi-Fi/);
+  assert.match(f.message, /Join Wi-Fi, or use the Signing Server\./);
+  assert.doesNotMatch(f.message, /try on Wi-Fi/);
+  assert.equal(f.short, "Tailscale installs need Wi-Fi. Join Wi-Fi, or use the Signing Server.");
+  assert.ok(f.short.length <= 70, `${f.short} (${f.short.length})`);
   assert.equal(verifyFailure(ts).again, false);
   const ldv = routeFailureOf(Object.assign(new Error("route_refused: this iPhone refused every connection through LocalDevVPN"), { code: "route_refused" }));
   assert.equal(ldv.fix, "openVPN");
