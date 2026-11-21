@@ -4,20 +4,21 @@
 
 Half done on the phone, then blocked on the one step that needs the owner: typing the Tailscale login.
 
-- **Sign Out, checked on the 15 Pro:** after Sign Out, the app's node `ifizbox-on-iphone-4` is **still listed**
-  in the tailnet, with its key expired. The count stays at five, but the old node is left behind.
+- **Sign Out, on the 15 Pro (R48 tapped it, R57 read the tailnet from the desktop's `tailscale status`):**
+  after Sign Out, `ifizbox-on-iphone-4`, the app's node by R48's and R55's notes, is **still listed** with its
+  key expired. The count stays at five, but the old node is left behind.
 - **Sign In, the login page:** opens login.tailscale.com on the phone as it should (shot `r57-6`). Nobody typed
   the login in its 10 minutes, so it ended with "Couldn't Sign In: the sign-in didn't finish in 10 minutes" (`r57-7`).
 - **What that means for the brief's pass rule** ("still 5 passes, 6+ means Sign Out leaves old nodes"): Sign Out
   deletes the node's state, so the next login registers a new machine, and the expired `-4` is still there
-  beside it. Unless Tailscale removes the expired node when the new one logs in (not seen, and not what it
-  usually does), the count goes to six on the first new login: a fail. Filed as **B301** (keep the machine key
-  across Sign Out, so a later Sign In comes back as the same machine).
+  beside it. **Expected, not seen:** unless Tailscale drops the expired node when the new one logs in, the count
+  goes to six on the first new login, which the brief counts as a fail. Filed as **B301** (keep the machine key
+  across Sign Out, so a later Sign In comes back as the same machine); the next login confirms or clears it.
 
 ## What I did (2026-11-21)
 
 1. R48 (the Tailscale sign-in hand check) had the 15's lock when I started, with the owner said to be at the
-   phone. It tapped Sign Out at about 17:40 UTC and opened the login page twice (12:43 and 12:55 local); neither
+   phone. It tapped Sign Out at about 17:40 UTC and opened the login page twice (about 17:43 and 17:55 UTC); neither
    login was finished. I logged the tailnet's nodes from the desktop (`tailscale status --json`) every 20 s the
    whole time. R48 released the lock at 18:06 UTC with the app signed out; F324 held it until 18:10.
 2. `tools/ui-15.sh lock R57`, `wake`, `launch`. The app was on F324's build (Settings footer: 0.18.4 (3748) ·
@@ -43,21 +44,21 @@ watch):
 | `ifizbox-on-iphone-3` | 2026-11-20 23:24 | 2026-11-21 18:00 | valid to 2027-05-19 |
 | `ifizbox-on-iphone-4` | 2026-11-21 03:49 | 2026-11-21 17:40 | **expired** (expiry shown as 2026-11-20 17:42) |
 
-Five nodes, the same five as before. `-4` was the app's node until Sign Out; its expiry now reads a day before
-the sign-out, which looks like how Tailscale marks a logged-out key (it stamps it in the past). Nothing was deleted.
+Five nodes, the same five as before. `-4` is the one that turned expired, last seen at the sign-out, so it is
+taken as the app's node until Sign Out. Its expiry reads a day before the sign-out; my guess (not checked) is that
+this is how the tailnet marks a logged-out key. Nothing was deleted.
 
-`-3` shows "last seen 18:00" while the 15's app was signed out. Something else still runs `-3`'s state: another
-install of the app (another phone or a Simulator) or an older Keychain copy. Not followed up; it doesn't change
-the count.
+`-3` shows "last seen 18:00" while the 15's app was signed out, so something else still runs `-3`'s state (another
+install of the app, on another phone or a Simulator, or an older Keychain copy). That leaves a small doubt on
+which node was the 15's; the expiry landing on `-4` at the sign-out is the evidence for `-4`. Not followed up.
 
 ## Why the next login adds a node (code, read)
 
 `native/sideload/tailscale/Tailscale.swift` `tailscale.signOut`: starts the node, `TSLogout()`
-(`LocalClient.Logout`: the tailnet expires the node key but keeps the machine listed, as seen above), stops it,
-then `Tailscale.forget()` deletes `tailscaled.state` and the Keychain copy (`TailscaleKeep.forgetNode()`). The
-next Sign In has no machine key, so the tailnet registers a new machine and names it `ifizbox-on-iphone-5`
-(the name `-4` is still taken). Tailscale re-registers the *same* machine only when the same machine key logs
-in again, which is B301's fix.
+(`LocalClient.Logout`; after it the machine stayed listed with an expired key, as seen above), stops it, then
+`Tailscale.forget()` deletes `tailscaled.state` and the Keychain copy (`TailscaleKeep.forgetNode()`). The next
+Sign In has no machine key, so I expect the tailnet to register a new machine, probably as `ifizbox-on-iphone-5`
+since `-4` is still taken (not seen). Keeping the machine key so the same machine logs in again is B301's fix.
 
 ## Shots
 
@@ -66,10 +67,11 @@ At a third of their size in `shots/` (full size in the main checkout's `ref/15/s
 
 ## What the owner is asked
 
-`BLOCKED`: be at the 15 Pro for 10 minutes to type the Tailscale login. R57 (or R48, whichever reopens first) opens the
-page. After it, R57 reads the count (expected six with today's code: a fail, B301), signs out and in once more
-for the brief's "twice" (a second login, so the owner types it again), and checks that Test with no Sign Out
-adds nothing. If B301 lands first, the same run checks the fix instead: five before and after.
+An unattended run can't ask mid-session: the block line is the live ask, in one line: "type your Tailscale
+login on the iPhone 15 Pro; reply when you're at it and R57 opens the page there". The page I opened timed out
+before anyone saw it. On the reply, R57 opens the page, reads the count after the login, then signs out
+(counting again) and signs in once more for the brief's "twice", so the owner types the login a second time.
+If B301 lands first, the same run checks the fix instead: five after every step.
 
 ## Not verified
 
