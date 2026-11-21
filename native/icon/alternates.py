@@ -4,7 +4,8 @@ Every theme has its own icon (icon/themes/<theme>/, tools/icons.sh), and Clear i
 draws an icon set's dark appearance when the Home Screen is dark, so a set is a (light icon, dark icon) pair; iOS
 15-17 only ever draw the light one. Sets (names as setAlternateIconName takes them, Sources/AppIcon.swift):
 
-  AppIcon               the primary: Classic, with Gunmetal as its dark appearance (the default themes)
+  AppIcon               the primary: Classic, with Gunmetal as its dark appearance (the default themes) and the
+                        globe alone as its tinted one (iOS 26+ Clear and Tinted: the Home Screen's glass is the tile)
   Icon-<light>-<dark>   a pair: every light theme or Clear, with every dark theme or Clear
   Icon-<icon>           one icon in both appearances, for every icon: iOS 15-17, and pairs not listed above
 
@@ -40,6 +41,7 @@ ALT_SIZES = ((60, 2), (60, 3))  # alternates: the Home Screen's; iOS scales thos
 # older iOS actool's flat render of it. Not in sets() (those are PNG sets); Info.plist lists it after them.
 GLASS = "glass"
 GLASS_SET = "Icon-glass"
+TINTED = os.path.join(ICON, "glass", "AppIconTinted1024.png")  # AppIcon's tinted appearance (glass.py tinted)
 
 
 def themes():
@@ -96,6 +98,9 @@ def primary_files(lite):
                 out.append(("%s%dx%d@%dx.png" % (tag, pt, pt, s), path, "dark" if dark else None, "%dx%d" % (pt, pt), s))
         path = src(PRIMARY[1], 1024, 1, lite) if dark else os.path.join(ICON, stem + "1024.png")
         out.append((tag + "1024.png", path, "dark" if dark else None, "1024x1024", 1))
+    # B309: the tinted appearance, the globe only (icon/glass.py tinted): iOS 26+ draws it in Clear and Tinted, so
+    # the Home Screen's own glass is the tile; the same picture in both builds, named for its build (carfile.py)
+    out.append((stem + "Tinted1024.png", TINTED, "tinted", "1024x1024", 1))
     return out
 
 

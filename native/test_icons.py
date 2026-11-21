@@ -193,6 +193,20 @@ class Alternates(unittest.TestCase):
                 for s in scales:
                     self.assertIn(("%sDark%dx%d@%dx.png" % (stem, pt, pt, s), pt * s), dark, car)
 
+    def test_primary_tinted_is_the_globe_alone(self):
+        """B309: iOS 26+ draws AppIcon's tinted appearance in the Home Screen's Clear and Tinted looks, as glass on its
+        own tile: without one, the light starburst became an opaque white tile. The globe only, on transparent."""
+        for car, stem in (("Assets.car", "AppIcon"), ("AssetsLite.car", "AppIconLite")):
+            got = carfile.icon_sets(read(car))["AppIcon"]
+            tinted = {(r["file"], r["width"]) for r in got if r["appearance"] == "ISAppearanceTintable"}
+            self.assertIn((stem + "Tinted1024.png", 1024), tinted, car)
+            # the PNG sizes stay, for iOS 15-25 (an .icon would have replaced them)
+            self.assertIn(stem + "60x60@2x.png", {r["file"] for r in got}, car)
+        png = read(os.path.join("glass", "AppIconTinted1024.png"))
+        self.assertEqual(png[25], 6, "RGBA, so the background is transparent")
+        self.assertEqual(png[16:24], (1024).to_bytes(4, "big") * 2)
+        self.assertIn(glass.TINTED, [f[1] for f in alternates.primary_files(True)])
+
     def test_lite_files_only_in_the_lite_car(self):
         plain = {r["file"] for rs in carfile.icon_sets(read("Assets.car")).values() for r in rs}
         lite = {r["file"] for rs in carfile.icon_sets(read("AssetsLite.car")).values() for r in rs}
