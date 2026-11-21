@@ -12,7 +12,8 @@ splash and the page there?
 `sim/` is B180's harness (journal/2026-11-20-b180-launch-strips/sim) with App.swift's `TopInset` copied in:
 `main.swift` reads the window's safe area top and `statusBarManager.statusBarFrame.height`, puts
 `--status-bar-bottom` on `<html>` at document start, sends it again on `viewSafeAreaInsetsDidChange` (as App.swift
-does), and writes the numbers it used to `Documents/r68.txt`. `run.sh` screenshots the system launch screen at 3 s
+does), and writes the numbers it used (its `islandBelowSafe`, `margin` and `value` are byte-for-byte App.swift's,
+checked with `diff` at commit time; `parts` is App.swift's `now` returning the inputs too) to `Documents/r68.txt`. `run.sh` screenshots the system launch screen at 3 s
 (`SPLASH_WAIT`) and the page at 11 s, then copies the numbers out. Files staged on the MBA as `~/r68sim`: the harness,
 `native/launch/LaunchScreen.storyboardc` and `Launch*@?x.png`, `web/app` minus `app.js`. MBA iOS Simulator, iOS
 26.3 (the only runtime there), Xcode 26.3, light Classic, `APP_ID=com.example.r68island1`.
@@ -47,7 +48,7 @@ status bar is 54 pt on every Dynamic Island model, and the safe area is 59, 62 o
   area or the screen). If a future phone hits the branch, the splash's bar would sit `safe − statusBar` points lower
   (at least 6 pt less than the island's 10.67 pt clearance, so under ~4.7 pt on today's geometry) until the page
   takes over.
-- Filed D25 (low) so docs/native.md says the gap is theoretical on every current iPhone (measured here),
+- No product fix. Only the docs wording: filed D25 (low) so docs/native.md says the gap is theoretical on every current iPhone (measured here),
   instead of reading like a known visible jump.
 
 ## What failed
