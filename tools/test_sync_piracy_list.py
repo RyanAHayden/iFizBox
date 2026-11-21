@@ -1,10 +1,12 @@
 """F228: tools/sync-piracy-list.py turns a saved git tree of cnstr/manifests into core/piracy-list.js. Never fetches."""
 import importlib.util
+import io
 import json
 import re
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location("sync_piracy_list", HERE / "sync-piracy-list.py")
@@ -51,6 +53,28 @@ class SyncPiracyList(unittest.TestCase):
     def test_bad_commit_answer_is_refused(self):
         with self.assertRaises(SystemExit):
             sync.last_commit([])
+
+    def _sent_headers(self, env):
+        """The headers fetch_json sends with this environment (urlopen patched: nothing goes out)."""
+        sent = []
+
+        def fake_urlopen(req, timeout=None):
+            sent.append({k.lower(): v for k, v in req.header_items()})
+            return io.BytesIO(b"[]")
+
+        with mock.patch.dict(sync.os.environ, env, clear=True), \
+                mock.patch.object(sync.urllib.request, "urlopen", fake_urlopen):
+            self.assertEqual(sync.fetch_json(sync.COMMITS_URL), [])
+        return sent[0]
+
+    def test_gh_token_goes_out_as_authorization(self):
+        h = self._sent_headers({"GH_TOKEN": "gho_example"})
+        self.assertEqual(h["authorization"], "Bearer gho_example")
+        self.assertEqual(h["accept"], "application/vnd.github+json")
+
+    def test_no_gh_token_no_authorization(self):
+        self.assertNotIn("authorization", self._sent_headers({}))
+        self.assertNotIn("authorization", self._sent_headers({"GH_TOKEN": "  "}))
 
     def test_committed_module_is_generated_shape(self):
         js = (HERE.parent / "web" / "app" / "core" / "piracy-list.js").read_text()

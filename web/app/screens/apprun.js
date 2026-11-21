@@ -583,11 +583,13 @@ export function clearLog(page) {
 }
 
 // B111: a run of one app that installd installed on This iPhone (row.here, not iFizBox itself) ends with Open <app>
-// above Return, as the single install does -> page.finish's `also` ({ label, action }) or null
+// above Return, as the single install does -> page.finish's `also` ({ label, action }) or null. An upgrade too (B297):
+// the new version is in place the same way; a re-sign is not a new app to open.
+const OPEN_MODES = new Set(["install", "upgrade"]);
 export function openRow(rows, lanes) {
   if (rows.length !== 1 || typeof lanes?.open !== "function") return null;
   const r = rows[0];
-  if (r.state !== "installed" || !r.here || r.unsure || r.mode !== "install" || !r.bundleId || isSelf(r)) return null;
+  if (r.state !== "installed" || !r.here || r.unsure || !OPEN_MODES.has(r.mode) || !r.bundleId || isSelf(r)) return null;
   return { label: `Open ${r.name}`, action: () => { lanes.open(r); return false; } };
 }
 
