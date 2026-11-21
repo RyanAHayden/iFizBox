@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runQueue } from "./queuerun.js";
-import { parseSimulation, createQueue } from "../core/queue.js";
+import { parseSimulation, createQueue, createRunLog } from "../core/queue.js";
 import { fakeDocument as fakeDom } from "../fakes.test-helper.js";
 
 // A stand-in for nav/progress.js's page: records what the run asks of it.
@@ -54,7 +54,9 @@ function setup({ badLib = true } = {}) {
     async markAuto(ids) { calls.auto.push(ids); return true; },
   };
   const catalog = { runInfo: async () => info, queueInfo: async () => ({}), reloadInstalled: async () => {} };
-  const runLogs = { add: (e) => calls.logs.push(e) };
+  // the real Console Logs store, in memory; calls.logs: the entries that have ended, oldest first
+  const runLogs = createRunLog(null, { flushMs: 0 });
+  Object.defineProperty(calls, "logs", { get: () => runLogs.list().filter((e) => e.state !== "running").reverse() });
   const page = fakePage();
   return { queue, calls, backend, catalog, runLogs, page, fixLib: () => { libBad = false; } };
 }
@@ -144,4 +146,46 @@ test("F247: a one-package run opens on the Log; two or more open on the Packages
   await runQueue({ jobs, plan: twoPlan }, { backend: two.backend, catalog: two.catalog, queue: two.queue, runLogs: two.runLogs, open: () => two.page });
   assert.equal(two.page.views[0], "pane");
   assert.equal(two.page.selected, 0);
+}));
+
+test("F363: Console Logs keep the run from its first line: a run that never ends reads Running with its lines so far", () => withDom(async () => {
+  const s = setup({ badLib: false });
+  const onePlan = parseSimulation("Inst other (1.0 R [a])");
+  s.backend.queueInstall = (r, { onEvent }) => {
+    onEvent({ fd: "status", line: `pmstatus:${r.id}:10:Unpacking ${r.id}` });
+    return new Promise(() => {}); // dpkg hangs
+  };
+  let ended = false;
+  runQueue({ jobs: [jobs[1]], plan: onePlan }, { backend: s.backend, catalog: s.catalog, queue: s.queue, runLogs: s.runLogs,
+    names: { other: "Other" }, open: () => s.page }).then(() => { ended = true; });
+  for (let i = 0; i < 20 && !s.page.lines.some((l) => l.text === "Unpacking Other"); i++) await settle();
+  assert.equal(ended, false);
+  const list = s.runLogs.list();
+  assert.equal(list.length, 1);
+  assert.equal(list[0].state, "running");
+  assert.equal(list[0].title, "Install Other");
+  assert.deepEqual(list[0].jobs, [{ op: "install", id: "other", version: undefined, mode: "install" }]);
+  const text = s.runLogs.get(list[0].id).text;
+  assert.match(text, /» Downloading Other/);
+  assert.match(text, /» Unpacking Other/);
+}));
+
+test("F363: each pass is its own entry: the first ends Failed with its lines, Retry All's ends Completed with its own", () => withDom(async () => {
+  const s = setup();
+  await runQueue({ jobs, plan }, { backend: s.backend, catalog: s.catalog, queue: s.queue, runLogs: s.runLogs,
+    names: { tweak: "Tweak", other: "Other" }, open: () => s.page });
+  assert.equal(s.calls.logs.length, 1);
+  assert.equal(s.calls.logs[0].state, "failed");
+  s.fixLib();
+  s.page.bars.at(-1).right.click();
+  for (let i = 0; i < 20 && s.calls.logs.length < 2; i++) await settle();
+  const [one, two] = s.calls.logs.map((e) => s.runLogs.get(e.id));
+  assert.equal(one.state, "failed");
+  assert.match(one.text, /SHA256/);
+  assert.match(one.text, /1 installed, 1 failed, 1 skipped$/);
+  assert.equal(two.state, "done");
+  assert.equal(two.title, "Install Tweak, Install Other");
+  assert.doesNotMatch(two.text, /SHA256/);
+  assert.match(two.text, /» Unpacking Lib/);
+  assert.match(two.text, /3 installed$/);
 }));
