@@ -111,8 +111,11 @@ test("F350: the DOM: tiles on every row, CHANGE as a price button, the dashed bo
   assert.equal(b.textContent, CHANGE_LABEL);
   assert.ok(b.classList.contains("price-btn"), "the eras' price button look (ios7.css / ios13.css)");
   assert.ok(g.querySelector(".cy-version-row .cell-inner").classList.contains("has-change"));
+  assert.equal(b.disabled, false);
   b.click();
   assert.equal(changed, 1);
+  const g2 = grouped([{ rows: detailRows(packageRows({ versions: 1 }).version) }]).firstElementChild;
+  assert.equal(changeButton(g2, () => {}, { disabled: true }).disabled, true, "nothing to change to: greyed, not gone");
   assert.equal(changeButton(grouped([{ rows: [{ label: "x" }] }]).firstElementChild, () => {}), null, "no Version row: no button");
   const d = descGroup("See https://x.dev/a.");
   assert.ok(d.querySelector(".cy-desc"));

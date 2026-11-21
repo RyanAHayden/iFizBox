@@ -1235,7 +1235,7 @@ async function renderPackage(body, route, key, id, ctx) {
     history: history?.versions.length ? versionHistoryCell(route, id, history) : {},
     files: { href: deeper(route, token("files", pid)) },
   }) }]).firstElementChild;
-  if (plan.change) changeButton(versionBox, () => installVersionHold(route).catch(() => {}));
+  changeButton(versionBox, () => installVersionHold(route).catch(() => {}), { disabled: !plan.change });
   details.append(versionBox);
   // F71: the copies N7's daemon kept, filled in when the helper answers (screens/rollback.js).
   if (inst && hasRollback()) details.append(rollbackSlot(pid, { installed: installedOf(history), name: pkg.row?.name }));

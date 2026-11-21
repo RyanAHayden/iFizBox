@@ -104,13 +104,15 @@ export function descGroup(text, { full = false } = {}) {
 }
 
 // Version's CHANGE: the price button (myipas.css .price-btn, the eras' look in ios7.css / ios13.css) at the right of
-// the group's .cy-version-row; it opens the pick-a-version sheet. -> the button, or null with no such row.
-export function changeButton(node, onClick) {
+// the group's .cy-version-row; it opens the pick-a-version sheet. `disabled` (no other version to pick, or Add to
+// App's tweak) greys it, as the eras draw a disabled price button. -> the button, or null with no such row.
+export function changeButton(node, onClick, { disabled = false } = {}) {
   const cell = node.querySelector?.(".cy-version-row .cell-inner");
   if (!cell) return null;
   loadStyle("myipas.css");
   const b = el("button", "price-btn cy-change", CHANGE_LABEL);
   b.type = "button";
+  b.disabled = disabled;
   b.addEventListener("click", (e) => { e.stopPropagation?.(); onClick(); });
   cell.append(b);
   cell.classList.add("has-change");

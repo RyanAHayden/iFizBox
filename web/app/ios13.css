@@ -465,5 +465,7 @@ html[data-style="ios13"] .alert-button:disabled { color: var(--i13-alert-dim); o
 html[data-style="ios13"] .alert-button:active:not(:disabled),
 html[data-style="ios13"] .alert-button.is-pressed { background: var(--i13-alert-pressed); }
 
-/* F350: the Details page's footer (id · source - section) stays centred as Cydia's, whatever iOS 13's footers do. */
+/* F350: the Details page's footer (id · source - section) stays centred as Cydia's, whatever iOS 13's footers do; the
+   description's dashed box in the keyline's grey (the table edge is the ground's colour in dark). */
 html[data-style="ios13"] .group-footer.cy-foot { text-align: center; }
+html[data-style="ios13"] { --cy-desc-edge: var(--keyline); }

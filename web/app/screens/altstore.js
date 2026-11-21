@@ -849,7 +849,7 @@ export function renderApp(body, route, pkg, source, { related = null, onChange =
   // every versions[] entry, older ones installable).
   const versionBox = grouped([{ header: "Version", rows: detailRows(rowsPlan.version, {
     history: { href: deeper(route, `versions:${pkg.row.id}`) } }), footer: v.date ? `Updated ${formatDate(v.date)}` : null }]).firstElementChild;
-  if (rowsPlan.change && onChange) changeButton(versionBox, onChange);
+  if (onChange) changeButton(versionBox, onChange, { disabled: !rowsPlan.change });
   details.append(versionBox);
 
   // F161: Information is drawn again once the App Store's facts are in (developer, category, its version and iOS).
