@@ -243,9 +243,11 @@ export function setSourceRowState(f) { rowState = f ?? (() => null); }
 
 // One source as the Sources tab counts it: its badge (the refresh's count once it landed, else the stored count) and
 // whether its row shows failed (the refresh's failure, else the stored error).
+// A refresh that failed shows "!" in place of the count, so it adds nothing; one still loading keeps the stored badge.
 export function sourceTally(source, live = rowState(source.key)) {
+  if (live?.failed) return { count: 0, failed: true };
   const count = typeof live?.count === "number" ? live.count : typeof source.count === "number" ? source.count : 0;
-  return { count, failed: live ? Boolean(live.failed) : Boolean(source.error) };
+  return { count, failed: live ? false : Boolean(source.error) };
 }
 
 // The grey line over the list: "2 selected · 3 sources · 1,204 apps · 1 not loading". `tallies` is every shown

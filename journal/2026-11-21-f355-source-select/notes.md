@@ -27,6 +27,10 @@ Built from the approved concept (branch concept/source-select, artifact 9g221YX3
 
 - "0 not loading" is shown, as in the concept and the brief's wording (only the `N selected` part is conditional).
 
+- Spec review: a source whose refresh failed shows "!" on the Sources tab, so it now adds 0 to the total (it had
+  added its stored count). Kept beyond the file list, as part of removing reordering or needed for the counts: the
+  `sources.js` hook, the dead `.armed` rule in `sources.css`, and the Manage root footer no longer saying "reorder".
+
 ## What failed on the way
 
 - The toolbar first never showed: the page body is drawn before it's pushed, and opened from Home the hash is

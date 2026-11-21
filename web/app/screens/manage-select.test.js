@@ -20,7 +20,9 @@ test("a source counts as its Sources tab row: the refresh's count and failure fi
   assert.deepEqual(sourceTally({ key: "a", error: "Not Responding" }), { count: 0, failed: true });
   // a refresh landed: its count; failed: the red badge even with no stored error
   assert.deepEqual(sourceTally({ key: "a", count: 12 }, { count: 30, failed: false }), { count: 30, failed: false });
-  assert.deepEqual(sourceTally({ key: "a", count: 12 }, { count: null, failed: true }), { count: 12, failed: true });
+  // failed: the row shows "!", not its count, so it adds nothing; still loading: the stored badge stays
+  assert.deepEqual(sourceTally({ key: "a", count: 12 }, { count: null, failed: true }), { count: 0, failed: true });
+  assert.deepEqual(sourceTally({ key: "a", count: 12 }, { count: null, failed: false }), { count: 12, failed: false });
   // a refresh that lands fine clears an old stored error, as the row's red goes
   assert.deepEqual(sourceTally({ key: "a", count: 5, error: "x" }, { count: 5, failed: false }), { count: 5, failed: false });
   // the hook sources.js sets is read by default
