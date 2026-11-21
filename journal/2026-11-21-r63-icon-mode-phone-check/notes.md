@@ -1,10 +1,15 @@
 # R63: B289's phone check on the iPhone 15 Pro
 
-Result: **all three Modes behave as B289 meant**, on a Lite build holding B289, after a reboot each time.
+Result: **all three Modes behave as B289 meant**, on a Lite build holding B289. Each state was shot before and
+after a reboot and showed the same icon both times: the Home Screen icon doesn't wait for a restart (the brief's
+notification-icon cache reason doesn't apply to it; see Found on the way).
 
-| Theme > Mode | iPhone / Home Screen | Home Screen icon after reboot | Expected |
+"Dark" below means the iPhone in Dark mode **and** Home Screen > Customize on Dark > Auto; "Light" means Light mode
+(Customize then draws light icons).
+
+| Theme > Mode | iPhone / Home Screen | Home Screen icon | Expected |
 |---|---|---|---|
-| Automatic | Dark (before the check) | Gunmetal | Gunmetal (the pair's dark side) |
+| Automatic | Dark (baseline, after I switched both to Dark) | Gunmetal | Gunmetal (the pair's dark side) |
 | Light | Dark | **Classic** | Classic |
 | Dark | Light | **Gunmetal** | Gunmetal |
 | Automatic | Light | Classic | Classic |
