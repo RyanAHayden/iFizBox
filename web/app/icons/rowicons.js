@@ -104,6 +104,13 @@ export const GLYPHS = {
   power: [["s", "M7.4 6.4a8 8 0 1 0 9.2 0", 2.8], ["s", "M12 2.4v9", 2.8]],
   apps: [["f", "M3 3h7.5v7.5H3zM13.5 3H21v7.5h-7.5zM3 13.5h7.5V21H3zM13.5 13.5H21V21h-7.5z"]],
   plus: [["f", "M10.2 3h3.6v7.2H21v3.6h-7.2V21h-3.6v-7.2H3v-3.6h7.2z"]], // F327: More Sources
+  // F350: the Details page's rows (Maintainer, More Information, Version, Filesystem Content)
+  envelope: [["e", "M2.5 5.5h19v13h-19zM4.6 7.4v9.2h14.8V7.4z"], ["s", "M3.4 6.4 12 13.2l8.6-6.8", 1.7],
+    ["s", "M3.6 17.6 9.6 11.6M20.4 17.6l-6-6", 1.4]],
+  laptop: [["e", "M5 5h14v10H5zM6.8 6.8v6.4h10.4V6.8z"], ["f", "M2 16.2h20l-1.6 2.8H3.6z"]],
+  badge: [["e", "M5.5 3.5h13v18h-13zM7.3 5.3v14.4h9.4V5.3z"], ["f", "M10 2h4v3h-4z"],
+    ["f", "M12 8.2a2 2 0 1 1 0 4a2 2 0 0 1 0-4zM8.8 16.6c.2-2 1.5-3.2 3.2-3.2s3 1.2 3.2 3.2z"]],
+  folder: [["f", "M2.5 5h7l2 2.2h10v11.8h-19z"]],
 };
 
 // Icon name -> tile colour and glyph. One name per thing a row is about, so the same thing looks the same everywhere.
@@ -119,6 +126,11 @@ export const ROW_ICONS = {
   keepBundleId: [C.indigo, "copy"], // F237: Keep Bundle IDs (no duplicate copies)
   showExpiryWarning: [C.gold, "seal"], expiryWarning: [C.gold, "clock"], // F244: Home's certificate warning
   otherLinks: [C.purple, "link"], lockHome: [C.dark, "lock"], websiteApps: [C.blue, "apps"],
+  // F350: the Details page (screens/details.js)
+  pkgSettings: [C.dark, "gear"], pkgAuthor: [C.dark, "envelope"], pkgMore: [C.purple, "laptop"],
+  pkgVersion: [C.grey, "badge"], pkgBundle: [C.indigo, "badge"], pkgFiles: [C.orange, "folder"], pkgHistory: [C.indigo, "clock"],
+  pkgSection: [C.brown, "apps"], pkgBlock: [C.red, "minusCircle"], pkgTweaks: [C.green, "bolt"], pkgWish: [C.pink, "plus"],
+  pkgSize: [C.teal, "download"], pkgDepends: [C.purple, "link"], pkgLink: [C.blue, "globe"],
   help: [C.blue, "question"], server: [C.teal, "globe"], checkServer: [C.green, "pulse"], runYourOwn: [C.orange, "cloud"],
   shareCert: [C.green, "personPlus"], // Share Your Certificate (SideDrop)
   sources: [C.blue, "list"], transfer: [C.green, "transfer"], hidden: [C.grey, "eyeSlash"], recommended: [C.gold, "star"],
@@ -279,6 +291,10 @@ const GLYPHS_7 = {
   power: [ln("M7.6 6.6a7.6 7.6 0 1 0 8.8 0"), ln("M12 3v8")],
   apps: [ln("M4 4h6.5v6.5H4zM13.5 4H20v6.5h-6.5zM4 13.5h6.5V20H4zM13.5 13.5H20V20h-6.5z", 1.6)],
   plus: [ln("M12 4.5v15M4.5 12h15", 2)],
+  envelope: [ln("M3 5.5h18v13H3z"), ln("M3.5 6.5 12 13l8.5-6.5")],
+  laptop: [ln("M5.5 5h13v9.5h-13z"), ln("M2.5 18.5h19l-1.5-2.5H4z")],
+  badge: [ln("M6 3.5h12v17.5H6z"), ln("M10 3.5h4"), ln(ring(12, 10, 2.2)), ln("M8.6 17c.4-2 1.7-3 3.4-3s3 1 3.4 3")],
+  folder: [ln("M3 5.5h6.5l2 2.2H21v11.8H3z")],
 };
 
 // Copying Files' tiles in iOS 7's colours, the glyphs drawn as 2.6-unit lines.

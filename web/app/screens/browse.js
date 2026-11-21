@@ -32,11 +32,11 @@ import { initDevice, filterRow, compatBadge, currentDevice } from "../device.js"
 import { compat, markOf, isIncompatible } from "../core/compat.js";
 import { isAltKey } from "../core/altstore.js";
 import { renderAltSource, renderApp, installRows, appBundleId, formatDate, osRange, appPageAction, appPageCustom } from "./altstore.js";
-import { linksGroup, previewSlot } from "./altstore.js";
+import { previewSlot } from "./altstore.js";
 import { jailbreakModify } from "./altstore.js"; // B69
 import { descriptionGroup } from "./description.js";
 import { packageLinks, packageGithub, aptShots, sileoShots, sileoRatings, sileoWhatsNew } from "../core/previews.js";
-import { storeHeader, headerLine, storeTabs, tileRow, worksOnTile, sizeTile, sectionTile, ratingTile, whatsNewGroup } from "./storepage.js";
+import { storeHeader, headerLine, storeTabs, whatsNewGroup } from "./storepage.js";
 import { reviewsTab } from "./reviews.js";
 import { reviewsApi, reviewsBase, mergeReviews } from "../core/reviews.js";
 import { showActionSheet } from "../nav/actionsheet.js";
@@ -84,6 +84,10 @@ import { queueApp } from "./queue.js";
 import { worksInGroup, addToApp, addableTweakRows, checkTweakRows } from "./tweaks.js"; // F302
 import { installWhichVersion, INSTALL_WHICH_TITLE } from "./altstore.js"; // F346: a hold on Install
 import { loadRowsIndex } from "./tweaks.js"; // F344
+import { DETAILS_TITLE, packageRows, moreInfoShown, detailRows, descGroup, changeButton, footerGroup,
+  detailsFooter, MORE_INFO_LABEL } from "./details.js"; // F350
+import { rowIcon } from "../icons/rowicons.js";
+import { appInfoNodes } from "./altstore.js"; // F350: an app's More Information
 
 // B269: in the sideload build a Tweak Source's list leaves out the tweaks already checked and refused on this device.
 export const sideloadListRows = (rows, mode = detectMode()) => (mode === "sideload" ? addableTweakRows(rows) : rows);
@@ -142,7 +146,7 @@ export function parseToken(seg) {
   const s = String(seg ?? "");
   const i = s.indexOf(":");
   const kind = i > 0 ? s.slice(0, i) : "";
-  return ["section", "package", "author", "versions"].includes(kind) ? { kind, value: s.slice(i + 1) } : { kind: "unknown", value: s };
+  return ["section", "package", "author", "versions", "info", "pkgsettings", "files"].includes(kind) ? { kind, value: s.slice(i + 1) } : { kind: "unknown", value: s };
 }
 
 export const token = (kind, value) => `${kind}:${value}`;
@@ -175,7 +179,11 @@ export function nav(route, sourceName = () => null) {
     case "section": return { title: p.value === ALL ? "All Packages" : p.value, style: "plain" };
     case "author": return { title: p.value || "Author", style: "plain" };
     // F29: Install (Modify once the page knows it's installed) opens the action sheet of what can be done here.
-    case "package": return { title: names.get(p.value) || p.value,
+    // F350: Details (Cydia's title), with its More Information, Change Package Settings and Filesystem Content.
+    case "info": return { title: MORE_INFO_LABEL };
+    case "pkgsettings": return { title: "Settings" };
+    case "files": return { title: "Files", style: "plain" };
+    case "package": return { title: DETAILS_TITLE,
       right: { label: "Install", onClick: (e) => packageActions(route, e.currentTarget),
         onHold: () => installVersionHold(route).catch(() => {}) } }; // F346: a hold picks the version
     case "versions": return { title: "Versions" };
@@ -191,6 +199,9 @@ export function render(body, route, ctx) {
       detectMode() === "sideload" && !isAltKey(p.key) ? dropRefusedTweaks : null);
     case "author": return renderAuthor(body, route, p.value);
     case "package": return renderPackage(body, route, p.key, p.value, ctx);
+    case "info": return renderInfo(body, p.key, p.value);
+    case "pkgsettings": return renderPackageSettings(body, p.value);
+    case "files": return renderFiles(body, p.value);
     case "versions": return renderVersions(body, route, p.key, p.value);
     default:
       body.append(note("Nothing here."));
@@ -1045,13 +1056,15 @@ export function blockRows({ name, author = null, blockedNow = false, authorBlock
 
 // The Block group, redrawn in place after each tap. In the app, blocking an installed package also holds it
 // (core/settings.js blocked.set).
-function blockGroup({ id, name, author }) {
+// F350: `tile`, a row icon in front of each row (the Details page's Block rows).
+function blockGroup({ id, name, author, tile = null }) {
   const box = el("div", "package-block");
   let installed = false;
   const draw = () => {
     const { rows, footer } = blockRows({ name, author, blockedNow: settings.blocked.has(id), authorBlocked: author ? settings.blocked.hasAuthor(author) : false,
       mode: detectMode(), installed });
-    box.replaceChildren(grouped([{ rows: rows.map((r) => ({ label: r.label, chevron: false, onClick: () => tap(r) })), footer }]));
+    box.replaceChildren(grouped([{ rows: rows.map((r) => ({ label: r.label, chevron: false, onClick: () => tap(r),
+      ...(tile ? { icon: rowIcon(tile) } : {}) })), footer }]));
   };
   const tap = async (r) => {
     if (r.confirm && await showActionSheet({ title: r.confirm.title, buttons: [r.confirm.button], destructive: 0 }) !== 0) return;
@@ -1090,17 +1103,18 @@ async function renderPackage(body, route, key, id, ctx) {
   const st = pkg.stanza;
   if (st.kind === "ipa" && st.ipa) { // F9: an AltStore app
     names.set(id, st.name);
-    setTitle(body, st.name);
     const altSrc = sources.find((s) => s.key === pkg.key);
     // F181: its Related tab is the same as a package's: the source's other apps in that category.
-    const { details } = renderApp(body, route, pkg, altSrc, { related: (pane) => relatedPane(pane, route, pkg, id) });
+    // F350: the same Details layout; Version's CHANGE opens Install Which Version? as the nav button's hold does.
+    const { tail } = renderApp(body, route, pkg, altSrc, { related: (pane) => relatedPane(pane, route, pkg, id),
+      onChange: () => installVersionHold(route).catch(() => {}) });
     // F102 for apps: their nav button installs at once (no sheet to hold Wish List), so it's a row on the page.
-    const wishLi = grouped([{ rows: [{ label: wishLabel(wishlist().has(id)), onClick: () => {
+    const wishLi = grouped([{ rows: [{ label: wishLabel(wishlist().has(id)), icon: rowIcon("pkgWish"), onClick: () => {
       wishlist().set(id, !wishlist().has(id));
       wishLi.querySelector(".cell-label").replaceChildren(wishLabel(wishlist().has(id)));
-    } }] }]);
-    details.append(wishLi);
-    if (detectMode() === "jailbreak") installedAppGroup(st.ipa.bundleIdentifier).then((g) => { if (g && details.isConnected) details.append(g); });
+    } }] }]).firstElementChild;
+    tail.append(wishLi);
+    if (detectMode() === "jailbreak") installedAppGroup(st.ipa.bundleIdentifier).then((g) => { if (g && tail.isConnected) tail.append(g); });
     rememberPackage(body, route, { id, pkg, source: altSrc, history: await catalog.history(id, key).catch(() => null) });
     return;
   }
@@ -1110,7 +1124,7 @@ async function renderPackage(body, route, key, id, ctx) {
   const desc = description(st);
   const name = st.name || st.package;
   names.set(id, name);
-  setTitle(body, name);
+  const pid = st.package || id;
 
   // F181: the iOS 6 App Store's header (screens/storepage.js): the large glossy icon, name, author, stars once a
   // rating is known, "Version · size · price" and Share. Install / Modify stays the nav bar's right button.
@@ -1149,10 +1163,9 @@ async function renderPackage(body, route, key, id, ctx) {
   const reviewApi = getBackend().reviews ?? reviewsApi({ base: reviewsBase(detectMode()) });
   const reviewId = st.package || id;
   const oursFirst = reviewApi.list(reviewId, 0).catch(() => null);
-  let ratingTiles = null, lastRating; // the tiles are made further down, after some awaits
-  const showRating = (r) => { lastRating = r; if (!body.isConnected) return; header.setRating(r); ratingTiles?.set("rating", ratingTile(r)); };
+  const showRating = (r) => { if (body.isConnected) header.setRating(r); };
   Promise.all([sileoJson, oursFirst]).then(([json, ours]) => showRating(mergeReviews({ ours, depiction: ratingOf(json) }).rating));
-  const descText = desc.long || desc.short;
+  const descText = desc.long || desc.short || "";
 
   const tabs = storeTabs({
     // F182: reviews written here (screens/reviews.js) merged with the depiction's; Tap to Rate, Write a Review.
@@ -1161,46 +1174,49 @@ async function renderPackage(body, route, key, id, ctx) {
     related: (pane) => relatedPane(pane, route, pkg, id),
   });
   const details = tabs.panes.details;
+  // F350: what Details shows is known before the page is drawn, so nothing pops in under the header.
+  // F18: what stops it installing, in plain words; its `targets` also link a virtual name to its provider.
+  // F29: Version History, every version the sources offer (Downgrade's list).
+  const [depReport, history, installedList] = await Promise.all([catalog.deps(id, key).catch(() => null),
+    catalog.history(id, key).catch(() => null), catalog.installed().catch(() => null)]);
+  const inst = installedList?.find((r) => r.id === pid) ?? null;
+  const author = parseAuthor(st.author);
+  const maint = parseAuthor(st.maintainer);
+  const rels = [...parseRelations(st["pre-depends"]), ...parseRelations(st.depends)];
+  const section = pkg.row.section && pkg.row.section !== NO_SECTION ? pkg.row.section : null;
+  const isz = Number(st["installed-size"]);
+  const plan = packageRows({ installed: inst?.version ?? null, version: st.version ?? "", author: author?.name ?? null,
+    maintainer: maint?.name ?? null, versions: history?.versions.length ?? 0, files: typeof getBackend().packageFiles === "function",
+    sideloadTweak: isSideloadTweak(st), installedOnly: pkg.installedOnly, paid: isPaid(st), source: sourceName, section,
+    worksOn: fit.range ?? compatBadge(fitCode), installedSize: isz > 0 ? formatSize(isz * 1024) : null, depends: rels.map((g) => g[0].name) });
   body.replaceChildren(header.head, ...tabs.nodes);
   // F228: from a source on the piracy list: Source Warning at the top of Details.
   const piracy = piracyBanner(packageWarning({ key: pkg.key, source: source?.uri }));
   if (piracy) details.append(piracy);
+  // F350: Change Package Settings (installed: its own page with the package's switches), Maintainer when it isn't the author.
+  if (plan.options.length) details.append(grouped([{ rows: detailRows(plan.options, {
+    settings: { href: deeper(route, token("pkgsettings", pid)) },
+    maintainer: maint ? { href: deeper(route, token("author", maint.name)) } : {},
+  }) }]));
   // F302: a Tweak Source's tweak in the sideload app: Works In (its filter's apps, read from the .deb on first open,
   // cached) and Add to App…, in Install's place.
   if (isSideloadTweak(st)) details.append(worksInGroup(st).el);
-
-  // Depends (and Pre-Depends): each line links to the first alternative we carry.
-  const rels = [...parseRelations(st["pre-depends"]), ...parseRelations(st.depends)];
-  const known = new Set(rels.length ? await catalog.has([...new Set(rels.flat().map((r) => r.name))]) : []);
-  // F18: what stops it installing, in plain words; its `targets` also link a virtual name to its provider.
-  const depReport = await catalog.deps(id, key).catch(() => null);
-  const depRows = rels.map((group) => {
-    const text = group.map((r) => r.name + (r.op ? ` (${r.op} ${r.version})` : "")).join(" | ");
-    const target = group.find((r) => known.has(r.name));
-    const via = !target && group.map((r) => depReport?.targets?.[r.name]).find(Boolean);
-    if (via) return { label: text, href: deeper(route, token("package", via)) };
-    return target ? { label: text, href: deeper(route, token("package", target.name)) } : { label: text, chevron: false };
-  });
-  const conflicts = parseRelations(st.conflicts).map((g) => ({ label: g.map((r) => r.name + (r.op ? ` (${r.op} ${r.version})` : "")).join(" | ") }));
-
-  // Source, other versions, and (on the site) the .deb through the proxy.
-  const srcRows = [{ label: sourceName || "Unknown Source", subtitle: source?.uri }];
-  for (const o of pkg.others) {
-    if (o.key === pkg.key) continue;
-    const s = sourceOf(o.key);
-    srcRows.push({ label: s ? displayName(s) : o.key, detail: o.version,
-      href: format({ tab: "sources", path: [o.key, token("package", id)] }) });
-  }
-
   // F20: price; in the app Sign In, Buy, Install. B11: in the app its state also drives the nav bar button.
   // F308: a paid sideload tweak's Price, Sign In and Buy are in its Add to an App group (worksInGroup) instead.
   const payBox = pkg.installedOnly || isSideloadTweak(st) ? null : paymentGroup(st, source, ctx, { onState: (s) => paidButton(body, s) });
   if (payBox) details.append(payBox);
-  // F122: the gallery (Screenshots:/Header:, a Sileo depiction's screenshots, else the HTML depiction's pictures or
-  // the GitHub repo's), sideways with page dots and tap-to-zoom (F181, altstore.js galleryGroup).
+  if (depReport?.problems.length) details.append(depProblemsGroup(depReport, route, ctx));
+  if (queueOf()) {
+    const slot = el("div", "package-queue-slot");
+    slot.dataset.id = pid;
+    fillQueueSlot(slot);
+    details.append(slot);
+  }
+  // F122: the gallery, headed Preview (Screenshots:/Header:, a Sileo depiction's screenshots, else the HTML
+  // depiction's pictures or the GitHub repo's), sideways with page dots and tap-to-zoom (altstore.js galleryGroup).
   const previews = el("div", "package-previews");
   details.append(previews);
-  const previewKey = `pkg:${pkg.key ?? "installed"}:${st.package || id}`;
+  const previewKey = `pkg:${pkg.key ?? "installed"}:${pid}`;
   const drawPreviews = (json) => previews.replaceChildren(previewSlot(previewKey, {
     shots: [...aptShots(st), ...(json ? sileoShots(json) : [])],
     html: sileo ? null : html,
@@ -1208,109 +1224,111 @@ async function renderPackage(body, route, key, id, ctx) {
   }));
   if (!sileo) drawPreviews(null);
 
-  // F181: the sideways info tiles: Rating (once known), Works On, Size, Section.
-  const tiles = tileRow();
-  tiles.set("works", worksOnTile(fit));
-  tiles.set("size", sizeTile(size, pkg.installedOnly ? null : isPaid(st) ? "Paid" : "Free"));
-  tiles.set("section", sectionTile(pkg.row.section === NO_SECTION ? null : pkg.row.section, { rootless: "Rootless", rootful: "Rootful", roothide: "Roothide" }[fit.need] ?? null));
-  details.append(tiles.row);
-  ratingTiles = tiles; // the Rating tile: showRating above, once the depiction and reviews written here are both in
-  if (lastRating !== undefined) tiles.set("rating", ratingTile(lastRating));
-
-  // Description, or the Sileo depiction as Details' body (its reviews go to the Reviews tab, its pictures to the
-  // gallery).
-  const depictionSlot = el("div", "depiction-slot");
-  details.append(depictionSlot);
-  if (!sileo && descText) depictionSlot.append(descriptionGroup(descText)); // F165: own group, long ones fold behind More
-
-  // What's New (a Sileo depiction's newest changelog entry) with Version History (F29) under it.
-  const news = el("div", "store-news-slot");
-  details.append(news);
-
-  // Information: who, where from, what it is and needs, and where it runs.
-  const info = [];
-  const author = parseAuthor(st.author);
-  const maint = parseAuthor(st.maintainer);
-  if (author) info.push({ label: "Developer", detail: author.name, href: deeper(route, token("author", author.name)) });
-  if (maint && maint.name.toLowerCase() !== author?.name.toLowerCase()) {
-    info.push({ label: author ? "Maintainer" : "Contact", detail: maint.name, href: deeper(route, token("author", maint.name)) });
+  // F350: the description in Cydia's dashed box, its first lines; More Information has the rest and the depiction.
+  if (descText) details.append(descGroup(descText));
+  if (moreInfoShown({ text: descText, depiction: Boolean(sileo || html) })) {
+    details.append(grouped([{ rows: [{ label: MORE_INFO_LABEL, icon: rowIcon("pkgMore"), href: deeper(route, token("info", id)) }] }]));
   }
-  if (!pkg.installedOnly) {
-    info.push({ label: "Source", detail: sourceName || "Unknown",
-      href: route.tab === "sources" && route.path[0] === pkg.key ? null : format({ tab: "sources", path: [pkg.key] }) });
-  }
-  info.push({ label: "Package", detail: st.package });
-  info.push({ label: "Version", detail: st.version ?? "" });
-  const inst = Number(st["installed-size"]);
-  if (inst > 0) info.push({ label: "Installed Size", detail: formatSize(inst * 1024) });
-  if (st.architecture) info.push({ label: "Architecture", detail: st.architecture });
-  if (rels.length) info.push({ label: "Depends", detail: rels.map((g) => g[0].name).join(", "), cls: "store-info-long" });
-  info.push({ label: "Compatibility", detail: fit.range ?? compatBadge(fitCode) });
-  details.append(grouped([{ header: "Information", rows: info, footer: fit.detail }]));
 
-  // More by the author, the HTML depiction, and Support: the Links group (the source, Homepage:, GitHub, a Sileo
-  // depiction's buttons).
-  const more = [];
-  if (headAuthor) more.push({ label: `More by ${headAuthor.name}`, href: deeper(route, token("author", headAuthor.name)) });
-  if (html) more.push({ label: "Depiction", onClick: () => openHtmlDepiction(html, name), chevron: true });
-  if (more.length) details.append(grouped([{ rows: more }]));
-  details.append(blockGroup({ id: st.package || id, name, author: headAuthor?.name ?? null })); // F226
-  const sourceLink = pkg.installedOnly ? null : { label: sourceName || "Unknown Source", subtitle: source?.uri,
-    href: route.tab === "sources" && route.path[0] === pkg.key ? null : format({ tab: "sources", path: [pkg.key] }) };
+  // Installed Package (or Version): Version with CHANGE (Install Which Version?), Version History, Filesystem Content.
+  const versionBox = grouped([{ header: plan.versionHeader, rows: detailRows(plan.version, {
+    history: history?.versions.length ? versionHistoryCell(route, id, history) : {},
+    files: { href: deeper(route, token("files", pid)) },
+  }) }]).firstElementChild;
+  if (plan.change) changeButton(versionBox, () => installVersionHold(route).catch(() => {}));
+  details.append(versionBox);
+  // F71: the copies N7's daemon kept, filled in when the helper answers (screens/rollback.js).
+  if (inst && hasRollback()) details.append(rollbackSlot(pid, { installed: installedOf(history), name: pkg.row?.name }));
+
+  // Information, each row with its tile.
+  details.append(grouped([{ header: "Information", footer: fit.detail, rows: detailRows(plan.info, {
+    source: route.tab === "sources" && route.path[0] === pkg.key ? {} : { href: format({ tab: "sources", path: [pkg.key] }) },
+    section: section ? { href: deeper(route, token("section", section)) } : {},
+  }) }]));
+  const conflicts = parseRelations(st.conflicts).map((g) => ({ label: g.map((r) => r.name + (r.op ? ` (${r.op} ${r.version})` : "")).join(" | ") }));
+  if (conflicts.length) details.append(grouped([{ header: "Conflicts", rows: conflicts }]));
+  // The same package from other sources, each with its version.
+  const others = pkg.others.filter((o) => o.key !== pkg.key).map((o) => {
+    const s = sourceOf(o.key);
+    return { label: s ? displayName(s) : o.key, detail: o.version, icon: rowIcon("sources"),
+      href: format({ tab: "sources", path: [o.key, token("package", id)] }) };
+  });
+  if (others.length) details.append(grouped([{ header: "Other Sources", rows: others }]));
+  // Links (Homepage:, GitHub, a Sileo depiction's buttons), each with the globe tile.
   const links = el("div", "package-links");
   const drawLinks = (json) => {
     const list = packageLinks(st, json);
-    links.replaceChildren(...(sourceLink || list.length ? [linksGroup(sourceLink, list)] : []));
+    links.replaceChildren(...(list.length ? [grouped([{ header: "Links", rows: list.map((l) => ({ label: l.label, subtitle: l.detail || l.url,
+      icon: rowIcon("pkgLink"), chevron: true, onClick: () => window.open(l.url, "_blank", "noopener") })) }])] : []));
   };
   drawLinks(null);
   details.append(links);
-
-  // F29: Version History, every version the sources offer (Downgrade's list); and Modify once it's installed.
-  const history = await catalog.history(id, key).catch(() => null);
-  rememberPackage(body, route, { id, key, pkg, source, history, payBox });
-  const drawNews = (json) => {
-    const notes = json ? sileoWhatsNew(json) : null;
-    const row = history?.versions.length ? versionHistoryCell(route, id, history) : null;
-    const g = whatsNewGroup({ version: notes ? notes.title || st.version : null, notes: notes?.text || null, history: row });
-    news.replaceChildren(...(g ? [g] : []));
-  };
-  drawNews(null);
-  if (queueOf()) {
-    const slot = el("div", "package-queue-slot");
-    slot.dataset.id = st.package || id;
-    fillQueueSlot(slot);
-    details.append(slot);
-  }
-  const installedEl = await installedGroup(st.package || id);
-  if (installedEl) details.append(installedEl);
-  // F71: the copies N7's daemon kept, filled in when the helper answers (screens/rollback.js).
-  if (installedEl && hasRollback()) details.append(rollbackSlot(st.package || id, { installed: installedOf(history), name: pkg.row?.name }));
-  if (depReport?.problems.length) details.append(depProblemsGroup(depReport, route, ctx));
-  if (depRows.length) details.append(grouped([{ header: "Depends", rows: depRows }]));
-  if (conflicts.length) details.append(grouped([{ header: "Conflicts", rows: conflicts }]));
-  // An installed package no source carries (F27) has no source to name: its page is the status stanza alone.
-  if (!pkg.installedOnly) details.append(grouped([{ header: pkg.others.length > 1 ? "Sources" : "Source", rows: srcRows }]));
   // F8: Open In, the package in another package manager (and its source from another device). Not in the jailbreak
   // build (F219: openInGroup returns nothing there; Share lists the installed managers).
-  if (!pkg.installedOnly && source) details.append(openInGroup(source, { pkg: st.package || id }));
+  if (!pkg.installedOnly && source) details.append(openInGroup(source, { pkg: pid }));
   if (st.debUrl && getBackend().kind === "http") {
     // Paid packages (cydia::commercial) only download for a buyer's device: the repo refuses the proxy.
     if (/(^|,)\s*cydia::commercial\s*(,|$)/.test(st.tag ?? "")) details.append(grouped([paidDebSection()]));
     else details.append(downloadGroup(st));
   }
-  details.append(grouped([{ footer: `${st.package}\n${[sourceName, pkg.row.section].filter(Boolean).join(" · ")}` }]));
+  details.append(blockGroup({ id: pid, name, author: headAuthor?.name ?? null, tile: "pkgBlock" })); // F226
+  details.append(footerGroup(detailsFooter(st.package, pkg.installedOnly ? "" : sourceName, section)));
+  rememberPackage(body, route, { id, key, pkg, source, history, payBox });
+  if (sileo) sileoJson.then((json) => { if (previews.isConnected) { drawPreviews(json); drawLinks(json); } });
+}
 
+// F350: More Information: the whole description in the dashed box, What's New and the depiction (a Sileo one drawn
+// here, an HTML one behind Open Depiction); an app's: the whole text, What's New and Permissions (altstore.js).
+async function renderInfo(body, key, id) {
+  body.append(placeholder("page", 2));
+  const pkg = await catalog.package(id, key).catch(() => null);
+  if (!pkg) { body.replaceChildren(note("Package not found.")); return; }
+  const st = pkg.stanza;
+  if (st.kind === "ipa" && st.ipa) { body.replaceChildren(...appInfoNodes(st.ipa)); return; }
+  const desc = description(st);
+  const text = desc.long || desc.short || "";
+  const sources = await getBackend().sources().catch(() => []);
+  const source = sources.find((s) => s.key === pkg.key);
+  const sileo = httpUrl(st.sileodepiction);
+  const html = st.depiction?.trim() ? httpUrl(st.depiction) : releaseDepiction(source, st.package || id);
+  const news = el("div", "store-news-slot");
+  const slot = el("div", "depiction-slot");
+  body.replaceChildren(...(text ? [descGroup(text, { full: true })] : []), news, slot);
   if (sileo) {
-    loadSileo(depictionSlot, sileo, { fallback: descText, json: sileoJson }).then((json) => {
-      if (!previews.isConnected) return;
-      // The gallery shows the depiction's screenshots (F122), so its own strip goes; the Reviews tab its reviews.
-      if (json && sileoShots(json).length) for (const strip of depictionSlot.querySelectorAll(".dep-shots")) strip.remove();
-      if (json && sileoRatings(json)?.reviews.length) for (const rv of depictionSlot.querySelectorAll(".dep-review")) rv.remove();
-      drawLinks(json);
-      drawPreviews(json);
-      drawNews(json);
+    loadSileo(slot, sileo, { fallback: "" }).then((json) => {
+      const notes = json ? sileoWhatsNew(json) : null;
+      const g = notes ? whatsNewGroup({ version: notes.title || st.version, notes: notes.text || null }) : null;
+      if (g) news.replaceChildren(g);
     });
+  } else if (html) {
+    slot.append(grouped([{ rows: [{ label: "Depiction", icon: rowIcon("pkgLink"), chevron: true, onClick: () => openHtmlDepiction(html, st.name || id) }] }]));
   }
+}
+
+// F350: Change Package Settings, Cydia's own page: the package's switches (Ignore Upgrades, Update Automatically).
+async function renderPackageSettings(body, id) {
+  const g = await installedGroup(id, { version: false });
+  body.replaceChildren(g ?? note("Not installed."));
+}
+
+// F350: Filesystem Content: the files dpkg lists for the installed package (backend packageFiles), as Cydia's list.
+export const FILES_SHOWN = 2000;
+async function renderFiles(body, id) {
+  body.append(spinner("Loading Files"));
+  let files = null;
+  try { files = await getBackend().packageFiles?.(id); } catch { files = null; }
+  if (!files) { body.replaceChildren(note("No files listed.")); return; }
+  const shown = files.slice(0, FILES_SHOWN);
+  const list = el("ul", "table plain pkg-files");
+  for (const f of shown) {
+    const li = el("li", "cell");
+    const inner = el("div", "cell-inner");
+    inner.append(el("span", "cell-label", f));
+    li.append(inner);
+    list.append(li);
+  }
+  body.replaceChildren(list);
+  if (files.length > shown.length) body.append(note(`${shown.length} of ${files.length} files.`));
 }
 
 // F181: the Related tab: other packages in the same section from the same source (All Sources: from every source),
@@ -1801,7 +1819,8 @@ export const paidDebSection = () => ({ rows: [{ label: "Download .deb", detail: 
 
 // Installed Package (F7, Cydia's Installed Details): the version on the device and the Ignore Upgrades switch
 // (Settings' Ignored Upgrades; in the app a dpkg hold, core/settings.js holds). Null when it isn't installed.
-async function installedGroup(id) {
+// F350: `version: false` leaves out the Installed Package / Version group (Change Package Settings: the switches only).
+async function installedGroup(id, { version = true } = {}) {
   let rows;
   try { rows = await catalog.installed(); } catch { return null; }
   const p = rows?.find((r) => r.id === id);
@@ -1809,15 +1828,16 @@ async function installedGroup(id) {
   // On the site a hold in the uploaded status file is dpkg's, set on the phone: shown, not switchable here.
   const dpkgHeld = p.held && catalog.statusSource() !== "native";
   const mark = autoMarkShown(settings); // F70: Update Automatically, for Only Packages I Mark
-  const frag = grouped(installedSections({ version: p.version, dpkgHeld, mark }));
+  const frag = grouped(installedSections({ version: p.version, dpkgHeld, mark }).slice(version ? 0 : 1));
+  const at = version ? 1 : 0; // the Ignore Upgrades cell
   if (!dpkgHeld) {
     // grouped() draws plain rows; the switch goes into its cell afterwards, as on the Settings tab.
-    const cell = frag.querySelectorAll(".cell-inner")[1];
+    const cell = frag.querySelectorAll(".cell-inner")[at];
     cell.append(createSwitch({ label: "Ignore Upgrades", checked: settings.holds.has(id), onToggle: (on) => { settings.holds.set(id, on); } }));
     cell.classList.add("has-switch");
   }
   if (mark) {
-    const cell = frag.querySelectorAll(".cell-inner")[2];
+    const cell = frag.querySelectorAll(".cell-inner")[at + 1];
     cell.append(createSwitch({ label: AUTO_MARK_LABEL, checked: settings.autoMarked.has(id), onToggle: (on) => { settings.autoMarked.set(id, on); } }));
     cell.classList.add("has-switch");
   }
@@ -1860,11 +1880,6 @@ function depActionRow(p, route, ctx) {
     }
     default: return null;
   }
-}
-
-// A deep link titles the page with the id until the package loads; then its name goes in the nav bar.
-function setTitle(body, title) {
-  handleOf(body)?.setTitle(title);
 }
 
 function downloadGroup(st) {

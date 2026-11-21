@@ -39,13 +39,16 @@ import { compareVersions } from "../core/apt.js";
 import { altVersionList } from "../core/catalog.js"; // B232: Install Which Version? offers what Version History does
 import { ignoreVersionLabel, withVersionButton, versionToStore, IGNORE_VERSION } from "../core/appupdates.js"; // F281
 import { queueApp } from "./queue.js";
-import { descriptionGroup, growOpen } from "./description.js";
-import { storeHeader, headerLine, storeTabs, tileRow, worksOnTile, sizeTile, sectionTile, ratingTile, updatedTile, whatsNewGroup } from "./storepage.js";
+import { descriptionGroup } from "./description.js";
+import { storeHeader, headerLine, storeTabs, whatsNewGroup } from "./storepage.js";
+import { appRows, moreInfoShown, detailRows, descGroup, changeButton, tileCells, footerGroup, detailsFooter, MORE_INFO_LABEL,
+  PREVIEW_HEADER } from "./details.js"; // F350
+import { rowIcon } from "../icons/rowicons.js";
 import { reviewsTab } from "./reviews.js";
 import { reviewsApi, reviewsBase, pageRating } from "../core/reviews.js";
 import { needsCheck, savedInfo, withIpaInfo, checkIpa, ipaInfoUrl, ipaRaises } from "../core/ipainfo.js";
 import { PUBLIC_SITE } from "../core/handoff.js";
-import { lookupApp, lookupNeed, mergeDetails, pageLinks, lookupUrl, workerLookupUrl, regionOf, ownPageLinks, shortText,
+import { lookupApp, lookupNeed, mergeDetails, pageLinks, lookupUrl, workerLookupUrl, regionOf, ownPageLinks,
   storeTrackId, storeReviews, reviewsFeedUrl, workerReviewsUrl } from "../core/applookup.js";
 import { NAME, BUNDLE_ID } from "../brand.js";
 import { addNavIcon } from "../nav/navbar.js";
@@ -742,7 +745,11 @@ export async function siteCertificateAlert({ download = () => {}, alert = showAl
 
 // F181: the iOS 6 App Store's page (screens/storepage.js): the header, then Details / Reviews / Related. `related`
 // fills the Related tab (browse.js relatedPane); the Details pane is returned for what the caller adds to it.
-export function renderApp(body, route, pkg, source, { related = null } = {}) {
+// F350: Details in Cydia's style (screens/details.js): Add Tweaks with its tile, Preview, the description's dashed box,
+// More Information (a long text, What's New, Permissions), Version with CHANGE (`onChange`: Install Which Version?)
+// and Version History, Information with tiles, the install groups, Links with globe tiles, then `tail` (the caller's
+// Wish List and Installed App) and the centred footer. -> { details, tabs, tail }
+export function renderApp(body, route, pkg, source, { related = null, onChange = null } = {}) {
   const st = pkg.stanza;
   const app = st.ipa;
   const v = app.versions[0];
@@ -763,6 +770,7 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   const fit = compat(keptInfo ? withIpaInfo(st, keptInfo) : st, currentDevice());
   const size = formatSize(v.size);
   const tooBig = siteTooBigApp(v); // F257: the website can't sign it (its listed size is over the cap)
+  const sourceName = app.sourceName || (source ? displayName(source) : "") || app.sourceUrl;
   // F194: Share sits on the header, where the App Store's install button was (the nav bar keeps Install / Modify).
   const header = storeHeader({ art: icon, name: app.name, author: app.developerName || null,
     action: headerShareButton(source ?? { key: pkg.key }, { app: true }),
@@ -780,12 +788,11 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
     // written reviews are asked for only when its view first opens.
     reviews: (pane) => reviewsTab(pane, { id: reviewId, version: v.version ?? "", build: true, appStore: appStoreTab(ratingReady, looked), first: oursFirst, api: reviewApi,
       malicious: () => reportMalicious({ id: reviewId, version: v.version ?? "", name: app.name }), // F291
-      onRating: (r) => { header.setRating(r); tiles.set("rating", ratingTile(r)); } }),
+      onRating: (r) => header.setRating(r) }),
     related,
   });
   const details = tabs.panes.details;
   body.replaceChildren(page, ...tabs.nodes);
-  const tiles = tileRow();
 
   // F161: the App Store's details by bundle ID (core/applookup.js), only now that the page is open; none when the
   // source already gives screenshots, developer and the app's own page.
@@ -797,22 +804,24 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   merged.then((m) => {
     if (m.developer && !app.developerName) header.setAuthor(m.developer); // F161: the App Store's, when the source names none
     if (m.rating != null) storeRating = { average: m.rating, count: m.ratingCount ?? null, noun: "Ratings" };
-    if (m.category) tiles.set("section", sectionTile(m.category, "App"));
     ratingKnown(storeRating);
   }, () => ratingKnown(null));
-  // B82: the header stars and the Rating tile: this build's when anyone rated it here, else the App Store's (marked
-  // "on the App Store"); never the two averaged. Drawn once both are known, so they don't flip from one to the other.
-  Promise.all([ratingReady, oursFirst]).then(([store, ours]) => {
-    const r = pageRating({ ours, appStore: store });
-    header.setRating(r);
-    tiles.set("rating", ratingTile(r));
-  });
+  // B82: the header stars: this build's when anyone rated it here, else the App Store's (marked "on the App Store");
+  // never the two averaged. Drawn once both are known, so they don't flip from one to the other.
+  Promise.all([ratingReady, oursFirst]).then(([store, ours]) => header.setRating(pageRating({ ours, appStore: store })));
 
   // F122: the source's screenshots, or (when it lists none) its GitHub repo's README and release pictures.
   // F161: when the source lists none, the App Store's screenshots come before the GitHub ones.
   // F302a: Add Tweaks, directly under the header's Install and above the screenshots (the sideload build)
   // (imported up front, so the row is there with the page and doesn't pop in; its count fills in when known)
-  if (detectMode() === "sideload" && app.bundleIdentifier) details.append(addTweaksGroup({ bundleId: app.bundleIdentifier, name: app.name }).el);
+  // F350: with its tile, and no footer naming every tweak (user 2026-11-21): the row's own detail says how many.
+  const rowsPlan = appRows({ sideload: detectMode() === "sideload", bundleId: app.bundleIdentifier, versions: app.versions.length,
+    version: `${v.version}${v.buildVersion ? ` (${v.buildVersion})` : ""}` });
+  if (rowsPlan.addTweaks) {
+    const tw = addTweaksGroup({ bundleId: app.bundleIdentifier, name: app.name }).el;
+    tw.querySelector(".group-footer")?.remove();
+    details.append(tileCells(tw, "pkgTweaks"));
+  }
   const previewKey = `app:${pkg.key}:${pkg.row?.id ?? app.bundleIdentifier}`;
   const shots = altShots(app);
   if (shots.length || need !== "full") details.append(previewSlot(previewKey, { shots, gh: appGithub(app) }));
@@ -820,38 +829,28 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
     details.append(previewSlot(previewKey, merged.then((m) => ({ shots: m.screenshots.map((url) => ({ url, from: "appstore" })), gh: appGithub(app) }))));
   }
 
-  // F181: the sideways info tiles: Rating (once the App Store answers), Works On, Size, Section, Updated.
-  tiles.set("works", worksOnTile(fit));
-  tiles.set("size", sizeTile(size, "Free"));
-  if (tooBig) tiles.tiles.get("size")?.classList.add("size-over"); // F257: the tile's size red too (user 2026-11-19)
-  tiles.set("section", sectionTile(pkg.row.section, "App"));
-  tiles.set("updated", updatedTile(v.date));
-  details.append(tiles.row);
+  // F350: the description in Cydia's dashed box, its first lines (the App Store's when the source has none, F161);
+  // More Information has the whole text, What's New and Permissions.
+  const perm = app.permissions ?? { privacy: [], entitlements: [] };
+  const nPerm = perm.privacy.length + perm.entitlements.length;
+  const descSlot = el("div");
+  const moreSlot = el("div");
+  details.append(descSlot, moreSlot);
+  const drawText = (text) => {
+    descSlot.replaceChildren(...(text ? [descGroup(text)] : []));
+    const more = moreInfoShown({ text, whatsNew: Boolean(v.localizedDescription), permissions: nPerm });
+    moreSlot.replaceChildren(...(more ? [grouped([{ rows: [{ label: MORE_INFO_LABEL, icon: rowIcon("pkgMore"),
+      href: deeper(route, `info:${pkg.row.id}`) }] }])] : []));
+  };
+  drawText(app.localizedDescription || "");
+  if (!app.localizedDescription) merged.then((m) => { if (m.description && body.isConnected) drawText(m.description); });
 
-  if (app.localizedDescription) details.append(descriptionGroup(app.localizedDescription)); // F165
-  // F161: the App Store's description, under the source's own text.
-  const storeText = el("div");
-  details.append(storeText);
-  merged.then((m) => {
-    if (!m.description) return;
-    // Apple's text runs long: the first lines, and a More row that opens the rest in place (iOS 6 App Store's More).
-    const short = shortText(m.description);
-    const text = el("div", "pkg-description", short ?? m.description);
-    const g = card([text]);
-    g.prepend(el("h2", "group-header", "From the App Store"));
-    if (short) {
-      // B271: it grows downward in place, the page not scrolled (growOpen).
-      const more = grouped([{ rows: [{ label: "More", onClick: () => growOpen(text, () => { text.textContent = m.description; more.remove(); }) }] }]).querySelector("li");
-      g.querySelector(".table").append(more);
-    }
-    storeText.replaceChildren(g);
-  });
-
-  // What's New (the newest version's notes and date) with Version History (F29: its own page, browse.js
-  // renderVersions, every versions[] entry, older ones installable) under it.
-  const news = whatsNewGroup({ version: v.version, date: formatDate(v.date), notes: v.localizedDescription || null,
-    history: { label: "Version History", href: deeper(route, `versions:${pkg.row.id}`) } });
-  if (news) details.append(news);
+  // Version with CHANGE (Install Which Version?), and Version History (F29: its own page, browse.js renderVersions,
+  // every versions[] entry, older ones installable).
+  const versionBox = grouped([{ header: "Version", rows: detailRows(rowsPlan.version, {
+    history: { href: deeper(route, `versions:${pkg.row.id}`) } }), footer: v.date ? `Updated ${formatDate(v.date)}` : null }]).firstElementChild;
+  if (rowsPlan.change && onChange) changeButton(versionBox, onChange);
+  details.append(versionBox);
 
   // F161: Information is drawn again once the App Store's facts are in (developer, category, its version and iOS).
   // F160: and once the IPA has been read (Compatibility: what it says, and where that came from).
@@ -861,18 +860,12 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   let ipaRow = keptInfo ? ipaCompatText(withIpaInfo(v, keptInfo), keptInfo) : needsCheck(v) ? "Checking…" : null;
   const drawDetails = (m = lastStore) => {
     lastStore = m;
-    const info = [];
-    if (app.developerName || m.developer) info.push({ label: "Developer", detail: app.developerName || m.developer });
-    info.push({ label: "Version", detail: v.version });
-    if (size) info.push({ label: "Size", detail: size, ...(tooBig ? { cls: "size-over" } : {}) }); // F257: red past the website's cap
-    if (v.date) info.push({ label: "Updated", detail: formatDate(v.date) });
-    info.push({ label: "Category", detail: m.category || pkg.row.section });
-    if (raised && ipaRow) info.push({ label: "Compatibility", detail: ipaRow }); // B74: the IPA needs more than the source says
-    else if (osRange(v)) info.push({ label: "Compatibility", detail: osRange(v) });
-    else if (ipaRow) info.push({ label: "Compatibility", detail: ipaRow });
-    if (m.version) info.push({ label: "App Store Version", detail: m.version });
-    if (m.minimumOs) info.push({ label: "App Store Requires", detail: `iOS ${m.minimumOs} or later` });
-    info.push({ label: "Bundle ID", detail: app.bundleIdentifier });
+    // F350: each row with its tile. Works On: B74's IPA range when the IPA needs more than the source says.
+    const worksOn = (raised && ipaRow) || osRange(v) || ipaRow || lastFit.range || "";
+    const info = detailRows(appRows({ bundleId: app.bundleIdentifier, source: sourceName, category: m.category || pkg.row.section,
+      worksOn, size, tooBig, storeVersion: m.version || null,
+      storeRequires: m.minimumOs ? `iOS ${m.minimumOs} or later` : null }).info, { // F257: Size red past the website's cap
+      source: route.tab === "sources" && route.path[0] === pkg.key ? {} : { href: format({ tab: "sources", path: [pkg.key] }) } });
     detailsBox.replaceChildren(grouped(infoSections(info, { fitDetail: lastFit.detail, tooBig })));
   };
   drawDetails();
@@ -880,48 +873,8 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   merged.then(drawDetails);
   const drawFit = (f) => {
     lastFit = f;
-    tiles.set("works", worksOnTile(f));
     drawDetails();
   };
-
-  // What the app may do, listed before the install buttons (AltStore shows these before it installs).
-  const perm = app.permissions;
-  if (perm.privacy.length || perm.entitlements.length) {
-    const rows = [
-      ...perm.privacy.map((p) => ({ label: p.name, subtitle: p.description || null })),
-      ...perm.entitlements.map((e) => ({ label: entitlementLabel(e.name), subtitle: e.description || e.name })),
-    ];
-    // The first few, then a row that opens the rest in place (user 2026-11-17), the iOS 6 table look.
-    const FEW = 3;
-    const footer = "What this app asks for, as its source lists it.";
-    const more = rows.length - FEW;
-    const toggleRow = (label, onClick, up) => {
-      const li = grouped([{ rows: [{ label, onClick }] }]).querySelector("li");
-      li.classList.add("perm-more");
-      li.classList.toggle("up", up);
-      return li;
-    };
-    const group = grouped([{ header: "Permissions", footer, rows: more > 1 ? rows.slice(0, FEW) : rows }]).firstElementChild;
-    const ul = group.querySelector("ul");
-    let extra = [];
-    // Open: the rest fade in above a Show Fewer row; Show Fewer puts them away again.
-    function open(toggle) {
-      extra = [...grouped([{ rows: rows.slice(FEW) }]).querySelector("ul").children];
-      toggle.replaceWith(...extra, toggleRow("Show Fewer", (e) => close(e.currentTarget.closest("li")), true));
-      for (const li of extra) li.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250 });
-    }
-    // The page scrolls so the row stays where it was under the finger (user 2026-11-17: no jump on Show Fewer).
-    function close(toggle) {
-      const scroller = toggle.closest(".page-body");
-      const before = toggle.getBoundingClientRect().top;
-      for (const li of extra) li.remove();
-      const row = toggleRow(`${more} More Permissions`, (e) => open(e.currentTarget.closest("li")), false);
-      toggle.replaceWith(row);
-      if (scroller) scroller.scrollTop += row.getBoundingClientRect().top - before;
-    }
-    if (more > 1) ul.append(toggleRow(`${more} More Permissions`, (e) => open(e.currentTarget.closest("li")), false));
-    details.append(group);
-  }
 
   // F30: without a jailbreak (the site, the sideload build) nothing can ask the phone what it has, so tapping an
   // install row records the app on the device for the Installed tab. F88: the jailbreak app records it too, once the
@@ -999,8 +952,7 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
 
   // Links (F161, after F122): this app's own page (its GitHub or website, else the App Store), then the source's page
   // in iFizBox, then the source's website when it is another page. Never two rows to one page (core/applookup.js).
-  const sourceName = app.sourceName || (source ? displayName(source) : "") || app.sourceUrl;
-  const sourceRow = { label: sourceName, subtitle: app.sourceUrl,
+  const sourceRow = { label: sourceName, subtitle: app.sourceUrl, icon: rowIcon("sources"),
     href: route.tab === "sources" && route.path[0] === pkg.key ? null : format({ tab: "sources", path: [pkg.key] }) };
   const linksBox = el("div");
   const drawLinks = (store, sourceWebsite) => linksBox.replaceChildren(appLinksGroup(pageLinks({ ownLinks, store, source: sourceRow,
@@ -1009,8 +961,34 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   details.append(linksBox);
   Promise.all([looked, catalog.altSource(pkg.key).then((m) => m?.website ?? null, () => null)])
     .then(([store, site]) => drawLinks(store, site), () => {});
-  details.append(grouped([{ footer: `${app.bundleIdentifier}\n${[sourceName, pkg.row.section].filter(Boolean).join(" · ")}` }]));
-  return { details, tabs };
+  // F350: the caller's rows (Wish List, Installed App) go in `tail`, above the centred footer.
+  const tail = el("div", "alt-app-tail");
+  details.append(tail, footerGroup(detailsFooter(app.bundleIdentifier, sourceName, pkg.row.section)));
+  return { details, tabs, tail };
+}
+
+// F350: an app's More Information: the whole description in the dashed box (the App Store's when the source has
+// none, F161), What's New in the newest version with its date, and every Permission the source lists.
+export const PERMISSIONS_FOOTER = "What this app asks for, as its source lists it.";
+export function permissionRows(app) {
+  const perm = app.permissions ?? { privacy: [], entitlements: [] };
+  return [...perm.privacy.map((p) => ({ label: p.name, subtitle: p.description || null })),
+    ...perm.entitlements.map((e) => ({ label: entitlementLabel(e.name), subtitle: e.description || e.name }))];
+}
+export function appInfoNodes(app, { lookup = (id) => storeLookup(id) } = {}) {
+  const v = app.versions[0] ?? {};
+  const out = [];
+  if (app.localizedDescription) out.push(descGroup(app.localizedDescription, { full: true }));
+  else if (app.bundleIdentifier) {
+    const slot = el("div");
+    out.push(slot);
+    Promise.resolve(lookup(app.bundleIdentifier)).then((m) => { if (m?.description) slot.replaceChildren(descGroup(m.description, { full: true })); }, () => {});
+  }
+  const news = v.localizedDescription ? whatsNewGroup({ version: v.version, date: formatDate(v.date), notes: v.localizedDescription }) : null;
+  if (news) out.push(news);
+  const rows = permissionRows(app);
+  if (rows.length) out.push(grouped([{ header: "Permissions", rows, footer: PERMISSIONS_FOOTER }]).firstElementChild);
+  return out;
 }
 
 // F161: an app's App Store details on this device: the website asks the Worker (/api/applookup, cached at the edge),
@@ -1073,7 +1051,7 @@ function ipaCompatText(v, info) {
 // F161: core/applookup.js pageLinks' rows as the Links group: a link row opens out, the source row opens its page.
 function appLinksGroup(links, sourceRow) {
   const rows = links.map((l) => (l.kind === "source" ? { ...sourceRow, chevron: true }
-    : { label: l.label, subtitle: l.detail || l.url, onClick: () => openOut(l.url), chevron: true }));
+    : { label: l.label, subtitle: l.detail || l.url, icon: rowIcon("pkgLink"), onClick: () => openOut(l.url), chevron: true }));
   const g = grouped([{ header: "Links", rows }]);
   g.firstElementChild?.classList.add("links-group");
   return g;
@@ -1147,7 +1125,7 @@ function galleryGroup(pics0) {
   const g = el("div", "group shots-group");
   const dots = el("div", "shot-dots");
   dots.setAttribute("aria-hidden", "true");
-  g.append(el("h2", "group-header", "Screenshots"), strip, dots);
+  g.append(el("h2", "group-header", PREVIEW_HEADER), strip, dots); // F350: not always screenshots
   const pics = () => [...strip.querySelectorAll(".alt-shot")];
   const drawDots = () => {
     const n = pics().length;
@@ -1186,7 +1164,7 @@ export function zoomShots(list, index = 0) {
   if (!list.length || typeof document === "undefined" || !document.body) return null;
   const layer = el("div", "shot-zoom");
   layer.setAttribute("role", "dialog");
-  layer.setAttribute("aria-label", "Screenshots");
+  layer.setAttribute("aria-label", PREVIEW_HEADER);
   const track = el("div", "shot-zoom-track");
   for (const p of list) {
     const page = el("div", "shot-zoom-page");
@@ -1247,7 +1225,7 @@ export function previewSlot(key, sources, { load = loadPreviews, text = previewT
   }
   const spin = el("div", "shots-loading");
   spin.setAttribute("role", "progressbar");
-  spin.setAttribute("aria-label", "Loading Screenshots");
+  spin.setAttribute("aria-label", `Loading ${PREVIEW_HEADER}`);
   spin.append(el("span", "shots-spinner"));
   slot.classList.add("shots-pending");
   slot.append(spin);

@@ -1223,3 +1223,21 @@ html[data-theme="dark"] .dep-piracy .dep-review-title { color: var(--dk-bad); }
   box-shadow: var(--row-failed-badge-shadow);
 }
 /* ==== } look-only ==== */
+
+/* F350: the Details page (screens/details.js), after Cydia's on the 4S: the description in a dashed box (its first 6
+   lines; More Information shows it whole), Version's CHANGE price button at the row's right, the centred footer in
+   every era, and Filesystem Content's paths. */
+.cy-desc-group { margin-top: 10px; }
+.cy-desc { padding: 11px 13px; border: 1.5px dashed; border-radius: 9.5px; }
+.cy-desc .cy-desc-text { padding: 0; line-height: 18px; max-height: 108px; overflow: hidden;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; }
+.cy-desc-full .cy-desc-text { max-height: none; -webkit-line-clamp: unset; display: block; }
+.cell-inner.has-change .cell-detail { margin-right: 10px; }
+.cy-change { flex: none; }
+.group-footer.cy-foot { text-align: center; }
+.pkg-files .cell-label { white-space: normal; overflow-wrap: anywhere; }
+/* ==== look-only { ==== the Details page */
+.cy-desc { color: var(--text); background: color-mix(in srgb, var(--table) 85%, transparent); border-color: var(--table-edge); }
+.cy-desc .cy-desc-text { font-size: 15px; }
+.pkg-files .cell-label { font-size: 13px; font-weight: normal; }
+/* ==== } look-only ==== */

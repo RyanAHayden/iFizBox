@@ -525,3 +525,6 @@ html[data-style="ios7"][data-theme] .manage-toolbar .bar-button.manage-delete:no
 html[data-style="ios7"][data-theme] .manage-toolbar .bar-button.manage-delete:not(.back):not(.done):is(:active, .is-pressed) {
   color: var(--i7-red); border-color: transparent; background: none; box-shadow: none;
 }
+
+/* F350: the Details page's footer (id · source - section) stays centred as Cydia's, whatever iOS 7's footers do. */
+html[data-style="ios7"] .group-footer.cy-foot { text-align: center; }
