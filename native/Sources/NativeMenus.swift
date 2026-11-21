@@ -55,10 +55,14 @@ enum NativeMenus {
             let view: UIView = c.web ?? top.view
             pop.sourceView = view
             pop.sourceRect = rect(p["rect"]) ?? CGRect(x: view.bounds.midX, y: view.bounds.maxY - 1, width: 1, height: 1)
-            pop.delegate = once // weak: the actions above keep `once`; a tap outside the popover is Cancel
+            pop.delegate = once // weak; a tap outside the popover is Cancel
         }
+        // The sheet keeps `once` (and so the popover's delegate) alive, also when no action holds it (no buttons, no Cancel).
+        objc_setAssociatedObject(vc, &onceKey, once, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         top.present(vc, animated: true)
     }
+
+    private static var onceKey: UInt8 = 0
 
     // One answer per call, whichever comes first.
     private final class Once: NSObject, UIPopoverPresentationControllerDelegate {
@@ -110,6 +114,7 @@ enum NativeMenus {
             DispatchQueue.main.asyncAfter(deadline: .now() + showWait) {
                 guard !button.shown else { return }
                 NSLog("ui.menu: performPrimaryAction showed no menu; trying UIEditMenuInteraction")
+                button.abandoned = true // a menu that still shows now is put away at once: the next way takes over
                 button.removeFromSuperview()
                 viaEdit()
             }
@@ -123,6 +128,7 @@ enum NativeMenus {
     private final class MenuButton: UIButton {
         let once: Once
         var shown = false
+        var abandoned = false
         init(frame: CGRect, once: Once) {
             self.once = once
             super.init(frame: frame)
@@ -134,12 +140,14 @@ enum NativeMenus {
         override func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willDisplayMenuFor configuration: UIContextMenuConfiguration,
                                              animator: UIContextMenuInteractionAnimating?) {
             super.contextMenuInteraction(interaction, willDisplayMenuFor: configuration, animator: animator)
+            if abandoned { return interaction.dismissMenu() }
             shown = true
         }
 
         override func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willEndFor configuration: UIContextMenuConfiguration,
                                              animator: UIContextMenuInteractionAnimating?) {
             super.contextMenuInteraction(interaction, willEndFor: configuration, animator: animator)
+            if abandoned { return }
             // A chosen item answers from its UIAction; put away with none, it answers -1 once the menu has gone.
             let end = { [weak self] in
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -195,6 +203,8 @@ enum NativeMenus {
 
         func editMenuInteraction(_ interaction: UIEditMenuInteraction, willPresentMenuFor configuration: UIEditMenuConfiguration,
                                  animator: UIEditMenuInteractionAnimating) {
+            // Too late: the page was told no menu showed and draws its own; this one goes at once.
+            if self.interaction == nil { return interaction.dismissMenu() }
             shown = true
         }
 

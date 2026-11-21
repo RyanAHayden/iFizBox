@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { showActionSheet, wantsNativeControls, tapRect, watchTaps } from "./actionsheet.js";
+import { showActionSheet, wantsNativeControls, tapRect, watchTaps, TAP_FRESH_MS } from "./actionsheet.js";
 import { showMenu, copyText } from "./menu.js";
 import { fakeDocument, tick } from "./fakedom.test-helper.js";
 
@@ -30,12 +30,22 @@ const shell = (methods) => {
 const placed = (el, r = { left: 10.4, top: 300, width: 320, height: 44 }) =>
   Object.assign(el, { getBoundingClientRect: () => ({ ...r, right: r.left + r.width, bottom: r.top + r.height }) });
 
-test("F345c: under the native hook, showActionSheet sends ui.actionSheet with the anchor's rect and answers its index", async () => {
+// A touch going down on `el`, seen by actionsheet.js's capture listener on this page's document.
+function touch(document, el) {
+  const listeners = {};
+  document.addEventListener = (t, f) => { listeners[t] = f; };
+  watchTaps(document);
+  listeners.pointerdown({ target: el });
+}
+
+test("F345c: under the native hook, showActionSheet sends ui.actionSheet with the tapped button's rect and answers its index", async () => {
   const native = shell({ "ui.actionSheet": () => ({ index: 1 }) });
   await withPage({ native }, async (document) => {
-    const anchor = placed(document.createElement("button"));
-    document.body.append(anchor);
-    const i = await showActionSheet({ title: "Modify", buttons: ["Reinstall", "Remove"], destructive: [1, 7], anchor });
+    const modify = placed(document.createElement("button"));
+    document.body.append(modify);
+    touch(document, modify);
+    const i = await showActionSheet({ title: "Modify", buttons: ["Reinstall", "Remove"], destructive: [1, 7] });
+    modify.remove();
     assert.equal(i, 1);
     assert.deepEqual(native.calls, [["ui.actionSheet", {
       title: "Modify", buttons: ["Reinstall", "Remove"], cancel: "Cancel", destructive: [1], // only real buttons
@@ -55,17 +65,15 @@ test("F345c: Cancel, an answer out of range and no cancel button", async () => {
   });
 });
 
-test("F345c: with no anchor the rect is the button the last touch went down on", async () => {
+test("F345c: the rect is the button the last touch went down on, only while that touch is recent", async () => {
   await withPage({}, async (document) => {
-    const listeners = {};
-    document.addEventListener = (t, f) => { listeners[t] = f; };
-    watchTaps(document);
     const row = placed(document.createElement("button"), { left: 0, top: 100, width: 200, height: 44 });
     const label = document.createElement("span");
     row.append(label);
     document.body.append(row);
-    listeners.pointerdown({ target: label });
+    touch(document, label);
     assert.deepEqual(tapRect(), { x: 0, y: 100, width: 200, height: 44 });
+    assert.equal(tapRect(Date.now() + TAP_FRESH_MS + 1), null, "a sheet long after the touch points at no row");
     row.remove();
     assert.equal(tapRect(), null, "an element gone from the page has no rect");
   });

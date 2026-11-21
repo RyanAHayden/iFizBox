@@ -6,9 +6,9 @@ Plan: `journal/2026-11-21-f345-ios26-native-controls/README.md` ("Action sheets"
 
 - `web/app/nav/actionsheet.js`: `showActionSheet` asks `wantsNativeControls()` first (the bridge takes calls and
   `<html data-controls="native">` is on). Then it sends `ui.actionSheet` `{title, buttons, cancel, destructive: [..],
-  rect?}` and answers the shell's index (anything out of range is -1, Cancel). `rect` comes from a new optional
-  `anchor` option or, since no caller passes one, from the element the last touch went down on (a capture
-  `pointerdown` listener, `tapRect()` takes its nearest button/row). A rejected call (an older shell, no window)
+  rect?}` and answers the shell's index (anything out of range is -1, Cancel). `rect` comes from the element the
+  last touch went down on (a capture `pointerdown` listener; `tapRect()` takes its nearest button/row), only when
+  that touch was in the last 3 s (`TAP_FRESH_MS`); with none the shell points at the bottom middle. A rejected call (an older shell, no window)
   shows the CSS sheet, which is the old body, now `cssSheet()`, unchanged.
 - `web/app/nav/menu.js`: `showMenu` under the same rule sends `ui.menu` `{items, rect, x?}` at the anchor's rect,
   keeps the anchor's `is-held` look while it waits, and runs the chosen item's `onClick`. -1 (put away) runs
@@ -66,6 +66,24 @@ on the iOS 6 style; I set `data-style="ios26"` and `data-controls="native"` on `
 
 Chromium can't check this: the native sheet and menu exist only in the shell.
 
+## After the spec review
+
+- Fixed: the last touch counts only for 3 s (it used to count however old it was).
+- Fixed: a sheet with no buttons and no Cancel never answered. The weak popover delegate was its only link to the
+  answer object, so the object was freed. The controller now keeps it (an associated object).
+- Fixed: a menu that starts showing after the 0.4 s wait (button, or edit menu) is put away at once
+  (`dismissMenu()`), so it never stays up under the CSS callout the page draws after the error.
+- Dropped the `anchor` option on `showActionSheet`: nobody asked for it, and nothing passed it.
+- Kept `clipboard.write` and copyText's fallback to it, which the review counted as not asked. Without them the
+  native menu's Copy URL copies nothing (seen on the phone: WebKit refuses the write after the shell answers). Both
+  are in the task's files.
+- Not changed: a menu put away answers -1 0.1 s after its dismissal ends, which relies on UIKit running a chosen
+  `UIAction` first. That order held on the phone (Copy URL answered 0, not -1). `close()` on a native menu only
+  drops the answer, as its comment says; the two callers never call it.
+
+The rebuilt shell with these Swift fixes compiled. The phone check above ran on the build from before them; only
+the late-show and empty-sheet paths changed, and neither ran in that check.
+
 ## Tried and failed
 
 - My first test of the CSS-callout fallback ran into `innerWidth` missing in Node and then into the callout's
@@ -73,6 +91,8 @@ Chromium can't check this: the native sheet and menu exist only in the shell.
 
 ## Not verified
 
+- **The review fixes in Swift on the phone** (a late menu put away, the empty sheet answering): they compiled, but
+  no phone run. Neither case comes up in the app's callers, and forcing them needs a slow or empty menu.
 - **The `UIEditMenuInteraction` fallback**: `performPrimaryAction()` worked, so it never ran on the phone; only
   compiled.
 - **A shell without `ui.actionSheet`/`ui.menu`** on a real phone: no older build installed. Covered by the Node tests
