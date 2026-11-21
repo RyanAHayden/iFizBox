@@ -364,6 +364,9 @@ export const APP_ICONS = [
   ...byKey.get("lightTheme").options.map((o) => ({ value: o.value, label: o.label, tone: "light" })),
   ...byKey.get("darkTheme").options.map((o) => ({ value: o.value, label: o.label, tone: "dark" })),
   { value: "clear", label: "Clear", tone: null },
+  // F324: the Glass icon (native/icon/glass.py): Classic in Light, Gunmetal in Dark, in iOS 26's Liquid Glass; older
+  // iOS show a flat copy of it. Offered on every iOS (user 2026-11-21).
+  { value: "glass", label: "Glass", tone: null },
 ];
 for (const k of ["lightIcon", "darkIcon"]) byKey.get(k).options.push(...APP_ICONS.map(({ value, label }) => ({ value, label })));
 
@@ -947,13 +950,13 @@ export function iconState(get, onScreen) {
 }
 
 // F323: Theme > App Icon > Light / Dark's grid: "Themes", that tone's themes; "Special", Clear and the other tone's
-// themes (any icon works in either mode). Each group's cells are APP_ICONS entries.
+// themes (any icon works in either mode), with Glass after Clear. Each group's cells are APP_ICONS entries.
 // `clear`: whether Clear is offered (clearOffered: not below iOS 18, user 2026-11-20).
 export function iconGroups(tone, { clear = true } = {}) {
   const t = tone === "dark" ? "dark" : "light";
   return [
     { header: "Themes", icons: APP_ICONS.filter((i) => i.tone === t) },
-    { header: "Special", icons: [...(clear ? [APP_ICONS.find((i) => i.value === "clear")] : []), ...APP_ICONS.filter((i) => i.tone && i.tone !== t)] },
+    { header: "Special", icons: [...(clear ? [APP_ICONS.find((i) => i.value === "clear")] : []), APP_ICONS.find((i) => i.value === "glass"), ...APP_ICONS.filter((i) => i.tone && i.tone !== t)] },
   ];
 }
 

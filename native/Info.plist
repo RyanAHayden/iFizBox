@@ -98,6 +98,7 @@
 			<key>Icon-clear-leather</key><dict><key>CFBundleIconName</key><string>Icon-clear-leather</string></dict>
 			<key>Icon-clear-felt</key><dict><key>CFBundleIconName</key><string>Icon-clear-felt</string></dict>
 			<key>Icon-clear-wood</key><dict><key>CFBundleIconName</key><string>Icon-clear-wood</string></dict>
+			<key>Icon-glass</key><dict><key>CFBundleIconName</key><string>Icon-glass</string></dict>
 			<key>Icon-owna</key><dict><key>CFBundleIconFiles</key><array><string>IconOwnA20x20</string><string>IconOwnA29x29</string><string>IconOwnA40x40</string><string>IconOwnA60x60</string></array></dict>
 			<key>Icon-ownb</key><dict><key>CFBundleIconFiles</key><array><string>IconOwnB20x20</string><string>IconOwnB29x29</string><string>IconOwnB40x40</string><string>IconOwnB60x60</string></array></dict>
 		</dict>

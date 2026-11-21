@@ -11,7 +11,7 @@ function memStorage() {
 const store = (mode = "jailbreak") => createSettings({ storage: memStorage(), mode });
 
 test("every theme has an icon, and Clear is one more", () => {
-  assert.deepEqual(APP_ICONS.map((i) => i.value), [...LIGHT_PALETTES, ...DARK_PALETTES, "clear"]);
+  assert.deepEqual(APP_ICONS.map((i) => i.value), [...LIGHT_PALETTES, ...DARK_PALETTES, "clear", "glass"]);
 });
 
 test("Match Theme (the default) gives each tone its theme's icon", () => {
@@ -57,13 +57,13 @@ test("the sideload build's footers say iOS shows an alert; the jailbreak app's s
   assert.equal(store("jailbreak").footerOf("lightIcon"), "Pick an icon for each mode.");
 });
 
-test("the grid: this mode's themes, then Clear and the other mode's", () => {
+test("the grid: this mode's themes, then Clear, Glass and the other mode's", () => {
   const [themes, special] = iconGroups("dark");
   assert.equal(themes.header, "Themes");
   assert.deepEqual(themes.icons.map((i) => i.value), DARK_PALETTES);
   assert.equal(special.header, "Special");
-  assert.deepEqual(special.icons.map((i) => i.value), ["clear", ...LIGHT_PALETTES]);
-  assert.deepEqual(iconGroups("light")[1].icons.map((i) => i.value), ["clear", ...DARK_PALETTES]);
+  assert.deepEqual(special.icons.map((i) => i.value), ["clear", "glass", ...LIGHT_PALETTES]);
+  assert.deepEqual(iconGroups("light")[1].icons.map((i) => i.value), ["clear", "glass", ...DARK_PALETTES]);
   // every icon is in one of each mode's groups exactly once
   for (const tone of ["light", "dark"]) {
     assert.deepEqual(iconGroups(tone).flatMap((g) => g.icons.map((i) => i.value)).sort(), APP_ICONS.map((i) => i.value).sort());
@@ -77,7 +77,8 @@ test("Clear is offered from iOS 18 on only (user 2026-11-20: not on the iPhone 7
   assert.equal(clearOffered("26.1"), true);
   assert.equal(clearOffered(null), true);
   assert.ok(!iconGroups("dark", { clear: false })[1].icons.some((i) => i.value === "clear"));
-  assert.equal(iconGroups("light", { clear: false })[1].icons.length, DARK_PALETTES.length);
+  // F324: Glass stays on every iOS (older ones show actool's flat copy of it, user 2026-11-21)
+  assert.deepEqual(iconGroups("light", { clear: false })[1].icons.map((i) => i.value), ["glass", ...DARK_PALETTES]);
   const ua = (v) => `Mozilla/5.0 (iPhone; CPU iPhone OS ${v} like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148`;
   assert.equal(clearHere(ua("15_8_8")), false);
   assert.equal(clearHere(ua("18_1")), true);
@@ -103,6 +104,7 @@ test("tellIcon sends app.icon once per change, only in the apps", () => {
   }
   assert.deepEqual(iconMessage((k) => s.get(k), "dark").params.onScreen, "oled");
   assert.equal(iconSrc("clear"), "appicon/clear.png");
+  assert.equal(iconSrc("glass"), "appicon/glass.png");
 });
 
 test("a Clear pick saved earlier counts as the theme's icon where Clear isn't offered", () => {

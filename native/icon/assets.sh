@@ -11,8 +11,8 @@
 # its dark appearance), and every alternate set Info.plist's CFBundleAlternateIcons lists (F323: the icon follows the
 # theme, Sources/AppIcon.swift). iOS reads AppIcon from Assets.car for notifications, Settings and Spotlight; with the
 # name set and no catalog it shows a blank placeholder there. native/test_icons.py checks every set and size.
-# F324: every set also gets an Icon Composer document of the same name (icon/glass.py), so iOS 26+ draws it in Liquid
-# Glass (Clear, Tinted, Dark); needs Xcode 26's actool.
+# F324: glass.py's CAR_SETS (the Glass icon, Icon-glass) go in as Icon Composer documents, so iOS 26+ draws them in
+# Liquid Glass (Clear, Tinted, Dark); needs Xcode 26's actool.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -27,7 +27,12 @@ compile() {
   # glass.py car leaves glass/ empty while CAR_SETS is: no documents, not an error (nullglob, so no ls to fail).
   local glass=() doc
   shopt -s nullglob
-  for doc in "$1"/glass/*.icon; do glass+=("$doc"); done
+  for doc in "$1"/glass/*.icon; do
+    glass+=("$doc")
+    # one with no .appiconset of its own (the Glass icon) is an alternate actool would otherwise not list
+    name=$(basename "$doc" .icon)
+    if [ "$name" != AppIcon ] && [ ! -d "$1/Assets.xcassets/$name.appiconset" ]; then alts+=(--alternate-app-icon "$name"); fi
+  done
   shopt -u nullglob
   xcrun actool --compile "$1/out" --platform iphoneos --minimum-deployment-target 15.0 --target-device iphone \
     --app-icon AppIcon "${alts[@]}" --output-partial-info-plist "$1/partial.plist" \

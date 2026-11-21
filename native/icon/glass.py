@@ -3,9 +3,11 @@ refraction, and the Home Screen's Default, Dark, Clear and Tinted looks.
 
 An .icon is a folder: icon.json (the background fill and the layer groups, front first) and Assets/ (one SVG per
 layer). Xcode 26's actool compiles it into Assets.car beside the asset catalog's PNG set of the same name
-(icon/assets.sh): iOS 26+ draws the .icon, iOS 15-25 the PNGs icon/alternates.py puts in the .appiconset. So every
-set alternates.py lists (AppIcon and every Icon-*) gets an .icon here too, and Sources/AppIcon.swift switches the
-same names on every iOS.
+(icon/assets.sh). An .icon replaces a same-named .appiconset's PNGs whole, and costs ~3 MB of renders per set, so
+only CAR_SETS go into the .car: the Glass icon (alternates.GLASS_SET, Classic in Light and Gunmetal in Dark), an
+extra choice in Theme > App Icon with no PNG set (iOS 15-25 show actool's flat render of it). Every theme's set stays
+the PNGs (iOS 26 makes their Clear and Tinted looks itself). `write` still makes a document for every set, for the
+tests and for trying one.
 
 Each icon's layers are the globe of tools/icon.svg.in, flat, as Icon Composer wants them (the system adds the depth):
 
@@ -24,6 +26,7 @@ Settings and notifications come from the .icon too).
     python3 native/icon/glass.py write DIR      DIR/<set>.icon for every set
     python3 native/icon/glass.py car DIR        only the CAR_SETS ones (icon/assets.sh hands them to actool)
     python3 native/icon/glass.py show <icon>    the colours one icon's layers take, as JSON
+    python3 native/icon/glass.py thumb          icon/glass/AppIcon60x60@3x.png, the page's thumbnail (rsvg-convert)
     python3 native/icon/glass.py sources        one digest of everything `write` makes (icon/assets.sources)
 
 Stdlib only: the gate (native/test_icons.py) writes them too.
@@ -163,17 +166,51 @@ def write_icon(dest, name, light, dark):
 
 
 def all_sets():
-    """Every set's (light, dark) icons, AppIcon first: alternates.py's sets, a one-icon set dark as itself."""
+    """Every set's (light, dark) icons, AppIcon first: alternates.py's sets, a one-icon set dark as itself, then the
+    Glass icon's own set."""
     out = {"AppIcon": alternates.PRIMARY}
     for name, (light, dark) in alternates.sets().items():
         out[name] = (light, dark or light)
+    out[alternates.GLASS_SET] = alternates.PRIMARY
     return out
 
 
-# The sets whose .icon goes into Assets.car (icon/assets.sh). Empty until the user picks which (journal
-# 2026-11-20-f324-liquid-glass-icon): actool drops a same-named .appiconset's PNGs for the .icon (iOS 15-25 then get
-# actool's flattened render, no LITE sash) and stores ~3 MB of 1024 px renders per set, so all 74 would be ~220 MB.
-CAR_SETS = ()
+# The sets whose .icon goes into Assets.car (icon/assets.sh). Only the Glass icon's (user 2026-11-21): actool drops a
+# same-named .appiconset's PNGs for the .icon (iOS 15-25 would get actool's flattened render, no LITE sash) and
+# stores ~3 MB of 1024 px renders per set, so every theme's set stays a PNG set and the glass one is an extra choice,
+# a set of its own with no PNG set (alternates.GLASS_SET): Classic in Light, Gunmetal in Dark. iOS 15-25 show
+# actool's flat render of it.
+CAR_SETS = (alternates.GLASS_SET,)
+
+
+def flat_svg(icon):
+    """One icon's layers on its fill as a single flat picture (no system glass): the 180 px thumbnail the page shows
+    for the Glass icon (icon/glass/AppIcon60x60@3x.png, `glass.py thumb`)."""
+    c = colours(icon)
+    inner = lambda s: s.split("\n", 1)[1].rsplit("\n</svg>", 1)[0]  # noqa: E731
+    layers = layer_svgs(icon)
+    grad = ('  <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#%s"/>'
+            '<stop offset="1" stop-color="#%s"/></linearGradient></defs>\n'
+            '  <rect width="1024" height="1024" fill="url(#bg)"/>' % tuple(c["fill"]))
+    return svg("\n".join([grad, inner(layers["rim"]), inner(layers["sphere"]), inner(layers["grid"])]))
+
+
+THUMB = os.path.join(ICON, "glass", "AppIcon60x60@3x.png")
+
+
+def thumb():
+    """icon/glass/AppIcon60x60@3x.png from flat_svg (needs rsvg-convert): the Glass icon's light look, the same in
+    both builds (no LITE sash: the .icon is one picture for both)."""
+    import subprocess
+    import tempfile
+    os.makedirs(os.path.dirname(THUMB), exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", suffix=".svg", delete=False) as f:
+        f.write(flat_svg(alternates.PRIMARY[0]))
+    try:
+        subprocess.run(["rsvg-convert", "-w", "180", "-h", "180", f.name, "-o", THUMB], check=True)
+    finally:
+        os.unlink(f.name)
+    return THUMB
 
 
 def write(dest, names=None):
@@ -209,6 +246,8 @@ def main(argv):
     elif len(argv) == 2 and argv[0] == "car":
         for p in write(argv[1], CAR_SETS):
             print(p)
+    elif argv == ["thumb"]:
+        print(thumb())
     elif argv == ["sources"]:
         for path, digest in sources().items():
             print("%s  %s" % (digest, path))
