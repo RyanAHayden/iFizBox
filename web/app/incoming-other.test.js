@@ -1,4 +1,4 @@
-// F83: other sideloaders' links reaching incoming.js: a source opens Sources > Manage's Add filled in, an IPA opens
+// F83: other sideloaders' links reaching incoming.js: a source opens the Sources tab, Add filled in, an IPA opens
 // Install IPAs and asks, and with Open Other Apps' Links off (or a link only that app understands) iFizBox opens it
 // again, and says the link was for another app when nothing else answers or it comes straight back.
 import { test } from "node:test";
@@ -24,11 +24,11 @@ function deps({ on = true, answer = 1, opened = false, t = 0 } = {}) {
   };
 }
 
-test("AltStore source link: Sources > Manage, Add Source filled in", async () => {
+test("AltStore source link: the Sources tab, Add Source filled in", async () => {
   const { d, log } = deps();
   assert.equal(await handleIncoming(`altstore://source?url=${encodeURIComponent(SRC)}`, d), "other-source");
   assert.deepEqual(log.adds, [{ url: SRC }]);
-  assert.match(log.hashes[0], /sources\/manage\/sources/);
+  assert.deepEqual(log.hashes, ["#/sources"]); // B306: the tab's list, no Manage page
   assert.equal(log.opens.length, 0);
 });
 

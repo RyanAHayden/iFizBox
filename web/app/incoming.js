@@ -6,15 +6,15 @@
 //                                      page sent it (Open in iFizBox) until F92/F95 dropped the hand-offs; kept for
 //                                      links already out there and anyone's own pages
 //   ifizbox://myipas?file=<name>        F77: an .ipa another app sent, already in My IPAs (MyIPAs.swift): its page
-//   ifizbox://add?url=<url>[&suite=…]   N8: the Add Source intent: Add Source's alert, filled in (core/handoff.js);
-//                                      N9: also an APT repo or AltStore source shared with iFizBox
+//   ifizbox://add?url=<url>[&suite=…]   N8: the Add Source intent: the Sources tab, Add Source's alert filled in over
+//                                      it (core/handoff.js); N9: also an APT repo or AltStore source shared with iFizBox
 //   ifizbox://shared?route=…            N9: an .ipa or .deb shared with iFizBox, or why not (share.js)
 //   ifizbox://package?id=<id>           F96: the website's Install in iFizBox: that app's page (Search's package:<id>)
 //   ifizbox://account?k=<key>           F97: a iFizBox Account's link or QR code: Sign In With Key, filled in
 //   ifizbox://<tab>                     B14: home, sources, changes, installed, search, settings: that tab, at its root
 //   altstore://source?url=…, feather://install/<ipa>, …   F83: other sideloaders' links (core/otherlinks.js), when
-//                                      Settings > Sideloading > Open Other Apps' Links is on: a source goes to Sources >
-//                                      Manage's Add, filled in; an IPA to Install IPAs, then Install (signAndInstall).
+//                                      Settings > Sideloading > Open Other Apps' Links is on: a source goes to the Sources
+//                                      tab, Add Source filled in over it; an IPA to Install IPAs, then Install (signAndInstall).
 //                                      Off, or a link iFizBox has no use for: handed back (handBack below)
 //
 //   B175: the app run's log (screens/apprun.js) still up with its run over closes when iFizBox comes back to the
@@ -163,8 +163,7 @@ export async function handleIncoming(url, { native = nativeBridge(), alert = sho
   if (/^ifizbox:\/\/add\b/i.test(u)) {
     const prefill = addPrefill(u);
     if (!prefill) return "add";
-    const run = add ?? (await import("./screens/manage.js")).addSource;
-    await run({ showHUD: hud }, prefill);
+    await addFromLink(prefill, { add, hud, open });
     return "add";
   }
   if (/^ifizbox:\/\/shared\b/i.test(u)) {
@@ -211,14 +210,22 @@ const goHash = (hash) => { if (typeof location !== "undefined") location.hash = 
 async function handleOtherLink(u, other, { native, alert, hud, add, install, on, open, now, reload, drop }) {
   if (!on() || other.action === "other") return handBack(u, other, { native, alert, now, off: !on() });
   if (other.action === "source") {
-    open(format({ tab: "sources", path: ["manage", "sources"] }));
-    const run = add ?? (await import("./screens/manage.js")).addSource;
-    await run({ showHUD: hud }, { url: other.url });
+    await addFromLink({ url: other.url }, { add, hud, open });
     return "other-source";
   }
   await confirmInstall(other.url, "", `${other.app} link: ${ipaFileName(other.url)}\n${other.url}`, { alert, install, open, reload, drop });
   return "other-install";
 }
+
+// B306: a source from a link (another app's, ifizbox://add): the Sources tab at its root (a plain tab switch, so the
+// tab bar selects Sources), Add Source's alert filled in over it; once added, the new source shows in that list
+// loading (sources.js onSourcesChanged, with the tab's own ctx: fromLink). No Manage page.
+async function addFromLink(prefill, { add, hud, open }) {
+  open(SOURCES_ROOT);
+  const run = add ?? (await import("./screens/manage.js")).addSource;
+  return run({ showHUD: hud, fromLink: true }, prefill);
+}
+export const SOURCES_ROOT = format({ tab: "sources" });
 
 // Install IPAs opens under the alert; Install signs and installs (the sideload build's signAndInstall).
 // B50: the jailbreak build has no signer (signAndInstall only says "Can't Install Here" there): Install downloads the
