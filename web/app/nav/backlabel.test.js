@@ -25,6 +25,7 @@ function push(info, below = null) {
     b.className = "bar-button back";
     b.textContent = below.back;
     b.setAttribute("aria-label", "Back to " + below.back);
+    below.backButton = b;
     left.append(b);
   }
   const h1 = document.createElement("h1");
@@ -52,6 +53,16 @@ test("a package page named after it opened: Version History above it reads the n
   versions.item.remove();
   const again = push({ title: "Version History" }, pkg);
   assert.equal(backOf(again).textContent, "YouTube");
+});
+
+test("a popped page's item still in the DOM (removed at idle) doesn't take the new label from the live page above", () => {
+  stack.replaceChildren();
+  const pkg = push({ title: "com.google.ios.youtube" });
+  const popped = push({ title: "Version History" }, pkg); // popped, its item not yet removed
+  const live = push({ title: "Version History" }, pkg);
+  pkg.handle.setTitle("YouTube");
+  assert.equal(backOf(live).textContent, "YouTube");
+  assert.equal(backOf(popped).textContent, "com.google.ios.youtube");
 });
 
 test("named before anything is pushed: the next page's back reads the name", () => {

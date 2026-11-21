@@ -188,6 +188,7 @@ function navParts(info, below, title) {
   if (bar.back) {
     const back = button({ label: below.page.back, onClick: () => goBack() }, "bar-button back");
     back.setAttribute("aria-label", "Back to " + below.page.back);
+    below.page.backButton = back; // the newest page above's: a later title of below's renames it (nav/go.js backFollowsTitle)
     left.append(back);
   } else if (bar.left) left.append(button(bar.left, "bar-button"));
   const h1 = document.createElement("h1");

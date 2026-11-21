@@ -9,8 +9,10 @@ later `setTitle` only changed the shown title.
 - `web/app/nav/go.js` `backFollowsTitle(entry)` (first tried as its own module, nav/backlabel.js: that put app.js's
   startup closure at 117 modules and failed module-graph.test.js's cap, so it sits beside pageHandle instead): wraps the page handle's `setTitle` so a new title also
   becomes `entry.back` (only while `entry.back` still equals the old title, so a screen's own `back` stays), and
-  the back button of the page right above (the next `.nav-item` in the tab's nav stack), when it still reads the
-  old title, takes the new one and its aria-label.
+  the back button of the page right above, when it still reads the old title, takes the new one and its aria-label.
+  app.js navParts records that button on the page below (`entry.backButton`). Spec review: the first version took
+  the next `.nav-item` sibling, but a popped page's item stays in the DOM until idle (app.js drop), so a quick
+  back-then-push could rename the hidden item and leave the live one on the id; fixed, with a test.
 - `web/app/app.js` makePage calls it for every page.
 - Differs from branch concept/add-tweaks: that one rewrote every `.bar-button.back` in the whole document whose
   text matched, which could hit another tab's page with the same label; this one touches only the page above, and
@@ -25,6 +27,10 @@ later `setTitle` only changed the shown title.
   renamed again while Version History was on top: back and aria-label followed. No page errors.
 
 ## Not verified
+
+- No committed test drives app.js makePage/navParts itself (app.js can't load in node's fake DOM, and the browser
+  smoke test isn't in the gate): the node test copies their markup, and the real wiring was checked only by the
+  scratch Chromium script above.
 
 - The name arriving from real source data (browse.js loading the package): the fake bridge answers null, so the
   Chromium check gave the name through the same page handle call browse.js makes instead.
