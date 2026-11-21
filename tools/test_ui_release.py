@@ -64,6 +64,28 @@ class UiRelease(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual((self.run_dir / "ifizbox-15-ui.lock" / "slot").read_text().strip(), "5")
 
+    def test_every_phone_lock_records_the_slot_and_is_freed_by_it(self):
+        for phone in ("15", "7", "4s"):
+            with self.subTest(phone=phone):
+                ui = ROOT / "tools" / f"ui-{phone}.sh"
+                lock = self.run_dir / f"ifizbox-{phone}-ui.lock"
+                r = subprocess.run(["sh", str(ui), "lock", "T1"], env={**self.env, "AGENT_SLOT": "6"},
+                                   capture_output=True, text=True, timeout=30)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual((lock / "slot").read_text().strip(), "6")
+                # retaken outside a runner slot: no stale slot file left to free it by mistake
+                r = subprocess.run(["sh", str(ui), "lock", "T1"], env=self.env, capture_output=True, text=True,
+                                   timeout=30)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertFalse((lock / "slot").exists())
+                subprocess.run(["sh", str(ui), "lock", "T1"], env={**self.env, "AGENT_SLOT": "6"},
+                               capture_output=True, text=True, timeout=30, check=True)
+                # the branch moved on: on_exit frees it by slot alone
+                r = subprocess.run(["sh", str(SCRIPT)], env={**self.env, "AGENT_SLOT": "6"}, capture_output=True,
+                                   text=True, timeout=30)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertFalse(lock.exists())
+
     def test_main_is_left_alone(self):
         d = self.hold("15", "main")
         self.assertEqual(self.release("main").returncode, 0)
