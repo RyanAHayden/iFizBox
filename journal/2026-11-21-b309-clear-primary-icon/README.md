@@ -48,6 +48,35 @@ Stays. On iOS 26+ the primary icon now covers the Home Screen's Clear look by it
 it. It still has a use on iOS 18-25 (no Clear Home Screen look there) and for anyone who wants the clear picture in
 Default; removing it would also touch the web chooser, outside this task's files.
 
+## Checks on the phones (the gate's builds from this branch)
+
+- **iPhone 15 Pro (iOS 27)**: installed the gate's `iFizBox.ipa` (its Assets.car md5 = the committed
+  AssetsLite.car), rebooted first (`ui-15.sh reboot`), then Customize in turn: `final-default.jpg` (Classic + LITE),
+  `final-dark.jpg` (Dark, Always: Gunmetal + LITE), `final-clearlight.jpg` and `final-cleardark.jpg` (the globe alone
+  on the glass tile), `final-tinted.jpg` (the globe in the tint). Put the Home Screen back on Default afterwards. The
+  15 is left on this branch's Lite build.
+- **iPhone 7 (iOS 15.8.8)**: installed the gate's `iFizBox.deb` (`apt-get install`; it was on 0.17.3-3159, now
+  0.19.1-3913 from this branch; the app's Assets.car md5 = the committed Assets.car). Home Screen: the normal Classic
+  picture icon (`iphone7-ios15.jpg`, the right-hand iFizBox; the left one is the web app with its WEB sash).
+
+## Tried and failed
+
+- The first car named the tinted picture `AppIconTinted1024.png` in both builds: `carfile.icon_problems` (the
+  mkipa.py bundle check) refused it in the Lite car as "the jailbreak build's icon". Renamed per build and recompiled.
+- The first gate run failed the size guard: the journal's PNG shots were 1.3 MB each; now ~30 KB JPEG crops.
+- The MBA timed out on the first `ssh mba` (asleep: Tailscale showed it "active" with rx 0); it answered a minute
+  later, and `caffeinate` kept it up.
+
+## Follow-up filed
+
+- F360: the same tinted appearance for the theme icon sets (Icon-*), so a phone showing another theme's icon also
+  goes see-through in Clear. Out of this task's scope (the brief asks for the primary icon).
+
 ## Not verified
 
-(filled in below as checks finish)
+- iOS 18-25 Tinted (and Dark) on a real phone: no iOS 18-25 device here (the 7 is iOS 15, the 15 Pro iOS 27). iOS 18
+  reads the same tinted appearance, so its Tinted look should show the globe too; not seen.
+- The Settings, Spotlight and notification icons in Clear/Tinted: only the Home Screen was checked (the brief's ask).
+- The jailbreak build on iOS 26+: no jailbroken iOS 26+ phone; it has the same AppIcon set as the Lite build minus the
+  sash.
+- The iPhone 7 in Dark Home Screen mode: iOS 15 has no icon appearances, so nothing to check.
