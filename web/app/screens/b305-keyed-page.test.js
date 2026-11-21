@@ -20,7 +20,7 @@ const ID = "com.burbn.instagram";
 const RYUK = "alt:https://source.ryuksign.com/";
 const TESTERS = "alt:https://repo.apptesters.org/";
 const app = (name, version, key) => ({ key, row: { id: ID, name, version }, stanza: { kind: "ipa", name, version, package: ID,
-  ipa: { name, bundleIdentifier: ID, version, versions: [{ version, downloadURL: `https://x.test/${name}.ipa` }], sourceUrl: key.slice(4) } } });
+  ipa: { name, bundleIdentifier: ID, permissions: { privacy: [], entitlements: [] }, version, versions: [{ version, downloadURL: `https://x.test/${name}.ipa` }], sourceUrl: key.slice(4) } } });
 // Instagram is newer, so it is All Sources' answer for the bundle ID.
 const PKGS = { [RYUK]: app("RyukGram", "400.0", RYUK), [TESTERS]: app("Instagram", "401.0", TESTERS) };
 PKGS[ALL] = PKGS[TESTERS];
@@ -49,7 +49,7 @@ test("B305: RyukGram's Installed row says RyukGram and opens RyukGram's entry, n
   backend.sources = async () => [{ key: RYUK, url: RYUK.slice(4), name: "RyukSign" }, { key: TESTERS, url: TESTERS.slice(4), name: "AppTesters" }];
   try {
     const body = fakePage();
-    await browse.render(body, page, { go() {}, setBadge() {}, setTitle() {}, showHUD: () => () => {} }).catch(() => {});
+    await browse.render(body, page, { go() {}, setBadge() {}, setTitle() {}, showHUD: () => () => {} });
     for (let i = 0; i < 5; i++) await tick();
     assert.equal(browse.nav(page).title, "RyukGram", "the page's title");
     assert.match(body.textContent, /RyukGram/, "the page drew");
