@@ -320,7 +320,7 @@ html[data-sheet="card"] {
 html[data-sheet="card"] .sheet { overflow: hidden; } /* the rounded corners clip the bar */
 .sheet { position: fixed; inset: var(--sheet-top) 0 0; z-index: 25; display: flex; flex-direction: column; will-change: transform; }
 .navbar.sheet-bar { height: calc(44px + var(--sheet-bar-top)); }
-html.native .navbar.sheet-bar { display: block; } /* the app hides the web nav bar, not a sheet's */
+html.native .navbar.sheet-bar { display: block; } /* html.native (unset; style.css) would hide the web nav bar, not a sheet's */
 .sheet-bar-row {
   position: absolute; left: 0; right: 0; top: var(--sheet-bar-top); height: 44px;
   display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 4px;

@@ -314,7 +314,8 @@ final class WebController: UIViewController, WKNavigationDelegate, WKUIDelegate 
     override var preferredStatusBarStyle: UIStatusBarStyle { Theme.darkText ? .darkContent : .lightContent }
 }
 
-// Where the nav bar starts, for the iOS 6 era (web/app/style.css --top-inset, from --status-bar-bottom on <html>):
+// Where the nav bar starts, for the iOS 6 and iOS 26 eras (web/app/style.css --top-inset, from --status-bar-bottom on
+// <html>; iOS 26's strip is the page's ground, its --site-strip):
 // the bottom of iOS's status bar, with its black strip above the bar, when that leaves at least `margin` under the
 // resting Dynamic Island (room for it to grow when touched, and for compact Live Activities); otherwise, and on
 // every phone whose status bar is the safe area (notch, Home button), the safe area's top. iOS puts the safe area

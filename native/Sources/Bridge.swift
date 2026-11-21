@@ -197,7 +197,8 @@ enum WebKitFeature {
 // window's interface style. Automatic leaves the style to the system, so the
 // page's prefers-color-scheme (which follows the window's traits) keeps tracking it. The status bar is light text
 // on every iOS 6 bar (blue, dark palettes'); B221: dark text on iOS 7's White bar (the page's statusBar "dark").
-// The bars themselves are web/app/'s (R3 (a)): the shell draws no UINavigationBar or UITabBar.
+// The bars themselves are web/app/'s (R3 (a)): the shell draws no UINavigationBar or UITabBar, so every era's bars,
+// iOS 26's floating glass tab bar and capsule buttons too, are the page's (F354; native/test_web_bars.py).
 // F198: the window and web view behind the page take the palette's ground (black for OLED Black), and the shell keeps
 // the last {style, darkPalette} so the next launch paints that ground before the page has run (no light or grey
 // flash on a dark launch). Until the page has said anything: Automatic and Gunmetal, the page's own defaults.
