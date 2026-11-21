@@ -27,6 +27,19 @@
   `handleIncoming('altstore://source?url=…', { on: () => true })` lands on `#/sources`, Sources selected, the
   Enter APT URL alert over the Sources list, no page errors.
 
+- `fromLink` relies on sources.js holding the app's ctx (app.js `useContext`, run when the Sources screen starts).
+  The link opens `#/sources` before the alert, which loads and starts that screen, so it is in place by the time Add
+  Source is tapped.
+
+## Spec review
+
+- It noted the node test copies addSource's last line (`sourcesChanged(ctx.fromLink ? undefined : ctx)`) instead of
+  calling the real `addSource`: that one opens DOM alerts (nav/alert.js, safety.js) that node can't answer. Kept
+  as is and listed under Not verified.
+- It noted that Manage mounted from another tab (Guides' Add a Source) still selects that tab: kept on purpose,
+  see Findings. `router.js` needed no change.
+- The `plan/TODO.md` line is B307, written by `run plan add`, not by hand.
+
 ## Follow-up
 
 - B307: the website's `/add?url=…` path (app.js, not in this task's files) still opens Manage > Sources.
@@ -36,5 +49,6 @@
 - Tapping Add Source in Chromium and watching the new row spin in the drawn list: the fake bridge answers every call
   with null, so no real add happens there. The node test covers the load (reload bar, badge, refresh of the new key)
   with sources.js and a fake backend.
+- The real `addSource` with `fromLink` under node: its alerts need a DOM; the test copies its change-notice line.
 - The phone (iPhone 15 / 7): a real altstore:// link from Safari. Chromium covers the web change; the native side
   (the URL reaching `startIncoming`) is unchanged.
