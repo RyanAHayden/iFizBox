@@ -287,8 +287,8 @@ folder in the Files app. Paste the table here when it exists.
 ## Launch screen
 
 What opening the app shows before the page draws: the page's first frame without its text. That is `index.html`'s
-`#boot` under the app's bars (`web/app/ios6.css` with `data-shell="app"`): the nav bar's gloss runs up through the
-status-bar strip, the pinstripes fill the middle, and the tab bar's black runs down over the home indicator. It has
+`#boot` under the app's bars (`web/app/ios6.css` with `data-shell="app"`): a plain black status-bar strip with the
+44 pt nav bar under it, the pinstripes fill the middle, and the tab bar's black runs down over the home indicator. It has
 no title, tab icons or Loading, and it is in the current theme ("Every theme's frame" below). The jailbreak
 build's splash and both builds' cover use it; the sideload IPA's own splash is neutral.
 
@@ -311,13 +311,19 @@ launch storyboard lays its views out with Auto Layout against the safe area, so 
   | view | image | laid out |
   |---|---|---|
   | pinstripes | `LaunchStripes` (600x1 pt) | screen top to bottom from the left edge, at 600 pt wide, so it is only stretched down; the screen clips the rest |
-  | nav gloss, top half | `LaunchNavTop` | screen top to safe area top + 22 pt (as `.navbar::before` stretches it) |
+  | status-bar strip | `LaunchStatusStrip` (1 pt of one colour) | screen top to safe area top: black in every iOS 6 set (ios6.css `--site-strip`), the bar's own flat colour in the iOS 7 and iOS 13 sets (`white`, `white13`, `oled7`, `oled13`), whose page runs the bar up through the strip |
+  | nav gloss, top half | `LaunchNavTop` | the bar's first 22 pt, from the safe area top |
   | nav gloss, bottom half | `LaunchNavBottom` | the bar's last 22 pt |
-  | nav highlight / bottom edge | colour views `#eff2f7` / `#2d3642` | 1 pt at the screen's top / the bar's last 1 pt |
+  | nav highlight / bottom edge | colour views `#eff2f7` / `#2d3642` | the bar's first 1 pt (at the safe area top) / its last 1 pt |
   | shadows | `LaunchNavShadow`, `LaunchTabShadow` | 2.5 pt below the nav bar / above the tab bar |
   | tab bar | black view, `LaunchTabGloss` (48 pt) | safe area bottom − 49 pt to the screen's bottom; the gloss from 1 pt down, a white 10 % line at 1 pt |
 
 - `Info.plist`: `UILaunchStoryboardName` `LaunchScreen`, and no `UILaunchScreen`.
+
+The storyboard can only pin the strip to the safe area. The page's iOS 6 strip is `--top-inset` tall ("The status
+bar" above): the safe area on notch and Home-button phones and on the iPhone 15 Pro, but the status bar's bottom on
+a Dynamic Island phone whose status bar clears the island by 6 pt. On such a phone the page's bar starts a few
+points higher than the splash's.
 
 **Keep the images small.** SplashBoard refuses a launch screen whose estimated size is over 25,000,000 bytes, and
 the app then launches to black. The estimate is about width × height × 4 of the images, summed. A full-screen
