@@ -1,16 +1,18 @@
 /* The install queue (N4, screens/queue.js): queued rows, the Confirm sheet and the console. Sizes and colours of the
-   console from Cydia's progress page (docs/cydia.md "Running: the console"); the black bar is the kit's
-   "Semi-transparent black bar", opaque (#4c4c4c to black at 52%, a white-at-20% line on top, black-at-70% below).
+   console from Cydia's progress page (docs/cydia.md "Running: the console"); the black bar is
+   the 4S's own Running/Complete bar (sampled, below).
    Each part's layout is in its own rules; what it paints is in the look-only stretch beside them (docs/eras.md), and
    the iOS 6 decorations (the black bar and its buttons) come from the tokens in the first stretch. */
 
 /* ==== look-only { ==== queued packages in every list: "Queued for <mode>" in the kit's detail blue */
 :root {
   /* the console's black bar and its bar buttons, and pressed */
+  /* B303: sampled off the 4S's Running/Complete bar (ref/4s/screens/b224-complete.png): a #464646 hairline on top,
+     #303030 -> #101010 down the top half, a hard step to flat #070707, a #141414 line at the bottom, then the page */
   --console-bar:
-    linear-gradient(rgba(0,0,0,.7), rgba(0,0,0,.7)) bottom / 100% 1px no-repeat,
-    linear-gradient(rgba(255,255,255,.2), rgba(255,255,255,.2)) 0 env(safe-area-inset-top) / 100% 1px no-repeat,
-    linear-gradient(#4c4c4c, #000 52%) bottom / 100% 44px no-repeat,
+    linear-gradient(#141414, #141414) bottom / 100% 1px no-repeat,
+    linear-gradient(#464646, #464646) 0 env(safe-area-inset-top) / 100% .5px no-repeat,
+    linear-gradient(#303030, #101010 50%, #080808 50%, #070707) bottom / 100% 44px no-repeat,
     #000;
   --console-btn: linear-gradient(#4a4f58, #24272c);
   --console-btn-edge: #111;

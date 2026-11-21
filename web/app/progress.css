@@ -132,13 +132,11 @@
 /* UISegmentBarBlackButton / ...Highlighted / ...Divider (ref/4s/artwork/Shared@2x, sampled): 30px, a #1e1e1e top
    edge, #767676 -> #262626 to the middle, flat black under it, a white 30% line below; the chosen segment
    #8f8f8f -> #494848 over flat #3b3b3b; #8f8f8f -> #3c3c3c dividers over #262626. */
-/* B224: the nav bar keeps Cydia's title ("Running", then "Complete", as on the 4S); the control sits on the black page
-   just under it, and the log and the list start under the band. */
-.progress-seg-band { flex: none; display: flex; justify-content: center; align-items: center; height: 44px; margin-top: var(--nav-h); }
-.has-seg-band .progress-scroll { padding-top: 10px; }
-.has-seg-band .progress-pane { padding-top: 0; }
+/* B303: the control takes the title's place in the black nav bar (one bar, as iOS 6's Phone > Recents in a black bar);
+   "Running" / "Complete" stays the page's label. */
+.nav-title.has-seg { display: flex; justify-content: center; align-items: center; height: 44px; max-width: none; overflow: visible; }
 .progress-seg { display: inline-flex; height: 30px; overflow: hidden; }
-.progress-seg-item { min-width: 82px; height: 30px; padding: 0 12px; cursor: pointer; touch-action: manipulation; }
+.progress-seg-item { min-width: 64px; height: 30px; padding: 0 12px; cursor: pointer; touch-action: manipulation; }
 
 /* ==== look-only { ==== the queue run's segmented control */
 .progress-seg { border-radius: 5px; box-shadow: var(--progress-seg-shadow); }

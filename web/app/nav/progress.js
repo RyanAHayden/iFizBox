@@ -172,7 +172,8 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
   let paneNode = null;     // F234: page.pane's view
   let hiddenPage = false;  // F234: page.hide
   const closers = [];
-  const setTitle = (t) => { h1.textContent = t; sheet.setAttribute("aria-label", t); };
+  let segNode = null;      // B303: page.segmented's control, in the title's place
+  const setTitle = (t) => { if (!segNode) h1.textContent = t; sheet.setAttribute("aria-label", t); };
   const setProgress = (pct) => { fill.style.transform = `scaleX(${Math.max(0, Math.min(100, Number(pct) || 0)) / 100})`; };
   setProgress(0);
 
@@ -216,8 +217,8 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
       toBottom();
     },
     get filtered() { return filterPkg; },
-    // A segmented control on a black band under the nav bar (B224: the nav bar keeps Cydia's "Running" / "Complete"
-    // title, as on the 4S): labels, onPick(index). -> { select(index) }
+    // A segmented control in the nav bar's title slot (B303: one bar, as iOS 6's Phone > Recents; the title
+    // "Running" / "Complete" stays the page's label): labels, onPick(index). -> { select(index) }
     segmented(labels, onPick) {
       const seg = el("div", "progress-seg");
       seg.setAttribute("role", "tablist");
@@ -231,10 +232,9 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
       });
       const select = (i) => buttons.forEach((b, j) => { b.classList.toggle("selected", i === j); b.setAttribute("aria-selected", String(i === j)); });
       select(0);
-      const band = el("div", "progress-seg-band");
-      band.append(seg);
-      body.insertBefore(band, body.firstChild);
-      sheet.classList.add("has-seg-band");
+      segNode = seg;
+      h1.replaceChildren(seg);
+      h1.classList.add("has-seg");
       return { select };
     },
     // Another view in the page's body (the Packages list), shown in place of the log by view("pane").
