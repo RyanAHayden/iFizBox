@@ -1,7 +1,10 @@
 # R65: B310's icon badge after a queue run, on the iPhone 7
 
 **Result: passes.** Queue an upgrade, run it from Confirm on the Installed tab, press Home as the run ends,
-no relaunch: the Home Screen icon badge dropped from 2 to 1 (the one upgrade still waiting) both times.
+no relaunch: the Home Screen icon badge dropped from 2 to 1 (the one upgrade still waiting). Run 1 is the
+brief's check (Home the moment dpkg had the package installed, icon seen at 2 before). Run 2 was an extra,
+earlier press (Home while dpkg was still unpacking, before the run's end); it also ended at 1, but I didn't
+look at the icon before it.
 Chromium can't show a Home Screen badge, so this needed the phone.
 
 ## Setup
@@ -32,8 +35,10 @@ The Home press was one ssh call on the phone: `phonectl tap` on Confirm, then a 
   last `app.badge` sent, Notifications.swift) read 1 after run 1.
 - The daemon did not do it: `upgrades.state` was last written at 12:17, hours before the runs, and nothing
   else sets the badge.
-- Run 2's count arrived 60 ms after Home, while the app was already going to the background: B310's
-  synchronous count at the run's end got out in that window.
+- Run 2's last `app.badge` reached the shell 60 ms after Home, so the page still ran in that moment. Which
+  call sent it (B310's quick count at the run's end, or the recount after it) I can't tell from the outside;
+  either way the icon ended right. With a 572-byte package, run 1's Home press and the run's end are under a
+  second apart, so "right as it ends" and "just after it ended" are hard to tell apart here.
 - After both, the run page showed "1 installed"; Changes showed 1 (OpenTennis).
 
 ## Side finding: the shell path on its own
