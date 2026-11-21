@@ -100,7 +100,13 @@ export const CHECKING = { state: "checking", title: "Checking…", subtitle: "Pa
 export const NO_CERTIFICATE = { state: "certificate", title: "Import Your Certificate", subtitle: "Installs need your certificate and its profile first.", action: "certificate", tone: "warn", local: false };
 // The Signing Server route before signing.status first answers: no Ready to Install until the certificate is known.
 export const CHECKING_SERVER = { ...CHECKING, subtitle: "Your certificate." };
-export function installStatus(choice, st, { host = DOMAIN, certificate } = {}) {
+// B316: `failure` (routeFailure: the last check or install on this iPhone failed, and no check has passed since) turns
+// Ready to Install into that failure, red with its fix, until a check passes; any other answer stands as it is.
+export function installStatus(choice, st, { host = DOMAIN, certificate, failure = null } = {}) {
+  const s = routeStatus(choice, st, { host, certificate });
+  return failure && s.state === "ready" ? failureStatus(failure) : s;
+}
+function routeStatus(choice, st, { host = DOMAIN, certificate } = {}) {
   if (certificate === false) return NO_CERTIFICATE;
   if (choice !== "iphone") return { state: "server", title: "Ready to Install", subtitle: `Through the Signing Server, ${host}.`, action: "checkServer", tone: "ok", local: false };
   if (st === undefined) return CHECKING;
@@ -195,7 +201,9 @@ export function tailscaleTestResult(r) {
   switch (r?.code) {
     case "no_interface": return { title: "Tailscale Is Off", message: "Turn on the Tailscale app's VPN, then test again." };
     case "needs_approval": return { title: "Approve This Device", message: `Your tailnet needs new devices approved. Approve "${r.name || NAME}" in the Tailscale admin console (Machines), then test again.` };
-    case "expired": case "needs_login": return { title: "Sign In Again", message: "This device's key expired. Sign out, then sign in again. To avoid it, turn off key expiry for this device in the admin console." };
+    // B316: the shell marks the node signed out, so the page shows Sign In; the alert says it as installs do
+    case "expired": case "needs_login": return { title: TAILSCALE_SIGNED_OUT.title, message: `${NAME} is signed out of Tailscale (its device key expired or was removed). Sign in again; to avoid it, turn off key expiry for this device in the admin console.` };
+    case "route_refused": { const f = routeRefused(VPNS[1]); return { title: f.title, message: f.message }; }
     case "acl": {
       const rule = aclRule(r.name, r.address);
       return { title: "Blocked by Your Tailnet", message: `Your tailnet's access rules don't let ${r.name || NAME} reach this iPhone${r.peer ? ` (${r.peer})` : ""}${d}. Add this rule to the policy file in the admin console: ${rule}`, copy: rule };
@@ -382,11 +390,116 @@ export function verifyVPN(st, raw = "") {
 // reason reads the same), so it offers Pair Again without forgetting the pairing by itself (no `unusable`).
 export const earlyEOF = (raw) => /UnexpectedEof|early eof/i.test(raw);
 
+// ---- B316: a broken route, said for what it is and kept until a check passes
+// The user's phone: an install failed "refused … it no longer has this pairing. Pair again" while the real cause was
+// Tailscale (iFizBox's node logged out; then the phone refusing every connection from the tailnet). Tailscale is
+// checked first, and the pairing is blamed only when Tailscale is fine.
+
+// The codes a connect to this iPhone fails with (IDevice.swift): the ones that may be Tailscale's doing.
+const CONNECT_CODES = new Set(["refused", "pairing_rejected", "pair_again", "connect_failed", "bad_pairing"]);
+
+// What's wrong with Tailscale for a connect that failed, from idevice.status (`st`), or null when Tailscale isn't the
+// way in or is fine: "signedOut" (Tailscale is the way in, Connect With: Tailscale or its VPN on with Automatic, and
+// iFizBox isn't signed in to it) or "off" (Connect With: Tailscale and its VPN is off).
+export function tailscaleProblem(st) {
+  const ts = st?.tailscale;
+  if (!ts || ts.connect === "localdevvpn") return null;
+  if (ts.connect !== "tailscale" && !tailscaleVPNOn(st)) return null;
+  // Automatic with LocalDevVPN really on (VPNCheck counts a refusal only through a tunnel): the connect went to
+  // 10.7.0.1, so a refusal there is the pairing's, not Tailscale's
+  if (ts.connect !== "tailscale" && st.localDevVPN && !ts.use) return null;
+  if (!ts.signedIn) return "signedOut";
+  if (!tailscaleVPNOn(st)) return "off";
+  return null;
+}
+
+// The alerts' words ({title, message}), the install log's and the status cell's (`short`: two lines at 320pt), and
+// `fix`: what the fix row or button does ("signIn": Install Apps With, where Tailscale's Sign In is; "openTailscale";
+// "openVPN": LocalDevVPN; "pair": Pairing; "check": Check Connection again).
+export const TAILSCALE_SIGNED_OUT = {
+  title: "Tailscale Is Signed Out", again: false, fix: "signIn", button: "Sign In",
+  message: `${NAME} is signed out of Tailscale, so it can't reach this iPhone. Sign in again in Settings > Installation & Signing > Install Apps With.`,
+  short: "Installs can't reach this iPhone. Sign in again.",
+};
+export const TAILSCALE_VPN_OFF = {
+  title: "Tailscale Is Off", again: false, fix: "openTailscale", button: "Open Tailscale",
+  message: `Installs go through Tailscale, and the Tailscale app's VPN is off. Turn it on, then try again.`,
+  short: "Turn on the Tailscale app's VPN.",
+};
+// The phone refused every connection through the route, lockdown's port too (the shell's route_refused): not the
+// pairing. Over Tailscale it was the user's phone on cellular; over LocalDevVPN a stale tunnel.
+export function routeRefused(vpn = VPNS[0]) {
+  if (vpn === VPNS[1]) {
+    return { title: "Tailscale Refused", again: false, fix: "openTailscale", button: "Open Tailscale",
+      message: `This iPhone refused every connection through Tailscale, so it isn't the pairing. Check that the Tailscale app says Connected; on cellular, try on Wi-Fi.`,
+      short: "Every connection was refused. Check the Tailscale app." };
+  }
+  return { title: `${VPNS[0]} Refused`, again: false, fix: "openVPN", button: `Open ${VPNS[0]}`,
+    message: `This iPhone refused every connection through ${VPNS[0]}, so it isn't the pairing. Turn ${VPNS[0]} off and on, then try again.`,
+    short: `Every connection was refused. Turn ${VPNS[0]} off and on.` };
+}
+
+// A failed connect (idevice.verify, an install on this iPhone, tailscale.test's verify) as a remembered failure
+// { title, message, short, fix, button }, or null when the error isn't about reaching this iPhone (Developer Mode,
+// signing, a download): those don't make the route broken.
+const ROUTE_CODES = new Set([...CONNECT_CODES, "route_refused", "tailscale_signed_out", "needs_login", "expired", "not_paired"]);
+export function routeFailureOf(err, st = null) {
+  const raw = String(err?.message ?? err ?? "");
+  const code = err?.code ?? raw.split(":")[0];
+  if (!ROUTE_CODES.has(code)) return null;
+  if (developerModeFailure(err)) return null;
+  const why = verifyFailure(err, st);
+  const fix = why.fix ?? (why.again ? "pair" : /^Turn On/.test(why.title) ? (why.title.includes(VPNS[1]) ? "openTailscale" : "openVPN") : "check");
+  const short = why.short ?? (why.again ? "Installs are refused. Pair again." : "Installs can't reach this iPhone.");
+  const button = why.button ?? (fix === "pair" ? "Pair Again" : fix === "openVPN" ? `Open ${VPNS[0]}` : fix === "openTailscale" ? "Open Tailscale" : "Check Again");
+  return { title: why.title, message: why.message, short, fix, button };
+}
+
+// Kept in this browser's storage (it outlives a relaunch: the route stays broken until a check passes), and told to
+// the pages on screen with the "ifizbox:route-failure" event.
+export const FAILURE_KEY = "ifizbox.routeFailure";
+const tell = () => { try { globalThis.dispatchEvent?.(new CustomEvent("ifizbox:route-failure")); } catch { /* no events here */ } };
+export function routeFailure(storage = globalThis.localStorage) {
+  try {
+    const f = JSON.parse(storage?.getItem(FAILURE_KEY) || "null");
+    return f && typeof f.title === "string" ? f : null;
+  } catch { return null; }
+}
+export function rememberRouteFailure(f, { storage = globalThis.localStorage, now = Date.now() } = {}) {
+  if (!f) return;
+  try { storage?.setItem(FAILURE_KEY, JSON.stringify({ title: f.title, message: f.message, short: f.short, fix: f.fix, button: f.button, at: now })); } catch { /* storage off */ }
+  tell();
+}
+export function clearRouteFailure(storage = globalThis.localStorage) {
+  let had = false;
+  try { had = storage?.getItem(FAILURE_KEY) != null; storage?.removeItem(FAILURE_KEY); } catch { /* storage off */ }
+  if (had) tell();
+}
+
+// A check that got no answer in time (screens' Not Responding): kept too, with Check Again as its fix.
+export const NO_ANSWER_FAILURE = { title: "Not Responding", message: "This iPhone didn't answer the last check. Check that the VPN is on, then check again.",
+  short: "This iPhone didn't answer the last check.", fix: "check", button: "Check Again" };
+
+// The status cell for a remembered failure: red, with the fix as its action row.
+const FIX_ACTIONS = { signIn: "signIn", openTailscale: "openTailscale", openVPN: "openVPN", pair: "pair", check: "check" };
+export function failureStatus(f) {
+  return { state: "failed", title: f.title, subtitle: f.short, action: FIX_ACTIONS[f.fix] ?? "check", tone: "warn", red: true, local: false };
+}
+
 // What a failed idevice.verify means: { title, message, again } (`again`: offer Pair Again). `st` is the
 // idevice.status read for the check (null or left out: not known), which names the VPN the check went through.
 export function verifyFailure(err, st = null) {
   const raw = String(err?.message ?? err ?? "");
   const code = err?.code ?? raw.split(":")[0];
+  // B316: Tailscale's own state before the pairing. The shell found iFizBox's node logged out, or a connect failed
+  // while Tailscale is the way in and iFizBox isn't signed in to it (or its VPN is off): the fix is Tailscale's.
+  if (code === "tailscale_signed_out" || code === "needs_login" || code === "expired") return TAILSCALE_SIGNED_OUT;
+  if (code === "route_refused") return routeRefused(/Tailscale/i.test(raw) ? VPNS[1] : VPNS[0]);
+  if (CONNECT_CODES.has(code)) {
+    const t = tailscaleProblem(st);
+    if (t === "signedOut") return TAILSCALE_SIGNED_OUT;
+    if (t === "off" && code !== "connect_failed") return TAILSCALE_VPN_OFF; // a plain connect failure says Turn On Tailscale below
+  }
   // B220: refused on every port RemotePairing is advertised on, or turned down: the phone no longer has the pairing
   if (code === "refused" || code === "pairing_rejected" || (code === "connect_failed" && /connection refused/i.test(raw))) {
     return { title: "Pair Again", message: `This iPhone no longer accepts ${NAME}'s pairing, so every connection is refused. Pair again.`, again: true, unusable: true };

@@ -29,6 +29,7 @@ import { ringStyle, vpnWaitText } from "../core/installroute.js";
 import { tailscaleRoute } from "../core/installroute.js";
 import { leaveQuestion, LEAVE } from "../core/installroute.js";
 import { tailscaleVPNOn, installStatus, CHECKING, CHECKING_SERVER, STATUS_ACTIONS } from "../core/installroute.js";
+import { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, NO_ANSWER_FAILURE } from "../core/installroute.js"; // B316
 import { NAME, DOMAIN } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
 import { showHUD } from "../nav/hud.js";
@@ -136,7 +137,7 @@ let signInVisit = null; // B143: the pair page's visit that started it (leaving 
 // that part is read again, `late: {device, tailscale}` that part didn't answer in time: its rows say Not Responding.
 export function installationGroups(choice, st, { pick = () => {}, openVPN = () => {}, connect = () => {}, signIn = () => {}, test = () => {}, signOut = () => {}, busy = null,
   reading = false, connectPick = null, picking = false, connectBusy = null, hint = null, server = () => [],
-  tsReading = reading, refreshing = {}, late = {}, testing = false } = {}) {
+  tsReading = reading, refreshing = {}, late = {}, testing = false, failure = null, fix = () => {} } = {}) {
   const groups = [{
     header: "Install Apps With",
     rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", icon: rowIcon(ROUTE_ROW[o.value].icon), checked: o.value === choice, onClick: () => pick(o.value),
@@ -156,19 +157,28 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
     const spinning = connectBusy ?? (tsUnknown || tsAgain ? connectPick : null);
     const viaTs = tailscaleRoute(tsUnknown ? hint : st, now); // F300: no LocalDevVPN rows then
     const devLate = Boolean(late.device), devAgain = Boolean(refreshing.device) && !reading && !devLate;
+    // B316: Tailscale signed out with Tailscale's group already offering Sign In: the failure is said there (one
+    // Sign In row); any other failure goes in This iPhone's group with its fix row
+    const tsSignIn = !busy && !tsUnknown && !(late.tailscale && !ts) && !ts?.signedIn;
+    const failTs = Boolean(failure && failure.fix === "signIn" && tsSignIn);
+    const failHere = Boolean(failure) && !failTs;
+    const failText = failure ? `${failure.title}. ${failure.short}` : "";
     groups.push({
       header: "This iPhone",
       rows: [
         devLate ? { label: "Pairing", detail: NOT_RESPONDING, href: route("pair") }
           : reading ? { label: "Pairing", detail: "Checking…", href: route("pair"), spin: true }
-          : { label: "Pairing", detail: st?.paired ? "Paired" : "Not Paired", href: route("pair"), ...(devAgain ? { spin: true } : {}) },
+          : { label: "Pairing", detail: withDetail("iphone", st ?? {}, failure), href: route("pair"), ...(devAgain ? { spin: true } : {}) },
         ...(viaTs ? [] : [
           devLate ? { label: VPN, detail: NOT_RESPONDING }
             : { label: VPN, detail: reading ? "Checking…" : vpnDetail(st), ...(reading || devAgain ? { spin: true } : {}) },
           { label: `Open ${VPN}`, cls: "sign-import", onClick: openVPN },
         ]),
+        // B316: the last check or install failed (core routeFailure): its fix row here, and the footer says what's wrong
+        ...(failHere && failure.fix !== "openVPN" ? [{ label: failure.button, cls: "sign-import", onClick: fix }] : []),
       ],
-      ...(viaTs ? {} : { footer: `${VPN} must be on while apps install.` }), // F317: no "(below)": Tailscale's group says its own
+      ...(failHere ? { footer: failText, warn: true }
+        : viaTs ? {} : { footer: `${VPN} must be on while apps install.` }), // F317: no "(below)": Tailscale's group says its own
     });
     groups.push({
       header: "Connect With",
@@ -184,7 +194,7 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
           { label: "Test Connection", cls: "sign-import", onClick: test, ...(testing ? { detail: "Testing…", spin: true } : {}) },
           { label: "Sign Out", cls: "sign-import", onClick: signOut }]
         : [{ label: "Sign In", cls: "sign-import", onClick: signIn }];
-    groups.push({ header: "Tailscale", rows, footer: tailscaleFooter(ts) });
+    groups.push({ header: "Tailscale", rows, ...(failTs ? { footer: failText, warn: true } : { footer: tailscaleFooter(ts) }) });
   }
   return groups;
 }
@@ -237,6 +247,13 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
       reading: devWait && !cached, tsReading: tsWait && !view?.tailscale,
       refreshing: { device: devWait && cached, tailscale: tsWait && Boolean(view?.tailscale) }, late, testing,
       connectPick, connectBusy, hint: lastStatus, server, picking: devWait && picked === choice,
+      failure: choice === "iphone" ? routeFailure() : null, // B316
+      fix: () => {
+        const f = routeFailure();
+        if (f?.fix === "signIn") return tailscaleSignIn(native, alert, redraw);
+        if (!f || f.fix === "check") return check(native, alert, redraw, store);
+        return fixAction(f.fix, native, alert);
+      },
       // the store's set redraws Settings' pages (this one too); a store that doesn't, redraws it here
       pick: (v) => {
         if (v === choice && !picked) return;
@@ -277,7 +294,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
     const shown = subGroups(sections, sub);
     patchGroups(el, shown, (s) => {
       const frag = spinRows(warnFooters(s), s);
-      for (const d of frag.querySelectorAll?.(".cell-detail") ?? []) if (d.textContent === "Another VPN" || d.textContent === NOT_RESPONDING) d.classList.add("install-red");
+      for (const d of frag.querySelectorAll?.(".cell-detail") ?? []) if (d.textContent === "Another VPN" || d.textContent === NOT_RESPONDING || d.textContent === FAILING) d.classList.add("install-red");
       return frag;
     });
   };
@@ -294,6 +311,8 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
       got.tailscale = true;
       connectPick = null; // the answer carries Connect With now
     }
+    // B316: opened after a failure: the pairing is checked by itself; the page repaints when it passes or fails
+    if (st?.paired && choice === "iphone") autoCheck(native, alert, () => { if (mine()) paint(); }, store);
     const wasPicked = picked === choice;
     if (wasPicked) picked = null;
     if (choice !== "iphone" && !wasPicked) return; // nothing on the page waited on the answer
@@ -454,16 +473,17 @@ export async function recheckPairing(native, alert, redraw) {
   const st = await status(native);
   if (!st?.paired || !vpnOn(st)) return "skipped";
   const verify = async () => {
-    try { await within(call(native, "idevice.verify"), TIMEOUTS.verify); return null; } catch (e) { return isLate(e) ? { late: true } : verifyFailure(e); }
+    try { await within(call(native, "idevice.verify"), TIMEOUTS.verify); return null; } catch (e) { lastErr = e; return isLate(e) ? { late: true } : verifyFailure(e, st); }
   };
+  let lastErr = null; // B316: what the failed check is kept as
   const why = await busy("Checking Pairing", async () => {
     const first = await verify();
     if (!first?.unusable) return first;
     await new Promise((r) => setTimeout(r, recheckHooks.retryMs));
     return verify();
   });
-  if (!why) return "ok";
-  if (!why.unusable) return "failed";
+  if (!why) { clearRouteFailure(); return "ok"; } // B316: after a sign-in or a new way in, the pairing answered: green again
+  if (!why.unusable) { rememberRouteFailure(why.late ? NO_ANSWER_FAILURE : routeFailureOf(lastErr, st)); return "failed"; } // B316
   await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {}));
   forgetStatus();
   if (visit) visit.started = false;
@@ -481,6 +501,10 @@ async function tailscaleTest(native, alert, ended = () => {}) {
   const ms = TIMEOUTS.test + TIMEOUTS.verify;
   try { r = await within(call(native, "tailscale.test", { verify: true }), ms); } catch (e) { r = isLate(e) ? { ok: false, code: "not_responding" } : { ok: false, code: "error", detail: e?.message }; }
   ended();
+  if (r?.ok && r.verified) clearRouteFailure(); // B316: the pairing answered through Tailscale
+  else if (r?.code === "not_responding") rememberRouteFailure(NO_ANSWER_FAILURE);
+  else if (r?.code === "verify_failed") rememberRouteFailure(routeFailureOf({ message: String(r.detail || "connect_failed: Tailscale") }));
+  else if (["refused", "route_refused", "needs_login", "expired", "not_paired"].includes(r?.code)) rememberRouteFailure(routeFailureOf({ code: r.code, message: `${r.code}: ${r.detail || "Tailscale"}` }));
   return testAlert(alert, r, { native, ms });
 }
 
@@ -533,9 +557,12 @@ export const MAIN_ROWS = ["status", "action", "with", "certificate", "apps", "he
 
 // F300/F351: Install Apps With's detail on the main page: This iPhone's pairing once idevice.status said (`st`
 // undefined: not answered yet; null: it failed). The route itself is the row's label, subtitle and icon (ROUTE_ROW).
-export function withDetail(choice, st) {
+// B316: paired, with the last check or install failed (`failure`, core routeFailure): "Failing", red, until a check
+// passes (the user's page said a green Paired while every install was refused).
+export const FAILING = "Failing";
+export function withDetail(choice, st, failure = null) {
   if (choice !== "iphone" || !st) return "";
-  return st.paired ? "Paired" : "Not Paired";
+  return st.paired ? (failure ? FAILING : "Paired") : "Not Paired";
 }
 // F351: each route's row: its icon (icons/rowicons.js), its name and one line under it, on the main page and the
 // Install Apps With page.
@@ -612,17 +639,27 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
   };
   // Each source's answers land in order: an older read never paints over a newer one.
   let asked = 0, statusShown = 0, signingShown = 0, appsShown = 0, lastChoice = null;
-  const refresh = async () => {
+  // B316: the remembered failure set or cleared (an install, a check on another page): the cell repaints at once
+  let cellOf = null;
+  const showWith = (c, st) => { const f = routeFailure(); const t = withDetail(c, st, f); slots.with.set(t, { red: t === FAILING }); };
+  const onFailure = () => {
+    if (box.isConnected === false && cellOf) { globalThis.removeEventListener?.("ifizbox:route-failure", onFailure); return; }
+    if (cellOf && statusShown && now.state !== "checking") { const c = store.get(ROUTE_KEY); paintStatus(cellOf(c, known)); if (c === "iphone") showWith(c, known); }
+  };
+  globalThis.addEventListener?.("ifizbox:route-failure", onFailure);
+  // B316: `auto` false: the redraw after a check (a tap's, or the automatic one) never starts another automatic check
+  const refresh = async ({ auto = true } = {}) => {
     const n = ++asked;
     const choice = store.get(ROUTE_KEY);
     showRoute(choice);
     const h = host();
     // B250: the Signing Server route says nothing until signing.status first answers (no Ready without a certificate)
     const cell = (c, st) => (c !== "iphone" ? (certRead ? installStatus(c, undefined, { host: h, certificate }) : CHECKING_SERVER)
-      : installStatus(c, st, { host: h, certificate }));
+      : installStatus(c, st, { host: h, certificate, failure: routeFailure() })); // B316: a failed check or install shows until one passes
+    cellOf = cell;
     if (choice !== "iphone") { paintStatus(cell(choice)); slots.with.set(withDetail(choice)); }
     else if (lastChoice && lastChoice !== choice) { paintStatus(CHECKING); title.wait(); subtitle.wait(); slots.with.wait(); } // just picked
-    else if (!lastChoice && lastStatus) { paintStatus(cell(choice, lastStatus)); slots.with.set(withDetail(choice, lastStatus)); } // F301: the last answer at once
+    else if (!lastChoice && lastStatus) { paintStatus(cell(choice, lastStatus)); showWith(choice, lastStatus); } // F301: the last answer at once
     lastChoice = choice;
     const reads = [
       status(native).then((st) => {
@@ -632,7 +669,9 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
         rememberStatus(st);
         const c = store.get(ROUTE_KEY);
         paintStatus(cell(c, st));
-        slots.with.set(withDetail(c, st));
+        showWith(c, st);
+        // B316: opened after a failure: Check Connection runs by itself (its button spins), quietly
+        if (auto && c === "iphone" && st?.paired && box.isConnected !== false) autoCheck(native, alert, after, store, checkButton);
       }),
       Promise.resolve().then(signing).catch(() => null).then((v) => {
         if (n < signingShown) return;
@@ -657,8 +696,9 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
     ];
     await Promise.all(reads);
   };
+  const after = () => refresh({ auto: false });
   const runAction = async (a) => {
-    if (a === "check") return check(native, alert, refresh, store, checkButton).then(refresh);
+    if (a === "check") return check(native, alert, after, store, checkButton).then(after);
     if (a === "checkServer") return checkServer();
     if (a === "openVPN") return openVPN(native, alert).then(refresh);
     if (a === "pair") return goTo("pair");
@@ -947,6 +987,7 @@ async function drawPair(box, { store, native, alert, redraw }) {
       // page is left (no timeout)
       await call(native, "idevice.pair", {}, (ev) => { if (pairing) { pairing = pairEvent(pairing, ev); redraw(); } });
       pairing = null;
+      AUTO_CHECK.last = 0; // B316: paired again: the paired page checks at once and goes green on its own
       store.set(ROUTE_KEY, "iphone");
       if (visit === v) redraw();
     } catch (e) {
@@ -1026,6 +1067,8 @@ async function drawPair(box, { store, native, alert, redraw }) {
     }
   } else if (state === "pairing" && !pairing && !v.started) {
     start();
+  } else if (state === "paired") {
+    autoCheck(native, alert, recheck, store, checkButton); // B316: opened after a failure, or just paired again: checks by itself
   }
 }
 
@@ -1034,8 +1077,33 @@ async function drawPair(box, { store, native, alert, redraw }) {
 // F301: the check runs with the spinner on its own button (no HUD) and at most TIMEOUTS.verify. It reads
 // idevice.status first (under a second): with neither LocalDevVPN nor Tailscale's route on, idevice.verify could only
 // wait out its 30 s tunnel limit, so the answer (Turn On LocalDevVPN) comes at once instead.
-async function check(native, alert, redraw, store, mark = null) {
-  if (mark?.spinning()) return; // a second tap while it checks
+// B316: a check that passes clears the remembered route failure (Installation & Signing and Home go green); one that
+// fails to reach the phone remembers it (core routeFailureOf: Tailscale's state before the pairing). `quiet`: the
+// automatic check when a page opens after a failure (autoCheck): no alert, the status and the button's x say it.
+// A failure whose fix isn't Pair Again (Tailscale signed out or off, every connection refused) offers its fix button.
+async function check(native, alert, redraw, store, mark = null, { quiet = false } = {}) {
+  if (mark?.spinning() || checking) return; // a second tap while it checks
+  checking = true;
+  try { return await checkOnce(native, alert, redraw, store, mark, { quiet }); } finally { checking = false; }
+}
+let checking = false;
+// B316: opening Installation & Signing, Pairing or Install Apps With after a failed check or install checks by itself,
+// at most once every AUTO_CHECK.gapMs (moving between those pages doesn't check again at once).
+export const AUTO_CHECK = { gapMs: 15000, last: 0 };
+export function autoCheck(native, alert, redraw, store, mark = null, now = Date.now()) {
+  if (!routeFailure() || store.get(ROUTE_KEY) !== "iphone" || checking || now - AUTO_CHECK.last < AUTO_CHECK.gapMs) return null;
+  AUTO_CHECK.last = now;
+  // the gap counts from the end too: a slow check (up to TIMEOUTS.verify) isn't followed by another at once
+  return check(native, alert, redraw, store, mark, { quiet: true }).finally(() => { AUTO_CHECK.last = Math.max(AUTO_CHECK.last, Date.now()); });
+}
+async function fixAction(fix, native, alert) {
+  if (fix === "signIn") return goTo("with");
+  if (fix === "openTailscale") return openApp(native, alert, TAILSCALE_URL, "Tailscale");
+  if (fix === "openVPN") return openVPN(native, alert);
+  if (fix === "pair") return goTo("pair");
+  return undefined;
+}
+async function checkOnce(native, alert, redraw, store, mark = null, { quiet = false } = {}) {
   mark?.reset();
   const stop = mark?.spin() ?? (() => {});
   let st = null; // B258: the failure names the VPN this check went through
@@ -1044,14 +1112,23 @@ async function check(native, alert, redraw, store, mark = null) {
     rememberStatus(st);
     if (st && !vpnOn(st)) { stop(); throw Object.assign(new Error("connect_failed: neither LocalDevVPN nor Tailscale is on"), { code: "connect_failed" }); }
     try { await within(call(native, "idevice.verify"), TIMEOUTS.verify); } finally { stop(); }
+    clearRouteFailure(); // B316
     if (store.get(ROUTE_KEY) !== "iphone") store.set(ROUTE_KEY, "iphone"); // a set redraws Settings' pages, and the mark with them
     mark?.show(true);
+    if (quiet) redraw();
   } catch (e) {
     const why = isLate(e)
       ? { title: NOT_RESPONDING, message: `This iPhone didn't answer in ${TIMEOUTS.verify / 1000} seconds. Check that ${st ? verifyVPN(st) : `${VPN} (or Tailscale)`} is on, then check again.`, again: false }
       : verifyFailure(e, st);
+    rememberRouteFailure(isLate(e) ? NO_ANSWER_FAILURE : routeFailureOf(e, st)); // B316
     mark?.show(false);
+    if (quiet) { mark?.expire(); redraw(); return undefined; }
     try {
+      if (why.fix && why.button) {
+        const { index } = await alert({ title: why.title, message: why.message, buttons: ["OK", why.button], cancel: 0 }) || {};
+        if (index === 1) await fixAction(why.fix, native, alert);
+        return undefined;
+      }
       if (!why.again) return await alert({ title: why.title, message: why.message, buttons: ["OK"] });
       const { index } = await alert({ title: why.title, message: why.message, buttons: ["Cancel", "Pair Again"], cancel: 0 }) || {};
       if (index === 1) { await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {})); forgetStatus(); if (visit) visit.started = false; redraw(); }

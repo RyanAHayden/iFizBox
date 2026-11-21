@@ -34,6 +34,29 @@ export async function chooseRoute({ native, alert = showAlert, storage = storage
   return params;
 }
 export const forgetRoute = () => { heldRoute = null; };
+
+// B316: a This iPhone install that failed to reach the phone, worded by core routeFailureOf with idevice.status read
+// now (Tailscale signed out or off is said before the pairing is blamed) and remembered, so Installation & Signing and
+// Home show the broken state until a check passes. Other failures keep deviceError's words.
+export async function routeWords(err, why, native) {
+  let st = null;
+  try { st = await bridge(native).call("idevice.status", {}); } catch { st = null; }
+  const f = routeFailureOf(err, st);
+  if (!f) return why;
+  rememberRouteFailure(f);
+  return { ...why, title: f.title, message: f.message, fix: f.fix, button: f.button };
+}
+// The fix button of a failure's alert: Install Apps With (Tailscale's Sign In is there), Pairing, the main page's
+// Check Connection, or the VPN app.
+export function runFix(fix, { native, go = openRoute } = {}) {
+  if (fix === "signIn") return go(["installation", "with"]);
+  if (fix === "pair") return go(["installation", "pair"]);
+  if (fix === "check") return go(["installation"]);
+  const url = fix === "openTailscale" ? TAILSCALE_URL : null;
+  if (url) return Promise.resolve().then(() => bridge(native).call("app.openURL", { url })).catch(() => {});
+  if (fix === "openVPN") return Promise.resolve().then(() => bridge(native).call("idevice.openLocalDevVPN", {})).catch(() => {});
+  return undefined;
+}
 import { showBanner } from "../nav/banner.js";
 import { phaseLabel, deviceError, rateText } from "../core/signing.js"; // rateText: B262
 import { IFIZBOX_ID } from "../core/websign.js";
@@ -44,6 +67,7 @@ import { showAlert } from "../nav/alert.js";
 import { NAME } from "../brand.js";
 import { storedRoute, decideRoute, ALERTS as ROUTE_ALERTS, routeParams, VPN_WAIT, VPN_CONNECTED, VPN_POLL,
   vpnReady } from "../core/installroute.js";
+import { routeFailureOf, rememberRouteFailure, clearRouteFailure, TAILSCALE_URL } from "../core/installroute.js"; // B316
 import { SELF_RESTART } from "../core/apprun.js";
 import { KNOWN_MALWARE, askInsecure, bridge, failed, keepIpaHash, refusing, stopNative, storageOf,
   untilCancel } from "./common.js";
@@ -161,12 +185,16 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   } catch (e) {
     if (h.cancelled) return false;
     if (e?.code === "cancelled") { h.hide(); return false; } // B104: Cancel on This Download Is Not Secure
-    const why = deviceError(e, name);
+    let why = deviceError(e, name);
+    if (route.route) why = await routeWords(e, why, native); // B316: Tailscale first, then the pairing; kept until a check passes
     failed(h, why.message);
-    await alert({ title: e?.code === "malware" ? KNOWN_MALWARE : why.title, message: why.message, buttons: ["OK"] });
+    const fix = why.fix && why.button ? why : null;
+    const { index } = await alert({ title: e?.code === "malware" ? KNOWN_MALWARE : why.title, message: why.message, buttons: fix ? ["OK", fix.button] : ["OK"], ...(fix ? { cancel: 0 } : {}) }) || {};
     if (why.open === "signing") go(["signing"]);
+    if (fix && index === 1) runFix(fix.fix, { native, go });
     return false;
   }
+  if (route.route) clearRouteFailure(); // B316: an install went through: the route works
   keepIpaHash(storageOf(), result, { bundleId: params?.bundleId ?? null }); // F292
   if (h.cancelled) return false;
   if (route.route && !self && result?.bundleId !== IFIZBOX_ID) {
