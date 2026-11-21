@@ -37,11 +37,16 @@ test("every app starts signing up front, before the first install", async () => 
   const run = createAppRun({ rows, sign: ph.sign, install: ph.install, ahead: Infinity, parallel: HERE_PARALLEL, local: () => true });
   run.start();
   await flush();
-  assert.deepEqual(ph.events, ["sign:a", "sign:b", "sign:c", "sign:d", "sign:e"]);
-  for (const id of ["a", "b", "c", "d", "e"]) ph.signed(id);
+  assert.deepEqual(ph.events, ["sign:a", "sign:b", "sign:c", "sign:d", "sign:e"], "every app signs at once, no ahead = 2");
+  ph.signed("a");
   await flush();
-  assert.ok(rows.every((r) => r.state !== "waiting" && r.state !== "downloading" && r.state !== "signing"));
-  assert.equal(ph.events.indexOf("install:a"), 5, "the first install comes after every sign started");
+  assert.deepEqual(ph.events, ["sign:a", "sign:b", "sign:c", "sign:d", "sign:e", "install:a"],
+    "the first install comes after every app's signing started");
+  assert.deepEqual(rows.slice(1).map((r) => r.state), ["downloading", "downloading", "downloading", "downloading"]);
+  ph.copying("a");
+  for (const id of ["b", "c", "d", "e"]) ph.signed(id);
+  await flush();
+  assert.ok(rows.every((r) => r.state !== "waiting" && r.state !== "downloading" && r.state !== "signing"), "all signed");
   run.cancel();
 });
 
