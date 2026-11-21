@@ -673,7 +673,9 @@ export async function runAppQueueRun(jobs, { queue = appQueue, record = recordAp
     held = { release: () => hold(undefined, false) }; // until the lanes below take it over
     const { runAppRun, phoneLanes } = await import("./apprun.js");
     // B137: on Settings > Installation's This iPhone route the rows say Installing, not Tap Install (no iOS prompt)
-    held = sc.heldLanes(lanes ?? { ...phoneLanes(sc), local: () => storedRoute() === "iphone" }, { keep: hold });
+    // F366: not once the run's Use the Signing Server sent its failed apps through the Signing Server
+    const phone = lanes ? null : phoneLanes(sc);
+    held = sc.heldLanes(lanes ?? { ...phone, local: () => !phone.serverRoute() && storedRoute() === "iphone" }, { keep: hold });
     const lanesHeld = held;
     return await (run ?? runAppRun)(jobs.filter((j) => queue.get(j.id)), {
       queue, record, lanes: lanesHeld,

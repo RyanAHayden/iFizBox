@@ -268,6 +268,11 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   step (upload the first 30%, then installd's percentage). Not paired, LocalDevVPN off or another VPN on: an alert
   says so and the install goes through the Signing Server ("Another VPN Is On" also offers Open LocalDevVPN, which
   stops the install). The VPN apps' names come from one list (`VPNS`, core/installroute.js).
+  An install that went to This iPhone and couldn't reach it (refused, the pairing lost, Tailscale or LocalDevVPN
+  down, not paired: `serverFallback`) offers Use the Signing Server besides the fix: in the install's alert and its
+  log, and on the IPA queue run's Log (each failed app's fix, then Use the Signing Server) and at its bottom. It
+  runs the same install, or the same failed apps, again through the default Signing Server for that install or run
+  only; Install Apps With stays This iPhone.
 - **This iPhone over Tailscale** (`native/sideload/tailscale/`, its README): for Tailscale users, who can't run
   LocalDevVPN at the same time. The sideload app embeds tsnet (tailscale.com, BSD-3-Clause, a Go c-archive built on
   Linux with a pinned Go; not in the jailbreak executable) and joins the tailnet as its own device ("iFizBox on
