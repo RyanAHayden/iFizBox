@@ -14,6 +14,9 @@ node joins as `Tailscale.hostname` = `"<brand> on <deviceName>"` (e.g. `iFizBox 
   (The brief named `web/app/core/test/installroute.test.js` and then the screens tests; the footer's existing
   assertions live in `web/app/core/installroute.test.js`, so the new ones went there.)
 
+`idevice.status`'s `tailscale` field is `Tailscale.status()` itself (`native/sideload/idevice/IDeviceBridge.swift`,
+`s["tailscale"] = Tailscale.status()`), so the hostname gets there too. The spec review asked about this.
+
 ## Check in Chromium (fake bridge)
 
 `capture.mjs` here is F317's copy with `tailscale.status` read from `TS` (env). The page reads Tailscale from
