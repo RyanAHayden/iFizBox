@@ -11,7 +11,9 @@
 - `build` and `rebrand` both go through `app_entry`, so `release.sh`'s `update` and `native/brand.py sync` keep the
   list. Ran `brand.py sync` to regenerate `web/app/source.json` (the one built-in copy; the IPA and .deb bundle
   it from `web/app/`, `native/build/...` copies are build output).
-- Order: README order (jailbreak shots first, since the README's hero row is jailbreak ones); the brief allowed it.
+- Order: README order by first appearance: the hero row's jb-home, jb-package, jb-log, then the web-* shots with
+  jb-sources and jb-installed where the README shows them. URLs use `HEAD`, so the gallery shows main's current
+  pictures rather than the tagged release's.
 - `tools/test_altsource.py`: the source lists exactly the web-*/jb-* files in docs/img, no crop-*, no repeats, all
   from raw.githubusercontent.com; `build` carries the list.
 - Checked `parseAltSource` (core/altstore.js) on the new source.json: 16 screenshots, URL and size read.
