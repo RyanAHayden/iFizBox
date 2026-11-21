@@ -231,13 +231,16 @@ def tinted_svg():
 
 
 def tinted():
-    """icon/glass/AppIconTinted1024.png from tinted_svg (needs rsvg-convert)."""
+    """icon/glass/AppIconTinted1024.png from tinted_svg (needs rsvg-convert), and the same picture at the alternate
+    sets' sizes (alternates.tinted_src, F360: every theme icon set's tinted appearance)."""
     import subprocess
     import tempfile
     with tempfile.NamedTemporaryFile("w", suffix=".svg", delete=False) as f:
         f.write(tinted_svg())
+    outs = [(1024, TINTED)] + [(pt * s, alternates.tinted_src(pt, s)) for pt, s in alternates.ALT_SIZES]
     try:
-        subprocess.run(["rsvg-convert", "-w", "1024", "-h", "1024", f.name, "-o", TINTED], check=True)
+        for px, out in outs:
+            subprocess.run(["rsvg-convert", "-w", str(px), "-h", str(px), f.name, "-o", out], check=True)
     finally:
         os.unlink(f.name)
     return TINTED
