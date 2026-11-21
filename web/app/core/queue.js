@@ -15,7 +15,8 @@
 //   finishOf(levels...)       -> the highest of return | uicache | reopen | restart | reload | reboot
 //   CONFFILE_TITLE, CONFFILE_BUTTONS, conffileMessage(file), conffileAnswer(index), conffileLine(file, answer)
 //                             F63: the Configuration Upgrade alert and the word it answers (keep | new)
-//   createRunLog(storage)     -> the console logs Settings shows
+//   createRunLog(storage)     -> the console logs Settings shows (F361: start() keeps a run as it goes)
+//   runState(e), runStatusText(e)  an entry's running | done | failed | cancelled | stopped, and its words
 //   createRepeatFilter()      -> (type, text) -> false for a status line the same as the one before (C6)
 //   debUrlOf(history, version), isAbsoluteFilename(f), mergePlans(plans)
 //                             F131: a Filename that is a full URL, fetched by the shell instead of apt
@@ -231,8 +232,33 @@ export function trimLog(text, max = LOG_CHARS) {
   return `${s.slice(0, head)}\n… ${cut} lines left out …\n${s.slice(s.length - tail)}`;
 }
 
+// F361: a run is kept from its first line, not only once it ends: start() adds it as running and its handle's line()
+// saves each line as it comes, so a run that hangs or is killed still leaves its log. Each page load has its own
+// SESSION: an entry still running from an earlier one (the app was closed or killed mid-run) reads "stopped".
+// An entry's state: running | done | failed | cancelled | stopped (older entries, without one, go by ok).
+const SESSION = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+export const RUN_STATES = ["running", "done", "failed", "cancelled", "stopped"];
+export function runState(e) {
+  if (e?.state === "running") return e.session === SESSION ? "running" : "stopped";
+  if (RUN_STATES.includes(e?.state)) return e.state;
+  return e?.ok ? "done" : "failed";
+}
+// The words Console Logs shows for an entry's state.
+export function runStatusText(e) {
+  switch (runState(e)) {
+    case "running": return "Running…";
+    case "done": return "Completed";
+    case "cancelled": return "Cancelled";
+    case "stopped": return "Stopped";
+    default: return e?.code == null || e.code === -1 ? "Failed" : `Failed (${e.code})`;
+  }
+}
+
 // storage: a localStorage-like { getItem, setItem, removeItem }; none (or one that throws) keeps logs in memory.
-export function createRunLog(storage = null, { max = LOG_MAX, chars = LOG_CHARS, now = () => Date.now() } = {}) {
+// flushMs: a running entry's lines are saved at most this often (the first at once, the rest within flushMs), so a
+// long apt run doesn't rewrite the whole list once per line; end() saves what is left.
+export function createRunLog(storage = null, { max = LOG_MAX, chars = LOG_CHARS, now = () => Date.now(), session = SESSION,
+  flushMs = 250, later = setTimeout, cancel = clearTimeout } = {}) {
   let mem = null;
   const read = () => {
     if (mem) return mem;
@@ -248,17 +274,74 @@ export function createRunLog(storage = null, { max = LOG_MAX, chars = LOG_CHARS,
       mem = list;
     }
   };
+  const stateOf = (run) => (run.state && RUN_STATES.includes(run.state) ? run.state
+    : run.cancelled ? "cancelled" : run.code === 0 ? "done" : "failed");
+  const put = (entry) => { write([entry, ...read()].slice(0, max)); return entry; };
+  // Changes one kept entry (gone past the newest `max`: nothing). -> the entry as saved, or null
+  const change = (id, f) => {
+    const list = read();
+    const i = list.findIndex((e) => e.id === id);
+    if (i < 0) return null;
+    list[i] = f(list[i]);
+    write([...list]);
+    return list[i];
+  };
+  const newId = (at) => `${at.toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   return {
-    // { title, jobs, code, finish, text } -> the saved entry (with id and at)
+    // { title, jobs, code, finish, text, cancelled } -> the saved entry (with id and at), for a run that has ended
     add(run) {
       const at = now();
-      const entry = { id: `${at.toString(36)}-${Math.random().toString(36).slice(2, 6)}`, at, title: run.title ?? "", jobs: run.jobs ?? [],
-        code: run.code ?? null, ok: run.code === 0, text: trimLog(run.text, chars) };
-      write([entry, ...read()].slice(0, max));
-      return entry;
+      return put({ id: newId(at), at, title: run.title ?? "", jobs: run.jobs ?? [],
+        code: run.code ?? null, ok: run.code === 0, state: stateOf(run), text: trimLog(run.text, chars) });
     },
-    list: () => read().map(({ text, ...rest }) => ({ ...rest, lines: String(text).split("\n").length })),
-    get: (id) => read().find((e) => e.id === id) ?? null,
+    // F361: { title, jobs, text } -> a handle for a run that is starting, saved now as running:
+    //   line(text)                    one more line, saved at once
+    //   set({ title, jobs })          what the run turned out to be (a name the answer gave)
+    //   end({ code, cancelled, finish, text })   done (code 0), cancelled or failed; `text` replaces the lines
+    // Calls after end() do nothing.
+    start(run = {}) {
+      const at = now();
+      const lines = run.text ? [String(run.text)] : [];
+      const entry = put({ id: newId(at), at, title: run.title ?? "", jobs: run.jobs ?? [], code: null, ok: false,
+        state: "running", session, text: trimLog(lines.join("\n"), chars) });
+      let over = false;
+      let timer = null;
+      let saved = 0; // when the lines were last saved
+      const save = (patch) => change(entry.id, (e) => ({ ...e, ...patch }));
+      const flush = () => {
+        if (timer != null) { cancel(timer); timer = null; }
+        saved = now();
+        save({ text: trimLog(lines.join("\n"), chars) });
+      };
+      return {
+        id: entry.id,
+        line(text) {
+          if (over || text == null) return;
+          lines.push(String(text));
+          if (flushMs <= 0 || now() - saved >= flushMs) flush();
+          else if (timer == null) timer = later(() => { timer = null; if (!over) flush(); }, flushMs);
+        },
+        set(patch = {}) {
+          if (over) return;
+          const p = {};
+          if (patch.title != null) p.title = patch.title;
+          if (patch.jobs) p.jobs = patch.jobs;
+          save(p);
+        },
+        end(result = {}) {
+          if (over) return null;
+          over = true;
+          if (timer != null) { cancel(timer); timer = null; }
+          const code = result.code ?? (result.cancelled ? null : -1);
+          const text = result.text != null ? String(result.text) : lines.join("\n");
+          return save({ code, ok: code === 0 && !result.cancelled, state: stateOf({ ...result, code }),
+            ...(result.finish ? { finish: result.finish } : {}), text: trimLog(text, chars) });
+        },
+        get ended() { return over; },
+      };
+    },
+    list: () => read().map(({ text, ...rest }) => ({ ...rest, state: runState(rest), lines: String(text).split("\n").length })),
+    get: (id) => { const e = read().find((x) => x.id === id); return e ? { ...e, state: runState(e) } : null; },
     clear() { mem = null; try { storage?.removeItem(LOG_KEY); } catch { /* nothing to clear */ } if (!storage) mem = []; },
   };
 }

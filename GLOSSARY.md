@@ -33,3 +33,10 @@ _Said_: add tweaks page, add tweaks sheet
 _On screen_: Add Tweaks
 _In code_: renderAddTweaks, addtweaks:<bundle id>, addTweaksItems, addTweakButton, addTweaksGroup
 _Avoid_: tweak picker, inject tweaks page
+
+**Console Log**:
+The kept output of one install, re-sign or queue run, saved on the iPhone line by line from its start; one cut off by closing the app reads Stopped
+_Said_: install log, run log
+_On screen_: Console Logs, Console Log; Running…, Completed, Failed, Cancelled, Stopped
+_In code_: runLogs, createRunLog, start(), runStatusText, loggedBridge
+_Avoid_: history, transcript
