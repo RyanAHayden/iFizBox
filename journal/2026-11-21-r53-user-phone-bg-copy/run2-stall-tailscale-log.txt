@@ -1,0 +1,108 @@
+11:59:28.122 [v1] magicsock: got updated network map; 17 peers
+11:59:28.123 magicsock: new contact: control-netmap usec=918654 cached=false
+11:59:28.126 magicsock: SetPrivateKey called (init)
+11:59:28.378 netcheck: [v1] report: udp=true v6=false v6os=true mapvarydest=false portmap=UM v4a=<public-ip>:54059 derp=16 derpdist=1v4:31ms,2v4:75ms,3v4:241ms,4v4:109ms,5v4:243ms,7v4:169ms,8v4:100ms,9v4:31ms,10v4:71ms,11v4:173ms,12v4:31ms,13v4:46ms,14v4:109ms,16v4:30ms,17v4:68ms,18v4:100ms,19v4:117ms,20v4:209ms,21v4:45ms,22v4:125ms,23v4:201ms,26v4:135ms,27v4:33ms,28v4:121ms
+11:59:28.378 magicsock: home DERP changing from derp-0 [0ms] to derp-16 [29ms] (forced=false)
+11:59:28.379 magicsock: home is now derp-16 (mia)
+11:59:28.379 magicsock: adding connection to derp-16 for home-keep-alive
+11:59:28.379 magicsock: 1 active derp conns: derp-16=cr0s,wr0s
+11:59:28.382 magicsock: endpoints changed: <public-ip>:54059 (portmap), 192.168.0.194:54059 (local)
+11:59:28.386 control: NetInfo: NetInfo{varies=false ipv6=false ipv6os=true udp=true icmpv4=false derp=#16 portmap=active-UM link="" firewallmode=""}
+11:59:28.479 magicsock: derp-16 connected; connGen=1
+11:59:28.500 wg: [v2] [CGkiG] - Starting
+11:59:28.500 wg: [v2] [CGkiG] - Sending handshake initiation
+11:59:28.500 [v1] magicsock: derp route for [CGkiG] set to derp-16 (shared home)
+11:59:28.502 magicsock: disco: node [CGkiG] d:e9549257265cf788 now using 192.168.0.194:41641 mtu=1360 tx=83efefcc0fb4
+11:59:28.502 magicsock: new contact: peer=[CGkiG] usec=1297470 cached=false via=direct
+11:59:28.555 wg: [v2] [CGkiG] - Received handshake response
+11:59:28.557 [v1] magicsock: received disco key update d:e9549257265cf788 from nqGL39EhD111CNTRL
+11:59:28.557 magicsock: updated disco key for peer [CGkiG] to d:e9549257265cf788
+11:59:28.562 magicsock: disco: node [CGkiG] d:e9549257265cf788 now using 192.168.0.194:41641 mtu=1360 tx=41834bb12116
+11:59:28.639 netcheck: [v1] report: udp=true v6=false v6os=true mapvarydest=false portmap=UM v4a=<public-ip>:54059 derp=16 derpdist=9v4:30ms,12v4:29ms,16v4:25ms
+11:59:28.689 [v1] LinkChange: minor
+11:59:28.946 netcheck: [v1] report: udp=true v6=false v6os=true mapvarydest=false portmap=UM v4a=<public-ip>:54059 derp=16 derpdist=9v4:29ms,12v4:30ms,16v4:25ms
+11:59:33.696 iFizBox install: the app went to the background
+11:59:33.938 wg: [v2] [CGkiG] - Received handshake initiation
+11:59:33.939 wg: [v2] [CGkiG] - Sending handshake response
+11:59:35.732ylib}[67] <NOTICE>: tcp_timers [C347:2] retransmit seq=362985516 3
+11:59:37.183ylib}[67] <NOTICE>: tcp_timers [C347:2] retransmit seq=362985516 4
+11:59:39.912ylib}[67] <NOTICE>: tcp_timers [C347:2] retransmit seq=362985516 5
+11:59:39.944 magicsock: new contact: peer=[CGkiG] usec=12739367 cached=false via=derp
+11:59:44.629ylib}[67] <NOTICE>: tcp_timers [C347:2] retransmit seq=362985516 6
+11:59:48.989 wg: [v2] [CGkiG] - Retrying handshake because we stopped hearing back after 15 seconds
+11:59:48.989 wg: [v2] [CGkiG] - Sending handshake initiation
+11:59:52.381 netcheck: netcheck: UDP is blocked, trying HTTPS
+11:59:52.394 netcheck: UDP is blocked, trying ICMP
+11:59:53.857ylib}[67] <NOTICE>: tcp_timers [C347:2] retransmit seq=362985516 7
+11:59:54.111 wg: [v2] [CGkiG] - Handshake did not complete after 5 seconds, retrying (try 2)
+11:59:54.111 wg: [v2] [CGkiG] - Sending handshake initiation
+11:59:54.378 netcheck: [v1] netcheck: measuring HTTPS latency of hnl (24): dialRegion(24): context deadline exceeded
+11:59:54.379 netcheck: [v1] report: udp=false icmpv4=false v6=false v6os=true mapvarydest= portmap=UM derp=16 derpdist=
+11:59:54.379 control: NetInfo: NetInfo{varies= ipv6=false ipv6os=true udp=false icmpv4=false derp=#16 portmap=active-UM link="" firewallmode=""}
+11:59:59.053 [v1] LinkChange: minor
+11:59:59.245 wg: [v2] [CGkiG] - Handshake did not complete after 5 seconds, retrying (try 3)
+11:59:59.245 wg: [v2] [CGkiG] - Sending handshake initiation
+12:00:02.054 netcheck: netcheck: UDP is blocked, trying HTTPS
+12:00:02.054 netcheck: UDP is blocked, trying ICMP
+12:00:03.438 iFizBox install: TIMEOUT copying the IPA to iOS (AFC): no answer from iOS for 30 s (78.0 MB of 340.0 MB copied); closing the tunnel
+12:00:04.054 netcheck: [v1] netcheck: measuring HTTPS latency of hnl (24): dialRegion(24): context deadline exceeded
+12:00:04.054 netcheck: [v1] report: udp=false icmpv4=false v6=false v6os=true mapvarydest= portmap=UM derp=16 derpdist=
+12:00:04.353 wg: [v2] [CGkiG] - Handshake did not complete after 5 seconds, retrying (try 4)
+12:00:04.354 wg: [v2] [CGkiG] - Sending handshake initiation
+12:00:09.637 wg: [v2] [CGkiG] - Handshake did not complete after 5 seconds, retrying (try 5)
+12:00:09.638 wg: [v2] [CGkiG] - Sending handshake initiation
+12:00:13.443 iFizBox install: dropped during the copy (78.0 MB of 340.0 MB): timeout: copying the IPA to iOS (AFC): no answer from iOS for 30 s (78.0 MB of 340.0 MB copied). Check that LocalDevVPN (or Tailscale) is on, then try again (try 1 of 4)
+12:00:14.760 wg: [v2] [CGkiG] - Handshake did not complete after 5 seconds, retrying (try 6)
+12:00:14.761 wg: [v2] [CGkiG] - Sending handshake initiation
+12:00:15.469 magicsock: disco key = d:5810f57c748d3b55
+12:00:15.470 wg: [v2] UDP bind has been updated
+12:00:15.470 wg: [v2] Interface state was Down, requested Up, now Up
+12:00:15.470 wg: [v2] Routine: receive incoming mkReceiveFunc - started
+12:00:15.470 wg: [v2] Routine: receive incoming mkReceiveFunc - started
+12:00:15.470 wg: [v2] Routine: receive incoming receiveDERP - started
+12:00:15.495 magicsock: new contact: control-netmap usec=26666 cached=true
+12:00:15.496 magicsock: home DERP changing from derp-0 [0ms] to derp-16 [0ms] (forced=true)
+12:00:15.497 magicsock: SetPrivateKey called (init)
+12:00:15.497 magicsock: private key changed, reconnecting to home derp-16
+12:00:15.497 magicsock: adding connection to derp-16 for home-keep-alive
+12:00:15.497 magicsock: 1 active derp conns: derp-16=cr0s,wr0s
+12:00:15.595 magicsock: derp-16 connected; connGen=1
+12:00:15.755 netcheck: [v1] report: udp=true v6=false v6os=true mapvarydest=false portmap=UM v4a=<public-ip>:62155 derp=16 derpdist=1v4:30ms,2v4:73ms,3v4:240ms,4v4:109ms,5v4:255ms,7v4:172ms,8v4:100ms,9v4:36ms,10v4:69ms,11v4:172ms,12v4:30ms,13v4:44ms,14v4:108ms,16v4:28ms,17v4:69ms,18v4:101ms,19v4:116ms,20v4:221ms,21v4:44ms,22v4:123ms,23v4:203ms,26v4:134ms,27v4:38ms,28v4:126ms
+12:00:15.755 control: NetInfo: NetInfo{varies=false ipv6=false ipv6os=true udp=true icmpv4=false derp=#16 portmap=active-UM link="" firewallmode=""}
+12:00:15.756 magicsock: endpoints changed: <public-ip>:62155 (portmap), 192.168.0.194:62155 (local)
+12:00:16.009 netcheck: [v1] report: udp=true v6=false v6os=true mapvarydest=false portmap=UM v4a=<public-ip>:62155 derp=16 derpdist=1v4:29ms,12v4:29ms,16v4:25ms
+12:00:16.372 [v1] magicsock: got updated network map; 17 peers
+12:00:16.518 wg: [v2] [CGkiG] - Starting
+12:00:16.518 wg: [v2] [CGkiG] - Sending handshake initiation
+12:00:16.519 [v1] magicsock: derp route for [CGkiG] set to derp-16 (shared home)
+12:00:16.522 magicsock: disco: node [CGkiG] d:e9549257265cf788 now using 192.168.0.194:41641 mtu=1360 tx=b2f05c2ee198
+12:00:16.522 magicsock: new contact: peer=[CGkiG] usec=1053740 cached=false via=direct
+12:00:16.580 wg: [v2] [CGkiG] - Received handshake response
+12:00:16.582 [v1] magicsock: received disco key update d:e9549257265cf788 from nqGL39EhD111CNTRL
+12:00:16.583 magicsock: updated disco key for peer [CGkiG] to d:e9549257265cf788
+12:00:16.588 magicsock: disco: node [CGkiG] d:e9549257265cf788 now using 192.168.0.194:41641 mtu=1360 tx=60340ff8a39e
+12:00:16.626 netcheck: [v1] report: udp=true v6=false v6os=true mapvarydest=false portmap=UM v4a=<public-ip>:62155 derp=16 derpdist=1v4:33ms,12v4:29ms,16v4:29ms
+12:00:16.771 [v1] LinkChange: minor
+12:00:16.771 [v1] LinkChange: minor
+12:00:16.835 iFizBox install: AFC: carrying on from 78.0 MB of 340.0 MB (iOS had 78.0 MB when the connection dropped)
+12:00:17.020 netcheck: [v1] report: udp=true v6=false v6os=true mapvarydest=false portmap=UM v4a=<public-ip>:62155 derp=16 derpdist=1v4:30ms,12v4:30ms,16v4:26ms
+12:00:19.769 netcheck: netcheck: UDP is blocked, trying HTTPS
+12:00:19.771 netcheck: UDP is blocked, trying ICMP
+12:00:19.863 wg: [v2] [CGkiG] - Handshake did not complete after 5 seconds, retrying (try 7)
+12:00:19.863 wg: [v2] [CGkiG] - Sending handshake initiation
+12:00:19.889 wg: [v2] Received invalid response message from 08692219d2cd4d8f9ada11c7798ce34f2a9d7722a0f9b017e911b24ba82dba5b
+12:00:19.931 [v1] LinkChange: minor
+12:00:19.933 [v1] LinkChange: minor
+12:00:20.181 netcheck: [v1] report: udp=true v6=false v6os=true mapvarydest=false portmap=UM v4a=<public-ip>:62155 derp=16 derpdist=1v4:28ms,12v4:29ms,16v4:25ms
+12:00:21.769 netcheck: [v1] netcheck: measuring HTTPS latency of hnl (24): dialRegion(24): context deadline exceeded
+12:00:21.769 netcheck: [v1] report: udp=false icmpv4=false v6=false v6os=true mapvarydest= portmap=UM derp=16 derpdist=
+12:00:24.769 netcheck: netcheck: UDP is blocked, trying HTTPS
+12:00:24.770 netcheck: UDP is blocked, trying ICMP
+12:00:24.906 wg: [v2] [CGkiG] - Received handshake initiation
+12:00:24.908 wg: [v2] [CGkiG] - Sending handshake response
+12:00:24.919 wg: [v2] [CGkiG] - Receiving keepalive packet
+12:00:24.922 [v1] magicsock: received disco key update d:e9549257265cf788 from nqGL39EhD111CNTRL
+12:00:24.924 [v1] magicsock: disco key did not change for node [CGkiG]
+12:00:24.952 wg: [v2] [CGkiG] - Handshake did not complete after 5 seconds, retrying (try 8)
+12:00:24.952 wg: [v2] [CGkiG] - Sending handshake initiation
+12:00:24.979 wg: [v2] Received invalid response message from 08692219d2cd4d8f9ada11c7798ce34f2a9d7722a0f9b017e911b24ba82dba5b

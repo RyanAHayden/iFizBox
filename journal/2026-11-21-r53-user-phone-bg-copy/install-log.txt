@@ -1,0 +1,744 @@
+11:54:31.279 iFizBox install: idevice log: /var/mobile/Containers/Data/Application/3DF77BAD-552A-4EEB-958D-2487B48BE3A4/Library/Caches/idevice.log (IdeviceLoggerError(rawValue: 0))
+11:54:31.292 iFizBox install: step: starting Tailscale (limit 30 s)
+11:54:32.856 iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+11:54:32.922 iFizBox install: RemotePairing is on port 49152
+11:54:32.922 iFizBox install: step: connecting to iOS at 127.0.0.1:62356 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+11:54:33.152 iFizBox install: tunnel and RSD up in 0.23 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 62410, installation_proxy on 62406
+11:54:33.152 iFizBox install: step: asking lockdown for the UDID (limit 20 s)
+11:54:33.378 iFizBox install: verify: done in 2.1 s
+11:54:39.498 iFizBox install: step: starting Tailscale (limit 30 s)
+11:54:39.548 iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+11:54:40.620 iFizBox install: step: connecting to iOS at 127.0.0.1:62438 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+11:54:40.797 iFizBox install: tunnel and RSD up in 0.17 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 62498, installation_proxy on 62494
+11:54:40.797 iFizBox install: step: asking lockdown for the UDID (limit 20 s)
+11:54:40.923 iFizBox install: verify: done in 1.4 s
+11:54:49.181 iFizBox install: step: starting Tailscale (limit 30 s)
+11:54:50.473 iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+11:54:50.534 iFizBox install: step: connecting to iOS at 127.0.0.1:62532 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+11:54:50.777 iFizBox install: tunnel and RSD up in 0.24 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 62586, installation_proxy on 62582
+11:54:50.777 iFizBox install: step: asking lockdown for the UDID (limit 20 s)
+11:54:51.029 iFizBox install: verify: done in 1.9 s
+11:56:53.675 iFizBox install: This iPhone: com.ryha.r53test 2.0, 356.5 MB
+11:56:53.677 iFizBox install: installing 70c32b3ea8ebf227e068f25049bab3a1-ahead.ipa (340.0 MB) as com.ryha.r53test 2.0
+11:56:53.682 iFizBox install: step: starting Tailscale (limit 30 s)
+11:56:53.724 iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+11:56:54.799 iFizBox install: step: connecting to iOS at 127.0.0.1:62648 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+11:56:55.007 iFizBox install: tunnel and RSD up in 0.20 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 62706, installation_proxy on 62702
+11:56:55.007 iFizBox install: step: connecting to installation_proxy (limit 20 s)
+11:56:55.014 iFizBox install: installation_proxy connected
+11:56:55.014 iFizBox install: step: asking installation_proxy for com.ryha.r53test (limit 20 s)
+11:56:55.048 iFizBox install: before the install, iOS lists com.ryha.r53test: nothing
+11:56:55.048 iFizBox install: step: connecting to AFC (limit 20 s)
+11:56:55.052 iFizBox install: AFC connected
+11:56:55.052 iFizBox install: step: opening /PublicStaging/7D5DC875-12A2-47C0-98EC-DD38786A0F51.ipa on iOS (AFC) (limit 20 s)
+11:56:55.056 iFizBox install: step: copying the IPA to iOS (AFC) (limit 30 s)
+11:56:55.558 iFizBox install: AFC: 8.0 MB of 340.0 MB (15.9 MB/s, in front)
+11:56:55.974 iFizBox install: AFC: 16.0 MB of 340.0 MB (17.4 MB/s, in front)
+11:56:56.389 iFizBox install: AFC: 24.0 MB of 340.0 MB (18.0 MB/s, in front)
+11:56:56.805 iFizBox install: AFC: 32.0 MB of 340.0 MB (18.3 MB/s, in front)
+11:56:57.216 iFizBox install: AFC: 40.0 MB of 340.0 MB (18.5 MB/s, in front)
+11:56:57.634 iFizBox install: AFC: 48.0 MB of 340.0 MB (18.6 MB/s, in front)
+11:56:58.051 iFizBox install: AFC: 56.0 MB of 340.0 MB (18.7 MB/s, in front)
+11:56:58.466 iFizBox install: AFC: 64.0 MB of 340.0 MB (18.8 MB/s, in front)
+11:56:58.870 iFizBox install: AFC: 72.0 MB of 340.0 MB (18.9 MB/s, in front)
+11:56:59.277 iFizBox install: AFC: 80.0 MB of 340.0 MB (19.0 MB/s, in front)
+11:57:00.194 iFizBox install: the app went to the background
+11:57:00.471 iFizBox install: AFC: 88.0 MB of 340.0 MB (16.3 MB/s, in the background)
+11:57:01.199 iFizBox install: AFC: 96.0 MB of 340.0 MB (15.6 MB/s, in the background)
+11:57:01.688 iFizBox install: AFC: 104.0 MB of 340.0 MB (15.7 MB/s, in the background)
+11:57:02.141 iFizBox install: AFC: 112.0 MB of 340.0 MB (15.8 MB/s, in the background)
+11:57:02.582 iFizBox install: AFC: 120.0 MB of 340.0 MB (15.9 MB/s, in the background)
+11:57:03.044 iFizBox install: AFC: 128.0 MB of 340.0 MB (16.0 MB/s, in the background)
+11:57:03.485 iFizBox install: AFC: 136.0 MB of 340.0 MB (16.1 MB/s, in the background)
+11:57:03.933 iFizBox install: AFC: 144.0 MB of 340.0 MB (16.2 MB/s, in the background)
+11:57:04.380 iFizBox install: AFC: 152.0 MB of 340.0 MB (16.3 MB/s, in the background)
+11:57:04.842 iFizBox install: AFC: 160.0 MB of 340.0 MB (16.3 MB/s, in the background)
+11:57:05.299 iFizBox install: AFC: 168.0 MB of 340.0 MB (16.4 MB/s, in the background)
+11:57:05.747 iFizBox install: AFC: 176.0 MB of 340.0 MB (16.5 MB/s, in the background)
+11:57:06.204 iFizBox install: AFC: 184.0 MB of 340.0 MB (16.5 MB/s, in the background)
+11:57:06.655 iFizBox install: AFC: 192.0 MB of 340.0 MB (16.6 MB/s, in the background)
+11:57:07.099 iFizBox install: AFC: 200.0 MB of 340.0 MB (16.6 MB/s, in the background)
+11:57:07.547 iFizBox install: AFC: 208.0 MB of 340.0 MB (16.7 MB/s, in the background)
+11:57:08.028 iFizBox install: AFC: 216.0 MB of 340.0 MB (16.7 MB/s, in the background)
+11:57:08.477 iFizBox install: AFC: 224.0 MB of 340.0 MB (16.7 MB/s, in the background)
+11:57:08.931 iFizBox install: AFC: 232.0 MB of 340.0 MB (16.7 MB/s, in the background)
+11:57:09.416 iFizBox install: AFC: 240.0 MB of 340.0 MB (16.7 MB/s, in the background)
+11:57:09.874 iFizBox install: AFC: 248.0 MB of 340.0 MB (16.7 MB/s, in the background)
+11:57:10.328 iFizBox install: AFC: 256.0 MB of 340.0 MB (16.8 MB/s, in the background)
+11:57:10.791 iFizBox install: AFC: 264.0 MB of 340.0 MB (16.8 MB/s, in the background)
+11:57:11.245 iFizBox install: AFC: 272.0 MB of 340.0 MB (16.8 MB/s, in the background)
+11:57:11.708 iFizBox install: AFC: 280.0 MB of 340.0 MB (16.8 MB/s, in the background)
+11:57:12.184 iFizBox install: AFC: 288.0 MB of 340.0 MB (16.8 MB/s, in the background)
+11:57:12.658 iFizBox install: AFC: 296.0 MB of 340.0 MB (16.8 MB/s, in the background)
+11:57:13.121 iFizBox install: AFC: 304.0 MB of 340.0 MB (16.8 MB/s, in the background)
+11:57:13.583 iFizBox install: AFC: 312.0 MB of 340.0 MB (16.8 MB/s, in the background)
+11:57:14.040 iFizBox install: AFC: 320.0 MB of 340.0 MB (16.9 MB/s, in the background)
+11:57:14.509 iFizBox install: AFC: 328.0 MB of 340.0 MB (16.9 MB/s, in the background)
+11:57:14.969 iFizBox install: AFC: 336.0 MB of 340.0 MB (16.9 MB/s, in the background)
+11:57:15.200 iFizBox install: AFC: 340.0 MB of 340.0 MB (16.9 MB/s, in the background)
+11:57:15.201 iFizBox install: step: closing /PublicStaging/7D5DC875-12A2-47C0-98EC-DD38786A0F51.ipa on iOS (AFC) (limit 20 s)
+11:57:15.202 iFizBox install: AFC: copied 340.0 MB in 20.1 s: 18.1 MB/s in front, 16.5 MB/s in the background
+11:57:15.202 iFizBox install: step: connecting to installation_proxy (limit 20 s)
+11:57:15.213 iFizBox install: installation_proxy connected
+11:57:15.213 iFizBox install: step: iOS installing the app (installd) (limit 180 s)
+11:57:18.296 iFizBox install: installd: 5%
+11:57:18.337 iFizBox install: installd: 15%
+11:57:18.337 iFizBox install: installd: 20%
+11:57:18.432 iFizBox install: installd: 30%
+11:57:18.504 iFizBox install: installd: 40%
+11:57:19.187 iFizBox install: installd: 50%
+11:57:19.214 iFizBox install: installd: 60%
+11:57:19.234 iFizBox install: installd: 70%
+11:57:19.266 iFizBox install: installd: 80%
+11:57:19.298 iFizBox install: installd: 90%
+11:57:19.347 iFizBox install: installd: 100%
+11:57:19.364 iFizBox install: installd: Complete
+11:57:19.364 iFizBox install: step: connecting to AFC (limit 20 s)
+11:57:19.367 iFizBox install: AFC connected
+11:57:19.367 iFizBox install: step: removing the staged IPA (limit 20 s)
+11:57:19.379 iFizBox install: install: done in 25.7 s
+11:57:19.390 iFizBox install: This iPhone: com.ryha.r53test installed
+11:57:33.674 iFizBox install: the app is in front again
+11:58:07.259 iFizBox install: the app went to the background
+11:58:48.698 iFizBox install: the app is in front again
+11:59:27.193 iFizBox install: This iPhone: com.ryha.r53test 3.0, 356.5 MB
+11:59:27.194 iFizBox install: installing ed3555f314a7078d8f22560fa7b89644-ahead.ipa (340.0 MB) as com.ryha.r53test 3.0
+11:59:27.198 iFizBox install: step: starting Tailscale (limit 30 s)
+11:59:28.497 iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+11:59:28.560 iFizBox install: step: connecting to iOS at 127.0.0.1:62783 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+11:59:28.726 iFizBox install: tunnel and RSD up in 0.16 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 62837, installation_proxy on 62833
+11:59:28.726 iFizBox install: step: connecting to installation_proxy (limit 20 s)
+11:59:28.739 iFizBox install: installation_proxy connected
+11:59:28.740 iFizBox install: step: asking installation_proxy for com.ryha.r53test (limit 20 s)
+11:59:28.774 iFizBox install: before the install, iOS lists com.ryha.r53test: 2.0 (2.0) in B037BBCC-9DB5-43F3-BE12-0A2215045D14
+11:59:28.774 iFizBox install: step: connecting to AFC (limit 20 s)
+11:59:28.778 iFizBox install: AFC connected
+11:59:28.778 iFizBox install: step: opening /PublicStaging/C0556E76-5824-45F3-963D-9B8AFCFEFF93.ipa on iOS (AFC) (limit 20 s)
+11:59:28.782 iFizBox install: step: copying the IPA to iOS (AFC) (limit 30 s)
+11:59:29.300 iFizBox install: AFC: 8.0 MB of 340.0 MB (15.4 MB/s, in front)
+11:59:29.724 iFizBox install: AFC: 16.0 MB of 340.0 MB (17.0 MB/s, in front)
+11:59:30.160 iFizBox install: AFC: 24.0 MB of 340.0 MB (17.4 MB/s, in front)
+11:59:30.569 iFizBox install: AFC: 32.0 MB of 340.0 MB (17.9 MB/s, in front)
+11:59:30.977 iFizBox install: AFC: 40.0 MB of 340.0 MB (18.2 MB/s, in front)
+11:59:31.385 iFizBox install: AFC: 48.0 MB of 340.0 MB (18.4 MB/s, in front)
+11:59:31.800 iFizBox install: AFC: 56.0 MB of 340.0 MB (18.6 MB/s, in front)
+11:59:32.215 iFizBox install: AFC: 64.0 MB of 340.0 MB (18.6 MB/s, in front)
+11:59:32.623 iFizBox install: AFC: 72.0 MB of 340.0 MB (18.7 MB/s, in front)
+11:59:33.696 iFizBox install: the app went to the background
+12:00:03.438 iFizBox install: TIMEOUT copying the IPA to iOS (AFC): no answer from iOS for 30 s (78.0 MB of 340.0 MB copied); closing the tunnel
+12:00:13.442 iFizBox install: the stuck call didn't come back (tunnel closed: false); leaving it
+12:00:13.443 iFizBox install: idevice: 2026-11-21T16:59:47.241333Z  WARN hp=32470 timed out after 5 retransmissions; closing
+12:00:13.443 iFizBox install: dropped during the copy (78.0 MB of 340.0 MB): timeout: copying the IPA to iOS (AFC): no answer from iOS for 30 s (78.0 MB of 340.0 MB copied). Check that LocalDevVPN (or Tailscale) is on, then try again (try 1 of 4)
+12:00:15.461 iFizBox install: step: starting Tailscale (limit 30 s)
+12:00:15.503 iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+12:00:16.584 iFizBox install: step: connecting to iOS at 127.0.0.1:62994 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+12:00:16.809 iFizBox install: tunnel and RSD up in 0.22 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 63052, installation_proxy on 63048
+12:00:16.809 iFizBox install: step: connecting to AFC (limit 20 s)
+12:00:16.823 iFizBox install: AFC connected
+12:00:16.823 iFizBox install: step: opening /PublicStaging/C0556E76-5824-45F3-963D-9B8AFCFEFF93.ipa on iOS (AFC) (limit 20 s)
+12:00:16.835 iFizBox install: AFC: carrying on from 78.0 MB of 340.0 MB (iOS had 78.0 MB when the connection dropped)
+12:00:16.835 iFizBox install: step: copying the IPA to iOS (AFC) (limit 30 s)
+12:00:17.290 iFizBox install: AFC: 86.0 MB of 340.0 MB (17.5 MB/s, in front)
+12:00:17.709 iFizBox install: AFC: 94.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:00:18.128 iFizBox install: AFC: 102.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:00:18.543 iFizBox install: AFC: 110.0 MB of 340.0 MB (18.7 MB/s, in front)
+12:00:18.961 iFizBox install: AFC: 118.0 MB of 340.0 MB (18.8 MB/s, in front)
+12:00:19.396 iFizBox install: AFC: 126.0 MB of 340.0 MB (18.7 MB/s, in front)
+12:00:19.833 iFizBox install: AFC: 134.0 MB of 340.0 MB (18.7 MB/s, in front)
+12:00:20.329 iFizBox install: AFC: 142.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:00:20.760 iFizBox install: AFC: 150.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:00:21.188 iFizBox install: AFC: 158.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:00:21.613 iFizBox install: AFC: 166.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:00:22.040 iFizBox install: AFC: 174.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:00:22.466 iFizBox install: AFC: 182.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:00:22.892 iFizBox install: AFC: 190.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:00:23.319 iFizBox install: AFC: 198.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:00:23.760 iFizBox install: AFC: 206.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:00:24.193 iFizBox install: AFC: 214.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:00:24.624 iFizBox install: AFC: 222.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:00:25.132 iFizBox install: AFC: 230.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:00:25.576 iFizBox install: AFC: 238.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:00:26.013 iFizBox install: AFC: 246.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:00:26.449 iFizBox install: AFC: 254.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:00:26.887 iFizBox install: AFC: 262.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:00:27.325 iFizBox install: AFC: 270.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:00:27.775 iFizBox install: AFC: 278.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:00:28.277 iFizBox install: AFC: 286.0 MB of 340.0 MB (18.2 MB/s, in front)
+12:00:28.785 iFizBox install: AFC: 294.0 MB of 340.0 MB (18.1 MB/s, in front)
+12:00:29.287 iFizBox install: AFC: 302.0 MB of 340.0 MB (18.0 MB/s, in front)
+12:00:29.752 iFizBox install: AFC: 310.0 MB of 340.0 MB (18.0 MB/s, in front)
+12:00:30.210 iFizBox install: AFC: 318.0 MB of 340.0 MB (17.9 MB/s, in front)
+12:00:30.660 iFizBox install: AFC: 326.0 MB of 340.0 MB (17.9 MB/s, in front)
+12:00:31.112 iFizBox install: AFC: 334.0 MB of 340.0 MB (17.9 MB/s, in front)
+12:00:31.452 iFizBox install: AFC: 340.0 MB of 340.0 MB (17.9 MB/s, in front)
+12:00:31.452 iFizBox install: step: closing /PublicStaging/C0556E76-5824-45F3-963D-9B8AFCFEFF93.ipa on iOS (AFC) (limit 20 s)
+12:00:31.453 iFizBox install: AFC: copied 340.0 MB in 62.7 s: 17.7 MB/s in front
+12:00:31.454 iFizBox install: step: connecting to installation_proxy (limit 20 s)
+12:00:31.457 iFizBox install: installation_proxy connected
+12:00:31.457 iFizBox install: step: iOS installing the app (installd) (limit 180 s)
+12:00:36.336 iFizBox install: installd: 90%
+12:00:36.495 iFizBox install: installd: 100%
+12:00:36.512 iFizBox install: installd: Complete
+12:00:36.512 iFizBox install: step: connecting to AFC (limit 20 s)
+12:00:36.519 iFizBox install: AFC connected
+12:00:36.519 iFizBox install: step: removing the staged IPA (limit 20 s)
+12:00:36.846 iFizBox install: install, connection 2: done in 21.4 s
+12:00:36.849 iFizBox install: This iPhone: com.ryha.r53test installed
+12:01:24.289 iFizBox install: the app went to the background
+12:02:20.341 iFizBox install: This iPhone: com.ryha.r53test 4.0, 356.5 MB
+12:02:20.343 iFizBox install: installing 2ce69a2f2c27693da71e694866816b43-ahead.ipa (340.0 MB) as com.ryha.r53test 4.0
+12:02:20.348 iFizBox install: step: starting Tailscale (limit 30 s)
+12:02:21.640 iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+12:02:21.724 iFizBox install: step: connecting to iOS at 127.0.0.1:63427 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+12:02:21.927 iFizBox install: tunnel and RSD up in 0.20 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 63481, installation_proxy on 63477
+12:02:21.927 iFizBox install: step: connecting to installation_proxy (limit 20 s)
+12:02:21.935 iFizBox install: installation_proxy connected
+12:02:21.936 iFizBox install: step: asking installation_proxy for com.ryha.r53test (limit 20 s)
+12:02:21.985 iFizBox install: before the install, iOS lists com.ryha.r53test: 3.0 (3.0) in F4D8E0B1-9AC2-4611-AB1C-F356FD7F7DCF
+12:02:21.986 iFizBox install: step: connecting to AFC (limit 20 s)
+12:02:21.986 iFizBox install: AFC connected
+12:02:21.986 iFizBox install: step: opening /PublicStaging/CC6E86B8-0D4B-45BB-B347-CA984321423D.ipa on iOS (AFC) (limit 20 s)
+12:02:21.989 iFizBox install: step: copying the IPA to iOS (AFC) (limit 30 s)
+12:02:22.457 iFizBox install: AFC: 8.0 MB of 340.0 MB (16.7 MB/s, in front)
+12:02:22.861 iFizBox install: AFC: 16.0 MB of 340.0 MB (18.1 MB/s, in front)
+12:02:23.268 iFizBox install: AFC: 24.0 MB of 340.0 MB (18.6 MB/s, in front)
+12:02:23.681 iFizBox install: AFC: 32.0 MB of 340.0 MB (18.8 MB/s, in front)
+12:02:24.092 iFizBox install: AFC: 40.0 MB of 340.0 MB (18.9 MB/s, in front)
+12:02:24.507 iFizBox install: AFC: 48.0 MB of 340.0 MB (19.0 MB/s, in front)
+12:02:24.937 iFizBox install: AFC: 56.0 MB of 340.0 MB (18.9 MB/s, in front)
+12:02:25.431 iFizBox install: AFC: 64.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:02:25.852 iFizBox install: AFC: 72.0 MB of 340.0 MB (18.6 MB/s, in front)
+12:02:26.269 iFizBox install: AFC: 80.0 MB of 340.0 MB (18.6 MB/s, in front)
+12:02:27.702 iFizBox install: AFC: 88.0 MB of 340.0 MB (15.4 MB/s, in the background)
+12:02:28.430 iFizBox install: AFC: 96.0 MB of 340.0 MB (14.9 MB/s, in the background)
+12:02:28.960 iFizBox install: AFC: 104.0 MB of 340.0 MB (14.9 MB/s, in the background)
+12:02:29.502 iFizBox install: AFC: 112.0 MB of 340.0 MB (14.9 MB/s, in the background)
+12:02:30.116 iFizBox install: AFC: 120.0 MB of 340.0 MB (14.7 MB/s, in the background)
+12:02:30.689 iFizBox install: AFC: 128.0 MB of 340.0 MB (14.7 MB/s, in the background)
+12:02:31.168 iFizBox install: AFC: 136.0 MB of 340.0 MB (14.8 MB/s, in the background)
+12:02:31.655 iFizBox install: AFC: 144.0 MB of 340.0 MB (14.9 MB/s, in the background)
+12:02:32.139 iFizBox install: AFC: 152.0 MB of 340.0 MB (15.0 MB/s, in the background)
+12:02:32.625 iFizBox install: AFC: 160.0 MB of 340.0 MB (15.0 MB/s, in the background)
+12:02:33.109 iFizBox install: AFC: 168.0 MB of 340.0 MB (15.1 MB/s, in the background)
+12:02:33.599 iFizBox install: AFC: 176.0 MB of 340.0 MB (15.1 MB/s, in the background)
+12:02:34.082 iFizBox install: AFC: 184.0 MB of 340.0 MB (15.2 MB/s, in the background)
+12:02:34.575 iFizBox install: AFC: 192.0 MB of 340.0 MB (15.2 MB/s, in the background)
+12:02:35.058 iFizBox install: AFC: 200.0 MB of 340.0 MB (15.3 MB/s, in the background)
+12:02:35.547 iFizBox install: AFC: 208.0 MB of 340.0 MB (15.3 MB/s, in the background)
+12:02:36.046 iFizBox install: AFC: 216.0 MB of 340.0 MB (15.4 MB/s, in the background)
+12:02:36.539 iFizBox install: AFC: 224.0 MB of 340.0 MB (15.4 MB/s, in the background)
+12:02:37.026 iFizBox install: AFC: 232.0 MB of 340.0 MB (15.4 MB/s, in the background)
+12:02:37.526 iFizBox install: AFC: 240.0 MB of 340.0 MB (15.4 MB/s, in the background)
+12:02:38.017 iFizBox install: AFC: 248.0 MB of 340.0 MB (15.5 MB/s, in the background)
+12:02:38.508 iFizBox install: AFC: 256.0 MB of 340.0 MB (15.5 MB/s, in the background)
+12:02:39.014 iFizBox install: AFC: 264.0 MB of 340.0 MB (15.5 MB/s, in the background)
+12:02:39.507 iFizBox install: AFC: 272.0 MB of 340.0 MB (15.5 MB/s, in the background)
+12:02:40.012 iFizBox install: AFC: 280.0 MB of 340.0 MB (15.5 MB/s, in the background)
+12:02:40.508 iFizBox install: AFC: 288.0 MB of 340.0 MB (15.5 MB/s, in the background)
+12:02:41.017 iFizBox install: AFC: 296.0 MB of 340.0 MB (15.5 MB/s, in the background)
+12:02:41.521 iFizBox install: AFC: 304.0 MB of 340.0 MB (15.6 MB/s, in the background)
+12:02:42.019 iFizBox install: AFC: 312.0 MB of 340.0 MB (15.6 MB/s, in the background)
+12:02:42.522 iFizBox install: AFC: 320.0 MB of 340.0 MB (15.6 MB/s, in the background)
+12:02:43.033 iFizBox install: AFC: 328.0 MB of 340.0 MB (15.6 MB/s, in the background)
+12:02:43.536 iFizBox install: AFC: 336.0 MB of 340.0 MB (15.6 MB/s, in the background)
+12:02:43.790 iFizBox install: AFC: 340.0 MB of 340.0 MB (15.6 MB/s, in the background)
+12:02:43.790 iFizBox install: step: closing /PublicStaging/CC6E86B8-0D4B-45BB-B347-CA984321423D.ipa on iOS (AFC) (limit 20 s)
+12:02:43.793 iFizBox install: AFC: copied 340.0 MB in 21.8 s: 17.5 MB/s in front, 15.0 MB/s in the background
+12:02:43.793 iFizBox install: step: connecting to installation_proxy (limit 20 s)
+12:02:43.800 iFizBox install: installation_proxy connected
+12:02:43.800 iFizBox install: step: iOS installing the app (installd) (limit 180 s)
+12:02:47.694 iFizBox install: installd: 90%
+12:02:47.820 iFizBox install: installd: 100%
+12:02:47.825 iFizBox install: installd: Complete
+12:02:47.825 iFizBox install: step: connecting to AFC (limit 20 s)
+12:02:47.825 iFizBox install: AFC connected
+12:02:47.825 iFizBox install: step: removing the staged IPA (limit 20 s)
+12:02:47.827 iFizBox install: install: done in 27.4 s
+12:02:47.830 iFizBox install: This iPhone: com.ryha.r53test installed
+12:04:39.307 iFizBox install: This iPhone: com.ryha.r53test 2.0, 356.5 MB
+12:04:39.308 iFizBox install: installing a96d2adc9b0b510b275afd04ae340a03-ahead.ipa (340.0 MB) as com.ryha.r53test 2.0
+12:04:39.314 iFizBox install: step: starting Tailscale (limit 30 s)
+12:04:39.354 iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+12:04:40.435 iFizBox install: step: connecting to iOS at 127.0.0.1:63714 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+12:04:40.603 iFizBox install: tunnel and RSD up in 0.16 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 63772, installation_proxy on 63768
+12:04:40.603 iFizBox install: step: connecting to installation_proxy (limit 20 s)
+12:04:40.612 iFizBox install: installation_proxy connected
+12:04:40.612 iFizBox install: step: asking installation_proxy for com.ryha.r53test (limit 20 s)
+12:04:40.690 iFizBox install: before the install, iOS lists com.ryha.r53test: 4.0 (4.0) in 6127BD44-7379-41FA-96E0-EAA728B7E4A6
+12:04:40.691 iFizBox install: step: connecting to AFC (limit 20 s)
+12:04:40.691 iFizBox install: AFC connected
+12:04:40.691 iFizBox install: step: opening /PublicStaging/0650F646-4314-4260-8936-0F194F28D428.ipa on iOS (AFC) (limit 20 s)
+12:04:40.693 iFizBox install: step: copying the IPA to iOS (AFC) (limit 30 s)
+12:04:41.178 iFizBox install: AFC: 8.0 MB of 340.0 MB (16.1 MB/s, in front)
+12:04:41.590 iFizBox install: AFC: 16.0 MB of 340.0 MB (17.6 MB/s, in front)
+12:04:42.000 iFizBox install: AFC: 24.0 MB of 340.0 MB (18.2 MB/s, in front)
+12:04:42.409 iFizBox install: AFC: 32.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:04:42.817 iFizBox install: AFC: 40.0 MB of 340.0 MB (18.7 MB/s, in front)
+12:04:43.227 iFizBox install: AFC: 48.0 MB of 340.0 MB (18.9 MB/s, in front)
+12:04:43.662 iFizBox install: AFC: 56.0 MB of 340.0 MB (18.8 MB/s, in front)
+12:04:44.127 iFizBox install: AFC: 64.0 MB of 340.0 MB (18.6 MB/s, in front)
+12:04:44.557 iFizBox install: AFC: 72.0 MB of 340.0 MB (18.6 MB/s, in front)
+12:04:44.975 iFizBox install: AFC: 80.0 MB of 340.0 MB (18.6 MB/s, in front)
+12:04:45.979 iFizBox install: the app went to the background
+12:04:46.525 iFizBox install: AFC: 88.0 MB of 340.0 MB (15.1 MB/s, in the background)
+12:04:47.161 iFizBox install: AFC: 96.0 MB of 340.0 MB (14.8 MB/s, in the background)
+12:04:47.710 iFizBox install: AFC: 104.0 MB of 340.0 MB (14.8 MB/s, in the background)
+12:04:48.898 iFizBox install: AFC: 112.0 MB of 340.0 MB (13.6 MB/s, in the background)
+12:04:49.468 iFizBox install: AFC: 120.0 MB of 340.0 MB (13.7 MB/s, in the background)
+12:04:49.988 iFizBox install: AFC: 128.0 MB of 340.0 MB (13.8 MB/s, in the background)
+12:04:50.586 iFizBox install: AFC: 136.0 MB of 340.0 MB (13.7 MB/s, in the background)
+12:04:51.165 iFizBox install: AFC: 144.0 MB of 340.0 MB (13.7 MB/s, in the background)
+12:04:51.738 iFizBox install: AFC: 152.0 MB of 340.0 MB (13.7 MB/s, in the background)
+12:04:52.280 iFizBox install: AFC: 160.0 MB of 340.0 MB (13.8 MB/s, in the background)
+12:04:52.788 iFizBox install: AFC: 168.0 MB of 340.0 MB (13.9 MB/s, in the background)
+12:04:53.289 iFizBox install: AFC: 176.0 MB of 340.0 MB (14.0 MB/s, in the background)
+12:04:53.812 iFizBox install: AFC: 184.0 MB of 340.0 MB (14.0 MB/s, in the background)
+12:04:54.329 iFizBox install: AFC: 192.0 MB of 340.0 MB (14.1 MB/s, in the background)
+12:04:54.845 iFizBox install: AFC: 200.0 MB of 340.0 MB (14.1 MB/s, in the background)
+12:04:55.355 iFizBox install: AFC: 208.0 MB of 340.0 MB (14.2 MB/s, in the background)
+12:04:55.866 iFizBox install: AFC: 216.0 MB of 340.0 MB (14.2 MB/s, in the background)
+12:04:56.377 iFizBox install: AFC: 224.0 MB of 340.0 MB (14.3 MB/s, in the background)
+12:04:56.886 iFizBox install: AFC: 232.0 MB of 340.0 MB (14.3 MB/s, in the background)
+12:04:57.403 iFizBox install: AFC: 240.0 MB of 340.0 MB (14.4 MB/s, in the background)
+12:04:57.912 iFizBox install: AFC: 248.0 MB of 340.0 MB (14.4 MB/s, in the background)
+12:04:58.425 iFizBox install: AFC: 256.0 MB of 340.0 MB (14.4 MB/s, in the background)
+12:04:58.946 iFizBox install: AFC: 264.0 MB of 340.0 MB (14.5 MB/s, in the background)
+12:04:59.464 iFizBox install: AFC: 272.0 MB of 340.0 MB (14.5 MB/s, in the background)
+12:04:59.992 iFizBox install: AFC: 280.0 MB of 340.0 MB (14.5 MB/s, in the background)
+12:05:00.508 iFizBox install: AFC: 288.0 MB of 340.0 MB (14.5 MB/s, in the background)
+12:05:01.025 iFizBox install: AFC: 296.0 MB of 340.0 MB (14.6 MB/s, in the background)
+12:05:01.553 iFizBox install: AFC: 304.0 MB of 340.0 MB (14.6 MB/s, in the background)
+12:05:02.072 iFizBox install: AFC: 312.0 MB of 340.0 MB (14.6 MB/s, in the background)
+12:05:02.591 iFizBox install: AFC: 320.0 MB of 340.0 MB (14.6 MB/s, in the background)
+12:05:03.120 iFizBox install: AFC: 328.0 MB of 340.0 MB (14.6 MB/s, in the background)
+12:05:03.649 iFizBox install: AFC: 336.0 MB of 340.0 MB (14.6 MB/s, in the background)
+12:05:03.915 iFizBox install: AFC: 340.0 MB of 340.0 MB (14.6 MB/s, in the background)
+12:05:03.915 iFizBox install: step: closing /PublicStaging/0650F646-4314-4260-8936-0F194F28D428.ipa on iOS (AFC) (limit 20 s)
+12:05:03.917 iFizBox install: AFC: copied 340.0 MB in 23.2 s: 16.9 MB/s in front, 14.0 MB/s in the background
+12:05:03.917 iFizBox install: step: connecting to installation_proxy (limit 20 s)
+12:05:03.926 iFizBox install: installation_proxy connected
+12:05:03.926 iFizBox install: step: iOS installing the app (installd) (limit 180 s)
+12:05:08.118 iFizBox install: installd: 90%
+12:05:08.270 iFizBox install: installd: 100%
+12:05:08.341 iFizBox install: installd: Complete
+12:05:08.341 iFizBox install: step: connecting to AFC (limit 20 s)
+12:05:08.341 iFizBox install: AFC connected
+12:05:08.342 iFizBox install: step: removing the staged IPA (limit 20 s)
+12:05:08.612 iFizBox install: install: done in 29.3 s
+12:05:08.615 iFizBox install: This iPhone: com.ryha.r53test installed
+12:05:23.286 iFizBox install: the app is in front again
+12:06:46.391 iFizBox install: This iPhone: com.ryha.r53test 3.0, 356.5 MB
+12:06:46.393 iFizBox install: installing ab82077b526dca1082a36ecedba3baa6-ahead.ipa (340.0 MB) as com.ryha.r53test 3.0
+12:06:46.396 iFizBox install: step: starting Tailscale (limit 30 s)
+12:06:47.690 iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+12:06:47.747 iFizBox install: step: connecting to iOS at 127.0.0.1:63959 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+12:06:47.931 iFizBox install: tunnel and RSD up in 0.18 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 64013, installation_proxy on 64009
+12:06:47.932 iFizBox install: step: connecting to installation_proxy (limit 20 s)
+12:06:47.939 iFizBox install: installation_proxy connected
+12:06:47.939 iFizBox install: step: asking installation_proxy for com.ryha.r53test (limit 20 s)
+12:06:48.005 iFizBox install: before the install, iOS lists com.ryha.r53test: 2.0 (2.0) in 757DFE64-628D-4B88-B234-52A846895363
+12:06:48.005 iFizBox install: step: connecting to AFC (limit 20 s)
+12:06:48.008 iFizBox install: AFC connected
+12:06:48.008 iFizBox install: step: opening /PublicStaging/33545EC3-D231-4FFA-9465-2E8C3A071CDD.ipa on iOS (AFC) (limit 20 s)
+12:06:48.012 iFizBox install: step: copying the IPA to iOS (AFC) (limit 30 s)
+12:06:48.501 iFizBox install: AFC: 8.0 MB of 340.0 MB (16.3 MB/s, in front)
+12:06:48.914 iFizBox install: AFC: 16.0 MB of 340.0 MB (17.7 MB/s, in front)
+12:06:49.356 iFizBox install: AFC: 24.0 MB of 340.0 MB (17.8 MB/s, in front)
+12:06:49.781 iFizBox install: AFC: 32.0 MB of 340.0 MB (18.1 MB/s, in front)
+12:06:50.196 iFizBox install: AFC: 40.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:06:50.661 iFizBox install: AFC: 48.0 MB of 340.0 MB (18.1 MB/s, in front)
+12:06:51.120 iFizBox install: AFC: 56.0 MB of 340.0 MB (18.0 MB/s, in front)
+12:06:51.575 iFizBox install: AFC: 64.0 MB of 340.0 MB (18.0 MB/s, in front)
+12:06:52.005 iFizBox install: AFC: 72.0 MB of 340.0 MB (18.0 MB/s, in front)
+12:06:52.428 iFizBox install: AFC: 80.0 MB of 340.0 MB (18.1 MB/s, in front)
+12:06:53.426 iFizBox install: the app went to the background
+12:06:53.916 iFizBox install: AFC: 88.0 MB of 340.0 MB (14.9 MB/s, in the background)
+12:06:54.578 iFizBox install: AFC: 96.0 MB of 340.0 MB (14.6 MB/s, in the background)
+12:06:55.119 iFizBox install: AFC: 104.0 MB of 340.0 MB (14.6 MB/s, in the background)
+12:06:55.664 iFizBox install: AFC: 112.0 MB of 340.0 MB (14.6 MB/s, in the background)
+12:06:56.341 iFizBox install: AFC: 120.0 MB of 340.0 MB (14.4 MB/s, in the background)
+12:06:56.905 iFizBox install: AFC: 128.0 MB of 340.0 MB (14.4 MB/s, in the background)
+12:06:57.416 iFizBox install: AFC: 136.0 MB of 340.0 MB (14.5 MB/s, in the background)
+12:06:58.085 iFizBox install: AFC: 144.0 MB of 340.0 MB (14.3 MB/s, in the background)
+12:06:58.615 iFizBox install: AFC: 152.0 MB of 340.0 MB (14.3 MB/s, in the background)
+12:06:59.141 iFizBox install: AFC: 160.0 MB of 340.0 MB (14.4 MB/s, in the background)
+12:06:59.686 iFizBox install: AFC: 168.0 MB of 340.0 MB (14.4 MB/s, in the background)
+12:07:00.223 iFizBox install: AFC: 176.0 MB of 340.0 MB (14.4 MB/s, in the background)
+12:07:00.759 iFizBox install: AFC: 184.0 MB of 340.0 MB (14.4 MB/s, in the background)
+12:07:01.282 iFizBox install: AFC: 192.0 MB of 340.0 MB (14.5 MB/s, in the background)
+12:07:01.796 iFizBox install: AFC: 200.0 MB of 340.0 MB (14.5 MB/s, in the background)
+12:07:02.307 iFizBox install: AFC: 208.0 MB of 340.0 MB (14.5 MB/s, in the background)
+12:07:02.835 iFizBox install: AFC: 216.0 MB of 340.0 MB (14.6 MB/s, in the background)
+12:07:03.367 iFizBox install: AFC: 224.0 MB of 340.0 MB (14.6 MB/s, in the background)
+12:07:03.884 iFizBox install: AFC: 232.0 MB of 340.0 MB (14.6 MB/s, in the background)
+12:07:04.410 iFizBox install: AFC: 240.0 MB of 340.0 MB (14.6 MB/s, in the background)
+12:07:04.934 iFizBox install: AFC: 248.0 MB of 340.0 MB (14.7 MB/s, in the background)
+12:07:05.451 iFizBox install: AFC: 256.0 MB of 340.0 MB (14.7 MB/s, in the background)
+12:07:05.984 iFizBox install: AFC: 264.0 MB of 340.0 MB (14.7 MB/s, in the background)
+12:07:06.506 iFizBox install: AFC: 272.0 MB of 340.0 MB (14.7 MB/s, in the background)
+12:07:07.037 iFizBox install: AFC: 280.0 MB of 340.0 MB (14.7 MB/s, in the background)
+12:07:07.562 iFizBox install: AFC: 288.0 MB of 340.0 MB (14.7 MB/s, in the background)
+12:07:08.092 iFizBox install: AFC: 296.0 MB of 340.0 MB (14.7 MB/s, in the background)
+12:07:08.633 iFizBox install: AFC: 304.0 MB of 340.0 MB (14.7 MB/s, in the background)
+12:07:09.171 iFizBox install: AFC: 312.0 MB of 340.0 MB (14.7 MB/s, in the background)
+12:07:09.702 iFizBox install: AFC: 320.0 MB of 340.0 MB (14.8 MB/s, in the background)
+12:07:10.246 iFizBox install: AFC: 328.0 MB of 340.0 MB (14.8 MB/s, in the background)
+12:07:10.782 iFizBox install: AFC: 336.0 MB of 340.0 MB (14.8 MB/s, in the background)
+12:07:11.048 iFizBox install: AFC: 340.0 MB of 340.0 MB (14.8 MB/s, in the background)
+12:07:11.048 iFizBox install: step: closing /PublicStaging/33545EC3-D231-4FFA-9465-2E8C3A071CDD.ipa on iOS (AFC) (limit 20 s)
+12:07:11.051 iFizBox install: AFC: copied 340.0 MB in 23.0 s: 16.8 MB/s in front, 14.2 MB/s in the background
+12:07:11.051 iFizBox install: step: connecting to installation_proxy (limit 20 s)
+12:07:11.059 iFizBox install: installation_proxy connected
+12:07:11.059 iFizBox install: step: iOS installing the app (installd) (limit 180 s)
+12:07:15.014 iFizBox install: installd: 90%
+12:07:15.152 iFizBox install: installd: 100%
+12:07:15.161 iFizBox install: installd: Complete
+12:07:15.161 iFizBox install: step: connecting to AFC (limit 20 s)
+12:07:15.161 iFizBox install: AFC connected
+12:07:15.161 iFizBox install: step: removing the staged IPA (limit 20 s)
+12:07:15.163 iFizBox install: install: done in 28.7 s
+12:07:15.165 iFizBox install: This iPhone: com.ryha.r53test installed
+12:07:39.970 iFizBox install: the app went to the background
+12:08:15.098 iFizBox install: the app is in front again
+12:08:33.960 iFizBox install: step: starting Tailscale (limit 30 s)
+12:08:33.998 iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+12:10:05.870 iFizBox install: This iPhone: com.ryha.r53test 4.0, 356.5 MB
+12:10:05.872 iFizBox install: installing c042315a8a7955d11586da59d8870f67-ahead.ipa (340.0 MB) as com.ryha.r53test 4.0
+12:10:05.876 iFizBox install: step: starting Tailscale (limit 30 s)
+12:10:07.185 iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+12:10:07.248 iFizBox install: step: connecting to iOS at 127.0.0.1:64648 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+12:10:07.431 iFizBox install: tunnel and RSD up in 0.18 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 64702, installation_proxy on 64698
+12:10:07.432 iFizBox install: step: connecting to installation_proxy (limit 20 s)
+12:10:07.441 iFizBox install: installation_proxy connected
+12:10:07.441 iFizBox install: step: asking installation_proxy for com.ryha.r53test (limit 20 s)
+12:10:07.498 iFizBox install: before the install, iOS lists com.ryha.r53test: 3.0 (3.0) in CB2DEA79-8955-46E9-A5D0-D5FDFA6A2FC6
+12:10:07.498 iFizBox install: step: connecting to AFC (limit 20 s)
+12:10:07.499 iFizBox install: AFC connected
+12:10:07.499 iFizBox install: step: opening /PublicStaging/BB68C621-3C70-4490-935D-A578EFC092D1.ipa on iOS (AFC) (limit 20 s)
+12:10:07.500 iFizBox install: step: copying the IPA to iOS (AFC) (limit 30 s)
+12:10:07.989 iFizBox install: AFC: 8.0 MB of 340.0 MB (16.3 MB/s, in front)
+12:10:08.408 iFizBox install: AFC: 16.0 MB of 340.0 MB (17.6 MB/s, in front)
+12:10:08.824 iFizBox install: AFC: 24.0 MB of 340.0 MB (18.1 MB/s, in front)
+12:10:09.260 iFizBox install: AFC: 32.0 MB of 340.0 MB (18.2 MB/s, in front)
+12:10:09.671 iFizBox install: AFC: 40.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:10:10.079 iFizBox install: AFC: 48.0 MB of 340.0 MB (18.6 MB/s, in front)
+12:10:10.519 iFizBox install: AFC: 56.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:10:10.991 iFizBox install: AFC: 64.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:10:11.415 iFizBox install: AFC: 72.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:10:11.951 iFizBox install: AFC: 80.0 MB of 340.0 MB (18.0 MB/s, in front)
+12:10:12.018 iFizBox install: the app went to the background
+12:10:12.607 iFizBox install: AFC: 88.0 MB of 340.0 MB (17.2 MB/s, in the background)
+12:10:13.279 iFizBox install: AFC: 96.0 MB of 340.0 MB (16.6 MB/s, in the background)
+12:10:13.745 iFizBox install: AFC: 104.0 MB of 340.0 MB (16.6 MB/s, in the background)
+12:10:14.235 iFizBox install: AFC: 112.0 MB of 340.0 MB (16.6 MB/s, in the background)
+12:10:14.782 iFizBox install: AFC: 120.0 MB of 340.0 MB (16.5 MB/s, in the background)
+12:10:15.285 iFizBox install: AFC: 128.0 MB of 340.0 MB (16.4 MB/s, in the background)
+12:10:15.777 iFizBox install: AFC: 136.0 MB of 340.0 MB (16.4 MB/s, in the background)
+12:10:16.322 iFizBox install: AFC: 144.0 MB of 340.0 MB (16.3 MB/s, in the background)
+12:10:16.811 iFizBox install: AFC: 152.0 MB of 340.0 MB (16.3 MB/s, in the background)
+12:10:17.302 iFizBox install: AFC: 160.0 MB of 340.0 MB (16.3 MB/s, in the background)
+12:10:17.795 iFizBox install: AFC: 168.0 MB of 340.0 MB (16.3 MB/s, in the background)
+12:10:18.292 iFizBox install: AFC: 176.0 MB of 340.0 MB (16.3 MB/s, in the background)
+12:10:18.792 iFizBox install: AFC: 184.0 MB of 340.0 MB (16.3 MB/s, in the background)
+12:10:19.371 iFizBox install: AFC: 192.0 MB of 340.0 MB (16.2 MB/s, in the background)
+12:10:19.844 iFizBox install: AFC: 200.0 MB of 340.0 MB (16.2 MB/s, in the background)
+12:10:20.333 iFizBox install: AFC: 208.0 MB of 340.0 MB (16.2 MB/s, in the background)
+12:10:20.820 iFizBox install: AFC: 216.0 MB of 340.0 MB (16.2 MB/s, in the background)
+12:10:21.309 iFizBox install: AFC: 224.0 MB of 340.0 MB (16.2 MB/s, in the background)
+12:10:21.783 iFizBox install: AFC: 232.0 MB of 340.0 MB (16.2 MB/s, in the background)
+12:10:22.259 iFizBox install: AFC: 240.0 MB of 340.0 MB (16.3 MB/s, in the background)
+12:10:22.728 iFizBox install: AFC: 248.0 MB of 340.0 MB (16.3 MB/s, in the background)
+12:10:23.196 iFizBox install: AFC: 256.0 MB of 340.0 MB (16.3 MB/s, in the background)
+12:10:23.675 iFizBox install: AFC: 264.0 MB of 340.0 MB (16.3 MB/s, in the background)
+12:10:24.146 iFizBox install: AFC: 272.0 MB of 340.0 MB (16.3 MB/s, in the background)
+12:10:24.679 iFizBox install: AFC: 280.0 MB of 340.0 MB (16.3 MB/s, in the background)
+12:10:25.233 iFizBox install: AFC: 288.0 MB of 340.0 MB (16.2 MB/s, in the background)
+12:10:25.817 iFizBox install: AFC: 296.0 MB of 340.0 MB (16.2 MB/s, in the background)
+12:10:26.464 iFizBox install: AFC: 304.0 MB of 340.0 MB (16.0 MB/s, in the background)
+12:10:27.203 iFizBox install: AFC: 312.0 MB of 340.0 MB (15.8 MB/s, in the background)
+12:10:27.823 iFizBox install: AFC: 320.0 MB of 340.0 MB (15.7 MB/s, in the background)
+12:10:28.419 iFizBox install: AFC: 328.0 MB of 340.0 MB (15.7 MB/s, in the background)
+12:10:28.696 iFizBox install: the app is in front again
+12:10:29.328 iFizBox install: AFC: 336.0 MB of 340.0 MB (15.4 MB/s, in front)
+12:10:29.675 iFizBox install: AFC: 340.0 MB of 340.0 MB (15.3 MB/s, in front)
+12:10:29.675 iFizBox install: step: closing /PublicStaging/BB68C621-3C70-4490-935D-A578EFC092D1.ipa on iOS (AFC) (limit 20 s)
+12:10:29.677 iFizBox install: AFC: copied 340.0 MB in 22.2 s: 16.2 MB/s in front, 15.1 MB/s in the background
+12:10:29.677 iFizBox install: step: connecting to installation_proxy (limit 20 s)
+12:10:29.681 iFizBox install: installation_proxy connected
+12:10:29.681 iFizBox install: step: iOS installing the app (installd) (limit 180 s)
+12:10:30.582 iFizBox install: the app went to the background
+12:10:32.962 iFizBox install: installd: 90%
+12:10:33.076 iFizBox install: installd: 100%
+12:10:33.092 iFizBox install: installd: Complete
+12:10:33.092 iFizBox install: step: connecting to AFC (limit 20 s)
+12:10:33.095 iFizBox install: AFC connected
+12:10:33.095 iFizBox install: step: removing the staged IPA (limit 20 s)
+12:10:33.369 iFizBox install: install: done in 27.5 s
+12:10:33.381 iFizBox install: This iPhone: com.ryha.r53test installed
+12:10:55.747 iFizBox install: the app is in front again
+12:11:10.162 iFizBox install: the app went to the background
+12:12:10.286 iFizBox install: the app is in front again
+12:12:41.723 iFizBox install: This iPhone: com.ryha.r53test 3.0, 356.5 MB
+12:12:41.724 iFizBox install: installing eee97601128fc393806fbfb4fd2a23f1-ahead.ipa (340.0 MB) as com.ryha.r53test 3.0
+12:12:41.729 iFizBox install: step: starting Tailscale (limit 30 s)
+12:12:41.770 iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+12:12:42.844 iFizBox install: step: connecting to iOS at 127.0.0.1:64897 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+12:12:43.018 iFizBox install: tunnel and RSD up in 0.17 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 64955, installation_proxy on 64951
+12:12:43.018 iFizBox install: step: connecting to installation_proxy (limit 20 s)
+12:12:43.041 iFizBox install: installation_proxy connected
+12:12:43.041 iFizBox install: step: asking installation_proxy for com.ryha.r53test (limit 20 s)
+12:12:43.104 iFizBox install: before the install, iOS lists com.ryha.r53test: 4.0 (4.0) in 6D96E9DA-AC4F-4CAC-875C-2EBBD0C956FB
+12:12:43.105 iFizBox install: step: connecting to AFC (limit 20 s)
+12:12:43.108 iFizBox install: AFC connected
+12:12:43.108 iFizBox install: step: opening /PublicStaging/AE51D227-395E-46D4-9069-A7DBA49131A3.ipa on iOS (AFC) (limit 20 s)
+12:12:43.112 iFizBox install: step: copying the IPA to iOS (AFC) (limit 30 s)
+12:12:43.581 iFizBox install: AFC: 8.0 MB of 340.0 MB (17.1 MB/s, in front)
+12:12:43.999 iFizBox install: AFC: 16.0 MB of 340.0 MB (18.0 MB/s, in front)
+12:12:44.421 iFizBox install: AFC: 24.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:12:44.839 iFizBox install: AFC: 32.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:12:45.268 iFizBox install: AFC: 40.0 MB of 340.0 MB (18.6 MB/s, in front)
+12:12:45.691 iFizBox install: AFC: 48.0 MB of 340.0 MB (18.6 MB/s, in front)
+12:12:46.174 iFizBox install: AFC: 56.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:12:46.620 iFizBox install: AFC: 64.0 MB of 340.0 MB (18.2 MB/s, in front)
+12:12:47.041 iFizBox install: AFC: 72.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:12:47.521 iFizBox install: AFC: 80.0 MB of 340.0 MB (18.1 MB/s, in front)
+12:12:48.047 iFizBox install: AFC: 88.0 MB of 340.0 MB (17.8 MB/s, in front)
+12:12:48.238 iFizBox install: the app went to the background
+12:13:02.020 iFizBox install: install: FAILED at copying the IPA to iOS (AFC) after 20.3 s: upload_failed: Socket(Kind(TimedOut)) (1)
+12:13:02.020 iFizBox install: idevice: 2026-11-21T16:59:47.241333Z  WARN hp=32470 timed out after 5 retransmissions; closing
+12:13:02.020 iFizBox install: idevice: 2026-11-21T17:13:02.000323Z  WARN hp=43293 timed out after 5 retransmissions; closing
+12:13:02.021 iFizBox install: dropped during the copy (94.0 MB of 340.0 MB): upload_failed: Socket(Kind(TimedOut)) (1) (try 1 of 4)
+12:13:04.038 iFizBox install: install, connection 2: FAILED at starting after 0.0 s: connect_failed: Tailscale isn't back on yet
+12:13:04.038 iFizBox install: idevice: 2026-11-21T16:59:47.241333Z  WARN hp=32470 timed out after 5 retransmissions; closing
+12:13:04.038 iFizBox install: idevice: 2026-11-21T17:13:02.000323Z  WARN hp=43293 timed out after 5 retransmissions; closing
+12:13:04.038 iFizBox install: dropped during the copy (94.0 MB of 340.0 MB): connect_failed: Tailscale isn't back on yet (try 2 of 4)
+12:13:08.057 iFizBox install: step: starting Tailscale (limit 30 s)
+12:13:09.357 iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+12:13:09.421 iFizBox install: step: connecting to iOS at 127.0.0.1:65181 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+12:13:09.670 iFizBox install: tunnel and RSD up in 0.24 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 65235, installation_proxy on 65231
+12:13:09.671 iFizBox install: step: connecting to AFC (limit 20 s)
+12:13:09.680 iFizBox install: AFC connected
+12:13:09.681 iFizBox install: step: opening /PublicStaging/AE51D227-395E-46D4-9069-A7DBA49131A3.ipa on iOS (AFC) (limit 20 s)
+12:13:09.703 iFizBox install: AFC: carrying on from 94.0 MB of 340.0 MB (iOS had 94.0 MB when the connection dropped)
+12:13:09.704 iFizBox install: step: copying the IPA to iOS (AFC) (limit 30 s)
+12:13:10.199 iFizBox install: the app is in front again
+12:13:10.351 iFizBox install: AFC: 102.0 MB of 340.0 MB (12.2 MB/s, in front)
+12:13:10.885 iFizBox install: AFC: 110.0 MB of 340.0 MB (13.4 MB/s, in front)
+12:13:11.453 iFizBox install: AFC: 118.0 MB of 340.0 MB (13.6 MB/s, in front)
+12:13:11.884 iFizBox install: AFC: 126.0 MB of 340.0 MB (14.6 MB/s, in front)
+12:13:12.304 iFizBox install: AFC: 134.0 MB of 340.0 MB (15.3 MB/s, in front)
+12:13:12.725 iFizBox install: AFC: 142.0 MB of 340.0 MB (15.8 MB/s, in front)
+12:13:13.147 iFizBox install: AFC: 150.0 MB of 340.0 MB (16.2 MB/s, in front)
+12:13:13.587 iFizBox install: AFC: 158.0 MB of 340.0 MB (16.4 MB/s, in front)
+12:13:14.035 iFizBox install: AFC: 166.0 MB of 340.0 MB (16.6 MB/s, in front)
+12:13:14.460 iFizBox install: AFC: 174.0 MB of 340.0 MB (16.8 MB/s, in front)
+12:13:14.888 iFizBox install: AFC: 182.0 MB of 340.0 MB (16.9 MB/s, in front)
+12:13:15.344 iFizBox install: AFC: 190.0 MB of 340.0 MB (17.0 MB/s, in front)
+12:13:15.815 iFizBox install: AFC: 198.0 MB of 340.0 MB (17.0 MB/s, in front)
+12:13:16.291 iFizBox install: AFC: 206.0 MB of 340.0 MB (17.0 MB/s, in front)
+12:13:16.757 iFizBox install: AFC: 214.0 MB of 340.0 MB (17.0 MB/s, in front)
+12:13:17.223 iFizBox install: AFC: 222.0 MB of 340.0 MB (17.0 MB/s, in front)
+12:13:17.665 iFizBox install: AFC: 230.0 MB of 340.0 MB (17.1 MB/s, in front)
+12:13:18.112 iFizBox install: AFC: 238.0 MB of 340.0 MB (17.1 MB/s, in front)
+12:13:18.554 iFizBox install: AFC: 246.0 MB of 340.0 MB (17.2 MB/s, in front)
+12:13:19.001 iFizBox install: AFC: 254.0 MB of 340.0 MB (17.2 MB/s, in front)
+12:13:19.505 iFizBox install: AFC: 262.0 MB of 340.0 MB (17.1 MB/s, in front)
+12:13:19.964 iFizBox install: AFC: 270.0 MB of 340.0 MB (17.1 MB/s, in front)
+12:13:20.411 iFizBox install: AFC: 278.0 MB of 340.0 MB (17.2 MB/s, in front)
+12:13:20.853 iFizBox install: AFC: 286.0 MB of 340.0 MB (17.2 MB/s, in front)
+12:13:21.327 iFizBox install: AFC: 294.0 MB of 340.0 MB (17.2 MB/s, in front)
+12:13:21.776 iFizBox install: AFC: 302.0 MB of 340.0 MB (17.2 MB/s, in front)
+12:13:22.228 iFizBox install: AFC: 310.0 MB of 340.0 MB (17.2 MB/s, in front)
+12:13:22.681 iFizBox install: AFC: 318.0 MB of 340.0 MB (17.2 MB/s, in front)
+12:13:23.132 iFizBox install: AFC: 326.0 MB of 340.0 MB (17.3 MB/s, in front)
+12:13:23.583 iFizBox install: AFC: 334.0 MB of 340.0 MB (17.3 MB/s, in front)
+12:13:23.926 iFizBox install: AFC: 340.0 MB of 340.0 MB (17.3 MB/s, in front)
+12:13:23.926 iFizBox install: step: closing /PublicStaging/AE51D227-395E-46D4-9069-A7DBA49131A3.ipa on iOS (AFC) (limit 20 s)
+12:13:23.927 iFizBox install: AFC: copied 340.0 MB in 40.8 s: 17.5 MB/s in front, 13.0 MB/s in the background
+12:13:23.927 iFizBox install: step: connecting to installation_proxy (limit 20 s)
+12:13:23.931 iFizBox install: installation_proxy connected
+12:13:23.931 iFizBox install: step: iOS installing the app (installd) (limit 180 s)
+12:13:27.307 iFizBox install: installd: 90%
+12:13:27.421 iFizBox install: installd: 100%
+12:13:27.434 iFizBox install: installd: Complete
+12:13:27.434 iFizBox install: step: connecting to AFC (limit 20 s)
+12:13:27.438 iFizBox install: AFC connected
+12:13:27.438 iFizBox install: step: removing the staged IPA (limit 20 s)
+12:13:27.444 iFizBox install: install, connection 3: done in 19.4 s
+12:13:27.451 iFizBox install: This iPhone: com.ryha.r53test installed
+12:14:10.558 iFizBox install: This iPhone: com.ryha.r53test 3.0, 356.5 MB
+12:14:10.560 iFizBox install: installing fc8d363b6c2aa429b23bef48a8e5f8ee-ahead.ipa (340.0 MB) as com.ryha.r53test 3.0
+12:14:10.564 iFizBox install: step: starting Tailscale (limit 30 s)
+12:14:10.605 iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+12:14:11.681 iFizBox install: step: connecting to iOS at 127.0.0.1:65456 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+12:14:11.837 iFizBox install: tunnel and RSD up in 0.15 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 65514, installation_proxy on 65510
+12:14:11.843 iFizBox install: step: connecting to installation_proxy (limit 20 s)
+12:14:11.850 iFizBox install: installation_proxy connected
+12:14:11.850 iFizBox install: step: asking installation_proxy for com.ryha.r53test (limit 20 s)
+12:14:11.913 iFizBox install: before the install, iOS lists com.ryha.r53test: 3.0 (3.0) in 83849DD8-8ED6-4C92-A740-C564F0525E47
+12:14:11.913 iFizBox install: step: connecting to AFC (limit 20 s)
+12:14:11.913 iFizBox install: AFC connected
+12:14:11.913 iFizBox install: step: opening /PublicStaging/798B712A-54B8-4391-B32F-473E4B9E7CB6.ipa on iOS (AFC) (limit 20 s)
+12:14:11.919 iFizBox install: step: copying the IPA to iOS (AFC) (limit 30 s)
+12:14:12.392 iFizBox install: AFC: 8.0 MB of 340.0 MB (16.8 MB/s, in front)
+12:14:12.811 iFizBox install: AFC: 16.0 MB of 340.0 MB (17.9 MB/s, in front)
+12:14:13.230 iFizBox install: AFC: 24.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:14:13.646 iFizBox install: AFC: 32.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:14:14.064 iFizBox install: AFC: 40.0 MB of 340.0 MB (18.6 MB/s, in front)
+12:14:14.489 iFizBox install: AFC: 48.0 MB of 340.0 MB (18.7 MB/s, in front)
+12:14:14.934 iFizBox install: AFC: 56.0 MB of 340.0 MB (18.6 MB/s, in front)
+12:14:15.392 iFizBox install: AFC: 64.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:14:15.820 iFizBox install: AFC: 72.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:14:16.278 iFizBox install: AFC: 80.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:14:16.711 iFizBox install: AFC: 88.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:14:17.140 iFizBox install: AFC: 96.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:14:17.567 iFizBox install: AFC: 104.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:14:17.997 iFizBox install: AFC: 112.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:14:18.431 iFizBox install: AFC: 120.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:14:18.879 iFizBox install: AFC: 128.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:14:19.312 iFizBox install: AFC: 136.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:14:19.747 iFizBox install: AFC: 144.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:14:20.188 iFizBox install: AFC: 152.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:14:20.631 iFizBox install: AFC: 160.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:14:21.073 iFizBox install: AFC: 168.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:14:21.520 iFizBox install: AFC: 176.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:14:21.965 iFizBox install: AFC: 184.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:14:22.414 iFizBox install: AFC: 192.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:14:22.860 iFizBox install: AFC: 200.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:14:23.307 iFizBox install: AFC: 208.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:14:23.757 iFizBox install: AFC: 216.0 MB of 340.0 MB (18.2 MB/s, in front)
+12:14:24.209 iFizBox install: AFC: 224.0 MB of 340.0 MB (18.2 MB/s, in front)
+12:14:24.662 iFizBox install: AFC: 232.0 MB of 340.0 MB (18.2 MB/s, in front)
+12:14:25.115 iFizBox install: AFC: 240.0 MB of 340.0 MB (18.2 MB/s, in front)
+12:14:25.570 iFizBox install: AFC: 248.0 MB of 340.0 MB (18.2 MB/s, in front)
+12:14:26.026 iFizBox install: AFC: 256.0 MB of 340.0 MB (18.1 MB/s, in front)
+12:14:26.529 iFizBox install: AFC: 264.0 MB of 340.0 MB (18.1 MB/s, in front)
+12:14:26.986 iFizBox install: AFC: 272.0 MB of 340.0 MB (18.0 MB/s, in front)
+12:14:27.444 iFizBox install: AFC: 280.0 MB of 340.0 MB (18.0 MB/s, in front)
+12:14:27.907 iFizBox install: AFC: 288.0 MB of 340.0 MB (18.0 MB/s, in front)
+12:14:28.375 iFizBox install: AFC: 296.0 MB of 340.0 MB (18.0 MB/s, in front)
+12:14:28.833 iFizBox install: AFC: 304.0 MB of 340.0 MB (18.0 MB/s, in front)
+12:14:29.300 iFizBox install: AFC: 312.0 MB of 340.0 MB (17.9 MB/s, in front)
+12:14:29.761 iFizBox install: AFC: 320.0 MB of 340.0 MB (17.9 MB/s, in front)
+12:14:30.422 iFizBox install: AFC: 328.0 MB of 340.0 MB (17.7 MB/s, in front)
+12:14:30.729 iFizBox install: the app went to the background
+12:14:44.503 iFizBox install: install: FAILED at copying the IPA to iOS (AFC) after 33.9 s: upload_failed: Socket(Kind(TimedOut)) (1)
+12:14:44.504 iFizBox install: idevice: 2026-11-21T16:59:47.241333Z  WARN hp=32470 timed out after 5 retransmissions; closing
+12:14:44.504 iFizBox install: idevice: 2026-11-21T17:13:02.000323Z  WARN hp=43293 timed out after 5 retransmissions; closing
+12:14:44.504 iFizBox install: idevice: 2026-11-21T17:14:44.482588Z  WARN hp=22818 timed out after 5 retransmissions; closing
+12:14:44.504 iFizBox install: dropped during the copy (334.0 MB of 340.0 MB): upload_failed: Socket(Kind(TimedOut)) (1) (try 1 of 4)
+12:14:46.517 iFizBox install: install, connection 2: FAILED at starting after 0.0 s: connect_failed: Tailscale isn't back on yet
+12:14:46.518 iFizBox install: idevice: 2026-11-21T16:59:47.241333Z  WARN hp=32470 timed out after 5 retransmissions; closing
+12:14:46.518 iFizBox install: idevice: 2026-11-21T17:13:02.000323Z  WARN hp=43293 timed out after 5 retransmissions; closing
+12:14:46.518 iFizBox install: idevice: 2026-11-21T17:14:44.482588Z  WARN hp=22818 timed out after 5 retransmissions; closing
+12:14:46.518 iFizBox install: dropped during the copy (334.0 MB of 340.0 MB): connect_failed: Tailscale isn't back on yet (try 2 of 4)
+12:14:50.532 iFizBox install: install, connection 3: FAILED at starting after 0.0 s: connect_failed: Tailscale isn't back on yet
+12:14:50.533 iFizBox install: idevice: 2026-11-21T16:59:47.241333Z  WARN hp=32470 timed out after 5 retransmissions; closing
+12:14:50.534 iFizBox install: idevice: 2026-11-21T17:13:02.000323Z  WARN hp=43293 timed out after 5 retransmissions; closing
+12:14:50.535 iFizBox install: idevice: 2026-11-21T17:14:44.482588Z  WARN hp=22818 timed out after 5 retransmissions; closing
+12:14:50.535 iFizBox install: dropped during the copy (334.0 MB of 340.0 MB): connect_failed: Tailscale isn't back on yet (try 3 of 4)
+12:14:55.743 iFizBox install: the app is in front again
+12:14:58.553 iFizBox install: step: starting Tailscale (limit 30 s)
+12:15:00.108 iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+12:15:00.175 iFizBox install: step: connecting to iOS at 127.0.0.1:49420 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+12:15:00.374 iFizBox install: tunnel and RSD up in 0.20 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 49474, installation_proxy on 49470
+12:15:00.375 iFizBox install: step: connecting to AFC (limit 20 s)
+12:15:00.378 iFizBox install: AFC connected
+12:15:00.378 iFizBox install: step: opening /PublicStaging/798B712A-54B8-4391-B32F-473E4B9E7CB6.ipa on iOS (AFC) (limit 20 s)
+12:15:00.401 iFizBox install: AFC: carrying on from 334.0 MB of 340.0 MB (iOS had 334.0 MB when the connection dropped)
+12:15:00.401 iFizBox install: step: copying the IPA to iOS (AFC) (limit 30 s)
+12:15:00.778 iFizBox install: AFC: 340.0 MB of 340.0 MB (15.5 MB/s, in front)
+12:15:00.778 iFizBox install: step: closing /PublicStaging/798B712A-54B8-4391-B32F-473E4B9E7CB6.ipa on iOS (AFC) (limit 20 s)
+12:15:00.779 iFizBox install: AFC: copied 340.0 MB in 48.9 s: 17.6 MB/s in front, 8.4 MB/s in the background
+12:15:00.779 iFizBox install: step: connecting to installation_proxy (limit 20 s)
+12:15:00.783 iFizBox install: installation_proxy connected
+12:15:00.783 iFizBox install: step: iOS installing the app (installd) (limit 180 s)
+12:15:03.959 iFizBox install: installd: 90%
+12:15:04.008 iFizBox install: installd: 100%
+12:15:04.022 iFizBox install: installd: Complete
+12:15:04.022 iFizBox install: step: connecting to AFC (limit 20 s)
+12:15:04.025 iFizBox install: AFC connected
+12:15:04.025 iFizBox install: step: removing the staged IPA (limit 20 s)
+12:15:04.055 iFizBox install: install, connection 4: done in 5.5 s
+12:15:04.056 iFizBox install: This iPhone: com.ryha.r53test installed
+12:15:39.059 iFizBox install: This iPhone: com.ryha.r53test 3.0, 356.5 MB
+12:15:39.060 iFizBox install: installing 82bf9f86300df9faa380674db9b8e501-ahead.ipa (340.0 MB) as com.ryha.r53test 3.0
+12:15:39.064 iFizBox install: step: starting Tailscale (limit 30 s)
+12:15:39.101 iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+12:15:40.181 iFizBox install: step: connecting to iOS at 127.0.0.1:49688 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+12:15:40.351 iFizBox install: tunnel and RSD up in 0.17 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 49746, installation_proxy on 49742
+12:15:40.351 iFizBox install: step: connecting to installation_proxy (limit 20 s)
+12:15:40.364 iFizBox install: installation_proxy connected
+12:15:40.364 iFizBox install: step: asking installation_proxy for com.ryha.r53test (limit 20 s)
+12:15:40.417 iFizBox install: before the install, iOS lists com.ryha.r53test: 3.0 (3.0) in 21870960-E391-416B-A194-6F4C74F0242D
+12:15:40.417 iFizBox install: step: connecting to AFC (limit 20 s)
+12:15:40.418 iFizBox install: AFC connected
+12:15:40.418 iFizBox install: step: opening /PublicStaging/18EF6560-3E60-4DC4-8CD5-657EEDFA2D83.ipa on iOS (AFC) (limit 20 s)
+12:15:40.422 iFizBox install: step: copying the IPA to iOS (AFC) (limit 30 s)
+12:15:40.905 iFizBox install: AFC: 8.0 MB of 340.0 MB (16.5 MB/s, in front)
+12:15:41.315 iFizBox install: AFC: 16.0 MB of 340.0 MB (17.9 MB/s, in front)
+12:15:41.731 iFizBox install: AFC: 24.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:15:42.143 iFizBox install: AFC: 32.0 MB of 340.0 MB (18.6 MB/s, in front)
+12:15:42.560 iFizBox install: AFC: 40.0 MB of 340.0 MB (18.7 MB/s, in front)
+12:15:42.979 iFizBox install: AFC: 48.0 MB of 340.0 MB (18.8 MB/s, in front)
+12:15:43.423 iFizBox install: AFC: 56.0 MB of 340.0 MB (18.6 MB/s, in front)
+12:15:43.877 iFizBox install: AFC: 64.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:15:44.306 iFizBox install: AFC: 72.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:15:44.734 iFizBox install: AFC: 80.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:15:45.161 iFizBox install: AFC: 88.0 MB of 340.0 MB (18.6 MB/s, in front)
+12:15:45.591 iFizBox install: AFC: 96.0 MB of 340.0 MB (18.6 MB/s, in front)
+12:15:46.027 iFizBox install: AFC: 104.0 MB of 340.0 MB (18.6 MB/s, in front)
+12:15:46.461 iFizBox install: AFC: 112.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:15:46.898 iFizBox install: AFC: 120.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:15:47.336 iFizBox install: AFC: 128.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:15:47.773 iFizBox install: AFC: 136.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:15:48.210 iFizBox install: AFC: 144.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:15:48.649 iFizBox install: AFC: 152.0 MB of 340.0 MB (18.5 MB/s, in front)
+12:15:49.097 iFizBox install: AFC: 160.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:15:49.542 iFizBox install: AFC: 168.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:15:49.988 iFizBox install: AFC: 176.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:15:50.438 iFizBox install: AFC: 184.0 MB of 340.0 MB (18.4 MB/s, in front)
+12:15:50.886 iFizBox install: AFC: 192.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:15:51.338 iFizBox install: AFC: 200.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:15:51.791 iFizBox install: AFC: 208.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:15:52.245 iFizBox install: AFC: 216.0 MB of 340.0 MB (18.3 MB/s, in front)
+12:15:52.699 iFizBox install: AFC: 224.0 MB of 340.0 MB (18.2 MB/s, in front)
+12:15:53.155 iFizBox install: AFC: 232.0 MB of 340.0 MB (18.2 MB/s, in front)
+12:15:53.610 iFizBox install: AFC: 240.0 MB of 340.0 MB (18.2 MB/s, in front)
+12:15:54.067 iFizBox install: AFC: 248.0 MB of 340.0 MB (18.2 MB/s, in front)
+12:15:54.524 iFizBox install: AFC: 256.0 MB of 340.0 MB (18.2 MB/s, in front)
+12:15:54.986 iFizBox install: AFC: 264.0 MB of 340.0 MB (18.1 MB/s, in front)
+12:15:55.444 iFizBox install: AFC: 272.0 MB of 340.0 MB (18.1 MB/s, in front)
+12:15:55.905 iFizBox install: AFC: 280.0 MB of 340.0 MB (18.1 MB/s, in front)
+12:15:56.371 iFizBox install: AFC: 288.0 MB of 340.0 MB (18.1 MB/s, in front)
+12:15:56.839 iFizBox install: AFC: 296.0 MB of 340.0 MB (18.0 MB/s, in front)
+12:15:57.303 iFizBox install: AFC: 304.0 MB of 340.0 MB (18.0 MB/s, in front)
+12:15:57.767 iFizBox install: AFC: 312.0 MB of 340.0 MB (18.0 MB/s, in front)
+12:15:58.233 iFizBox install: AFC: 320.0 MB of 340.0 MB (18.0 MB/s, in front)
+12:15:58.700 iFizBox install: AFC: 328.0 MB of 340.0 MB (17.9 MB/s, in front)
+12:15:59.165 iFizBox install: AFC: 336.0 MB of 340.0 MB (17.9 MB/s, in front)
+12:15:59.399 iFizBox install: AFC: 340.0 MB of 340.0 MB (17.9 MB/s, in front)
+12:15:59.399 iFizBox install: step: closing /PublicStaging/18EF6560-3E60-4DC4-8CD5-657EEDFA2D83.ipa on iOS (AFC) (limit 20 s)
+12:15:59.401 iFizBox install: AFC: copied 340.0 MB in 19.0 s: 17.9 MB/s in front
+12:15:59.401 iFizBox install: step: connecting to installation_proxy (limit 20 s)
+12:15:59.405 iFizBox install: installation_proxy connected
+12:15:59.405 iFizBox install: step: iOS installing the app (installd) (limit 180 s)
+12:16:00.243 iFizBox install: the app went to the background
+12:16:29.845 iFizBox install: installd quiet for 30 s: asking iOS for com.ryha.r53test 3.0 on a second connection
+12:16:29.859 iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+12:16:30.075 iFizBox install: the app is in front again
+12:16:30.879 iFizBox install: step: connecting to iOS at 127.0.0.1:49688 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+12:16:31.053 iFizBox install: tunnel and RSD up in 0.16 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 50079, installation_proxy on 50075
+12:16:31.054 iFizBox install: step: connecting to installation_proxy (limit 20 s)
+12:16:31.055 iFizBox install: installation_proxy connected
+12:16:31.055 iFizBox install: step: asking installation_proxy for com.ryha.r53test (limit 20 s)
+12:16:31.103 iFizBox install: second look: iOS lists com.ryha.r53test: 3.0 (3.0) in 962051F2-EF8C-4158-BF15-C7571CD7ACF8 -> installed
+12:16:31.103 iFizBox install: step: connecting to AFC (limit 20 s)
+12:16:31.104 iFizBox install: AFC connected
+12:16:31.104 iFizBox install: step: removing the staged IPA (limit 20 s)
+12:16:31.105 iFizBox install: second look: done in 1.3 s
+12:16:31.105 iFizBox install: second look: installed; ending the wait for installd
+12:16:31.357 iFizBox install: ending iOS installing the app (installd): iOS lists com.ryha.r53test 3.0 (asked on a second connection); closing the tunnel
+12:16:31.368 iFizBox install: installed (seen on a second connection); the first one ended with: stopped: iOS lists com.ryha.r53test 3.0 (asked on a second connection)
+12:16:31.380 iFizBox install: This iPhone: com.ryha.r53test installed
+12:17:45.388 iFizBox install: the app went to the background

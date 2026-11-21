@@ -1,0 +1,93 @@
+# Run 1 (Voice Memos recording, 11:56:59-11:57:31): iFizBox's AudioSession notices (NOTICE/INFO)
+11:57:00.007718 notificationName = AvailableSampleRatesDidChange
+11:57:00.075878 notificationName = ActiveAudioRouteDidChange
+11:57:00.076690 posting AVAudioSessionRouteChangeNotification
+11:57:00.276820 notificationName = AvailableSampleRatesDidChange
+11:57:00.279064 notificationName = CurrentOutputDeviceBufferSizeDidChange
+11:57:00.317555 notificationName = CurrentInputDeviceBufferSizeDidChange
+11:57:00.329426 notificationName = ApplicationStateDidChange
+11:57:00.336194 notificationName = AvailableFormatsDidChange
+11:57:00.383309 posting AVAudioSessionAvailableOutputsChangeNotification
+11:57:00.393031 posting AVAudioSessionAvailableInputsChangeNotification
+11:57:00.393046 posting AVAudioSessionAvailableOutputsChangeNotification
+11:57:00.412259 posting AVAudioSessionAvailableOutputsChangeNotification
+11:57:00.419098 posting AVAudioSessionAvailableInputsChangeNotification
+11:57:00.419114 posting AVAudioSessionAvailableOutputsChangeNotification
+11:57:00.712350 notificationName = SomeOtherNonAmbientSessionIsPlayingDidChange
+11:57:00.715528 notificationName = SomeOtherNonAmbientSessionIsPlayingDidChange
+11:57:31.441442 notificationName = SomeOtherNonAmbientSessionIsPlayingDidChange
+11:57:31.441810 notificationName = SomeOtherNonAmbientSessionIsPlayingDidChange
+11:57:31.455042 notificationName = SomeOtherNonAmbientSessionIsPlayingDidChange
+11:57:31.739720 notificationName = ActiveAudioRouteDidChange
+11:57:31.741090 posting AVAudioSessionRouteChangeNotification
+11:57:31.886714 notificationName = AvailableSampleRatesDidChange
+11:57:31.898415 notificationName = CurrentOutputDeviceBufferSizeDidChange
+11:57:31.906424 notificationName = CurrentInputDeviceBufferSizeDidChange
+11:57:31.911438 notificationName = AvailableFormatsDidChange
+11:57:31.911610 posting AVAudioSessionAudioHardwareFormatChangeNotification
+11:57:31.915056 notificationName = PickableRoutesDidChange
+11:57:31.930495 notificationName = SomeOtherNonAmbientSessionIsPlayingDidChange
+11:57:31.935892 notificationName = PickableRoutesDidChange
+11:57:31.960650 posting AVAudioSessionAvailableOutputsChangeNotification
+11:57:31.968301 posting AVAudioSessionAvailableInputsChangeNotification
+11:57:31.968311 posting AVAudioSessionAvailableOutputsChangeNotification
+11:57:31.979557 posting AVAudioSessionAvailableOutputsChangeNotification
+11:57:31.985506 posting AVAudioSessionAvailableInputsChangeNotification
+11:57:31.985530 posting AVAudioSessionAvailableOutputsChangeNotification
+11:57:33.635666 notificationName = ApplicationStateDidChange
+11:57:33.698754 notificationName = CMSessionIsActiveDidChange
+11:57:33.698764 posting AVAudioSessionDidBecomeInactiveNotification
+11:57:33.737674 notificationName = PickableRoutesDidChange
+11:57:33.786305 notificationName = ApplicationStateDidChange
+11:57:33.805602 posting AVAudioSessionAvailableOutputsChangeNotification
+11:57:33.846591 posting AVAudioSessionAvailableInputsChangeNotification
+11:57:33.858148 posting AVAudioSessionAvailableOutputsChangeNotification
+
+# Run 4 (Camera video, 12:04:45-12:05:23): same
+12:04:45.668752 notificationName = InputGainDidChange
+12:04:45.688469 notificationName = AvailableSampleRatesDidChange
+12:04:45.699431 notificationName = CurrentOutputDeviceBufferSizeDidChange
+12:04:45.732127 notificationName = CurrentInputDeviceBufferSizeDidChange
+12:04:45.832389 notificationName = PickableRoutesDidChange
+12:04:45.840554 notificationName = SomeOtherNonAmbientSessionIsPlayingDidChange
+12:04:45.923571 posting AVAudioSessionAvailableOutputsChangeNotification
+12:04:45.948010 posting AVAudioSessionAvailableInputsChangeNotification
+12:04:45.948049 posting AVAudioSessionAvailableOutputsChangeNotification
+12:04:46.081173 notificationName = ApplicationStateDidChange
+12:04:47.986678 notificationName = SomeOtherNonAmbientSessionIsPlayingDidChange
+12:04:47.991101 notificationName = SomeOtherNonAmbientSessionIsPlayingDidChange
+12:04:48.335669 notificationName = PickableRoutesDidChange
+12:04:48.649536 posting AVAudioSessionAvailableOutputsChangeNotification
+12:04:48.687012 posting AVAudioSessionAvailableInputsChangeNotification
+12:04:48.710227 posting AVAudioSessionAvailableOutputsChangeNotification
+12:04:48.711943 notificationName = PickableRoutesDidChange
+12:04:48.749486 notificationName = PickableRoutesDidChange
+12:04:48.749696 posting AVAudioSessionAvailableOutputsChangeNotification
+12:04:48.749776 posting AVAudioSessionAvailableInputsChangeNotification
+12:04:48.749838 posting AVAudioSessionAvailableOutputsChangeNotification
+12:04:48.776155 posting AVAudioSessionAvailableOutputsChangeNotification
+12:04:48.783876 posting AVAudioSessionAvailableInputsChangeNotification
+12:04:48.783892 posting AVAudioSessionAvailableOutputsChangeNotification
+12:05:22.526702 notificationName = SomeOtherNonAmbientSessionIsPlayingDidChange
+12:05:23.125422 notificationName = SomeOtherNonAmbientSessionIsPlayingDidChange
+12:05:23.130581 notificationName = SomeOtherNonAmbientSessionIsPlayingDidChange
+12:05:23.290252 notificationName = InputGainDidChange
+12:05:23.313632 notificationName = AvailableSampleRatesDidChange
+12:05:23.325974 notificationName = ApplicationStateDidChange
+12:05:23.329850 notificationName = CurrentInputDeviceBufferSizeDidChange
+12:05:23.363358 notificationName = PickableRoutesDidChange
+12:05:23.405056 notificationName = PickableRoutesDidChange
+12:05:23.429214 notificationName = CMSessionIsActiveDidChange
+12:05:23.429299 posting AVAudioSessionDidBecomeInactiveNotification
+ 2026-11-21 12:05:23.438039
+nName = ApplicationStateDidChange 2026-11-21 12:05:23.479728
+nName = PickableRoutesDidChange 2026-11-21 12:05:23.481460
+udioSessionAvailableOutputsChangeNotification 2026-11-21 12:05:23.483109
+udioSessionAvailableInputsChangeNotification 2026-11-21 12:05:23.486316
+udioSessionAvailableOutputsChangeNotification 2026-11-21 12:05:23.486741
+udioSessionAvailableOutputsChangeNotification 2026-11-21 12:05:23.492009
+udioSessionAvailableInputsChangeNotification 2026-11-21 12:05:23.496159
+udioSessionAvailableOutputsChangeNotification 2026-11-21 12:05:23.520090
+udioSessionAvailableOutputsChangeNotification 2026-11-21 12:05:23.526481
+udioSessionAvailableInputsChangeNotification 2026-11-21 12:05:23.535101
+udioSessionAvailableOutputsChangeNotification 
