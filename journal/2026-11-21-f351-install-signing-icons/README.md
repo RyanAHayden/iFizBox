@@ -20,7 +20,7 @@ The approved concept (branch `concept/install-signing`, one commit), taken as a 
 ## Chromium check
 
 `capture.mjs` (copied from the B298 journal) with `--mode sideload` against `python3 -m http.server` of `web/app`,
-script `main.json`, at DPR 3 (402x874). Grids left to right: iOS 6 light, iOS 6 dark, iOS 7 light, iOS 7 dark.
+script `main.json`, at DPR 3 (390x844 CSS px). Grids left to right: iOS 6 light, iOS 6 dark, iOS 7 light, iOS 7 dark.
 
 - `main-server.png`: main page on the Signing Server route.
 - `main-iphone.png`: main page on This iPhone, the fake shell's pairing answering Paired.
@@ -33,6 +33,8 @@ name) aren't this task's. Switched to capture.mjs for the shots.
 ## Not verified
 
 - Real devices (15 Pro, iPhone 7): not needed for a web-only row change; Chromium at 3x covered the look.
+- iOS 13 and iOS 26 eras: not shot; they have no icon set of their own and fall back to iOS 6's tiles
+  (`icon()` in rowicons.js), which the new test draws for every era.
 - Palettes beyond the default light/dark per era (textured themes): the tile is an image with its own colour, the
   same as every other row tile, so palettes don't change it; not shot.
 - The Upgrade banner covering the status cell in the shots is the fake shell's update offer, unrelated.

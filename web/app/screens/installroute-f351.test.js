@@ -31,7 +31,7 @@ test("withDetail: nothing for the Signing Server or an unanswered pairing, Paire
 
 test("the new Signing Server tile is a purple cloud, drawn in every icon set", () => {
   assert.deepEqual(ROW_ICONS.signingServer.slice(1), ["cloud"]);
-  for (const style of ["ios6", "ios7"]) assert.match(tileSvg("signingServer", style), /<svg/);
+  for (const style of ["ios6", "ios7", "ios13", "ios26"]) assert.match(tileSvg("signingServer", style), /<svg/);
 });
 
 test("main page: every row below the status has its row icon; Install Apps With is the chosen route", async () => {
