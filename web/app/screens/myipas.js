@@ -457,8 +457,9 @@ function attachLibraryGestures(ul, ctl, on) {
   let start = null;
   let swiped = false;
   ul.addEventListener("click", (e) => {
-    if (e.target.closest(".del-confirm, .price-btn")) return;
-    if (swiped) { swiped = false; e.preventDefault(); e.stopPropagation(); return; }
+    if (e.target.closest(".del-confirm")) return;
+    if (swiped) { swiped = false; e.preventDefault(); e.stopPropagation(); return; } // B315: a swipe's lift on the button signs nothing
+    if (e.target.closest(".price-btn")) return;
     const li = e.target.closest(".myipa-row");
     if (!li || tapOpens(ctl.state)) return;
     e.preventDefault();
@@ -468,7 +469,7 @@ function attachLibraryGestures(ul, ctl, on) {
   ul.addEventListener("pointerdown", (e) => {
     const li = e.target.closest(".myipa-row");
     swiped = false;
-    start = li && !ctl.state.editing && !e.target.closest(".del-confirm, .price-btn") ? { li, x: e.clientX, y: e.clientY } : null;
+    start = li && !ctl.state.editing && !e.target.closest(".del-confirm") ? { li, x: e.clientX, y: e.clientY } : null;
   });
   ul.addEventListener("pointermove", (e) => {
     if (!start) return;
