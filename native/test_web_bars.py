@@ -13,9 +13,11 @@ WEB = os.path.join(ROOT, "web", "app")
 
 # A UIKit bar the shell would draw over the page: made, subclassed, or styled through its appearance proxy.
 UIKIT_BAR = re.compile(r"\bUI(?:Navigation|Tab)Bar(?:Controller)?\s*(?:\(|\.appearance|:)|\bUI(?:Navigation|Tab)BarController\b")
-# Anything that would give <html> the `native` class: classList, className, or a class attribute.
-NATIVE_CLASS = re.compile(r"""classList\.(?:add|toggle)\(\s*["']native["']|className\s*\+?=\s*["'][^"']*\bnative\b"""
-                          r"""|setAttribute\(\s*["']class["']\s*,\s*["'][^"']*\bnative\b|<html[^>]*class=["'][^"']*\bnative\b""")
+# Anything that would give <html> the `native` class: classList, className, or a class attribute. The class name
+# whole: `is-native` (nav/switch.js's WebKit switch) is another class.
+NATIVE_CLASS = re.compile(r"""classList\.(?:add|toggle)\(\s*["']native["']|className\s*\+?=\s*["'](?:[^"']*\s)?native(?=["'\s])"""
+                          r"""|setAttribute\(\s*["']class["']\s*,\s*["'](?:[^"']*\s)?native(?=["'\s])"""
+                          r"""|<html[^>]*class=["'](?:[^"']*\s)?native(?=["'\s])""")
 
 
 def files(root, exts):
