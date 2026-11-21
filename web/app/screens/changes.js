@@ -93,6 +93,12 @@ const ignoredIds = () => ignoredList(settings.holds.list(), settings.blocked.lis
 // B264: counts run side by side (an install's record, the run's recount, a redraw); only the latest one asked for
 // sets the badge, so an older count that answers late never puts a number back.
 let badgeAsked = 0;
+// B310: what the last count held (badgeAfterRun takes a run's packages off it), and whether a queue run has ended
+// since: the next count then goes on the icon even when it is 0 and Changes isn't on screen. Only for a while
+// (AFTER_RUN_MS): a recount that fails leaves later, ordinary counts to F65's rule.
+let lastCounted = null;
+let afterRunUntil = 0;
+export const AFTER_RUN_MS = 2 * 60 * 1000;
 async function badge(upgrades, resign) {
   const asked = ++badgeAsked;
   try {
@@ -100,10 +106,33 @@ async function badge(upgrades, resign) {
     resign ??= await resignNow(upgrades);
     if (asked !== badgeAsked) return;
     sendResigns(resign);
-    state.ctx?.setBadge("changes", badgeCount(upgrades, resign));
+    lastCounted = { upgrades, resign };
+    setCount(badgeCount(upgrades, resign), Date.now() < afterRunUntil);
+    afterRunUntil = 0;
   } catch {
     // no catalog yet: no badge
   }
+}
+
+const setCount = (n, ran, ctx = state.ctx) => {
+  if (ran && typeof ctx?.badgeAfterRun === "function") ctx.badgeAfterRun("changes", n);
+  else ctx?.setBadge("changes", n);
+};
+
+// B310: a queue run has just ended (screens/queue.js), and `ids` are the packages it installed, upgraded or removed.
+// The tab badge and the icon badge drop to what's still waiting at once, from the last count less those packages,
+// before dpkg's status is read again and Changes counts for real (catalog.reloadInstalled's change): iFizBox can go
+// to the background right after the run, and a page in the background counts nothing. That recount goes on the
+// icon too, 0 included, whichever tab is shown. -> the quick count set, or null without an earlier count.
+export function badgeAfterRun(ids = [], { ctx = state.ctx, counted = lastCounted } = {}) {
+  afterRunUntil = Date.now() + AFTER_RUN_MS;
+  if (!counted || !ctx) return null;
+  const done = new Set(ids);
+  const { upgrades, resign } = counted;
+  const left = { ...upgrades, available: (upgrades?.available ?? []).filter((r) => !done.has(r?.id)) };
+  const n = badgeCount(left, resign);
+  setCount(n, true, ctx);
+  return n;
 }
 
 // B264: the sideload app's shell learns which Needs Re-sign rows the count holds (updates.resigns), so the icon badge

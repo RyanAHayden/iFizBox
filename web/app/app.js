@@ -98,6 +98,9 @@ const ctx = {
   go: (route) => router.go(route),
   back: () => goBack(),
   setBadge: (tab, n) => { tabbar.setBadge(tab, n); upgradeNotices.badge(tab, n); },
+  // B310: Changes' count right after a queue run (screens/changes.js badgeAfterRun): the icon badge takes it at once,
+  // 0 included on any tab (setBadge clears it only on the Changes tab), so nothing the run upgraded stays counted.
+  badgeAfterRun: (tab, n) => { ctx.setBadge(tab, n); if (tab === "changes" && !(Number(n) > 0)) upgradeNotices.updated(); },
   showHUD,
   showAlert,
   // F150: Sources' refreshes drop the reload bar; its last two steps load the new package lists into the catalog
