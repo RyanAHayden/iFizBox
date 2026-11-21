@@ -59,13 +59,20 @@ export function mounted(route) {
 // #/sources/manage/… -> #/sources/<key>) is a push too: it mounts the tab again on top (#/sources/manage/…/~sources/
 // <key>), so Back returns to Manage instead of the tab's root (or Home, when Manage is mounted there). The innermost
 // mount is the one a link stays in. A link up to a page the route stands on stays a pop.
-// B300: a link from another tab's pages mounted on Home (Home's Install IPAs tile, #/home/~installed/myipas) to a page
-// of Home's own that the route doesn't stand on is a push too: a Settings page mounts as "~settings" (Install's Set Up
-// Signing: #/home/~installed/myipas/~settings/signing), any other Home page as "~home". Left as a plain route, the
-// stack swapped the mounted page for the new one without a slide.
+// B300: a link from another tab's pages mounted on a tab (Home's Install IPAs tile, #/home/~installed/myipas) to a page
+// of that tab's own that the route doesn't stand on is a push too, so it slides in: on Home a Settings page mounts as
+// "~settings" (Install's Set Up Signing: #/home/~installed/myipas/~settings/signing; Settings' root as a final
+// "~settings"), any other page as "~<tab>" again. Left as a plain route, the stack swapped the mounted page for the new
+// one without a slide.
 export function mountLink(from, to) {
   if (from && from.tab !== "home" && inHome(to)) to = { tab: IN_HOME, path: to.path.slice(1) };
-  else if (from && from.path.some(isMount) && inHome(to) && to.path.length > 1) to = { tab: IN_HOME, path: to.path.slice(1) };
+  else if (from && from.path.some(isMount) && inHome(to)) {
+    to = { tab: IN_HOME, path: to.path.slice(1) };
+    if (!to.path.length) { // Settings' root: its own mount's root page, or that mount's (a pop when the route stands on it)
+      const at = from.path.lastIndexOf(MOUNT + IN_HOME);
+      return { tab: from.tab, path: [...(at >= 0 ? from.path.slice(0, at) : from.path), MOUNT + IN_HOME] };
+    }
+  }
   if (!from || !to.path.length) return null;
   if (to.tab === from.tab && to.path.length <= from.path.length && to.path.every((s, i) => s === from.path[i])) return null;
   const k = from.path.lastIndexOf(MOUNT + to.tab);

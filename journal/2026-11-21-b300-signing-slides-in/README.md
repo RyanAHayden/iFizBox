@@ -43,6 +43,11 @@ the Pairing page under a mount counted as "left the page" (its hashchange listen
 the mounted route (`isPairHash`, tested). That was already wrong from the Installed tab's Install IPAs
 (`#/installed/myipas/~settings/…`); the new Home route would have made it wrong there too.
 
+Spec review fixes: Settings' root linked from a mounted page now mounts as a final `~settings` (its rows then stay in
+that mount: `#/home/~installed/myipas/~settings` → `…/~settings/signing`, tested) instead of `~home/settings`; the
+test parses hashes with router.js `parse`; the router comment says the push holds for any tab with a mount, which is
+what the code does (a same-tab link from a mounted page was a no-slide replace on every tab).
+
 ## Chromium check
 
 `probe.mjs` here (`node probe.mjs web/app`): reloads per way in, taps with CDP mouse events, and records the

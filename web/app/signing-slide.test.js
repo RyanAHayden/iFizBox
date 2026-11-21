@@ -3,7 +3,7 @@
 // (Home's Install IPAs tile, #/home/~installed/myipas) used to land as a stack replace: no slide.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { format, createRouter, BAR_TABS, mounted, settingsRoute } from "./router.js";
+import { format, parse, createRouter, BAR_TABS, mounted, settingsRoute } from "./router.js";
 import { createStacks } from "./nav/stack.js";
 import { opensMerged } from "./screens/settings.js";
 
@@ -48,8 +48,7 @@ function setup(start) {
 
 const SIGNING = format(settingsRoute(["signing"])); // Home's tiles, Settings' row, Why's and the guides' rows, Install
 const INSTALLATION = format(settingsRoute(["installation"]));
-const shows = (hash) => mounted(parseHash(hash));
-const parseHash = (hash) => { const [tab, ...path] = hash.replace(/^#\//, "").split("/").map(decodeURIComponent); return { tab, path }; };
+const shows = (hash) => mounted(parse(hash));
 
 // Where each way in starts: Home (its certificate and Install Lite tiles), Settings (its row), Why and a guide (their
 // Settings > Signing rows), and every page Install's Set Up Signing (or a sign failure) can be tapped on.
@@ -88,9 +87,22 @@ test("B300: Install's Set Up Signing from Home's Install IPAs mounts Settings on
 });
 
 test("B300: Settings' root from a page mounted on Home pushes too", () => {
-  const { win, open } = setup("#/home/~installed/myipas");
+  const { win, open, results } = setup("#/home/~installed/myipas");
   assert.equal(open(format(settingsRoute())).kind, "push");
+  assert.equal(win.location.hash, "#/home/~installed/myipas/~settings");
   assert.deepEqual(shows(win.location.hash), { tab: "settings", path: [] });
+  // its Installation & Signing row stays in that mount, and pushes
+  assert.equal(open(SIGNING).kind, "push");
+  assert.equal(win.location.hash, "#/home/~installed/myipas/~settings/signing");
+  win.history.back();
+  assert.equal(results.at(-1).kind, "pop");
+  assert.equal(win.location.hash, "#/home/~installed/myipas/~settings");
+});
+
+test("B300: a sign failure's Open Signing (go to the same hash) from Install IPAs on Home pushes too", () => {
+  const { win, open } = setup("#/home/~installed/myipas/ipa:App.ipa");
+  assert.equal(open("/home/settings/signing").kind, "push"); // signing/device.js openRoute: no leading #
+  assert.equal(win.location.hash, "#/home/~installed/myipas/ipa%3AApp.ipa/~settings/signing");
 });
 
 test("B300: the Pairing page opened on another page's stack is still the Pairing page (a hashchange there doesn't end pairing)", async () => {
