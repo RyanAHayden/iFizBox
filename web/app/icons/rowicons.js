@@ -186,7 +186,6 @@ const HOME_TILES = {
   browse: { colour: "#f39c12", svg: `${HOME_SVG} fill='#fff'><path d='M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z'/></svg>` },
   signing: { colour: "#8e44ad", svg: `${HOME_SVG} fill='#fff'><path d='M4 3h12l4 4v8.5a5 5 0 0 0-2-1.2V8h-3V5H6v14h6.6a5 5 0 0 0 .7 2H4zm14 13a3.5 3.5 0 1 1-1.5 6.7L15 24v-3.4A3.5 3.5 0 0 1 18 16zM8 9h7v2H8zm0 4h5v2H8z'/></svg>` },
   install: { colour: "#2c9b3c", svg: `${HOME_SVG} fill='#fff'><path d='M11 3h2v9.6l3.3-3.3 1.4 1.4L12 16.4l-5.7-5.7 1.4-1.4 3.3 3.3zM4 18h16v2H4z'/></svg>` },
-  send: { colour: "#2c9b3c", svg: `${HOME_SVG} fill='#fff'><path d='M3 11h12.2l-4.6-4.6L12 5l7 7-7 7-1.4-1.4 4.6-4.6H3z'/></svg>` },
   // the certificate tile (screens/home.js): no colour of its own, the row's stage ink colours it
   failed: { svg: `${HOME_SVG} fill='#fff'><path d='M10 3h4l-.6 12h-2.8zm0 15h4v3h-4z'/></svg>` },
   // B266: More Sources in the green row's slot: its row tile's blue and white plus (ROW_ICONS moreSources), which
@@ -325,7 +324,6 @@ const HOME_TILES_7 = {
   signing: home7(C7.purple, [ln("M13 21H5.5V3h8.5l4.5 4.5v3"), ln("M8.5 9h6M8.5 12.5h3.5"), ln(ring(17, 15.5, 2.8)),
     ln("M15.4 17.8 14.8 22l2.2-1.1 2.2 1.1-.6-4.2")]),
   install: home7(C7.green, GLYPHS_7.install),
-  send: home7(C7.green, [ln("M4 12h15M13 6l6 6-6 6")]),
   failed: home7(null, [ln("M12 4v10", 2.2), dot(12, 19, 1.4)]),
   more: home7(C7.blue, GLYPHS_7.plus), // B266: More Sources in the green row's slot, its row tile's blue plus
   jailbreak: home7(C7.purple, [ln("M5.5 11h13v9.5h-13z"), ln("M8.5 11V7.8a3.5 3.5 0 0 1 6.8-1.2"), ln("M12 14.5v2.5")]),
