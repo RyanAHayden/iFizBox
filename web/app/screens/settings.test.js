@@ -398,11 +398,11 @@ test("F205: Settings root, General and Theme rows carry iOS 6 tiles where iOS 6 
   assert.equal(at("Compatibility Marks"), at("Works on My Phone") + 1);
   for (const r of general) assert.equal(r[1], "cell-icon row-icon", r[0]);
   // F199: Theme is Mode (a segmented control, no rows) and Themes' two push rows, bare like iOS 6's.
-  // F201: Style's choice rows come first (F202: iOS 13 the third).
+  // F201: Style's choice rows come first (F202: iOS 13 the third, F203: iOS 26 the fourth).
   const theme = rows(["theme"]);
-  assert.deepEqual(theme.map((r) => r[0]), ["iOS 6", "iOS 7", "iOS 13", "Light", "Dark"]);
+  assert.deepEqual(theme.map((r) => r[0]), ["iOS 6", "iOS 7", "iOS 13", "iOS 26", "Light", "Dark"]);
   for (const r of theme) assert.equal(r[1], null, r[0]);
-  assert.deepEqual(rows(["display"]).map((r) => r[0]), ["iOS 6", "iOS 7", "iOS 13", "Light", "Dark"]); // the old route
+  assert.deepEqual(rows(["display"]).map((r) => r[0]), ["iOS 6", "iOS 7", "iOS 13", "iOS 26", "Light", "Dark"]); // the old route
   // each theme list: a checked row per theme, each with its swatch
   // (then the preview's sample rows, which start at Sources)
   const list = (k) => { const r = rows(["theme", k]); return r.slice(0, r.findIndex((x) => x[0] === "Sources")).map((x) => [x[0], x[1]]); };
@@ -510,6 +510,50 @@ test("F202: Theme > Style picks iOS 13: data-style, its two themes, card sheets 
     assert.equal(html.dataset.style, "ios6");
     assert.equal(attrs["data-sheet"], undefined);
     assert.equal(attrs["data-nav"], undefined);
+  } finally {
+    settings.set("style", was[0]); settings.set("appearance", was[1]);
+    (await import("../nav/navbar.js")).setLargeTitles(false, doc);
+  }
+});
+
+// F203: iOS 26 is the fourth Style: its own White / OLED Black, card sheets, large titles and the floating tab bar
+// (<html data-tabbar="float">, nav/tabbar.js setFloatingTabbar), all three gone again in iOS 6 and iOS 13 drops
+// only the tab bar.
+test("F203: Theme > Style picks iOS 26: data-style, its two themes, card sheets, large titles, floating tab bar", async () => {
+  const { render, settings, applyTheme, applyStyleHooks } = await import("./settings.js");
+  const was = [settings.get("style"), settings.get("appearance")];
+  const attrs = {};
+  const html = { dataset: {}, getAttribute: (k) => attrs[k] ?? null,
+    setAttribute: (k, v) => { attrs[k] = String(v); }, removeAttribute: (k) => { delete attrs[k]; } };
+  const doc = { documentElement: html, querySelectorAll: () => [], getElementById: () => null };
+  const win = { matchMedia: () => ({ matches: false }), location: { hash: "" } };
+  try {
+    settings.set("style", "ios26");
+    const root = fakeElement("div");
+    render(root, { tab: "home", path: ["theme"] });
+    const labels = [];
+    const walk = (n) => { for (const c of n.children ?? []) { if (c.className === "cell-label") labels.push(c.textContent); walk(c); } };
+    walk(root);
+    assert.deepEqual(labels.slice(0, 4), ["iOS 6", "iOS 7", "iOS 13", "iOS 26"]);
+    assert.equal(labels.includes("Light"), false); // iOS 6's Themes rows hide, as under iOS 7 and iOS 13
+    settings.set("appearance", "light");
+    applyTheme(doc, win);
+    assert.deepEqual([html.dataset.style, html.dataset.theme, html.dataset.palette], ["ios26", "light", "white"]);
+    assert.equal(attrs["data-sheet"], "card");
+    assert.equal(attrs["data-tabbar"], "float");
+    await applyStyleHooks("ios26", doc);
+    assert.equal(attrs["data-nav"], "large");
+    settings.set("appearance", "dark");
+    applyTheme(doc, win);
+    assert.deepEqual([html.dataset.style, html.dataset.theme, html.dataset.palette], ["ios26", "dark", "oled"]);
+    settings.set("style", "ios13");
+    applyTheme(doc, win);
+    await applyStyleHooks("ios13", doc);
+    assert.deepEqual([attrs["data-sheet"], attrs["data-nav"], attrs["data-tabbar"]], ["card", "large", undefined]);
+    settings.set("style", "ios6");
+    applyTheme(doc, win);
+    await applyStyleHooks("ios6", doc);
+    assert.deepEqual([attrs["data-sheet"], attrs["data-nav"], attrs["data-tabbar"]], [undefined, undefined, undefined]);
   } finally {
     settings.set("style", was[0]); settings.set("appearance", was[1]);
     (await import("../nav/navbar.js")).setLargeTitles(false, doc);

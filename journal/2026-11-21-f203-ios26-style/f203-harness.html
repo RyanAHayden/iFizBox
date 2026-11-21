@@ -1,0 +1,75 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>F203 glass timing</title>
+<style>
+html, body { margin: 0; height: 100%; overflow: hidden; }
+iframe { border: 0; width: 100%; height: 100%; display: block; }
+#out { position: fixed; left: 0; right: 0; top: 30%; background: #fff; color: #000; font: 10px/1.35 Menlo, monospace;
+  white-space: pre-wrap; padding: 10px; z-index: 9; }
+</style>
+<iframe id="f"></iframe>
+<div id="out">loading…</div>
+<script>
+// F203: scrolls Changes in the real app (same origin, in an iframe) once a frame for 5 s, with ios26.css's glass blur
+// on and off (the --i26-glass-blur token set inline on the iframe's <html>), and prints the rAF intervals.
+const out = document.getElementById("out");
+const log = (s) => { out.textContent += "\n" + s; };
+try {
+  localStorage.setItem("ifizbox.firstVisit", "later");
+  localStorage.setItem("ifizbox.device", "iphoneos-arm64");
+  localStorage.setItem("ifizbox.style", "ios26");
+  localStorage.setItem("ifizbox.appearance", "light");
+} catch (e) { log("storage: " + e); }
+const f = document.getElementById("f");
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+f.src = "/#/changes";
+function scroller(d) {
+  const p = d.querySelector(".tab-stack.is-active > .page.is-top");
+  if (!p) return null;
+  let best = null, room = 0;
+  for (const e of [p, ...p.querySelectorAll("*")]) {
+    const r = e.scrollHeight - e.clientHeight;
+    if (r > room && /auto|scroll/.test(getComputedStyle(e).overflowY)) { best = e; room = r; }
+  }
+  return best;
+}
+async function run(label, blur, tone) {
+  const w = f.contentWindow, d = w.document, html = d.documentElement;
+  html.setAttribute("data-theme", tone);
+  html.style.setProperty("--i26-glass-blur", blur ? "blur(14px) saturate(1.8)" : "none");
+  const s = scroller(d);
+  if (!s) { log(label + ": no scroller"); return; }
+  s.scrollTop = 0;
+  await sleep(800);
+  const ivs = []; let last = 0, dir = 1;
+  await new Promise((res) => {
+    const t0 = performance.now();
+    function step(t) {
+      if (last) ivs.push(t - last);
+      last = t;
+      s.scrollTop += 7 * dir;
+      if (s.scrollTop >= s.scrollHeight - s.clientHeight - 1) dir = -1;
+      if (s.scrollTop <= 0) dir = 1;
+      if (t - t0 < 5000) w.requestAnimationFrame(step); else res();
+    }
+    w.requestAnimationFrame(step);
+  });
+  const a = ivs.slice().sort((x, y) => x - y), q = (p) => a[Math.min(a.length - 1, Math.floor(p * a.length))];
+  const fps = 1000 * ivs.length / ivs.reduce((x, y) => x + y, 0);
+  const slow = ivs.filter((v) => v > 25).length;
+  log(`${label.padEnd(10)} ${fps.toFixed(1).padStart(5)}fps p50 ${q(.5).toFixed(1)} p95 ${q(.95).toFixed(1)} max ${a[a.length - 1].toFixed(1)} >25ms ${slow}/${ivs.length} (${s.className.split(" ")[0]} ${s.scrollHeight - s.clientHeight}px)`);
+}
+(async () => {
+  await sleep(9000); // the app loads its sources
+  out.textContent = "F203 scroll Changes 5 s, rAF ms (" + navigator.userAgent.match(/OS [\d_]+/) + ", " + innerWidth + "x" + innerHeight + ")";
+  out.style.top = "0"; // over the nav bar, clear of the tab bar being timed
+  for (const r of [1, 2]) {
+    await run("glass " + r, true, "light");
+    await run("solid " + r, false, "light");
+  }
+  await run("glass dk", true, "dark");
+  await run("solid dk", false, "dark");
+  log("done");
+})();
+</script>
