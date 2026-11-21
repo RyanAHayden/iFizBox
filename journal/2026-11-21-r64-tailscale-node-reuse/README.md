@@ -35,11 +35,13 @@ after that, which must not add another one.
 ### Which build the 15 runs
 
 `ios apps` (read-only): `com.ryha.ifizbox` 0.19.1, CFBundleVersion **3913**. `native/build.sh` sets the build
-number to `git rev-list --count HEAD`. The only local refs at 3913 are `task/B309` (head 9b667936, committed
-19:35 UTC, which contains F353's merge d3227a86 (count 3867) and B301's merge 1f956e6d). So the phone now runs
-B309's work-in-progress build, with B301 and F353. It was installed **after** the owner's sign-in (19:35 >
-~19:10), so which build the owner's attempt ran on is not known. That doesn't matter: per the state file, the
-attempt never reached the node.
+number to `git rev-list --count HEAD`. A count alone doesn't name a commit. What does is the app's own Settings
+footer, `0.19.1 (3913) · 9b66793` (below, `shots/r64-2-build.jpg`): `task/B309`'s head 9b667936, committed 19:35
+UTC, which contains F353's merge d3227a86 and B301's merge 1f956e6d. So the phone now runs B309's
+work-in-progress build, with B301 and F353. A build holding a 19:35 commit can't have been installed before
+19:35. The owner's sign-in came before R64 was filed (plan commit b83a2abb, 19:14 UTC), so it happened on an
+earlier build, and which one isn't known. That doesn't matter: per the state file, the attempt never reached
+the node.
 
 ### F353's name on a reused node: Tailscale renames it
 
@@ -48,13 +50,18 @@ attempt never reached the node.
 That node runs a build with F353 on an iPhone19,2 (not the 15 Pro: the user's newer phone). F353's table doesn't
 list that model, so it fell back to the identifier. Two things follow:
 
-- **A reused node takes the new name.** The control server renamed an existing machine when its hostname changed
-  (it had not been renamed by hand). So once the 15's node comes back under B301, it should read
-  `ifizbox-on-iphone-15-pro` even if it was first registered under an old name.
-- **The fallback label is `iphone192`, not `iphone19-2`.** Tailscale drops the comma rather than turning it into
-  a hyphen. F353's journal says `ifizbox-on-iphone19-1`, and `test_tailscale.py`'s `tailscale_label` maps every
-  non-alphanumeric run to `-`. Both are wrong for punctuation, but only fallback names have any. A follow-up was
-  filed (below).
+- **A reused node took the new name (seen once).** The control server renamed an existing machine when its
+  hostname changed. I can't tell from here whether anyone renamed it by hand in the admin console. Nobody in the
+  plan or journal says so, and the new name is exactly what the new hostname would give, so an automatic rename
+  is the likely reading. If so, once the 15's node comes back under B301, it should read
+  `ifizbox-on-iphone-15-pro` even if it was first registered under an old name. That still has to be seen on
+  the 15.
+- **The fallback label came out `iphone192`, not `iphone19-2` (one sample).** Here Tailscale dropped the comma
+  rather than turning it into a hyphen. F353's journal says `ifizbox-on-iphone19-1`, and `test_tailscale.py`'s
+  `tailscale_label` maps every non-alphanumeric run to `-`. Both disagree with this one sample; Tailscale's
+  sanitising code wasn't read. Only fallback names hold punctuation. B311 (below) checks it.
+- `ifizbox-on-iphone192` shows Online yes with "last seen 19:20" in a 19:38 snapshot. `LastSeen` in `tailscale
+  status --json` isn't updated while a peer stays connected, so the two don't contradict each other.
 
 ## Desktop `tailscale status --json`, 19:38 UTC
 
@@ -83,7 +90,10 @@ didn't match an `ifizbox-on-iphone-N` name, so it was easy to miss.
   key is gone (above).
 - The signed-out footer still says `"iFizBox on iPhone"`. That's a fixed string in `web/app/core/installroute.js`,
   not the name F353 now registers. Filed as B313.
-- I left the app on that page for the owner and gave the lock back.
+- I left the app on that page for the owner and gave the lock back. I did not tap Sign In myself: the login page
+  times out after about 10 minutes, and three windows opened by agents (R48 twice, R57 once) closed with nobody
+  typing. So the owner taps Sign In when they're at the phone, and R64 blocks on that one step, as the brief
+  allows.
 
 ## What is left (needs the owner's login, twice)
 
