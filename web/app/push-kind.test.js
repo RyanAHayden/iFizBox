@@ -4,7 +4,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { format, createRouter, BAR_TABS, rootOn, mounted, prefixes, parent } from "./router.js";
 import { createStacks } from "./nav/stack.js";
-import { ipasTile, stateTile, CHANGES_HREF } from "./screens/home.js";
+import { ipasTile, MORE_SOURCES_TILE } from "./screens/home.js";
+
+// Changes as its root on Home's stack (rootOn), as Help and the guides link to a tab's root.
+const CHANGES_HREF = format(rootOn("changes"));
+const SOURCES_HREF = format(rootOn("sources"));
 
 // A window-like stub with a browser-like history: location.hash adds an entry (state null), replaceState swaps the
 // current one's hash and state, history.back() walks to the one before with its state. hashchange fires synchronously
@@ -73,25 +77,22 @@ test("B169: Install IPAs from Home still pushes after a visit to Installed > Ins
   assert.equal(win.location.hash, "#/home");
 });
 
-test("B169: Home's What's New tile pushes Changes onto Home's stack, and Back pops it", () => {
-  for (const tile of [stateTile({ sources: [{}], upgrades: 0 }), stateTile({ sources: [{}], upgrades: 2 })]) {
-    const { win, tap, results, stacks } = setup();
-    assert.equal(tile.href, "#/home/~changes");
-    const r = tap(tile.href);
-    assert.equal(r.kind, "push", tile.label);
-    assert.equal(win.location.hash, "#/home/~changes");
-    assert.deepEqual(r.to.page, { tab: "home", path: ["~changes"] });
-    assert.deepEqual(mounted({ tab: "home", path: ["~changes"] }), { tab: "changes", path: [] }); // Changes draws it
-    assert.deepEqual(stacks.stack("home").map((e) => e.path.join("/")), ["", "~changes"]);
-    win.history.back();
-    assert.equal(results.at(-1).kind, "pop");
-    assert.equal(win.location.hash, "#/home");
-  }
+test("B169: a link to Changes' root pushes it onto Home's stack, and Back pops it", () => {
+  const { win, tap, results, stacks } = setup();
+  assert.equal(CHANGES_HREF, "#/home/~changes");
+  const r = tap(CHANGES_HREF);
+  assert.equal(r.kind, "push");
+  assert.equal(win.location.hash, "#/home/~changes");
+  assert.deepEqual(r.to.page, { tab: "home", path: ["~changes"] });
+  assert.deepEqual(mounted({ tab: "home", path: ["~changes"] }), { tab: "changes", path: [] }); // Changes draws it
+  assert.deepEqual(stacks.stack("home").map((e) => e.path.join("/")), ["", "~changes"]);
+  win.history.back();
+  assert.equal(results.at(-1).kind, "pop");
+  assert.equal(win.location.hash, "#/home");
 });
 
-test("B266: the More Sources tile (where What's New was) pushes Sources > More onto Home's stack, and Back pops it", () => {
-  const tile = stateTile({ sources: [{}], upgrades: null });
-  assert.equal(tile.kind, "more");
+test("B295: Home's More Sources tile pushes Sources > More onto Home's stack, and Back pops it", () => {
+  const tile = MORE_SOURCES_TILE;
   const { win, tap, results, stacks } = setup();
   const r = tap(tile.href);
   assert.equal(r.kind, "push", tile.label);
@@ -181,13 +182,10 @@ test("B169: a real Back (history.back to the entry before) is still a pop, not a
   assert.equal(win.location.hash, "#/home");
 });
 
-// B172: the other links that open a tab's root push it too: Home's green tile while sources load or fail and Help's
-// Refresh Sources (Sources), Find Extensions for Applications (Search), the guides' Refresh Sources and Installed.
+// B172: the other links that open a tab's root push it too: Help's Refresh Sources (Sources), Find Extensions for Applications (Search), the guides' Refresh Sources and Installed.
 test("B172: Home's links to Sources and Search push that root onto Home's stack, and Back pops it", async () => {
-  const { SOURCES_HREF, SEARCH_HREF } = await import("./screens/home.js");
+  const { SEARCH_HREF } = await import("./screens/home.js");
   const cases = [
-    [stateTile().href, "#/home/~sources", "sources"], // Loading Sources
-    [stateTile({ sources: [{ error: "x" }], upgrades: 0 }).href, "#/home/~sources", "sources"], // N Sources Failed
     [SOURCES_HREF, "#/home/~sources", "sources"],
     [SEARCH_HREF, "#/home/~search", "search"], // Find Extensions for Applications
   ];

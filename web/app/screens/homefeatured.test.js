@@ -113,7 +113,7 @@ test("B239: a Style change repaints the link rows' tiles Home already drew", asy
     const gear = () => groups[0].querySelector(".cell-icon > img").src;
     assert.equal(gear(), rowIcon("general", "ios6").src);
     doc.documentElement.dataset.style = "ios7";
-    assert.ok(repaintLinkIcons(groups, homeLinks()) >= 2, "Settings and More Sources at least");
+    assert.ok(repaintLinkIcons(groups, homeLinks()) >= 1, "Settings at least");
     assert.equal(gear(), rowIcon("general", "ios7").src);
     assert.equal(repaintLinkIcons(groups, homeLinks()), 0, "nothing left to repaint");
   });
