@@ -4,7 +4,7 @@
 //
 //   appRows(jobs)              -> [row]  one row per queued app (core/appqueue.js jobs), in runOrder (iFizBox last)
 //   row: { id, name, mode, job, size, state, phase, fraction, error, token, bundleId, expires, unsure, dismissed, again }
-//   createAppRun({ rows, sign, install, discard, reprompt, ahead = 2, stallMs, later, clear, onChange, onLog })
+//   createAppRun({ rows, sign, install, discard, reprompt, ahead = 2, parallel = 1, stallMs, later, clear, onChange, onLog })
 //       sign(row, hooks)    -> { token, bundleId?, expires?, name? }  the download and the signing, ahead of the installs
 //                              (hooks: { signal, progress(phase "downloading" | "signing", fraction 0..1) })
 //       install(row, hooks) -> { installed: true | false | null, expires? }  hands the signed app to iOS and waits for
@@ -60,9 +60,12 @@
 //   installdText(text, row)    B138: a row's error with installd's raw words made plain (the App ID refusal, error 15:
 //                              appIdMismatchText; any other UnknownErrorType: "iOS refused to install it: <why>")
 //
-// Two lanes. Signing: `ahead` apps at a time in the run's order are downloaded and signed. Installing: one app at a
+// Two lanes. Signing: `ahead` apps at a time in the run's order are downloaded and signed (the sideload app's page
+// passes Infinity, F359: every app starts at once). Installing: one app at a
 // time: the first signed row is handed to iOS (installLaneNext, B263: never held by a row ahead of it that is still
-// downloading or signing), and the next waits for iOS to finish it (or for it to fail or be stopped). iFizBox's own
+// downloading or signing), and the next waits for iOS to finish it (or for it to fail or be stopped). F359: on the This
+// iPhone route (local(row), no iOS prompt) up to `parallel` rows copy and install together (installLaneStart), each
+// joining once the one before it is copying; an iOS prompt row still goes alone. iFizBox's own
 // IPA goes only after every other row has ended, so iOS closing iFizBox to install it can't cut the others off.
 // A download or signing phase that sends no progress for `stallMs` fails its row ("stopped at Signing 50%"), and that app's job is aborted, so the queue moves on. The log gets one line per phase per
 // app (Downloading Delta 48 MB, Signed Delta, Asked iOS to install Delta, Installed Delta / the reason it failed);
@@ -210,7 +213,29 @@ export function installLaneNext(rows = []) {
   return self && rows.every((r) => r === self || ended(r)) ? self : null;
 }
 
-export function createAppRun({ rows, sign, install, discard = () => {}, reprompt = null, ahead = 2, stallMs = APP_STALL,
+// F359: how many This iPhone installs (core/installroute.js "iphone": installd over LocalDevVPN or Tailscale, no iOS
+// prompt) the install lane runs at once; the shell takes as many (native SignBridge.swift HereLane)
+export const HERE_PARALLEL = 3;
+
+// F359: whether a row may install beside others: the This iPhone route (local(row)), not iFizBox itself (it goes alone,
+// last), not the jailbreak app's helper, and not a Try Again (iOS's prompt again: one prompt at a time)
+const wideRow = (r, localRoute) => !isSelf(r) && !helperRow(r) && !r.again && localRoute(r);
+
+// F359: the row the install lane starts now, or null. Nothing with iOS: the next signed row (installLaneNext). Rows
+// already with iOS: one more only while every one of them is copying or installing on This iPhone (`here`: its route
+// is settled, so no LocalDevVPN alert or iOS prompt can be up), the next is a This iPhone row too, and fewer than
+// `parallel` are going. An iOS prompt row, or a row still settling its route, waits for every other to end. So rows
+// join one at a time: each as the one before it starts copying (the run asks again then).
+export function installLaneStart(rows = [], { parallel = 1, local = () => false } = {}) {
+  const next = installLaneNext(rows);
+  if (!next) return null;
+  const going = rows.filter((r) => WITH_IOS.has(r.state));
+  if (!going.length) return next;
+  if (going.length >= parallel || !wideRow(next, local)) return null;
+  return going.every((r) => r.here && wideRow(r, local)) ? next : null;
+}
+
+export function createAppRun({ rows, sign, install, discard = () => {}, reprompt = null, ahead = 2, parallel = 1, stallMs = APP_STALL,
   later = setTimeout, clear = clearTimeout, onChange = () => {}, onLog = () => {}, local = () => false, onStart = () => {}, keepAwake = () => {} }) {
   const awake = (on) => { try { Promise.resolve(keepAwake(on)).catch(() => {}); } catch { /* the screen may lock */ } }; // F287
   const flights = new Map(); // id -> { ctl: AbortController, timer, why }
@@ -258,6 +283,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       } else if (phase === "installing") log(r, "step", `iOS is installing ${label(r)}`);
       else if (phase === "vpn") log(r, "step", VPN_WAIT); // B110: Open LocalDevVPN: the row waits for it
     }
+    const settled = !r.here && phase === "copying"; // F359: its This iPhone route is settled: others may join it
     const here = r.here || phase === "copying";
     const state = phase === "copying" ? "installing" : SIGNING.has(phase) || WITH_IOS.has(phase) ? phase : r.state;
     let frac = Math.max(0, Math.min(1, Number(fraction) || 0));
@@ -265,6 +291,13 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     const dl = phase === "downloading" && info ? { bytes: Number(info.bytes) || 0, total: Number(info.total) || 0, rate: Number(info.rate) || 0 } : {};
     set(r, { phase, state, here, fraction: frac, ...dl });
     if (SIGNING.has(phase)) arm(r, f);
+    // F359: the shell signs one app at a time, so a downloaded app waits for the signer with no progress of its own:
+    // while another row's signing moves, the downloaded rows' stall clocks start again (a stuck signer still fails)
+    if (phase === "signing") for (const o of rows) {
+      const of = o !== r && o.state === "downloading" && o.fraction >= 1 ? flights.get(o.id) : null;
+      if (of && !of.ctl.signal.aborted) arm(o, of);
+    }
+    if (settled) pump();
   };
 
   // B65: a download or signing phase that goes quiet fails its row (and aborts its job); iOS's prompt waits for the user.
@@ -405,11 +438,9 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
         if (busy >= ahead) break;
         if (r.state === "waiting") { busy++; startSign(r); }
       }
-      // the install lane: nothing while one is with iOS; else the first signed row (installLaneNext)
-      if (!rows.some((r) => WITH_IOS.has(r.state))) {
-        const next = installLaneNext(rows);
-        if (next) startInstall(next);
-      }
+      // the install lane: one row with iOS at a time, or (F359) up to `parallel` This iPhone rows (installLaneStart)
+      const next = installLaneStart(rows, { parallel, local: localRoute });
+      if (next) startInstall(next);
     }
     if (rows.every(ended) && !flights.size) {
       running = false;
@@ -600,7 +631,11 @@ export function summaryLine(rows) {
 
 export function runStatus(rows) {
   const pos = (r) => `${rows.indexOf(r) + 1} of ${rows.length}`;
-  const ios = rows.find((r) => WITH_IOS.has(r.state));
+  const withIos = rows.filter((r) => WITH_IOS.has(r.state));
+  if (withIos.length > 1) { // F359: This iPhone rows installing together
+    return withIos.every((r) => r.phase === "copying") ? `Copying ${withIos.length} apps to iPhone` : `Installing ${withIos.length} apps`;
+  }
+  const ios = withIos[0];
   if (ios && helperRow(ios)) return `${ios.mode === "remove" ? "Removing" : "Installing"} ${label(ios)} (${pos(ios)})`;
   if (ios?.phase === "vpn") return VPN_WAIT;
   if (ios?.phase === "copying") return `Copying ${label(ios)} to iPhone (${pos(ios)})`; // B111: This iPhone

@@ -583,7 +583,7 @@ enum Sideload {
         } : nil
         if isSelf { DispatchQueue.main.async { CloseForUpdate.hereBegan(app: app) } }
         DispatchQueue.main.async { KeepAlive.shared.begin(); IDevice.AppFront.watch() }
-        IDevice.queue.async {
+        HereLane.run { // F359: up to HereLane.width at once (SignBridge.swift)
             let result: Result<Void, Error>
             do {
                 try job?.check()

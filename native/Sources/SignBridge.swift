@@ -306,3 +306,28 @@ final class Download: NSObject, URLSessionDownloadDelegate {
         else { finish(nil) }
     }
 }
+
+// F359: This iPhone installs (Sideload.installHere: installd over LocalDevVPN or Tailscale, no iOS prompt) run side by
+// side, `width` at most, so the IPA queue's run (web/app/core/apprun.js HERE_PARALLEL) copies several apps at once.
+// Each has its own connection to iOS (IDevice.install opens a Session, a staging path and a watch per call). Over
+// Tailscale they still go one at a time: the install's node and its relay are one for the whole app
+// (Tailscale.beginInstall / endInstall), so a second install ending would stop the first one's node. Each waits for
+// whatever IDevice.queue is doing first (idevice.pair holds it), as when every install ran on that queue.
+enum HereLane {
+    static let width = 3
+    private static let lane = DispatchQueue(label: "ifizbox.here", qos: .userInitiated, attributes: .concurrent)
+    private static let slots = DispatchSemaphore(value: width)
+    private static let tailnet = DispatchSemaphore(value: 1)
+
+    static func run(_ body: @escaping () -> Void) {
+        lane.async {
+            slots.wait()
+            defer { slots.signal() }
+            let viaTailscale = Tailscale.useForInstall()
+            if viaTailscale { tailnet.wait() }
+            defer { if viaTailscale { tailnet.signal() } }
+            IDevice.queue.sync {}
+            body()
+        }
+    }
+}
