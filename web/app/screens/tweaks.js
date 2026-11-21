@@ -1114,14 +1114,14 @@ export function moreTweaksGroup({ bundleId, name = "", store = tweakStore, stora
 
 // The Add Tweaks page's route under the page shown now (browse.js renderAddTweaks): "addtweaks:<bundle id>".
 export const addTweaksToken = (bundleId) => `addtweaks:${bundleId}`;
-const appNames = new Map(); // bundle ID -> the app's name, from its page's Add Tweaks row (for the page's headers)
+const appNames = new Map(); // bundle ID -> the app's name, from its Details' Add Tweaks row (for the page's headers)
 export const addTweaksAppName = (bundleId) => appNames.get(bundleId) ?? "";
 export function pushAddTweaks(bundleId, loc = globalThis.location) {
   const h = String(loc.hash ?? "").replace(/\/$/, "");
   loc.hash = `${h}/${encodeURIComponent(addTweaksToken(bundleId))}`;
 }
 
-// The app page's group, right under the header: Add Tweaks with a count; it opens the Add Tweaks page (F352), or
+// An app's Details group, right under the header: Add Tweaks with a count; it opens the Add Tweaks page (F352), or
 // `open` (My IPAs: the pushed sheet).
 export function addTweaksGroup({ bundleId, name = "", open = null, rows = sourceTweakRows, store = tweakStore, storage, push = pushAddTweaks } = {}) {
   style();

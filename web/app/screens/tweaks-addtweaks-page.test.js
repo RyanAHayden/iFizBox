@@ -1,4 +1,4 @@
-// F352: the Add Tweaks page (browse.js renderAddTweaks, pushed under an app's page): its groups (Added, Made for <app>,
+// F352: the Add Tweaks page (browse.js renderAddTweaks, pushed under an app's Details): its groups (Added, Made for <app>,
 // Works in Any App), the search bar's filter, the price button's ADD / ADDED, More Tweaks with one footer, and the app
 // page's row pushing the page instead of the sheet.
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -116,7 +116,7 @@ test("More Tweaks: Browse Tweak Sources, Search All Repos, From Files, and one s
   assert.deepEqual(opened, [["browse", "com.me.app"], ["search", "YouTube"]]);
 }));
 
-test("the app page's Add Tweaks row pushes the Add Tweaks page; its detail counts, no footer names tweaks", () => withDoc(async () => {
+test("an app's Details: its Add Tweaks row pushes the Add Tweaks page; its detail counts, no footer names tweaks", () => withDoc(async () => {
   const s = storage();
   s.setItem("ifizbox.tweakInfo", JSON.stringify({ "com.t.yt@2": { ok: true, bundles: ["com.x.tube"] } }));
   const pushed = [];
@@ -131,7 +131,7 @@ test("the app page's Add Tweaks row pushes the Add Tweaks page; its detail count
   assert.equal(addTweaksAppName("com.x.tube"), "Tube");
 }));
 
-test("the Add Tweaks route: addtweaks:<bundle id> under the app's page, its tweak pages in their Tweak Source", () => {
+test("the Add Tweaks route: addtweaks:<bundle id> under the app's Details, its tweaks' Details in their Tweak Source", () => {
   const loc = { hash: "#sources/alt%3Ax/package%3Acom.x.tube/" };
   pushAddTweaks("com.x.tube", loc);
   assert.equal(loc.hash, "#sources/alt%3Ax/package%3Acom.x.tube/addtweaks%3Acom.x.tube");

@@ -1245,6 +1245,7 @@ html[data-theme="dark"] .dep-piracy .dep-review-title { color: var(--dk-bad); }
 /* Add Tweaks (an app's tweaks, browse.js renderAddTweaks): Search's package rows with the price button at the end */
 .pkg-row .tw-row-add { position: absolute; right: 10px; top: 50%; margin-top: -12px; z-index: 1; }
 .pkg-row:has(.tw-row-add) .pkg-text { padding-right: 78px; }
+.pkg-row:has(.tw-row-add) > .cell-inner::after { display: none; } /* the button stands in the chevron's place */
 .tw-row-add .loading-spinner { width: 12px; height: 12px; margin: 0 4px 0 0; }
 .tw-more { margin-top: 8px; }
 /* ==== look-only { ==== Add Tweaks' ADDED: the price button greyed, as More Sources' ADDED */

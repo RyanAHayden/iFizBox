@@ -958,7 +958,7 @@ export async function renderSearchableList(body, route, fetchRows, { letters = f
   bar.onQuery(draw);
 }
 
-// F352: Add Tweaks, a page of its own under an app's page ("addtweaks:<bundle id>"): the grey search bar, then the
+// F352: Add Tweaks, a page of its own under an app's Details ("addtweaks:<bundle id>"): the grey search bar, then the
 // tweaks for the app as Search draws packages (icon, name, version, description) with the price button at the end
 // (tweaks.js addTweakButton: ADD checks and keeps the .deb, ADDED offers Remove, a paid one Sign In / Buy), grouped
 // Added / Made for <app> / Works in Any App (tweaks.js addTweaksItems). A row opens the tweak's page in its Tweak
