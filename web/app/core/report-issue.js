@@ -56,11 +56,13 @@ export function issueBody(info = {}, entry = null, { lines = Infinity, chars = I
   let kept = all.slice(Math.max(0, all.length - lines));
   let text = kept.join("\n");
   if (text.length > chars) text = text.slice(text.length - chars); // one line longer than the URL can carry
-  const trimmed = kept.length < all.length || text.length < kept.join("\n").length;
+  const cutLine = text.length < kept.join("\n").length;
+  const trimmed = kept.length < all.length || cutLine;
   const when = Number.isFinite(entry.at) ? new Date(entry.at).toISOString().replace("T", " ").slice(0, 16) + " UTC" : "";
   const f = fence(text);
   out.push(`**Console Log:** ${[entry.title || "Run", when, runStatusText(entry)].filter(Boolean).join(" · ")}`
-    + (trimmed ? ` (trimmed: the last ${text.split("\n").length} of ${all.length} lines)` : ""), "", f, text, f, "");
+    + (cutLine ? ` (trimmed: the end of the last of ${all.length} lines)`
+      : trimmed ? ` (trimmed: the last ${text.split("\n").length} of ${all.length} lines)` : ""), "", f, text, f, "");
   if (trimmed) out.push("The full log is on your clipboard: paste it here in place of the trimmed one above.", "");
   return out.join("\n");
 }

@@ -1029,7 +1029,7 @@ export function logsSection(mode, { logs = runLogs } = {}) {
   return grouped([{ header: "Console", rows: [{ label: "Console Logs", detail: list.length ? String(list.length) : "None", href: format(settingsRoute([LOGS])), icon: rowIcon("logs") }],
     footer: mode === "jailbreak" ? "The output of every install, upgrade and removal, kept on this iPhone."
       : "The output of every app signed, installed and re-signed, kept on this iPhone." },
-  reportGroup(null, { logs, footer: "Opens a new issue on GitHub with this iPhone's details and the newest failed log." })]);
+  reportGroup(null, { logs, footer: "Opens a new issue on GitHub with this iPhone's details and the newest failed log, else the newest one." })]);
 }
 
 // ---- F362: Report an Issue ---------------------------------------------------------------------------------
@@ -1052,13 +1052,24 @@ function reportInfoNow(native = nativeBridge()) {
 
 // Opens the new issue in Safari (app.js and the shell send window.open there); a log too long for the URL goes on
 // the clipboard whole, and the issue's body asks for it to be pasted.
-export async function reportIssue(id = null, { logs = runLogs, open = (u) => window.open(u, "_blank", "noopener"), copy = copyText } = {}) {
-  const info = reportReady ?? await reportInfoNow();
+export async function reportIssue(id = null, { logs = runLogs, native = nativeBridge(), open = (u) => openOutside(u, native),
+  copy = copyText } = {}) {
+  // The website never waits (the tap's own turn): before build.json answers, the issue goes without a version.
+  const info = reportReady ?? (native?.call ? await reportInfoNow(native)
+    : { mode: detectMode(), ios: currentDevice().ios, machine: globalThis.navigator?.userAgent });
   const pick = reportLog(logs.list(), id); // list() leaves the text out: get() has it
   const { url, trimmed, full } = issueUrl(info, pick && (logs.get(pick.id) ?? pick));
   if (trimmed) copy(full)?.catch?.(() => {});
   open(url);
   return { url, trimmed };
+}
+
+// The app: the shell's app.openURL (Safari); an older shell, or the website: window.open.
+async function openOutside(url, native) {
+  if (native?.call) {
+    try { if ((await native.call("app.openURL", { url }))?.opened) return; } catch { /* an older shell */ }
+  }
+  window.open(url, "_blank", "noopener");
 }
 
 function reportGroup(id, { logs = runLogs, footer } = {}) {

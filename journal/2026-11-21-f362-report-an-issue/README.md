@@ -29,6 +29,19 @@
 - `runLogs.list()` drops each entry's text. The first run of the shot sent an empty code block, so `reportIssue`
   now reads the picked entry with `get()`.
 
+## Spec review (fixed)
+
+- The Settings footer claimed "the newest failed log", but the fallback can send one that didn't fail. It now adds
+  "else the newest one".
+- When only the end of one long line fits, the header said "the last 1 of M lines". It now says "the end of the last
+  of M lines".
+- In the app, the row now calls the bridge's `app.openURL` itself and falls back to `window.open`. The shot's run
+  logged the `app.openURL` call.
+- On the website, a tap made before build.json answers no longer waits for it, so the popup and clipboard write keep
+  the tap's gesture. The issue then has no version.
+- I kept these extras: the glossary entry (the runner rules ask for one), the empty "What happened:" section and the
+  run's status in the title.
+
 ## Decisions
 
 - The clipboard is written only when the log was trimmed, so it isn't overwritten for nothing.

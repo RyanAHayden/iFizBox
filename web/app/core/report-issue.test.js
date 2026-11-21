@@ -54,6 +54,7 @@ test("report-issue: one line longer than the cap keeps its end", () => {
   assert.ok(url.length <= URL_CAP);
   assert.equal(trimmed, true);
   assert.match(parse(url).body, /THE END\n```/);
+  assert.match(parse(url).body, /\(trimmed: the end of the last of 1 lines\)/);
 });
 
 test("report-issue: characters that need encoding survive the round trip", () => {
