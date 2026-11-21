@@ -25,7 +25,8 @@ import { sourceCredit } from "../core/installed.js";
 import { recordSelfUpdate } from "../core/selfupdate.js";
 import { showAlert } from "../nav/alert.js";
 import { askInsecure, bridge, keepIpaHash, refusing, storageOf } from "./common.js";
-import { getServer } from "./identity.js";
+import { getServer, defaultServer } from "./identity.js";
+import { serverFallback } from "../core/installroute.js"; // F366
 import { chooseRoute, holdApp } from "./route.js";
 export { hereLabel, shownName, finishHere } from "./common.js";
 
@@ -90,9 +91,13 @@ export async function prepareOnDevice(job, { tag, signal = null, progress = () =
   }
 }
 
-export async function openPrepared(row, { tag, signal = null, progress = () => {}, log = () => {}, host = false, wait = ASK_WAIT, native, again = false } = {}) {
+// F366: `server`: this row goes through the default Signing Server whatever Install Apps With says (the run's Use the
+// Signing Server). A This iPhone failure that offers it (core/installroute.js serverFallback) throws with `fallback`,
+// the failure's { title, short, fix, button }.
+export async function openPrepared(row, { tag, signal = null, progress = () => {}, log = () => {}, host = false, wait = ASK_WAIT, native, again = false, server = false } = {}) {
   const name = row?.name || row?.id || "";
   let opened;
+  let route = null;
   if (again && !host) {
     // B91: a row iOS didn't download, tapped: the shell's IPA (still served) gets iOS's prompt again, no new signing;
     // code "gone" when it isn't served any more
@@ -101,20 +106,24 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
   } else try {
     // B110: Open LocalDevVPN keeps this row (and so the queue, which installs one at a time) waiting on the run's page
     // ("vpn": core/apprun.js says "Waiting for LocalDevVPN…"); the run's Cancel or the row's stop aborts the signal
-    const route = await chooseRoute({ native, signal: signal ?? new AbortController().signal, onWait: () => progress("vpn", 0) });
+    route = server ? {} : await chooseRoute({ native, signal: signal ?? new AbortController().signal, onWait: () => progress("vpn", 0) });
     if (!route) throw Object.assign(new Error("Cancelled"), { code: "cancelled" });
     if (route.route) host = false; // This iPhone: installd updates iFizBox in place
     // B111: This iPhone has no iOS prompt: the row shows the copy and installd's percent (herePhase), and the reply
     // comes once installd has the app
     if (route.route) progress("copying", 0);
-    opened = await abortable(native, "signing.open", { token: row.token, manifestServer: getServer(), ...(host ? { host: true } : {}), ...route },
+    opened = await abortable(native, "signing.open", { token: row.token, manifestServer: server ? defaultServer() : getServer(), ...(host ? { host: true } : {}), ...route },
       (ev) => {
         if (ev?.log) { log(ev.log); return; }
         const p = route.route ? herePhase(ev) : null;
         if (p) progress(p.phase, p.fraction);
       }, { tag, signal });
     if (route.route) return { installed: opened?.installed ?? true, expires: opened?.expires ?? null };
-  } catch (e) { throw rowError(e, name); }
+  } catch (e) {
+    const err = rowError(e, name);
+    const fallback = route ? serverFallback(e, route) : null; // F366
+    throw fallback ? Object.assign(err, { fallback }) : err;
+  }
   progress("asking", 0);
   if (host) recordSelfUpdate(storageOf(), opened?.version || row?.version); // B83: the next launch checks it landed
   if (host) return { installed: null, expires: opened?.expires ?? null, host: true };

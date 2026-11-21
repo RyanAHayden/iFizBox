@@ -43,6 +43,8 @@ import { HERE_PARALLEL } from "../core/apprun.js"; // F359
 import { apps as appStore, undoRecord } from "../core/installed.js"; // B170
 import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, HERE_CLOSING_LINE, DOWNLOAD_HINT, DOWNLOAD_BY_HAND } from "../signing/selfupdate.js";
 import { nativeBridge, hasNativeCall } from "../native.js";
+import { USE_SERVER, USE_SERVER_LINE, serverStep } from "../core/installroute.js"; // F366
+const SETTINGS_FIXES = new Set(["signIn", "pair", "check"]); // F366: fixes that open Installation & Signing
 
 // The phone's side of a run, from signing-client.js (prepareOnDevice, openPrepared, discardPrepared). Each attempt of a
 // row gets its own tag, so signing.cancel {tag} stops that try only.
@@ -72,13 +74,26 @@ export function phoneLanes(sc, { native, run = laneRunId() } = {}) {
   let n = 0;
   const tagOf = (r) => `${r.id}#${++n}${run ? `@${run}` : ""}`;
   const served = new Map(); // B91: row id -> the tag its served IPA runs under (Try Again's Stop stops that serving)
+  // F366: rows This iPhone couldn't reach (id -> the failure, openPrepared's `fallback`), and the run's switch to the
+  // default Signing Server (Use the Signing Server): for this run only, Install Apps With is left as it is
+  const fallbacks = new Map();
+  let server = false;
   return {
     sign: (r, { signal, progress }, log = () => {}) => sc.prepareOnDevice(r.job, { tag: tagOf(r), signal, progress, log, native }),
     install: (r, { signal, progress, again = false }, log = () => {}) => {
       const tag = (again && served.get(r.id)) || tagOf(r);
       served.set(r.id, tag);
-      return sc.openPrepared(r, { tag, signal, progress, log, host: isSelf(r), native, ...(again ? { again: true } : {}) });
+      fallbacks.delete(r.id);
+      return Promise.resolve(sc.openPrepared(r, { tag, signal, progress, log, host: isSelf(r), native, ...(again ? { again: true } : {}),
+        ...(server ? { server: true } : {}) })).catch((e) => {
+        if (e?.fallback && !server) fallbacks.set(r.id, e.fallback);
+        throw e;
+      });
     },
+    fallbacks,
+    useServer: () => { server = true; },
+    serverRoute: () => server, // a function: heldLanes copies the lanes' keys
+    fix: (fix) => sc.runFix?.(fix, { native }), // the failure's own fix button (signing/route.js runFix)
     discard: (r) => sc.discardPrepared(r.token, native),
     // B123: iFizBox's own update once its IPA is with iOS (signing.selfUpdate): onState(state) -> the last state | null
     selfUpdate: (onState) => (sc.watchSelfUpdate ? sc.watchSelfUpdate(onState, native) : Promise.resolve(null)),
@@ -428,6 +443,35 @@ export async function runAppRun(jobs, deps) {
     return end(cancelled);
   }
 
+  // F366: rows This iPhone couldn't reach (lanes.fallbacks) end the Log with their fix (Sign In, Pair Again, …) and
+  // Use the Signing Server, which runs those same rows again through the default Signing Server, for this run only
+  // (lanes.useServer); the bottom gets the same button above Return. -> page.finish's `also`, or null with none.
+  function offerServer() {
+    const failed = rows.filter((r) => r.state === "failed" && lanes.fallbacks?.has(r.id));
+    if (!failed.length || typeof lanes.useServer !== "function") return null;
+    for (const r of failed) {
+      const f = lanes.fallbacks.get(r.id);
+      if (f?.button && lanes.fix) page.help?.(`${r.name}: ${f.short || f.title}`, { label: f.button, action: () => {
+        if (SETTINGS_FIXES.has(f.fix)) page.close(); // a Settings page opens under this one: out of its way
+        lanes.fix(f.fix);
+      } });
+    }
+    let used = false;
+    const go = () => {
+      if (used || run.running) return true;
+      used = true;
+      lanes.fallbacks.clear();
+      lanes.useServer();
+      let p = null;
+      for (const r of failed) p = run.retry(r.id) ?? p;
+      for (const r of failed) line("step", serverStep(r.name), r.id); // after retry: a new pass empties the Log first
+      if (p) drive(p);
+      return true;
+    };
+    page.help?.(USE_SERVER_LINE, { label: USE_SERVER, action: go });
+    return { label: USE_SERVER, action: go };
+  }
+
   async function end(wasCancel) {
     for (const r of rows) draw(r);
     tick();
@@ -450,9 +494,11 @@ export async function runAppRun(jobs, deps) {
     // B49: iFizBox's own IPA is with iOS, which closes iFizBox to install it: nothing to tap
     const fin = sentSelf ? null : deps.finish?.(result); // B71a: the jailbreak run's (AppSync Unified's respring)
     const opener = sentSelf || fin ? null : openRow(rows, lanes); // B111: one app installed on This iPhone
+    const server = sentSelf || fin || opener ? null : offerServer(); // F366
     if (sentSelf) followSelf(text);
     else if (fin) page.finish({ label: fin.label, status: text, action: fin.action ?? (() => false) });
     else if (opener) page.finish({ label: RETURN_LABEL, status: text, action: () => false, also: opener });
+    else if (server) page.finish({ label: RETURN_LABEL, status: text, action: () => false, also: server });
     else page.finish({ label: RETURN_LABEL, status: text, action: () => false });
     if (page.hidden) page.show?.(); // B175: put aside for a link (Open Now): back with its result
     settled();

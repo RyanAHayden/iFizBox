@@ -75,3 +75,10 @@ _Said_: installs being refused, pairing broken
 _On screen_: Tailscale Is Signed Out / Tailscale Refused / Pair Again (red status, Home tile: Installs are failing · Fix in Settings)
 _In code_: routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, ifizbox.routeFailure
 _Avoid_: pairing error, connection error
+
+**Signing Server Fallback**:
+After a This iPhone install couldn't reach the phone, the same install or failed apps go again through the default Signing Server, for that install or run only
+_Said_: use the signing server instead, fall back to ifizbox.com
+_On screen_: Use the Signing Server
+_In code_: serverFallback, USE_SERVER, useServer, server: true (installOnDevice, openPrepared)
+_Avoid_: server retry, fallback route

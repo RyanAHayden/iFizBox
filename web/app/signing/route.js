@@ -71,7 +71,8 @@ import { routeFailureOf, rememberRouteFailure, clearRouteFailure, TAILSCALE_URL 
 import { SELF_RESTART } from "../core/apprun.js";
 import { KNOWN_MALWARE, askInsecure, bridge, failed, keepIpaHash, refusing, stopNative, storageOf,
   untilCancel } from "./common.js";
-import { getServer } from "./identity.js";
+import { getServer, defaultServer } from "./identity.js";
+import { serverFallback, USE_SERVER, USE_SERVER_LINE } from "../core/installroute.js"; // F366
 import { isSelfIpa, finishHere, hereLabel, shownName } from "./common.js";
 import { lastDevice, openRoute } from "./device.js";
 import { followHereSelf, followSelfUpdate } from "./selfupdate.js";
@@ -148,11 +149,27 @@ export function holdApp(native, on) {
   try { Promise.resolve(bridge(native).call("signing.hold", { on })).catch(() => {}); } catch { /* no bridge */ }
 }
 
-async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, params = null, after = null, host = false },
+// F366: the failed install again through the default Signing Server, once (the alert's button or the log's line).
+// `inline`: from inside the failed install (its alert), which still holds installOnDevice's one-at-a-time.
+function serverRetry(opts, deps) {
+  let used = false;
+  return {
+    run({ inline = false } = {}) {
+      if (used) return Promise.resolve(false);
+      used = true;
+      const o = { ...opts, server: true };
+      return inline ? installOnDeviceOnce(o, deps) : installOnDevice(o, deps);
+    },
+  };
+}
+
+async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, params = null, after = null, host = false, server = false },
   { native, hud = progressHUD, alert = showAlert, go = openRoute, later = setTimeout, follow = null } = {}) {
   forgetRoute();
-  const route = await chooseRoute({ native, alert });
+  // F366: `server`: this install goes through the default Signing Server whatever Install Apps With says
+  const route = server ? {} : await chooseRoute({ native, alert });
   if (!route) return false;
+  const manifestServer = server ? defaultServer() : getServer();
   // This iPhone: installd puts the app (iFizBox too) in place itself, so no Signing Server and no hosting.
   const self = isSelfIpa(url) || host; // iFizBox itself, whichever route
   if (route.route) host = false;
@@ -164,7 +181,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   try {
     // manifestServer: the signing server hands iOS the manifest while iFizBox serves the IPA over plain HTTP at
     // 127.0.0.1 (nothing to set up on the phone; the server sees only the app's ID, version and name).
-    result = await untilCancel(h, askInsecure((extra) => bridge(native).call("signing.install", { ...withKeep(params ?? { url }), manifestServer: getServer(), ...refusing(), ...(host ? { host: true } : {}), ...route, ...extra }, (ev) => {
+    result = await untilCancel(h, askInsecure((extra) => bridge(native).call("signing.install", { ...withKeep(params ?? { url }), manifestServer, ...refusing(), ...(host ? { host: true } : {}), ...route, ...extra }, (ev) => {
       if (ev?.log) h.page?.raw?.(ev.log); // the shell's console lines (Sideload.swift install's log)
       // B111: This iPhone: the copy's and installd's own percents ({here}), not the overall "Installing on this iPhone"
       const here = route.route ? hereLabel(ev) : null;
@@ -189,9 +206,14 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
     if (route.route) why = await routeWords(e, why, native); // B316: Tailscale first, then the pairing; kept until a check passes
     failed(h, why.message);
     const fix = why.fix && why.button ? why : null;
-    const { index } = await alert({ title: e?.code === "malware" ? KNOWN_MALWARE : why.title, message: why.message, buttons: fix ? ["OK", fix.button] : ["OK"], ...(fix ? { cancel: 0 } : {}) }) || {};
+    // F366: This iPhone couldn't be reached: the Signing Server for this install, besides the fix (alert and log)
+    const fallback = serverFallback(e, route) ? serverRetry({ url, name, onInstalled, params, after, host }, { native, hud, alert, go, later, follow }) : null;
+    if (fallback) h.page?.help?.(USE_SERVER_LINE, { label: USE_SERVER, action: () => { fallback.run(); } });
+    const buttons = [...(fix ? ["OK", fix.button] : ["OK"]), ...(fallback ? [USE_SERVER] : [])];
+    const { index } = await alert({ title: e?.code === "malware" ? KNOWN_MALWARE : why.title, message: why.message, buttons, ...(buttons.length > 1 ? { cancel: 0 } : {}) }) || {};
     if (why.open === "signing") go(["signing"]);
     if (fix && index === 1) runFix(fix.fix, { native, go });
+    if (fallback && index === buttons.length - 1) return fallback.run({ inline: true });
     return false;
   }
   if (route.route) clearRouteFailure(); // B316: an install went through: the route works
