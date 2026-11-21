@@ -51,7 +51,7 @@ test("B305: RyukGram's Installed row says RyukGram and opens RyukGram's entry, n
     const body = fakePage();
     await browse.render(body, page, { go() {}, setBadge() {}, setTitle() {}, showHUD: () => () => {} });
     for (let i = 0; i < 5; i++) await tick();
-    assert.equal(browse.nav(page).title, "RyukGram", "the page's title");
+    assert.equal(browse.nav(page).title, "Details", "the page's title (F350: Cydia's Details)");
     assert.match(body.textContent, /RyukGram/, "the page drew");
     assert.doesNotMatch(body.textContent, /Instagram/);
   } finally {
