@@ -190,25 +190,32 @@ export function openIpaInstall(opts) {
 
 // The console part of openIpaInstall. installd's no_adhoc refusal gets no alert here: installWithAppSync's short
 // fallback says it.
-export async function runIpaConsole({ url, name = "", onInstalled = () => {}, native = undefined }) {
+export async function runIpaConsole({ url, name = "", onInstalled = () => {}, native = undefined },
+  { open = openProgress, install = runIpaInstall, logs = runLogs, alert = showAlert } = {}) {
   if (running) return false;
   running = true;
   const title = name || ipaName(url);
-  const page = openProgress();
+  const page = open();
   page.onClose(() => { running = false; });
   // F188: Cancel at the top right from the first line to the end (Done once it has ended): it stops the run and the
   // page closes, back where Install was tapped.
   const ctl = new AbortController();
   page.stoppable?.(() => { ctl.abort(); stopIpaInstall(native); });
+  // F361: kept in Console Logs from the first line (runLogs.start), each line saved as it comes, so an install that
+  // hangs or is killed still leaves its log; the lines as runIpaInstall's own log writes them.
+  const run = logs.start({ title: `Install ${title}`, jobs: [{ op: "install", id: url, version: null, mode: "ipa" }] });
   const view = {
-    line(type, text) { page.line(type === "status" ? "step" : type === "info" ? "raw" : type, text); },
+    line(type, text) {
+      run.line(type === "error" ? `E: ${text}` : type === "status" ? `» ${text}` : text);
+      page.line(type === "status" ? "step" : type === "info" ? "raw" : type, text);
+    },
     status(text) { page.status(text); },
     progress(pct) { page.progress(pct); },
   };
 
-  const r = await runIpaInstall({ url, name: title }, view, { ...(native ? { native } : {}), signal: ctl.signal });
-  runLogs.add({ title: `Install ${title}`, jobs: [{ op: "install", id: r.bundleId || url, version: null, mode: "ipa" }],
-    code: r.ok ? 0 : -1, text: r.log });
+  const r = await install({ url, name: title }, view,{ ...(native ? { native } : {}), signal: ctl.signal });
+  if (r.bundleId) run.set({ jobs: [{ op: "install", id: r.bundleId, version: null, mode: "ipa" }] });
+  run.end({ code: r.ok ? 0 : -1, cancelled: Boolean(r.cancelled), text: r.log });
   if (r.declined) page.close(); // B113: Cancel on This Download Is Not Secure: back where Install was tapped
   if (r.cancelled) return r;
   if (r.ok) { try { onInstalled(r); } catch { /* the record is a nicety */ } }
@@ -216,7 +223,7 @@ export async function runIpaConsole({ url, name = "", onInstalled = () => {}, na
   const fin = ipaFinish({ ok: r.ok, name: title, bundleId: r.bundleId });
   if (fin.note) page.line("step", fin.note);
   page.finish({ label: fin.label, status: r.ok ? "Done" : "Failed", action: fin.action });
-  if (r.error && r.error.code !== "no_adhoc") await showAlert({ title: r.error.title, message: r.error.message, buttons: ["OK"] });
+  if (r.error && r.error.code !== "no_adhoc") await alert({ title: r.error.title, message: r.error.message, buttons: ["OK"] });
   return { ...r, close: () => page.close() };
 }
 

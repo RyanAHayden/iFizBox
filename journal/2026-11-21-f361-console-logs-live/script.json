@@ -1,0 +1,14 @@
+[
+  { "eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'" },
+  { "nav": "#/settings", "ms": 4000 },
+  { "eval": "(async () => { const { bridge } = await import('./signing/common.js'); bridge().call('signing.install', { url: 'https://example.com/Delta.ipa' }, () => {}); return 'started'; })()" },
+  { "wait": 1500 },
+  { "eval": "[...document.querySelectorAll('.page.is-top li')].map(l => l.textContent.trim()).filter(t => /Console/.test(t)).join(' | ')" },
+  { "go": "#/settings/logs", "ms": 2000 },
+  { "shot": "logs-list" },
+  { "eval": "document.querySelector('.page.is-top a[href*=\"settings/logs/\"]')?.getAttribute('href')" },
+  { "eval": "(() => { const a = document.querySelector('.page.is-top a[href*=\"settings/logs/\"]'); location.hash = a.getAttribute('href').replace(/^.*#/, '#'); return 'ok'; })()" },
+  { "wait": 2500 },
+  { "shot": "logs-running" },
+  { "eval": "document.querySelector('.page.is-top pre.console-log')?.textContent" }
+]

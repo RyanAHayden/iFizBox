@@ -658,6 +658,7 @@ export function stallMessage(ev, limit = STALL_LIMIT) {
 // { code: "stalled", message: stallMessage(...) } once a phase before "installing" goes quiet for `limit` ms (then
 // native.call("signing.cancel") stops the shell's job). Events after that are dropped.
 export function callWithStall(native, method, params, onEvent = () => {}, { limit = STALL_LIMIT, later = setTimeout, clear = clearTimeout } = {}) {
+  native = loggedBridge(native); // F361: the re-sign's lines in Console Logs
   return new Promise((resolve, reject) => {
     let over = false;
     let timer = null;
@@ -686,6 +687,80 @@ export function callWithStall(native, method, params, onEvent = () => {}, { limi
     })).then((r) => { if (!over) { over = true; stop(); resolve(r); } },
       (e) => { if (!over) { over = true; stop(); reject(e); } });
   });
+}
+
+// ---- F361: sideload runs in Settings > Console Logs ---------------------------------------------------------
+//
+// Every bridge call that signs or installs an app is kept as a console log from its first event: the shell's log
+// lines ({ log }, Sideload.swift / MyIPAs.swift / SignAhead.swift log?) and each new phase ({ phase }, step?) as it
+// comes, then Completed, Failed or Cancelled when the call ends. A call cut off (the app killed mid-run) is left
+// running and reads Stopped after the next launch (core/queue.js runState).
+//   logSideloadRuns(store)        the run log the calls go to (queue.js runLogs, set as it loads)
+//   loggedBridge(native, store)   `native` with call() keeping those calls; any other call, or no store, as it was
+//   sideloadRunTitle(method, params, result)   "Install Delta", "Sign Delta", "Re-sign Delta", "Re-sign All"
+export const SIDELOAD_RUNS = { "signing.install": "Install", "signing.open": "Install", "library.install": "Install",
+  "signing.prepare": "Sign", "library.sign": "Sign", "signing.resign": "Re-sign", "signing.resignAll": "Re-sign" };
+let sideloadLogs = null;
+export function logSideloadRuns(store) { sideloadLogs = store ?? null; }
+const preparedNames = new Map(); // signing.prepare's token -> the app's name, for signing.open's title
+
+const fileTitle = (s) => String(s ?? "").split(/[?#]/)[0].split("/").pop().replace(/\.ipa$/i, "");
+export function sideloadRunTitle(method, params = {}, result = null) {
+  const verb = SIDELOAD_RUNS[method] ?? "Run";
+  if (method === "signing.resignAll") return "Re-sign All";
+  const name = result?.name || params?.name || (params?.token && preparedNames.get(params.token)) || params?.bundleId ||
+    result?.bundleId || fileTitle(params?.file) || fileTitle(params?.url) || "App";
+  return `${verb} ${String(name).replace(/\.ipa$/i, "")}`;
+}
+
+// The line a phase event adds: its name once per phase (and per app in Re-sign All), not each percent.
+function phaseLine(ev, seen) {
+  const name = PHASES[ev?.phase];
+  if (!name) return null;
+  const key = `${ev.phase}|${ev.name ?? ""}|${ev.index ?? ""}`;
+  if (seen.key === key) return null;
+  seen.key = key;
+  return ev.count != null ? `${name} ${ev.name || "App"} (${Number(ev.index) + 1} of ${ev.count})` : name;
+}
+
+const LOGGED = Symbol("ifizbox.loggedBridge");
+export function loggedBridge(native, store = sideloadLogs) {
+  if (!native || typeof native.call !== "function" || native[LOGGED] || !store?.start) return native;
+  const wrapped = Object.create(native);
+  wrapped[LOGGED] = true;
+  wrapped.call = (method, params, onEvent) => {
+    if (!SIDELOAD_RUNS[method]) return native.call(method, params, onEvent);
+    let run = null;
+    try { run = store.start({ title: sideloadRunTitle(method, params), jobs: [{ op: "install", id: params?.bundleId || params?.file || params?.url || method, version: null, mode: "ipa" }] }); } catch { run = null; }
+    const seen = {};
+    const forward = (ev) => {
+      try {
+        if (ev?.log) run?.line(ev.log);
+        const p = phaseLine(ev, seen);
+        if (p) run?.line(p);
+      } catch { /* the log is a nicety */ }
+      onEvent?.(ev);
+    };
+    let p;
+    try { p = Promise.resolve(native.call(method, params, forward)); } catch (e) { p = Promise.reject(e); }
+    return p.then((r) => {
+      try {
+        if (method === "signing.prepare" && r?.token && r?.name) preparedNames.set(r.token, r.name);
+        if (r?.name || r?.bundleId) run?.set({ title: sideloadRunTitle(method, params, r) });
+        run?.line(r?.cancelled ? "Cancelled" : "Done");
+        run?.end(r?.cancelled ? { cancelled: true } : { code: 0 });
+      } catch { /* the log is a nicety */ }
+      return r;
+    }, (e) => {
+      try {
+        const cancelled = e?.code === "cancelled";
+        run?.line(cancelled ? "Cancelled" : `Error: ${e?.message || String(e)}`);
+        run?.end(cancelled ? { cancelled: true } : { code: -1 });
+      } catch { /* the log is a nicety */ }
+      throw e;
+    });
+  };
+  return wrapped;
 }
 
 // Signed Apps' rows from signing.installed's { apps: [{ bundleId, originalBundleId, name, version, expires }] },
