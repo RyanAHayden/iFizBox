@@ -1015,7 +1015,7 @@ async function renderAuthor(body, route, name) {
       settings.hiddenAuthors.set(name, !hiddenNow);
       renderAuthor(body, route, name);
     } }], footer: hiddenNow ? "Hidden everywhere else: lists, Search and Changes." : null }]);
-    g.firstElementChild.classList.add("author-hide"); // grouped() returns a fragment: the class goes on its .group
+    g.querySelector(".group").classList.add("author-hide"); // grouped() returns a fragment: the class goes on its .group
     body.append(g);
   }
   if (!rows.length) { body.append(note("No packages.")); return; }

@@ -34,11 +34,13 @@ async function draw(name, found) {
 
 test("an author page draws its Hide by Author group (marked author-hide) above the package list", async () => {
   const page = await draw("Jane", rows);
-  const group = page.querySelector(".group");
-  assert.ok(group, "the Hide by Author group is drawn");
-  assert.ok(group.classList.contains("author-hide"), "the class is on the .group element, not the fragment");
-  assert.ok(page.querySelector(".pkg-vlist"), "the package list follows");
-  assert.equal(page.children.indexOf(group) < page.children.indexOf(page.querySelector(".pkg-vlist")), true);
+  const group = page.querySelector(".group.author-hide");
+  assert.ok(group, "the Hide by Author group is drawn, the class on the .group element (not the fragment)");
+  assert.equal(group.querySelector(".cell-label").textContent, "Hide Packages by Jane");
+  const list = page.querySelector(".pkg-vlist");
+  assert.ok(list, "the package list follows");
+  const at = (n) => page.children.indexOf(n);
+  assert.ok(at(group) >= 0 && at(list) > at(group), "both straight on the page, the group first");
 });
 
 test("an author with no packages still gets the group, then No packages.", async () => {
