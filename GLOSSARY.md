@@ -54,3 +54,10 @@ _Said_: the actual native input boxes
 _On screen_: (none: the iOS 26 style draws them)
 _In code_: data-controls="native", native-controls.js, drawsIos26Controls
 _Avoid_: real controls, system controls
+
+**Report an Issue**:
+A row under Console Logs that opens a new GitHub issue filled in with the app's version, iOS, the device and a Console Log
+_Said_: report a bug, file an issue
+_On screen_: Report an Issue
+_In code_: core/report-issue.js, issueUrl, reportIssue, reportLog
+_Avoid_: bug report, feedback

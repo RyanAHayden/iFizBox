@@ -1,0 +1,19 @@
+[
+  { "eval": "localStorage.setItem('ifizbox.firstVisit','later'); (async () => { const { runLogs } = await import('./queue.js'); runLogs.add({ title: 'Install Delta', code: 0, text: 'Signing Delta…\\nInstalled.' }); runLogs.add({ title: 'Install Foo', code: 100, text: Array.from({ length: 1500 }, (_, i) => `Unpacking foo (1.0-${i}) over (0.9) … step ${i}`).join('\\n') + '\\nE: Sub-process /usr/bin/dpkg returned an error code (1)' }); runLogs.add({ title: 'Upgrade Bar', code: 0, text: 'Setting up bar (2.0) ...' }); return 'seeded'; })()" },
+  { "nav": "#/settings", "ms": 4000 },
+  { "eval": "(() => { const r = document.querySelector('.page.is-top .report-issue'); r?.scrollIntoView({ block: 'center' }); return r ? r.textContent.trim() : 'none'; })()" },
+  { "wait": 500 },
+  { "shot": "settings-row" },
+  { "eval": "window.__opened = []; window.open = (u) => { window.__opened.push(u); return null; }; navigator.clipboard.writeText = (t) => { window.__copied = t; return Promise.resolve(); }; 'hooked'" },
+  { "tap": ".page.is-top .report-issue", "ms": 1500 },
+  { "eval": "(() => { const u = new URL(window.__opened[0]); return { len: window.__opened[0].length, path: u.pathname, title: u.searchParams.get('title'), head: u.searchParams.get('body').slice(0, 400), tail: u.searchParams.get('body').slice(-260), copied: (window.__copied || '').length }; })()" },
+  { "go": "#/settings/logs", "ms": 2000 },
+  { "eval": "(() => { const a = [...document.querySelectorAll('.page.is-top a[href*=\"settings/logs/\"]')].at(-1); location.hash = a.getAttribute('href').replace(/^.*#/, '#'); return a.textContent.trim(); })()" },
+  { "wait": 2500 },
+  { "eval": "(() => { const r = document.querySelector('.page.is-top .report-issue'); r?.scrollIntoView({ block: 'center' }); return r ? 'row' : 'none'; })()" },
+  { "wait": 500 },
+  { "shot": "log-page-row" },
+  { "eval": "window.__opened = []; window.__copied = ''; 'reset'" },
+  { "tap": ".page.is-top .report-issue", "ms": 1500 },
+  { "eval": "(() => { const u = new URL(window.__opened[0]); return { len: window.__opened[0].length, title: u.searchParams.get('title'), body: u.searchParams.get('body'), copied: (window.__copied || '').length }; })()" }
+]
