@@ -1,0 +1,73 @@
+11:56:51.154 run1 tap Confirm
+11:56:55.274 run1 first AFC line seen
+11:56:59.275 run1 launch Voice Memos
+11:56:59.475 run1 tap Record
+11:57:30.953 run1 tap Stop
+11:57:33.452 run1 launch iFizBox
+11:57:33.976 run1 done
+11:59:24.735 run2 tap Confirm
+11:59:28.816 run2 first AFC line seen
+11:59:32.817 run2 launch Camera (Video mode)
+11:59:35.394 run2 tap Record
+12:00:06.235 run2 tap Stop
+12:00:08.148 run2 launch iFizBox
+12:00:10.683 run2 done
+12:02:17.825 run3 tap Confirm
+12:02:22.415 run3 first AFC line seen
+12:02:26.416 run3 launch Camera (no capture)
+12:02:57.954 run3 launch iFizBox
+12:02:58.677 run3 done
+12:04:36.951 run4 tap Confirm
+12:04:41.049 run4 first AFC line seen
+12:04:45.051 run4 launch Camera, switch to Video
+12:04:50.291 run4 tap Record
+12:05:21.031 run4 tap Stop
+12:05:22.927 run4 launch iFizBox
+12:05:23.576 run4 done
+12:06:43.891 run5 tap Confirm
+12:06:48.484 run5 first AFC line seen
+12:06:52.485 run5 launch Camera, switch to Video
+12:06:55.557 run5 tap Record
+12:07:26.440 run5 tap Stop
+12:07:28.308 run5 launch iFizBox
+12:07:29.062 run5 done
+12:10:03.446 run6 tap Confirm
+12:10:07.525 run6 trigger line seen (AFC)
+12:10:11.526 run6 lock button
+12:10:26.819 run6 wake
+12:10:29.766 run6 launch Settings
+12:10:30.454 run6 tap VPN (off)
+12:10:33.236 run6 VPN switch: off (204, 204, 204)
+12:10:45.238 run6 tap VPN (on)
+12:10:49.360 run6 VPN switch: off (204, 204, 204)
+12:10:49.361 run6 tap VPN (on) again
+12:10:53.573 run6 VPN switch: off (204, 204, 204)
+12:10:55.575 run6 launch iFizBox
+12:10:55.916 run6 done
+12:12:39.317 run7 tap Confirm
+12:12:43.397 run7 trigger line seen (AFC)
+12:12:47.399 run7 launch Settings
+12:12:48.155 run7 tap VPN (off)
+12:12:51.935 run7 VPN switch: off (255, 255, 255)
+12:13:03.937 run7 tap VPN (on)
+12:13:08.081 run7 VPN switch: on (101, 196, 102)
+12:13:10.082 run7 launch iFizBox
+12:13:10.343 run7 done
+12:14:08.200 run8 tap Confirm
+12:14:29.878 run8 trigger line seen (AFC: 320\.0 MB)
+12:14:29.879 run8 launch Settings
+12:14:30.649 run8 tap VPN (off)
+12:14:34.431 run8 VPN switch: off (255, 255, 255)
+12:14:49.432 run8 tap VPN (on)
+12:14:53.585 run8 VPN switch: on (101, 196, 102)
+12:14:55.587 run8 launch iFizBox
+12:14:55.890 run8 done
+12:15:36.701 run9 tap Confirm
+12:15:59.397 run9 trigger line seen (AFC: 336\.0 MB)
+12:15:59.398 run9 launch Settings
+12:16:00.081 run9 tap VPN (off)
+12:16:03.798 run9 VPN switch: off (255, 255, 255)
+12:16:23.799 run9 tap VPN (on)
+12:16:27.923 run9 VPN switch: on (101, 196, 102)
+12:16:29.924 run9 launch iFizBox
+12:16:30.222 run9 done
