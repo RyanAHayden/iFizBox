@@ -22,6 +22,21 @@
   if (window.__conceptTouch) return;
   window.__conceptTouch = true;
 
+  // A real touch screen (the concept opened on a phone or tablet): the browser's own touches already are what the
+  // app wants, so the mouse-as-finger stays out of the way (it would take the tap's click for a mouse's and drop it).
+  // Only the pressed look is kept: :active was rewritten to .concept-active at build time.
+  var realTouch = (navigator.maxTouchPoints || 0) > 0 && window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+  if (realTouch) {
+    var held = [];
+    var clear = function () { held.forEach(function (n) { n.classList.remove("concept-active"); }); held = []; };
+    document.addEventListener("touchstart", function (e) {
+      clear();
+      for (var n = e.target; n && n.nodeType === 1; n = n.parentElement) { n.classList.add("concept-active"); held.push(n); }
+    }, { capture: true, passive: true });
+    ["touchend", "touchcancel", "scroll"].forEach(function (t) { document.addEventListener(t, clear, { capture: true, passive: true }); });
+    return;
+  }
+
   var SLOP = 10;            // px a press may move and still be a tap (and before a drag pans)
   var POINTER = 2;          // the finger's pointerId (the mouse is 1)
   var DECEL = 0.998;        // UIScrollView's normal deceleration, per ms
@@ -124,12 +139,17 @@
   }
 
   // ---- panning: which way the touch-action under the finger lets the browser pan, and what scrolls that way
+  // As a browser does: the touch-action of the element under the finger and its ancestors up to (and including)
+  // the scroller that would pan that way; a vertical page's pan-y doesn't stop a sideways strip inside it.
   function panAllowed(el, axis) {
+    var stop = scrollerFor(el, axis);
     for (var n = el; n && n.nodeType === 1; n = n.parentElement) {
       var ta = getComputedStyle(n).touchAction || "auto";
-      if (ta === "auto" || ta === "manipulation") continue;
-      if (ta === "none") return false;
-      if (axis === "x" ? !/pan-(x|left|right)/.test(ta) : !/pan-(y|up|down)/.test(ta)) return false;
+      if (ta !== "auto" && ta !== "manipulation") {
+        if (ta === "none") return false;
+        if (axis === "x" ? !/pan-(x|left|right)/.test(ta) : !/pan-(y|up|down)/.test(ta)) return false;
+      }
+      if (n === stop) break;
     }
     return true;
   }
