@@ -75,7 +75,7 @@ import { runOrder, sizeText, SELF_ID } from "./appqueue.js";
 import { VPN_WAIT } from "./installroute.js";
 import { NAME } from "../brand.js";
 import { isNewer } from "./selfupdate.js"; // B159: staleSelf
-import { rateText } from "./signing.js"; // B262
+import { rateText, busyText } from "./signing.js"; // B262; B312
 
 // B136: an install that failed must not leave the app recorded as installed (Installed's record decides the Search
 // row's swipe: a recorded, up-to-date app has none). recordWhen(row, onPhone) says when a row's app goes into that
@@ -282,6 +282,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
         if (isSelf(r)) log(r, "step", SELF_CLOSING); // B173: installd accepted it: the shell closes iFizBox now
       } else if (phase === "installing") log(r, "step", `iOS is installing ${label(r)}`);
       else if (phase === "vpn") log(r, "step", VPN_WAIT); // B110: Open LocalDevVPN: the row waits for it
+      else if (phase === "busy") log(r, "step", busyText(label(r))); // B312: iOS installs it for another app first
     }
     const settled = !r.here && phase === "copying"; // F359: its This iPhone route is settled: others may join it
     const here = r.here || phase === "copying";
@@ -602,6 +603,7 @@ export function rowStatus(row, opts = {}) {
     case "signed": return "Signed";
     case "asking":
       if (row.phase === "vpn") return VPN_WAIT;
+      if (row.phase === "busy") return busyText(label(row)); // B312
       return promptUp(row) ? "Tap Install on the iOS prompt" : "Installing"; // B137: This iPhone has no prompt
     case "installing":
       if (row.phase === "copying") return p > 0 && p < 100 ? `Copying to iPhone ${p}%` : "Copying to iPhone";
@@ -638,6 +640,7 @@ export function runStatus(rows) {
   const ios = withIos[0];
   if (ios && helperRow(ios)) return `${ios.mode === "remove" ? "Removing" : "Installing"} ${label(ios)} (${pos(ios)})`;
   if (ios?.phase === "vpn") return VPN_WAIT;
+  if (ios?.phase === "busy") return busyText(label(ios)); // B312
   if (ios?.phase === "copying") return `Copying ${label(ios)} to iPhone (${pos(ios)})`; // B111: This iPhone
   if (selfClosing(ios)) return `Installing ${label(ios)}: ${SELF_CLOSING}`;
   if (ios) return ios.state === "asking" && promptUp(ios) ? `Tap Install for ${label(ios)} (${pos(ios)})` : `Installing ${label(ios)} (${pos(ios)})`;

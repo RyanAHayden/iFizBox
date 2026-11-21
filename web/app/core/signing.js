@@ -427,6 +427,12 @@ export function phaseLabel(ev) {
 // B262: a download's speed, bytes a second -> "21.4 MB/s" (core/downloadmeter.js's lines, the row's and the labels')
 export const rateText = (rate) => `${(Math.max(0, Number(rate) || 0) / 1048576).toFixed(1)} MB/s`;
 
+// B312: iOS is already installing the same app for another app (SideDrop re-signing every app, say): the row while it
+// waits ({busy: true} from signing.progress), and the failure once that install sat still for a minute.
+export const busyText = (app) => `iOS is already installing ${app} for another app. Wait for it to finish.`;
+export const busyStuckText = (app) => `iOS is already installing ${app} for another app, and it hasn't moved for a minute. `
+  + `Wait for it to finish, then install ${app} again.`;
+
 // What a failed signing call leads to, by its error code (native/Sources/SignBridge.swift): an alert's
 // { title, message } and where it sends the user next ("signing": Settings > Signing's walkthrough; null: nowhere).
 export function deviceError(err, name = "") {
@@ -452,6 +458,12 @@ export function deviceError(err, name = "") {
     // The native text names the host and why; a Signing Server set by hand may be the cause, so say where it is.
     return { title: name ? `Couldn't Install ${name}` : "Couldn't Install", open: null,
       message: `${message} Check the connection, or the Signing Server in ${signingPage()}.` };
+  }
+  if (code === "install_busy" || code === "install_stalled") {
+    // B312: the shell's watch saw iOS's install sit still before iOS had the IPA (Sideload.swift watch stuckQuiet)
+    const app = name || "the app";
+    return { title: name ? `Couldn't Install ${name}` : "Couldn't Install", open: null,
+      message: code === "install_busy" ? busyStuckText(app) : `iOS didn't install ${app}: nothing moved for a minute. Try again.` };
   }
   // B104: an http link nothing asked about, and any other ATS refusal: our words, never iOS's raw sentence
   if (code === "insecure") return { title: INSECURE_IPA_ALERT.title, open: null, message: insecureText(name) };

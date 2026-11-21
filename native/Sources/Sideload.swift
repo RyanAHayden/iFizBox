@@ -788,6 +788,8 @@ enum Sideload {
     }
 
     // iOS's own install progress for an app, until it is done: at most 15 minutes, or 45 s with no progress seen.
+    // B312: {busy: true | false} while iOS is installing the same bundle ID for another app; fails "install_busy: …"
+    // (or "install_stalled: …") when the install iOS shows sits still for `stuckQuiet` before iOS has our IPA.
     // B29: meanwhile the install server's lines for it (InstallLog) go to the page's console as {log} events.
     static func progress(_ c: Bridge.Call) {
         guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: not in the jailbreak app") }
@@ -799,10 +801,26 @@ enum Sideload {
         watch(bid, ask: wait, tag: tag, onProgress: { c.emitOnMain([["phase": "installing", "progress": $0]]) },
               // B200: iOS has every byte: the page's queue counts the app as handed off and starts the next one
               onServed: { c.emitOnMain([["served": true]]) },
+              // B312: another install of this bundle ID is running (SideDrop re-signing it): the row says so
+              onBusy: { on in
+                  if on { InstallLog.say(bid, "iOS is already installing \(bid) for another app; waiting for it to finish") }
+                  c.emitOnMain([["busy": on]])
+              },
               lost: { seen, away in
             // B76: a false here after a handoff is iFizBox losing sight of iOS's install, not iOS refusing it
             // (B85: a prompt the user dismissed is neither)
             !InstallPrompt.dismissed(bid) && Handoff.lostSight(served: Handoff.wasServed(bid), away: away, seen: seen)
+        }, stuck: { busy in
+            // B312: iOS's install went quiet before iOS had our IPA: end the row with why, not a page left spinning
+            DispatchQueue.main.async {
+                let text = busy
+                    ? "install_busy: iOS is already installing \(bid) for another app, and it hasn't moved for \(Int(stuckQuiet)) seconds. Wait for it to finish, then install it again"
+                    : "install_stalled: iOS didn't install \(bid): its install hasn't moved for \(Int(stuckQuiet)) seconds"
+                DeviceLog.say("\(Brand.name) install \(bid): " + text)
+                c.emit([["log": text]])
+                InstallLog.detach(bid)
+                Apt.reply(c, nil, text)
+            }
         }) { installed, handedOff in
             DispatchQueue.main.async {
                 // B85: a dismissed prompt ends that app's watch, and the run moves on (dismissed: true). B91: it stays
@@ -949,19 +967,30 @@ enum Sideload {
     // isInstalled true all along. Only nil for `nilGrace` seconds in a row ends it (`nilGraceDone` once it reached 100%).
     static let nilGrace: TimeInterval = 6, nilGraceDone: TimeInterval = 1.5
 
+    // B312: how long the install iOS shows may sit still, before iOS has our whole IPA, before the watch ends with why.
+    static let stuckQuiet: TimeInterval = 60
+
     // nil: the private API isn't there, so it can't be told.
     // B76: `lost(seen, away)` is asked before a false is answered: true turns it into (nil, handedOff: true), as iFizBox
     // lost sight of the install (it went to the background during the watch: `away`), it didn't see iOS refuse it.
     // B200: `onServed` once, when iOS has fetched the whole IPA (Handoff.wasServed), while the watch goes on.
+    // B312: `onBusy(true)` when iOS already shows an install of this bundle ID before it has our IPA (another app, such
+    // as SideDrop re-signing every app, is installing it), `onBusy(false)` once that install ends and the watch starts
+    // over for ours. `stuck(busy)` ends the watch (instead of `finish`) when the install iOS shows hasn't moved for
+    // `stuckQuiet` seconds while iOS still hasn't fetched our IPA (after that the row is handed off anyway, B200).
     static func watch(_ bid: String, ask: TimeInterval = 45, tag: String? = nil, onProgress: @escaping (Double) -> Void,
                       onServed: (() -> Void)? = nil,
+                      onBusy: ((Bool) -> Void)? = nil,
                       lost: @escaping (_ seen: Bool, _ away: Bool) -> Bool = { _, _ in false },
+                      stuck: ((Bool) -> Void)? = nil,
                       done finish: @escaping (Bool?, Bool) -> Void) {
         guard Workspace.available else { return finish(nil, false) }
-        let start = Date()
+        var start = Date()
         var cancels: Int?
         var seen = false, last = -1
         var nilSince: Date?
+        var first = true, busy = false // B312
+        var moved = -1.0, movedAt = Date()
         // B76: iFizBox in the background at any time during the watch (iOS's home screen showing the install)
         var away = false
         var servedAt: Date?
@@ -986,11 +1015,30 @@ enum Sideload {
             if cancels != watchCancels { return done(nil) } // F196: signing.cancel
             if let t = tag, SignJob.wasCancelled(tag: t) { return done(nil) } // F235: signing.cancel {tag}
             if !servedTold, Handoff.wasServed(bid) { servedTold = true; onServed?() }
-            if let p = Workspace.installProgress(bid) {
+            let progress = Workspace.installProgress(bid)
+            if first {
+                first = false
+                // B312: nothing can have fetched our IPA yet (the prompt has only just opened), so a progress now is
+                // another install of the same bundle ID
+                if progress != nil && !Handoff.wasServed(bid) { busy = true; onBusy?(true) }
+            }
+            if busy && progress == nil {
+                // B312: the other install ended: watch for ours from here, with the whole `ask` again
+                busy = false; seen = false; last = -1; nilSince = nil; moved = -1; start = Date()
+                onBusy?(false)
+            } else if let p = progress {
                 seen = true
                 nilSince = nil
-                let pct = Int(p.fractionCompleted * 100)
-                if pct != last { last = pct; onProgress(p.fractionCompleted) }
+                let f = p.fractionCompleted
+                if f != moved { moved = f; movedAt = Date() }
+                else if !Handoff.wasServed(bid), Date().timeIntervalSince(movedAt) >= stuckQuiet {
+                    DeviceLog.say("\(Brand.name) B312 watch \(bid): stuck at \(Int(f * 100))%, busy \(busy)")
+                    guard let stuck = stuck else { return done(nil) }
+                    nc.removeObserver(bg)
+                    return stuck(busy)
+                }
+                let pct = Int(f * 100)
+                if !busy, pct != last { last = pct; onProgress(f) }
             } else if seen {
                 let since = nilSince ?? Date()
                 nilSince = since
