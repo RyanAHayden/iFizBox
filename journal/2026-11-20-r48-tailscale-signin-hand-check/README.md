@@ -79,7 +79,27 @@ What went wrong on my side:
 - My first watcher matched the first attempt's timeout text in the log. I saved that log, cleared `__log`
   (`clear.js`-style eval) and watched for a new `tailscale.test` or signIn end instead.
 
-## For the reopened run (the real login)
+## Third attempt: after the owner's login (2026-11-21, 13:36–13:38)
+
+The owner logged in on the 15 Pro by themselves (new node `ifizbox-on-iphone-5.beetal-ling.ts.net`, same
+address 100.109.186.91, key expiry 2027-05-20). No Web Inspector hook was on the page while they did it, so the
+moment right after their login wasn't recorded. What I checked afterwards, under the UI lock:
+
+| Check | Result | Alerts |
+|---|---|---|
+| Page as the owner left it (`shots/r48-f1`) | Install Apps With in its connected state: Device `ifizbox-on-iphone-5…`, Test Connection with no value, Sign Out; Pairing: Paired | none on screen |
+| Test Connection tapped by hand on the new node (`r48-f2`, `r48-f4`) | `tailscale.test` 1.67 s, `ok`, `verified`, peer `iphone-15-pro-1`, 11 ms | one, the hand test's own "Connected … in 11 ms" (expected for a tap) |
+| Stand-in Sign In on the new node (status faked signed-out, real `tailscale.signIn` from the kept new node; `r48-f6`, `r48-f9`) | signIn 0.29 s; the first `tailscale.test` started 15 ms later by itself, passed in 1.39 s (`ok`, 7 ms); Test Connection spun "Testing…" with the Pairing check beside it, then settled with no value | none |
+
+- The connected state after a real login holds, and no alert was left on screen. That suggests no Signed In
+  alert, but the owner could have tapped one away before I looked (see Not verified).
+- Timing on the new node: the first test passes on the first try, about 1.4 s after signIn returns (1.67 s by
+  hand). That is far inside the 30 s AFTER_SIGN_IN budget, and the 2.5 s gap never came into play. No change to
+  either number is called for: nothing measured comes near them.
+- Afterwards I put `call` back, stopped the inspector and released the lock. The 15 Pro stays signed in on
+  `ifizbox-on-iphone-5`, Connect With Tailscale, paired.
+
+## For a later run (the real login)
 
 1. `tools/ui-15.sh lock R48`, then `wake`, `launch`. Start `pymobiledevice3 webinspector cdp --port 9341` from
    `~/.local/share/ifizbox-rig/` in the background and keep its pid.
@@ -103,6 +123,14 @@ What went wrong on my side:
   Filed as a low-priority bug.
 
 ## Not verified
+
+- **After the third attempt (2026-11-21):** the seconds from the owner's own return from login.tailscale.com to
+  the first passing `tailscale.test` weren't recorded: they logged in before this run hooked the page, and
+  asking them to sign out and log in again for a stopwatch reading would cost their time for a number that the
+  stand-in already puts at ~1.4 s against a 30 s budget. Likewise, whether a Signed In alert flashed and was
+  tapped away during their login can't be told from the screen afterwards; the stand-in sign-in on the new node
+  showed none. A real `needs_approval` still hasn't happened (this tailnet doesn't ask for device approval).
+  Everything else in the brief is checked.
 
 - **Still not verified after the second attempt (2026-11-21):** the owner didn't log in during either 10-minute
   window, so everything below about a brand-new node is still open. The login page itself now has been seen.
