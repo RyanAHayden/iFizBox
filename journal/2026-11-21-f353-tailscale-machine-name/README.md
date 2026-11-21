@@ -12,8 +12,8 @@ Code and the table check are done. Tailscale's own naming on the 15 Pro is not c
        15 or older).
     2. The table's name for the model.
     3. The bare identifier.
-  - New `machineIdentifier`: utsname machine, or the model the Simulator stands in for
-    (`SIMULATOR_MODEL_IDENTIFIER`).
+  - New `machineIdentifier`: utsname machine. In the Simulator this is the Mac's (e.g. `arm64`). A Simulator
+    branch was taken out after the spec review, because the task didn't ask for it.
   - `TailscaleBridge.register` sets `Tailscale.deviceName` from these at launch. `hostname` stays
     `"<name> on <deviceName>"`, so the 15 Pro becomes "… on iPhone 15 Pro", which Tailscale turns into
     `ifizbox-on-iphone-15-pro`.
@@ -35,6 +35,12 @@ Code and the table check are done. Tailscale's own naming on the 15 Pro is not c
   native build compiles it.
 
 ## Not verified
+
+- The iPhone 18 line (autumn 2026) and any 17e are not in the table: their identifiers came out after what I know
+  and I could not check them here. They fall back to the identifier (e.g. `ifizbox-on-iphone19-1`) until they are
+  added.
+- The Python copy of the selection rules is tied to the Swift only by text checks, not by running the Swift (there
+  is no Swift toolchain on Linux).
 
 - On the 15 Pro, after Sign In, `tailscale status` listing `ifizbox-on-iphone-15-pro`. This needs:
   - a build with this change installed on the 15, and

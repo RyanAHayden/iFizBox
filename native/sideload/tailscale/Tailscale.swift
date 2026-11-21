@@ -60,12 +60,11 @@ enum Tailscale {
     static func machineName(deviceName: String, model: String, machine: String) -> String {
         if !deviceName.isEmpty && deviceName != model { return deviceName }
         if let name = modelNames[machine] { return name }
-        return machine.isEmpty ? (model.isEmpty ? "iPhone" : model) : machine
+        return machine
     }
 
-    /// utsname's machine (e.g. iPhone16,1); the Simulator reports the Mac's, so take the one it simulates.
+    /// utsname's machine, e.g. iPhone16,1.
     static var machineIdentifier: String {
-        if let sim = ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"] { return sim }
         var u = utsname(); uname(&u)
         return withUnsafeBytes(of: &u.machine) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
     }

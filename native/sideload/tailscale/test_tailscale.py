@@ -87,7 +87,7 @@ def machine_name(device_name, model, machine, table):
     """Tailscale.machineName, the same rules: the user's own name, else the model's, else the identifier."""
     if device_name and device_name != model:
         return device_name
-    return table.get(machine) or machine or model or "iPhone"
+    return table.get(machine) or machine
 
 
 def tailscale_label(hostname):
