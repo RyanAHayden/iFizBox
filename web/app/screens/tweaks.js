@@ -28,6 +28,7 @@ import { BUNDLE_ID } from "../brand.js"; // F302a
 import { INDEX_PATH, INDEX_URL, indexSource, indexQuery, entryInfo, paidEntry, paidHint, liteTweaks, worksInLine } from "../core/tweakindex.js"; // F344
 import { appNameOf } from "../core/tweaks.js"; // F344
 import { loadStyle } from "../nav/motion.js";
+import { filterRows } from "../core/changes.js"; // F352: Add Tweaks' search
 import { tweakListRow } from "./tweakrow.js"; // B267
 import { isCommercial, paymentEndpointUrl, parseEndpoint, createPaymentClient, createCredentialStore, isFreePrice,
   paidTweakDeb, PaidNeeded } from "../core/payment.js"; // F308
@@ -984,9 +985,147 @@ async function dropItem(bundleId, test, store) {
   return items;
 }
 
-// The app page's group, right under the header: Add Tweaks with a count, and a footer naming what goes in.
-export function addTweaksGroup({ bundleId, name = "", open = (o) => openAddTweaks(o), rows = sourceTweakRows, store = tweakStore, storage } = {}) {
+// One tweak's ADD / ADDED. ADD: added at once (a spinner while its .deb is read and checked), kept for the app if the
+// check passes; a paid tweak not bought offers Sign In / Buy, then ADD again (F308). ADDED: Remove. `cls` the button's
+// look (Add Tweaks' sheet: tw-add / on; the Add Tweaks page: the price button, added / adding). A button drawn again
+// while its tweak is still being added (a recycled list row) shows the spinner and waits for that add.
+const addingTweaks = new Set(); // `${bundleId}\n${package}` while ADD reads and checks its .deb
+const defaultPkg = async (r) => (await (await import("../catalog.js")).catalog.package(r.id, r.key))?.stanza;
+export function addTweakButton(r, { bundleId, on = false, cls = "tw-add", onCls = "on", busyCls = "", store = tweakStore, storage, fetchDeb,
+  paid = null, sheet = showActionSheet, alert = showAlert, pkg = defaultPkg, onChange = () => {}, onRemove = () => {} } = {}) {
+  const busyKey = `${bundleId}\n${r.id}`;
+  const btn = el("button", `${cls}${on ? ` ${onCls}` : ""}`, on ? "ADDED" : "ADD");
+  btn.type = "button";
+  btn.setAttribute("aria-label", `${on ? "Remove" : "Add"} ${r.name || r.id}`);
+  const busy = (yes) => {
+    btn.classList.toggle(onCls, yes);
+    if (busyCls) btn.classList.toggle(busyCls, yes);
+    if (yes) btn.dataset.busy = "1"; else delete btn.dataset.busy;
+    btn.replaceChildren(...(yes ? [el("span", "loading-spinner")] : []), globalThis.document.createTextNode(yes ? "ADDED" : "ADD"));
+  };
+  if (addingTweaks.has(busyKey)) busy(true);
+  btn.addEventListener("click", async (ev) => {
+    ev.preventDefault(); // in a package row's link: the row opens the tweak, the button adds it
+    ev.stopPropagation();
+    if (btn.dataset.busy) return;
+    if (btn.classList.contains(onCls)) { // added: Remove
+      const i = await sheet({ title: r.name || r.id, buttons: ["Remove"], destructive: 0 });
+      if (i !== 0) return;
+      await dropItem(bundleId, (x) => (r.file ? x.name === r.file : debOf(x.name)?.package === r.id), store); // r.file: from Files
+      onChange();
+      onRemove();
+      return;
+    }
+    // green at once, a spinner while the .deb is read and checked
+    busy(true);
+    addingTweaks.add(busyKey);
+    let again = false, paidSt = null, added = false;
+    try {
+      const st = await pkg(r);
+      if (!st) throw new Error("This tweak isn't on its source any more.");
+      paidSt = st;
+      const info = await tweakInfo(st, { fetchDeb, storage, paid });
+      if (!info.ok) throw new Error(info.why || "It can't go into an app.");
+      const data = await tweakDeb(st, { fetchDeb, paid });
+      await addDebTo(bundleId, st, data, { store });
+      added = true;
+    } catch (e) {
+      addingTweaks.delete(busyKey);
+      busy(false);
+      // F308: a paid tweak not bought (or signed out): Sign In or Buy, then ADD again
+      if (e instanceof PaidNeeded) again = await offerPaid(paidSt, e, { paid, sheet, alert });
+      else await alert({ title: "Can't Add This Tweak", message: String(e?.message ?? e), buttons: ["OK"] });
+    }
+    if (added) {
+      addingTweaks.delete(busyKey);
+      busy(false);
+      btn.classList.add(onCls);
+      btn.replaceChildren(globalThis.document.createTextNode("ADDED"));
+      btn.setAttribute("aria-label", `Remove ${r.name || r.id}`);
+      onChange();
+    }
+    if (again) btn.click();
+  });
+  return btn;
+}
+
+// The Add Tweaks page's list (F352): the tweaks as package rows under headers, filtered by `query` (name, id,
+// description, author), [{ header } | row]. Added first (the listed tweaks kept for the app, then the ones from Files:
+// { id: "file:<name>", file: <name> }), then Made for <app>, then Works in Any App, each without the added ones.
+export function addTweaksItems({ made = [], any = [], kept = [], query = "", appName = "" } = {}) {
+  const has = (r) => keptHas(kept, r.id);
+  const listed = [...made, ...any];
+  const files = kept.filter((x) => !listed.some((r) => debOf(x.name)?.package === r.id))
+    .map((x) => ({ id: `file:${x.name}`, file: x.name, name: tweakTitle(x), version: "", short: tweakKind(x.name), section: "Tweaks" }));
+  const pick = (rows) => filterRows(rows.map((r) => ({ ...r, short: r.short || "" })), { query });
+  const added = [...pick(listed.filter(has)), ...pick(files)].map((r) => ({ ...r, added: true }));
+  const out = [];
+  const put = (header, rows) => { if (rows.length) out.push({ header }, ...rows); };
+  put("Added", added);
+  put(`Made for ${appName || "This App"}`, pick(made.filter((r) => !has(r))));
+  put("Works in Any App", pick(any.filter((r) => !has(r))));
+  return out;
+}
+
+// The Add Tweaks page's last group (F352): More Tweaks: Browse Tweak Sources, Search All Repos, From Files, one footer.
+export function moreTweaksGroup({ bundleId, name = "", store = tweakStore, storage, alert = showAlert, onChange = () => {},
+  browse = pickSourceTweak, searchAll = openSearchAllRepos } = {}) {
   style();
+  const input = Object.assign(el("input", "visually-hidden"), { type: "file", accept: TWEAK_ACCEPT, multiple: true });
+  input.id = "tw" + Math.random().toString(36).slice(2);
+  input.addEventListener("change", async () => {
+    const picked = [...(input.files ?? [])];
+    input.value = "";
+    for (const f of picked) {
+      const one = { name: f.name, data: new Uint8Array(await f.arrayBuffer()) };
+      try { prepareTweaks([one]); } catch (e) {
+        if (!/CydiaSubstrate/.test(String(e?.message))) { await alert({ title: "Can't Add This Tweak", message: String(e?.message ?? e), buttons: ["OK"] }); continue; }
+      }
+      await keepItem(bundleId, one, store);
+    }
+    if (picked.length) onChange();
+  });
+  const cell = (label, onClick, detail = "") => {
+    const li = el("li", "cell tw-row");
+    const b = el("button", "cell-inner chevron");
+    b.type = "button";
+    b.addEventListener("click", onClick);
+    const t = el("span", "cell-text");
+    t.append(el("span", "cell-label", label));
+    b.append(t);
+    if (detail) b.append(el("span", "cell-detail", detail));
+    li.append(b);
+    return li;
+  };
+  const g = el("div", "group tw-more");
+  const ul = el("ul", "table grouped");
+  const filesLi = el("li", "cell tw-row");
+  const files = Object.assign(el("label", "cell-inner chevron ss-tweak-add"), { htmlFor: input.id });
+  files.append(el("span", "cell-label", "From Files…"));
+  filesLi.append(files, input);
+  const searchLi = cell("Search All Repos", () => searchAll({ appName: name, ctx: null }), "Canister");
+  searchLi.classList.add("tw-search-all");
+  ul.append(cell("Browse Tweak Sources", () => browse({ bundleId, storage, alert,
+    onPick: async (one) => { await keepItem(bundleId, one, store); onChange(); } })), searchLi, filesLi);
+  g.append(el("h2", "group-header", "More Tweaks"), ul,
+    el("p", "group-footer", `Only tweaks that work in ${name || "this app"} without a jailbreak are listed.`));
+  return g;
+}
+
+// The Add Tweaks page's route under the page shown now (browse.js renderAddTweaks): "addtweaks:<bundle id>".
+export const addTweaksToken = (bundleId) => `addtweaks:${bundleId}`;
+const appNames = new Map(); // bundle ID -> the app's name, from its page's Add Tweaks row (for the page's headers)
+export const addTweaksAppName = (bundleId) => appNames.get(bundleId) ?? "";
+export function pushAddTweaks(bundleId, loc = globalThis.location) {
+  const h = String(loc.hash ?? "").replace(/\/$/, "");
+  loc.hash = `${h}/${encodeURIComponent(addTweaksToken(bundleId))}`;
+}
+
+// The app page's group, right under the header: Add Tweaks with a count; it opens the Add Tweaks page (F352), or
+// `open` (My IPAs: the pushed sheet).
+export function addTweaksGroup({ bundleId, name = "", open = null, rows = sourceTweakRows, store = tweakStore, storage, push = pushAddTweaks } = {}) {
+  style();
+  if (bundleId && name) appNames.set(bundleId, name);
   const g = el("div", "group tw-app");
   const ul = el("ul", "table grouped");
   const li = el("li", "cell tw-row");
@@ -1004,12 +1143,22 @@ export function addTweaksGroup({ bundleId, name = "", open = (o) => openAddTweak
   async function refresh() {
     const [kept, made] = await Promise.all([savedTweaks(bundleId, { store }), madeForRows(bundleId, { rows, storage })]);
     detail.textContent = kept.length ? `${kept.length} Added` : made.length ? `${made.length} for This App` : "";
-    foot.textContent = kept.length ? `Goes in when it's signed: ${kept.map(tweakTitle).join(", ")}.`
-      : made.length ? `From your sources: ${made.map((r) => r.name || r.id).join(", ")}.`
+    // F352: no footer naming the tweaks; the row's detail says how many
+    foot.textContent = kept.length ? "They go in the next time it's signed." : made.length ? ""
       : "Tweaks from your Tweak Sources or Files go into the app when it's signed.";
+    foot.hidden = !foot.textContent;
     return { kept, made };
   }
-  b.addEventListener("click", async () => { await open({ bundleId, name, rows, store, storage }); refresh(); });
+  b.addEventListener("click", async () => {
+    if (!open) { push(bundleId); return; }
+    await open({ bundleId, name, rows, store, storage });
+    refresh();
+  });
+  // back from the Add Tweaks page: the count again (the page above may have added or removed some)
+  globalThis.addEventListener?.("hashchange", function again() {
+    if (!g.isConnected) { globalThis.removeEventListener?.("hashchange", again); return; }
+    refresh().catch(() => null);
+  });
   const ready = refresh().catch(() => null);
   return { el: g, ready, refresh };
 }
@@ -1098,46 +1247,8 @@ export function openAddTweaks({ bundleId, name = "", rows = sourceTweakRows, sto
       if (picked.length) { onChange(); draw(); }
     });
 
-    function addButton(r, on) {
-      const btn = el("button", `tw-add${on ? " on" : ""}`, on ? "ADDED" : "ADD");
-      btn.type = "button";
-      btn.addEventListener("click", async (ev) => {
-        ev.stopPropagation();
-        if (btn.dataset.busy) return;
-        if (btn.classList.contains("on")) { // added: Remove
-          const i = await sheet({ title: r.name || r.id, buttons: ["Remove"], destructive: 0 });
-          if (i !== 0) return;
-          await dropItem(bundleId, (x) => debOf(x.name)?.package === r.id, store);
-          onChange();
-          draw();
-          return;
-        }
-        // green at once, a spinner while the .deb is read and checked
-        btn.classList.add("on");
-        btn.dataset.busy = "1";
-        btn.replaceChildren(el("span", "loading-spinner"), document.createTextNode("ADDED"));
-        let again = false, paidSt = null;
-        try {
-          const st = await pkg(r);
-          if (!st) throw new Error("This tweak isn't on its source any more.");
-          paidSt = st;
-          const info = await tweakInfo(st, { fetchDeb, storage, paid });
-          if (!info.ok) throw new Error(info.why || "It can't go into an app.");
-          const data = await tweakDeb(st, { fetchDeb, paid });
-          await addDebTo(bundleId, st, data, { store });
-          btn.replaceChildren(document.createTextNode("ADDED"));
-          onChange();
-        } catch (e) {
-          btn.classList.remove("on");
-          btn.replaceChildren(document.createTextNode("ADD"));
-          // F308: a paid tweak not bought (or signed out): Sign In or Buy, then ADD again
-          if (e instanceof PaidNeeded) again = await offerPaid(paidSt, e, { paid, sheet, alert });
-          else await alert({ title: "Can't Add This Tweak", message: String(e?.message ?? e), buttons: ["OK"] });
-        } finally { delete btn.dataset.busy; }
-        if (again) btn.click();
-      });
-      return btn;
-    }
+    const addButton = (r, on) => addTweakButton(r, { bundleId, on, store, storage, fetchDeb, paid, sheet, alert, pkg, onChange,
+      onRemove: () => draw() });
     const cell = (label, subtitle, right = null, onClick = null) => {
       const li = el("li", "cell tw-row");
       const b = el(onClick ? "button" : "div", `cell-inner${onClick ? " chevron" : ""}`);
