@@ -113,9 +113,11 @@ class MachineName(unittest.TestCase):
         self.assertEqual(t["iPhone10,6"], "iPhone X")
         self.assertEqual(t["iPhone17,1"], "iPhone 16 Pro")
         self.assertEqual(t["iPhone14,6"], "iPhone SE 3")
+        self.assertEqual(t["iPhone18,5"], "iPhone 17e")
+        self.assertEqual(t["iPhone19,2"], "iPhone 18 Pro")
         # every iPhone that runs iOS 15 or later, so none falls back to its identifier
         for k in ["iPhone8,1", "iPhone8,4", "iPhone11,8", "iPhone12,8", "iPhone13,1", "iPhone15,4", "iPhone17,5",
-                  "iPhone18,1"]:
+                  "iPhone18,1", "iPhone18,5", "iPhone19,2"]:
             self.assertIn(k, t)
 
     def test_rules(self):
@@ -126,6 +128,8 @@ class MachineName(unittest.TestCase):
         self.assertEqual(machine_name("iPad", "iPad", "iPad13,1", t), "iPad13,1")
         self.assertTrue(tailscale_label("X on " + machine_name("iPhone", "iPhone", "iPhone16,1", t))
                         .endswith("-on-iphone-15-pro"))
+        self.assertTrue(tailscale_label("X on " + machine_name("iPhone", "iPhone", "iPhone19,2", t))
+                        .endswith("-on-iphone-18-pro"))
 
     def test_swift_uses_it(self):
         s = read("Tailscale.swift")

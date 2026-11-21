@@ -52,7 +52,9 @@ enum Tailscale {
         "iPhone17,3": "iPhone 16", "iPhone17,4": "iPhone 16 Plus", "iPhone17,1": "iPhone 16 Pro",
         "iPhone17,2": "iPhone 16 Pro Max", "iPhone17,5": "iPhone 16e",
         "iPhone18,3": "iPhone 17", "iPhone18,4": "iPhone Air", "iPhone18,1": "iPhone 17 Pro",
-        "iPhone18,2": "iPhone 17 Pro Max",
+        "iPhone18,2": "iPhone 17 Pro Max", "iPhone18,5": "iPhone 17e",
+        // iPhone19,2 read from the user's iPhone 18 Pro (ProductType); the line's other identifiers are not known yet
+        "iPhone19,2": "iPhone 18 Pro",
     ]
 
     /// The name the node signs in with: the user's own device name when iOS hands it over (entitled, or before iOS 16:
