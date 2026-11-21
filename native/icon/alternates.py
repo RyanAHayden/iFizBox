@@ -36,6 +36,10 @@ PRIMARY = ("classic", "gunmetal")  # the defaults (core/settings.js lightTheme, 
 CLEAR = "clear"
 SIZES = {20: (2, 3), 29: (2, 3), 40: (2, 3), 60: (2, 3)}  # carfile.ICON_SIZES; the primary has them all
 ALT_SIZES = ((60, 2), (60, 3))  # alternates: the Home Screen's; iOS scales those down for Settings and notifications
+# F324: the Glass icon, an Icon Composer document (icon/glass.py) and no PNG set: iOS 26+ draws it in Liquid Glass,
+# older iOS actool's flat render of it. Not in sets() (those are PNG sets); Info.plist lists it after them.
+GLASS = "glass"
+GLASS_SET = "Icon-glass"
 
 
 def themes():
@@ -168,7 +172,7 @@ def own_stem(slot, pt=60):
 
 def plist_block(indent="\t\t"):
     lines = [indent + BEGIN, indent + "<key>CFBundleAlternateIcons</key><dict>"]
-    for name in sets():
+    for name in list(sets()) + [GLASS_SET]:
         lines.append(indent + "\t<key>%s</key><dict><key>CFBundleIconName</key><string>%s</string></dict>" % (name, name))
     for slot in OWN_SLOTS:
         stems = "".join("<string>%s</string>" % own_stem(slot, pt) for pt in OWN_SIZES)
@@ -195,6 +199,8 @@ def thumbs(dest, lite):
     os.makedirs(dest, exist_ok=True)
     for i in icons():
         shutil.copyfile(src(i, 60, 3, lite), os.path.join(dest, i + ".png"))
+    # F324: the Glass icon's flat picture (icon/glass.py thumb), no sash in either build
+    shutil.copyfile(os.path.join(ICON, "glass", "AppIcon60x60@3x.png"), os.path.join(dest, GLASS + ".png"))
 
 
 def sources():
