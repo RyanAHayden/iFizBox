@@ -467,6 +467,34 @@ test("This iPhone: a dropped connection is not a failed install (B246)") {
     check(fr.summary == "5.0 MB/s in front", "front only: \(fr.summary)")
 }
 
+test("Copy speed counts stalls as waiting (B293)") {
+    let mb = 1 << 20
+    // R53 run 8: 0.1 s chunks, then one chunk lands 15 s later with the VPN back on
+    var v = HereRecheck.CopySpeed()
+    for _ in 0..<10 { v.add(mb, 0.1, front: true) }
+    for _ in 0..<5 { v.add(mb, 0.1, front: false) }
+    v.add(mb, 15, front: false)
+    check(v.stallAfter == 1, "stall limit at the 1 s floor: \(String(describing: v.stallAfter))")
+    check(v.summary == "10.0 MB/s in front, 10.0 MB/s in the background, 15 s waiting for the connection", "VPN off: \(v.summary)")
+    // R53 run 2: stalled as the app went to the background, 40 s until the first chunk after the reconnect
+    var s = HereRecheck.CopySpeed()
+    for _ in 0..<20 { s.add(mb, 0.5, front: true) }
+    s.add(mb, 40, front: false)
+    for _ in 0..<9 { s.add(mb, 0.5, front: false) }
+    check(abs(s.waitSecs - 39.5) < 0.001, "all but a normal chunk's 0.5 s waits: \(s.waitSecs)")
+    check(s.summary == "2.0 MB/s in front, 2.0 MB/s in the background, 40 s waiting for the connection", "stall: \(s.summary)")
+    // a slow route's own pace is not a stall
+    var slow = HereRecheck.CopySpeed()
+    for g in [2.0, 3.0, 2.5, 2.0, 3.5, 2.5] { slow.add(mb, g, front: true) }
+    check(slow.waitSecs == 0, "slow but steady: no waiting (\(slow.waitSecs))")
+    // before the pace is known, a gap counts whole
+    var early = HereRecheck.CopySpeed()
+    early.add(mb, 5, front: true)
+    check(early.waitSecs == 0 && early.summary == "0.2 MB/s in front", "no pace yet: \(early.summary)")
+    // a stall doesn't raise the pace it is measured against
+    check(s.stallAfter == 2, "stall limit after the stall: \(String(describing: s.stallAfter))")
+}
+
 test("Download progress once a second (B262)") {
     let mb = Int64(1 << 20)
     let t0 = Date(timeIntervalSince1970: 1_000_000)
