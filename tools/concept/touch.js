@@ -22,6 +22,21 @@
   if (window.__conceptTouch) return;
   window.__conceptTouch = true;
 
+  // A real touch screen (the concept opened on a phone or tablet): the browser's own touches already are what the
+  // app wants, so the mouse-as-finger stays out of the way (it would take the tap's click for a mouse's and drop it).
+  // Only the pressed look is kept: :active was rewritten to .concept-active at build time.
+  var realTouch = (navigator.maxTouchPoints || 0) > 0 && window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+  if (realTouch) {
+    var held = [];
+    var clear = function () { held.forEach(function (n) { n.classList.remove("concept-active"); }); held = []; };
+    document.addEventListener("touchstart", function (e) {
+      clear();
+      for (var n = e.target; n && n.nodeType === 1; n = n.parentElement) { n.classList.add("concept-active"); held.push(n); }
+    }, { capture: true, passive: true });
+    ["touchend", "touchcancel", "scroll"].forEach(function (t) { document.addEventListener(t, clear, { capture: true, passive: true }); });
+    return;
+  }
+
   var SLOP = 10;            // px a press may move and still be a tap (and before a drag pans)
   var POINTER = 2;          // the finger's pointerId (the mouse is 1)
   var DECEL = 0.998;        // UIScrollView's normal deceleration, per ms
