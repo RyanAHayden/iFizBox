@@ -35,10 +35,17 @@ Headless Chromium, the sideload app's fake shell (`capture.mjs`, from the B164 j
 - `find-all.png`: Find More (ADD).
 - `more-all.png`: More Sources > App Sources (ADD).
 
-## Not verified
+- `states-all.png` (`states.json`, iOS 7 White / OLED, iOS 13 light / dark, after the spec review asked for them):
+  top band SIGN held (a `press` step: CDP mouse down, shot, then move away and release so no click fires), middle
+  band the confirm INSTALL held (darker; the page also dims there, from the long hold, not the button), bottom band
+  Find More's ADDED and the spinner (`.adding`, set by an eval as findmore.js setButton does).
 
-- ADDED and Find More's spinner (`.adding`) weren't in the shots: no source was added in the fake profile. Their
-  rules are unchanged in look from B272 apart from the selector; the test covers that they exist.
-- The pressed states (`:active`, `.go:active`) weren't shot: the capture script has no held-press step.
+Review notes kept on purpose: `.go:active` has its own rule because without it a held confirm INSTALL in iOS 13
+would fall to the base held rule (the grey pill); `:not(.adding)` keeps Find More's spinner tinted. The test reads
+state classes from `paintPrice` / `setButton` and look variants from every other sheet; a future button built on
+`.price-btn` gets the base era rule automatically, and any variant another sheet styles fails the test until the
+eras style it too.
+
+## Not verified
 - Real devices (iPhone 15 Pro, iPhone 7): not run; the change is CSS only and the Chromium shots cover the four
   era/tone pairs. WebKit-specific risk is low (rgba tokens, inset box-shadow, no new syntax).

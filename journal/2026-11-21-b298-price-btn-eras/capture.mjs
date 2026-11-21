@@ -208,6 +208,16 @@ for (const s of steps) {
   if (s.nav !== undefined) { await send("Page.navigate", { url: base + "?r=" + (++id) + s.nav }); await sleep(s.ms ?? 4000); }
   else if (s.go !== undefined) { await ev(`location.hash = ${JSON.stringify(s.go)}`); await sleep(s.ms ?? 1500); }
   else if (s.wait) await sleep(s.wait);
+  else if (s.press) { // B298: hold the mouse down on an element (its :active look) for a shot, then let go
+    const c = await ev(`(()=>{const e=document.querySelectorAll(${JSON.stringify(s.press)})[${s.nth ?? 0}]; if(!e) return null; const b=e.getBoundingClientRect(); return [b.left+b.width/2, b.top+b.height/2]})()`);
+    if (!c) { console.log("press: none", s.press); continue; }
+    await send("Input.dispatchMouseEvent", { type: "mousePressed", x: c[0], y: c[1], button: "left", clickCount: 1 });
+    await sleep(300);
+    const r = await send("Page.captureScreenshot", { format: "png" }); await writeFile(join(outdir, s.shot + ".png"), Buffer.from(r.result.data, "base64")); console.log("shot", s.shot);
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 1, y: 1, button: "left" });
+    await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: 1, y: 1, button: "left", clickCount: 1 });
+    await sleep(300);
+  }
   else if (s.eval) { // B298: ERA / TONE in an eval are the env's (ERA=ios7 TONE=dark), as JS strings
     const js = s.eval.replaceAll("ERA", JSON.stringify(process.env.ERA || "ios6")).replaceAll("TONE", JSON.stringify(process.env.TONE || "light"));
     console.log("eval:", String(JSON.stringify(await ev(js))).slice(0, 3000));
