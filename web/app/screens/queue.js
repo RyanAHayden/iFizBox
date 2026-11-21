@@ -48,6 +48,11 @@ import { runQueue, markNeededBy } from "./queuerun.js";
 import { createQueueHint } from "../nav/queuehint.js";
 import { showSheet } from "../nav/sheet.js";
 import { nativeBridge } from "../native.js";
+import { issueUrl, reportLog } from "../core/report-issue.js"; // F362
+import { copyText } from "../nav/menu.js";
+import { detectMode } from "../core/settings.js";
+import { currentDevice } from "../device.js";
+import { buildInfo } from "./version-foot.js";
 
 let ctxRef = null;
 let confirm = null;   // the open Confirm sheet: { refresh(), close() }
@@ -1023,7 +1028,43 @@ export function logsSection(mode, { logs = runLogs } = {}) {
   const list = logs.list();
   return grouped([{ header: "Console", rows: [{ label: "Console Logs", detail: list.length ? String(list.length) : "None", href: format(settingsRoute([LOGS])), icon: rowIcon("logs") }],
     footer: mode === "jailbreak" ? "The output of every install, upgrade and removal, kept on this iPhone."
-      : "The output of every app signed, installed and re-signed, kept on this iPhone." }]);
+      : "The output of every app signed, installed and re-signed, kept on this iPhone." },
+  reportGroup(null, { logs, footer: "Opens a new issue on GitHub with this iPhone's details and the newest failed log." })]);
+}
+
+// ---- F362: Report an Issue ---------------------------------------------------------------------------------
+// The app's version and build, iOS and the model, asked once when a row draws, so a tap opens GitHub at once (the
+// website's clipboard and window.open both want the tap itself, not a later await). On the website the version is
+// build.json's and the model is unknown to the page, so the browser's user agent stands in for it.
+let reportInfo = null, reportReady = null;
+function reportInfoNow(native = nativeBridge()) {
+  reportInfo ??= (async () => {
+    const mode = detectMode();
+    if (native?.call) {
+      const i = (await native.call("app.info", {}).catch(() => null)) ?? {};
+      return { mode, version: i.version, build: i.build, ios: i.ios, machine: i.machine };
+    }
+    const b = await buildInfo();
+    return { mode, version: b?.version, build: b?.build, ios: currentDevice().ios, machine: globalThis.navigator?.userAgent };
+  })().then((i) => (reportReady = i));
+  return reportInfo;
+}
+
+// Opens the new issue in Safari (app.js and the shell send window.open there); a log too long for the URL goes on
+// the clipboard whole, and the issue's body asks for it to be pasted.
+export async function reportIssue(id = null, { logs = runLogs, open = (u) => window.open(u, "_blank", "noopener"), copy = copyText } = {}) {
+  const info = reportReady ?? await reportInfoNow();
+  const pick = reportLog(logs.list(), id); // list() leaves the text out: get() has it
+  const { url, trimmed, full } = issueUrl(info, pick && (logs.get(pick.id) ?? pick));
+  if (trimmed) copy(full)?.catch?.(() => {});
+  open(url);
+  return { url, trimmed };
+}
+
+function reportGroup(id, { logs = runLogs, footer } = {}) {
+  reportInfoNow();
+  return { rows: [{ label: "Report an Issue", cls: "report-issue", icon: rowIcon("help"), chevron: true,
+    onClick: () => { reportIssue(id, { logs }); } }], footer };
 }
 
 const when = (t) => new Date(t).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -1048,6 +1089,7 @@ export function logsPage(id, redraw = () => {}, { logs = runLogs, later = setTim
     const g = el("div", "group");
     g.append(el("pre", "table grouped console-log", e.text || (e.state === "running" ? "(waiting for output)" : "(no output)")));
     frag.append(g);
+    frag.append(grouped([reportGroup(e.id, { logs, footer: "Opens a new issue on GitHub with this log and this iPhone's details." })]));
     followRunning(frag, e.state === "running", redraw, later);
     return frag;
   }

@@ -40,3 +40,10 @@ _Said_: install log, run log
 _On screen_: Console Logs, Console Log; Running…, Completed, Failed, Cancelled, Stopped
 _In code_: runLogs, createRunLog, start(), runStatusText, loggedBridge
 _Avoid_: history, transcript
+
+**Report an Issue**:
+A row under Console Logs that opens a new GitHub issue filled in with the app's version, iOS, the device and a Console Log
+_Said_: report a bug, file an issue
+_On screen_: Report an Issue
+_In code_: core/report-issue.js, issueUrl, reportIssue, reportLog
+_Avoid_: bug report, feedback
