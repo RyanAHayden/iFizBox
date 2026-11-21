@@ -11,6 +11,7 @@
 
 import { liveText } from "./pagestate.js";
 import { slideChange } from "./slide.js";
+import { nativeBridge, hasNativeCall } from "../native.js";
 
 export function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -156,9 +157,159 @@ export function segments(values, labels, current, onPick) {
   select(current);
   seg.append(...buttons);
   seg.buttons = buttons;
-  seg.select = select;
-  seg.show = (shown) => buttons.forEach((b, i) => { b.hidden = !shown.includes(values[i]); });
+  seg.select = (v) => { select(v); scheduleSegmentsSync(); };
+  seg.show = (shown) => { buttons.forEach((b, i) => { b.hidden = !shown.includes(values[i]); }); scheduleSegmentsSync(); };
+  nativeSegments(seg, (i) => {
+    const b = buttons[i];
+    if (b && !b.classList.contains("selected")) { select(values[i]); onPick(values[i]); }
+  });
   return seg;
+}
+
+// F345d: in the app under the native controls hook (<html data-controls="native">), a scope bar pinned under the
+// search bar (nav/searchbar.js pinned: inside .search-root, not in its .search-results scroller) is drawn by the
+// shell as a real UISegmentedControl laid over this element's rect (bridge call ui.segments,
+// native/Sources/NativeSegments.swift). The CSS bar stays in the page underneath, see-through while the native one
+// shows, and is what shows whenever the native one can't: while a push or a sheet moves, while one of the page's own
+// sheets, alerts or pages covers the bar, and on a shell without ui.segments (it stays the CSS bar from then on).
+// A scope bar inside a scroller, the site and every other style keep the CSS bar. One watcher (scroll-free page
+// changes, resizes, the keyboard) keeps every native bar's place, items and selection in step, once per frame.
+let segmentKeys = 0;
+const openSegments = new Set(); // bars the shell has open, to close the ones that left the page
+let segmentsWatch = null;
+let segmentsQueued = false;
+
+function nativeSegments(seg, pick) {
+  if (!hasNativeCall()) return;
+  seg.dataset.nativeSegments = "";
+  seg.nativeBar = { key: `scope-${++segmentKeys}`, pick, open: false, ready: false, failed: false, sent: null };
+  watchSegments();
+  scheduleSegmentsSync();
+}
+
+const POPUP = '[aria-modal="true"], [role="dialog"], [role="alertdialog"]'; // nav/popups.js POPUPS, inline (startup modules)
+
+// What the native bar should show now, or null when it should be closed: { items, selected, rect, hidden }.
+export function segmentsSnapshot(seg, doc = globalThis.document, win = globalThis) {
+  if (doc?.documentElement?.getAttribute?.("data-controls") !== "native") return null;
+  if (!seg.isConnected || !seg.closest?.(".search-root") || seg.closest(".search-results")) return null;
+  const shown = seg.buttons.map((b, i) => [b, i]).filter(([b]) => !b.hidden);
+  const items = shown.map(([b]) => b.textContent);
+  const selected = shown.findIndex(([b]) => b.classList.contains("selected"));
+  const r = seg.getBoundingClientRect();
+  const vv = win.visualViewport;
+  const round = (n) => Math.round(n * 2) / 2;
+  const rect = { x: round(r.left - (vv?.offsetLeft ?? 0)), y: round(r.top - (vv?.offsetTop ?? 0)), width: round(r.width), height: round(r.height) };
+  const hidden = !items.length || r.width <= 0 || r.height <= 0 || popupUp(doc) || moving(seg, doc) || covered(seg, r, doc);
+  return { items, selected, rect, hidden };
+}
+
+function popupUp(doc) {
+  return [...(doc.querySelectorAll?.(POPUP) ?? [])].some((el) => !el.getClientRects || el.getClientRects().length > 0);
+}
+
+// A push, pop or sheet in flight (nav/transition.js and sheet.js run Web Animations on transform; the edge swipe sets
+// an inline transform on the page each frame): the native bar can't follow it, so the CSS bar shows meanwhile.
+const sliding = (a) => a.playState === "running" && a.effect?.getTiming?.().iterations !== Infinity &&
+  (a.effect?.getKeyframes?.() ?? []).some((k) => k.transform != null);
+function moving(seg, doc) {
+  for (let p = seg; p && p !== doc.body; p = p.parentElement) if (p.style?.transform) return true;
+  const anims = (doc.getAnimations?.() ?? []).filter(sliding);
+  if (anims.length) Promise.allSettled(anims.map((a) => a.finished)).then(scheduleSegmentsSync);
+  return anims.length > 0;
+}
+
+// Something of the page's own over the bar (a pushed page, a sheet): the bar's middle and both ends hit-test elsewhere.
+function covered(seg, r, doc) {
+  if (!doc.elementFromPoint) return false;
+  const y = r.top + r.height / 2;
+  return [r.left + 6, r.left + r.width / 2, r.right - 6].some((x) => {
+    const hit = doc.elementFromPoint(x, y);
+    return !hit || !seg.contains(hit);
+  });
+}
+
+// Brings every native bar in step with its element: opens, updates, hides and closes. Exported for the tests.
+export function syncSegments(doc = globalThis.document, native = nativeBridge(), win = globalThis) {
+  if (!hasNativeCall(native)) return;
+  const live = new Set(doc?.querySelectorAll?.("[data-native-segments]") ?? []);
+  for (const seg of [...openSegments]) if (!live.has(seg)) closeSegments(seg, native);
+  for (const seg of live) {
+    const st = seg.nativeBar;
+    if (!st || st.failed) continue;
+    const snap = segmentsSnapshot(seg, doc, win);
+    if (!snap) { if (st.open) closeSegments(seg, native); continue; }
+    const key = JSON.stringify(snap);
+    if (key === st.sent) continue;
+    const wasShown = st.sent && !JSON.parse(st.sent).hidden;
+    st.sent = key;
+    if (snap.hidden || !wasShown) seethrough(seg, false); // the CSS bar shows at once; the native one on its answer
+    if (!st.open) {
+      st.open = true;
+      st.ready = false;
+      openSegments.add(seg);
+      native.call("ui.segments", { op: "open", key: st.key, ...snap }, (e) => {
+        if (e?.ready) { st.ready = true; seethrough(seg, st.sent && !JSON.parse(st.sent).hidden); }
+        else if (Number.isInteger(e?.pick) && st.sent) {
+          const shown = seg.buttons.map((b, i) => [b, i]).filter(([b]) => !b.hidden);
+          if (shown[e.pick]) st.pick(shown[e.pick][1]);
+        }
+      }).then(() => { /* closed */ }, () => {
+        // An older shell ("unknown method ui.segments") or no window: the CSS bar from now on.
+        st.failed = true;
+        st.open = false;
+        openSegments.delete(seg);
+        seethrough(seg, false);
+      });
+    } else {
+      native.call("ui.segments", { op: "update", key: st.key, ...snap }).then(() => {
+        if (st.sent === key && st.ready) seethrough(seg, !snap.hidden);
+      }, () => {});
+    }
+  }
+}
+
+function closeSegments(seg, native) {
+  const st = seg.nativeBar;
+  openSegments.delete(seg);
+  seethrough(seg, false);
+  if (!st?.open) return;
+  st.open = false;
+  st.ready = false;
+  st.sent = null;
+  native.call("ui.segments", { op: "close", key: st.key }).catch(() => {});
+}
+
+// The CSS bar under a native one that shows is see-through (it keeps its box, so its rect stays the native bar's).
+function seethrough(seg, on) {
+  if (seg.style) seg.style.opacity = on ? "0" : "";
+}
+
+export function scheduleSegmentsSync() {
+  if (segmentsQueued || !openSegments.size && !segmentsWatch) return;
+  segmentsQueued = true;
+  const run = () => { segmentsQueued = false; syncSegments(); };
+  if (typeof globalThis.requestAnimationFrame === "function") globalThis.requestAnimationFrame(run);
+  else setTimeout(run, 16);
+}
+
+// Page changes that can move or cover a bar: nodes added or removed and class/hidden/style/role changes anywhere but
+// inside a scroller (a list's rows come and go as it scrolls), the hook itself, resizes (rotation) and the keyboard
+// (the visual viewport).
+function watchSegments(doc = globalThis.document, win = globalThis) {
+  if (segmentsWatch || !doc?.body) return;
+  const Observer = win.MutationObserver;
+  segmentsWatch = true;
+  if (typeof Observer === "function") {
+    const inScroller = (n) => (n.nodeType === 1 ? n : n.parentElement)?.closest?.("[data-scroller]");
+    const obs = new Observer((records) => { if (records.some((r) => !inScroller(r.target))) scheduleSegmentsSync(); });
+    obs.observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "hidden", "style", "role", "aria-modal"] });
+    obs.observe(doc.documentElement, { attributes: true, attributeFilter: ["data-controls"] });
+    segmentsWatch = obs;
+  }
+  win.addEventListener?.("resize", scheduleSegmentsSync);
+  win.visualViewport?.addEventListener?.("resize", scheduleSegmentsSync);
+  win.visualViewport?.addEventListener?.("scroll", scheduleSegmentsSync);
 }
 
 // iOS 6's plain grey UISegmentedControl (ios6.css .store-segmented, sampled from the 4S's UISegmentButton art): the

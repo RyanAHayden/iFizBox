@@ -74,6 +74,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         AppIcon.register(self) // F323: app.icon, the Home Screen icon follows the theme (AppIcon.swift)
         NativeAlerts.register(self) // F345b: ui.alert, the iOS 26 style's UIAlertController (NativeAlerts.swift)
         NativeMenus.register(self) // F345c: ui.actionSheet and ui.menu, its sheets and UIMenus (NativeMenus.swift)
+        NativeSegments.register(self) // F345d: ui.segments, its pinned scope bar as a UISegmentedControl (NativeSegments.swift)
         // F345c: {text}, a copy straight to UIPasteboard, for nav/menu.js copyText when WebKit refuses the write (a
         // native menu's Copy runs after the touch WebKit wants).
         on("clipboard.write") { c in

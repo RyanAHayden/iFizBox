@@ -279,6 +279,8 @@ markup gets `ios26.css`'s look-alikes.
   | The run page's bar (`nav/progress.js`) | `<progress class="progress-bar">` | the drawn track and fill |
   | Alerts (`nav/alert.js` `showAlert`), in the app only | the shell's `UIAlertController` (bridge call `ui.alert`, `native/Sources/NativeAlerts.swift`): the cancel button is the cancel action, red buttons are destructive, the green one is the preferred action, at most one text field; `input.paste` is dropped (the field has Paste in its own menu). A countdown alert and one with `onTap` keep the CSS alert | the CSS alert (`.alert`, "Overlays" below); so does the site, and a shell without `ui.alert` |
 
+  | The scope bar pinned under the search bar (`nav/ui.js` `segments` inside `nav/searchbar.js` `pinned`), in the app only | the shell's `UISegmentedControl` (bridge call `ui.segments`, `native/Sources/NativeSegments.swift`) laid over the CSS bar's rect, which turns see-through while it shows; hidden while a slide runs or one of the page's own popups or pages covers the bar, closed when its page leaves; a tap calls the page's `onPick`. A scope bar inside a scroller keeps the CSS bar | the CSS bar; so does the site, and a shell without `ui.segments` |
+
   `appearance` (and `-webkit-appearance`) is look: it is in the test's `LOOK` list.
 
 ### Overlays (nav/)

@@ -61,3 +61,10 @@ _Said_: report a bug, file an issue
 _On screen_: Report an Issue
 _In code_: core/report-issue.js, issueUrl, reportIssue, reportLog
 _Avoid_: bug report, feedback
+
+**Scope bar**:
+The row of segments under a search bar that picks which kind of item a list shows
+_Said_: scope bar, segments
+_On screen_: All | Tweaks | Themes | Apps
+_In code_: segments(), .scope-segments, ui.segments, NativeSegments
+_Avoid_: tab bar, filter tabs
