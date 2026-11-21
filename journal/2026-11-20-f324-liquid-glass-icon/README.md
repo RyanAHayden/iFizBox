@@ -76,19 +76,40 @@ replacing AppIcon; then (a second answer) offer it on every iOS, older ones gett
   and Tintable renders; every other set is unchanged PNGs.
 - No Swift change: the page sends `app.icon {light: "glass", dark: "glass", onScreen: "glass"}` and
   `AppIcon.setName` already turns that into `Icon-glass` (no `Icon-glass-<x>` pair exists, so mixing Glass in one
-  mode with a theme in the other falls back to the one-icon set of the tone on screen, as for any pair without a set).
+  mode with a theme in the other falls back to the one-icon set of the tone on screen, as for any pair without a set,
+  e.g. a dark theme's icon picked for Light). Pair sets with Glass would cost ~3 MB each, so I didn't add any; the
+  Glass set itself already has both looks, so picking Glass for both modes is the way to get it in both.
 - Web (outside the task's file list, needed for the chooser): `core/settings.js` `APP_ICONS` gets
   `{value: "glass", label: "Glass", tone: null}`, and `iconGroups` puts it in Special after Clear, on every iOS.
   `appicon.test.js` updated.
 - `test_icons.py`: Info.plist and thumbs include Glass; `Icon-glass` in both cars; CAR_SETS is only it, it isn't a
   PNG set, it's the primary pair, the page offers it.
 
+## On the iPhone 15 Pro (iOS 27, Lite IPA from this branch, ui-15.sh)
+
+Needs the real device (Home Screen icons; Chromium can't show iOS's icon rendering). Installed the gate's
+`native/build/iFizBox.ipa`; Theme > App Icon, Match Theme off, Light Icon: the grid's Special group shows
+Clear, **Glass**, then the dark themes. Tapping Glass switched the icon (iOS's "You have changed the icon" alert,
+drawing the new icon). Home Screen Customize, in turn: Default, Dark, Clear and Tinted all draw it as the system's
+glass ([glass-looks-15pro.png](glass-looks-15pro.png)): Default the Classic blue fill with the lit globe, Dark the
+Gunmetal layers (dark fill, navy globe), Clear and Tinted a clear glass tile with the white glass globe and specular
+edge. Afterwards I put the phone back: Home Screen on Default, iFizBox's Match Theme on (the alert showed the sashed
+default icon again).
+
 ## Tried and failed
 
 - The MBA dropped off Tailscale three times this session ("offline, last seen 16m ago", `ssh mba`: connection timed
   out), once in the middle of the full `assets.sh mba` run ("Timeout, server mbas-macbook-air not responding"), even
-  with `caffeinate -i -t 2400` started there. The full compile never finished; the small trial above did.
+  with `caffeinate -i -t 2400` started there. The full compile never finished that session; the small trial above
+  did. On 2026-11-21 the MBA stayed up and the full `assets.sh mba` run finished (the committed .car files).
 
 ## Not verified
 
-NOTVERIFIED
+- iPhone 7 (iOS 15) and any iOS 15-25 phone: not checked. The theme icons are the same PNG sets as before (the .car's
+  other sets are unchanged, test_icons.py checks every one), so the 7 still shows its PNG icon unless Glass is
+  picked. Picking Glass there should show actool's flat render of it (seen in the .car only, not on a phone). I
+  left the 7 alone: the 15 Pro covers the new part (the .icon set), and the 7 would need its own .deb install.
+- The jailbreak build's quiet switch to `Icon-glass`: same code path as every other set, not tried on the 7.
+- Glass picked for one mode and a theme for the other: goes to the one-icon set of the tone on screen (the existing
+  rule for a pair with no set); reasoned from AppIcon.setName, not tried on the phone.
+- The chooser in Chromium (fake bridge): not shot; the 15 Pro showed the real grid with Glass in it.
