@@ -80,11 +80,11 @@ test("no Developer Mode row; an install it stops says so in its alert, with the 
   assert.doesNotMatch(CHECKING.subtitle, /Developer Mode/);
 });
 
-test("the main page's Install Apps With detail: the route, and This iPhone's pairing", () => {
-  assert.equal(withDetail("server", PAIRED_ON), "Signing Server");
-  assert.equal(withDetail("iphone", PAIRED_ON), "This iPhone · Paired");
-  assert.equal(withDetail("iphone", { paired: null }), "This iPhone · Not Paired");
-  assert.equal(withDetail("iphone", null), "This iPhone");
+test("the main page's Install Apps With detail: This iPhone's pairing (the route is the row's own label)", () => {
+  assert.equal(withDetail("server", PAIRED_ON), "");
+  assert.equal(withDetail("iphone", PAIRED_ON), "Paired");
+  assert.equal(withDetail("iphone", { paired: null }), "Not Paired");
+  assert.equal(withDetail("iphone", null), "");
 });
 
 test("Install Apps With: a tap moves the checkmark at once and spins that row until idevice.status answers; the route's groups follow", async () => {
