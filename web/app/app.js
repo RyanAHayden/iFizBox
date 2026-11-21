@@ -143,6 +143,17 @@ function makePage(tab, path) {
 
   // back: the label pages above it show; handle: the page's own nav item for its screen (nav/go.js pageHandle)
   const entry = { el: page, body, shade, item, title: "", back: "", handle: pageHandle(item, body) };
+  // A title the screen sets once it knows it (a package page's name, after its id) is also the label pages above it
+  // show on their back button, unless the screen gave one of its own; a page already above takes it at once.
+  const setTitle = entry.handle.setTitle;
+  entry.handle.setTitle = (text) => {
+    setTitle(text);
+    if (entry.back === entry.title) {
+      entry.back = text;
+      for (const b of document.querySelectorAll(".nav-item .bar-button.back")) if (b.textContent === entry.title) b.textContent = text;
+    }
+    entry.title = text;
+  };
   drawPage(entry, route, below);
   return entry;
 }
