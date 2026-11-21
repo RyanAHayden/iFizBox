@@ -469,3 +469,40 @@ html[data-style="ios13"] .alert-button.is-pressed { background: var(--i13-alert-
    description's dashed box in the keyline's grey (the table edge is the ground's colour in dark). */
 html[data-style="ios13"] .group-footer.cy-foot { text-align: center; }
 html[data-style="ios13"] { --cy-desc-edge: var(--keyline); }
+
+/* B304: the Running page (nav/progress.js, the queue run): the console stays black in both themes, a terminal, but
+   its parts are this era's dark controls, OLED Black's: the black bar under a hairline with tinted text buttons, the
+   grey track with a #636366 pill for Apps | Log, iOS 13's 4pt rounded progress bar (a grey track, the tint's fill)
+   for the rows and the foot, and the finish button as the action sheet's Cancel on a dark ground; the system font. */
+html[data-style="ios13"][data-theme] {
+  --i13-console-tint: #0a84ff;
+  --console-bar: linear-gradient(#38383a, #38383a) bottom / 100% .5px no-repeat, #000;
+  --console-btn: none; --console-btn-edge: transparent; --console-btn-pressed: none;
+  --progress-seg: #1c1c1e; --progress-seg-selected: #636366; --progress-seg-edge: #1c1c1e;
+  --progress-seg-divider: inset 1px 0 0 #3a3a3c; --progress-seg-shadow: none; --progress-seg-emboss: none;
+  --progress-seg-text: #fff;
+  --qr-bar: linear-gradient(#3a3a3c, #3a3a3c) center / 100% 4px no-repeat;
+  --qr-fill: linear-gradient(var(--i13-console-tint), var(--i13-console-tint)) center / 100% 4px no-repeat;
+  --progress-track: #3a3a3c content-box; --progress-track-edge: transparent;
+  --progress-fill: var(--i13-console-tint);
+  --progress-finish: #2c2c2e; --progress-finish-pressed: #3a3a3c; --progress-finish-ring: none;
+  --progress-finish-emboss: none; --progress-finish-pressed-emboss: none; --progress-finish-text: var(--i13-console-tint);
+}
+html[data-style="ios13"] .console .nav-title { color: #fff; }
+html[data-style="ios13"] .console .bar-button:not(.red) { color: var(--i13-console-tint); }
+html[data-style="ios13"] .progress-seg { border-radius: 9px; background: #1c1c1e; }
+html[data-style="ios13"] .progress-seg-item,
+html[data-style="ios13"] .progress-finish,
+html[data-style="ios13"] .progress-status { font-family: -apple-system, system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif; }
+html[data-style="ios13"] .progress-seg-item { font-size: 13px; font-weight: 400; }
+html[data-style="ios13"] .progress-seg-item:first-child { border-radius: 9px 0 0 9px; }
+html[data-style="ios13"] .progress-seg-item:last-child { border-radius: 0 9px 9px 0; }
+html[data-style="ios13"] .progress-seg-item:active:not(.selected) { background: #2c2c2e; }
+/* the chosen segment a pill 1pt inside the track (the track's colour as a ring), no divider beside it */
+html[data-style="ios13"] .progress-seg-item.selected {
+  border-radius: 8px; font-weight: 600; box-shadow: inset 0 0 0 1px #1c1c1e, 0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04);
+}
+html[data-style="ios13"] .progress-seg-item.selected + .progress-seg-item { box-shadow: none; }
+html[data-style="ios13"] .qr-bar, html[data-style="ios13"] .qr-fill { border-radius: 2px; }
+html[data-style="ios13"] .progress-track, html[data-style="ios13"] .progress-fill { border-radius: 2px; }
+html[data-style="ios13"] .progress-finish { border-radius: 13px; font-size: 20px; font-weight: 600; }

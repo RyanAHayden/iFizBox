@@ -527,3 +527,33 @@ html[data-style="ios7"][data-theme] .manage-toolbar .bar-button.manage-delete:no
    description's dashed box in the keyline's grey. */
 html[data-style="ios7"] .group-footer.cy-foot { text-align: center; }
 html[data-style="ios7"] { --cy-desc-edge: var(--keyline); }
+
+/* B304: the Running page (nav/progress.js, the queue run): the console stays black in both themes, a terminal, but
+   its parts are this era's dark controls, OLED Black's: the flat black bar under a hairline with tinted text buttons,
+   the tinted outline segmented control (Apps | Log), the kit's 2pt UIProgressView (#b7b7b7 track, tinted fill) for
+   the rows and the foot, and the finish button as the action sheet's Cancel on a dark ground. */
+html[data-style="ios7"][data-theme] {
+  --i7-console-tint: #0a84ff; /* the tint as iOS draws it on a dark ground (the banner's) */
+  --console-bar: linear-gradient(#262626, #262626) bottom / 100% .5px no-repeat, #000;
+  --console-btn: none; --console-btn-edge: transparent; --console-btn-pressed: none;
+  --progress-seg: none; --progress-seg-selected: var(--i7-console-tint); --progress-seg-edge: var(--i7-console-tint);
+  --progress-seg-divider: inset 1px 0 0 var(--i7-console-tint); --progress-seg-shadow: none; --progress-seg-emboss: none;
+  --progress-seg-text: var(--i7-console-tint);
+  --qr-bar: linear-gradient(#b7b7b7, #b7b7b7) center / 100% 2px no-repeat;
+  --qr-fill: linear-gradient(var(--i7-console-tint), var(--i7-console-tint)) center / 100% 2px no-repeat;
+  --progress-track: linear-gradient(#b7b7b7, #b7b7b7) center / 100% 2px no-repeat content-box;
+  --progress-track-edge: transparent;
+  --progress-fill: linear-gradient(var(--i7-console-tint), var(--i7-console-tint)) center / 100% 2px no-repeat;
+  --progress-finish: #1c1c1e; --progress-finish-pressed: #2c2c2e; --progress-finish-ring: none;
+  --progress-finish-emboss: none; --progress-finish-pressed-emboss: none; --progress-finish-text: var(--i7-console-tint);
+}
+html[data-style="ios7"] .console .nav-title { color: #fff; }
+html[data-style="ios7"] .console .bar-button:not(.red) { color: var(--i7-console-tint); }
+html[data-style="ios7"] .progress-seg { border-radius: 4px; }
+html[data-style="ios7"] .progress-seg-item { font-size: 13px; font-weight: 400; }
+html[data-style="ios7"] .progress-seg-item:first-child { border-radius: 4px 0 0 4px; }
+html[data-style="ios7"] .progress-seg-item:last-child { border-radius: 0 4px 4px 0; }
+html[data-style="ios7"] .progress-seg-item:active:not(.selected) { background: rgba(10,132,255,.25); }
+html[data-style="ios7"] .progress-seg-item.selected { color: #fff; }
+html[data-style="ios7"] .qr-bar, html[data-style="ios7"] .qr-fill, html[data-style="ios7"] .progress-fill { border-radius: 0; }
+html[data-style="ios7"] .progress-finish { border-radius: 3px; font-size: 21px; font-weight: 600; }

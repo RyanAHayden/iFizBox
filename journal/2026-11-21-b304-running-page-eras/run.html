@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+  const q = new URLSearchParams(location.search);
+  const h = document.documentElement;
+  h.setAttribute("data-theme", q.get("theme") || "light");
+  if (q.get("style") && q.get("style") !== "ios6") h.setAttribute("data-style", q.get("style"));
+  h.setAttribute("data-palette", q.get("palette") || "classic");
+  // headless screenshots catch slides half way: end every Web Animation at once
+  const anim = Element.prototype.animate;
+  Element.prototype.animate = function (k, o) { const a = anim.call(this, k, o); try { a.finish(); } catch {} return a; };
+</script>
+<link rel="stylesheet" href="app/style.css">
+<link rel="stylesheet" href="app/ios6.css">
+<link rel="stylesheet" href="app/sources.css">
+<link rel="stylesheet" href="app/packages.css">
+<link rel="stylesheet" href="app/home.css">
+<link rel="stylesheet" href="app/queue.css">
+<link rel="stylesheet" href="app/progress.css">
+<link rel="stylesheet" href="app/palettes.css">
+<link rel="stylesheet" href="app/ios7.css">
+<link rel="stylesheet" href="app/ios13.css">
+<link rel="stylesheet" href="app/ios26.css">
+</head>
+<body>
+<script type="module">
+import { runQueue } from "./app/screens/queuerun.js";
+import { parseSimulation, createQueue } from "./app/core/queue.js";
+const q = new URLSearchParams(location.search);
+const done = q.get("state") === "complete";
+const plan = parseSimulation("Inst lib (2.0 R [a])\nInst tweak (1.0 R [a])\nInst other (1.0 R [a])");
+const jobs = [{ op: "install", id: "tweak", name: "Tweak", mode: "install" }, { op: "install", id: "other", name: "Other", mode: "install" }];
+const info = { lib: { name: "Lib Substrate", debUrl: "https://r/lib.deb" }, tweak: { debUrl: "https://r/tweak.deb", depends: "lib" },
+  other: { debUrl: "https://r/other.deb" }, installed: {} };
+const queue = createQueue();
+for (const j of jobs) queue.add(j);
+const never = new Promise(() => {});
+const backend = {
+  async queueFetch(r, { progress }) {
+    if (!done && r.id === "other") { progress(0.35); return never; }
+    progress(1);
+    return { file: `${r.id}.deb` };
+  },
+  async queueInstall(r, { onEvent }) {
+    onEvent({ fd: "status", line: `pmstatus:${r.id}:10:Unpacking ${r.id}` });
+    onEvent({ fd: "out", line: `Selecting previously unselected package ${r.id}.` });
+    onEvent({ fd: "status", line: `pmstatus:${r.id}:60:Setting up ${r.id}` });
+    if (!done && r.id === "tweak") return never;
+    return { code: 0, stdout: "", stderr: "" };
+  },
+  async markAuto() { return true; },
+};
+const catalog = { runInfo: async () => info, queueInfo: async () => ({}), reloadInstalled: async () => {} };
+if (q.get("single")) {
+  const { openProgress } = await import("./app/nav/progress.js");
+  const p = openProgress({ title: "Running", onCancel: () => {} });
+  p.line("step", "Downloading Tweak"); p.line("raw", "Get:1 https://r tweak 1.0 [12 kB]"); p.line("step", "Unpacking Tweak");
+  p.line("warning", "a warning line"); p.help("Not on the Home Screen?", { label: "Help" });
+  p.status("Unpacking Tweak"); p.progress(60);
+  if (done) p.finish({});
+} else runQueue({ jobs, plan }, { backend, catalog, queue, runLogs: { add() {} }, names: { tweak: "Tweak", other: "Other" } });
+if (q.get("pane") === "log") setTimeout(() => document.querySelectorAll(".progress-seg-item")[1]?.click(), 300);
+</script>
+</body>
+</html>
