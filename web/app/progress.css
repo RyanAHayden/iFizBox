@@ -53,7 +53,11 @@
   --progress-finish-pressed: linear-gradient(#c7cde9, #c7cde9 .5px, #818fce .5px, #7a8acb 8%, #6577c3 18%, #485db8 31%, #2b45ae 44%,
     #253eaa 50%, #001d9d 50%, #04229e 56%, #1330a7 69%, #1940b4 82%, #1354cd calc(100% - .5px), #2c68d4 calc(100% - .5px));
   --progress-finish-pressed-emboss: 0 -1px 0 rgba(0,0,0,.4);
+  --progress-finish-text: #fff;
+  /* B304: the foot's bar, Cydia's white ring with a #eee fill (an era draws its own UIProgressView here) */
+  --progress-track: none; --progress-track-edge: #fff; --progress-fill: #eee;
   /* UISegmentBarBlackButton, ...Highlighted and ...Divider */
+  --progress-seg-text: #fff;
   --progress-seg: linear-gradient(#767676 6.7%, #262626 50%, #000 50%);
   --progress-seg-selected: linear-gradient(#8f8f8f 6.7%, #494848 50%, #3b3b3b 50%);
   --progress-seg-edge: #1e1e1e;
@@ -111,17 +115,17 @@
 /* ==== look-only { ==== the foot: status, bar, finish button */
 .progress-foot { background: #000; }
 .progress-status { color: #fff; font: bold 12px/16px "Helvetica Neue", Helvetica, sans-serif; text-align: center; }
-.progress-track { border: 1px solid #fff; border-radius: 6px; }
-.progress-fill { border-radius: 2px; background: #eee; }
+.progress-track { border: 1px solid var(--progress-track-edge); border-radius: 6px; background: var(--progress-track); }
+.progress-fill { border-radius: 2px; background: var(--progress-fill); }
 .progress-finish {
   border: 0; border-radius: 10px;
-  font: bold 20px/44px "Helvetica Neue", Helvetica, sans-serif; color: #fff; text-shadow: var(--progress-finish-emboss);
+  font: bold 20px/44px "Helvetica Neue", Helvetica, sans-serif; color: var(--progress-finish-text); text-shadow: var(--progress-finish-emboss);
   box-shadow: var(--progress-finish-ring);
   /* black, as the user asked (2026-11-18): UIAlertSheetBlackCancelButton's gradient (packages.css) */
   background: var(--progress-finish);
 }
 .progress-finish:active, .progress-finish.is-pressed {
-  color: #fff; text-shadow: var(--progress-finish-pressed-emboss);
+  color: var(--progress-finish-text); text-shadow: var(--progress-finish-pressed-emboss);
   background: var(--progress-finish-pressed);
 }
 .progress-finish:disabled { opacity: .6; }
@@ -142,7 +146,7 @@
 .progress-seg { border-radius: 5px; box-shadow: var(--progress-seg-shadow); }
 .progress-seg-item {
   border: 1px solid var(--progress-seg-edge); border-left-width: 0;
-  font: bold 12px/28px "Helvetica Neue", Helvetica, sans-serif; color: #fff;
+  font: bold 12px/28px "Helvetica Neue", Helvetica, sans-serif; color: var(--progress-seg-text);
   text-shadow: var(--progress-seg-emboss);
   background: var(--progress-seg); background-origin: border-box;
 }
