@@ -94,9 +94,11 @@ const ignoredIds = () => ignoredList(settings.holds.list(), settings.blocked.lis
 // sets the badge, so an older count that answers late never puts a number back.
 let badgeAsked = 0;
 // B310: what the last count held (badgeAfterRun takes a run's packages off it), and whether a queue run has ended
-// since: the next count then goes on the icon even when it is 0 and Changes isn't on screen.
+// since: the next count then goes on the icon even when it is 0 and Changes isn't on screen. Only for a while
+// (AFTER_RUN_MS): a recount that fails leaves later, ordinary counts to F65's rule.
 let lastCounted = null;
-let afterRun = false;
+let afterRunUntil = 0;
+export const AFTER_RUN_MS = 2 * 60 * 1000;
 async function badge(upgrades, resign) {
   const asked = ++badgeAsked;
   try {
@@ -105,8 +107,8 @@ async function badge(upgrades, resign) {
     if (asked !== badgeAsked) return;
     sendResigns(resign);
     lastCounted = { upgrades, resign };
-    setCount(badgeCount(upgrades, resign), afterRun);
-    afterRun = false;
+    setCount(badgeCount(upgrades, resign), Date.now() < afterRunUntil);
+    afterRunUntil = 0;
   } catch {
     // no catalog yet: no badge
   }
@@ -123,7 +125,7 @@ const setCount = (n, ran, ctx = state.ctx) => {
 // to the background right after the run, and a page in the background counts nothing. That recount goes on the
 // icon too, 0 included, whichever tab is shown. -> the quick count set, or null without an earlier count.
 export function badgeAfterRun(ids = [], { ctx = state.ctx, counted = lastCounted } = {}) {
-  afterRun = true;
+  afterRunUntil = Date.now() + AFTER_RUN_MS;
   if (!counted || !ctx) return null;
   const done = new Set(ids);
   const { upgrades, resign } = counted;

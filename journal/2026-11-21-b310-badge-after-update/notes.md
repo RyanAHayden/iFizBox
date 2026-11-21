@@ -39,6 +39,17 @@
   doesn't (F65 kept); the wiring in app.js and queue.js.
 - Neighbouring tests: changes-recount, badge-count, settings.
 
+## Spec review
+
+- Fixed: the after-run mark could stay set if the recount after a run failed, sending a later ordinary 0 off
+  Changes to the icon (against F65). It now lasts `AFTER_RUN_MS` (2 min) at most; tested.
+- Kept: `countAfterRun` goes through `import("./changes.js")`. Changes is already loaded by then (its init runs after
+  the first page), so this resolves within microtasks, before `reloadInstalled`'s worker round trip. That is not a
+  window where the page can be suspended.
+- Kept: Confirm's run (queuerun.js) calls `onEnd` after `backend.markAuto` (one helper call, only when apt pulled
+  packages in) and `runLogs.add`. queuerun.js isn't this task's file; the delay is one bridge round trip at most.
+- queue.js isn't in the brief's file list, but the run-end calls have to sit there (two added lines).
+
 ## Not verified
 
 - The real Home Screen icon on the iPhone 7 after a run (update, go Home without relaunching). Chromium can't show
@@ -46,4 +57,5 @@
   slots overwrite it), a package with a pending upgrade there, and the run itself; I judged the cost too high
   for a change that is entirely in the page: the native `app.badge` path it calls is the one B158 already checked
   on the device, and the new call goes out synchronously at the end of the run, which the node test shows.
+- Filed R65 for the iPhone 7 check.
 - Lite on the 15 Pro: not run, for the same reason (no native change; B264 covers the re-sign/update path).

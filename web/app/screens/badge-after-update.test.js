@@ -50,6 +50,17 @@ test("the recount after a run goes on the icon through the after-run setter, the
     assert.deepEqual(seen.at(-1), ["run", 0]);
     await m.recountBadge(); // later counts are ordinary again
     assert.deepEqual(seen.at(-1), ["set", 0]);
+
+    // a run whose recount never came (failed): only for a while, then counts are ordinary again
+    m.badgeAfterRun([]);
+    const now = Date.now;
+    Date.now = () => now() + m.AFTER_RUN_MS + 1000;
+    try {
+      await m.recountBadge();
+    } finally {
+      Date.now = now;
+    }
+    assert.deepEqual(seen.at(-1), ["set", 0]);
   } finally {
     delete globalThis.ifizboxNative;
   }
