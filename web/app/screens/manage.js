@@ -3,7 +3,7 @@
 //   #/sources/manage                     Sources, Import & Export, Hidden; then More Sources (F327,
 //                                        screens/moresources.js), its badge the recommended sources not added yet
 //   #/sources/manage/recommended         F327: More Sources' page (screens/sources.js hands it to moresources.js)
-//   #/sources/manage/sources            the edit list: Add, the red minus and Delete, drag the grabber to reorder
+//   #/sources/manage/sources            the edit list: Add, tick sources (Installed's circles), Delete (n) in the toolbar
 //   #/sources/manage/io                  Export (share text, save a file, QR code) and Import (file or the clipboard)
 //   #/sources/manage/io/review           what an import found: new ones (ticked), already listed, can't add; Add
 //   #/sources/manage/hidden              F104: what's hidden, sections (Section Visibility) and authors (Hide
@@ -11,13 +11,14 @@
 //   #/sources/manage/recommended/<key>   one not added yet, read from its URL: its apps (F52) or packages (F54), and Add
 //
 // Source keys always hold a ':' (deb:..., alt:...), so "manage" can't be one. The parsing, export text and order
-// live in core/sourcelist.js; the QR code in core/qr.js. A change here (add, delete, reorder) tells sources.js
+// live in core/sourcelist.js; the QR code in core/qr.js. A change here (add, delete) tells sources.js
 // through onSourcesChanged, so the tab's list is right when the user goes back.
 import { cleanSourceUrl, httpsInput } from "../core/sources.js";
-import { grouped, plain, collapse, placeholder, el, note } from "../nav/ui.js";
+import { grouped, plain, collapse, placeholder, el, note, barButton } from "../nav/ui.js";
+import { showActionSheet } from "../nav/actionsheet.js";
 import { showAlert } from "../nav/alert.js";
 import { showSheet } from "../nav/sheet.js";
-import { format } from "../router.js";
+import { format, mounted, parse } from "../router.js";
 import { getBackend, getParser, getArch, siteJailbroken } from "../backend.js";
 import { detectMode } from "../core/settings.js";
 import { repoLayout } from "../core/apt.js";
@@ -27,7 +28,7 @@ import { tweakSourcesFor } from "../core/sources.js"; // F302
 import { sourceIconImage } from "../source-icon.js";
 import { altRecord, parseSource } from "../core/altstore.js";
 import {
-  exportText, clipboardText, parseImport, reviewImport, orderSources, loadOrder, saveOrder, recommendedRows, recommendedSeed,
+  exportText, clipboardText, parseImport, reviewImport, orderSources, loadOrder, recommendedRows, recommendedSeed,
   packagePreview, EXPORT_FILENAME,
 } from "../core/sourcelist.js";
 import { qrSvg } from "../core/qr.js";
@@ -126,7 +127,7 @@ function renderRoot(body, ctx) {
     { ...hiddenRow(), icon: rowIcon("hidden") },
   ];
   // F327: Recommended and Find More Sources are one page now, More Sources (screens/moresources.js).
-  body.replaceChildren(grouped([{ rows, footer: "Add, delete and reorder your sources, or move them to another phone "
+  body.replaceChildren(grouped([{ rows, footer: "Add and delete your sources, or move them to another phone "
     + "or package manager." }, { rows: [{ label: "More Sources", href: MORE_HREF, cls: "rec-entry", icon: rowIcon("moreSources") }],
     footer: findMore.findMoreOn() ? "Recommended sources, and more to find for tweaks and apps." : "Recommended app sources, and more to find." }]));
   // The badge: how many aren't added yet.
@@ -198,119 +199,177 @@ async function renderSources(body) {
   const backend = getBackend();
   const ul = plain([{ rows: list.map((s) => ({ label: displayName(s), subtitle: sourceSubtitle(s),
     icon: { text: displayName(s)[0]?.toUpperCase() ?? "?" } })) }]);
-  ul.classList.add("editing", "manage-list");
+  ul.classList.add("editing", "managing", "manage-list");
   const cells = [...ul.querySelectorAll(":scope > .cell")];
   list.forEach((s, i) => editRow(cells[i], s, backend, body));
-  attachReorder(ul, body);
   body.replaceChildren(ul);
   if (!list.length) body.append(note("No sources. Tap Add."));
-  const foot = el("div", "manage-foot");
-  if (list.length > 1) {
-    const sort = el("button", "manage-link", "Sort by Name");
-    sort.type = "button";
-    sort.addEventListener("click", () => { saveOrder(null); changed(); renderSources(body); });
-    foot.append(sort);
-  }
-  foot.append(el("p", "group-footer", "Drag ≡ to reorder; the Sources tab keeps this order."));
-  body.append(foot);
+  syncPick(body);
 }
 
 function editRow(li, source, backend, body) {
   li.classList.add("source-row");
   li.dataset.key = source.key;
+  li._source = source;
   if (source.error) li.querySelector(".cell-subtitle")?.classList.add("cell-error");
   li.querySelector(".cell-icon").append(sourceIconImage(source.key, sourceIcons(source), backend)); // B58: cached
-  // F72: iFizBox's own source is built in: a lock where the minus goes, no Delete, and it doesn't move.
+  // F72: iFizBox's own source is built in: a lock where the circle goes, and it can't be picked.
   if (isBuiltin(source)) {
     li.dataset.builtin = "1";
     li.append(lockMark("source-lock", `${displayName(source)} is built in: it can't be removed`));
     return;
   }
-
-  const toggle = el("button", "del-toggle");
-  toggle.type = "button";
-  toggle.setAttribute("aria-label", "Delete " + displayName(source));
-  toggle.addEventListener("click", () => {
-    const on = !li.classList.contains("armed");
-    for (const o of li.parentNode.querySelectorAll(".source-row.armed")) o.classList.remove("armed");
-    li.classList.toggle("armed", on);
-  });
-  const confirm = el("button", "del-confirm", "Delete");
-  confirm.type = "button";
-  confirm.addEventListener("click", () => removeRow(li, source, body));
-  const grab = el("span", "reorder");
-  grab.setAttribute("aria-label", "Reorder " + displayName(source));
-  li.append(toggle, confirm, grab);
-}
-
-async function removeRow(li, source, body) {
-  li.classList.add("removing");
-  try {
-    await getBackend().removeSource(source.key);
-  } catch (e) {
-    li.classList.remove("removing");
-    await showAlert({ title: "Error", message: e.message, buttons: ["OK"] });
-    return;
-  }
-  changed();
-  setTimeout(() => {
-    if (li.parentNode.querySelectorAll(".source-row").length > 1) collapse(li); // the rows below slide up
-    else { li.remove(); renderSources(body); }
-  }, 200);
-}
-
-// Drag a row by its grabber: it follows the finger (transform only) and the rows it passes slide out of its way;
-// on release the order is saved. Rows are one height (Cydia's 53pt), so the slot is the offset over that height.
-function attachReorder(ul, body) {
-  let drag = null;
-  ul.addEventListener("pointerdown", (e) => {
-    const grab = e.target.closest(".reorder");
-    if (!grab) return;
+  // Installed's multi-select circle (packages.css .manage-row/.manage-check); a tap ticks the row for Delete (n).
+  li.classList.add("manage-row");
+  const inner = li.querySelector(".cell-inner");
+  inner?.setAttribute("aria-selected", "false");
+  const check = el("span", "manage-check");
+  check.setAttribute("aria-hidden", "true");
+  li.addEventListener("click", (e) => {
     e.preventDefault();
-    const li = grab.closest(".source-row");
-    const rows = [...ul.querySelectorAll(":scope > .source-row")];
-    const min = rows.filter((r) => r.dataset.builtin).length; // F72: nothing goes above the built-in source
-    drag = { li, rows, min, from: rows.indexOf(li), to: rows.indexOf(li), y: e.clientY, h: li.offsetHeight, id: e.pointerId };
-    grab.setPointerCapture?.(e.pointerId);
-    li.classList.add("dragging");
-    ul.classList.add("is-reordering");
+    const on = li.classList.toggle("picked");
+    inner?.setAttribute("aria-selected", String(on));
+    syncPick(body);
   });
-  ul.addEventListener("pointermove", (e) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    const dy = e.clientY - drag.y;
-    const { rows, from, h, min } = drag;
-    const to = Math.max(min, Math.min(rows.length - 1, from + Math.round(dy / h)));
-    drag.to = to;
-    drag.li.style.transform = `translateY(${Math.max(-(from - min) * h, Math.min((rows.length - 1 - from) * h, dy))}px)`;
-    rows.forEach((r, i) => {
-      if (r === drag.li) return;
-      const shift = from < to && i > from && i <= to ? -h : from > to && i < from && i >= to ? h : 0;
-      r.style.transform = shift ? `translateY(${shift}px)` : "";
-    });
-  });
-  const end = (e) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    const { li, rows, from, to } = drag;
-    drag = null;
-    for (const r of rows) r.style.transform = "";
-    li.classList.remove("dragging");
-    ul.classList.remove("is-reordering");
-    if (from === to) return;
-    rows.splice(to, 0, ...rows.splice(from, 1));
-    for (const r of rows) ul.append(r);
-    saveFullOrder(rows.map((r) => r.dataset.key));
-  };
-  ul.addEventListener("pointerup", end);
-  ul.addEventListener("pointercancel", end);
+  li.append(check);
 }
 
-// The shown rows' new order, with sources hidden on this device kept where they were relative to the rest.
-async function saveFullOrder(shownKeys) {
-  const all = orderSources(await getBackend().sources(), loadOrder()).map((s) => s.key);
-  const shown = new Set(shownKeys);
-  let i = 0;
-  saveOrder(all.map((k) => (shown.has(k) ? shownKeys[i++] : k)));
-  changed();
+// ---- Sources: picking and deleting --------------------------------------------------------------------------------
+
+// The live refresh state of one source, from the Sources tab (screens/sources.js sets it: this file can't import
+// that one, which imports this): { count, failed }, or null when no refresh holds it.
+let rowState = () => null;
+export function setSourceRowState(f) { rowState = f ?? (() => null); }
+
+// One source as the Sources tab counts it: its badge (the refresh's count once it landed, else the stored count) and
+// whether its row shows failed (the refresh's failure, else the stored error).
+// A refresh that failed shows "!" in place of the count, so it adds nothing; one still loading keeps the stored badge.
+export function sourceTally(source, live = rowState(source.key)) {
+  if (live?.failed) return { count: 0, failed: true };
+  const count = typeof live?.count === "number" ? live.count : typeof source.count === "number" ? source.count : 0;
+  return { count, failed: live ? false : Boolean(source.error) };
+}
+
+// The grey line over the list: "2 selected · 3 sources · 1,204 apps · 1 not loading". `tallies` is every shown
+// source ({ count, failed }), `picked` how many are ticked; packages where APT is kept, apps where it isn't.
+export function sourceSummary(tallies, picked = 0, apt = aptKept()) {
+  const total = tallies.reduce((t, s) => t + (s.count || 0), 0);
+  const failing = tallies.filter((s) => s.failed).length;
+  return [...(picked ? [`${picked} selected`] : []), plural(tallies.length, "source"),
+    `${total.toLocaleString("en-US")} ${apt ? "package" : "app"}${total === 1 ? "" : "s"}`, `${failing} not loading`].join(" · ");
+}
+
+// The bottom toolbar from `pickable` (rows that can be ticked) and `picked`: Select All / Deselect, Delete (n).
+export function sourceToolbar(pickable, picked) {
+  const every = pickable > 0 && picked === pickable;
+  return {
+    select: { label: every ? "Deselect" : "Select All", disabled: !pickable },
+    delete: { label: picked ? `Delete (${picked})` : "Delete", disabled: !picked },
+  };
+}
+
+// The action sheet's one button: "Delete <name>" for one source, "Delete N Sources" for more.
+export const deleteSourcesLabel = (names) => names.length === 1 ? `Delete ${names[0]}` : `Delete ${names.length} Sources`;
+
+const pick = { body: null, summary: null, bar: null };
+const pickRows = (body = pick.body) => [...(body?.querySelectorAll(".manage-list > .source-row.manage-row") ?? [])];
+const pickedRows = () => pickRows().filter((r) => r.classList.contains("picked"));
+// On screen: this page's body, and the route (in this tab or opened from another, #/home/~sources/…) is this page.
+const pickShown = () => {
+  if (!pick.body?.isConnected || typeof location === "undefined") return false;
+  const r = mounted(parse(location.hash));
+  return r.tab === "sources" && isManage(r) && page(r) === "sources";
+};
+
+function pickBar() {
+  if (pick.bar) return pick.bar;
+  const bar = el("div", "manage-toolbar source-toolbar");
+  bar.setAttribute("role", "toolbar");
+  const select = barButton("Select All", "manage-select");
+  const del = barButton("Delete", "manage-delete");
+  select.addEventListener("click", () => {
+    const rows = pickRows();
+    const every = rows.length && rows.every((r) => r.classList.contains("picked"));
+    for (const r of rows) {
+      r.classList.toggle("picked", !every);
+      r.querySelector(".cell-inner")?.setAttribute("aria-selected", String(!every));
+    }
+    syncPick();
+  });
+  del.addEventListener("click", () => deletePicked());
+  bar.append(select, del);
+  pick.bar = { el: bar, select, delete: del };
+  return pick.bar;
+}
+
+// The grey line, the toolbar's labels, and the toolbar shown only while this page is (My IPAs' syncToolbar).
+function syncPick(body = pick.body) {
+  if (typeof document === "undefined" || !body) return;
+  pick.body = body;
+  const ul = body.querySelector(".manage-list");
+  const sources = [...(ul?.querySelectorAll(":scope > .source-row") ?? [])].map((r) => r._source).filter(Boolean);
+  const rows = pickRows(body);
+  const n = rows.filter((r) => r.classList.contains("picked")).length;
+  if (ul) {
+    pick.summary ??= el("p", "manage-summary");
+    pick.summary.textContent = sourceSummary(sources.map((s) => sourceTally(s)), n);
+    if (pick.summary.nextSibling !== ul) ul.before(pick.summary);
+  }
+  // the page is drawn before it is pushed: the toolbar waits a frame for it to be on screen
+  requestAnimationFrame(() => syncPickBar());
+}
+
+function syncPickBar(pickable = pickRows().length, picked = pickedRows().length) {
+  const show = pickShown();
+  if (!show && !pick.bar) return;
+  const bar = pickBar();
+  if (show) {
+    const spec = sourceToolbar(pickable, picked);
+    for (const kind of ["select", "delete"]) {
+      bar[kind].textContent = spec[kind].label;
+      bar[kind].disabled = spec[kind].disabled;
+    }
+    if (!bar.el.isConnected) document.body.append(bar.el);
+    requestAnimationFrame(() => requestAnimationFrame(() => { if (pickShown()) bar.el.classList.add("shown"); }));
+  } else bar.el.classList.remove("shown");
+  document.documentElement.classList.toggle("has-manage-toolbar", show);
+}
+
+// Leaving the page (Back, another tab, a pushed page) puts the toolbar away; coming back shows it again.
+if (typeof window !== "undefined") window.addEventListener("hashchange", () => requestAnimationFrame(() => syncPickBar()));
+
+// Delete (n): one action sheet, then the picked rows collapse away.
+async function deletePicked() {
+  const rows = pickedRows();
+  if (!rows.length) return;
+  const index = await showActionSheet({ buttons: [deleteSourcesLabel(rows.map((r) => displayName(r._source)))], destructive: 0 });
+  if (index !== 0) return;
+  await removeRows(rows, pick.body);
+}
+
+// One at a time (each remove rewrites the saved list), then the rows that went collapse together and the rows below
+// slide up; a remove that fails says why and its row stays, still ticked.
+async function removeRows(rows, body) {
+  const gone = [];
+  let error = null;
+  for (const li of rows) {
+    li.classList.add("removing");
+    try {
+      await getBackend().removeSource(li._source.key);
+      gone.push(li);
+    } catch (e) {
+      li.classList.remove("removing");
+      error ??= e;
+    }
+  }
+  if (gone.length) changed();
+  if (error) await showAlert({ title: "Error", message: error.message, buttons: ["OK"] });
+  if (!gone.length) return;
+  const ul = gone[0].parentNode;
+  if (ul && ul.querySelectorAll(":scope > .source-row").length > gone.length) {
+    for (const li of gone) { li.classList.remove("manage-row", "picked"); li._source = null; collapse(li); }
+    syncPick(body);
+  } else renderSources(body);
 }
 
 // F144: where APT repos aren't kept (the sideload app; the site while Settings > Device says Not Jailbroken), Add

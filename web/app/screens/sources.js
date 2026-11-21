@@ -157,6 +157,11 @@ manage.onSourcesChanged((ctx) => {
   if (views.all().length) load(ctx ?? state.ctx); else loadNew(ctx);
   feedCatalog(ctx ?? state.ctx);
 });
+// F355: Manage > Sources' grey line counts each source as its row here does (paintRow's badge and red badge).
+manage.setSourceRowState((key) => {
+  const r = state.rows?.get(key);
+  return r ? { count: r.state === ROW.done ? r.count : null, failed: r.state === ROW.failed } : null;
+});
 
 // B177: what a failed source's page (screens/sourceerror.js) needs from here: its live reason, Refresh Source (the
 // row's retry, then the catalog load so the page redraws from fresh data), Edit Source (Manage's Enter URL alert

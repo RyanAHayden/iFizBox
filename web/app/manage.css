@@ -1,39 +1,15 @@
-/* Sources > Manage (F45, screens/manage.js). The edit list reuses sources.css's .editing/.source-row (red minus,
-   Delete); this adds the reorder grabber, the paste box, the QR sheet and wrapping subtitles.
-   Each part's layout is in its own rules; what it paints is in the look-only stretch after them (docs/eras.md), and
-   the iOS 6 decorations (the grabber, the dragged row's shadow) come from the tokens in the first stretch. */
+/* Sources > Manage (F45, screens/manage.js). The source list reuses sources.css's .editing/.source-row and
+   Installed's multi-select circle, grey line and toolbar (packages.css .manage-check, .manage-summary,
+   .manage-toolbar); this adds the paste box, the QR sheet and wrapping subtitles.
+   Each part's layout is in its own rules; what it paints is in the look-only stretch after them (docs/eras.md). */
 
-/* UITableGrabber (ref/4s/artwork/Shared@2x/UITableGrabber.png, 19 x 17pt): three bars, each a 1pt dark top
-   rgba(0,0,0,.31), 3pt grey rgba(190,190,190,.68) and 1pt white rgba(255,255,255,.51), 1pt apart. */
-.manage-list .source-row .cell-inner { padding-right: 52px; }
+/* The source list: the content slides 37pt right for the circle (or the built-in source's lock); a tap anywhere on a
+   row ticks it, so no text selection. */
 .editing.manage-list .source-row .cell-inner { width: calc(100% - 37px); }
-.editing.manage-list .source-row.armed .cell-inner { width: calc(100% - 37px - 76px - 44px); }
-.manage-list .reorder {
-  position: absolute; right: 0; top: 0; bottom: 0; width: 52px; touch-action: none; cursor: grab;
-  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
-}
-.manage-list .reorder::before { position: absolute; left: 50%; top: 50%; width: 19px; height: 17px; margin: -8.5px 0 0 -9.5px; }
-.manage-list .source-row.armed .reorder { display: none; }
-.manage-list .source-row { transition: transform .2s ease; }
-.manage-list.is-reordering .source-row.dragging { transition: none; z-index: 2; }
+.manage-list .source-row.manage-row { cursor: pointer; -webkit-user-select: none; user-select: none; }
 
-.manage-foot { padding: 10px 0 20px; }
-.manage-link { padding: 8px 12px; cursor: pointer; }
-
-/* ==== look-only { ==== the grabber, the dragged row, the foot's links */
-:root {
-  --manage-grabber: linear-gradient(rgba(0,0,0,.31) 0 1px, rgba(190,190,190,.68) 1px 4px, rgba(255,255,255,.51) 4px 5px, transparent 5px 6px)
-    0 0 / 19px 6px repeat-y;
-  --manage-drag-shadow: 0 0 6px rgba(0,0,0,.4);
-}
-.manage-list .reorder::before { content: ""; background: var(--manage-grabber); }
+/* ==== look-only { ==== the list's rows */
 .manage-list .source-row { background: var(--plain); }
-.manage-list.is-reordering .source-row.dragging { opacity: .9; box-shadow: var(--manage-drag-shadow); }
-.manage-foot { text-align: center; }
-.manage-link {
-  border: 0; background: none; font: inherit; font-size: 17px; font-weight: bold;
-  color: var(--head); text-shadow: var(--emboss);
-}
 /* ==== } look-only ==== */
 
 /* Recommended and Import: the reason under each name wraps instead of ellipsizing. */

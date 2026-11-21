@@ -129,7 +129,6 @@
 .editing .source-row.armed .cell-inner { width: calc(100% - 37px - 76px); }
 .source-row.armed .cell-inner > :is(.cell-detail, .cell-count), .source-row.armed .cell-inner.chevron::after { translate: 76px 0; }
 :is(.editing, .managing) .source-row.armed .cell-inner.chevron::after { translate: 113px 0; }
-.editing.manage-list .source-row.armed .cell-inner > :is(.cell-detail, .cell-count) { translate: 120px 0; } /* manage.css: 76 + 44 */
 /* The Wish List's package rows (packages.css .wish-row) the same way: their chevron is the inner's ::after, the version
    sits at the end of the name's line (padding 37 in, margin -37 out: it keeps its place, the name loses the room). */
 .source-row.wish-row .pkg-version { transition: opacity .2s ease, transform .3s ease-in-out; }
