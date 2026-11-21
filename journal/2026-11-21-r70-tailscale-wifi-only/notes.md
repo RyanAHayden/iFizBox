@@ -12,7 +12,7 @@ nothing listens on), times are the connect's own. Endpoint from `tailscale ping`
 | When (UTC) | iphone192 endpoint | 100.123.95.114:49152 | :62078 | :49153 |
 |---|---|---|---|---|
 | 2026-11-21 ~22:40 (B316) | 174.252.157.109 (Verizon Wireless, cellular) | refused, 40-130 ms | refused | (not probed) |
-| 2026-11-21 23:26 (R70) | 192.168.0.60:41641 (home Wi-Fi, direct) | **open**, 38 ms | **open**, 3 ms | refused, 4 ms |
+| 2026-11-21 23:26:12 (R70, first manual probe; probe-log.txt starts 23:26:25) | 192.168.0.60:41641 (home Wi-Fi, direct) | **open**, 38 ms | **open**, 3 ms | refused, 4 ms |
 
 Controls at 23:26:
 - The phone's LAN address without Tailscale, `192.168.0.60`: 49152 open, 62078 open, 49153 refused.
@@ -31,8 +31,10 @@ cellular every port was refused at the round trip (the phone's own reset coming 
 RemotePairing and lockdownd answer through Tailscale exactly as on the LAN. So iOS takes RemotePairing (49152)
 and lockdownd (62078) over the network only while the phone is on Wi-Fi: their network listeners belong to Wi-Fi
 (as Wi-Fi sync does), and a VPN interface over cellular doesn't bring them up. Installs through This iPhone over
-Tailscale need the phone on Wi-Fi (any Wi-Fi with internet: the tailnet carries the rest); off Wi-Fi the Signing
-Server is the way.
+Tailscale need the phone on Wi-Fi; off Wi-Fi the Signing Server is the way. Only home Wi-Fi was measured (LAN
+path and the home's public address); Wi-Fi away from home is expected to behave the same (the listener follows
+Wi-Fi, not the path) but wasn't tried. The evidence is two sessions compared, cellular at 22:40 and Wi-Fi at
+23:26-23:36, not one phone switched back and forth: strong, not airtight (see Not verified).
 
 This meets the brief's test ("If Wi-Fi answers and cellular refuses"), so the hedge goes:
 - `web/app/core/installroute.js` `routeRefused` (Tailscale): "…on cellular, try on Wi-Fi." becomes a plain rule
@@ -52,6 +54,9 @@ every port after signing Tailscale back in) is explained by this.
   desktop. B316 showed the 15 stays reachable locked (without a passcode); a passcode-locked phone isn't covered.
   The refusals were immediate resets, not timeouts, which fits a closed listener rather than a dropped packet.
 - **Cellular with Wi-Fi on but not joined**, and a Personal Hotspot client: not tried (needs the user's phone).
+- **Wi-Fi away from home** (another network, traffic through a DERP relay or a remote direct path): not tried;
+  the phone was home for the whole session.
+- **49153 on cellular**: B316 didn't probe the control port, so "refused" there can't be told from "every port".
 - **Why iOS ties it to Wi-Fi** (which daemon decides): inferred from the behaviour, not read from iOS.
 
 ## Log
@@ -62,3 +67,9 @@ every port after signing Tailscale back in) is explained by this.
 - Filed B318 for the wording (plan add needed `--force`: it matched R70 itself as "the same work").
 - A stray wait command (`timeout 590 tail -f --pid=1 /dev/null`) was started by mistake; it ends on its own
   timeout and does nothing.
+
+## Spec review
+
+Fixed: "proved" overstated (now: two sessions compared, strong not airtight); "any Wi-Fi with internet" was untested
+(dropped, listed under Not verified, B318 noted); the 38 ms row labelled as the first manual probe (the log starts
+13 s later). Kept: plan/TODO.md changed only by `run plan add`/`plan note` (B318); probe-log.txt is the raw data.
