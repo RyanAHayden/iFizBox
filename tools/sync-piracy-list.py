@@ -9,10 +9,12 @@ before a release; the app itself never asks Canister or GitHub anything (the lis
     tools/sync-piracy-list.py                      # fetch from api.github.com, write the module
     tools/sync-piracy-list.py --tree t.json --commits c.json [--out path]   # from saved API answers (offline, tests)
 
-Stdlib only. Hosts in NOT_COPIED stay out (see there).
+Stdlib only. Hosts in NOT_COPIED stay out (see there). GH_TOKEN, when set, is sent as Authorization (the anonymous
+API limit is 60 calls an hour, shared by everything on the machine).
 """
 import argparse
 import json
+import os
 import re
 import sys
 import urllib.request
@@ -68,8 +70,19 @@ SOFTWARE."""
 HOST = re.compile(r"^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$")
 
 
+def api_headers(env=None):
+    """Headers for api.github.com. With GH_TOKEN set (tools/release.sh exports the owner's), it goes out as
+    Authorization: anonymous calls share a 60-an-hour limit per machine that other agents can use up (HTTP 403)."""
+    env = os.environ if env is None else env
+    headers = {"Accept": "application/vnd.github+json", "User-Agent": "sync-piracy-list"}
+    token = env.get("GH_TOKEN", "").strip()
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    return headers
+
+
 def fetch_json(url):
-    req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": "sync-piracy-list"})
+    req = urllib.request.Request(url, headers=api_headers())
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.load(r)
 
