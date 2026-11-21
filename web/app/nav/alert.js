@@ -14,11 +14,49 @@
 // `onTap(index)` runs inside the tap's own click (before the promise resolves), for what Safari only allows from a
 // user gesture, such as opening an itms-services link.
 // A one-button (OK) alert: title, message. `alert` swaps in another showAlert (tests pass a fake).
-import { nativeBridge } from "../native.js";
+//
+// F345b: in the app under the native controls hook (<html data-controls="native">, native-controls.js) the alert is
+// the shell's own UIAlertController (bridge call ui.alert, native/Sources/NativeAlerts.swift): same options, same
+// {index, value} answer. A countdown alert stays the CSS one (UIAlertAction titles can't count down), so does one
+// with `onTap` (the bridge's answer comes after the tap, outside the user gesture its window.open or link needs), `input.paste`
+// is dropped (the native field has Paste in its own menu), and a shell without ui.alert, the site and every other
+// style get the CSS alert.
+import { nativeBridge, hasNativeCall } from "../native.js";
 
 export const alertOK = (title, message, alert = showAlert) => alert({ title, message, buttons: ["OK"] });
 
-export function showAlert({ title = "", message = "", input = null, buttons = ["OK"], cancel = 0, stacked = false, countdown = null, colors = {}, onTap = null } = {}) {
+export function showAlert(opts = {}) {
+  const native = nativeBridge();
+  if (!wantsNativeAlert(opts, native)) return cssAlert(opts);
+  const { title = "", message = "", input = null, buttons = ["OK"], cancel = 0, colors = {} } = opts;
+  const params = { title: String(title ?? ""), message: String(message ?? ""), buttons: buttons.map((b) => String(b)),
+    cancel: buttons.length > 1 && Number.isInteger(cancel) ? cancel : -1, colors: nativeColors(colors, buttons.length) };
+  if (input) params.input = { placeholder: String(input.placeholder ?? ""), value: String(input.value ?? ""), type: String(input.type || "text") };
+  return native.call("ui.alert", params).then((r) => {
+    const index = Number.isInteger(r?.index) && r.index >= 0 && r.index < buttons.length ? r.index : (params.cancel >= 0 ? params.cancel : 0);
+    const value = input ? String(r?.value ?? "") : undefined;
+    return { index, value };
+  }, () => cssAlert(opts)); // an older shell ("unknown method ui.alert") or no window to show it in
+}
+
+// The native alert only in the app (the bridge takes calls), under the native controls hook, and never for a countdown
+// or an `onTap` (it must run inside the tap itself).
+export function wantsNativeAlert({ countdown = null, onTap = null } = {}, native = nativeBridge(), doc = globalThis.document) {
+  return hasNativeCall(native) && !countdown && !onTap && doc?.documentElement?.getAttribute?.("data-controls") === "native";
+}
+
+// {index: "red" | "green"} as the shell takes it: string keys, known colours, indexes inside the buttons.
+function nativeColors(colors, count) {
+  const out = {};
+  for (const [k, v] of Object.entries(colors || {})) {
+    const i = Number(k);
+    if (Number.isInteger(i) && i >= 0 && i < count && (v === "red" || v === "green")) out[String(i)] = v;
+  }
+  return out;
+}
+
+// The CSS alert: iOS 6's UIAlertView, restyled by each era's stylesheet.
+function cssAlert({ title = "", message = "", input = null, buttons = ["OK"], cancel = 0, stacked = false, countdown = null, colors = {}, onTap = null } = {}) {
   return new Promise((resolve) => {
     const scrim = document.createElement("div");
     scrim.className = "alert-scrim";

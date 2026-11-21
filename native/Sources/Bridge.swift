@@ -72,6 +72,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         ASC.register(self) // asc.*: the App Store Connect key and the profiles iFizBox makes with it (ASC.swift)
         KeepAwake.register(self) // F287: app.keepAwake, the screen stays on while work runs (KeepAwake.swift)
         AppIcon.register(self) // F323: app.icon, the Home Screen icon follows the theme (AppIcon.swift)
+        NativeAlerts.register(self) // F345b: ui.alert, the iOS 26 style's UIAlertController (NativeAlerts.swift)
     }
 
     func on(_ method: String, _ h: @escaping Handler) { methods[method] = h }
