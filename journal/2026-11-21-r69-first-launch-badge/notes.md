@@ -1,11 +1,19 @@
 # R69: the icon badge on the first launch after installing a new .deb, iPhone 7
 
 **Result: not reproduced, no B needed for now.** Six first launches right after `apt-get install` of an iFizBox
-.deb, covering every condition R65's case had (a version change, so the page's `updated()` sends 0 then the count;
-the old badge left by the daemon's posted "N Upgrades" notification; the page's count above the daemon's), and on
-every one the icon took the page's count within 10 s. The two suspects in the brief are both ruled out on this
-phone: badge permission still read `authorized` (badges on) on the first launch after an install, and the set
-landed at once, with no delay after uicache. R65's one stuck launch stays unexplained (see the end).
+.deb (five with the real page, one with the test page), covering every condition R65's case had (a version
+change, so the page's `updated()` sends 0 then the count; the old badge left by the daemon's posted "N Upgrades"
+notification; the page's count above the daemon's), and on every one SpringBoard's badge store held the new count
+at the first read, 8-10 s after the launch (7 s after the tap on the test page). The brief's two suspects don't show
+on this phone: badge permission read `authorized` (badges on) on a first launch after an install, and no set waited
+for SpringBoard to re-read the app: each was in place by the first read, well inside the minute R65 watched. How
+fast within those 8-10 s on a first launch wasn't timed (2 s for a set made later, in a running app). R65's one
+stuck launch stays unexplained (see the end).
+
+Permission on the real-page runs (1, 3-6) wasn't read directly, but iOS only puts a badge on an app's icon with
+badge permission, and each set landed. For the same reason no build with a log line in `applyIcon` was needed:
+the store changing to the page's count after its `app.badge` shows `applyIcon` ran and iOS took it. A log line
+only helps on a launch that sticks, and none did.
 
 Chromium can't show a Home Screen badge or iOS's notification permission, so this needed the phone.
 
@@ -54,7 +62,7 @@ Side checks:
 - In one process, a set equal to the last one the app made still lands after the daemon changed the icon in
   between (page 3 → daemon 0 → page 3: icon 3). So the app side keeps no stale "last badge" that skips a set.
 - `VersionedSectionInfo.plist` (BulletinBoard's per-app notification settings) kept its 2026-11-20 03:32 mtime
-  through all seven installs: an apt-get install of iFizBox does not reset its notification permission.
+  through the first five installs (read before run 7): an apt-get install of iFizBox does not reset its notification permission.
 - The postinst reloads the upgrade daemon (RunAtLoad), but a run only sets the badge when a check is due (6 h) or
   forced; R65's daemon state was 3 h old at its install, so the daemon didn't reset the icon there either.
 
@@ -92,4 +100,7 @@ stays installed, newer than the 3972 that was there.
   seconds to a minute old.
 - An install from inside the app (the helper's deferred uicache): the brief's case was `apt-get install` over ssh.
 - That the store and the screen agree on every run: checked on screen once (run 5); the other runs read the
-  store only.
+  store only, so "set but not redrawn" isn't ruled out for them (it would still not be a lost set).
+- How long a set takes to reach the store on a first launch after an install: only that it was there by the first
+  read, 8-10 s after the launch.
+- A build with a log line in `applyIcon`: not made, as no launch stuck (see the top).
