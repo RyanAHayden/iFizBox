@@ -67,6 +67,9 @@ rows or change footers. Top to bottom:
   Tailscale), with Check Connection; Another VPN Is On, red, when a VPN that isn't Tailscale's is on, with Open
   LocalDevVPN, or Open Tailscale when the user set up Tailscale (Connect With: Tailscale, or signed in to it);
   Pair This iPhone with Start Pairing; Sign In to Tailscale when Tailscale's VPN is on and the app isn't signed in.
+  Once that sign-in is in, the cell checks by itself in its own row (Checking…, "Checking Connection…" then "Checking
+  Pairing…" under it, the grey spinner; no HUD), and a pairing the phone dropped is redone on Pairing by itself.
+  Pair Again (a check the phone turned down) opens Pairing, which starts pairing at once.
   Tailscale's own VPN is never a conflict. With Signing Server chosen: Ready to Install through the server, Check Server.
 - **Installation**: one row, Install Apps With › (`installation/with`), its detail the route and, for This iPhone,
   the pairing: "This iPhone · Paired", "This iPhone · Not Paired" or "Signing Server".
@@ -100,7 +103,9 @@ The pages under it:
   check (Turn On LocalDevVPN alert when it's off, rechecked when the app comes back), then on iOS 27 pairing starts
   on its own: the 6-digit code and where to type it, a line and a ringed Settings screenshot a step; before iOS 27,
   Import Pairing File; once paired, Paired with a check, Check Connection (Pair Again when the pairing is refused)
-  and Forget Pairing.
+  and Forget Pairing. One pairing at a time: drawing the page again while it pairs, or coming back to it within 90
+  seconds of leaving, keeps the same code and the same advertisement (iOS's Developer Mode page keeps a dead "Pair
+  with" row for every advertisement that came and went), and every advertisement uses one kept key.
 
 ## Retired keys
 

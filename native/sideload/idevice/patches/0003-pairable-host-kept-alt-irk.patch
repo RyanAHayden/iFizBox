@@ -1,0 +1,55 @@
+diff --git i/ffi/src/pairing_host.rs w/ffi/src/pairing_host.rs
+index caece60..03603cd 100644
+--- i/ffi/src/pairing_host.rs
++++ w/ffi/src/pairing_host.rs
+@@ -199,6 +199,50 @@ pub unsafe extern "C" fn pairable_host_set_pin(
+     }
+ }
+ 
++/// Uses a kept 16-byte `altIRK` instead of the one `pairable_host_prepare` drew, and
++/// returns the TXT records again (an XML plist dictionary; free with
++/// `idevice_data_free`). With the same name, identifier and `altIRK`, every
++/// advertisement the caller publishes is the same one, so the device lists one host
++/// instead of one per try.
++///
++/// # Safety
++/// `handle` must be a valid handle from `pairable_host_prepare` or
++/// `pairable_host_new`, not in use by a running `pairable_host_accept_fd`.
++/// `alt_irk` must point to 16 readable bytes. The out-pointers must be valid.
++#[unsafe(no_mangle)]
++pub unsafe extern "C" fn pairable_host_set_alt_irk(
++    handle: *mut PairableHostHandle,
++    alt_irk: *const u8,
++    out_txt_data: *mut *mut u8,
++    out_txt_len: *mut usize,
++) -> *mut IdeviceFfiError {
++    if handle.is_null() || alt_irk.is_null() || out_txt_data.is_null() || out_txt_len.is_null() {
++        return ffi_err!(IdeviceError::FfiInvalidArg);
++    }
++    let handle = unsafe { &mut *handle };
++    unsafe { std::ptr::copy_nonoverlapping(alt_irk, handle.host_info.alt_irk.as_mut_ptr(), 16) };
++    let service_id = handle.pairing_file.identifier.clone();
++    let mut dict = plist::Dictionary::new();
++    for (key, value) in handle.host_info.mdns_txt_records(&service_id) {
++        dict.insert(key, plist::Value::String(value));
++    }
++    let mut txt = Vec::new();
++    if let Err(e) = plist::to_writer_xml(&mut txt, &plist::Value::Dictionary(dict)) {
++        return ffi_err!(IdeviceError::InternalError(format!(
++            "failed to encode TXT records: {e}"
++        )));
++    }
++    // capacity == len, as idevice_data_free rebuilds it
++    let txt = txt.into_boxed_slice();
++    let len = txt.len();
++    let ptr = Box::into_raw(txt) as *mut u8;
++    unsafe {
++        *out_txt_data = ptr;
++        *out_txt_len = len;
++    }
++    null_mut()
++}
++
+ /// Runs pair-setup against a device that has already connected to `fd`.
+ ///
+ /// Blocks the calling thread until pairing succeeds or fails. The fd is duplicated

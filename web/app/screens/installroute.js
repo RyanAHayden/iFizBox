@@ -396,8 +396,9 @@ function warnFooters(sections) {
 // B219: a finished sign-in says nothing and waits for no tap: Settings checks the connection by itself
 // (connectAfterSignIn) and only a failure gets an alert; This iPhone's setup page (`from`, its visit) has no pairing
 // to test yet: its poll starts pairing once the Tailscale VPN is on, and its rows say what it waits for.
-// `hud`: the page has no Test Connection row to spin (Settings' main page), so the check shows the HUD.
-async function tailscaleSignIn(native, alert, redraw, from = null, { hud = false } = {}) {
+// `spin(label)`: B320, the page's own spinner for the check after it (Settings' main page: its status cell), returning
+// its stop; without it the check spins Test Connection's row.
+async function tailscaleSignIn(native, alert, redraw, from = null, { spin = null } = {}) {
   if (signingIn) return;
   signingIn = "Starting…";
   signInVisit = from;
@@ -413,7 +414,7 @@ async function tailscaleSignIn(native, alert, redraw, from = null, { hud = false
     signInVisit = null;
     redraw();
     if (from) return;
-    await connectAfterSignIn(native, alert, redraw, { hud });
+    await connectAfterSignIn(native, alert, redraw, { spin });
   } catch (e) {
     signingIn = null;
     signInVisit = null;
@@ -444,17 +445,21 @@ export async function testUntilConnected(native, now = () => Date.now()) {
 // the page redrawn on its connected state with no alert. A connection made, or refused, goes on to B220's check of the
 // kept pairing (recheckPairing forgets a refused one and starts pairing again, with its own alert). Any other failure
 // shows Test Connection's alert for it. Answers "ok", "repair" or the failing code.
-export async function connectAfterSignIn(native, alert, redraw, { hud = false } = {}) {
+// B320: `spin(label)` (returning its stop) is the page's spinner for both checks, no HUD (docs/settings.md): Settings'
+// main page spins its status cell. Without it, Test Connection's row spins; `hud` (no row to spin, no spinner given)
+// is the HUD.
+export async function connectAfterSignIn(native, alert, redraw, { hud = false, spin = null } = {}) {
+  const rowSpin = () => { testing = true; redraw(); return () => { testing = false; redraw(); }; };
+  const s = spin ?? (hud ? null : rowSpin);
   let r;
-  if (hud) r = await busy("Checking Connection", () => testUntilConnected(native));
+  if (!s) r = await busy("Checking Connection", () => testUntilConnected(native));
   else {
-    testing = true;
-    redraw();
-    try { r = await testUntilConnected(native); } finally { testing = false; redraw(); }
+    const stop = s("Checking Connection");
+    try { r = await testUntilConnected(native); } finally { stop(); }
   }
   // B246: not_paired with a pairing kept here means the phone forgot it: the same check forgets it and pairs again
   if (r?.ok || r?.code === "refused" || (r?.code === "not_paired" && r.paired)) {
-    const how = await recheckPairing(native, alert, redraw);
+    const how = await recheckPairing(native, alert, redraw, { spin: s });
     if (r.ok) return "ok";
     if (how === "repair" || how === "ok") return how; // ok: the pairing answered after all
   }
@@ -468,26 +473,43 @@ export async function connectAfterSignIn(native, alert, redraw, { hud = false } 
 // failures (the VPN off, no answer) say nothing here: Check Connection explains them.
 // A refusal is tried again once after `retryMs` before the pairing is forgotten: remotepairingd restarting (the VPN
 // just came back) refuses for a moment, and redoing the pair step costs the user the 6-digit code.
+// B320: a pairing the phone answers and then drops (turnedDown, e.g. "connection invalidated" seen on the iPhone 15 Pro
+// right after a Tailscale sign-in) is tried once more too, and still dropped it is forgotten and pairing starts by
+// itself, as a refused one: the user was left to find Forget Pairing. `spin(label)` (returning its stop) spins the
+// page's own row instead of the HUD.
 export const recheckHooks = { goPair: () => goTo("pair"), retryMs: 3000 }; // tests
-export async function recheckPairing(native, alert, redraw) {
+// B320: the phone itself turned the kept pairing down: refused everywhere (verifyFailure's `unusable`), or it answered
+// and then dropped it (the shell's pair_again, an early EOF, the channel "invalidated"). A timeout or any other failure
+// isn't the pairing's fault and never forgets it.
+export function turnedDown(why, err) {
+  if (!why || why.late) return false;
+  if (why.unusable) return true;
+  const raw = String(err?.message ?? err ?? "");
+  const code = err?.code ?? raw.split(":")[0];
+  return Boolean(why.again) && (code === "pair_again" || /invalidat|early eof|UnexpectedEof/i.test(raw));
+}
+export async function recheckPairing(native, alert, redraw, { spin = null } = {}) {
   const st = await status(native);
   if (!st?.paired || !vpnOn(st)) return "skipped";
   const verify = async () => {
     try { await within(call(native, "idevice.verify"), TIMEOUTS.verify); return null; } catch (e) { lastErr = e; return isLate(e) ? { late: true } : verifyFailure(e, st); }
   };
   let lastErr = null; // B316: what the failed check is kept as
-  const why = await busy("Checking Pairing", async () => {
+  const work = async () => {
     const first = await verify();
-    if (!first?.unusable) return first;
+    if (!turnedDown(first, lastErr)) return first;
     await new Promise((r) => setTimeout(r, recheckHooks.retryMs));
     return verify();
-  });
+  };
+  let why;
+  if (spin) { const stop = spin("Checking Pairing"); try { why = await work(); } finally { stop(); } } else why = await busy("Checking Pairing", work);
   if (!why) { clearRouteFailure(); return "ok"; } // B316: after a sign-in or a new way in, the pairing answered: green again
-  if (!why.unusable) { rememberRouteFailure(why.late ? NO_ANSWER_FAILURE : routeFailureOf(lastErr, st)); return "failed"; } // B316
+  if (!turnedDown(why, lastErr)) { rememberRouteFailure(why.late ? NO_ANSWER_FAILURE : routeFailureOf(lastErr, st)); return "failed"; } // B316
   await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {}));
   forgetStatus();
   if (visit) visit.started = false;
-  await alert({ title: why.title, message: `This iPhone no longer accepts ${NAME}'s pairing, so every connection was refused. Pairing starts again now.`, buttons: ["OK"] });
+  const how = why.unusable ? ", so every connection was refused" : "";
+  await alert({ title: why.title, message: `This iPhone no longer accepts ${NAME}'s pairing${how}. Pairing starts again now.`, buttons: ["OK"] });
   if (typeof location !== "undefined" && onPairPage()) redraw(); else recheckHooks.goPair();
   return "repair";
 }
@@ -611,6 +633,7 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
   const subtitle = slotOf(statusCell.querySelector(".cell-subtitle"), CHECKING.subtitle);
   const actionLabel = actionCell.querySelector(".cell-label");
   const checkButton = checkMark(actionCell); // B135: Check Connection's answer on the action row
+  const cellSpin = checkMark(statusCell); // B320: the status cell's spinner while a sign-in's checks run (spinStatus)
   actionCell.classList.add("is-dim");
   actionCell.setAttribute("aria-disabled", "true");
   const withCell = cells[2];
@@ -626,7 +649,8 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
   let known; // idevice.status once read
   let certRead = false; // B250: signing() has answered once (or failed)
   let certificate; // B250: signing.status has an identity (signing()'s `ready`); undefined until read
-  const paintStatus = (s) => {
+  const paintStatus = (s, { force = false } = {}) => {
+    if (cellSpin.spinning() && !force) return; // B320: a sign-in's checks hold the cell (spinStatus) until they end
     now = s;
     icon.className = `status-icon tone-${s.tone}`;
     title.set(s.title, { red: Boolean(s.red) });
@@ -697,13 +721,21 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
     await Promise.all(reads);
   };
   const after = () => refresh({ auto: false });
+  // B320: the checks after a Tailscale sign-in ("Checking Connection", "Checking Pairing") as the status cell's own
+  // wait: Checking… with the step under it and the grey spinner in its row, the action row dimmed
+  const spinStatus = (label) => {
+    paintStatus({ ...CHECKING, subtitle: `${label}…` }, { force: true });
+    return cellSpin.spinning() ? () => {} : cellSpin.spin(); // the pairing check follows the connection's at once
+  };
   const runAction = async (a) => {
     if (a === "check") return check(native, alert, after, store, checkButton).then(after);
     if (a === "checkServer") return checkServer();
     if (a === "openVPN") return openVPN(native, alert).then(refresh);
     if (a === "pair") return goTo("pair");
     if (a === "certificate") return navGo(links.certificate); // B250: the Certificate page, as its row opens
-    if (a === "signIn") return tailscaleSignIn(native, alert, refresh, null, { hud: true });
+    // B320: redrawn without its automatic check (it failed while signing in and drew an x on this row), and the check
+    // after it spins the status cell instead of a HUD
+    if (a === "signIn") return tailscaleSignIn(native, alert, after, null, { spin: spinStatus }).then(after);
     if (a === "openTailscale") return openApp(native, alert, TAILSCALE_URL, "Tailscale");
     if (a === "useTailscale") { await busy("Switching", () => call(native, "tailscale.setConnect", { value: "auto" }).catch(() => {})); return refresh(); }
   };
@@ -875,7 +907,10 @@ export function leave() { // also for tests: ends a visit (its VPN poll) without
   const was = visit;
   if (visit?.poll) clearInterval(visit.poll);
   visit = null;
-  if (was && pairing && shown) call(shown.native, "idevice.pairCancel").catch(() => {}); // once, not again on the hashchange after Leave
+  if (was && pairing && shown) {
+    call(shown.native, "idevice.pairCancel").catch(() => {}); // once, not again on the hashchange after Leave
+    pairing = null; // B320: coming back starts (or rejoins: the shell keeps it a while) at once, not on this one's answer
+  }
   if (was && signingIn && signInVisit === was && shown) { // B143: the sign-in this page started (an older shell has no such call)
     signInVisit = null;
     call(shown.native, "tailscale.signInCancel").catch(() => {});
@@ -982,17 +1017,19 @@ async function drawPair(box, { store, native, alert, redraw }) {
     v.failed = false;
     pairing = { pin: "", text: "", error: "" };
     redraw();
+    // B320: this visit's events and answer only: an earlier visit's call answering late leaves this one's state alone
+    const mine = () => visit === v && pairing !== null;
     try {
       // idevice.pair's first event is the code, before anything listens; it keeps listening until it pairs or the
       // page is left (no timeout)
-      await call(native, "idevice.pair", {}, (ev) => { if (pairing) { pairing = pairEvent(pairing, ev); redraw(); } });
-      pairing = null;
+      await call(native, "idevice.pair", {}, (ev) => { if (mine()) { pairing = pairEvent(pairing, ev); redraw(); } });
+      if (visit === v) pairing = null;
       AUTO_CHECK.last = 0; // B316: paired again: the paired page checks at once and goes green on its own
       store.set(ROUTE_KEY, "iphone");
       if (visit === v) redraw();
     } catch (e) {
-      pairing = null;
       if (visit !== v) return;
+      pairing = null;
       v.failed = true;
       redraw();
       if (e?.code !== "canceled" && e?.code !== "cancelled" && !/^cancel+ed/.test(e?.message || "")) {
@@ -1091,7 +1128,9 @@ let checking = false;
 // at most once every AUTO_CHECK.gapMs (moving between those pages doesn't check again at once).
 export const AUTO_CHECK = { gapMs: 15000, last: 0 };
 export function autoCheck(native, alert, redraw, store, mark = null, now = Date.now()) {
-  if (!routeFailure() || store.get(ROUTE_KEY) !== "iphone" || checking || now - AUTO_CHECK.last < AUTO_CHECK.gapMs) return null;
+  // B320: not while Tailscale signs in: the sign-in checks by itself once it's in (connectAfterSignIn), and a check
+  // run now fails (still signed out) and drew its x on the row just tapped
+  if (!routeFailure() || store.get(ROUTE_KEY) !== "iphone" || checking || signingIn || now - AUTO_CHECK.last < AUTO_CHECK.gapMs) return null;
   AUTO_CHECK.last = now;
   // the gap counts from the end too: a slow check (up to TIMEOUTS.verify) isn't followed by another at once
   return check(native, alert, redraw, store, mark, { quiet: true }).finally(() => { AUTO_CHECK.last = Math.max(AUTO_CHECK.last, Date.now()); });
@@ -1131,7 +1170,13 @@ async function checkOnce(native, alert, redraw, store, mark = null, { quiet = fa
       }
       if (!why.again) return await alert({ title: why.title, message: why.message, buttons: ["OK"] });
       const { index } = await alert({ title: why.title, message: why.message, buttons: ["Cancel", "Pair Again"], cancel: 0 }) || {};
-      if (index === 1) { await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {})); forgetStatus(); if (visit) visit.started = false; redraw(); }
+      if (index === 1) {
+        await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {}));
+        forgetStatus();
+        if (visit) visit.started = false;
+        // B320: pairing starts by itself on the Pairing page: from Installation & Signing's main page, go there
+        if (typeof location !== "undefined" && onPairPage()) redraw(); else recheckHooks.goPair();
+      }
     } finally { mark?.expire(); } // the x stays while the alert is up, then the same few seconds
   }
 }
