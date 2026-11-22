@@ -36,6 +36,16 @@ Built from the approved concept (https://claude.ai/artifact/1jegTGS8DQc5qz1xTjpZ
   approved; if outline unselected tabs are wanted after all, it's one line in `eraSet` (`tabs` from
   `TAB_GLYPHS_7` at the era's weight).
 
+- Spec review findings kept as they are, with the reason:
+  - The iOS 26 tabs are filled, not outlined: this is the approved concept (above).
+  - iOS 13's tab bar is iOS 7's chosen-tab glyphs with round caps, and the sets are iOS 7's drawings recoloured and
+    weighed rather than new shapes: that is exactly the approved concept's `eraSet`, which the plan note says to build.
+  - A live Style change repaints only row tiles: these are the only pictures that stay on screen under Theme > Style.
+    Home's tiles are CSS and already repaint, Copying Files' guide tiles live on their own page, and the tab bar is
+    CSS tokens.
+  - The chosen tab's tint is the eras' existing `--tab-icon-active` / tab colour. The shots show the tinted Home tab
+    in every column.
+
 ## Shots
 
 `shots/sheet.png` is the Chromium sheet (tools/concept/check.mjs on a standalone build of this branch, iPhone 16
