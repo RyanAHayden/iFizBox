@@ -379,6 +379,11 @@ function eraSet(colours, line, tile, tabLine) {
       ...(t.gradient ? { gradient: t.gradient.map(recolour) } : {}), svg: weigh(t.svg) })),
     tabs: map(TAB_GLYPHS_SELECTED_7, (svg) => svg.replace(/stroke-width='1.6'/g, `stroke-width='${tabLine}'`)
       .replace(/stroke-linejoin='round'/g, "stroke-linejoin='round' stroke-linecap='round'")),
+    // F369: the glass bars' unselected tab glyphs: iOS 7's outlines at the era's tab weight, round caps and joins
+    tabsOutline: map(TAB_GLYPHS_7, (svg) => svg
+      .replace(/stroke-width='([\d.]+)'/g, (_, w) => `stroke-width='${+(w * tabLine / 1.6).toFixed(2)}'`)
+      .replace(/ stroke-linejoin='round'/g, "")
+      .replace(/fill='none' stroke='#000'/, "fill='none' stroke='#000' stroke-linejoin='round' stroke-linecap='round'")),
     tile,
   };
 }
@@ -393,6 +398,7 @@ const SET_26 = eraSet(C26, 2.4, { size: SIZE, radius: 7.8, glyph: 18 }, 2.2);
 //   home    name -> { colour, gradient, svg }   Home tiles drawn by a screen's own CSS (homeTileCss)
 //   tabs    tab -> SVG                          the tab bar's --glyph tokens (tabGlyphTokens)
 //   tabsSelected  tab -> SVG                    the chosen tab's glyph, when an era draws it apart (iOS 7: filled)
+//   tabsOutline   tab -> SVG                    iOS 13/26: outline glyphs for the glass bars' unselected tabs
 //   tile    the row tile's size, corners and glyph size
 // An era's set names only what it redraws: anything it leaves out falls back to iOS 6's entry.
 export const ICON_SETS = {

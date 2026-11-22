@@ -127,7 +127,7 @@ enum Incoming {
     static func openLogReady() {
         DispatchQueue.main.async {
             let web = UIApplication.shared.connectedScenes
-                .compactMap { ($0 as? UIWindowScene)?.windows.first?.rootViewController?.view as? WKWebView }.first
+                .compactMap { (($0 as? UIWindowScene)?.windows.first?.rootViewController as? WebController)?.webView }.first
             guard let web, !web.isLoading, web.url != nil else { return } // the page takes it at start
             web.callAsyncJavaScript("window.dispatchEvent(new Event('ifizbox:openlog'))", arguments: [:], in: nil, in: .page,
                                     completionHandler: nil)
@@ -137,7 +137,7 @@ enum Incoming {
     // The page's hash-style wake-up, as Notifications.open does: wait for the web view to finish loading.
     private static func notify(tries: Int) {
         let web = UIApplication.shared.connectedScenes
-            .compactMap { ($0 as? UIWindowScene)?.windows.first?.rootViewController?.view as? WKWebView }.first
+            .compactMap { (($0 as? UIWindowScene)?.windows.first?.rootViewController as? WebController)?.webView }.first
         guard let web, !web.isLoading, web.url != nil else {
             if tries > 0 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { notify(tries: tries - 1) } }
             else {
@@ -157,7 +157,7 @@ enum Incoming {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             guard pending != nil else { return }
             let web = UIApplication.shared.connectedScenes
-                .compactMap { ($0 as? UIWindowScene)?.windows.first?.rootViewController?.view as? WKWebView }.first
+                .compactMap { (($0 as? UIWindowScene)?.windows.first?.rootViewController as? WebController)?.webView }.first
             guard let web, !web.isLoading, web.url != nil else {
                 if left > 0 { slowNotify(left: left - 1) }
                 else { OpenLog.hop("Incoming: error: the page never took the link") }
@@ -175,7 +175,7 @@ enum Incoming {
     static func receiving(_ name: String, progress: Double?) {
         DispatchQueue.main.async {
             let web = UIApplication.shared.connectedScenes
-                .compactMap { ($0 as? UIWindowScene)?.windows.first?.rootViewController?.view as? WKWebView }.first
+                .compactMap { (($0 as? UIWindowScene)?.windows.first?.rootViewController as? WebController)?.webView }.first
             guard let web, !web.isLoading, web.url != nil else { return }
             let p: Any = progress ?? NSNull()
             web.callAsyncJavaScript("window.dispatchEvent(new CustomEvent('ifizbox:receiving', { detail: { name, progress } }))",
@@ -225,8 +225,19 @@ final class WebController: UIViewController, WKNavigationDelegate, WKUIDelegate 
     private let bridge = Bridge()
     private lazy var web = Web.make(bridge: bridge)
     private var cover: UIView?
+    var webView: WKWebView { web }
 
-    override func loadView() { view = web }
+    // F369: the root view holds the web view (full size) rather than being it, so the iOS 26 glass bars can put the
+    // web view inside their UITabBarController's tab (NativeGlass.swift) and give it back. Clear: the window's ground
+    // shows behind the page's edges as before.
+    override func loadView() {
+        let root = UIView()
+        root.backgroundColor = .clear
+        web.frame = root.bounds
+        web.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        root.addSubview(web)
+        view = root
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -343,6 +354,16 @@ enum TopInset {
     }
 }
 
+// F369: the app's web view. While the iOS 26 glass bars hold it inside their tab (NativeGlass.swift), UIKit adds the
+// tab bar to its safe area; the page lays out with env(safe-area-inset-*) and draws its own room for the bar, so the
+// glass bars pin its safe area to the screen's (pinnedSafeArea) and the page sees no change.
+final class PageWebView: WKWebView {
+    var pinnedSafeArea: UIEdgeInsets? {
+        didSet { if pinnedSafeArea != oldValue { safeAreaInsetsDidChange() } }
+    }
+    override var safeAreaInsets: UIEdgeInsets { pinnedSafeArea ?? super.safeAreaInsets }
+}
+
 enum Web {
     static func make(bridge: Bridge) -> WKWebView {
         let c = WKWebViewConfiguration()
@@ -357,7 +378,7 @@ enum Web {
             injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page))
         // WebKit holds requestAnimationFrame near 60 Hz by default on iOS; the JS edge swipe needs 120 (R3).
         WebKitFeature.set({ $0 == "PreferPageRenderingUpdatesNear60FPSEnabled" }, false, c.preferences)
-        let w = WKWebView(frame: .zero, configuration: c)
+        let w = PageWebView(frame: .zero, configuration: c)
         FocusKeyboard.enable() // F248: a focus from script brings up the keyboard too
         // Back is web/app/'s JS swipe; WebKit's history gesture would fight it.
         w.allowsBackForwardNavigationGestures = false

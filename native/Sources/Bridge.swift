@@ -75,7 +75,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         NativeAlerts.register(self) // F345b: ui.alert, the iOS 26 style's UIAlertController (NativeAlerts.swift)
         NativeMenus.register(self) // F345c: ui.actionSheet and ui.menu, its sheets and UIMenus (NativeMenus.swift)
         NativeSegments.register(self) // F345d: ui.segments, its pinned scope bar as a UISegmentedControl (NativeSegments.swift)
-        NativeGlass.register(self) // F367: ui.glass, its tab bar and bar buttons as Liquid Glass on iOS 26+ (NativeGlass.swift)
+        NativeGlass.register(self) // F367/F369: ui.glass, the glass bars (a real UITabBar, glass bar buttons) on iOS 26+ (NativeGlass.swift)
         // F345c: {text}, a copy straight to UIPasteboard, for nav/menu.js copyText when WebKit refuses the write (a
         // native menu's Copy runs after the touch WebKit wants).
         on("clipboard.write") { c in
@@ -209,8 +209,9 @@ enum WebKitFeature {
 // window's interface style. Automatic leaves the style to the system, so the
 // page's prefers-color-scheme (which follows the window's traits) keeps tracking it. The status bar is light text
 // on every iOS 6 bar (blue, dark palettes'); B221: dark text on iOS 7's White bar (the page's statusBar "dark").
-// The bars themselves are web/app/'s (R3 (a)): the shell draws no UINavigationBar or UITabBar, so every era's bars,
-// iOS 26's floating glass tab bar and capsule buttons too, are the page's (F354; native/test_web_bars.py).
+// The bars themselves are web/app/'s (R3 (a)): the shell draws no UINavigationBar or UITabBar, so every era's bars
+// are the page's (F354; native/test_web_bars.py), except the glass bars: on iOS 26+ under the iOS 26 style the page
+// asks for a real UITabBar and UIKit glass bar buttons through ui.glass (F369, NativeGlass.swift).
 // F198: the window and web view behind the page take the palette's ground (black for OLED Black), and the shell keeps
 // the last {style, darkPalette} so the next launch paints that ground before the page has run (no light or grey
 // flash on a dark launch). Until the page has said anything: Automatic and Gunmetal, the page's own defaults.
@@ -248,7 +249,7 @@ enum Theme {
         window.overrideUserInterfaceStyle = Self.style(style)
         let ground = Launch.ground(dark: theme == "dark", palette: darkPalette, lightPalette: lightPalette)
         window.backgroundColor = ground.pattern
-        if let web = window.rootViewController?.view as? WKWebView { Launch.paint(web, ground) }
+        if let web = (window.rootViewController as? WebController)?.webView { Launch.paint(web, ground) }
         UserDefaults.standard.set(["style": style, "darkPalette": darkPalette, "lightPalette": lightPalette],
                                   forKey: savedKey)
         Splash.follow(dark: theme == "dark", palette: darkPalette, lightPalette: lightPalette) // B203: the next splash
