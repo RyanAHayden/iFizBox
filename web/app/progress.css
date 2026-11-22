@@ -178,6 +178,10 @@
 /* installing, or a download that hasn't said its size: the fill sweeps (transform only) */
 .qr-bar.is-indeterminate .qr-fill { width: 35%; transition: none; animation: qr-sweep 1.1s linear infinite; }
 @keyframes qr-sweep { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+/* B324: WebKit's own <progress> in the bar's place under the native controls hook (nav/progress.js rowBar; ios26.css
+   hands it to WebKit) */
+.qr-progress { display: block; width: 100%; margin-top: 3px; }
+.qr-progress[hidden] { display: none; }
 /* the row's stop: a grey disc with a white x, until dpkg takes the package */
 .qr-stop { flex: none; width: 44px; height: 44px; margin-right: 4px; cursor: pointer; touch-action: manipulation; }
 .qr-stop[hidden] { display: none; }

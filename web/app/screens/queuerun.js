@@ -23,7 +23,7 @@
 // What installed leaves the queue as it goes; what failed or was skipped stays queued, so Confirm shows it again.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { el, barButton } from "../nav/ui.js";
-import { openProgress, openOn } from "../nav/progress.js";
+import { openProgress, openOn, rowBar } from "../nav/progress.js";
 import { showAlert } from "../nav/alert.js";
 import { classify, chooseFinish, selfLevels } from "../core/progress.js";
 import { runRows, neededBy, createInstallRun, rowStatus, summaryLine, runStatus, runPercent, ended } from "../core/installrun.js";
@@ -125,9 +125,7 @@ export async function runQueue({ jobs, plan }, deps) {
     main.type = "button";
     const name = el("div", "qr-name", label(r.id));
     const status = el("div", "qr-status");
-    const bar = el("div", "qr-bar");
-    const fill = el("div", "qr-fill");
-    bar.append(fill);
+    const { bar, set: setBar } = rowBar(); // B324: <progress> under the native controls hook
     main.append(name, status, bar);
     const act = el("button", "qr-stop");
     act.type = "button";
@@ -139,7 +137,7 @@ export async function runQueue({ jobs, plan }, deps) {
       else showLog(r.id);
     });
     act.addEventListener("click", () => run.stop(r.id));
-    views.set(r.id, { li, status, bar, fill, act });
+    views.set(r.id, { li, status, bar, setBar, act });
   }
   list.append(summary);
   const draw = (r) => {
@@ -149,8 +147,7 @@ export async function runQueue({ jobs, plan }, deps) {
     v.status.textContent = rowStatus(r, names);
     const busy = r.state === "downloading" || r.state === "installing";
     v.bar.hidden = !busy;
-    v.bar.classList.toggle("is-indeterminate", r.state === "installing" || (r.state === "downloading" && !r.fraction));
-    v.fill.style.transform = `scaleX(${r.state === "downloading" ? r.fraction || 0 : 1})`;
+    v.setBar(r.state === "downloading" ? r.fraction || 0 : 1, r.state === "installing" || (r.state === "downloading" && !r.fraction));
     v.act.hidden = !["waiting", "downloading", "ready"].includes(r.state) || run.stopping;
   };
 

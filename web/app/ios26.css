@@ -587,3 +587,82 @@ html[data-style="ios26"] .alert-button.red { color: var(--i26-red); }
 html[data-style="ios26"] .alert-button:disabled { color: var(--i26-alert-dim); opacity: 1; }
 html[data-style="ios26"] .alert-button:active:not(:disabled),
 html[data-style="ios26"] .alert-button.is-pressed { background: var(--i26-alert-pressed); }
+
+/* ---- B324: the Running page (nav/progress.js, the queue run and the app run) ----
+   Unlike iOS 7's and iOS 13's always-black console, this era's page follows the theme (iOS 26 has no black
+   terminal page of its own): White is the grouped ground with black step lines, OLED Black stays black. Its parts are
+   the era's controls in each tone: the nav bar as every page's (the ground fading out, no hairline) with the glass
+   capsule bar buttons (Cancel, Close), Apps | Log as the segmented control above (grey track, the chosen segment a
+   pill), the rows' and the foot's bars as iOS 26's UIProgressView (a 4pt capsule, the tint on a grey track; in the
+   rows' 9pt box through transparent 2.5pt borders, as iOS 13's), the rows' stop as the App Store's stop glyph (a
+   square in a thin ring, in the tint), and the finish button a prominent tint capsule with white semibold text.
+   Under the native controls hook the bars are WebKit's own <progress> (nav/progress.js; the rule above). */
+html[data-style="ios26"][data-theme="light"] {
+  --i26-run-track: #e3e3e8; --i26-run-raw: #6d6d72; --i26-run-warning: #c66b00;
+  --console-bar: var(--nav-bar);
+}
+html[data-style="ios26"][data-theme="dark"] {
+  --i26-run-track: #3a3a3c; --i26-run-raw: #8d8d93; --i26-run-warning: #ffd60a;
+  --console-bar: var(--dk-nav-bar);
+}
+html[data-style="ios26"][data-theme] {
+  --console-btn: var(--i26-capsule); --console-btn-edge: var(--i26-glass-rim); --console-btn-pressed: var(--i26-capsule-pressed);
+  --progress-seg: var(--i26-seg-track); --progress-seg-selected: var(--i26-seg-pill); --progress-seg-edge: var(--i26-seg-track);
+  --progress-seg-divider: inset 1px 0 0 var(--i26-seg-divider); --progress-seg-shadow: none; --progress-seg-emboss: none;
+  --progress-seg-text: var(--i26-seg-text);
+  --qr-bar: var(--i26-run-track) padding-box; --qr-fill: var(--i26-tint);
+  --progress-track: var(--i26-run-track) content-box; --progress-track-edge: transparent; --progress-fill: var(--i26-tint);
+  --progress-finish: var(--i26-tint); --progress-finish-pressed: linear-gradient(rgba(0,0,0,.2), rgba(0,0,0,.2)), var(--i26-tint);
+  --progress-finish-ring: none; --progress-finish-emboss: none; --progress-finish-pressed-emboss: none; --progress-finish-text: #fff;
+}
+html[data-style="ios26"] .console,
+html[data-style="ios26"] .progress-foot { background: var(--i26-bar); }
+html[data-style="ios26"] :is(.pl-raw, .pl-step, .pl-error, .pl-warning, .pl-help, .progress-status, .progress-seg-item,
+  .progress-finish, .progress-jump, .qr-name, .qr-status, .qr-summary) {
+  font-family: -apple-system, system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+html[data-style="ios26"] .pl-raw { font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--i26-run-raw); }
+html[data-style="ios26"] .pl-step { font-weight: 600; color: var(--i26-label); }
+html[data-style="ios26"] .pl-error { font-weight: 600; color: var(--i26-red); }
+html[data-style="ios26"] .pl-warning { font-weight: 600; color: var(--i26-run-warning); }
+html[data-style="ios26"] .pl-help { color: var(--i26-run-raw); }
+html[data-style="ios26"] .progress-cursor { background: var(--i26-run-raw); }
+html[data-style="ios26"] .progress-jump {
+  border-radius: 12px; font-weight: 600; color: var(--i26-label); background: var(--i26-capsule); box-shadow: var(--i26-capsule-shadow);
+}
+html[data-style="ios26"] .progress-status { font-size: 13px; font-weight: 600; color: var(--i26-label); }
+/* Apps | Log: the grey track, the chosen segment a pill 1pt inside it (the track's colour as a ring), no divider beside it */
+html[data-style="ios26"] .progress-seg { border-radius: 9px; background: var(--i26-seg-track); }
+html[data-style="ios26"] .progress-seg-item { font-size: 13px; font-weight: 400; }
+html[data-style="ios26"] .progress-seg-item:first-child { border-radius: 9px 0 0 9px; }
+html[data-style="ios26"] .progress-seg-item:last-child { border-radius: 0 9px 9px 0; }
+html[data-style="ios26"] .progress-seg-item:active:not(.selected) { background: var(--i26-seg-pressed); }
+html[data-style="ios26"] .progress-seg-item.selected {
+  border-radius: 8px; font-weight: 600; box-shadow: inset 0 0 0 1px var(--i26-seg-track), var(--i26-seg-pill-shadow);
+}
+html[data-style="ios26"] .progress-seg-item.selected + .progress-seg-item { box-shadow: none; }
+/* the rows: the label colours on the ground, separators in the era's divider */
+html[data-style="ios26"] .qr-row { border-bottom-color: var(--divider); }
+html[data-style="ios26"] .qr-main { color: var(--i26-label); }
+html[data-style="ios26"] .qr-main:active { background: var(--select); }
+html[data-style="ios26"] .qr-name { font-size: 17px; font-weight: 600; }
+html[data-style="ios26"] .qr-status { font-size: 13px; color: var(--i26-run-raw); }
+html[data-style="ios26"] .qr-row[data-state="installed"] .qr-status { color: var(--i26-label); }
+html[data-style="ios26"] .qr-row[data-state="failed"] .qr-status { color: var(--i26-red); }
+html[data-style="ios26"] .qr-row[data-state="skipped"] .qr-status,
+html[data-style="ios26"] .qr-row[data-state="cancelled"] .qr-status { color: var(--i26-run-warning); }
+html[data-style="ios26"] .qr-summary { font-weight: 600; color: var(--i26-label); }
+/* UIProgressView: a 4pt capsule */
+html[data-style="ios26"] .qr-bar { border: solid transparent; border-width: 2.5px 0; border-radius: 2px / 4.5px; }
+html[data-style="ios26"] .qr-fill, html[data-style="ios26"] .progress-fill { border-radius: 2px; }
+/* the stop: the App Store's stop glyph, a small rounded square in a thin ring, painted in the tint through a mask */
+html[data-style="ios26"] .qr-stop {
+  background: var(--i26-tint);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Ccircle cx='14' cy='14' r='12.6' fill='none' stroke='%23000' stroke-width='1.6'/%3E%3Crect x='10' y='10' width='8' height='8' rx='1.6'/%3E%3C/svg%3E") center / 26px 26px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Ccircle cx='14' cy='14' r='12.6' fill='none' stroke='%23000' stroke-width='1.6'/%3E%3Crect x='10' y='10' width='8' height='8' rx='1.6'/%3E%3C/svg%3E") center / 26px 26px no-repeat;
+}
+html[data-style="ios26"] .qr-stop:active { opacity: .3; }
+/* the finish button: the prominent capsule */
+html[data-style="ios26"] .progress-finish { border-radius: 22px; font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+/* the native <progress>es take the tint */
+html[data-style="ios26"][data-controls="native"] progress { accent-color: var(--i26-tint); }
