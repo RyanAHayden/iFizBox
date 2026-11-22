@@ -40,6 +40,10 @@
 			<key>Icon-felt</key><dict><key>CFBundleIconName</key><string>Icon-felt</string></dict>
 			<key>Icon-wood</key><dict><key>CFBundleIconName</key><string>Icon-wood</string></dict>
 			<key>Icon-clear</key><dict><key>CFBundleIconName</key><string>Icon-clear</string></dict>
+			<key>Icon-ios7</key><dict><key>CFBundleIconName</key><string>Icon-ios7</string></dict>
+			<key>Icon-ios7dark</key><dict><key>CFBundleIconName</key><string>Icon-ios7dark</string></dict>
+			<key>Icon-ios13</key><dict><key>CFBundleIconName</key><string>Icon-ios13</string></dict>
+			<key>Icon-ios13dark</key><dict><key>CFBundleIconName</key><string>Icon-ios13dark</string></dict>
 			<key>Icon-classic-oled</key><dict><key>CFBundleIconName</key><string>Icon-classic-oled</string></dict>
 			<key>Icon-classic-midnight</key><dict><key>CFBundleIconName</key><string>Icon-classic-midnight</string></dict>
 			<key>Icon-classic-linen</key><dict><key>CFBundleIconName</key><string>Icon-classic-linen</string></dict>
@@ -98,6 +102,8 @@
 			<key>Icon-clear-leather</key><dict><key>CFBundleIconName</key><string>Icon-clear-leather</string></dict>
 			<key>Icon-clear-felt</key><dict><key>CFBundleIconName</key><string>Icon-clear-felt</string></dict>
 			<key>Icon-clear-wood</key><dict><key>CFBundleIconName</key><string>Icon-clear-wood</string></dict>
+			<key>Icon-ios7light</key><dict><key>CFBundleIconName</key><string>Icon-ios7light</string></dict>
+			<key>Icon-ios13light</key><dict><key>CFBundleIconName</key><string>Icon-ios13light</string></dict>
 			<key>Icon-glass</key><dict><key>CFBundleIconName</key><string>Icon-glass</string></dict>
 			<key>Icon-owna</key><dict><key>CFBundleIconFiles</key><array><string>IconOwnA20x20</string><string>IconOwnA29x29</string><string>IconOwnA40x40</string><string>IconOwnA60x60</string></array></dict>
 			<key>Icon-ownb</key><dict><key>CFBundleIconFiles</key><array><string>IconOwnB20x20</string><string>IconOwnB29x29</string><string>IconOwnB40x40</string><string>IconOwnB60x60</string></array></dict>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1024 1024" width="1024" height="1024">
+<defs><clipPath id="c"><circle cx="512" cy="520" r="230"/></clipPath><linearGradient id="g13" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#ececf1"/></linearGradient></defs>
+<rect width="1024" height="1024" fill="url(#g13)"/>
+<g transform="translate(512 512) scale(1.45) translate(-512 -520)">
+<circle cx="512" cy="520" r="230" fill="#007aff"/>
+<g clip-path="url(#c)"><g transform="rotate(-16 512 520)" fill="none" stroke="#fff" stroke-width="24" stroke-linecap="round">
+<ellipse cx="512" cy="520" rx="126.5" ry="234.6"/>
+<path d="M305.7 393.0 Q512 459.3 718.3 393.0"/><path d="M270.7 521.8 Q512 588.1 753.3 521.8"/><path d="M311.9 641.4 Q512 707.7 712.1 641.4"/>
+</g></g><circle cx="512" cy="520" r="230" fill="none" stroke="#fff" stroke-width="24"/></g></svg>

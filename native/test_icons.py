@@ -163,7 +163,8 @@ class Alternates(unittest.TestCase):
     def test_sets_cover_every_theme_pair_and_clear(self):
         lights, darks = alternates.themes()
         have = alternates.sets()
-        self.assertEqual(sorted(i for i, d in have.values() if d is None), sorted(lights + darks + ["clear"]))
+        self.assertEqual(sorted(i for i, d in have.values() if d is None),
+                         sorted(lights + darks + ["clear"] + alternates.ERA_ICONS))  # F371: Icon-ios7dark, Icon-ios7light
         for l in lights + ["clear"]:
             for d in darks + ["clear"]:
                 if (l, d) == alternates.PRIMARY:
@@ -293,9 +294,53 @@ class Alternates(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as d:
             alternates.thumbs(d, lite=True)
-            self.assertEqual(sorted(os.listdir(d)), sorted(i + ".png" for i in alternates.icons() + [alternates.GLASS]))
+            self.assertEqual(sorted(os.listdir(d)), sorted(i + ".png" for i in alternates.icons()
+                                                           + [alternates.GLASS, alternates.GLASS_DARK]))
             with open(os.path.join(d, "sepia.png"), "rb") as f:
                 self.assertEqual(f.read(), read(os.path.join("themes", "sepia", "AppIconLite60x60@3x.png")))
+            with open(os.path.join(d, "ios7dark.png"), "rb") as f:  # F371: the eras' with their sash too
+                self.assertEqual(f.read(), read(os.path.join("era", "ios7dark", "AppIconLite60x60@3x.png")))
+
+
+class EraIcons(unittest.TestCase):
+    """F371: iOS 7's and iOS 13's icons (icon/era/make.py), light and dark, plain and LITE at every size; each era's
+    pair is the set named for its light icon, so the Home Screen turns it dark by itself on iOS 18+."""
+
+    def test_every_era_icon_plain_and_lite_at_every_size(self):
+        for icon in alternates.ERA_ICONS:
+            for lite in (False, True):
+                for pt, scales in list(carfile.ICON_SIZES.items()) + [(1024, (1,))]:
+                    for s in scales:
+                        p = alternates.src(icon, pt, s, lite)
+                        with self.subTest(file=p):
+                            self.assertIn(os.path.join("era", icon), p)
+                            with open(p, "rb") as f:
+                                data = f.read()
+                            px = 1024 if pt == 1024 else pt * s
+                            self.assertEqual(carfile.png_size(data), (px, px))
+            plain, lite = (alternates.src(icon, 60, 3, x) for x in (False, True))
+            self.assertNotEqual(read(plain), read(lite), "%s: the Lite build's has the sash" % icon)
+
+    def test_era_sets(self):
+        have = alternates.sets()
+        self.assertEqual(have["Icon-ios7"], ("ios7", "ios7dark"))
+        self.assertEqual(have["Icon-ios13"], ("ios13", "ios13dark"))
+        self.assertEqual(have["Icon-ios7dark"], ("ios7dark", None))
+        self.assertEqual(have["Icon-ios13dark"], ("ios13dark", None))
+        self.assertEqual(have["Icon-ios7light"], ("ios7", None))  # Theme > Mode Light: no dark appearance (B289)
+        self.assertEqual(have["Icon-ios13light"], ("ios13", None))
+        # Sources/AppIcon.swift: light == dark gives Icon-<light>; the page sends an era's light name in both
+        self.assertEqual(alternates.set_name("ios7", "ios7"), "Icon-ios7")
+        with open(os.path.join(os.path.dirname(HERE), "web", "app", "core", "settings.js")) as f:
+            js = f.read()
+        for light, dark in alternates.ERAS:
+            self.assertIn('%s: { light: "%s", dark: "%s" }' % (light, light, dark), js)
+
+    def test_era_masters_are_svg(self):
+        import xml.etree.ElementTree as ET
+        for icon in alternates.ERA_ICONS:
+            with open(os.path.join(ICON, "era", icon, icon + ".svg")) as f:
+                self.assertEqual(ET.fromstring(f.read()).get("viewBox"), "0 0 1024 1024")
 
 
 class Glass(unittest.TestCase):
@@ -318,7 +363,9 @@ class Glass(unittest.TestCase):
             return json.load(f)
 
     def test_one_document_per_set(self):
-        want = ["AppIcon"] + list(alternates.sets()) + [alternates.GLASS_SET]
+        # F371: the eras' sets are flat pictures, with no document
+        want = (["AppIcon"] + [n for n, (l, _) in alternates.sets().items() if l not in alternates.ERA_ICONS]
+                + [alternates.GLASS_SET])
         self.assertEqual(list(glass.all_sets()), want)
         self.assertEqual(sorted(n[:-5] for n in os.listdir(self.tmp.name)), sorted(want))
 
@@ -379,8 +426,11 @@ class Glass(unittest.TestCase):
         # Sources/AppIcon.swift's one-icon name for the page's "glass" pick, and the page offers it
         self.assertEqual("Icon-%s" % alternates.GLASS, alternates.GLASS_SET)
         with open(os.path.join(os.path.dirname(HERE), "web", "app", "core", "settings.js")) as f:
-            self.assertIn('{ value: "%s", label: "Glass", tone: null }' % alternates.GLASS, f.read())
+            self.assertIn('{ value: "%s", label: "iOS 26", tone: null }' % alternates.GLASS, f.read())  # F371: renamed
         self.assertEqual(carfile.png_size(read(os.path.join("glass", "AppIcon60x60@3x.png"))), (180, 180))
+        # F371: its dark (Gunmetal) picture, for Dark's grid and Home's header in dark mode
+        self.assertEqual(carfile.png_size(read(os.path.join("glass", "AppIconDark60x60@3x.png"))), (180, 180))
+        self.assertNotEqual(read(os.path.join("glass", "AppIconDark60x60@3x.png")), read(os.path.join("glass", "AppIcon60x60@3x.png")))
 
     def test_glass_icon_in_both_cars(self):
         """actool compiled the .icon: the set is in each .car (iOS 26+ draws its layers, older iOS its flat render)."""

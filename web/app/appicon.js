@@ -17,7 +17,9 @@ import { clearOffered, isOwnIcon } from "./core/settings.js";
 export const clearHere = (ua = globalThis.navigator?.userAgent) => clearOffered(iosFromUserAgent(ua));
 
 export const nativeIcons = (s = settings) => Boolean(nativeBridge()) && s.isShown("iconMatch");
-export const iconSrc = (name) => `appicon/${name}.png`;
+// F371: `tone` "dark" shows the Glass (iOS 26) icon's dark look, appicon/glass-dark.png (native/icon/glass.py thumb).
+export const iconSrc = (name, tone) => `appicon/${name === "glass" && tone === "dark" ? "glass-dark" : name}.png`;
+const toneOf = (slot, onScreen = toneOnScreen()) => (slot === "light" || slot === "dark" ? slot : onScreen);
 
 const toneOnScreen = () => (globalThis.document?.documentElement?.dataset.theme === "dark" ? "dark" : "light");
 // A Clear pick doesn't count where Clear isn't offered (below iOS 18): that mode shows its theme's icon.
@@ -34,7 +36,7 @@ export function iconOf(slot, read = get, onScreen = toneOnScreen()) {
 
 export function iconImage(img, slot = "current") {
   img.dataset.appicon = slot;
-  img.src = iconSrc(iconOf(slot));
+  img.src = iconSrc(iconOf(slot), toneOf(slot));
   img.removeAttribute("srcset");
   return img;
 }
@@ -42,7 +44,7 @@ export function iconImage(img, slot = "current") {
 export function refreshIcons(doc = globalThis.document) {
   for (const img of doc?.querySelectorAll?.("img[data-appicon]") ?? []) {
     if (!img.dataset?.appicon) continue;
-    const src = iconSrc(iconOf(img.dataset.appicon));
+    const src = iconSrc(iconOf(img.dataset.appicon), toneOf(img.dataset.appicon));
     if (img.getAttribute("src") !== src) img.src = src;
   }
 }
