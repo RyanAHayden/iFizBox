@@ -75,6 +75,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         NativeAlerts.register(self) // F345b: ui.alert, the iOS 26 style's UIAlertController (NativeAlerts.swift)
         NativeMenus.register(self) // F345c: ui.actionSheet and ui.menu, its sheets and UIMenus (NativeMenus.swift)
         NativeSegments.register(self) // F345d: ui.segments, its pinned scope bar as a UISegmentedControl (NativeSegments.swift)
+        NativeGlass.register(self) // F367: ui.glass, its tab bar and bar buttons as Liquid Glass on iOS 26+ (NativeGlass.swift)
         // F345c: {text}, a copy straight to UIPasteboard, for nav/menu.js copyText when WebKit refuses the write (a
         // native menu's Copy runs after the touch WebKit wants).
         on("clipboard.write") { c in
