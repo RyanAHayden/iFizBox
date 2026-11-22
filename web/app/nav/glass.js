@@ -1,11 +1,12 @@
-// F367: the iOS 26 style's real Liquid Glass bars. In the app on iOS 26 and later, under the native controls hook
+// F367/F369: the iOS 26 style's glass bars. In the app on iOS 26 and later, under the native controls hook
 // (<html data-controls="native">, native-controls.js) with the floating tab bar (data-tabbar="float"), the shell
-// draws the tab bar's pill and Search circle and the nav bar's capsule buttons as UIGlassEffect views over the web
-// view (bridge call ui.glass, native/Sources/NativeGlass.swift), at the rects of these CSS look-alikes. The screens
-// already scroll under both bars, so the glass refracts the page.
+// draws the tab bar as a real UITabBar (one tab per page tab, Search as its search tab, our glyphs from
+// icons/rowicons.js, the badges; iOS draws the glass, the press-and-drag lens and the shrink on scroll) and the nav
+// bar's buttons as UIKit glass buttons at the rects of the page's own (bridge call ui.glass,
+// native/Sources/NativeGlass.swift). The screens already scroll under both bars, so the glass refracts the page.
 //
-// The CSS bars stay in the page underneath. While the shell's glass is up, <html data-glass="native"> is set, and each
-// look-alike the glass covers right now carries data-glass-shown, which ios26.css makes see-through. Whenever the glass
+// The CSS bars stay in the page underneath. While the shell's bars are up, <html data-glass="native"> is set, and each
+// look-alike the glass bars cover right now carries data-glass-shown, which ios26.css hides. Whenever the glass
 // can't follow the page it hides and the look-alike shows at once: the buttons while their nav item slides (a push, a
 // pop, the edge swipe), either part while a popup is up or one of the page's own sheets or pages covers it. A tap on
 // the glass comes back as {tap} and clicks the look-alike, so tabs and buttons run their own handlers (a tab's
@@ -16,6 +17,8 @@
 // below iOS 26 and a shell without ui.glass keep the CSS bars and send nothing more.
 
 import { nativeBridge, hasNativeCall } from "../native.js";
+import { icon } from "../icons/rowicons.js";
+import { FLOAT_OWN_TAB } from "./tabbar.js";
 
 export const GLASS_KEY = "bars";
 const POPUP = '[aria-modal="true"], [role="dialog"], [role="alertdialog"]'; // nav/popups.js POPUPS, inline (startup modules)
@@ -128,26 +131,38 @@ function moving(el, doc) {
 
 const weightOf = (cs) => parseInt(cs?.fontWeight, 10) || (cs?.fontWeight === "bold" ? 700 : 400);
 
+// F369: the tab bar as the shell's real UITabBar shows it: each tab's id, title, glyphs (icons/rowicons.js: the era's
+// outline glyph, its filled one for the chosen tab), badge ("" for the refreshing spinner: a dot), and which tab is
+// chosen. Search is the UITabBar's search tab. Hidden while a popup is up or one of the page's sheets covers the bar.
 function tabbarSnapshot(doc, win, popup) {
   const bar = barOf(doc);
   if (!shows(bar)) return null;
-  const tabs = [...bar.querySelectorAll("a.tab")].filter(shows);
-  const own = tabs.find((a) => a.dataset.tab === "search" && win.getComputedStyle(a).position === "absolute");
+  const style = doc.documentElement.getAttribute("data-style") || "ios26";
+  const tabs = [...bar.querySelectorAll("a.tab")].filter((a) => !a.hidden);
   const items = tabs.map((a) => {
-    const glyph = a.querySelector(".tab-icon");
-    const label = a.querySelector(".tab-label");
+    const id = a.dataset.tab;
     const badge = a.querySelector(".badge");
-    const lcs = label && win.getComputedStyle(label);
-    const text = label?.textContent ?? "";
+    const title = (a.querySelector(".tab-label")?.textContent || a.getAttribute("aria-label") || id).trim();
     return {
-      id: a.dataset.tab, rect: rectOf(a, win), own: a === own, selected: a.classList.contains("active"),
-      icon: glyph ? iconOf(glyph, win) : null,
-      label: label && text && parseFloat(lcs.fontSize) > 0 ? { text, rect: rectOf(label, win), size: parseFloat(lcs.fontSize), weight: weightOf(lcs) } : null,
-      badge: shows(badge) ? { text: badge.textContent, rect: rectOf(badge, win), spin: badge.classList.contains("spinning") } : null,
+      id, title, selected: a.classList.contains("active"), search: id === FLOAT_OWN_TAB,
+      icon: tabIcon(icon("tabsOutline", id, style), win), selectedIcon: tabIcon(icon("tabsSelected", id, style), win),
+      badge: shows(badge) ? (badge.classList.contains("spinning") ? "" : badge.textContent) : null,
     };
   });
-  const hidden = popup || moving(bar, doc) || covered(bar, doc) || (own ? covered(own, doc) : false);
-  return { pill: rectOf(bar, win), circle: own ? rectOf(own, win) : null, hidden, items };
+  return { hidden: popup || covered(bar, doc), items };
+}
+
+// One tab glyph (an SVG from icons/rowicons.js) drawn once into a TAB_ICON_PT square PNG for the shell: its key.
+export const TAB_ICON_PT = 26;
+function tabIcon(svg, win) {
+  if (!svg) return null;
+  const key = "tab-" + hash(svg);
+  if (!icons.has(key)) {
+    icons.set(key, null);
+    const src = "data:image/svg+xml," + encodeURIComponent(svg);
+    drawIcon(src, TAB_ICON_PT, TAB_ICON_PT, [TAB_ICON_PT, TAB_ICON_PT], win).then((d) => { icons.set(key, d); scheduleGlassSync(); }, () => {});
+  }
+  return key;
 }
 
 function buttonId(b) {
@@ -184,7 +199,6 @@ function colorsOf(doc, win) {
   return {
     text: plain ? win.getComputedStyle(plain).color : null,
     active: active ? win.getComputedStyle(active).color : null,
-    chosen: active ? win.getComputedStyle(active).backgroundColor : null,
   };
 }
 
@@ -202,7 +216,7 @@ export function glassSnapshot(doc = globalThis.document, win = globalThis, nativ
 // ---- keeping the shell in step --------------------------------------------------------------------------------------
 
 function pendingIcons(snap) {
-  const keys = [...(snap.tabbar?.items ?? []).map((i) => i.icon?.key), ...snap.buttons.map((b) => b.icon?.key)].filter(Boolean);
+  const keys = [...(snap.tabbar?.items ?? []).flatMap((i) => [i.icon, i.selectedIcon]), ...snap.buttons.map((b) => b.icon?.key)].filter(Boolean);
   const out = {};
   for (const k of keys) if (!st.iconsSent.has(k) && icons.get(k)) out[k] = icons.get(k);
   return out;
@@ -264,10 +278,13 @@ export function syncGlass(doc = globalThis.document, native = nativeBridge(), wi
   }
 }
 
-// A tap on the glass: the look-alike's own click, so its handlers run as for a finger on it.
+// A tap on a glass bars' tab or button: the look-alike's own click, so its handlers run as for a finger on it (a tab
+// through tapTab: switch, back to its root, or to the top). The tab bar has already moved its selection: the next
+// sync sends the page's choice even when nothing changed here (a tab the page didn't switch to), so it goes back.
 function tapped(id, doc) {
   const [kind, name] = [id.slice(0, id.indexOf(":")), id.slice(id.indexOf(":") + 1)];
   const el = kind === "tab" ? [...(barOf(doc)?.querySelectorAll("a.tab") ?? [])].find((a) => a.dataset.tab === name) : st.byId.get(name);
+  if (kind === "tab") { st.sent = null; scheduleGlassSync(); }
   el?.click?.();
 }
 

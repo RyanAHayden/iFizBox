@@ -111,15 +111,19 @@ test("open: the pill, the Search circle, each tab and both buttons; look-alikes 
   assert.equal(c.method, "ui.glass");
   assert.equal(c.op, "open");
   assert.equal(c.key, GLASS_KEY);
-  assert.deepEqual(c.tabbar.pill, { x: 21, y: 776, width: 290, height: 62 });
-  assert.deepEqual(c.tabbar.circle, { x: 330, y: 780, width: 62, height: 54 });
   assert.equal(c.tabbar.hidden, false);
-  assert.deepEqual(c.tabbar.items.map((i) => [i.id, i.own, i.selected, i.label?.text ?? null]),
-    [["home", false, true, "Home"], ["sources", false, false, "Sources"], ["search", true, false, null]]);
-  assert.deepEqual(c.tabbar.items[0].label.rect, { x: 25, y: 814, width: 140, height: 12 });
+  assert.equal(c.tabbar.pill, undefined, "F369: a real UITabBar, no rects to lay glass at");
+  assert.deepEqual(c.tabbar.items.map((i) => [i.id, i.title, i.search, i.selected, i.badge]),
+    [["home", "Home", false, true, null], ["sources", "Sources", false, false, null], ["search", "search", true, false, null]]);
+  for (const i of c.tabbar.items) {
+    assert.match(i.icon, /^tab-/, `${i.id}: an outline glyph`);
+    assert.match(i.selectedIcon, /^tab-/, `${i.id}: a filled glyph`);
+    assert.notEqual(i.icon, i.selectedIcon, `${i.id}: outline and filled differ`);
+  }
+  assert.equal(new Set(c.tabbar.items.map((i) => i.icon)).size, 3, "one glyph per tab");
   assert.deepEqual(c.buttons.map((b) => [b.kind, b.title]), [["back", "Home"], ["plain", "Install"]]);
   assert.equal(c.buttonsHidden, false);
-  assert.deepEqual(c.colors, { text: "rgb(28, 28, 30)", active: "rgb(0, 122, 255)", chosen: "rgba(0, 0, 0, 0.07)" });
+  assert.deepEqual(c.colors, { text: "rgb(28, 28, 30)", active: "rgb(0, 122, 255)" });
   assert.equal(c.dark, false);
   assert.equal(doc.documentElement.getAttribute("data-glass"), "native");
   for (const n of [bar, back, install]) assert.equal(n.dataset.glassShown, "", "covered by the glass: see-through");
@@ -141,8 +145,34 @@ test("titles and buttons follow the page; a badge and the chosen tab update the 
   const up = calls.at(-1);
   assert.equal(up.op, "update");
   assert.equal(up.buttons[1].title, "Remove");
-  assert.deepEqual(up.tabbar.items[1].badge, { text: "3", rect: { x: 240, y: 778, width: 20, height: 20 }, spin: false });
+  assert.equal(up.tabbar.items[1].badge, "3");
   assert.deepEqual(up.tabbar.items.map((i) => i.selected), [false, true, false]);
+  sources.querySelector(".badge").classList.add("spinning");
+  sources.querySelector(".badge")._text = "";
+  syncGlass(doc, native, win);
+  assert.equal(calls.at(-1).tabbar.items[1].badge, "", "the refreshing spinner: a dot");
+});
+
+test("a tab tap clicks the look-alike and resends the page's choice, even when it didn't switch", () => {
+  reset();
+  const { native, calls, tap } = fakeShell();
+  app(native);
+  syncGlass(doc, native, win);
+  const n = calls.length;
+  tap("tab:sources"); // the page refuses: Home stays chosen, nothing changed on the page
+  syncGlass(doc, native, win);
+  assert.equal(calls.length, n + 1, "sent again, so the UITabBar goes back to Home");
+  assert.deepEqual(calls.at(-1).tabbar.items.map((i) => i.selected), [true, false, false]);
+});
+
+test("the tab glyphs: our own outline drawings for the UITabBar, the filled ones for the chosen tab", async () => {
+  const { ICON_SETS } = await import("../icons/rowicons.js");
+  for (const tab of ["home", "sources", "changes", "installed", "search"]) {
+    const svg = ICON_SETS.ios26.tabsOutline[tab];
+    assert.match(svg, /fill='none'/, `${tab}: outline`);
+    assert.match(svg, /stroke-width='2\.2'/, `${tab}: iOS 26's tab weight`);
+    assert.ok(ICON_SETS.ios26.tabsSelected[tab], `${tab}: filled`);
+  }
 });
 
 test("a push hides the buttons (the CSS ones show at once) but not the tab bar; back at rest they return", async () => {
@@ -227,14 +257,22 @@ test("below iOS 26 or an older shell: refused once, the CSS bars from then on", 
   }
 });
 
-test("the shell: ui.glass registered, UIGlassEffect views over the web view, iOS 26 only", () => {
+test("the shell: ui.glass registered, a real UITabBar and UIKit glass buttons over the web view, iOS 26 only", () => {
   const swift = readFileSync(join(HERE, "../../../native/Sources/NativeGlass.swift"), "utf8");
   const bridge = readFileSync(join(HERE, "../../../native/Sources/Bridge.swift"), "utf8");
   assert.match(bridge, /NativeGlass\.register\(self\)/);
   assert.match(swift, /b\.on\("ui\.glass"\)/);
-  assert.match(swift, /UIGlassEffect\(style:/);
-  assert.match(swift, /UIGlassContainerEffect\(\)/);
+  assert.match(swift, /UITabBarController\(\)/);
+  assert.match(swift, /UISearchTab\(viewControllerProvider:/, "Search as the search tab");
+  assert.match(swift, /UITab\(title:/);
+  assert.match(swift, /\.badgeValue = badge/);
+  assert.match(swift, /tabBarMinimizeBehavior = \.onScrollDown/, "shrinks on scroll");
+  assert.match(swift, /setContentScrollView\(best, for: \.bottom\)/, "watching the page's own scroller");
+  assert.match(swift, /shouldSelectTab tab: UITab\) -> Bool \{\n\s+if let id = .*emit\(id\)/, "taps go to the page");
+  assert.doesNotMatch(swift, /UIImage\(systemName:/, "no SF Symbols (AGENTS.md)");
+  assert.doesNotMatch(swift, /UIGlassEffect\(style:/, "F369: no glass laid over the look-alike any more");
   assert.match(swift, /\.prominentGlass\(\)/);
+  assert.match(swift, /: \.glass\(\)/);
   assert.match(swift, /#available\(iOS 26\.0, \*\) else \{ return c\.reply\(nil, "unsupported:/);
   assert.match(swift, /emit\(\[\["tap":/);
   assert.match(swift, /emit\(\[\["ready": true\]\]\)/);

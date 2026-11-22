@@ -286,6 +286,9 @@ html[data-style="ios26"] .badge { font-size: 14px; font-weight: 400; line-height
    fading from the status bar to nothing at the bar's foot, so the content scrolling under the buttons is there for
    the glass to bend. */
 html[data-style="ios26"][data-glass="native"] [data-glass-shown] { opacity: 0; }
+/* F369: the glass bars' tab bar is UIKit's own, not laid over the look-alike's rects, so the hidden tabs take no
+   touches (the bar itself stays hit-testable: nav/glass.js's cover check reads it). */
+html[data-style="ios26"][data-glass="native"] .tabbar[data-glass-shown] .tab { pointer-events: none; }
 html[data-style="ios26"][data-glass="native"] .navbar,
 html[data-style="ios26"][data-glass="native"][data-theme] .navbar {
   background: linear-gradient(var(--site-strip) var(--top-inset, env(safe-area-inset-top)),
