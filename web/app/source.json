@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "0.20.1",
+          "date": "2026-11-22T04:36:03Z",
+          "localizedDescription": "Real Liquid Glass bars on iOS 26+, and Open Tailscale without the \"Could not sign device\" sheet\niOS 26 style in the app on iOS 26+: the tab bar, Search circle and bar buttons are iOS's own Liquid Glass\nOpen Tailscale opens the app directly instead of Tailscale's \"Could not sign device\" sheet\niOS 26 style in the app on iOS 26+: the floating tab bar, the Search circle and the nav bar's buttons are drawn by iOS as real Liquid Glass, with its refraction, over the page.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.20.1",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.20.1/iFizBox.ipa",
+          "size": 38997594,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.20.0",
           "date": "2026-11-22T02:30:36Z",
           "localizedDescription": "iOS 26 style with native controls, Add Tweaks, and installs that fall back to the Signing Server\nTheme > Style iOS 26: Liquid Glass bars, and in the app iOS's own switches, alerts, action sheets and scope bar\nAdd Tweaks page under an app's Details; Manage > Sources picks sources like Installed\nThis iPhone installs: Tailscale checked first, one pairing at a time, Use the Signing Server when it fails\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.20.0",
@@ -250,14 +258,6 @@
           "localizedDescription": "Install apps right on your iPhone: pair once, then This iPhone installs over LocalDevVPN or Tailscale.\nFree Apple ID route: sign in with a free account and keep apps going with LiveContainer.\nOne-command computer setup for the free route (curl \u2026 | sh), no Docker and no GUI.\nPull to refresh on Sources, Changes and Home, and one search bar everywhere.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.10.0",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.10.0/iFizBox.ipa",
           "size": 15526896,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.9.9",
-          "date": "2026-11-19T14:18:51Z",
-          "localizedDescription": "Install queues keep going when one package or app fails, with a row for each and Retry All.\nSigned apps keep their own bundle ID, so they get their notifications with a profile that has Push.\nSettings > Signing checks that this iPhone is in your profile and says how to fix it.\nSources refresh one row at a time; a dead source no longer holds the rest.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.9",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.9.9/iFizBox.ipa",
-          "size": 5386413,
           "minOSVersion": "15.0"
         }
       ]
