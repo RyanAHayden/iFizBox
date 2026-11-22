@@ -10,7 +10,7 @@ globalThis.document = fakeDocument();
 const make = (tag) => document.createElement(tag);
 
 const { drawInstallation, leave, connectGroups, setupGroups, pickRoute } = await import("./installroute.js");
-const { LOCALDEVVPN_STORE, TAILSCALE_URL } = await import("../core/installroute.js");
+const { LOCALDEVVPN_STORE, TAILSCALE_URL, TAILSCALE_ID } = await import("../core/installroute.js");
 
 const all = (e) => [e, ...e.children.flatMap(all)];
 const withClass = (box, c) => all(box).filter((n) => n._cls.has(c));
@@ -89,7 +89,7 @@ test("both installed: asks which (Connect With), and the answer is kept with tai
 });
 
 test("only Tailscale: Sign In and Open Tailscale; acting on it makes Connect With Tailscale", async () => {
-  const native = bridge({ "idevice.status": VPN_OFF, "idevice.vpnApps": { localdevvpn: false, tailscale: true }, "tailscale.setConnect": null, "app.openURL": { opened: true } });
+  const native = bridge({ "idevice.status": VPN_OFF, "idevice.vpnApps": { localdevvpn: false, tailscale: true }, "tailscale.setConnect": null, "signing.openApp": { opened: true } });
   const box = make("div");
   await drawInstallation(box, "pair", { store: store(), native, alert: async () => ({ index: 0 }) });
   assert.deepEqual(labels(box), ["Sign In", "Open Tailscale"]);
@@ -97,7 +97,21 @@ test("only Tailscale: Sign In and Open Tailscale; acting on it makes Connect Wit
   await tap(box, "Open Tailscale");
   await flush();
   assert.deepEqual(native.calls.find(([m]) => m === "tailscale.setConnect")[1], { value: "tailscale" });
-  assert.deepEqual(native.calls.find(([m]) => m === "app.openURL")[1], { url: TAILSCALE_URL });
+  // B323: by bundle ID; a tailscale: link makes Tailscale show "Could not sign device"
+  assert.deepEqual(native.calls.find(([m]) => m === "signing.openApp")[1], { bundleId: TAILSCALE_ID });
+  assert.ok(!native.calls.some(([m, p]) => m === "app.openURL" && p?.url === TAILSCALE_URL), "never opens tailscale:");
+  leave();
+});
+
+test("B323: Open Tailscale says to open it by hand when iOS won't", async () => {
+  const native = bridge({ "idevice.status": VPN_OFF, "idevice.vpnApps": { localdevvpn: false, tailscale: true }, "tailscale.setConnect": null, "signing.openApp": { opened: false } });
+  const asked = [];
+  const box = make("div");
+  await drawInstallation(box, "pair", { store: store(), native, alert: async (a) => { asked.push(a); return { index: 0 }; } });
+  await tap(box, "Open Tailscale");
+  await flush();
+  assert.equal(asked.at(-1)?.title, "Couldn't Open Tailscale");
+  assert.match(asked.at(-1)?.message, /^Open Tailscale from the Home Screen/);
   leave();
 });
 

@@ -40,7 +40,8 @@ enum IDeviceBridge {
     private static let pairQueue = DispatchQueue(label: "ifizbox.idevice.pair", qos: .userInitiated) // one pairing at a time
     static let localDevVPNScheme = "localdevvpn://" // LocalDevVPN's URL scheme, to open it
     // The Tailscale app's URL scheme: Tailscale's own deep links use it (tailscale/tailscale tka/deeplink.go,
-    // DeeplinkTailscaleURLScheme = "tailscale").
+    // DeeplinkTailscaleURLScheme = "tailscale"). Only for canOpenURL (idevice.vpnApps): B323, opening any tailscale:
+    // link shows Tailscale's "Could not sign device"; Open Tailscale goes through signing.openApp with its bundle ID.
     static let tailscaleScheme = "tailscale://"
     static let codeNoteID = "ifizbox-pairing-code"
     private static var now: [String: Any] = ["active": false] // idevice.pairState; guarded by lock

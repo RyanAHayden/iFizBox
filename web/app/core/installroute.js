@@ -282,8 +282,20 @@ export function tailscaleRoute(st, connect = st?.tailscale?.connect ?? "auto") {
 
 // LocalDevVPN's App Store page (App Store ID 6755608044, com.jkcoxson.LocalDevVPN), offered when no VPN app is
 // installed, and the Tailscale app's URL scheme (Tailscale's own deep links, tailscale/tailscale tka/deeplink.go).
+// TAILSCALE_URL only tells whether Tailscale is installed (idevice.vpnApps' canOpenURL); never open it: Tailscale
+// 1.104.7 takes every tailscale: link as a Tailnet Lock signing request and shows "Could not sign device ... Unable
+// to verify deeplink" (B323, iPhone 15 Pro; bare, //open, //app, //login and /// all do). It registers no other
+// scheme and no universal links, so Open Tailscale launches it by its bundle ID instead (openTailscale).
 export const LOCALDEVVPN_STORE = "https://apps.apple.com/app/localdevvpn/id6755608044";
 export const TAILSCALE_URL = "tailscale://";
+export const TAILSCALE_ID = "io.tailscale.ipn.ios";
+
+// B323: Open Tailscale. `call` is the bridge's call(method, params); true once iOS opened the app (signing.openApp,
+// the sideload shell's LSApplicationWorkspace openApplicationWithBundleID:), false when it couldn't or the call
+// failed: the caller then says to open Tailscale from the Home Screen.
+export async function openTailscale(call) {
+  try { return (await call("signing.openApp", { bundleId: TAILSCALE_ID }))?.opened === true; } catch { return false; }
+}
 
 // The way to connect from idevice.vpnApps ({localdevvpn, tailscale}: installed or not) and Connect With:
 //   "localdevvpn"  only LocalDevVPN (or both, with Connect With: LocalDevVPN), or an older shell with no answer

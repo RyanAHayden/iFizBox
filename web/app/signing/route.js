@@ -52,8 +52,7 @@ export function runFix(fix, { native, go = openRoute } = {}) {
   if (fix === "signIn") return go(["installation", "with"]);
   if (fix === "pair") return go(["installation", "pair"]);
   if (fix === "check") return go(["installation"]);
-  const url = fix === "openTailscale" ? TAILSCALE_URL : null;
-  if (url) return Promise.resolve().then(() => bridge(native).call("app.openURL", { url })).catch(() => {});
+  if (fix === "openTailscale") return openTailscale((m, p) => bridge(native).call(m, p)); // B323: by bundle ID, not tailscale:
   if (fix === "openVPN") return Promise.resolve().then(() => bridge(native).call("idevice.openLocalDevVPN", {})).catch(() => {});
   return undefined;
 }
@@ -67,7 +66,7 @@ import { showAlert } from "../nav/alert.js";
 import { NAME } from "../brand.js";
 import { storedRoute, decideRoute, ALERTS as ROUTE_ALERTS, routeParams, VPN_WAIT, VPN_CONNECTED, VPN_POLL,
   vpnReady } from "../core/installroute.js";
-import { routeFailureOf, rememberRouteFailure, clearRouteFailure, TAILSCALE_URL } from "../core/installroute.js"; // B316
+import { routeFailureOf, rememberRouteFailure, clearRouteFailure, openTailscale } from "../core/installroute.js"; // B316, B323
 import { SELF_RESTART } from "../core/apprun.js";
 import { KNOWN_MALWARE, askInsecure, bridge, failed, keepIpaHash, refusing, stopNative, storageOf,
   untilCancel } from "./common.js";

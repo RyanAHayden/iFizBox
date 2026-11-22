@@ -22,7 +22,8 @@ import { format, settingsRoute, mounted, parse } from "../router.js";
 import { showAlert } from "../nav/alert.js";
 import { copyText } from "../nav/menu.js";
 import { toBase64 } from "../core/signing.js";
-import { vpnRoute, connectAlert, LOCALDEVVPN_STORE, TAILSCALE_URL } from "../core/installroute.js";
+import { vpnRoute, connectAlert, LOCALDEVVPN_STORE } from "../core/installroute.js";
+import { openTailscale } from "../core/installroute.js"; // B323
 import { ROUTE_KEY, ROUTE_OPTIONS, VPNS, VPN_POLL, vpnList, vpnOn, IPHONE_INTRO, setupState, PAIR_GUIDE, pairEvent, pairFooter, pairFromNative, pinText, PAIR_STEPS, verifyFailure, verifyVPN,
   CONNECT_OPTIONS, connectFooter, tailscaleFooter, tailscaleTestResult } from "../core/installroute.js";
 import { ringStyle, vpnWaitText } from "../core/installroute.js";
@@ -740,7 +741,7 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
     // B320: redrawn without its automatic check (it failed while signing in and drew an x on this row), and the check
     // after it spins the status cell instead of a HUD
     if (a === "signIn") return tailscaleSignIn(native, alert, after, null, { spin: spinStatus }).then(after);
-    if (a === "openTailscale") return openApp(native, alert, TAILSCALE_URL, "Tailscale");
+    if (a === "openTailscale") return openTailscaleApp(native, alert);
     if (a === "useTailscale") { await busy("Switching", () => call(native, "tailscale.setConnect", { value: "auto" }).catch(() => {})); return refresh(); }
   };
   return { el: box, refresh, known: () => known, status: () => now };
@@ -862,7 +863,16 @@ export function pairSections(sections) {
 async function openApp(native, alert, url, name) {
   let opened = false;
   try { opened = (await busy(`Opening ${name}`, () => call(native, "app.openURL", { url })))?.opened === true; } catch { /* below */ }
-  if (!opened) await alert({ title: `Couldn't Open ${name}`, message: name === "Tailscale" ? "Get the Tailscale app from the App Store, sign in and turn it on." : "Try again.", buttons: ["OK"] });
+  if (!opened) await alert({ title: `Couldn't Open ${name}`, message: "Try again.", buttons: ["OK"] });
+}
+
+// B323: Open Tailscale launches the app by its bundle ID (a tailscale: link shows Tailscale's "Could not sign
+// device"); when iOS won't, it says plainly to open Tailscale.
+export const OPEN_TAILSCALE_BY_HAND = "Open Tailscale from the Home Screen and turn it on. No Tailscale app? Get it from the App Store.";
+async function openTailscaleApp(native, alert) {
+  let opened = false;
+  try { opened = await busy("Opening Tailscale", () => openTailscale((m, p) => call(native, m, p))); } catch { /* below */ }
+  if (!opened) await alert({ title: "Couldn't Open Tailscale", message: OPEN_TAILSCALE_BY_HAND, buttons: ["OK"] });
 }
 
 // The steps: a short line each, and the screenshot of the Settings row to tap, ringed.
@@ -1063,7 +1073,7 @@ async function drawPair(box, { store, native, alert, redraw }) {
     busy: signingIn,
     choose: async (value) => { await busy("Switching", () => call(native, "tailscale.setConnect", { value }).catch(() => {})); recheck(); },
     signIn: async () => { await useTailscale(); tailscaleSignIn(native, alert, () => { if (visit === v) redraw(); }, v); }, // B143: once left, an ending sign-in mustn't draw the page (a new visit and its poll)
-    openTailscale: async () => { await useTailscale(); openApp(native, alert, TAILSCALE_URL, "Tailscale"); },
+    openTailscale: async () => { await useTailscale(); openTailscaleApp(native, alert); },
     install: () => openApp(native, alert, LOCALDEVVPN_STORE, "App Store"),
     installTailscale: () => openApp(native, alert, TAILSCALE_STORE, "App Store"),
   });
@@ -1142,7 +1152,7 @@ export function autoCheck(native, alert, redraw, store, mark = null, now = Date.
 }
 async function fixAction(fix, native, alert) {
   if (fix === "signIn") return goTo("with");
-  if (fix === "openTailscale") return openApp(native, alert, TAILSCALE_URL, "Tailscale");
+  if (fix === "openTailscale") return openTailscaleApp(native, alert);
   if (fix === "openVPN") return openVPN(native, alert);
   if (fix === "pair") return goTo("pair");
   return undefined;

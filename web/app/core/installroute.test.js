@@ -221,6 +221,21 @@ test("the VPN apps' schemes match the native side and Info-sideload.plist", asyn
   for (const s of ["localdevvpn", "tailscale"]) assert.ok(queries.includes(`<string>${s}</string>`), s);
 });
 
+// B323: Tailscale 1.104.7 shows "Could not sign device" for every tailscale: link, so Open Tailscale goes by bundle ID.
+test("openTailscale launches Tailscale by its bundle ID and is false when iOS won't", async () => {
+  const { openTailscale, TAILSCALE_ID } = await import("./installroute.js");
+  const { runFix } = await import("../signing/route.js");
+  assert.equal(TAILSCALE_ID, "io.tailscale.ipn.ios");
+  const calls = [];
+  assert.equal(await openTailscale(async (m, p) => { calls.push([m, p]); return { opened: true }; }), true);
+  assert.deepEqual(calls, [["signing.openApp", { bundleId: TAILSCALE_ID }]]);
+  assert.equal(await openTailscale(async () => ({ opened: false })), false);
+  assert.equal(await openTailscale(async () => { throw new Error("unknown method"); }), false);
+  const native = { calls: [], call(m, p) { this.calls.push([m, p]); return Promise.resolve({ opened: true }); } };
+  await runFix("openTailscale", { native });
+  assert.deepEqual(native.calls, [["signing.openApp", { bundleId: TAILSCALE_ID }]]); // the failure alert's fix button too
+});
+
 // B258: Check Connection names the VPN it went through, and an early eof after connecting means pair again.
 test("Check Connection: a connect failure names the route used; early eof is Pair Again", () => {
   const cf = (m) => Object.assign(new Error(`connect_failed: ${m}`), { code: "connect_failed" });
