@@ -105,7 +105,7 @@ The pages under it:
   Import Pairing File; once paired, Paired with a check, Check Connection (Pair Again when the pairing is refused)
   and Forget Pairing. One pairing at a time: drawing the page again while it pairs, or coming back to it within 90
   seconds of leaving, keeps the same code and the same advertisement (iOS's Developer Mode page keeps a dead "Pair
-  with" row for every advertisement that came and went), and every advertisement uses one kept key.
+  with" row for every advertisement that came and went).
 
 ## Retired keys
 

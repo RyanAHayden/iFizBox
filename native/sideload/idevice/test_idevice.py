@@ -168,7 +168,7 @@ class RemotePairingPort(unittest.TestCase):
 class OnePairingAtATime(unittest.TestCase):
     # B320 (iPhone 15 Pro): the code on the page didn't work in Settings, and Developer Mode listed a "Pair with" row
     # per try. A pairing runs on its own queue (never behind a connect), a second idevice.pair joins the one that runs
-    # (same code), and every advertisement carries the same kept altIRK.
+    # (same code), and a left pairing keeps its advertisement leaveGrace more, so coming back rejoins it.
     def test_pairing_has_its_own_queue(self):
         src = read("IDeviceBridge.swift")
         body = src[src.index('b.on("idevice.pair")'):src.index('b.on("idevice.pairCancel")')]
@@ -190,13 +190,6 @@ class OnePairingAtATime(unittest.TestCase):
         self.assertIn("asyncAfter(deadline: .now() + leaveGrace)", cancel)
         self.assertIn("s.leaving == gen", cancel)  # a join (or another leave) after it keeps it going
         self.assertIn('"canceled: pairing stopped"', cancel)  # the left page's call still ends at once
-
-    def test_advertisement_keeps_its_key(self):
-        src = read("IDevice.swift")
-        self.assertIn("pairable_host_set_alt_irk(", src)
-        self.assertIn('advertService = "ifizbox.idevice.advert"', src)
-        self.assertIn("kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly", src[src.index("keptAdvertKey"):])
-        self.assertTrue(os.path.exists(os.path.join(HERE, "patches", "0003-pairable-host-kept-alt-irk.patch")))
 
 
 class Built(unittest.TestCase):

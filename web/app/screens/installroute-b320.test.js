@@ -164,3 +164,13 @@ test("leaving and coming back pairs again at once; the left visit's late answer 
   leave();
   pending[1]();
 });
+
+test("Install Apps With's check of the kept pairing spins the Pairing row, not the HUD", async () => {
+  const { installationGroups } = await import("./installroute.js");
+  const pairingRow = (o) => installationGroups("iphone", PAIRED_TS, o).find((g) => g.header === "This iPhone").rows[0];
+  assert.equal(pairingRow({ pairChecking: true }).spin, true);
+  assert.equal(pairingRow({}).spin, undefined);
+  const src = (await import("node:fs")).readFileSync(new URL("./installroute.js", import.meta.url), "utf8");
+  assert.match(src, /if \(v === "iphone" && v !== choice\) recheckPairing\(native, alert, redraw, \{ spin: pairSpin \}\)/);
+  assert.match(src, /if \(ts\) recheckPairing\(native, alert, redraw, \{ spin: pairSpin \}\)/);
+});

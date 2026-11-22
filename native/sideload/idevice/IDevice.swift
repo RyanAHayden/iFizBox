@@ -130,30 +130,6 @@ enum IDevice {
     /// The 6-digit code for one pairing: made before anything listens, shown at once, and used by every try.
     static func newPairingCode() -> String { String(format: "%06d", Int.random(in: 0..<1_000_000)) }
 
-    /// B320: the 16-byte altIRK every advertisement uses (its authTag comes from it), made once and kept in the
-    /// Keychain beside the pairing, this device only. Pairing stops and starts again (leaving the page, Forget
-    /// Pairing): with the same name, identifier and key the phone sees the same host each time.
-    static let advertService = "ifizbox.idevice.advert"
-    static let advertKey: Data = keptAdvertKey() // once per run: a Keychain that refuses it still gets one key a run
-    private static func keptAdvertKey() -> Data {
-        let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: advertService,
-                                kSecAttrAccount as String: "irk"]
-        var read = q
-        read[kSecReturnData as String] = true
-        var out: CFTypeRef?
-        if SecItemCopyMatching(read as CFDictionary, &out) == errSecSuccess, let d = out as? Data, d.count == 16 { return d }
-        var key = Data(count: 16)
-        let ok = key.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 16, $0.baseAddress!) } == errSecSuccess
-        if !ok { for i in 0..<16 { key[i] = UInt8.random(in: 0...255) } }
-        SecItemDelete(q as CFDictionary)
-        var add = q
-        add[kSecValueData as String] = key
-        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        let st = SecItemAdd(add as CFDictionary, nil)
-        if st != errSecSuccess { log("advert key not kept (\(st)); this run uses it anyway") }
-        return key
-    }
-
     private final class PinBox { let show: (String) -> Void; init(_ f: @escaping (String) -> Void) { show = f } }
 
     private final class RegBox {
@@ -176,19 +152,6 @@ enum IDevice {
         defer { pairable_host_free(handle) }
         // Our code, not one idevice draws after the phone connects (patches/0001: pairable_host_set_pin)
         try check(pairable_host_set_pin(handle, code), "pair_failed")
-        // B320: the kept altIRK (patches/0003), so every try advertises the same TXT record: iOS's Developer Mode
-        // page listed a new "Pair with <app>" row for each try, the earlier ones dead
-        let irk = advertKey
-        var keptTxt: UnsafeMutablePointer<UInt8>?
-        var keptLen: UInt = 0
-        let irkErr = irk.withUnsafeBytes { pairable_host_set_alt_irk(handle, $0.baseAddress?.assumingMemoryBound(to: UInt8.self), &keptTxt, &keptLen) }
-        if irkErr == nil, let kept = keptTxt {
-            if let t = txtPtr { idevice_data_free(t, txtLen) }
-            txtPtr = kept; txtLen = keptLen
-        } else {
-            try? check(irkErr, "pair_failed") // logged below with the TXT keys; the try's own record still works
-            log("kept advert key not used; this try advertises a key of its own")
-        }
         let serviceID = sid.map { String(cString: $0) } ?? ""
         if let sid = sid { idevice_string_free(sid) }
         let txtPlist = txtPtr.map { Data(bytes: $0, count: Int(txtLen)) } ?? Data()

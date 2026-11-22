@@ -82,6 +82,6 @@ test("Tailscale's sign-in checks the kept pairing once it's in", () => {
 
 test("picking This iPhone again, or a new Connect With, checks it too (setting up local signing again)", () => {
   const src = readFileSync(new URL("./installroute.js", import.meta.url), "utf8");
-  assert.match(src, /if \(v === "iphone" && v !== choice\) recheckPairing\(native, alert, redraw\)/);
-  assert.match(src, /if \(ts\) recheckPairing\(native, alert, redraw\)/);
+  assert.match(src, /if \(v === "iphone" && v !== choice\) recheckPairing\(native, alert, redraw[,)]/);
+  assert.match(src, /if \(ts\) recheckPairing\(native, alert, redraw[,)]/);
 });

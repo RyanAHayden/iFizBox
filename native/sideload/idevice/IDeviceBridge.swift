@@ -26,9 +26,10 @@ enum IDeviceBridge {
     /// it and takes the call over). Guarded by lock.
     private final class PairSession {
         let cancel: IDevice.PairCancel
+        let code: String // the 6-digit code every try of this pairing uses
         var call: Bridge.Call? // nil once the page left (idevice.pairCancel), until a page joins again
         var leaving = 0 // bumped by every leave and join: a scheduled stop runs only if nothing came after it
-        init(cancel: IDevice.PairCancel, call: Bridge.Call) { self.cancel = cancel; self.call = call }
+        init(cancel: IDevice.PairCancel, code: String, call: Bridge.Call) { self.cancel = cancel; self.code = code; self.call = call }
     }
     /// B320: how long a left pairing keeps advertising before it stops. iOS's Developer Mode page (Preferences) keeps a
     /// row for every advertisement that came and went while it was open or in the background ("Pair with <app>" three
@@ -88,7 +89,8 @@ enum IDeviceBridge {
             // leaveGrace ago) is joined, not started again: the same code and the same advertisement, its events and
             // its answer now go to this call. Starting over drew a new code and a new advertisement while the phone's
             // Settings still showed the earlier one, so the code on the page didn't work there.
-            if let running = pairing, !running.cancel.isCanceled, let code = now["pin"] as? String {
+            if let running = pairing, !running.cancel.isCanceled {
+                let code = running.code
                 let earlier = running.call
                 running.call = c
                 running.leaving += 1 // a stop scheduled by a leave doesn't run
@@ -104,7 +106,7 @@ enum IDeviceBridge {
             }
             let cancel = IDevice.PairCancel()
             let code = IDevice.newPairingCode()
-            let session = PairSession(cancel: cancel, call: c)
+            let session = PairSession(cancel: cancel, code: code, call: c)
             pairing?.cancel.signal()
             pairing = session
             now = ["active": true, "pin": code, "step": "starting", "text": "", "error": ""]

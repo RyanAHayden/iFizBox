@@ -137,7 +137,7 @@ let signInVisit = null; // B143: the pair page's visit that started it (leaving 
 // that part is read again, `late: {device, tailscale}` that part didn't answer in time: its rows say Not Responding.
 export function installationGroups(choice, st, { pick = () => {}, openVPN = () => {}, connect = () => {}, signIn = () => {}, test = () => {}, signOut = () => {}, busy = null,
   reading = false, connectPick = null, picking = false, connectBusy = null, hint = null, server = () => [],
-  tsReading = reading, refreshing = {}, late = {}, testing = false, failure = null, fix = () => {} } = {}) {
+  tsReading = reading, refreshing = {}, late = {}, testing = false, failure = null, fix = () => {}, pairChecking = false } = {}) {
   const groups = [{
     header: "Install Apps With",
     rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", icon: rowIcon(ROUTE_ROW[o.value].icon), checked: o.value === choice, onClick: () => pick(o.value),
@@ -168,7 +168,8 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
       rows: [
         devLate ? { label: "Pairing", detail: NOT_RESPONDING, href: route("pair") }
           : reading ? { label: "Pairing", detail: "Checking…", href: route("pair"), spin: true }
-          : { label: "Pairing", detail: withDetail("iphone", st ?? {}, failure), href: route("pair"), ...(devAgain ? { spin: true } : {}) },
+          // B320: `pairChecking`: the kept pairing is checked (recheckPairing): this row spins, no HUD
+          : { label: "Pairing", detail: withDetail("iphone", st ?? {}, failure), href: route("pair"), ...(devAgain || pairChecking ? { spin: true } : {}) },
         ...(viaTs ? [] : [
           devLate ? { label: VPN, detail: NOT_RESPONDING }
             : { label: VPN, detail: reading ? "Checking…" : vpnDetail(st), ...(reading || devAgain ? { spin: true } : {}) },
@@ -230,6 +231,7 @@ let picked = null; // F300: the choice just tapped, until idevice.status answers
 let connectBusy = null; // F300: the Connect With pick whose tailscale.setConnect hasn't answered
 const painting = new WeakMap(); // page element → its latest paintInstallation (an older one stops painting)
 let testing = false; // F301: Test Connection runs (its row spins; a second tap waits for it)
+let pairChecking = false; // B320: Install Apps With's check of the kept pairing runs (the Pairing row spins)
 
 async function paintInstallation(el, { store, native, alert, redraw, server = () => [], sub = null }) {
   const choice = sub === "iphone" ? "iphone" : store.get(ROUTE_KEY);
@@ -240,12 +242,14 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
   let view = lastStatus;
   const cached = Boolean(view);
   const got = { device: false, tailscale: false }, late = { device: false, tailscale: false };
+  // B320: recheckPairing's spinner here: the Pairing row, not the HUD
+  const pairSpin = () => { pairChecking = true; paint(); return () => { pairChecking = false; redraw(); }; };
   const paint = () => {
     if (!mine()) return;
     const devWait = !got.device && !late.device, tsWait = !got.tailscale && !late.tailscale;
     const sections = installationGroups(choice, view, {
       reading: devWait && !cached, tsReading: tsWait && !view?.tailscale,
-      refreshing: { device: devWait && cached, tailscale: tsWait && Boolean(view?.tailscale) }, late, testing,
+      refreshing: { device: devWait && cached, tailscale: tsWait && Boolean(view?.tailscale) }, late, testing, pairChecking,
       connectPick, connectBusy, hint: lastStatus, server, picking: devWait && picked === choice,
       failure: choice === "iphone" ? routeFailure() : null, // B316
       fix: () => {
@@ -258,7 +262,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
       pick: (v) => {
         if (v === choice && !picked) return;
         picked = v; pickRoute(v, { set: (r) => store.set(ROUTE_KEY, r) }); if (mine()) redraw();
-        if (v === "iphone" && v !== choice) recheckPairing(native, alert, redraw); // B220: set up again, the kept pairing checked
+        if (v === "iphone" && v !== choice) recheckPairing(native, alert, redraw, { spin: pairSpin }); // B220: set up again, the kept pairing checked
       },
       openVPN: () => openVPN(native, alert),
       // F300: checked at once with the spinner in its row (no HUD), until setConnect and then the status answer.
@@ -272,7 +276,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
         try { ts = await within(call(native, "tailscale.setConnect", { value: v }), TIMEOUTS.tailscale).catch(() => null); } finally { connectBusy = null; }
         if (ts && typeof ts === "object" && ts.connect && lastStatus) lastStatus = { ...lastStatus, tailscale: ts };
         redraw();
-        if (ts) recheckPairing(native, alert, redraw); // B220: a new way in, the kept pairing checked over it
+        if (ts) recheckPairing(native, alert, redraw, { spin: pairSpin }); // B220: a new way in, the kept pairing checked over it
       },
       signIn: () => tailscaleSignIn(native, alert, redraw),
       test: async () => {
@@ -725,7 +729,7 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
   // wait: Checking… with the step under it and the grey spinner in its row, the action row dimmed
   const spinStatus = (label) => {
     paintStatus({ ...CHECKING, subtitle: `${label}…` }, { force: true });
-    return cellSpin.spinning() ? () => {} : cellSpin.spin(); // the pairing check follows the connection's at once
+    return cellSpin.spinning() ? () => {} : cellSpin.spin(); // never two spinners in the cell
   };
   const runAction = async (a) => {
     if (a === "check") return check(native, alert, after, store, checkButton).then(after);

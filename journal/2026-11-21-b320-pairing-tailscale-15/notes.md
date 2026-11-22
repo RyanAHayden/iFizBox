@@ -32,14 +32,26 @@ Signing meanwhile.
 - native: `idevice.pair` runs on its own queue (`pairQueue`); a second call while one runs joins it (same code, same
   advertisement; the earlier call answers "canceled: ..."); `idevice.pairCancel` ends the page's call at once and
   stops the advertisement 90 s later (`leaveGrace`) unless a page joins again, so leave-and-return doesn't churn
-  advertisements. patches/0003 adds `pairable_host_set_alt_irk`; IDevice keeps one altIRK in the Keychain
-  (`ifizbox.idevice.advert`), so every advertisement has the same TXT (authTag `oiJ1dYpG` across tries, checked
-  with avahi-browse).
+  advertisements.
 - web: the main page's Sign In redraws without the automatic check and autoCheck never runs while signing in; the
   checks after the sign-in spin the status cell (Checking…, "Checking Connection…"/"Checking Pairing…") instead of
   the HUD; recheckPairing retries a pairing the phone answered and dropped (`turnedDown`: pair_again, early EOF,
   "invalidated") and then forgets it and opens Pairing, which pairs by itself; Pair Again from the main page's check
-  opens Pairing; leaving Pairing drops the page's pairing state at once so coming back asks again (and rejoins).
+  opens Pairing; leaving Pairing drops the page's pairing state at once so coming back asks again (and rejoins);
+  Install Apps With's own check of the kept pairing (picking This iPhone, a new Connect With) spins the Pairing row
+  instead of the HUD.
+
+## Spec review
+
+Fixed: Install Apps With's "Checking Pairing" HUD (now the Pairing row spins; B322, filed before the review, is now
+covered here), the join no longer depends on idevice.pairState's pin (the session keeps its code), a misleading
+comment, and the journal line that said the main-page sign-in was checked in node tests only. Reverted: the kept
+altIRK (an idevice patch 0003 and a Keychain item): it gave every try the same TXT but didn't stop the dead rows.
+Kept, as part of the fix: the 90 s grace (the code notification and KeepAlive stay up those 90 s too), the automatic
+re-pair after a retry (a dropped pairing right after a sign-in costs the code again, but the user had to find Forget
+Pairing by hand before), the Pairing Advertisement glossary term. Still partial by nature: after more than 90 s away,
+or after Forget Pairing or a relaunch, a new advertisement can still leave a dead row while Preferences stays open;
+re-entering Developer Mode clears it.
 
 ## Checked
 
@@ -47,8 +59,8 @@ Signing meanwhile.
 - native/sideload/idevice/test_idevice.py (new OnePairingAtATime).
 - On the 15 with build 4102 (first version of the fix): pairing starts within a second of opening Pairing (code
   687419, advertised 0.7 s later); a web view reload while pairing joined it ("joined the pairing that runs", same
-  code on the page); leave and return re-advertised with the same authTag. Settings still showed two rows after that
-  leave-and-return, which is why the 90 s grace was added.
+  code on the page); leave and return re-advertised (with the kept altIRK, since reverted: same authTag). Settings
+  still showed two rows after that leave-and-return, which is why the 90 s grace was added.
 - On the 15 with the grace build: Pairing opened (code 216142, port 60313), Settings, back, leave and return: the
   page asked again and got the same code and port ("joined"), Settings showed one row, and typing 216142 paired
   (20:03:27, "Successfully wirelessly paired"); Pairing then showed Paired.
@@ -64,8 +76,11 @@ Signing meanwhile.
 
 ## Not verified
 
-- The Tailscale login itself: the node is signed in and a new login needs the owner (memory: iphone15 tailscale
-  login). The main page's sign-in flow (no x, status cell spinning, no HUD) is checked in node tests only.
+- The Tailscale login page itself (a real login): the node is signed in and a new login needs the owner. The main
+  page's sign-in flow was checked on the 15 with a faked signed-out status (above), so the login page never opened.
+- The final build (kept altIRK reverted, Install Apps With's Pairing row spinner, the join keyed on the session) was
+  not put on the phone again: those changes are a revert to main's IDevice.swift, a JS spinner checked by node
+  tests, and a one-line Swift change the gate's native build compiles.
 - The exact error text the user saw ("connection invalidated"): its log was before my syslog capture started, so
   `turnedDown` matches it by the word "invalidat" plus pair_again/early EOF; if the shell words it otherwise, the
   pairing is kept and the main page says Pair Again, as before.
