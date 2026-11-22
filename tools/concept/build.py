@@ -146,9 +146,27 @@ def frame_html(html):
     return html
 
 
+_THUMBS = None
+
+
+def app_icon_thumbs():
+    """{"appicon/<icon>.png": data URI}: the 180 px app icons the native shell serves as appicon/<icon>.png (native/
+    build.sh AppIconThumbs), which Theme > App Icon's thumbnails and Home's header load. The jailbreak build's (no
+    LITE sash), from this checkout's native/icon (alternates.py thumbs)."""
+    global _THUMBS
+    if _THUMBS is None:
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            subprocess.run([sys.executable, str(ROOT / "native/icon/alternates.py"), "thumbs", tmp], check=True)
+            _THUMBS = {f"appicon/{p.name}": "data:image/png;base64," + base64.b64encode(p.read_bytes()).decode()
+                       for p in sorted(Path(tmp).glob("*.png"))}
+    return _THUMBS
+
+
 def pack(tree):
     """A version of the app as the page carries it: each module wrapped for the registry (esm.py)."""
     parts = split_tree(tree)
+    parts["assets"].update(app_icon_thumbs())
     wrapped, _ = bundle_modules(parts["modules"])
     return {"modules": wrapped, "files": parts["files"], "assets": parts["assets"], "html": parts["html"],
             "boot": script_safe(parts["boot"])}
