@@ -35,9 +35,12 @@ s.onpointerdown=e=>{down=[px(e),Date.now()];e.preventDefault()};
 s.onpointerup=e=>{if(!down)return;const[a,t0]=down,b=px(e);down=null;
  if(Math.hypot(b[0]-a[0],b[1]-a[1])<30)go({cmd:'tap',x:a[0],y:a[1]});
  else go({cmd:'swipe',x1:a[0],y1:a[1],x2:b[0],y2:b[1],secs:Math.max(.1,(Date.now()-t0)/1000)})};
-function live(){s.src='stream?'+Date.now()} // MJPEG: the browser keeps redrawing it
-s.onerror=()=>{st.textContent='stream dropped, reconnecting…';setTimeout(live,2000)};
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)live()});live();
+let n=-1; // long poll /frame: each answer is the next screen; Safari's MJPEG held frames back
+async function loop(){for(;;){if(document.hidden){await new Promise(r=>setTimeout(r,500));continue}
+ try{const r=await fetch('frame?after='+n+'&t='+Date.now());
+  if(r.ok){n=+r.headers.get('X-Frame');const u=URL.createObjectURL(await r.blob());s.onload=()=>URL.revokeObjectURL(u);s.src=u}
+  else await new Promise(r=>setTimeout(r,2000))}catch(e){await new Promise(r=>setTimeout(r,2000))}}}
+loop();
 </script>"""
 
 
@@ -108,29 +111,29 @@ class H(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        if self.path.startswith("/stream"):
-            return self.stream()
+        if self.path.startswith("/frame"):
+            return self.next_frame()
         if self.path.startswith("/shot"):
             png = screenshot()
             return self.send(200, png, "image/png") if png else self.send(503, b"no screen yet: tap Wake", "text/plain")
         self.send(200, PAGE.encode(), "text/html; charset=utf-8")
 
-    def stream(self):  # MJPEG of the small frames grabber() makes; a frame only when the screen changed
+    def next_frame(self):  # long poll: the newest small JPEG once it is newer than ?after=N (15 s at most)
+        try:
+            after = int(self.path.split("after=")[1].split("&")[0])
+        except (IndexError, ValueError):
+            after = -1
+        with frame_cv:
+            frame_cv.wait_for(lambda: frame[1] != after and frame[0], timeout=15)
+            jpg, n = frame
+        if not jpg:
+            return self.send(503, b"no screen yet: tap Wake", "text/plain")
         self.send_response(200)
-        self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=f")
+        self.send_header("Content-Type", "image/jpeg")
+        self.send_header("X-Frame", str(n))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
-        seen = -1
-        try:
-            while True:
-                with frame_cv:
-                    frame_cv.wait_for(lambda: frame[1] != seen, timeout=15)
-                    jpg, seen = frame
-                if jpg:
-                    self.wfile.write(b"--f\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n" % len(jpg) + jpg + b"\r\n")
-                    self.wfile.flush()
-        except OSError:
-            pass  # viewer left
+        self.wfile.write(jpg)
 
     def do_POST(self):
         a = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
