@@ -77,6 +77,18 @@ unchanged (`7-unchanged.png`); the container root view changes nothing there.
 - The web view moves into the tab rather than making the tab bar controller the window's root, so presenting from
   `rootViewController` (MyIPAs, Tailscale) and the status bar handling stay as they were.
 
+## Spec review
+
+Fixed: Search's title fell back to the lowercase id when its label is empty (now aria-label or the capitalised id);
+the UITabBar hides again while the page's tab bar moves (a card sheet scales the page back, the tab bar too: the
+`moving(bar)` check F367 had); the shrink-on-scroll scroller must be on screen whole across, so a page half slid
+away isn't picked; a test that each outline glyph carries round joins once (no duplicate attribute).
+Kept, with the reason: the outline glyphs are our own iOS 7 drawings at iOS 26's weight (F370's approved way of
+deriving the era sets; no Apple artwork); the buttons are UIButtons with `UIButton.Configuration.glass()`, which the
+brief names as one of the two forms; the container root view and the Notifications.swift / test_web_bars.py edits
+are what the real UITabBar and its shrink need (above). The last fixes after the phone run (scroller pick, moving
+bar, title) are checked by node tests and the build only, not on the phone again.
+
 ## Incident on the iPhone 7
 
 While checking the 7 (under its lock), the App Store was in front instead of iFizBox (`ui-7.sh open

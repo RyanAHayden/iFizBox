@@ -114,7 +114,7 @@ test("open: the pill, the Search circle, each tab and both buttons; look-alikes 
   assert.equal(c.tabbar.hidden, false);
   assert.equal(c.tabbar.pill, undefined, "F369: a real UITabBar, no rects to lay glass at");
   assert.deepEqual(c.tabbar.items.map((i) => [i.id, i.title, i.search, i.selected, i.badge]),
-    [["home", "Home", false, true, null], ["sources", "Sources", false, false, null], ["search", "search", true, false, null]]);
+    [["home", "Home", false, true, null], ["sources", "Sources", false, false, null], ["search", "Search", true, false, null]]);
   for (const i of c.tabbar.items) {
     assert.match(i.icon, /^tab-/, `${i.id}: an outline glyph`);
     assert.match(i.selectedIcon, /^tab-/, `${i.id}: a filled glyph`);
@@ -153,6 +153,19 @@ test("titles and buttons follow the page; a badge and the chosen tab update the 
   assert.equal(calls.at(-1).tabbar.items[1].badge, "", "the refreshing spinner: a dot");
 });
 
+test("a card sheet scaling the page back (the tab bar too) hides the UITabBar until it is still", () => {
+  reset();
+  const { native, calls } = fakeShell();
+  const { bar } = app(native);
+  syncGlass(doc, native, win);
+  bar.style.transform = "scale(0.94)";
+  syncGlass(doc, native, win);
+  assert.equal(calls.at(-1).tabbar.hidden, true);
+  bar.style.transform = "";
+  syncGlass(doc, native, win);
+  assert.equal(calls.at(-1).tabbar.hidden, false);
+});
+
 test("a tab tap clicks the look-alike and resends the page's choice, even when it didn't switch", () => {
   reset();
   const { native, calls, tap } = fakeShell();
@@ -171,6 +184,8 @@ test("the tab glyphs: our own outline drawings for the UITabBar, the filled ones
     const svg = ICON_SETS.ios26.tabsOutline[tab];
     assert.match(svg, /fill='none'/, `${tab}: outline`);
     assert.match(svg, /stroke-width='2\.2'/, `${tab}: iOS 26's tab weight`);
+    assert.equal(svg.match(/stroke-linejoin=/g)?.length, 1, `${tab}: round joins once, on the whole glyph (no duplicate attribute)`);
+    assert.match(svg, /^<svg [^>]*stroke-linecap='round'/, `${tab}: round caps on the whole glyph`);
     assert.ok(ICON_SETS.ios26.tabsSelected[tab], `${tab}: filled`);
   }
 });

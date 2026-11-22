@@ -133,7 +133,8 @@ const weightOf = (cs) => parseInt(cs?.fontWeight, 10) || (cs?.fontWeight === "bo
 
 // F369: the tab bar as the shell's real UITabBar shows it: each tab's id, title, glyphs (icons/rowicons.js: the era's
 // outline glyph, its filled one for the chosen tab), badge ("" for the refreshing spinner: a dot), and which tab is
-// chosen. Search is the UITabBar's search tab. Hidden while a popup is up or one of the page's sheets covers the bar.
+// chosen. Search is the UITabBar's search tab. Hidden while a popup is up, one of the page's sheets covers the bar, or
+// the page moves it (a card sheet scales the page behind it back, the tab bar too).
 function tabbarSnapshot(doc, win, popup) {
   const bar = barOf(doc);
   if (!shows(bar)) return null;
@@ -142,14 +143,15 @@ function tabbarSnapshot(doc, win, popup) {
   const items = tabs.map((a) => {
     const id = a.dataset.tab;
     const badge = a.querySelector(".badge");
-    const title = (a.querySelector(".tab-label")?.textContent || a.getAttribute("aria-label") || id).trim();
+    const title = (a.querySelector(".tab-label")?.textContent || a.getAttribute("aria-label")?.split(",")[0]
+      || id.charAt(0).toUpperCase() + id.slice(1)).trim();
     return {
       id, title, selected: a.classList.contains("active"), search: id === FLOAT_OWN_TAB,
       icon: tabIcon(icon("tabsOutline", id, style), win), selectedIcon: tabIcon(icon("tabsSelected", id, style), win),
       badge: shows(badge) ? (badge.classList.contains("spinning") ? "" : badge.textContent) : null,
     };
   });
-  return { hidden: popup || covered(bar, doc), items };
+  return { hidden: popup || moving(bar, doc) || covered(bar, doc), items };
 }
 
 // One tab glyph (an SVG from icons/rowicons.js) drawn once into a TAB_ICON_PT square PNG for the shell: its key.

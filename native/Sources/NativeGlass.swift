@@ -395,8 +395,11 @@ private final class NativeTabs: NSObject, UITabBarControllerDelegate {
         var best: UIScrollView?
         func walk(_ v: UIView) {
             for s in v.subviews where !s.isHidden && s.alpha > 0.01 {
+                // on screen whole across (not a page half slid away) and over the middle; the last such in drawing
+                // order is the frontmost
+                let r = s.convert(s.bounds, to: web)
                 if let sv = s as? UIScrollView, sv !== web.scrollView, sv.contentSize.height > sv.bounds.height + 1,
-                   sv.convert(sv.bounds, to: web).contains(mid) {
+                   r.contains(mid), r.minX > -1, r.maxX < web.bounds.width + 1 {
                     best = sv
                 }
                 walk(s)
