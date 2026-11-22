@@ -293,6 +293,7 @@ export const TAILSCALE_ID = "io.tailscale.ipn.ios";
 // B323: Open Tailscale. `call` is the bridge's call(method, params); true once iOS opened the app (signing.openApp,
 // the sideload shell's LSApplicationWorkspace openApplicationWithBundleID:), false when it couldn't or the call
 // failed: the caller then says to open Tailscale from the Home Screen.
+export const OPEN_TAILSCALE_BY_HAND = "Open Tailscale from the Home Screen and turn it on. No Tailscale app? Get it from the App Store.";
 export async function openTailscale(call) {
   try { return (await call("signing.openApp", { bundleId: TAILSCALE_ID }))?.opened === true; } catch { return false; }
 }

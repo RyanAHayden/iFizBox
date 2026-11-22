@@ -112,6 +112,15 @@ test("B323: Open Tailscale says to open it by hand when iOS won't", async () => 
   await flush();
   assert.equal(asked.at(-1)?.title, "Couldn't Open Tailscale");
   assert.match(asked.at(-1)?.message, /^Open Tailscale from the Home Screen/);
+  assert.ok(!native.calls.some(([m]) => m === "app.openURL"), "OK opens nothing");
+  leave();
+  // its App Store button opens Tailscale's App Store page
+  const native2 = bridge({ "idevice.status": VPN_OFF, "idevice.vpnApps": { localdevvpn: false, tailscale: true }, "tailscale.setConnect": null, "signing.openApp": { opened: false }, "app.openURL": { opened: true } });
+  const box2 = make("div");
+  await drawInstallation(box2, "pair", { store: store(), native: native2, alert: async (a) => ({ index: a.title === "Couldn't Open Tailscale" ? 1 : 0 }) });
+  await tap(box2, "Open Tailscale");
+  await flush();
+  assert.match(native2.calls.find(([m]) => m === "app.openURL")?.[1]?.url ?? "", /^https:\/\/apps\.apple\.com\/app\/tailscale\//);
   leave();
 });
 

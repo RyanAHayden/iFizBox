@@ -23,7 +23,7 @@ import { showAlert } from "../nav/alert.js";
 import { copyText } from "../nav/menu.js";
 import { toBase64 } from "../core/signing.js";
 import { vpnRoute, connectAlert, LOCALDEVVPN_STORE } from "../core/installroute.js";
-import { openTailscale } from "../core/installroute.js"; // B323
+import { openTailscale, OPEN_TAILSCALE_BY_HAND } from "../core/installroute.js"; // B323
 import { ROUTE_KEY, ROUTE_OPTIONS, VPNS, VPN_POLL, vpnList, vpnOn, IPHONE_INTRO, setupState, PAIR_GUIDE, pairEvent, pairFooter, pairFromNative, pinText, PAIR_STEPS, verifyFailure, verifyVPN,
   CONNECT_OPTIONS, connectFooter, tailscaleFooter, tailscaleTestResult } from "../core/installroute.js";
 import { ringStyle, vpnWaitText } from "../core/installroute.js";
@@ -867,12 +867,13 @@ async function openApp(native, alert, url, name) {
 }
 
 // B323: Open Tailscale launches the app by its bundle ID (a tailscale: link shows Tailscale's "Could not sign
-// device"); when iOS won't, it says plainly to open Tailscale.
-export const OPEN_TAILSCALE_BY_HAND = "Open Tailscale from the Home Screen and turn it on. No Tailscale app? Get it from the App Store.";
+// device"); when iOS won't, it says plainly to open Tailscale, with its App Store page one tap away.
 async function openTailscaleApp(native, alert) {
   let opened = false;
   try { opened = await busy("Opening Tailscale", () => openTailscale((m, p) => call(native, m, p))); } catch { /* below */ }
-  if (!opened) await alert({ title: "Couldn't Open Tailscale", message: OPEN_TAILSCALE_BY_HAND, buttons: ["OK"] });
+  if (opened) return;
+  const r = await alert({ title: "Couldn't Open Tailscale", message: OPEN_TAILSCALE_BY_HAND, buttons: ["OK", "App Store"], cancel: 0 });
+  if (r?.index === 1) await openApp(native, alert, TAILSCALE_STORE, "App Store");
 }
 
 // The steps: a short line each, and the screenshot of the Settings row to tap, ringed.

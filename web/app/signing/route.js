@@ -52,7 +52,9 @@ export function runFix(fix, { native, go = openRoute } = {}) {
   if (fix === "signIn") return go(["installation", "with"]);
   if (fix === "pair") return go(["installation", "pair"]);
   if (fix === "check") return go(["installation"]);
-  if (fix === "openTailscale") return openTailscale((m, p) => bridge(native).call(m, p)); // B323: by bundle ID, not tailscale:
+  if (fix === "openTailscale") { // B323: by bundle ID, not tailscale:; plain words when iOS won't
+    return openTailscale((m, p) => bridge(native).call(m, p)).then((ok) => ok || showAlert({ title: "Couldn't Open Tailscale", message: OPEN_TAILSCALE_BY_HAND }));
+  }
   if (fix === "openVPN") return Promise.resolve().then(() => bridge(native).call("idevice.openLocalDevVPN", {})).catch(() => {});
   return undefined;
 }
@@ -66,7 +68,7 @@ import { showAlert } from "../nav/alert.js";
 import { NAME } from "../brand.js";
 import { storedRoute, decideRoute, ALERTS as ROUTE_ALERTS, routeParams, VPN_WAIT, VPN_CONNECTED, VPN_POLL,
   vpnReady } from "../core/installroute.js";
-import { routeFailureOf, rememberRouteFailure, clearRouteFailure, openTailscale } from "../core/installroute.js"; // B316, B323
+import { routeFailureOf, rememberRouteFailure, clearRouteFailure, openTailscale, OPEN_TAILSCALE_BY_HAND } from "../core/installroute.js"; // B316, B323
 import { SELF_RESTART } from "../core/apprun.js";
 import { KNOWN_MALWARE, askInsecure, bridge, failed, keepIpaHash, refusing, stopNative, storageOf,
   untilCancel } from "./common.js";

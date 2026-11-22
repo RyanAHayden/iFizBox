@@ -36,9 +36,17 @@ Unable to verify deeplink".
 - Tests: `core/installroute.test.js` (openTailscale, runFix), `screens/installroute-pair.test.js` (Open Tailscale
   calls signing.openApp, never app.openURL tailscale:, and the by-hand alert).
 
+- After review: the by-hand alert has an App Store button (Tailscale's App Store page), and the install-failure
+  alert's fix button (`runFix`) now shows the same plain alert when iOS won't open Tailscale (it was silent).
+- Jailbreak build: signing.* is refused there, but every Open Tailscale path is on the This iPhone route
+  (idevice.*, sideload only), which the jailbreak app never shows, so the refusal can't reach these rows.
+
 ## Tried and failed
 
 - No other link form: every tailscale: link above fails the same way; there is nothing else registered.
+- `shortcuts://` not used: it can only run a shortcut the user made themselves (run-shortcut?name=…), and there
+  is no stock "open Tailscale" shortcut to call, so it would need a setup step for nothing the bundle-ID open
+  doesn't already do.
 
 ## Not verified
 
