@@ -34,6 +34,7 @@ import { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, 
 import { NAME, DOMAIN } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
 import { showHUD } from "../nav/hud.js";
+import { loadStyle } from "../nav/motion.js";
 import { slideChange } from "../nav/slide.js";
 import { go as navGo, back as navBack } from "../nav/go.js";
 import { nativeBridge } from "../native.js";
@@ -41,12 +42,14 @@ import { nativeBridge } from "../native.js";
 export const PAGE = "installation";
 // F300: Installation & Signing's main page links to Install Apps With (`with`: the choice and the chosen route's
 // groups); `iphone` still opens This iPhone's groups alone. The Pairing row opens the setup (`pair`).
-export const SUB_TITLES = { pair: "Pairing", iphone: "This iPhone", with: "Install Apps With" };
+export const SUB_TITLES = { pair: "Pairing", iphone: "This iPhone", with: "Install Apps With", how: "How It Works", shortcuts: "Cellular Shortcuts", server: "Signing Server" };
 const VPN = VPNS[0];
 
 const route = (sub) => format(settingsRoute(sub ? [PAGE, sub] : [PAGE]));
 const goTo = (sub) => navGo(route(sub));
-const call = (native, m, p = {}, ev) => native?.call ? native.call(m, p, ev) : Promise.reject(new Error(`This needs the ${NAME} app.`));
+// concept: the concept's fake bridge has no idevice.*; these answers stand in (paired, the built-in VPN ready)
+const SAMPLE = { "idevice.status": { paired: true, concept: true, tailscale: { connect: "auto" } }, "idevice.verify": { ok: true }, "tailscale.status": { connect: "auto" } };
+const call = (native, m, p = {}, ev) => (native?.call ? Promise.resolve(native.call(m, p, ev)).catch(() => null) : Promise.resolve(null)).then((r) => r ?? SAMPLE[m] ?? r);
 // F301: every call the page waits on has a deadline. Past it the row (or the alert) says Not Responding instead of
 // spinning on; a later answer is dropped. idevice.status answers in under a second (VPNCheck: no probe when no tunnel
 // is up, both ports at once otherwise), tailscale.status at once (UserDefaults and getifaddrs); idevice.verify and
@@ -141,62 +144,76 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
   tsReading = reading, refreshing = {}, late = {}, testing = false, failure = null, fix = () => {}, pairChecking = false } = {}) {
   const groups = [{
     header: "Install Apps With",
-    rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", icon: rowIcon(ROUTE_ROW[o.value].icon), checked: o.value === choice, onClick: () => pick(o.value),
+    // concept: one line each; a tap picks it and opens its setup page
+    rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, icon: rowIcon(ROUTE_ROW[o.value].icon), checked: o.value === choice,
+      href: route(o.value === "iphone" ? "iphone" : "server"), onClick: () => pick(o.value),
       ...(picking && o.value === choice ? { spin: true } : {}) })),
     footer: choice === "iphone"
       ? `Signed apps go straight to iOS through ${vpnList()}. When it's off, installs use the Signing Server.`
       : "The Signing Server hands iOS each app's install link.",
   }];
   if (choice !== "iphone") return [...groups, ...(server() ?? [])];
-  {
-    const ts = st?.tailscale ?? null;
-    // B167: while idevice.status (tailscale.status with it) hasn't answered, Tailscale's state is unknown, not signed
-    // out: its row says Checking… with the spinner (one row, as Sign In is), and Connect With keeps the pick just made.
-    const tsUnknown = (tsReading || !st) && !late.tailscale;
-    const tsAgain = Boolean(refreshing.tailscale) && !tsUnknown; // F301: the last answer shown while it's read again
-    const now = connectBusy ?? (tsUnknown || tsAgain ? connectPick : null) ?? ts?.connect ?? (tsUnknown ? hint?.tailscale?.connect : null) ?? "auto";
-    const spinning = connectBusy ?? (tsUnknown || tsAgain ? connectPick : null);
-    const viaTs = tailscaleRoute(tsUnknown ? hint : st, now); // F300: no LocalDevVPN rows then
-    const devLate = Boolean(late.device), devAgain = Boolean(refreshing.device) && !reading && !devLate;
-    // B316: Tailscale signed out with Tailscale's group already offering Sign In: the failure is said there (one
-    // Sign In row); any other failure goes in This iPhone's group with its fix row
-    const tsSignIn = !busy && !tsUnknown && !(late.tailscale && !ts) && !ts?.signedIn;
-    const failTs = Boolean(failure && failure.fix === "signIn" && tsSignIn);
-    const failHere = Boolean(failure) && !failTs;
-    const failText = failure ? `${failure.title}. ${failure.short}` : "";
-    groups.push({
-      header: "This iPhone",
-      rows: [
-        devLate ? { label: "Pairing", detail: NOT_RESPONDING, href: route("pair") }
-          : reading ? { label: "Pairing", detail: "Checking…", href: route("pair"), spin: true }
-          // B320: `pairChecking`: the kept pairing is checked (recheckPairing): this row spins, no HUD
-          : { label: "Pairing", detail: withDetail("iphone", st ?? {}, failure), href: route("pair"), ...(devAgain || pairChecking ? { spin: true } : {}) },
-        ...(viaTs ? [] : [
-          devLate ? { label: VPN, detail: NOT_RESPONDING }
-            : { label: VPN, detail: reading ? "Checking…" : vpnDetail(st), ...(reading || devAgain ? { spin: true } : {}) },
-          { label: `Open ${VPN}`, cls: "sign-import", onClick: openVPN },
-        ]),
-        // B316: the last check or install failed (core routeFailure): its fix row here, and the footer says what's wrong
-        ...(failHere && failure.fix !== "openVPN" ? [{ label: failure.button, cls: "sign-import", onClick: fix }] : []),
-      ],
-      ...(failHere ? { footer: failText, warn: true }
-        : viaTs ? {} : { footer: `${VPN} must be on while apps install.` }), // F317: no "(below)": Tailscale's group says its own
-    });
-    groups.push({
-      header: "Connect With",
-      rows: CONNECT_OPTIONS.map((o) => ({ label: o.label, checked: o.value === now, onClick: () => connect(o.value), ...(o.value === spinning ? { spin: true } : {}) })),
-      footer: connectFooter(now),
-    });
-    const rows = busy
-      ? [{ label: "Signing In…", detail: busy, spin: true }]
-      : late.tailscale && !ts ? [{ label: "Tailscale", detail: NOT_RESPONDING }]
-      : tsUnknown ? [{ label: "Tailscale", detail: "Checking…", spin: true }]
-      : ts?.signedIn
-        ? [{ label: "Device", detail: ts.name || NAME, ...(tsAgain ? { spin: true } : {}) },
-          { label: "Test Connection", cls: "sign-import", onClick: test, ...(testing ? { detail: "Testing…", spin: true } : {}) },
-          { label: "Sign Out", cls: "sign-import", onClick: signOut }]
-        : [{ label: "Sign In", cls: "sign-import", onClick: signIn }];
-    groups.push({ header: "Tailscale", rows, ...(failTs ? { footer: failText, warn: true } : { footer: tailscaleFooter(ts) }) });
+  groups[0].footer = "Tap one to set it up.";
+  return [...groups, ...localGroups(st, { reading, test, testing })];
+}
+
+// concept: This iPhone with the built-in VPN (no Tailscale, no LocalDevVPN). The VPN is iFizBox's own packet tunnel
+// to the phone itself (10.7.0.1); it runs only while an app installs. On cellular, two Shortcuts the user adds once
+// turn Cellular Data off for the few seconds the connection opens. After the install the VPN goes off and the VPN
+// that was on before (Tailscale) comes back through its VPN On Demand.
+export const shortcutsAdded = { off: false, on: false };
+let tested = false;
+export const iphoneReady = (st) => Boolean(st?.paired) && tested; // concept: set up = paired and tested once
+export const markTested = () => { tested = true; };
+export function localGroups(st, { reading = false, test = () => {}, testing = false } = {}) {
+  const paired = Boolean(st?.paired), both = shortcutsAdded.off && shortcutsAdded.on;
+  const footer = !paired ? "Pair this iPhone once to install straight onto it."
+    : !tested ? "Test the connection to finish setting up."
+    : both ? "Set up. Apps install straight onto this iPhone, on Wi-Fi, cellular or offline."
+    : "Set up for Wi-Fi and offline. Add the Cellular Shortcuts to install on cellular too.";
+  return [
+    { header: "Set Up", rows: [
+      reading ? { label: "Pair This iPhone", icon: rowIcon("pairPhone"), detail: "Checking…", href: route("pair"), spin: true }
+        : { label: "Pair This iPhone", icon: rowIcon("pairPhone"), detail: paired ? "Done" : "Start", href: route("pair") },
+      { label: "Test Connection", icon: rowIcon("testConnection"), onClick: test,
+        detail: testing ? "Testing…" : tested ? "Connected" : "Test", ...(testing ? { spin: true } : {}) },
+      { label: "Cellular Shortcuts", subtitle: "Optional, for installs on cellular", icon: rowIcon("cellular"), detail: both ? "Done" : "Add", href: route("shortcuts") }],
+      footer },
+    { rows: [{ label: "How It Works", icon: rowIcon("help"), href: route("how") }] },
+  ];
+}
+
+// concept: How It Works, the steps of one install, a row each
+export const HOW_STEPS = [
+  { label: "1. Download", subtitle: "The app downloads over Wi-Fi or cellular." },
+  { label: "2. Sign", subtitle: "Signed on this iPhone with your certificate." },
+  { label: `3. ${NAME} VPN On`, subtitle: "iOS runs one VPN at a time, so Tailscale pauses." },
+  { label: "4. Cellular Data Off", subtitle: "On cellular only: a Shortcut turns it off for a moment." },
+  { label: "5. Install", subtitle: "Copied straight to iOS. No internet needed." },
+  { label: "6. All Back On", subtitle: "Data back on, VPN off, Tailscale reconnects." },
+];
+function howGroups() {
+  return [
+    { header: "Each Install", rows: HOW_STEPS.map((s) => ({ ...s })),
+      footer: "Takes a few seconds more than an install over Wi-Fi." },
+    { header: "Without Wi-Fi or Data", rows: [{ label: "Offline", detail: "Works" }],
+      footer: "Apps you already downloaded install with no connection at all." },
+  ];
+}
+
+// concept: Cellular Shortcuts, each Shortcut in its own group with its add row, then a test
+function shortcutGroups(redraw, alert) {
+  const add = (k) => () => { shortcutsAdded[k] = true; redraw(); };
+  const row = (k, name) => shortcutsAdded[k]
+    ? { label: name, icon: rowIcon("cellular"), detail: "Added" }
+    : { label: name, icon: rowIcon("cellular"), detail: "Add", chevron: true, onClick: add(k) };
+  const groups = [
+    { header: "Turn Off", rows: [row("off", "Cellular Data Off")], footer: "Opens Shortcuts with it ready to add. Tap Add Shortcut, then come back." },
+    { header: "Turn On", rows: [row("on", "Cellular Data On")], footer: "Turns Cellular Data back on when the install has connected." },
+  ];
+  if (shortcutsAdded.off && shortcutsAdded.on) {
+    groups.push({ rows: [{ label: "Test Shortcuts", icon: rowIcon("testConnection"), onClick: () => alert({ title: "Shortcuts Work", message: "Cellular Data went off and came back on.", buttons: ["OK"] }) }],
+      footer: "Turns Cellular Data off and on again once." });
   }
   return groups;
 }
@@ -205,6 +222,9 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
 export async function drawInstallation(el, sub, { store, native = nativeBridge(), alert = showAlert, server = () => [] } = {}) {
   const redraw = () => drawInstallation(el, sub, { store, native, alert, server });
   if (sub === "pair") return drawPair(el, { store, native, alert, redraw });
+  if (sub === "server") { el.replaceChildren(grouped(server() ?? [])); return; } // concept: the Signing Server's own page
+  if (sub === "how") { el.replaceChildren(grouped(howGroups())); return; } // concept
+  if (sub === "shortcuts") { el.replaceChildren(grouped(shortcutGroups(redraw, alert))); return; } // concept
   return paintInstallation(el, { store, native, alert, redraw, server, sub: SUB_TITLES[sub] ? sub : null });
 }
 
@@ -226,7 +246,7 @@ export function pickRoute(v, { set }) {
 
 // F284: `sub` "iphone" draws only This iPhone's groups (whatever the choice); F300: "with" draws them all (the choice
 // and the chosen route's groups).
-export const subGroups = (sections, sub) => (sub === "iphone" ? sections.slice(1) : sections);
+export const subGroups = (sections, sub) => (sub === "iphone" ? sections.slice(1) : sub === "with" ? sections.slice(0, 1) : sections); // concept: Install Apps With is the choice alone
 
 let picked = null; // F300: the choice just tapped, until idevice.status answers on the page it redrew
 let connectBusy = null; // F300: the Connect With pick whose tailscale.setConnect hasn't answered
@@ -284,7 +304,8 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
         if (testing) return;
         testing = true;
         paint();
-        try { await tailscaleTest(native, alert, () => { testing = false; paint(); }); } finally { if (testing) { testing = false; paint(); } }
+        // concept: the built-in VPN's test: on for a moment, reach iOS, off again
+        try { await new Promise((r) => setTimeout(r, 1200)); testing = false; markTested(); if (store.get(ROUTE_KEY) !== "iphone") store.set(ROUTE_KEY, "iphone"); paint(); await alert({ title: "Connected", message: `${NAME} VPN reached this iPhone in 38 ms, then turned off again.`, buttons: ["OK"] }); } finally { if (testing) { testing = false; paint(); } }
       },
       signOut: async () => {
         const { index } = await alert({ title: "Sign Out of Tailscale?", message: `${NAME} leaves your tailnet. Installs use LocalDevVPN until you sign in again.`, buttons: ["Cancel", "Sign Out"], cancel: 0 });
@@ -622,8 +643,11 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
   const sections = [
     { rows: [{ label: "", subtitle: " ", cls: "install-status" }, { label: STATUS_ACTIONS.check, cls: "install-action", onClick: act }] },
     // F351: the chosen route is the row (its icon, its name, what it does), under the question as the header
-    { header: "Install Apps With", rows: [{ label: ROUTE_ROW.server.label, subtitle: ROUTE_ROW.server.sub, detail: "", href: links.with, icon: rowIcon(ROUTE_ROW.server.icon) }],
-      footer: "Tap to choose how signed apps reach iOS." },
+    // concept: both ways on this page. A tap on the row opens its page; USE at its right uses it (This iPhone not set
+    // up yet: its setup opens, and finishing it uses it); the way in use says ACTIVE.
+    { header: "Install Apps With", rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, icon: rowIcon(ROUTE_ROW[o.value].icon),
+      href: route(o.value), cls: "route-pick" })),
+      footer: "Tap USE to install that way." },
     { header: "Signing", rows: [{ label: "Certificate", detail: "", href: links.certificate, icon: rowIcon("signing") },
       { label: "Signed Apps", detail: "", href: links.apps, icon: rowIcon("websiteApps") }] },
     { rows: [{ label: "How Signing Works", href: links.help, icon: rowIcon("help") }] },
@@ -641,15 +665,34 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
   const cellSpin = checkMark(statusCell); // B320: the status cell's spinner while a sign-in's checks run (spinStatus)
   actionCell.classList.add("is-dim");
   actionCell.setAttribute("aria-disabled", "true");
-  const withCell = cells[2];
-  const showRoute = (c) => {
-    const r = ROUTE_ROW[c === "iphone" ? "iphone" : "server"];
-    withCell.querySelector(".cell-label").textContent = r.label;
-    withCell.querySelector(".cell-subtitle").textContent = r.sub;
-    withCell.querySelector(".cell-icon img").src = rowIcon(r.icon).src;
+  // concept: USE / ACTIVE at the right of each way's row: the App Store price button, the green ACTIVE revealed over
+  // it from the right as the red Delete is in Sources (clip-path, sources.css .del-confirm)
+  loadStyle("myipas.css");
+  const routeCells = { iphone: cells[2], server: cells[3] };
+  for (const [v, c] of Object.entries(routeCells)) {
+    const wrap = el("span", "route-use");
+    const useBtn = el("button", "price-btn route-use-btn", "USE");
+    useBtn.type = "button";
+    const active = el("span", "price-btn go route-active", "ACTIVE");
+    active.setAttribute("aria-hidden", "true");
+    useBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); use(v); });
+    wrap.append(useBtn, active);
+    // beside the row's link, not inside it (as My IPAs' price buttons): a tap on USE never also follows the link,
+    // which pushed the page twice and showed it without the slide
+    c.parentElement.append(wrap);
+    c.parentElement.classList.add("has-use");
+  }
+  const showRoute = (choice) => {
+    for (const [v, c] of Object.entries(routeCells)) c.parentElement.classList.toggle("route-on", v === choice);
   };
-  const slots = {};
-  ["with", "certificate", "apps"].forEach((k, i) => { slots[k] = slotOf(cells[i + 2].querySelector(".cell-detail")); });
+  showRoute(store.get(ROUTE_KEY));
+  const use = (v) => {
+    if (v === "iphone" && !iphoneReady(known ?? lastStatus)) return goTo("iphone"); // not set up: its setup page
+    showRoute(v);
+    if (store.get(ROUTE_KEY) !== v) setTimeout(() => { store.set(ROUTE_KEY, v); refresh(); }, 260); // after the reveal
+  };
+  const slots = { with: slotOf(el("span", "cell-detail")) };
+  ["certificate", "apps"].forEach((k, i) => { slots[k] = slotOf(cells[i + 4].querySelector(".cell-detail")); });
 
   let known; // idevice.status once read
   let certRead = false; // B250: signing() has answered once (or failed)

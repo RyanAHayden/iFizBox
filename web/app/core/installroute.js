@@ -16,8 +16,8 @@ export const vpnList = (vpns = VPNS) => vpns.length < 2 ? vpns.join("") : `${vpn
 // Subtitles: one short point per line (the rows wrap them, settings.css .route-row).
 // F300: This iPhone first, then the Signing Server (still the default).
 export const ROUTE_OPTIONS = [
-  { value: "iphone", label: "This iPhone", subtitle: `${vpnList()}\nNo server, no install popup\nUpdates itself` },
-  { value: "server", label: "Signing Server", subtitle: `Default\nUses ${DOMAIN}` },
+  { value: "iphone", label: "This iPhone", subtitle: "Works offline - no install popup" },
+  { value: "server", label: "Signing Server", subtitle: `Default - Uses ${DOMAIN}` },
 ];
 
 // This iPhone's page says what it gives in one sentence under its title. Installs through installation_proxy never
@@ -113,6 +113,7 @@ function routeStatus(choice, st, { host = DOMAIN, certificate } = {}) {
   const later = `Installs use ${host} for now.`;
   if (!st) return { state: "noStatus", title: "Can't Reach This iPhone", subtitle: later, action: "check", tone: "warn", local: false };
   if (!st.paired) return { state: "pair", title: "Pair This iPhone", subtitle: `Installs use ${host} until it's paired.`, action: "pair", tone: "warn", local: false };
+  if (st.concept) return { state: "ready", via: "vpn", title: "Ready to Install", subtitle: "Straight onto this iPhone, through its own VPN.", action: "check", tone: "ok", local: true }; // concept: the built-in VPN
   const ts = st.tailscale ?? {};
   const ready = (via) => ({ state: "ready", via, title: "Ready to Install", subtitle: `Straight onto this iPhone, through ${via}.`, action: "check", tone: "ok", local: true });
   if (ts.use) return ready("Tailscale");
