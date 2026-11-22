@@ -37,6 +37,26 @@ test("the jailbreak build still shows the same report", () => {
   assert.equal(pageDepReport(report, plain, "sideload"), report, "not a Tweak Source tweak: left as it is");
 });
 
+test("an unmet iOS range still shows on the page: Works On comes from compat, not the dependency report", async () => {
+  const { compat } = await import("../core/compat.js");
+  const st = liteCatalog().package("com.x.yt", KEY).stanza;
+  const old = compat(st, { ios: "14.8", jailbreak: "none" });
+  assert.equal(old.status, "no");
+  assert.equal(old.reason, "ios");
+  assert.match(old.detail, /iOS 15\.0 or later/);
+  const browse = readFileSync(new URL("./browse.js", import.meta.url), "utf8");
+  assert.ok(browse.includes("const fit = compat(st, currentDevice());"), "the package page judges the stanza itself");
+});
+
+test("plain jailbreak tweaks aren't offered in Lite: a Tweak Source drops them, so they have no page to report on", () => {
+  const c = createCatalog();
+  c.setDevice({ ios: "17.0", jailbreak: "none" });
+  const text = `${PACKAGES}\nPackage: com.x.daemon\nName: Daemon Tweak\nArchitecture: iphoneos-arm64\nSection: Tweaks\nVersion: 1\nDepends: mobilesubstrate, com.x.lib\n`;
+  c.load(KEY, text, "https://repo.x/", "iphoneos-arm64", { tweaks: true });
+  assert.equal(c.package("com.x.daemon", KEY), null);
+  assert.ok(c.package("com.x.yt", KEY));
+});
+
 test("wiring: the package page draws Can't Install Yet from pageDepReport only", () => {
   const browse = readFileSync(new URL("./browse.js", import.meta.url), "utf8");
   assert.ok(browse.includes("const shownDeps = pageDepReport(depReport, st);"));

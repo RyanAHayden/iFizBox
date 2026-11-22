@@ -1464,7 +1464,7 @@ export const isSideloadTweak = (st, mode = detectMode()) => Boolean(st?.injectab
 // B325: the dependency report (core/deps.js explain) the package page shows, or null. A sideload tweak gets none: it
 // is checked against apt's sources and dpkg's status, which say nothing about a signed app. Its Depends can only name
 // what Add to App bundles or drops (core/tweakfields.js injectableFromFields: the hooking library, PreferenceLoader,
-// firmware, cy+ names), Works On is left out for it already (core/catalog.js judge), and the Lite app has no dpkg
+// firmware, cy+ names), an unmet iOS range shows in the page's Works On (compat above) already, and the Lite app has no dpkg
 // status to conflict with, so every sentence would be wrong ("Can't Install Yet: needs mobilesubstrate").
 export const pageDepReport = (report, st, mode = detectMode()) => (isSideloadTweak(st, mode) ? null : report);
 

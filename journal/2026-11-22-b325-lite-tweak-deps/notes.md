@@ -8,9 +8,15 @@
   only stanzas that pass `core/tweakfields.js injectableFromFields`, so every Depends group of a sideload tweak is
   already satisfiable by something Add to App bundles or drops (the hooking library, PreferenceLoader, firmware,
   cy+ names). Filtering only mobilesubstrate/ellekit/libhooker would have left "Needs preferenceloader … Add
-  palera1n" (seen in the before shot). Firmware is the only other thing the report could say, and Works On is
-  already left out for injectable tweaks on a phone without a jailbreak (`core/catalog.js judge`); the Lite app has
-  no dpkg status, so no conflicts either. So nothing in the report applies to injection. `core/deps.js` is unchanged.
+  palera1n" (seen in the before shot). Firmware is the only other thing the report could say, and the page already
+  says it: it judges the stanza itself (`compat(st, currentDevice())`), so an unmet range shows in the header mark and
+  in Works On as "Not on iOS x / Made for iOS 15.0 or later" (the catalog's row mark is what's left out, not this).
+  The Lite app has no dpkg status, so no conflicts either. So nothing in the report applies to injection.
+  `core/deps.js` is unchanged.
+- Spec review: it asked whether dropping the report loses the firmware warning (above: no; now pinned by a test),
+  and for a test behind "plain tweaks aren't offered" (added). It also flagged the copied capture.mjs carrying
+  B129's unused hooks and the string-match wiring test: kept, as journal tooling and the repo's usual wiring check
+  (browse-addtoapp.test.js does the same).
 - Plain jailbreak-repo tweaks in Lite: not offered at all. `catalog.js` loads APT sources in the sideload build only
   as Tweak Sources (`{ tweaks: true }`), and `core/catalog.js load` drops every stanza that isn't injectable, so a
   non-injectable tweak has no page there ("Package not found", as B182 already handles). No dep-problem wording is
