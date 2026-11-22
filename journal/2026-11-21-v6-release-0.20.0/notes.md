@@ -21,5 +21,16 @@
   shows 0.20.0 as Latest.
 - `--verify-live 0.20.0`: /repo/source.json and /repo/Packages list 0.20.0 (-4115) first.
 
+- `gh release view v0.20.0`: tag v0.20.0, draft=false, prerelease=false, published 2026-11-22T02:30:42Z.
+
+## Spec review
+- The brief's generic release steps (CHANGELOG.md, commit to main, release workflow, `gh run list`) don't fit
+  this repo: it has neither file nor workflow, and docs/release.md says releases go through `tools/release.sh`.
+  The version bump reaches main when the runner merges task/V6, which already holds the tag's commit.
+- `web/app/source.json` and the deploy are steps 5-6 of docs/release.md, kept. The source keeps at most 20
+  versions (`tools/altsource.py update`), so adding 0.20.0 dropped 0.9.8: intended.
+- B320/B321 are in the notes' "This iPhone" line (one pairing at a time; the Pairing page names Tailscale);
+  B322 changed no code; B319 is tooling.
+
 ## Not verified
 - No install of 0.20.0 on a phone: the task asks for the release and the server checks only.
