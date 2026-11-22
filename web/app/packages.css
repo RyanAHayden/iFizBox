@@ -1059,8 +1059,9 @@ html[data-theme="dark"] .store-bar-fill { background: var(--dk-bar-fill); }
 html[data-theme="dark"] .store-review-response { background: var(--dk-inset-box); border-color: var(--table-edge); }
 /* ==== } look-only ==== */
 
-/* The Related tab's rows: the package's icon in the cell's icon box. B41: the picture fills the box over the letter
-   tile and stays hidden until it loads (ui.js removes it when it fails), so the letter shows otherwise. */
+/* The Related tab's rows: the package's icon in the cell's icon box. B41: the picture fills the box over the icon
+   its section list shows without one (B326: the section's, as the box's background) and stays hidden until it loads
+   (ui.js removes it when it fails), so that icon shows otherwise. */
 .store-related-icon { position: relative; overflow: hidden; }
 .store-related-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 /* ==== look-only { ==== The Related tab's rows */

@@ -1407,14 +1407,18 @@ async function renderFiles(body, id) {
 // as a plain list of up to RELATED rows; none when the package has no section.
 const RELATED = 50;
 
-// B41: one Related row. The icon is the letter tile, with the package's own picture over it when its URL is one we
-// can load (iconSrc: https/data, http through the proxy, not one that already failed in a list). ui.js drops the
-// <img> when it fails, and packages.css .store-related-icon keeps it out of sight until it loads, so the letter
-// shows while loading, without an icon, and after a failure.
+// B41: one Related row. The package's own picture when its URL is one we can load (iconSrc: https/data, http
+// through the proxy, not one that already failed in a list), over the icon its section list shows without one
+// (B326: packageIcon's fallback, the section's icon, else Cydia's unknown.png; a letter tile here left most of a
+// BigBoss tweak's Related rows blank, as their Icon is a file:/// path on the device). The fallback comes in as the
+// tile's background (nav/ui.js icon.color); ui.js drops the <img> when it fails, and packages.css
+// .store-related-icon keeps it out of sight until it loads, so the fallback shows while loading, without an icon,
+// and after a failure.
 export function relatedRow(r, route) {
+  const { fallback } = packageIcon(r);
   return {
     label: r.name, subtitle: r.short || null, href: deeper(route, token("package", r.id)), cls: "store-related-row",
-    icon: { text: (String(r.name || r.id || "").trim().charAt(0) || "?").toUpperCase(), src: iconSrc(r), cls: "store-related-icon" },
+    icon: { text: "", color: `url("${fallback}") center / cover no-repeat`, src: iconSrc(r), cls: "store-related-icon" },
   };
 }
 
