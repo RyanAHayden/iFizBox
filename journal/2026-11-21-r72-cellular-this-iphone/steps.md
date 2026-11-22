@@ -11,7 +11,8 @@ Connection, write down what iFizBox says (Connected, or the alert's title).
    Back in iFizBox, **Check Connection**.
 4. Control Center: tap **Cellular Data** off (the antenna tile turns white). LocalDevVPN still on.
    **Check Connection**.
-5. Still with Cellular Data off: install any small app through This iPhone; when it says Copying, turn
+5. Pick a small app that is already downloaded (in My IPAs; if none, download one with Cellular Data on first,
+   then turn it off again). With Cellular Data off, install it through This iPhone; when it says Copying, turn
    Cellular Data back on. Did it finish?
 6. Optional, Airplane Mode instead of step 4: Cellular Data on, Airplane Mode on (Wi-Fi tile white),
    LocalDevVPN on, **Check Connection**.
