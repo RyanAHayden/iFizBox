@@ -70,6 +70,26 @@ export function openOn(page, seg, count, { logTab = 1 } = {}) {
   return v;
 }
 
+// B324: a row's bar on a rows page (screens/apprun.js, screens/queuerun.js). Under the native controls hook
+// (native-controls.js) it is WebKit's own <progress>, iOS 26's UIProgressView (no value: WebKit's indeterminate bar);
+// otherwise the drawn .qr-bar track and .qr-fill, which sweeps while indeterminate. -> { bar, set(fraction, sweep) }
+export function rowBar(doc = globalThis.document) {
+  if (doc?.documentElement?.getAttribute?.("data-controls") === "native") {
+    const bar = Object.assign(el("progress", "qr-progress"), { max: 1 });
+    return { bar, set(fraction, sweep) { if (sweep) bar.removeAttribute("value"); else bar.value = Math.max(0, Math.min(1, Number(fraction) || 0)); } };
+  }
+  const bar = el("div", "qr-bar");
+  const fill = el("div", "qr-fill");
+  bar.append(fill);
+  return {
+    bar,
+    set(fraction, sweep) {
+      bar.classList.toggle("is-indeterminate", !!sweep);
+      fill.style.transform = `scaleX(${Math.max(0, Math.min(1, Number(fraction) || 0))})`;
+    },
+  };
+}
+
 const MAX_LINES = 1500; // lines kept on screen while it follows; the callers' logs keep everything
 // B49: how long a locked finish keeps Close greyed if iOS never closes iFizBox (no prompt came): then Close works
 // again, so the page can't trap the user. iOS's prompt and the native CloseForUpdate exit normally come in seconds.

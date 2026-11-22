@@ -34,7 +34,7 @@
 // B175: a finished run's page closes when iFizBox is back in front or a link comes (incoming.js, through runPage()).
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { el, barButton } from "../nav/ui.js";
-import { openProgress, openOn, RETURN_LABEL, CLOSING_LABEL, WAITING_LABEL, TRY_AGAIN_LABEL, CLOSE_GRACE, CLOSE_BY_HAND,
+import { openProgress, openOn, rowBar, RETURN_LABEL, CLOSING_LABEL, WAITING_LABEL, TRY_AGAIN_LABEL, CLOSE_GRACE, CLOSE_BY_HAND,
   RESTART_BY_HAND } from "../nav/progress.js";
 import { fitFileNames } from "../core/midtrunc.js";
 import { appRows, createAppRun, rowStatus, summaryLine, runStatus, runPercent, ended, isSelf, DIDNT_DOWNLOAD, barOf } from "../core/apprun.js";
@@ -252,9 +252,7 @@ export async function runAppRun(jobs, deps) {
     main.type = "button";
     const name = el("div", "qr-name", r.name);
     const status = el("div", "qr-status");
-    const bar = el("div", "qr-bar");
-    const fill = el("div", "qr-fill");
-    bar.append(fill);
+    const { bar, set: setBar } = rowBar(); // B324: <progress> under the native controls hook
     main.append(name, status, bar);
     const act = el("button", "qr-stop");
     act.type = "button";
@@ -268,7 +266,7 @@ export async function runAppRun(jobs, deps) {
       else showLog(r.id);
     });
     act.addEventListener("click", () => run.stop(r.id));
-    views.set(r.id, { li, status, bar, fill, act });
+    views.set(r.id, { li, status, bar, setBar, act });
   }
   list.append(summary);
   fitFileNames(list); // B92: an app still known by its file name is cut in the middle, keeping the end and .ipa
@@ -283,8 +281,7 @@ export async function runAppRun(jobs, deps) {
     // B152: the app's whole way (barOf: download, signing, iOS's install by weight), never backwards; it sweeps only
     // until the first percent, so it doesn't flip between the sweep and the fill at each stage
     const fill = barOf(r);
-    v.bar.classList.toggle("is-indeterminate", !(fill > 0));
-    v.fill.style.transform = `scaleX(${fill})`;
+    v.setBar(fill, !(fill > 0));
     v.act.hidden = !WORKING.includes(r.state) || run.stopping;
   };
 
