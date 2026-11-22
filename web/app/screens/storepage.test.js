@@ -288,27 +288,33 @@ test("F195: Size keeps its unit in the value, the price under it; the row counts
   assert.match(css, /\.store-tile-value \{[^}]*font-size: 15px/s);
 });
 
-test("B41: a Related row's icon: the picture over the letter tile, the letter alone when there is none or it fails", async () => {
+test("B41/B326: a Related row's icon: the picture over its section list's fallback icon, the fallback alone when there is none or it fails", async () => {
   const { grouped } = await import("../nav/ui.js");
   const route = { tab: "search", path: ["package:com.a"] };
   const rows = [
-    browseMod.relatedRow({ id: "com.b", name: "bravo", short: "B", icon: "https://repo.example/b.png" }, route),
-    browseMod.relatedRow({ id: "com.c", name: "Charlie", icon: "file:///Applications/C.app/icon.png" }, route),
-    browseMod.relatedRow({ id: "com.d", name: "" }, route),
+    browseMod.relatedRow({ id: "com.b", name: "bravo", short: "B", section: "Tweaks", icon: "https://repo.example/b.png" }, route),
+    // B326: BigBoss's tweaks: Icon is a PreferenceLoader path on the device, which no page can load
+    browseMod.relatedRow({ id: "com.c", name: "Charlie", section: "Tweaks", icon: "file:///Library/PreferenceLoader/Preferences/C.png" }, route),
+    browseMod.relatedRow({ id: "com.d", name: "", section: "Nothing Cydia Knows" }, route),
+    browseMod.relatedRow({ id: "com.e", name: "Echo", section: "Themes", icon: "http://repo.example/e.png" }, route),
   ];
   assert.equal(rows[0].icon.src, "https://repo.example/b.png");
-  assert.equal(rows[0].icon.text, "B", "the letter, upper case");
   assert.equal(rows[0].icon.cls, "store-related-icon");
-  assert.equal(rows[1].icon.src, null, "a URL we can't load: the letter only");
-  assert.equal(rows[2].icon.text, "C", "no name: the id's first letter");
+  assert.equal(rows[1].icon.src, null, "a URL we can't load: no picture");
+  assert.match(rows[3].icon.src, /repo\.example.*e\.png/, "http: as the section list loads it (through the proxy on the site)");
+  // the section list's fallback (core/sectionicons.js packageIcon), never a letter tile
+  for (const r of rows) assert.equal(r.icon.text, "", "no letter");
+  assert.equal(rows[0].icon.color, 'url("icons/sections/Tweaks.png") center / cover no-repeat');
+  assert.equal(rows[1].icon.color, 'url("icons/sections/Tweaks.png") center / cover no-repeat', "the tweak shows the Tweaks icon, as in its section list");
+  assert.equal(rows[2].icon.color, 'url("icons/sections/unknown.png") center / cover no-repeat', "an unknown section: Cydia's unknown.png");
+  assert.equal(rows[3].icon.color, 'url("icons/sections/Themes.png") center / cover no-repeat');
   const icons = byClass(grouped([{ rows }]), "store-related-icon");
-  assert.equal(icons.length, 3);
+  assert.equal(icons.length, 4);
   const img = icons[0].children.find((c) => c.tagName === "IMG");
   assert.ok(img, "the picture is in the tile");
-  assert.equal(icons[0].textContent, "B", "with the letter under it");
+  assert.equal(img.src, "https://repo.example/b.png");
   img.onerror();
-  assert.equal(icons[0].children.some((c) => c.tagName === "IMG"), false, "a failed load leaves the letter tile");
-  assert.equal(icons[0].textContent, "B");
+  assert.equal(icons[0].children.some((c) => c.tagName === "IMG"), false, "a failed load leaves the fallback");
   assert.equal(icons[1].children.some((c) => c.tagName === "IMG"), false);
   // The CSS sizes and clips the picture to the tile and hides it until it loads (the bug: it drew at its own size).
   const css = readFileSync(new URL("../packages.css", import.meta.url), "utf8");
