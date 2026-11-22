@@ -95,3 +95,10 @@ In the app on iOS 26 and later under the iOS 26 style, the tab bar and the nav b
 _Said_: real Liquid Glass, glass bars
 _In code_: ui.glass, NativeGlass.swift, nav/glass.js, data-glass
 _Avoid_: native tab bar, UITabBar
+
+**Era Icon**:
+The app's icon drawn in one iOS era's look, with a light and a dark picture; the icon a Theme > Style era gives when the icon matches the theme
+_Said_: era app icon, iOS 7 icon
+_On screen_: Theme > App Icon > Eras: iOS 7, iOS 13, iOS 26
+_In code_: ERA_ICONS, APP_ICONS era entries, native/icon/era/, alternates.ERAS
+_Avoid_: style icon, retro icon
