@@ -616,7 +616,7 @@ const iconLabel = (name) => APP_ICONS.find((i) => i.value === name)?.label ?? (i
 let ownIcons = null;
 const ownOffered = () => (settings.mode === "jailbreak" || settings.mode === "sideload") && hasNativeCall(); // appicon.js ownIconsOffered
 const loadOwnIcons = () => import("./appicon.js").then((m) => (ownIcons = m));
-const iconThumb = (name) => ({ icon: { cls: "app-icon-thumb", src: iconSrc(name) } });
+const iconThumb = (name, tone) => ({ icon: { cls: "app-icon-thumb", src: iconSrc(name, tone) } });
 
 // The groups' data, pure for the tests: [switch group, picks group].
 export function appIconLayout(store = settings) {
@@ -637,7 +637,7 @@ function appIconGroups() {
   const [sw, picks] = appIconLayout();
   const frag = grouped([
     { header: sw.header, rows: sw.rows.map((r) => ({ label: r.label })), footer: sw.footer },
-    { rows: picks.rows.map((r) => ({ label: r.label, detail: r.detail, href: r.href, ...iconThumb(r.icon),
+    { rows: picks.rows.map((r) => ({ label: r.label, detail: r.detail, href: r.href, ...iconThumb(r.icon, defOf(r.key).iconTone),
       live: () => iconLabel(iconOf(defOf(r.key).iconTone)) })), footer: picks.footer },
   ]);
   const [group, pickGroup] = frag.querySelectorAll(".group");
@@ -683,7 +683,7 @@ function redrawPicks(pickGroup, rows) {
     if (detail) detail.textContent = iconLabel(name);
     const box = cell.querySelector(".cell-icon");
     if (!box) return;
-    const src = iconSrc(name);
+    const src = iconSrc(name, defOf(r.key).iconTone);
     let img = box.querySelector("img");
     if (img && img.getAttribute("src") === src) return;
     if (!img) { // dropped after a failed load: a new one, as nav/ui.js draws it
@@ -721,7 +721,7 @@ function iconPage(key) {
       b.setAttribute("role", "radio");
       b.setAttribute("aria-checked", String(i.value === now));
       b.dataset.icon = i.value;
-      const img = Object.assign(document.createElement("img"), { src: iconSrc(i.value), alt: "" });
+      const img = Object.assign(document.createElement("img"), { src: iconSrc(i.value, d.iconTone), alt: "" });
       b.append(img, Object.assign(document.createElement("span"), { className: "icon-cell-label", textContent: i.label }));
       b.addEventListener("click", () => { if (settings.get(key) !== i.value) settings.set(key, i.value); });
       grid.append(b);

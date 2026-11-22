@@ -367,8 +367,19 @@ export const APP_ICONS = [
   { value: "clear", label: "Clear", tone: null },
   // F324: the Glass icon (native/icon/glass.py): Classic in Light, Gunmetal in Dark, in iOS 26's Liquid Glass; older
   // iOS show a flat copy of it. Offered on every iOS (user 2026-11-21).
-  { value: "glass", label: "Glass", tone: null },
+  // F371: renamed iOS 26 and shown under Eras: it is that era's icon.
+  { value: "glass", label: "iOS 26", tone: null },
+  // F371: the eras' icons (native/icon/era/), each era's light and dark; native/icon/alternates.py ERAS
+  { value: "ios7", label: "iOS 7", era: "light" }, { value: "ios13", label: "iOS 13", era: "light" },
+  { value: "ios7dark", label: "iOS 7", era: "dark" }, { value: "ios13dark", label: "iOS 13", era: "dark" },
 ];
+// F371: each Theme > Style's own icon, by the mode on screen: what Match Theme (or a "Theme" pick) gives under that
+// era. iOS 6 has none: its themes' icons. iOS 26's is the Glass icon, which has its own dark (Gunmetal) look.
+export const ERA_ICONS = { ios7: { light: "ios7", dark: "ios7dark" }, ios13: { light: "ios13", dark: "ios13dark" },
+  ios26: { light: "glass", dark: "glass" } };
+// F371: the name the shell's sets know an icon's pair by: an era's dark icon is in its light icon's set
+// (Icon-ios7 = ios7 + ios7dark, native/icon/alternates.py), so a pick in either mode sends the pair.
+export const pairName = (name) => Object.values(ERA_ICONS).find((p) => p.dark === name)?.light ?? name;
 for (const k of ["lightIcon", "darkIcon"]) byKey.get(k).options.push(...APP_ICONS.map(({ value, label }) => ({ value, label })));
 
 // F37: the device types. "none" is an iPhone without a jailbreak; the others are the APT architecture it installs.
@@ -936,8 +947,9 @@ export const hooksOf = (style) => ({ nav: null, sheet: null, tabbar: null, ...ST
 
 // F323: the app icon a tone ("light" or "dark") gets: with Match Theme on, that tone's theme's icon; off, the tone's
 // pick (lightIcon, darkIcon), its theme's own while that is "theme". `get` reads a setting (settings.get).
+// F371: under iOS 7, 13 and 26 (Theme > Style) the theme's own icon is the era's (ERA_ICONS).
 export function iconFor(tone, get) {
-  const own = paletteFor(tone, get("darkTheme"), get("lightTheme"));
+  const own = ERA_ICONS[get("style")]?.[tone === "dark" ? "dark" : "light"] ?? paletteFor(tone, get("darkTheme"), get("lightTheme"));
   if (get("iconMatch") !== false) return own;
   const pick = get(tone === "dark" ? "darkIcon" : "lightIcon");
   return APP_ICONS.some((i) => i.value === pick) || isOwnIcon(pick) ? pick : own;
@@ -956,21 +968,25 @@ export const isOwnIcon = (v) => typeof v === "string" && OWN_ICON.test(v);
 export function iconState(get, onScreen) {
   const mode = get("appearance");
   const fixed = mode === "light" || mode === "dark" ? iconFor(mode, get) : null;
+  // F371: Automatic sends an era icon as its pair's name (ios7dark as ios7), so ios7 with ios7dark is Icon-ios7;
+  // a fixed Mode keeps the one icon (Icon-ios7dark in Dark), as B289 wants.
   return {
-    light: fixed ?? iconFor("light", get),
-    dark: fixed ?? iconFor("dark", get),
+    light: fixed ?? pairName(iconFor("light", get)),
+    dark: fixed ?? pairName(iconFor("dark", get)),
     onScreen: fixed ?? iconFor(onScreen === "dark" ? "dark" : "light", get),
   };
 }
 
-// F323: Theme > App Icon > Light / Dark's grid: "Themes", that tone's themes; "Special", Clear and the other tone's
-// themes (any icon works in either mode), with Glass after Clear. Each group's cells are APP_ICONS entries.
+// F323: Theme > App Icon > Light / Dark's grid: "Themes", that tone's themes; "Eras" (F371), iOS 7's and iOS 13's
+// icon for that tone and iOS 26's (the Glass icon); "Special", Clear and the other tone's themes (any icon works in
+// either mode). Each group's cells are APP_ICONS entries.
 // `clear`: whether Clear is offered (clearOffered: not below iOS 18, user 2026-11-20).
 export function iconGroups(tone, { clear = true } = {}) {
   const t = tone === "dark" ? "dark" : "light";
   return [
     { header: "Themes", icons: APP_ICONS.filter((i) => i.tone === t) },
-    { header: "Special", icons: [...(clear ? [APP_ICONS.find((i) => i.value === "clear")] : []), APP_ICONS.find((i) => i.value === "glass"), ...APP_ICONS.filter((i) => i.tone && i.tone !== t)] },
+    { header: "Eras", icons: [...APP_ICONS.filter((i) => i.era === t), APP_ICONS.find((i) => i.value === "glass")] },
+    { header: "Special", icons: [...(clear ? [APP_ICONS.find((i) => i.value === "clear")] : []), ...APP_ICONS.filter((i) => i.tone && i.tone !== t)] },
   ];
 }
 

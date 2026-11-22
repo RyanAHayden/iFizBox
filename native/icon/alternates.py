@@ -8,6 +8,8 @@ draws an icon set's dark appearance when the Home Screen is dark, so a set is a 
                         globe alone as its tinted one (iOS 26+ Clear and Tinted: the Home Screen's glass is the tile)
   Icon-<light>-<dark>   a pair: every light theme or Clear, with every dark theme or Clear
   Icon-<icon>           one icon in both appearances, for every icon: iOS 15-17, and pairs not listed above
+  Icon-ios7, Icon-ios13 an era's pair (F371, icon/era/): its light icon with its dark one (ios7dark, ios13dark),
+                        which also have their own one-icon sets
 
 Every Icon-* set also has the globe alone as its tinted appearance at 60pt (F360), like AppIcon's.
 
@@ -45,6 +47,13 @@ GLASS = "glass"
 GLASS_SET = "Icon-glass"
 TINTED = os.path.join(ICON, "glass", "AppIconTinted1024.png")  # AppIcon's tinted appearance (glass.py tinted)
 TINTED_ICON = "tinted"  # F360: the alternate sets' tinted appearance in the catalog: tinted[-lite]-60x60@2x.png
+# F371: the eras' icons (icon/era/make.py), (light, dark) per era. Each era's pair is the set named for its light icon
+# (Icon-ios7 = ios7 + ios7dark), so the Home Screen turns it dark by itself on iOS 18+; the dark icon also has a
+# one-icon set (Icon-ios7dark) for iOS 15-17 and for Theme > Mode Dark. iOS 26's is the Glass icon (GLASS).
+ERAS = (("ios7", "ios7dark"), ("ios13", "ios13dark"))
+ERA_ICONS = [i for pair in ERAS for i in pair]
+GLASS_DARK = "glass-dark"  # F371: the Glass icon's dark (Gunmetal) thumbnail, appicon/glass-dark.png (glass.py thumb)
+GLASS_DARK_THUMB = os.path.join(ICON, "glass", "AppIconDark60x60@3x.png")
 
 
 def tinted_src(pt, scale):
@@ -65,7 +74,7 @@ def themes():
 
 def icons():
     lights, darks = themes()
-    return lights + darks + [CLEAR]
+    return lights + darks + [CLEAR] + ERA_ICONS
 
 
 def pairs():
@@ -82,13 +91,15 @@ def sets():
     """Every alternate set: name -> (light icon, dark icon or None)."""
     out = {set_name(i): (i, None) for i in icons()}
     out.update({set_name(l, d): (l, d) for l, d in pairs()})
+    out.update({set_name(l): (l, d) for l, d in ERAS})  # F371: an era's light icon's set is the era's pair
     return out
 
 
 def src(icon, pt, scale, lite):
-    """An icon's PNG at a size: Clear has no LITE sash (user 2026-11-20), the themes' Lite build has."""
+    """An icon's PNG at a size: Clear has no LITE sash (user 2026-11-20), the themes' and eras' Lite build has."""
     stem = "AppIconLite" if lite and icon != CLEAR else "AppIcon"
-    folder = os.path.join(ICON, "clear") if icon == CLEAR else os.path.join(ICON, "themes", icon)
+    folder = (os.path.join(ICON, "clear") if icon == CLEAR else os.path.join(ICON, "era", icon) if icon in ERA_ICONS
+              else os.path.join(ICON, "themes", icon))
     name = "%s1024.png" % stem if pt == 1024 else "%s%dx%d@%dx.png" % (stem, pt, pt, scale)
     return os.path.join(folder, name)
 
@@ -219,6 +230,8 @@ def thumbs(dest, lite):
         shutil.copyfile(src(i, 60, 3, lite), os.path.join(dest, i + ".png"))
     # F324: the Glass icon's flat picture (icon/glass.py thumb), no sash in either build
     shutil.copyfile(os.path.join(ICON, "glass", "AppIcon60x60@3x.png"), os.path.join(dest, GLASS + ".png"))
+    # F371: and its dark (Gunmetal) one, for Dark's grid and Home's header in dark mode
+    shutil.copyfile(GLASS_DARK_THUMB, os.path.join(dest, GLASS_DARK + ".png"))
 
 
 def sources():

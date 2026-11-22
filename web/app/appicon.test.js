@@ -11,7 +11,7 @@ function memStorage() {
 const store = (mode = "jailbreak") => createSettings({ storage: memStorage(), mode });
 
 test("every theme has an icon, and Clear is one more", () => {
-  assert.deepEqual(APP_ICONS.map((i) => i.value), [...LIGHT_PALETTES, ...DARK_PALETTES, "clear", "glass"]);
+  assert.deepEqual(APP_ICONS.map((i) => i.value), [...LIGHT_PALETTES, ...DARK_PALETTES, "clear", "glass", "ios7", "ios13", "ios7dark", "ios13dark"]); // F371: the eras'
 });
 
 test("Match Theme (the default) gives each tone its theme's icon", () => {
@@ -57,16 +57,21 @@ test("the sideload build's footers say iOS shows an alert; the jailbreak app's s
   assert.equal(store("jailbreak").footerOf("lightIcon"), "Pick an icon for each mode.");
 });
 
-test("the grid: this mode's themes, then Clear, Glass and the other mode's", () => {
-  const [themes, special] = iconGroups("dark");
+test("the grid: this mode's themes, its eras' icons (F371), then Clear and the other mode's", () => {
+  const [themes, eras, special] = iconGroups("dark");
   assert.equal(themes.header, "Themes");
   assert.deepEqual(themes.icons.map((i) => i.value), DARK_PALETTES);
   assert.equal(special.header, "Special");
-  assert.deepEqual(special.icons.map((i) => i.value), ["clear", "glass", ...LIGHT_PALETTES]);
-  assert.deepEqual(iconGroups("light")[1].icons.map((i) => i.value), ["clear", "glass", ...DARK_PALETTES]);
-  // every icon is in one of each mode's groups exactly once
+  assert.equal(eras.header, "Eras");
+  assert.deepEqual(eras.icons.map((i) => [i.value, i.label]), [["ios7dark", "iOS 7"], ["ios13dark", "iOS 13"], ["glass", "iOS 26"]]);
+  assert.deepEqual(iconGroups("light")[1].icons.map((i) => i.value), ["ios7", "ios13", "glass"]);
+  assert.deepEqual(special.icons.map((i) => i.value), ["clear", ...LIGHT_PALETTES]);
+  assert.deepEqual(iconGroups("light")[2].icons.map((i) => i.value), ["clear", ...DARK_PALETTES]);
+  // every icon but the other mode's era icons is in one of each mode's groups exactly once
   for (const tone of ["light", "dark"]) {
-    assert.deepEqual(iconGroups(tone).flatMap((g) => g.icons.map((i) => i.value)).sort(), APP_ICONS.map((i) => i.value).sort());
+    const other = tone === "dark" ? "light" : "dark";
+    assert.deepEqual(iconGroups(tone).flatMap((g) => g.icons.map((i) => i.value)).sort(),
+      APP_ICONS.filter((i) => i.era !== other).map((i) => i.value).sort());
   }
 });
 
@@ -76,9 +81,10 @@ test("Clear is offered from iOS 18 on only (user 2026-11-20: not on the iPhone 7
   assert.equal(clearOffered("18.0"), true);
   assert.equal(clearOffered("26.1"), true);
   assert.equal(clearOffered(null), true);
-  assert.ok(!iconGroups("dark", { clear: false })[1].icons.some((i) => i.value === "clear"));
-  // F324: Glass stays on every iOS (older ones show actool's flat copy of it, user 2026-11-21)
-  assert.deepEqual(iconGroups("light", { clear: false })[1].icons.map((i) => i.value), ["glass", ...DARK_PALETTES]);
+  assert.ok(!iconGroups("dark", { clear: false })[2].icons.some((i) => i.value === "clear"));
+  // F324: Glass (iOS 26) stays on every iOS (older ones show actool's flat copy of it, user 2026-11-21)
+  assert.deepEqual(iconGroups("light", { clear: false })[1].icons.map((i) => i.value), ["ios7", "ios13", "glass"]);
+  assert.deepEqual(iconGroups("light", { clear: false })[2].icons.map((i) => i.value), DARK_PALETTES);
   const ua = (v) => `Mozilla/5.0 (iPhone; CPU iPhone OS ${v} like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148`;
   assert.equal(clearHere(ua("15_8_8")), false);
   assert.equal(clearHere(ua("18_1")), true);
@@ -105,6 +111,9 @@ test("tellIcon sends app.icon once per change, only in the apps", () => {
   assert.deepEqual(iconMessage((k) => s.get(k), "dark").params.onScreen, "oled");
   assert.equal(iconSrc("clear"), "appicon/clear.png");
   assert.equal(iconSrc("glass"), "appicon/glass.png");
+  assert.equal(iconSrc("glass", "light"), "appicon/glass.png");
+  assert.equal(iconSrc("glass", "dark"), "appicon/glass-dark.png"); // F371: iOS 26's dark look
+  assert.equal(iconSrc("ios7dark", "dark"), "appicon/ios7dark.png");
 });
 
 test("a Clear pick saved earlier counts as the theme's icon where Clear isn't offered", () => {

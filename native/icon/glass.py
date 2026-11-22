@@ -171,6 +171,8 @@ def all_sets():
     Glass icon's own set."""
     out = {"AppIcon": alternates.PRIMARY}
     for name, (light, dark) in alternates.sets().items():
+        if light in alternates.ERA_ICONS:
+            continue  # F371: the eras' icons are flat pictures with no layers here (icon/era/make.py)
         out[name] = (light, dark or light)
     out[alternates.GLASS_SET] = alternates.PRIMARY
     return out
@@ -201,16 +203,18 @@ THUMB = os.path.join(ICON, "glass", "AppIcon60x60@3x.png")
 
 def thumb():
     """icon/glass/AppIcon60x60@3x.png from flat_svg (needs rsvg-convert): the Glass icon's light look, the same in
-    both builds (no LITE sash: the .icon is one picture for both)."""
+    both builds (no LITE sash: the .icon is one picture for both). F371: and AppIconDark60x60@3x.png
+    (alternates.GLASS_DARK_THUMB), its dark (Gunmetal) look, for Dark's grid and Home's header in dark mode."""
     import subprocess
     import tempfile
     os.makedirs(os.path.dirname(THUMB), exist_ok=True)
-    with tempfile.NamedTemporaryFile("w", suffix=".svg", delete=False) as f:
-        f.write(flat_svg(alternates.PRIMARY[0]))
-    try:
-        subprocess.run(["rsvg-convert", "-w", "180", "-h", "180", f.name, "-o", THUMB], check=True)
-    finally:
-        os.unlink(f.name)
+    for icon, out in ((alternates.PRIMARY[0], THUMB), (alternates.PRIMARY[1], alternates.GLASS_DARK_THUMB)):
+        with tempfile.NamedTemporaryFile("w", suffix=".svg", delete=False) as f:
+            f.write(flat_svg(icon))
+        try:
+            subprocess.run(["rsvg-convert", "-w", "180", "-h", "180", f.name, "-o", out], check=True)
+        finally:
+            os.unlink(f.name)
     return THUMB
 
 
