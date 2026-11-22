@@ -138,3 +138,7 @@ it (`CONFIRM:`). Expected from the code: refused, refused, connected, finishes, 
   stopped the capture by that pid.
 - My 22:45:03 probe shows in the log as en0 (LAN) then utun5 (Tailscale). A connect to 49152/62078 over utun5
   at 22:44:50 wasn't mine; another session's probe, probably.
+
+## Spec review
+
+Fixed: step 5 started an install with data off, which needs the IPA downloaded first (now: an IPA already in My IPAs); F368 noted that the cellular rule is from SideStore/StikDebug code and stays conditional until the user answers. Kept: steps 4-6 beyond the brief (Cellular Data off, Airplane Mode) are the setups the tools use; F368 at normal (it waits on R72); the test file name follows the repo's installroute-b316 style. (2) stays partial, written under Not verified.
