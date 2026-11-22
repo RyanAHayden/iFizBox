@@ -23,6 +23,16 @@
 - `gh release view v0.20.1`: draft=false, prerelease=false, published 2026-11-22T04:36:10Z; `gh release list`
   shows it as Latest.
 
+## Spec review
+- CHANGELOG.md, commit to main, release workflow, `gh run list`: the brief's generic steps don't fit this repo
+  (neither file nor workflow; docs/release.md says releases go through `tools/release.sh`). The bump reaches
+  main when the runner merges task/V1, which holds the tag's commit.
+- `web/app/source.json` dropped 0.9.9: the source keeps at most 20 versions (`tools/altsource.py` `KEEP`), intended.
+- The 0.20.1 `localizedDescription` has the notes' first four lines plus the release link, by design
+  (`note_text`); line 3 names the Open Tailscale fix. Not changed.
+- Deploy and `--verify-live` are steps 5-6 of docs/release.md, kept.
+- Journal dated 2026-11-21 local time; GitHub shows 2026-11-22 UTC.
+
 ## Not verified
 - No install of 0.20.1 on a phone: the task asks for the release and the server checks only.
 - `gh run list` passing: there is no release workflow to pass (see above).
