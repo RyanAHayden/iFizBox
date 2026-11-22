@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "0.20.0",
+          "date": "2026-11-22T02:30:36Z",
+          "localizedDescription": "iOS 26 style with native controls, Add Tweaks, and installs that fall back to the Signing Server\nTheme > Style iOS 26: Liquid Glass bars, and in the app iOS's own switches, alerts, action sheets and scope bar\nAdd Tweaks page under an app's Details; Manage > Sources picks sources like Installed\nThis iPhone installs: Tailscale checked first, one pairing at a time, Use the Signing Server when it fails\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.20.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.20.0/iFizBox.ipa",
+          "size": 38965531,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.19.1",
           "date": "2026-11-21T19:16:10Z",
           "localizedDescription": "Cydia-style Details page for packages and apps, and Source links that land on Sources\nPackages and apps open a Details page like Cydia's: icon rows, Preview, More Information, Filesystem Content\nWebsite add-source links open the Sources tab with the new source loading there\nHome Screen icon follows Theme > Mode; Tailscale names the machine after the phone model\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.19.1",
@@ -250,14 +258,6 @@
           "localizedDescription": "Install queues keep going when one package or app fails, with a row for each and Retry All.\nSigned apps keep their own bundle ID, so they get their notifications with a profile that has Push.\nSettings > Signing checks that this iPhone is in your profile and says how to fix it.\nSources refresh one row at a time; a dead source no longer holds the rest.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.9",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.9.9/iFizBox.ipa",
           "size": 5386413,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.9.8",
-          "date": "2026-11-19T04:14:42Z",
-          "localizedDescription": "Installed Manage mode, Install IPAs on one page, and Re-sign for installed apps\nScrolling no longer starts installs, and Home always opens at the top\nMalware check against Canister's piracy list; block packages and authors\nSix new themes with a live preview, and Delete in the jailbreak app uninstalls\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.8",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.9.8/iFizBox.ipa",
-          "size": 5273001,
           "minOSVersion": "15.0"
         }
       ]
