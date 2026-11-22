@@ -1275,7 +1275,8 @@ async function renderPackage(body, route, key, id, ctx) {
   // F308: a paid sideload tweak's Price, Sign In and Buy are in its Add to an App group (worksInGroup) instead.
   const payBox = pkg.installedOnly || isSideloadTweak(st) ? null : paymentGroup(st, source, ctx, { onState: (s) => paidButton(body, s) });
   if (payBox) details.append(payBox);
-  if (depReport?.problems.length) details.append(depProblemsGroup(depReport, route, ctx));
+  const shownDeps = pageDepReport(depReport, st);
+  if (shownDeps?.problems.length) details.append(depProblemsGroup(shownDeps, route, ctx));
   if (queueOf()) {
     const slot = el("div", "package-queue-slot");
     slot.dataset.id = pid;
@@ -1459,6 +1460,13 @@ function rememberPackage(body, route, page) {
 // Add to App (screens/tweaks.js addToApp), not Install.
 export const ADD_TO_APP = "Add to App";
 export const isSideloadTweak = (st, mode = detectMode()) => Boolean(st?.injectable) && st.kind !== "ipa" && mode === "sideload";
+
+// B325: the dependency report (core/deps.js explain) the package page shows, or null. A sideload tweak gets none: it
+// is checked against apt's sources and dpkg's status, which say nothing about a signed app. Its Depends can only name
+// what Add to App bundles or drops (core/tweakfields.js injectableFromFields: the hooking library, PreferenceLoader,
+// firmware, cy+ names), Works On is left out for it already (core/catalog.js judge), and the Lite app has no dpkg
+// status to conflict with, so every sentence would be wrong ("Can't Install Yet: needs mobilesubstrate").
+export const pageDepReport = (report, st, mode = detectMode()) => (isSideloadTweak(st, mode) ? null : report);
 
 // B296: the Add to an App group's check (screens/tweaks.js tweakInfo: { ok, library, why }) says the tweak can't go
 // into an app: the nav bar's Add to App is hidden, as the group already says why. A check that couldn't finish
