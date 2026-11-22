@@ -353,6 +353,38 @@ const TAB_GLYPHS_SELECTED_7 = {
   settings: `${T7}><path fill-rule='evenodd' d='M14 3.8a10.2 10.2 0 1 1 0 20.4a10.2 10.2 0 0 1 0-20.4zM14 9.8a4.2 4.2 0 1 0 0 8.4a4.2 4.2 0 0 0 0-8.4z'/><circle cx='14' cy='14' r='11.3' fill='none' stroke='#000' stroke-width='2.6' stroke-dasharray='3.6 5.27'/></svg>`,
 };
 
+// F370: iOS 13's and iOS 26's sets, drawn from iOS 7's (the approved concept): each era's system colours, its line
+// weight (iOS 13 a regular weight, iOS 26 a touch heavier and rounder), its tile corners and glyph size, and a tab bar
+// of filled glyphs (both eras draw their tab bars filled; the chosen tab takes the tint, style.css's --tab-icon-active).
+// Our own drawings, never Apple's glyphs or SF Symbols (AGENTS.md).
+const C13 = { grey: "#8e8e93", blue: "#007aff", sky: "#32ade6", green: "#34c759", red: "#ff3b30", orange: "#ff9500",
+  purple: "#af52de", indigo: "#5856d6", dark: "#3a3a3c", teal: "#5ac8fa", gold: "#ffcc00", brown: "#a2845e", pink: "#ff2d55" };
+const C26 = { grey: "#8e8e93", blue: "#0088ff", sky: "#00c0e8", green: "#34c759", red: "#ff383c", orange: "#ff8d28",
+  purple: "#cb30e0", indigo: "#6155f5", dark: "#2c2c2e", teal: "#00c3d0", gold: "#ffcc00", brown: "#ac7f5e", pink: "#ff2d55" };
+// One era's set: `colours` keyed as C, `line` the row glyphs' stroke in 24ths (iOS 7's is W7), `tile` its row tile,
+// `tabLine` the filled tab glyphs' outline stroke on 28 units.
+function eraSet(colours, line, tile, tabLine) {
+  const k = line / W7;
+  const heavier = (w) => +(w * k).toFixed(2);
+  const of7 = Object.fromEntries(Object.keys(C7).map((key) => [C7[key], colours[key]]));
+  const recolour = (hex) => of7[hex] ?? hex;
+  const weigh = (svg) => svg.replace(/stroke-width='([\d.]+)'/g, (_, w) => `stroke-width='${heavier(+w)}'`);
+  const of6 = Object.fromEntries(Object.keys(C).map((key) => [C[key], colours[key]]));
+  const map = (o, f) => Object.fromEntries(Object.entries(o).map(([n, v]) => [n, f(v)]));
+  return {
+    rows: map(ROW_ICONS, ([colour, glyph]) => [of6[colour], glyph]),
+    glyphs: map(GLYPHS_7, (parts) => parts.map(([t, d, w]) => (t === "s" ? [t, d, heavier(w)] : [t, d]))),
+    guides: map(GUIDE_TILES_7, ([light, colour, body]) => [recolour(light), recolour(colour), weigh(body)]),
+    home: map(HOME_TILES_7, (t) => ({ ...t, ...(t.colour ? { colour: recolour(t.colour) } : {}),
+      ...(t.gradient ? { gradient: t.gradient.map(recolour) } : {}), svg: weigh(t.svg) })),
+    tabs: map(TAB_GLYPHS_SELECTED_7, (svg) => svg.replace(/stroke-width='1.6'/g, `stroke-width='${tabLine}'`)
+      .replace(/stroke-linejoin='round'/g, "stroke-linejoin='round' stroke-linecap='round'")),
+    tile,
+  };
+}
+const SET_13 = eraSet(C13, 2.2, { size: SIZE, radius: 6.8, glyph: 19 }, 1.6);
+const SET_26 = eraSet(C26, 2.4, { size: SIZE, radius: 7.8, glyph: 18 }, 2.2);
+
 // C51: the per-style icon map (docs/eras.md, "Icon map"). Every inline SVG the screens draw from JS comes from here,
 // keyed by kind and icon name, so an era (outline or filled icons) ships its own set beside iOS 6's:
 //   rows    name -> [tile colour, glyph name]   29pt row tiles (tileSvg, rowIcon)
@@ -368,6 +400,9 @@ export const ICON_SETS = {
     tile: { size: SIZE, radius: R, glyph: 19 } },
   ios7: { rows: ROW_ICONS_7, glyphs: GLYPHS_7, guides: GUIDE_TILES_7, home: HOME_TILES_7, tabs: TAB_GLYPHS_7,
     tabsSelected: TAB_GLYPHS_SELECTED_7, tile: { size: SIZE, radius: 6.5, glyph: 20 } },
+  // the chosen tab is the same filled glyph in the tint; tabsSelected names it for the native tab bar (F369)
+  ios13: { ...SET_13, tabsSelected: SET_13.tabs },
+  ios26: { ...SET_26, tabsSelected: SET_26.tabs },
 };
 
 // The style the page shows: <html data-style="ios7"> (docs/eras.md), iOS 6 when none is set.
@@ -444,9 +479,43 @@ export function tileSvg(name, style = iconStyle()) {
 }
 
 const cache = new Map();
+const nameOf = new Map(); // a tile picture's src -> its row icon name, for restyleRowIcons
 // A row's `icon` for nav/ui.js grouped()/plain(): the tile as a picture in the .cell-icon (ios6.css .row-icon).
 export function rowIcon(name, style = iconStyle()) {
   const key = `${style}:${name}`;
-  if (!cache.has(key)) cache.set(key, "data:image/svg+xml," + encodeURIComponent(tileSvg(name, style)));
+  if (!cache.has(key)) {
+    const src = "data:image/svg+xml," + encodeURIComponent(tileSvg(name, style));
+    cache.set(key, src);
+    nameOf.set(src, name);
+  }
   return { cls: "row-icon", src: cache.get(key) };
 }
+
+// F370: a Theme > Style change redraws the row tiles already on screen (the pages under Theme, Home's links) in the new
+// era's set, so going back doesn't show the old era's tiles. Returns how many it changed.
+export function restyleRowIcons(root, style = iconStyle()) {
+  let n = 0;
+  for (const img of root?.querySelectorAll?.(".row-icon img") ?? []) {
+    const name = nameOf.get(img.getAttribute("src"));
+    if (!name) continue;
+    const src = rowIcon(name, style).src;
+    if (img.getAttribute("src") !== src) { img.setAttribute("src", src); n++; }
+  }
+  return n;
+}
+
+// Follows <html data-style> for the page's lifetime (started once, below, wherever a document exists).
+export function followRowIconStyle(doc = globalThis.document, Observer = globalThis.MutationObserver) {
+  const root = doc?.documentElement;
+  if (!root || typeof Observer !== "function") return null;
+  let last = iconStyle(doc);
+  const mo = new Observer(() => {
+    const now = iconStyle(doc);
+    if (now === last) return;
+    last = now;
+    restyleRowIcons(doc, now);
+  });
+  mo.observe(root, { attributes: true, attributeFilter: ["data-style"] });
+  return mo;
+}
+followRowIconStyle();

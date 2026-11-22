@@ -174,7 +174,7 @@ test("F202: iOS 13's White and OLED Black and its card sheets, the same in theme
 });
 
 // F202: ios13.css is linked after palettes.css and ios7.css, before wide.css, and every rule in it is scoped to
-// html[data-style="ios13"], so iOS 6 and iOS 7 never see it; it keeps iOS 6's filled tab glyphs (no glyph of its own).
+// html[data-style="ios13"], so iOS 6 and iOS 7 never see it; F370: its tab glyphs are its own (icons/rowicons.js).
 test("F202: ios13.css is linked after palettes.css and only styles html[data-style=ios13]", () => {
   const links = [...read("index.html").matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
   assert.ok(links.indexOf("ios13.css") > links.indexOf("ios7.css"));
@@ -184,7 +184,8 @@ test("F202: ios13.css is linked after palettes.css and only styles html[data-sty
   const sels = [...css.matchAll(/([^{}]+)\{/g)].map((m) => m[1].trim());
   assert.ok(sels.length > 20);
   for (const sel of sels) for (const one of sel.split(/,(?![^(]*\))/)) assert.match(one.trim(), /^html\[data-style="ios13"\]/, one);
-  assert.doesNotMatch(css, /--glyph:/, "filled tabs: ios6.css's glyphs");
+  // F370: its own filled tab glyphs, only on the tabs (rowicons.test.js checks them against the icon map)
+  for (const m of css.matchAll(/([^{}]+)\{[^}]*--glyph:/g)) assert.match(m[1].trim(), /^html\[data-style="ios13"\] \.tab\[data-tab="\w+"\](\.active)?$/);
   // 120 Hz: nothing that animates or blurs
   assert.doesNotMatch(css, /transition|animation|backdrop-filter|will-change/);
 });
@@ -219,7 +220,8 @@ test("F203: ios26.css is linked after ios13.css, only styles html[data-style=ios
   assert.ok(rules.length > 20);
   for (const [sel] of rules) for (const one of sel.split(/,(?![^(]*\))/)) assert.match(one.trim(), /^html\[data-style="ios26"\]/, one);
   assert.doesNotMatch(css, /transition|animation|will-change/);
-  assert.doesNotMatch(css, /--glyph:/, "filled tabs: ios6.css's glyphs");
+  // F370: its own filled tab glyphs, only on the tabs (rowicons.test.js checks them against the icon map)
+  for (const m of css.matchAll(/([^{}]+)\{[^}]*--glyph:/g)) assert.match(m[1].trim(), /^html\[data-style="ios26"\] \.tab\[data-tab="\w+"\](\.active)?$/);
   const blurring = rules.filter(([, body]) => /backdrop-filter/.test(body));
   assert.equal(blurring.length, 2);
   for (const [sel, body] of blurring) {

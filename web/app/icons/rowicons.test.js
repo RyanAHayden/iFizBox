@@ -257,3 +257,93 @@ test("C62: Home's send glyph is gone from both maps and both stylesheets, and ho
   assert.doesNotMatch(ios7, /\.glyph-send\b/, "ios7.css: .glyph-send");
   assert.doesNotMatch(screen, /glyph: "send"/, "screens/home.js: a send tile");
 });
+
+// F370: iOS 13's and iOS 26's sets (the approved concept: iOS 7's drawings in each era's colours, weight and corners).
+const ERAS = { ios13: { radius: 6.8, glyph: 19, line: 2.2, blue: "#007aff" }, ios26: { radius: 7.8, glyph: 18, line: 2.4, blue: "#0088ff" } };
+
+test("F370: iOS 13 and iOS 26 each draw a full set: rows, glyphs, guides, home, tabs, tabsSelected, tile", async () => {
+  const { ICON_SETS, GUIDE_TILE_NAMES } = await import("./rowicons.js");
+  for (const [style, want] of Object.entries(ERAS)) {
+    const s = ICON_SETS[style];
+    for (const kind of ["rows", "glyphs", "guides", "home", "tabs", "tabsSelected", "tile"]) assert.ok(s[kind], `${style}: ${kind}`);
+    assert.deepEqual(Object.keys(s.rows), Object.keys(ROW_ICONS), `${style}: every row`);
+    assert.deepEqual(Object.keys(s.glyphs).sort(), Object.keys(GLYPHS).sort(), `${style}: every glyph`);
+    assert.deepEqual(Object.keys(s.guides), GUIDE_TILE_NAMES, `${style}: every guide tile`);
+    assert.deepEqual(Object.keys(s.home).sort(), Object.keys(ICON_SETS.ios6.home).sort(), `${style}: every Home tile`);
+    assert.deepEqual(Object.keys(s.tabs), Object.keys(ICON_SETS.ios6.tabs), `${style}: every tab`);
+    assert.deepEqual(Object.keys(s.tabsSelected), Object.keys(ICON_SETS.ios6.tabs), `${style}: every chosen tab`);
+    assert.deepEqual(s.tile, { size: 29, radius: want.radius, glyph: want.glyph }, style);
+  }
+});
+
+test("F370: the eras' row tiles: their own colours and corners, white line glyphs in their weight", async () => {
+  const { ICON_SETS } = await import("./rowicons.js");
+  for (const [style, want] of Object.entries(ERAS)) {
+    const colours = new Set(Object.values(ICON_SETS[style].rows).map(([c]) => c));
+    assert.equal(colours.size, 13, `${style}: iOS 6's 13 tile colours, each its own`);
+    assert.equal(ICON_SETS[style].rows.ipa[0], want.blue, `${style}: its blue`);
+    for (const [name, [colour, glyph]] of Object.entries(ICON_SETS[style].rows)) {
+      assert.match(colour, /^#[0-9a-f]{6}$/, `${style} ${name}`);
+      assert.equal(glyph, ROW_ICONS[name][1], `${style} ${name}: the same thing, the same glyph`);
+      const svg = tileSvg(name, style);
+      assert.match(svg, new RegExp(`<rect width="29" height="29" rx="${want.radius}" fill="${colour}"/>`), `${style} ${name}`);
+      assert.doesNotMatch(svg, /NaN|undefined|Gradient/, `${style} ${name}`);
+      assert.notEqual(svg, tileSvg(name, "ios7"), `${style} ${name}: not iOS 7's`);
+      assert.notEqual(svg, tileSvg(name, "ios6"), `${style} ${name}: not iOS 6's`);
+    }
+    // the plain line glyphs take the era's weight
+    assert.match(tileSvg("logs", style), new RegExp(`stroke-width="${want.line}"`), style);
+  }
+  assert.notEqual(tileSvg("general", "ios13"), tileSvg("general", "ios26"));
+});
+
+test("F370: the eras' guide and Home tiles are their own, flat, line glyphs, single-quoted for url()", async () => {
+  const { ICON_SETS, guideSvg, homeTileCss, GUIDE_TILE_NAMES } = await import("./rowicons.js");
+  for (const style of Object.keys(ERAS)) {
+    for (const id of GUIDE_TILE_NAMES) assert.notEqual(guideSvg(id, style), guideSvg(id, "ios7"), `${style} guide ${id}`);
+    for (const [name, t] of Object.entries(ICON_SETS[style].home)) {
+      if (name !== "why") assert.equal(t.gradient, undefined, `${style} ${name}: flat`);
+      assert.match(t.svg, /stroke='#fff'/, `${style} ${name}: a line glyph`);
+      assert.doesNotMatch(t.svg, /"/, `${style} ${name}: single quotes`);
+      assert.notEqual(homeTileCss(name, style), homeTileCss(name, "ios7"), `${style} ${name}`);
+    }
+  }
+});
+
+test("F370: the eras' tab bars are filled glyphs, and each stylesheet carries its tab tokens and Home tile rules", async () => {
+  const { ICON_SETS, tabGlyphTokens, homeGlyphRules } = await import("./rowicons.js");
+  for (const style of Object.keys(ERAS)) {
+    const css = readFileSync(new URL(`../${style}.css`, import.meta.url), "utf8");
+    const lines = css.split("\n");
+    for (const kind of ["tabs", "tabsSelected"]) {
+      for (const line of tabGlyphTokens(style, kind).split("\n")) assert.ok(lines.includes(`html[data-style="${style}"] ${line}`), `${style}.css: ${line.slice(0, 60)}`);
+      for (const [tab, svg] of Object.entries(ICON_SETS[style][kind])) {
+        assert.doesNotMatch(svg.match(/^<svg[^>]*>/)[0], /fill='none'/, `${style} ${kind} ${tab}: filled`);
+        assert.doesNotMatch(svg, /<mask/, `${style} ${tab}`);
+        assert.notEqual(svg, ICON_SETS.ios6.tabs[tab], `${style} ${tab}: not iOS 6's`);
+      }
+    }
+    for (const line of homeGlyphRules(style).split("\n")) assert.ok(lines.includes(`html[data-style="${style}"] ${line}`), `${style}.css: ${line.slice(0, 60)}`);
+    assert.ok(lines.includes(`html[data-style="${style}"] .home-glyph { border-radius: ${ERAS[style].radius}px; background-size: ${ERAS[style].glyph}px ${ERAS[style].glyph}px; }`), `${style}.css: Home's tile`);
+  }
+});
+
+test("F370: a style change redraws the row tiles already on screen in the new era's set", async () => {
+  const { restyleRowIcons, followRowIconStyle } = await import("./rowicons.js");
+  const make = (src) => { const o = { s: src, getAttribute: () => o.s, setAttribute: (_, v) => { o.s = v; } }; return o; };
+  const general = make(rowIcon("general", "ios6").src), stranger = make("data:image/png,x");
+  const root = { dataset: { style: "ios6" } };
+  const doc = { documentElement: root, querySelectorAll: (sel) => (assert.equal(sel, ".row-icon img"), [general, stranger]) };
+  assert.equal(restyleRowIcons(doc, "ios13"), 1);
+  assert.equal(general.s, rowIcon("general", "ios13").src);
+  assert.equal(stranger.s, "data:image/png,x", "a picture that isn't a row tile is left alone");
+  assert.equal(restyleRowIcons(doc, "ios13"), 0, "nothing left to change");
+  // the observer: a data-style change restyles; another attribute's doesn't
+  let fire;
+  class Obs { constructor(f) { fire = f; } observe(el, opts) { assert.equal(el, root); assert.deepEqual(opts.attributeFilter, ["data-style"]); } }
+  assert.ok(followRowIconStyle(doc, Obs));
+  root.dataset.style = "ios26";
+  fire();
+  assert.equal(general.s, rowIcon("general", "ios26").src);
+  assert.equal(followRowIconStyle({}, Obs), null, "no page: nothing to follow");
+});
