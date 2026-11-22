@@ -89,3 +89,9 @@ _Said_: Pair with iFizBox row
 _On screen_: Settings > Privacy & Security > Developer Mode > Other Devices: Pair with iFizBox
 _In code_: pairOnPhone, DNSServiceRegister, PairSession, leaveGrace
 _Avoid_: pairing offer, broadcast
+
+**Glass bars**:
+In the app on iOS 26 and later under the iOS 26 style, the tab bar and the nav bar's buttons drawn by iOS itself as Liquid Glass over the page
+_Said_: real Liquid Glass, glass bars
+_In code_: ui.glass, NativeGlass.swift, nav/glass.js, data-glass
+_Avoid_: native tab bar, UITabBar
