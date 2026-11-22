@@ -82,3 +82,10 @@ _Said_: use the signing server instead, fall back to ifizbox.com
 _On screen_: Use the Signing Server
 _In code_: serverFallback, USE_SERVER, useServer, server: true (installOnDevice, openPrepared)
 _Avoid_: server retry, fallback route
+
+**Pairing Advertisement**:
+How the app offers itself to iOS for pairing while the Pairing page runs; iOS lists it as one Pair with row, and its code is the one on the page
+_Said_: Pair with iFizBox row
+_On screen_: Settings > Privacy & Security > Developer Mode > Other Devices: Pair with iFizBox
+_In code_: pairOnPhone, DNSServiceRegister, PairSession, leaveGrace
+_Avoid_: pairing offer, broadcast

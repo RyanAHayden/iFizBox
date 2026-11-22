@@ -165,6 +165,33 @@ class RemotePairingPort(unittest.TestCase):
         self.assertIn("<string>_remotepairing-pairable-host._tcp</string>", bonjour)
 
 
+class OnePairingAtATime(unittest.TestCase):
+    # B320 (iPhone 15 Pro): the code on the page didn't work in Settings, and Developer Mode listed a "Pair with" row
+    # per try. A pairing runs on its own queue (never behind a connect), a second idevice.pair joins the one that runs
+    # (same code), and a left pairing keeps its advertisement leaveGrace more, so coming back rejoins it.
+    def test_pairing_has_its_own_queue(self):
+        src = read("IDeviceBridge.swift")
+        body = src[src.index('b.on("idevice.pair")'):src.index('b.on("idevice.pairCancel")')]
+        self.assertIn("pairQueue.async", body)
+        self.assertEqual(body.count("run(c)"), 1)  # only the jailbreak build's refusal goes through IDevice.queue
+        self.assertIn('DispatchQueue(label: "ifizbox.idevice.pair"', src)
+
+    def test_a_second_call_joins_the_running_pairing(self):
+        src = read("IDeviceBridge.swift")
+        body = src[src.index('b.on("idevice.pair")'):src.index('b.on("idevice.pairCancel")')]
+        join = body[:body.index("IDevice.newPairingCode()")]
+        self.assertIn("!running.cancel.isCanceled", join)
+        self.assertIn('c.emit([["pin": code]])', join)  # the running pairing's code, not a new one
+        self.assertIn("running.call = c", join)
+
+    def test_leaving_keeps_the_advertisement_a_while(self):
+        src = read("IDeviceBridge.swift")
+        cancel = src[src.index('b.on("idevice.pairCancel")'):src.index('b.on("idevice.verify")')]
+        self.assertIn("asyncAfter(deadline: .now() + leaveGrace)", cancel)
+        self.assertIn("s.leaving == gen", cancel)  # a join (or another leave) after it keeps it going
+        self.assertIn('"canceled: pairing stopped"', cancel)  # the left page's call still ends at once
+
+
 class Built(unittest.TestCase):
     # The built IPA is checked by mkipa.py check right after native/build.sh builds it (the gate's last step). A
     # check here would read whatever native/build/ipa a checkout last built, from before a merge brought idevice in.
