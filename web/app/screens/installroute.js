@@ -1047,7 +1047,8 @@ async function drawPair(box, { store, native, alert, redraw }) {
   const recheck = () => { if (visit === v && !pairing) box.replaceChildren(); return redraw(); };
   let checkButton = null; // B135: the Check Connection button's answer, set once the rows are drawn
   let input = null; // the pairing file picker, made below for the "file" state
-  const sections = setupGroups(state, st, pairing, {
+  // B321: in pairing mode st is null (not read again); the VPN row names the way in from the last answer (Tailscale too)
+  const sections = setupGroups(state, st ?? (pairing ? cachedStatus() : null), pairing, {
     importFile: () => input?.click(),
     failed: v.failed,
     openVPN: () => openVPN(native, alert),

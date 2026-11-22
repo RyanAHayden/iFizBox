@@ -138,3 +138,25 @@ test("F300: a tap on This iPhone is checked at once, paired or not (Pairing show
   pickRoute("server", h);
   assert.deepEqual(did, ["iphone", "server"]);
 });
+
+test("B321: while pairing, the VPN row names the way in from the last idevice.status (Tailscale, not LocalDevVPN)", async () => {
+  const TS_ON = { paired: null, pairOnPhone: true, localDevVPN: false, otherVPN: true, tailscale: { connect: "tailscale", signedIn: true, address: "100.64.0.2", use: true } };
+  let stop;
+  const native = { call: (m, p, ev) => {
+    if (m === "idevice.status") return Promise.resolve(TS_ON);
+    if (m === "idevice.vpnApps") return Promise.resolve({ localdevvpn: true, tailscale: true });
+    if (m === "idevice.pair") return new Promise((_, no) => { ev?.({ pin: "123456" }); stop = () => no(Object.assign(new Error("canceled"), { code: "canceled" })); });
+    return Promise.resolve(null);
+  } };
+  const box = make("div");
+  await drawInstallation(box, "pair", { store: store("iphone"), native, alert: async () => ({ index: 0 }) });
+  await flush();
+  assert.ok(stop, "idevice.pair started");
+  assert.ok(labels(box).includes("Tailscale"), `rows: ${labels(box)}`);
+  assert.ok(!labels(box).includes("LocalDevVPN"), `rows: ${labels(box)}`);
+  leave();
+  stop();
+  // pure: no status at all still falls back to LocalDevVPN
+  assert.equal(setupGroups("pairing", null, { pin: "1" })[1].rows[0].label, "LocalDevVPN");
+  assert.equal(setupGroups("pairing", TS_ON, { pin: "1" })[1].rows[0].label, "Tailscale");
+});
