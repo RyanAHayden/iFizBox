@@ -47,6 +47,12 @@ x stop discs, the black gloss bar buttons and finish button.
 
 - Real device: Chromium only (a web check, per the repo's rule). WebKit's native `<progress>` under the hook, and
   whether it takes `accent-color`, are only seen on an iOS 26+ phone; Chromium draws its own bar there.
+- Not the readme_shots / capture.mjs route: it opens the app's own screens and has no way into a running install
+  (no sample run), so the shots come from the scratch page above, as B304's did; it loads the same stylesheets and
+  runs the real runQueue / openProgress.
+- `queue.css` (in the brief's list) needed no change: the console's bar and buttons already read `--console-*`
+  tokens, which ios26.css sets. The log lines, jump button and row colours are restyled too because the White page
+  is light; the iOS 6 colours (white text) would vanish on it.
 - No SF font on this Linux box: the system font renders as the fallback.
 - The app run (screens/apprun.js) was not shot: it shares the rows, bars and stop with the queue run (same classes,
   same rowBar); its tests pass.
