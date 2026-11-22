@@ -368,6 +368,9 @@ export const APP_ICONS = [
   // F324: the Glass icon (native/icon/glass.py): Classic in Light, Gunmetal in Dark, in iOS 26's Liquid Glass; older
   // iOS show a flat copy of it. Offered on every iOS (user 2026-11-21).
   { value: "glass", label: "Glass", tone: null },
+  // concept F371: the eras' icons (icons/era/), light and dark; iOS 26 is the Glass icon, renamed
+  { value: "ios7", label: "iOS 7", era: "light" }, { value: "ios13", label: "iOS 13", era: "light" },
+  { value: "ios7-dark", label: "iOS 7", era: "dark" }, { value: "ios13-dark", label: "iOS 13", era: "dark" },
 ];
 for (const k of ["lightIcon", "darkIcon"]) byKey.get(k).options.push(...APP_ICONS.map(({ value, label }) => ({ value, label })));
 
@@ -970,7 +973,9 @@ export function iconGroups(tone, { clear = true } = {}) {
   const t = tone === "dark" ? "dark" : "light";
   return [
     { header: "Themes", icons: APP_ICONS.filter((i) => i.tone === t) },
-    { header: "Special", icons: [...(clear ? [APP_ICONS.find((i) => i.value === "clear")] : []), APP_ICONS.find((i) => i.value === "glass"), ...APP_ICONS.filter((i) => i.tone && i.tone !== t)] },
+    // concept F371: each era's icon for this mode; iOS 26 is Glass
+    { header: "Eras", icons: [...APP_ICONS.filter((i) => i.era === t), { value: "glass", label: "iOS 26" }] },
+    { header: "Special", icons: [...(clear ? [APP_ICONS.find((i) => i.value === "clear")] : []), ...APP_ICONS.filter((i) => i.tone && i.tone !== t)] },
   ];
 }
 

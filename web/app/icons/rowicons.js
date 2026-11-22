@@ -370,6 +370,32 @@ export const ICON_SETS = {
     tabsSelected: TAB_GLYPHS_SELECTED_7, tile: { size: SIZE, radius: 6.5, glyph: 20 } },
 };
 
+// concept F370: iOS 13's and iOS 26's sets, from iOS 7's drawings: each era's system colours, a heavier line (iOS 13
+// SF-regular-like, iOS 26 a touch heavier and rounder), its tile corners; tab bars filled, as those iOS draw them.
+const C13 = { grey: "#8e8e93", blue: "#007aff", sky: "#32ade6", green: "#34c759", red: "#ff3b30", orange: "#ff9500",
+  purple: "#af52de", indigo: "#5856d6", dark: "#3a3a3c", teal: "#5ac8fa", gold: "#ffcc00", brown: "#a2845e", pink: "#ff2d55" };
+const C26 = { grey: "#8e8e93", blue: "#0088ff", sky: "#00c0e8", green: "#34c759", red: "#ff383c", orange: "#ff8d28",
+  purple: "#cb30e0", indigo: "#6155f5", dark: "#2c2c2e", teal: "#00c3d0", gold: "#ffcc00", brown: "#ac7f5e", pink: "#ff2d55" };
+function eraSet(colours, line, radius, glyph, tabLine) {
+  const from7 = Object.fromEntries(Object.keys(C7).map((k) => [C7[k].toLowerCase(), colours[k]]));
+  const recolour = (s) => s.replace(/#[0-9a-fA-F]{6}\b/g, (h) => from7[h.toLowerCase()] ?? h);
+  const k = line / W7;
+  const weigh = (parts) => parts.map(([t, d, w]) => (t === "s" ? [t, d, +(w * k).toFixed(2)] : [t, d]));
+  const glyphs = Object.fromEntries(Object.entries(GLYPHS_7).map(([n, p]) => [n, weigh(p)]));
+  const rows = Object.fromEntries(Object.entries(ROW_ICONS).map(([n, [c, g]]) => [n, [colours[Object.keys(C).find((x) => C[x] === c)] ?? c, g]]));
+  const heavier = (s) => s.replace(/stroke-width='([\d.]+)'/g, (_, w) => `stroke-width='${(+w * k).toFixed(2)}'`);
+  const home = Object.fromEntries(Object.entries(HOME_TILES_7).map(([n, t]) => [n, {
+    ...t, ...(t.colour ? { colour: recolour(t.colour) } : {}), ...(t.gradient ? { gradient: t.gradient.map(recolour) } : {}),
+    svg: heavier(t.svg).replace(/stroke-width="([\d.]+)"/g, (_, w) => `stroke-width="${(+w * k).toFixed(2)}"`) }]));
+  const guides = Object.fromEntries(Object.entries(GUIDE_TILES_7).map(([n, [a, b, body]]) => [n,
+    [recolour(a), recolour(b), body.replace("stroke-width='2.6'", `stroke-width='${(2.6 * k).toFixed(2)}'`)]]));
+  const fill = Object.fromEntries(Object.entries(TAB_GLYPHS_SELECTED_7).map(([n, s]) => [n,
+    s.replace(/stroke-width='1.6'/g, `stroke-width='${tabLine}'`).replace(/stroke-linejoin='round'/g, "stroke-linejoin='round' stroke-linecap='round'")]));
+  return { rows, glyphs, guides, home, tabs: fill, tabsSelected: fill, tile: { size: SIZE, radius, glyph } };
+}
+ICON_SETS.ios13 = eraSet(C13, 2.2, 6.8, 19, 1.6);
+ICON_SETS.ios26 = eraSet(C26, 2.4, 7.8, 18, 2.2);
+
 // The style the page shows: <html data-style="ios7"> (docs/eras.md), iOS 6 when none is set.
 export function iconStyle(doc = globalThis.document) {
   return doc?.documentElement?.dataset?.style || "ios6";

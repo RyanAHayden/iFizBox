@@ -17,7 +17,7 @@ import { clearOffered, isOwnIcon } from "./core/settings.js";
 export const clearHere = (ua = globalThis.navigator?.userAgent) => clearOffered(iosFromUserAgent(ua));
 
 export const nativeIcons = (s = settings) => Boolean(nativeBridge()) && s.isShown("iconMatch");
-export const iconSrc = (name) => `appicon/${name}.png`;
+export const iconSrc = (name) => (/^ios(7|13)(-dark)?$/.test(name) ? `icons/era/${name}.png` : `appicon/${name}.png`); // concept F371
 
 const toneOnScreen = () => (globalThis.document?.documentElement?.dataset.theme === "dark" ? "dark" : "light");
 // A Clear pick doesn't count where Clear isn't offered (below iOS 18): that mode shows its theme's icon.
