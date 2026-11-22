@@ -1,0 +1,38 @@
+2026-11-21 22:43:32.118934 lockdownd{lockdownd}[91] <NOTICE>: handle_get_value: <private>
+2026-11-21 22:43:32.120083 lockdownd{lockdownd}[91] <NOTICE>: handle_get_value: <private>
+2026-11-21 22:43:39.332387 lockdownd{lockdownd}[91] <DEBUG>: WiFi link down.
+2026-11-21 22:43:39.332450 lockdownd{lockdownd}[91] <NOTICE>: wifi_link_down_callback: <private>
+2026-11-21 22:44:02.146749 lockdownd{lockdownd}[91] <NOTICE>: handle_get_value: <private>
+2026-11-21 22:44:02.148046 lockdownd{lockdownd}[91] <NOTICE>: handle_get_value: <private>
+2026-11-21 22:44:32.173908 lockdownd{lockdownd}[91] <NOTICE>: handle_get_value: <private>
+2026-11-21 22:44:32.174817 lockdownd{lockdownd}[91] <NOTICE>: handle_get_value: <private>
+2026-11-21 22:44:48.155939 lockdownd{lockdownd}[91] <DEBUG>: WiFi link up.
+2026-11-21 22:44:48.157704 lockdownd{lockdownd}[91] <NOTICE>: update_bonjour_service_instance_name: <private>
+2026-11-21 22:44:50.382280 kernel{kernel}[0] <NOTICE>: tcp connect incoming: [<IPv4-redacted>:49152<-><IPv4-redacted>:39930] interface: utun5 (skipped: 0)
+2026-11-21 22:44:50.382501 kernel{kernel}[0] <NOTICE>: tcp connect incoming: [<IPv4-redacted>:62078<-><IPv4-redacted>:51360] interface: utun5 (skipped: 0)
+2026-11-21 22:45:02.210612 lockdownd{lockdownd}[91] <NOTICE>: handle_get_value: <private>
+2026-11-21 22:45:02.211669 lockdownd{lockdownd}[91] <NOTICE>: handle_get_value: <private>
+2026-11-21 22:45:03.332849 kernel{kernel}[0] <NOTICE>: tcp connect incoming: [<IPv4-redacted>:49152<-><IPv4-redacted>:49160] interface: en0 (skipped: 0)
+2026-11-21 22:45:03.337000 kernel{kernel}[0] <NOTICE>: tcp connect incoming: [<IPv4-redacted>:62078<-><IPv4-redacted>:42062] interface: en0 (skipped: 0)
+2026-11-21 22:45:03.342344 lockdownd{lockdownd}[91] <NOTICE>: socket_accept_callback: <private>
+2026-11-21 22:45:03.345939 kernel{kernel}[0] <NOTICE>: tcp connect incoming: [<IPv4-redacted>:49152<-><IPv4-redacted>:58880] interface: utun5 (skipped: 0)
+2026-11-21 22:45:03.349625 kernel{kernel}[0] <NOTICE>: tcp connect incoming: [<IPv4-redacted>:62078<-><IPv4-redacted>:42768] interface: utun5 (skipped: 0)
+2026-11-21 22:45:03.351328 lockdownd{lockdownd}[91] <NOTICE>: handle_get_value: <private>
+2026-11-21 22:45:03.351450 lockdownd{lockdownd}[91] <NOTICE>: set_response_error: <private>
+2026-11-21 22:45:03.352100 lockdownd{lockdownd}[91] <NOTICE>: handle_get_value: <private>
+2026-11-21 22:45:03.352188 lockdownd{lockdownd}[91] <NOTICE>: set_response_error: <private>
+2026-11-21 22:45:03.354007 lockdownd{lockdownd}[91] <NOTICE>: handle_get_value: <private>
+2026-11-21 22:45:03.357629 lockdownd{lockdownd}[91] <NOTICE>: socket_accept_callback: <private>
+2026-11-21 22:45:03.358718 lockdownd{lockdownd}[91] <NOTICE>: set_response_error: <private>
+2026-11-21 22:45:03.358806 lockdownd{lockdownd}[91] <NOTICE>: handle_get_value: <private>
+2026-11-21 22:45:03.359026 lockdownd{lockdownd}[91] <NOTICE>: set_response_error: <private>
+2026-11-21 22:45:03.361448 lockdownd{lockdownd}[91] <NOTICE>: handle_get_value: <private>
+2026-11-21 22:45:03.361525 lockdownd{lockdownd}[91] <NOTICE>: set_response_error: <private>
+2026-11-21 22:45:03.362120 lockdownd{lockdownd}[91] <NOTICE>: handle_get_value: <private>
+2026-11-21 22:45:03.362166 lockdownd{lockdownd}[91] <NOTICE>: set_response_error: <private>
+2026-11-21 22:45:03.364440 lockdownd{lockdownd}[91] <NOTICE>: handle_get_value: <private>
+2026-11-21 22:45:03.364480 lockdownd{lockdownd}[91] <NOTICE>: set_response_error: <private>
+2026-11-21 22:45:03.364835 lockdownd{lockdownd}[91] <NOTICE>: handle_get_value: <private>
+2026-11-21 22:45:03.364843 lockdownd{lockdownd}[91] <NOTICE>: set_response_error: <private>
+2026-11-21 22:45:32.240239 lockdownd{lockdownd}[91] <NOTICE>: handle_get_value: <private>
+2026-11-21 22:45:32.241048 lockdownd{lockdownd}[91] <NOTICE>: handle_get_value: <private>
