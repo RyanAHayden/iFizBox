@@ -3,7 +3,7 @@
 // (Icon-ios7 = ios7 + ios7dark) to the shell; a fixed Mode keeps the one icon.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSettings, iconFor, iconState, pairName, ERA_ICONS, APP_ICONS } from "./settings.js";
+import { createSettings, iconFor, iconState, pairName, lightOnlyName, ERA_ICONS, APP_ICONS } from "./settings.js";
 import { iconOf, iconSrc } from "../appicon.js";
 
 function memStorage() {
@@ -56,23 +56,37 @@ test("a pick in either mode uses the pair", () => {
   const s = store();
   s.set("iconMatch", false);
   const get = (k) => s.get(k);
-  s.set("darkIcon", "ios7dark"); // Dark only: Light keeps Classic, so no pair set; the shell shows the one on screen
-  assert.deepEqual(iconState(get, "dark"), { light: "classic", dark: "ios7", onScreen: "ios7dark" });
-  s.set("lightIcon", "ios7");
+  s.set("darkIcon", "ios7dark"); // Dark only: Light, left on "Theme", takes iOS 7's light icon
+  assert.equal(iconFor("light", get), "ios7");
+  assert.deepEqual(iconState(get, "dark"), { light: "ios7", dark: "ios7", onScreen: "ios7dark" });
+  s.set("darkIcon", "theme");
+  s.set("lightIcon", "ios7"); // Light only: Dark takes iOS 7's dark icon
+  assert.equal(iconFor("dark", get), "ios7dark");
   assert.deepEqual(iconState(get, "light"), { light: "ios7", dark: "ios7", onScreen: "ios7" });
+  s.set("darkIcon", "nord"); // a real pick for the other mode still wins: no pair, the shell shows the one on screen
+  assert.deepEqual(iconState(get, "dark"), { light: "ios7", dark: "nord", onScreen: "nord" });
+  s.set("darkIcon", "theme");
+  s.set("lightIcon", "glass"); // iOS 26: the Glass icon in both
+  assert.equal(iconFor("dark", get), "glass");
   s.set("lightIcon", "ios13");
   s.set("darkIcon", "ios13dark");
   assert.deepEqual(iconState(get, "dark"), { light: "ios13", dark: "ios13", onScreen: "ios13dark" });
 });
 
-test("a fixed Mode keeps the one era icon (B289): Dark sends ios7dark everywhere", () => {
+test("a fixed Mode keeps the one era icon (B289): Dark sends ios7dark, Light the light icon alone", () => {
   const s = store();
   s.set("style", "ios7");
   s.set("appearance", "dark");
   const get = (k) => s.get(k);
   assert.deepEqual(iconState(get, "light"), { light: "ios7dark", dark: "ios7dark", onScreen: "ios7dark" });
-  s.set("appearance", "light");
-  assert.deepEqual(iconState(get, "dark"), { light: "ios7", dark: "ios7", onScreen: "ios7" });
+  s.set("appearance", "light"); // Icon-ios7light: no dark appearance, so a dark Home Screen keeps it
+  assert.deepEqual(iconState(get, "dark"), { light: "ios7light", dark: "ios7light", onScreen: "ios7light" });
+  s.set("style", "ios13");
+  assert.deepEqual(iconState(get, "dark"), { light: "ios13light", dark: "ios13light", onScreen: "ios13light" });
+  s.set("style", "ios26"); // the Glass icon has one set, Classic and Gunmetal, as before
+  assert.deepEqual(iconState(get, "dark"), { light: "glass", dark: "glass", onScreen: "glass" });
+  assert.equal(lightOnlyName("nord"), "nord");
+  assert.equal(lightOnlyName("ios7dark"), "ios7dark");
 });
 
 test("pairName and the icon list agree", () => {

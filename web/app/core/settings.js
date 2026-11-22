@@ -380,6 +380,9 @@ export const ERA_ICONS = { ios7: { light: "ios7", dark: "ios7dark" }, ios13: { l
 // F371: the name the shell's sets know an icon's pair by: an era's dark icon is in its light icon's set
 // (Icon-ios7 = ios7 + ios7dark, native/icon/alternates.py), so a pick in either mode sends the pair.
 export const pairName = (name) => Object.values(ERA_ICONS).find((p) => p.dark === name)?.light ?? name;
+// F371: the name of an era's light icon alone, in both appearances (Icon-ios7light), for Theme > Mode Light: B289
+// keeps a Light Mode's icon on a dark Home Screen, which the pair set would turn dark.
+export const lightOnlyName = (name) => (Object.values(ERA_ICONS).some((p) => p.light === name && p.dark !== name) ? `${name}light` : name);
 for (const k of ["lightIcon", "darkIcon"]) byKey.get(k).options.push(...APP_ICONS.map(({ value, label }) => ({ value, label })));
 
 // F37: the device types. "none" is an iPhone without a jailbreak; the others are the APT architecture it installs.
@@ -948,11 +951,17 @@ export const hooksOf = (style) => ({ nav: null, sheet: null, tabbar: null, ...ST
 // F323: the app icon a tone ("light" or "dark") gets: with Match Theme on, that tone's theme's icon; off, the tone's
 // pick (lightIcon, darkIcon), its theme's own while that is "theme". `get` reads a setting (settings.get).
 // F371: under iOS 7, 13 and 26 (Theme > Style) the theme's own icon is the era's (ERA_ICONS).
+// F371: a "Theme" pick beside an era icon picked for the other mode takes that era's icon for this mode, so a pick in
+// either mode gives the era's pair (Icon-ios7 = ios7 + ios7dark).
 export function iconFor(tone, get) {
-  const own = ERA_ICONS[get("style")]?.[tone === "dark" ? "dark" : "light"] ?? paletteFor(tone, get("darkTheme"), get("lightTheme"));
+  const t = tone === "dark" ? "dark" : "light";
+  const own = ERA_ICONS[get("style")]?.[t] ?? paletteFor(tone, get("darkTheme"), get("lightTheme"));
   if (get("iconMatch") !== false) return own;
-  const pick = get(tone === "dark" ? "darkIcon" : "lightIcon");
-  return APP_ICONS.some((i) => i.value === pick) || isOwnIcon(pick) ? pick : own;
+  const known = (v) => APP_ICONS.some((i) => i.value === v) || isOwnIcon(v);
+  const pick = get(t === "dark" ? "darkIcon" : "lightIcon");
+  if (known(pick)) return pick;
+  const other = get(t === "dark" ? "lightIcon" : "darkIcon");
+  return Object.values(ERA_ICONS).find((p) => p.light === other || p.dark === other)?.[t] ?? own;
 }
 
 // F329: one of your own icons (screens/appicon.js), kept by the shell as <name>.png: "own" and a few [a-z0-9]. A pick
@@ -967,9 +976,9 @@ export const isOwnIcon = (v) => typeof v === "string" && OWN_ICON.test(v);
 // icon; Automatic keeps the light/dark pair.
 export function iconState(get, onScreen) {
   const mode = get("appearance");
-  const fixed = mode === "light" || mode === "dark" ? iconFor(mode, get) : null;
+  const fixed = mode === "light" || mode === "dark" ? lightOnlyName(iconFor(mode, get)) : null;
   // F371: Automatic sends an era icon as its pair's name (ios7dark as ios7), so ios7 with ios7dark is Icon-ios7;
-  // a fixed Mode keeps the one icon (Icon-ios7dark in Dark), as B289 wants.
+  // a fixed Mode keeps the one icon (Icon-ios7dark in Dark, Icon-ios7light in Light), as B289 wants.
   return {
     light: fixed ?? pairName(iconFor("light", get)),
     dark: fixed ?? pairName(iconFor("dark", get)),

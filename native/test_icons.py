@@ -164,7 +164,7 @@ class Alternates(unittest.TestCase):
         lights, darks = alternates.themes()
         have = alternates.sets()
         self.assertEqual(sorted(i for i, d in have.values() if d is None),
-                         sorted(lights + darks + ["clear"] + [d for _, d in alternates.ERAS]))
+                         sorted(lights + darks + ["clear"] + alternates.ERA_ICONS))  # F371: Icon-ios7dark, Icon-ios7light
         for l in lights + ["clear"]:
             for d in darks + ["clear"]:
                 if (l, d) == alternates.PRIMARY:
@@ -327,6 +327,8 @@ class EraIcons(unittest.TestCase):
         self.assertEqual(have["Icon-ios13"], ("ios13", "ios13dark"))
         self.assertEqual(have["Icon-ios7dark"], ("ios7dark", None))
         self.assertEqual(have["Icon-ios13dark"], ("ios13dark", None))
+        self.assertEqual(have["Icon-ios7light"], ("ios7", None))  # Theme > Mode Light: no dark appearance (B289)
+        self.assertEqual(have["Icon-ios13light"], ("ios13", None))
         # Sources/AppIcon.swift: light == dark gives Icon-<light>; the page sends an era's light name in both
         self.assertEqual(alternates.set_name("ios7", "ios7"), "Icon-ios7")
         with open(os.path.join(os.path.dirname(HERE), "web", "app", "core", "settings.js")) as f:

@@ -26,15 +26,23 @@
 
 | car | before | after | growth |
 |---|---|---|---|
-| Assets.car | 23,605,832 | 23,937,320 | +331,488 B |
-| AssetsLite.car | 21,876,424 | 22,306,360 | +429,936 B |
+| Assets.car | 23,605,832 | 24,008,360 | +402,528 B |
+| AssetsLite.car | 21,876,424 | 22,419,016 | +542,592 B |
+
+(First compile, before the review's light-only sets: +331,488 / +429,936 B.)
 
 ## Choices
 
-- A Light-only pick of an era icon (Dark on "Theme" / another icon) has no pair set; the shell then shows the
-  one-icon set of the tone on screen, as for any unpaired pick. `Icon-ios7` is the pair, so a light Home Screen
-  with Mode Light on iOS 18+ that goes dark draws ios7dark (same as the Glass icon's Icon-glass already does).
 - Other mode's era icons are not in a mode's Special group (the concept showed none there).
+
+## Spec review fixes
+
+- "a pick in either mode uses the pair": a Light pick of iOS 7 with Dark left on "Theme" sent ios7 + gunmetal (no
+  pair set). Now a "Theme" pick beside an era icon picked for the other mode takes that era's icon for its mode
+  (`iconFor`), so both rows and the shell get the pair; a real pick for the other mode still wins.
+- B289 with Mode Light: the fixed light icon was sent as `ios7`, whose set is the pair, so a dark Home Screen would
+  draw ios7dark. Added `Icon-ios7light` / `Icon-ios13light` (the light icon alone), which Mode Light sends
+  (`lightOnlyName`). The Glass icon keeps its one set (Classic + Gunmetal), as before this task.
 
 ## Phone check (iPhone 15 Pro, iOS 27, Lite IPA from this branch, tools/ui-15.sh)
 
@@ -63,4 +71,7 @@ Light), Home Screen > Customize > Dark > Auto while checking dark (iOS 27 keeps 
   only when needed.
 - A Dark-grid pick of an era icon on the phone (only the Light grid's iOS 7 pick was tapped); node tests cover the
   message it sends (light = dark = the era's light name).
+- The two review fixes (Theme beside an era pick, `Icon-ios7light` for Mode Light) came after the phone run: node
+  tests and test_icons.py (both .car files hold the new sets) check them, the phone didn't, to ship today without a
+  second IPA build and phone session.
 - The jailbreak .deb wasn't built or installed: same web code, and its Assets.car passed test_icons.py.

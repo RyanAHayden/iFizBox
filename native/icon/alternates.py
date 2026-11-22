@@ -10,6 +10,7 @@ draws an icon set's dark appearance when the Home Screen is dark, so a set is a 
   Icon-<icon>           one icon in both appearances, for every icon: iOS 15-17, and pairs not listed above
   Icon-ios7, Icon-ios13 an era's pair (F371, icon/era/): its light icon with its dark one (ios7dark, ios13dark),
                         which also have their own one-icon sets
+  Icon-ios7light, ...   an era's light icon alone, for Theme > Mode Light (the pair would turn dark)
 
 Every Icon-* set also has the globe alone as its tinted appearance at 60pt (F360), like AppIcon's.
 
@@ -52,6 +53,7 @@ TINTED_ICON = "tinted"  # F360: the alternate sets' tinted appearance in the cat
 # one-icon set (Icon-ios7dark) for iOS 15-17 and for Theme > Mode Dark. iOS 26's is the Glass icon (GLASS).
 ERAS = (("ios7", "ios7dark"), ("ios13", "ios13dark"))
 ERA_ICONS = [i for pair in ERAS for i in pair]
+LIGHT_ONLY = "light"  # Icon-<era light icon>light: that icon alone (core/settings.js lightOnlyName)
 GLASS_DARK = "glass-dark"  # F371: the Glass icon's dark (Gunmetal) thumbnail, appicon/glass-dark.png (glass.py thumb)
 GLASS_DARK_THUMB = os.path.join(ICON, "glass", "AppIconDark60x60@3x.png")
 
@@ -92,6 +94,8 @@ def sets():
     out = {set_name(i): (i, None) for i in icons()}
     out.update({set_name(l, d): (l, d) for l, d in pairs()})
     out.update({set_name(l): (l, d) for l, d in ERAS})  # F371: an era's light icon's set is the era's pair
+    # F371: and its light icon alone (Icon-ios7light), which Theme > Mode Light sends: no dark appearance (B289)
+    out.update({set_name(l + LIGHT_ONLY): (l, None) for l, _ in ERAS})
     return out
 
 
