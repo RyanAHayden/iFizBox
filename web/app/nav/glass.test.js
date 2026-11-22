@@ -127,6 +127,7 @@ test("open: the pill, the Search circle, each tab and both buttons; look-alikes 
   assert.equal(c.dark, false);
   assert.equal(doc.documentElement.getAttribute("data-glass"), "native");
   for (const n of [bar, back, install]) assert.equal(n.dataset.glassShown, "", "covered by the glass: see-through");
+  assert.ok([...bar.querySelectorAll("a.tab")].every((a) => a.inert === true), "the hidden tabs take no touches");
   syncGlass(doc, native, win);
   assert.equal(calls.length, 1, "nothing changed (a scroll): nothing sent");
 });
@@ -255,6 +256,7 @@ test("closed when the hook goes off (another style); every look-alike shows", ()
   assert.deepEqual([calls.at(-1).op, calls.at(-1).key], ["close", GLASS_KEY]);
   assert.equal(doc.documentElement.getAttribute("data-glass"), null);
   assert.equal(bar.dataset.glassShown, undefined);
+  assert.ok([...bar.querySelectorAll("a.tab")].every((a) => a.inert === false), "the CSS tabs take touches again");
 });
 
 test("below iOS 26 or an older shell: refused once, the CSS bars from then on", async () => {

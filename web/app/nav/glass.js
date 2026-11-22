@@ -233,12 +233,23 @@ function seethrough(doc, parts) {
   else root.removeAttribute("data-glass");
   uncover(doc, parts ?? { tabbar: null, buttons: [] });
   if (parts) for (const el of [parts.tabbar, ...parts.buttons]) if (el && el.dataset.glassShown == null) el.dataset.glassShown = "";
+  if (parts?.tabbar) inertTabs(parts.tabbar, true);
 }
 
 // Only takes data-glass-shown off what `parts` no longer holds: those look-alikes show at once.
 function uncover(doc, parts) {
   const want = new Set([parts.tabbar, ...parts.buttons].filter(Boolean));
-  for (const el of [...(doc.querySelectorAll?.("[data-glass-shown]") ?? [])]) if (!want.has(el)) delete el.dataset.glassShown;
+  for (const el of [...(doc.querySelectorAll?.("[data-glass-shown]") ?? [])]) {
+    if (want.has(el)) continue;
+    delete el.dataset.glassShown;
+    inertTabs(el, false);
+  }
+}
+
+// F369: the UITabBar isn't laid over the hidden look-alike's rects, so its tabs take no touches while it shows (the bar
+// itself stays hit-testable: covered() reads it). Taps from the UITabBar still click them (tapped()).
+function inertTabs(el, on) {
+  for (const a of el.querySelectorAll?.("a.tab") ?? []) a.inert = on;
 }
 
 const barOf = (doc) => doc.getElementById?.("tabbar") ?? doc.querySelector?.(".tabbar");

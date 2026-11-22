@@ -32,7 +32,9 @@
   badge), no rects; tab glyphs drawn from rowicons SVGs into 26 pt PNGs.
 - `web/app/icons/rowicons.js`: `tabsOutline` in the iOS 13/26 sets (iOS 7's outline tab glyphs at the era's tab
   weight, round caps and joins).
-- `web/app/ios26.css`: under data-glass the page's hidden tabs take no touches.
+- The page's hidden tabs take no touches while the UITabBar shows: glass.js sets `inert` on them (a CSS
+  `pointer-events` rule in ios26.css failed the gate's C44 check, no layout in era stylesheets; the inert switch is
+  checked by node tests only, not re-run on the phone).
 - `native/test_web_bars.py` (outside the file list, needed): it forbade any UITabBarController in the shell (F354);
   now NativeGlass.swift is the one allowed place, and a new case checks it stays iOS 26-only behind ui.glass.
 
