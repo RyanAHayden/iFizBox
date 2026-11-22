@@ -1,10 +1,11 @@
 // F367/F369: ui.glass, the iOS 26 style's glass bars (docs/eras.md "Native controls"). On iOS 26 and later,
 // under the native controls hook, web/app/nav/glass.js has the shell draw:
-//   - the tab bar as a real UITabBar: a UITabBarController (child of the web view's controller, its view laid over the
-//     web view) with one UITab per page tab and Search as the UISearchTab, our own glyphs as template images, the
-//     page's badges, and tabBarMinimizeBehavior .onScrollDown watching the page's scroller. iOS draws every effect
-//     itself: the glass, the press-and-drag lens between tabs, the stretch, the shrink on scroll. Its tab views are
-//     empty and clear: the page is the web view under it, and a tab tap goes to the page's router ({tap: "tab:<id>"}).
+//   - the tab bar as a real UITabBar: a UITabBarController (child of the root controller, its view over the root
+//     view) with one UITab per page tab and Search as the UISearchTab, our own glyphs as template images, the
+//     page's badges, and tabBarMinimizeBehavior .onScrollDown following the page's scroller. iOS draws every effect
+//     itself: the glass, the press-and-drag lens between tabs, the stretch, the shrink on scroll. The one web view
+//     sits inside the chosen tab's view (UIKit shrinks the bar only for a scroller in there), moved to the new tab on
+//     each switch; a tab tap goes to the page's router ({tap: "tab:<id>"}).
 //   - the nav bar's buttons as UIButtons with UIButton.Configuration.glass() (.prominentGlass() for Done), titles and
 //     actions from each page, at the rects of the page's own buttons.
 // The page hides its own tab bar and buttons while these show (<html data-glass="native">, ios26.css) and shows them
@@ -27,7 +28,7 @@
 //   buttonsHidden: Bool
 //
 // Rects are CSS px from the web view's top left, which are its points (the page isn't zoomed and the scroll view never
-// moves: App.swift). Nothing moves per frame: the page sends an update only when its bars change (a page pushed, a
+// moves: App.swift); the web view fills the screen wherever it sits, so they are the overlay's points too. Nothing moves per frame: the page sends an update only when its bars change (a page pushed, a
 // tab chosen, a badge); the tab bar's shrink follows the page's own scroller (a UIScrollView WebKit keeps for each
 // overflow scroller), found again on each update, so scrolling sends nothing over the bridge and keeps 120 Hz.
 // Below iOS 26 the call answers "unsupported" and the page keeps its CSS bars. Both builds.
@@ -51,13 +52,15 @@ enum NativeGlass {
         guard #available(iOS 26.0, *) else { return c.reply(nil, "unsupported: Liquid Glass needs iOS 26") }
         switch p["op"] as? String ?? "" {
         case "open":
-            guard let web = c.web, web.window != nil else { return c.reply(nil, "internal: no web view to show the glass in") }
+            guard let web = c.web, let root = web.window?.rootViewController, let host = root.view else {
+                return c.reply(nil, "internal: no web view to show the glass in")
+            }
             close(key)
             let bars = GlassBars(call: c, web: web)
-            bars.frame = web.bounds
+            bars.frame = host.bounds
             bars.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            web.addSubview(bars)
-            bars.attach(parent: web.next as? UIViewController)
+            host.addSubview(bars)
+            bars.attach(parent: root, host: host)
             bars.apply(p)
             open[key] = bars
             watchLoads(web)
@@ -137,8 +140,8 @@ enum NativeGlass {
     }()
 }
 
-// The glass bars over the web view: the tab bar controller's view under the nav bar's buttons. Touches anywhere but
-// the tab bar and the buttons go through to the page.
+// The glass bars: this overlay on the root view holds the nav bar's buttons; the tab bar controller's view sits under
+// it, with the web view inside. Touches anywhere on the overlay but its buttons go through.
 @available(iOS 26.0, *)
 private final class GlassBars: UIView {
     let call: Bridge.Call
@@ -159,19 +162,20 @@ private final class GlassBars: UIView {
 
     required init?(coder: NSCoder) { fatalError("not from a nib") }
 
-    func attach(parent: UIViewController?) { tabs.attach(to: self, parent: parent) }
+    func attach(parent: UIViewController, host: UIView) { tabs.attach(parent: parent, host: host, below: self, web: web) }
     func detach() { tabs.detach() }
 
-    // Only the tab bar and the buttons take touches: this overlay, the tab bar controller's own view and its empty tab
-    // views let them through to the page.
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         guard let hit = super.hitTest(point, with: event), hit !== self else { return nil }
-        return tabs.passes(hit) ? nil : hit
+        return hit
     }
 
     func apply(_ p: [String: Any]) {
         if let s = NativeGlass.number(p["scale"]), s > 0 { scale = s }
-        if let dark = p["dark"] as? Bool { overrideUserInterfaceStyle = dark ? .dark : .light }
+        if let dark = p["dark"] as? Bool {
+            overrideUserInterfaceStyle = dark ? .dark : .light
+            tabs.controller.tabBar.overrideUserInterfaceStyle = overrideUserInterfaceStyle
+        }
         if let icons = p["icons"] as? [String: Any] {
             for (key, v) in icons {
                 guard let s = v as? String, let comma = s.firstIndex(of: ","),
@@ -185,7 +189,7 @@ private final class GlassBars: UIView {
         }
         if p.keys.contains("tabbar") { lastTabbar = p["tabbar"] as? [String: Any] }
         if p.keys.contains("tabbar") || p["icons"] != nil || p["colors"] != nil {
-            tabs.apply(lastTabbar, images: images, colors: colors, web: web)
+            tabs.apply(lastTabbar, images: images, colors: colors)
         }
         if let list = p["buttons"] as? [[String: Any]] { layoutButtons(list) }
         else if p["icons"] != nil { for b in buttons.values { (b as? GlassButton)?.refreshIcon(images) } }
@@ -213,19 +217,24 @@ private final class GlassBars: UIView {
     }
 }
 
-// The real tab bar: a UITabBarController whose tabs show nothing (clear, empty views over the web view), so the page
-// under it shows through and only its UITabBar is seen. The page owns the selection: a tap is sent to the page's router
-// and the page's next update says which tab is chosen (a tab the page doesn't switch to, Search's re-tap, comes back
-// as the old one and the bar follows).
+// The real tab bar: a UITabBarController over the root view whose tabs are empty, clear views; the one web view sits in
+// the chosen tab's (so the page's scroller is in UIKit's view tree and the bar shrinks as it scrolls) and moves to the
+// new tab on each switch, parked in the controller's own view meanwhile, so it never leaves the window (no visibility
+// change for the page) and the page never reloads. The page owns the selection: a tap is sent to the page's router and
+// the page's next update says which tab is chosen (a tab the page doesn't switch to comes back as the old one and the
+// bar follows).
 @available(iOS 26.0, *)
 private final class NativeTabs: NSObject, UITabBarControllerDelegate {
     let controller = UITabBarController()
     private let emit: (String) -> Void
     private var byId: [String: UITab] = [:]
     private var order: [String] = []
-    private var searchId: String?
     private var pages: [String: UIViewController] = [:]
     private weak var web: WKWebView?
+    private weak var host: UIView?
+    private weak var parent: UIViewController?
+    private weak var overlay: UIView?
+    private var attached = false
     private var pick: DispatchWorkItem?
 
     init(emit: @escaping (String) -> Void) {
@@ -233,53 +242,84 @@ private final class NativeTabs: NSObject, UITabBarControllerDelegate {
         super.init()
         controller.delegate = self
         controller.tabBarMinimizeBehavior = .onScrollDown
-        controller.view.backgroundColor = .clear
-        controller.view.isHidden = true
     }
 
-    func attach(to overlay: UIView, parent: UIViewController?) {
-        if let parent { parent.addChild(controller) }
-        controller.view.frame = overlay.bounds
+    // Remembers where to go; the controller goes in with the first tabs (apply).
+    func attach(parent: UIViewController, host: UIView, below overlay: UIView, web: WKWebView?) {
+        self.parent = parent
+        self.host = host
+        self.overlay = overlay
+        self.web = web
+    }
+
+    private func attachNow() {
+        guard !attached, let parent, let host else { return }
+        attached = true
+        parent.addChild(controller)
+        controller.view.backgroundColor = .clear
+        controller.view.frame = host.bounds
         controller.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        overlay.insertSubview(controller.view, at: 0)
+        if let overlay, overlay.superview === host { host.insertSubview(controller.view, belowSubview: overlay) }
+        else { host.addSubview(controller.view) }
         controller.didMove(toParent: parent)
     }
 
+    // The web view back on the root view, under everything, with its own safe area again; the controller gone.
     func detach() {
+        pick?.cancel()
+        if let web, let host {
+            host.insertSubview(web, at: 0)
+            web.frame = host.bounds
+            web.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            (web as? PageWebView)?.pinnedSafeArea = nil
+        }
+        guard attached else { return }
+        attached = false
         controller.willMove(toParent: nil)
         controller.view.removeFromSuperview()
         controller.removeFromParent()
     }
 
-    // True for the views a touch should pass through: the controller's own view, the empty tab views and the
-    // containers that hold them (the tab bar is none of these).
-    func passes(_ hit: UIView) -> Bool {
-        if hit === controller.view { return true }
-        for vc in pages.values where vc.isViewLoaded {
-            if hit === vc.view || vc.view.isDescendant(of: hit) || hit.isDescendant(of: vc.view) { return true }
-        }
-        return false
+    // The web view into the chosen tab's view (once that view is in the window), its safe area pinned to the screen's:
+    // UIKit adds the tab bar to a tab's safe area, and the page draws its own room for the bar.
+    private func place() {
+        guard let web, let host, let vc = controller.selectedTab?.viewController, vc.isViewLoaded, vc.view.window != nil
+        else { return }
+        (web as? PageWebView)?.pinnedSafeArea = host.safeAreaInsets
+        guard web.superview !== vc.view else { return }
+        vc.view.insertSubview(web, at: 0)
+        web.frame = vc.view.bounds
+        web.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    }
+
+    // During a switch the web view waits in the controller's own view, which stays in the window while UIKit swaps
+    // the tabs' views.
+    private func park() {
+        guard let web, web.superview !== controller.view, attached else { return }
+        controller.view.insertSubview(web, at: 0)
+        web.frame = controller.view.bounds
+        web.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     }
 
     private func page(_ id: String) -> UIViewController {
         if let vc = pages[id] { return vc }
         let vc = UIViewController()
         vc.view.backgroundColor = .clear
-        vc.view.isUserInteractionEnabled = false
         pages[id] = vc
         return vc
     }
 
-    func apply(_ t: [String: Any]?, images: [String: UIImage], colors: (text: UIColor, active: UIColor), web: WKWebView?) {
-        self.web = web
+    func apply(_ t: [String: Any]?, images: [String: UIImage], colors: (text: UIColor, active: UIColor)) {
         guard let t, let items = t["items"] as? [[String: Any]], !items.isEmpty else {
-            controller.view.isHidden = true
+            if attached { controller.setTabBarHidden(true, animated: true) }
             return
         }
+        let first = !attached
+        attachNow()
         let ids = items.compactMap { $0["id"] as? String }
         if ids != order {
+            park()
             byId = [:]
-            searchId = nil
             var list: [UITab] = []
             for item in items {
                 guard let id = item["id"] as? String else { continue }
@@ -287,7 +327,6 @@ private final class NativeTabs: NSObject, UITabBarControllerDelegate {
                 let tab: UITab
                 if item["search"] as? Bool ?? false {
                     tab = UISearchTab(viewControllerProvider: provider)
-                    searchId = id
                 } else {
                     tab = UITab(title: item["title"] as? String ?? id, image: nil, identifier: id, viewControllerProvider: provider)
                 }
@@ -309,14 +348,13 @@ private final class NativeTabs: NSObject, UITabBarControllerDelegate {
         }
         controller.tabBar.tintColor = colors.active
         controller.tabBar.unselectedItemTintColor = colors.text
-        if let chosen, controller.selectedTab !== chosen { controller.selectedTab = chosen }
-        let hidden = t["hidden"] as? Bool ?? false
-        if controller.view.isHidden {
-            controller.view.isHidden = false
-            controller.setTabBarHidden(hidden, animated: false)
-        } else if controller.isTabBarHidden != hidden {
-            controller.setTabBarHidden(hidden, animated: true)
+        if let chosen, controller.selectedTab !== chosen {
+            park()
+            controller.selectedTab = chosen
         }
+        place()
+        let hidden = t["hidden"] as? Bool ?? false
+        if controller.isTabBarHidden != hidden { controller.setTabBarHidden(hidden, animated: !first) }
         schedulePick()
     }
 
@@ -324,15 +362,24 @@ private final class NativeTabs: NSObject, UITabBarControllerDelegate {
     // UIKit moves the selection as it does on any tab bar; the page's answer keeps it or puts it back.
     func tabBarController(_ tabBarController: UITabBarController, shouldSelectTab tab: UITab) -> Bool {
         if let id = byId.first(where: { $0.value === tab })?.key { emit(id) }
+        if tab !== controller.selectedTab { park() }
         return true
+    }
+
+    func tabBarController(_ tabBarController: UITabBarController, didSelectTab selectedTab: UITab, previousTab: UITab?) {
+        place()
+        schedulePick()
     }
 
     // MARK: shrink on scroll
 
     // The page's scroller is an overflow box (.page-body), which WebKit backs with a UIScrollView of its own inside the
     // web view's. The one on screen now (the frontmost that scrolls and covers the middle of the screen) becomes the
-    // chosen tab's content scroll view, so UIKit shrinks the tab bar as it scrolls down and brings it back up. Picked
-    // again after each update (a tab chosen, a page pushed), now and once the page's new layer is in place.
+    // chosen tab's content scroll view, so UIKit shrinks the tab bar as it scrolls down and brings it back up. UIKit
+    // follows only a scroller inside the tab's own view (one elsewhere is ignored, and a stand-in scroll view copying
+    // the page's offset, or with its pan laid on the window, never counts as the user's scroll: tried on the 15 Pro),
+    // hence the web view inside the tab. Picked again after each update (a tab chosen, a page pushed), now and once the
+    // new layer is in place.
     private func schedulePick() {
         pick?.cancel()
         pickScroller()
@@ -342,7 +389,8 @@ private final class NativeTabs: NSObject, UITabBarControllerDelegate {
     }
 
     private func pickScroller() {
-        guard let web, let vc = controller.selectedTab?.viewController else { return }
+        place()
+        guard let web, let vc = controller.selectedTab?.viewController, web.isDescendant(of: vc.view) else { return }
         let mid = CGPoint(x: web.bounds.midX, y: web.bounds.midY)
         var best: UIScrollView?
         func walk(_ v: UIView) {

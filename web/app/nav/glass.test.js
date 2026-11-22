@@ -267,7 +267,8 @@ test("the shell: ui.glass registered, a real UITabBar and UIKit glass buttons ov
   assert.match(swift, /UITab\(title:/);
   assert.match(swift, /\.badgeValue = badge/);
   assert.match(swift, /tabBarMinimizeBehavior = \.onScrollDown/, "shrinks on scroll");
-  assert.match(swift, /setContentScrollView\(best, for: \.bottom\)/, "watching the page's own scroller");
+  assert.match(swift, /setContentScrollView\(best, for: \.bottom\)/, "following the page's own scroller");
+  assert.match(swift, /vc\.view\.insertSubview\(web, at: 0\)/, "the web view inside the chosen tab's view");
   assert.match(swift, /shouldSelectTab tab: UITab\) -> Bool \{\n\s+if let id = .*emit\(id\)/, "taps go to the page");
   assert.doesNotMatch(swift, /UIImage\(systemName:/, "no SF Symbols (AGENTS.md)");
   assert.doesNotMatch(swift, /UIGlassEffect\(style:/, "F369: no glass laid over the look-alike any more");

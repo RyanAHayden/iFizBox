@@ -249,7 +249,7 @@ enum Theme {
         window.overrideUserInterfaceStyle = Self.style(style)
         let ground = Launch.ground(dark: theme == "dark", palette: darkPalette, lightPalette: lightPalette)
         window.backgroundColor = ground.pattern
-        if let web = window.rootViewController?.view as? WKWebView { Launch.paint(web, ground) }
+        if let web = (window.rootViewController as? WebController)?.webView { Launch.paint(web, ground) }
         UserDefaults.standard.set(["style": style, "darkPalette": darkPalette, "lightPalette": lightPalette],
                                   forKey: savedKey)
         Splash.follow(dark: theme == "dark", palette: darkPalette, lightPalette: lightPalette) // B203: the next splash

@@ -5,7 +5,7 @@
 import { hasNativeCall } from "../native.js";
 
 export function createTabbar(el, tabs, titleOf) {
-  // F367: the iOS 26 style's Liquid Glass bars (nav/glass.js), loaded only in the app; nothing on the site
+  // F367/F369: the iOS 26 style's glass bars (nav/glass.js), loaded only in the app; nothing on the site
   if (hasNativeCall()) import("./glass.js").then((g) => g.watchGlass(), () => {});
   const items = {};
   for (const tab of tabs) {
@@ -44,8 +44,8 @@ export function createTabbar(el, tabs, titleOf) {
 // circle beside it; the screens scroll under both. All of it is layout in style.css behind the attribute (--tab-h
 // becomes the pill's height plus its gap to the bottom, so every scroller's end room and the bars that sit on the
 // tab bar follow); the markup is the same either way. Off (iOS 6, the default) the attribute is absent and nothing
-// changes. The app shows this same bar; on iOS 26+ the shell lays its Liquid Glass pill and circle over it and this
-// one goes see-through underneath (F367, nav/glass.js), with no UITabBar of its own (native/test_web_bars.py).
+// changes. The app shows this same bar, except on iOS 26+ under the iOS 26 style, where the shell shows a real
+// UITabBar with these tabs and this one hides (F369, the glass bars: nav/glass.js).
 export const FLOAT_OWN_TAB = "search";
 
 export const floatingTabbarOn = (doc = globalThis.document) =>

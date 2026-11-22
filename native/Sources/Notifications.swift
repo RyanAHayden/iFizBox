@@ -54,7 +54,7 @@ final class Notifications: NSObject, UNUserNotificationCenterDelegate {
     // loaded: try again every 0.2 s, for up to `tries` times, until the web view has finished loading.
     static func open(_ route: String, tries: Int) {
         let web = UIApplication.shared.connectedScenes
-            .compactMap { ($0 as? UIWindowScene)?.windows.first?.rootViewController?.view as? WKWebView }.first
+            .compactMap { (($0 as? UIWindowScene)?.windows.first?.rootViewController as? WebController)?.webView }.first
         guard let web, !web.isLoading, web.url != nil else {
             if tries > 0 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { open(route, tries: tries - 1) } }
             return
@@ -268,7 +268,7 @@ enum Shortcut {
     static let upgrade = "com.ryha.ifizbox.upgrade"
     static func perform(_ type: String, tries: Int = 50) {
         let web = UIApplication.shared.connectedScenes
-            .compactMap { ($0 as? UIWindowScene)?.windows.first?.rootViewController?.view as? WKWebView }.first
+            .compactMap { (($0 as? UIWindowScene)?.windows.first?.rootViewController as? WebController)?.webView }.first
         guard let web, !web.isLoading, web.url != nil else {
             if tries > 0 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { perform(type, tries: tries - 1) } }
             return
