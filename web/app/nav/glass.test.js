@@ -248,3 +248,41 @@ test("ios26.css: the look-alikes go see-through only under data-glass, and the n
     assert.doesNotMatch(readFileSync(join(HERE, "..", other), "utf8"), /data-glass/, `${other} never sees the glass hook`);
   }
 });
+
+test("a slide's transform left at rest doesn't keep the buttons hidden; one mid-swipe does", () => {
+  reset();
+  const { native, calls } = fakeShell();
+  const { item } = app(native);
+  item.style.transform = "translateX(0px)";
+  syncGlass(doc, native, win);
+  assert.equal(calls.at(-1).buttonsHidden, false);
+  item.style.transform = "translateX(120px)";
+  syncGlass(doc, native, win);
+  assert.equal(calls.at(-1).buttonsHidden, true);
+});
+
+test("another error (no window): the CSS bars, and the glass opens again a second later by itself", async () => {
+  reset();
+  let refuse = true;
+  const calls = [];
+  const native = { call(m, p, on) {
+    calls.push(p.op);
+    if (refuse) return Promise.reject(new Error("no web view to show the glass in"));
+    if (p.op === "open") { on({ ready: true }); return new Promise(() => {}); }
+    return Promise.resolve(null);
+  } };
+  app(native);
+  const glass = await import("./glass.js");
+  glass.watchGlass(doc, { ...win, MutationObserver: undefined, addEventListener() {} }, native);
+  syncGlass(doc, native, win);
+  await tick();
+  refuse = false;
+  const realRaf = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = undefined;
+  globalThis.getComputedStyle = win.getComputedStyle; // the scheduled sync runs with the real globals
+  for (let end = Date.now() + 5000; Date.now() < end && calls.filter((c) => c === "open").length < 2;) await new Promise((r) => setTimeout(r, 50));
+  globalThis.requestAnimationFrame = realRaf;
+  delete globalThis.getComputedStyle;
+  assert.deepEqual(calls.slice(0, 1), ["open"]);
+  assert.ok(calls.filter((c) => c === "open").length >= 2, `reopened: ${calls}`);
+});

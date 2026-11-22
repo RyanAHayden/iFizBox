@@ -171,8 +171,8 @@ private final class GlassBars: UIView {
         return v
     }
 
-    // Only the glass takes touches; the overlay itself, the tab group's ground between the pill and the circle, and
-    // a glass's own ground outside its items let them through to the page.
+    // Only the glass takes touches: the overlay itself and the tab group's ground between the pill and the circle let
+    // them through to the page. A touch on the pill between two tabs stays on the glass, as on iOS's tab bar.
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         let hit = super.hitTest(point, with: event)
         if hit === self || hit === tabGroup || hit === tabGroup.contentView { return nil }

@@ -111,9 +111,10 @@ function covered(el, doc) {
 // A slide moving `el` (nav/transition.js and the sheets run Web Animations on transform; the edge swipe and app.js mark
 // the pair .is-moving and set inline transforms).
 const awaited = new WeakSet();
+const STILL = /^(|none|translate(X|Y|3d)?\(0(px)?(, ?0(px)?)*\))$/; // no inline transform, or one a slide left at rest
 function moving(el, doc) {
   for (let p = el; p && p !== doc.body; p = p.parentElement) {
-    if (p.style?.transform || p.classList?.contains("is-moving")) return true;
+    if (STILL.test(p.style?.transform ?? "") === false || p.classList?.contains("is-moving")) return true;
   }
   const anims = (doc.getAnimations?.() ?? []).filter((a) => a.playState === "running" && a.effect?.getTiming?.().iterations !== Infinity &&
     a.effect?.target?.contains?.(el) && (a.effect.getKeyframes?.() ?? []).some((k) => k.transform != null));
@@ -255,7 +256,7 @@ export function syncGlass(doc = globalThis.document, native = nativeBridge(), wi
       // A shell without ui.glass or a phone below iOS 26: the CSS bars from now on. Anything else (no window while the
       // app is in the background): the CSS bars, and another try a second later at the next change.
       if (/unknown method|unsupported/.test(e?.message ?? "") || e?.code === "unsupported") st.failed = true;
-      else st.retryAt = Date.now() + 1000;
+      else { st.retryAt = Date.now() + 1000; setTimeout(scheduleGlassSync, 1050); }
       lost(doc);
     });
   } else {
@@ -306,7 +307,9 @@ export function watchGlass(doc = globalThis.document, win = globalThis, native =
       const el = r.target.nodeType === 1 ? r.target : r.target.parentElement;
       if (!el?.closest) return false;
       if (el.closest(".page-body, [data-scroller]")) return true;
-      return r.type === "attributes" && (r.attributeName === "style" && el.matches?.(".nav-title, .large-title"));
+      // the large title's fade, and the edge swipe's per-frame transforms on a pair already marked .is-moving (its
+      // class change, at the start and the end, is what hides and shows the buttons)
+      return r.type === "attributes" && r.attributeName === "style" && !!el.matches?.(".nav-title, .large-title, .is-moving");
     };
     const obs = new Observer((records) => { if (records.some((r) => !quiet(r))) scheduleGlassSync(); });
     obs.observe(doc.body, { childList: true, subtree: true, characterData: true, attributes: true,

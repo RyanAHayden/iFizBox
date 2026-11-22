@@ -127,3 +127,21 @@ The Lite IPA from this branch, installed with `tools/ui-15.sh` under its lock; `
 - **Rotation / iPad**: the iPhone app is portrait only; the `resize` listener re-sends rects, not tried.
 - **Icon-only bar buttons** (Share, the app page's Installed / queue toggles): the glyph path is the same as the
   tabs' (`::before` mask drawn to PNG) and ran for the tabs; no page with one was opened on the phone.
+
+## After the spec review
+
+- Fixed: an error other than "unsupported" (no window) only set a retry time; nothing tried again until the page
+  changed. A timer now runs the sync once the second is up (test added).
+- Fixed: an inline transform a slide leaves at rest (`translateX(0)`, `none`) counted as moving and could keep the
+  buttons hidden (test added).
+- Fixed: the edge swipe's per-frame inline transforms ran a snapshot each frame (no bridge traffic, but layout reads):
+  style writes on a pair already marked `.is-moving` are skipped now; its class change at the start and the end is
+  what hides and shows the buttons.
+- Fixed: `GlassBars.hitTest`'s comment said the pill's ground lets touches through; it doesn't (by design, as iOS).
+- Kept: the title stays the page's (Decisions above); the nav bar's scroll-edge ground under `data-glass` (it is what
+  puts content under the buttons for the glass to bend, the brief's "content scrolling under them"); the glossary
+  entry (the run's rules ask for one per new thing).
+- Not a bug: `dark` from `data-theme`: theme-boot.js and settings.js always set `data-theme` (light or dark), Automatic
+  included. `watchLoads` watches one web view: the app has one (as NativeSegments).
+- These fixes were checked in Node and the IPA rebuilt; the phone run above was on the build before them (the hit test
+  comment and JS-only changes; not re-shot).
