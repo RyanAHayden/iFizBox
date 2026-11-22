@@ -138,7 +138,9 @@ private final class GlassBars: UIView {
     private var scale: CGFloat = UIScreen.main.scale
     private var colors: (text: UIColor, active: UIColor, chosen: UIColor) = (.label, .systemBlue, UIColor.label.withAlphaComponent(0.08))
 
-    private let tabGroup = UIVisualEffectView(effect: { let e = UIGlassContainerEffect(); e.spacing = 12; return e }())
+    // spacing 0: the pill and the circle (7-10pt apart) stay two shapes, as iOS's tab bar and its Search tab, and only
+    // blend if they touch; 12 drew a liquid bridge between them on the 15 Pro
+    private let tabGroup = UIVisualEffectView(effect: { let e = UIGlassContainerEffect(); e.spacing = 0; return e }())
     private let pill = GlassBars.glass()
     private let circle = GlassBars.glass()
     private let chosen = UIView()
@@ -350,8 +352,9 @@ private final class GlassButton: UIButton {
             c.contentInsets = .zero
         } else if kind == "back" {
             c.image = NativeGlass.chevron
-            c.imagePadding = 5
-            c.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 10, bottom: 0, trailing: 13)
+            // as tight as the CSS back button (4pt, the 13pt chevron slot, the label, 14pt), so the label fits its rect
+            c.imagePadding = 3
+            c.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 6, bottom: 0, trailing: 8)
         }
         if glyph == nil, !title.isEmpty {
             c.attributedTitle = AttributedString(title, attributes: AttributeContainer([.font: font]))

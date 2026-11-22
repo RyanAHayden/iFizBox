@@ -65,6 +65,37 @@ So: **glass views over web rects**, the F345d pattern (`ui.segments`) grown to t
 - ios26.css: the `data-glass` rules; its header and `nav/tabbar.js`'s comment now say the app on iOS 26+ lays glass
   over the CSS bars.
 
+## Checked in Chromium
+
+A harness (headless Chromium, 393x852 @3x, the app's fake bridge recording `ui.glass`, `app.info` iOS 27,
+`ifizbox.style` ios26) on the real layout, light and dark: Home opens the glass with the pill (14, 776, 293x64), the
+circle (314, 777, 64x62), five tabs with their glyph PNGs drawn and sent, About / Reload; a `{tap: "tab:sources"}`
+switched to Sources and the buttons became Refresh / Add / Manage; a push hid the buttons (`buttonsHidden`, the CSS
+ones shown) and kept the tab bar; at rest Back came; a `{tap}` on Back popped to Home. No page errors. With `app.info`
+iOS 15.8.8 (the iPhone 7's case) nothing is sent, `data-glass` never set, the CSS tab bar stays at opacity 1.
+`tools/smoke/smoke.mjs` passes.
+
+## Checked on the iPhone 15 Pro (iOS 27.0.1)
+
+The Lite IPA from this branch, installed with `tools/ui-15.sh` under its lock; `ifizbox.style` set to ios26 through
+`pymobiledevice3 webinspector cdp` and the page reloaded, so the real hook (F345a) turned on from `app.info`. Shots
+(gitignored, iOS's status bar): `ref/15/screens/f367-{home,sources,app}-{light,dark}.png`, `f367-changes-light.png`,
+`f367-sheet-dark.png`. Afterwards the style and Mode were put back to iOS 6 / Light.
+
+- **Real glass**: the pill, the Search circle and every bar button are UIKit's Liquid Glass. With content under them
+  (Home scrolled, the iFizBox app page scrolled to "More Information" under the pill) the glass bends it at its edges
+  and frosts it inside, in light and dark.
+- **Real taps on the glass** (WDA touches, not script): Sources on the pill switched tabs, Back popped the app page,
+  Changes switched tabs. Titles and buttons followed each page: About / Reload, Refresh / Add / Manage, Refresh /
+  Upgrade (9), "‹ Changes" / Modify; the Changes badge (9) and the chosen tab's capsule are drawn.
+- **120 Hz**: two finger scrolls of 700 px on the app page with `ui.glass` calls counted: 0.
+- **A sheet** (`showSheet`) over the bars: the glass hid at once (no glass over the sheet); closed, it came back.
+- **Fixed after the first look**: the glass container's spacing (12) drew a liquid bridge between the pill and the
+  circle (iOS keeps them apart): 0 now. The back button's insets were wider than the CSS button's and cut "Changes"
+  to "Chan…": tightened, it fits.
+- iOS's own "You have changed the icon" alert (F323's theme-following icon) came up on the switch to Dark and took
+  the first tap; dismissed, the dark shots were taken again.
+
 ## Decisions
 
 - **The nav bar's title stays the page's.** iOS 26's title is plain text, not glass, and the large title's fade into
@@ -75,3 +106,24 @@ So: **glass views over web rects**, the F345d pattern (`ui.segments`) grown to t
   empty strip, and the glass takes over at rest.
 - **iOS 15-25, iOS 6/7/13 and the site**: no `data-controls="native"`, so nothing is loaded or sent; the iPhone 7
   (iOS 15) never gets the hook.
+
+## Tried and failed
+
+- The first phone install failed: the copy of the IPA to the scratchpad was chained behind the phone lock, which
+  P301b held; installed from `native/build` (the gate's build of the same commit) once the lock came free.
+- The startup module budget (`module-graph.test.js`, under 117) failed with a static import of `nav/glass.js` from
+  `nav/tabbar.js`: it is a dynamic import now, only where the bridge takes calls.
+
+## Not verified
+
+- **The iPhone 7 on the device.** Not run there: on iOS 15 the native controls hook is never on (F345a, node tests),
+  so `nav/glass.js` isn't even loaded, and the Swift answers `unsupported` below iOS 26. Checked in Chromium with
+  `app.info` iOS 15.8.8 (nothing sent, the CSS bars as before); AGENTS.md's "phone only when Chromium can't check".
+- **The edge swipe by finger on the 15 Pro**: the buttons hide on `.is-moving` (set for the swipe too, app.js
+  `setMoving`); covered in Node and Chromium (push), not swiped by finger.
+- **Frame-accurate hand-over** at a push's start and end (glass off, CSS on): shots are too slow; no screen recording.
+- **Interactive glass feel** (the press glow and stretch of `isInteractive`) was not filmed, only tapped.
+- **iOS 26.0-26.x**: the only iOS 26+ phone here runs iOS 27.
+- **Rotation / iPad**: the iPhone app is portrait only; the `resize` listener re-sends rects, not tried.
+- **Icon-only bar buttons** (Share, the app page's Installed / queue toggles): the glyph path is the same as the
+  tabs' (`::before` mask drawn to PNG) and ran for the tabs; no page with one was opened on the phone.
