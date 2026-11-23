@@ -1,0 +1,17 @@
+[
+ {"wait": 2000},
+ {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"},
+ {"nav": "#/sources", "ms": 6000},
+ {"eval": "import('./backend.js').then(m=>m.getBackend().addSource('http://127.0.0.1:8732/')).then(r=>'added '+r.key, e=>'err '+e.message)"},
+ {"eval": "import('./backend.js').then(m=>m.getBackend().addSource('http://apt.thebigboss.org/repofiles/cydia/')).then(r=>'added', e=>'err '+e.message)"},
+ {"nav": "#/sources", "ms": 15000},
+ {"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"},
+ {"wait": 1000},
+ {"shot": "lite-sources"},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,900)"},
+ {"go": "#/sources/manage", "ms": 2500},
+ {"tap": "text:Filters", "ms": 2500},
+ {"shot": "lite-filters"},
+ {"tap": "text:All Sources", "ms": 2500},
+ {"shot": "lite-filters-all"}
+]

@@ -12,6 +12,7 @@
 //   await s.holds.sync();                    // jailbreak: take dpkg's holds (apt-mark showhold) as the list
 //   s.hiddenSections.set("Themes", true);    // Section Visibility (F24): listeners hear ("hiddenSections", list)
 //   s.hiddenAuthors.set("Jane Doe", true);  // Hide by Author (F104): listeners hear ("hiddenAuthors", list)
+//   s.sourceFilters.set(key, "paid", true);  // Source Filters (F382): listeners hear ("sourceFilters", object)
 //   await s.blocked.set("com.example.tweak", true, { name, installed }); // Block (F226): out of every list; jailbreak: held too
 //   s.ignoredVersions.set("com.example.tweak", "1.2"); // Ignore This Version (F281): only 1.2 hidden; null undoes
 //   s.autoMarked.set("com.example.tweak", true); // Update Automatically, for Only Packages I Mark (F70)
@@ -30,6 +31,7 @@ import { IOS_VERSIONS, JAILBREAK_ARCH } from "./compat.js";
 import { NAME } from "../brand.js";
 import { OLD_WAY_ALERT } from "./keepid.js";
 import { ROUTE_OPTIONS } from "./installroute.js";
+import { normalizeFilters, filterOn, isCustom as isCustomFilter, ALL_SOURCES } from "./sourcefilters.js"; // F382
 
 export const MODES = ["site", "jailbreak", "sideload"];
 
@@ -332,6 +334,7 @@ const APP_HOLDS_KEY = PREFIX + "appHolds"; // B69: apps' Ignore Upgrades in the 
 const LAST_REFRESH_KEY = PREFIX + "lastRefresh"; // F270: pull to refresh's Last Updated
 const QUEUE_HINT_KEY = PREFIX + "queueHintHeld"; // F272: the Installed tab was held once; the queue's hint stops
 const IGNORED_VERSIONS_KEY = PREFIX + "ignoredVersions"; // F281: Ignore This Version, { id: version }
+const SOURCE_FILTERS_KEY = PREFIX + "sourceFilters"; // F382: Source Filters, core/sourcefilters.js
 
 // F100: Search's Recent table (from Zebra): the last RECENT_MAX queries, newest first, no duplicates (a query
 // already there moves to the top; case and surrounding spaces don't make a new one). Pure, for the tests.
@@ -637,6 +640,41 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     },
   };
 
+  // F382: Source Filters (core/sourcefilters.js): { all: { id: bool }, "<source key>": { id: bool } }, only the
+  // switches someone changed, kept on this device; core/catalog.js setFilters does the filtering. All Sources' Works
+  // on My Phone is the worksOnMyPhone setting itself. Listeners hear ("sourceFilters", object) on a change.
+  function readSourceFilters() {
+    try {
+      return normalizeFilters(JSON.parse(store.get(SOURCE_FILTERS_KEY) || "{}"));
+    } catch {
+      return {};
+    }
+  }
+  function writeSourceFilters(next) {
+    const clean = normalizeFilters(next);
+    if (JSON.stringify(clean) === JSON.stringify(readSourceFilters())) return;
+    if (Object.keys(clean).length) store.set(SOURCE_FILTERS_KEY, JSON.stringify(clean));
+    else store.remove(SOURCE_FILTERS_KEY);
+    notify("sourceFilters", clean);
+  }
+  const sourceFilters = {
+    all: readSourceFilters,
+    isOn: (key, id) => filterOn(readSourceFilters(), key, id, { fit: get("worksOnMyPhone") }),
+    isCustom: (key) => isCustomFilter(readSourceFilters(), key, { lite: mode === "sideload", fit: get("worksOnMyPhone") }),
+    set(key, id, on) {
+      if (key === ALL_SOURCES && id === "fit") { set("worksOnMyPhone", Boolean(on)); return; }
+      const all = readSourceFilters();
+      all[key] = { ...all[key], [id]: Boolean(on) };
+      writeSourceFilters(all);
+    },
+    // A source back to Same as All Sources; All Sources back to the defaults (Works on My Phone stays as it is).
+    reset(key) {
+      const all = readSourceFilters();
+      delete all[key];
+      writeSourceFilters(all);
+    },
+  };
+
   // F226: Block (Zebra #1037, #998): packages blocked from the package page, kept on this device as a JSON object
   // { id: name } (the name is for Settings > Blocked's rows), and the authors, which are F104's hidden authors (one
   // list: Block on a package page and Hide Packages by on the author page are the same switch). core/catalog.js
@@ -867,6 +905,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     daemonPrefs,
     hiddenSections,
     hiddenAuthors,
+    sourceFilters, // F382
     blocked, // F226
     ignoredVersions, // F281
     upgradeNotifications,

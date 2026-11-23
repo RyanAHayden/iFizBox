@@ -8,6 +8,8 @@
 //   #/sources/manage/io/review           what an import found: new ones (ticked), already listed, can't add; Add
 //   #/sources/manage/hidden              F104: what's hidden, sections (Section Visibility) and authors (Hide
 //                                        Packages by <author>), each with a switch to show it again
+//   #/sources/manage/filters             F382: Source Filters: All Sources (the defaults), then each source, Same or Custom
+//   #/sources/manage/filters/<key|all>   that one's switches (core/sourcefilters.js), and Same as All Sources once changed
 //   #/sources/manage/recommended/<key>   one not added yet, read from its URL: its apps (F52) or packages (F54), and Add
 //
 // Source keys always hold a ':' (deb:..., alt:...), so "manage" can't be one. The parsing, export text and order
@@ -47,6 +49,7 @@ import { rowIcon } from "../icons/rowicons.js";
 import { confirmUnknownSource, markTrusted } from "./safety.js"; // F291
 import * as findMore from "./findmore.js"; // F305: #/sources/manage/find(/<slug>), Find More Sources
 import { nativeBridge } from "../native.js";
+import { ALL_SOURCES, filtersFor } from "../core/sourcefilters.js"; // F382
 
 export const SEGMENT = "manage";
 export const isManage = (route) => route.path[0] === SEGMENT;
@@ -71,6 +74,8 @@ function page(route) {
   if (!p.length) return "root";
   if (p[0] === "sources" && p.length === 1) return "sources";
   if (p[0] === "hidden" && p.length === 1) return "hidden";
+  if (p[0] === "filters" && p.length === 1) return "filters"; // F382
+  if (p[0] === "filters" && p.length === 2) return "filter";
   if (p[0] === "recommended" && p.length === 2) return "preview";
   if (p[0] === "io") {
     if (p.length === 1) return "io";
@@ -86,6 +91,8 @@ export function nav(route, ctx) {
     case "sources": return { title: "Sources", style: "plain", right: { label: "Add", onClick: () => addSource(ctx) } };
     case "io": return { title: "Import & Export" };
     case "hidden": return { title: "Hidden" };
+    case "filters": return { title: "Filters" };
+    case "filter": return { title: filterNames.get(route.path[2]) ?? "Filters" };
     case "review": return { title: "Import", right: { label: "Add", onClick: () => addPicked(ctx) } };
     case "preview": return { title: [...RECOMMENDED_SOURCES, ...appSourceEntries()].find((r) => recommendedSeed(r).key === route.path[2])?.name || "Source",
       right: { label: "Add", onClick: () => addFromPreview(route, ctx) } };
@@ -100,6 +107,8 @@ export function render(body, route, ctx) {
     case "sources": return renderSources(body);
     case "io": return renderIO(body, route, ctx);
     case "hidden": return renderHidden(body);
+    case "filters": return renderFilters(body);
+    case "filter": return renderFilter(body, route.path[2]);
     case "review": return renderReview(body);
     case "preview": return renderPreview(body, route);
     default: body.append(note("Nothing here."));
@@ -125,6 +134,7 @@ function renderRoot(body, ctx) {
     { label: "Sources", href: here("sources"), icon: rowIcon("sources") },
     { label: "Import & Export", href: here("io"), icon: rowIcon("transfer") },
     { ...hiddenRow(), icon: rowIcon("hidden") },
+    { label: "Filters", href: here("filters"), icon: rowIcon("worksOnMyPhone") }, // F382
   ];
   // F327: Recommended and Find More Sources are one page now, More Sources (screens/moresources.js).
   body.replaceChildren(grouped([{ rows, footer: "Add and delete your sources, or move them to another phone "
@@ -184,6 +194,74 @@ function renderHidden(body) {
     body.replaceChildren(ul);
   };
   draw();
+}
+
+// ---- F382: Source Filters: All Sources, then a row per source (Same or Custom) -----------------------------------
+// The choices live on the device (core/settings.js sourceFilters; rules in core/sourcefilters.js) and reach the
+// worker's catalog through device.js, which leaves the filtered packages out of every list, section and Search.
+
+const filterNames = new Map([[ALL_SOURCES, "All Sources"]]); // key -> name, for a source page's title
+const isLite = () => detectMode() === "sideload";
+
+// Redraws `draw` whenever the filters (or Works on My Phone) change while `body` is on screen, so the Filters list
+// says Custom on the way back from a source's page; a page left behind unsubscribes.
+function redrawOnFilterChange(body, draw) {
+  const off = settings.onChange((key) => {
+    if (key !== "sourceFilters" && key !== "worksOnMyPhone") return;
+    // A page under a pushed one may be out of the document; it goes only once no Filters page is in the address.
+    if (!body.isConnected && !location.hash.includes(`${SEGMENT}/filters`)) { off(); return; }
+    draw();
+  });
+}
+
+async function renderFilters(body) {
+  let shown;
+  try { ({ shown } = await shownSources()); } catch (e) { return body.replaceChildren(note(e.message)); }
+  for (const s of shown) filterNames.set(s.key, displayName(s));
+  const draw = () => {
+    const on = filtersFor(ALL_SOURCES, { lite: isLite() }).filter((f) => settings.sourceFilters.isOn(ALL_SOURCES, f.id)).length;
+    const groups = [{ rows: [{ label: "All Sources", detail: `${on} On`, href: here("filters", ALL_SOURCES), icon: rowIcon("sources") }],
+      footer: "What every source hides, unless you change it on the source." }];
+    if (shown.length) groups.push({ header: "Sources", rows: shown.map((s) => ({ label: displayName(s),
+      detail: settings.sourceFilters.isCustom(s.key) ? "Custom" : "Same", href: here("filters", s.key),
+      cls: "filters-source", icon: { text: displayName(s)[0]?.toUpperCase() ?? "?" } })) });
+    const ul = grouped(groups);
+    const icons = [...ul.querySelectorAll(".cell-icon")].slice(1);
+    icons.forEach((ic, i) => ic.append(sourceIconImage(shown[i].key, sourceIcons(shown[i]), getBackend())));
+    body.replaceChildren(ul);
+    body.dataset.filtersDrawn = "1";
+  };
+  draw();
+  redrawOnFilterChange(body, draw);
+}
+
+async function renderFilter(body, key) {
+  if (key !== ALL_SOURCES) {
+    let s;
+    try { s = (await shownSources()).shown.find((x) => x.key === key); } catch (e) { return body.replaceChildren(note(e.message)); }
+    if (!s) return body.replaceChildren(note("Nothing here."));
+    filterNames.set(key, displayName(s));
+  }
+  const list = filtersFor(key, { lite: isLite() });
+  const draw = () => {
+    const groups = list.map((f) => ({ rows: [{ label: f.label, chevron: false }], footer: f.footer }));
+    // A source changed here goes back to following All Sources; All Sources back to the defaults.
+    if (settings.sourceFilters.isCustom(key)) {
+      groups.push({ rows: [{ label: key === ALL_SOURCES ? "Reset" : "Same as All Sources", chevron: false, cls: "filters-reset",
+        onClick: () => settings.sourceFilters.reset(key) }] });
+    }
+    const ul = grouped(groups);
+    const cells = ul.querySelectorAll(".cell .cell-inner");
+    list.forEach((f, i) => {
+      cells[i].classList.add("has-switch");
+      cells[i].append(createSwitch({ label: f.label, checked: settings.sourceFilters.isOn(key, f.id),
+        onToggle: (on) => setTimeout(() => settings.sourceFilters.set(key, f.id, on), 250) })); // the switch slides first
+    });
+    body.replaceChildren(ul);
+    body.dataset.filtersDrawn = "1";
+  };
+  draw();
+  redrawOnFilterChange(body, draw);
 }
 
 // ---- Sources: the edit list ------------------------------------------------------------------------------------

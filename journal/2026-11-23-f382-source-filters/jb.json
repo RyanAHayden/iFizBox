@@ -1,0 +1,80 @@
+[
+{
+"wait": 2000
+},
+{
+"eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"
+},
+{
+"nav": "#/sources",
+"ms": 9000
+},
+{
+"nav": "#/sources/manage",
+"ms": 3000
+},
+{
+"shot": "jb-manage"
+},
+{
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
+},
+{
+"tap": "text:Filters",
+"ms": 2500
+},
+{
+"shot": "jb-filters"
+},
+{
+"tap": "text:All Sources",
+"ms": 2500
+},
+{
+"eval": "location.hash"
+},
+{
+"shot": "jb-filters-all"
+},
+{
+"eval": "history.back(); 'ok'"
+},
+{
+"wait": 2000
+},
+{
+"tap": "text:BigBoss",
+"ms": 2500
+},
+{
+"eval": "location.hash"
+},
+{
+"shot": "jb-filters-bigboss"
+},
+{
+"eval": "(()=>{const sw=[...document.querySelectorAll('.page.is-top .switch')].filter(x=>x.offsetParent!==null); return sw.map(s=>s.getAttribute('aria-label')+':'+s.getAttribute('aria-checked')).join(', ')})()"
+},
+{
+"tap": ".page.is-top .switch[aria-label='Hide Unknown']",
+"ms": 1500
+},
+{
+"eval": "localStorage.getItem('ifizbox.sourceFilters')"
+},
+{
+"shot": "jb-filters-bigboss-changed"
+},
+{
+"eval": "history.back(); 'ok'"
+},
+{
+"wait": 2000
+},
+{
+"shot": "jb-filters-after-back"
+},
+{
+"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,400)"
+}
+]
