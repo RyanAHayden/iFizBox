@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "0.24.0",
+          "date": "2026-11-23T08:25:37Z",
+          "localizedDescription": "Install Switch: one Shortcut for installs on cellular\nYour own VPN comes back after installs\nAn IPA's page looks like an app's Details page\nAdd Tweaks opens as a page you can swipe back from\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.24.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.24.0/iFizBox.ipa",
+          "size": 39759618,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.23.0",
           "date": "2026-11-23T07:34:24Z",
           "localizedDescription": "Source Filters hide old, paid or unknown-iOS packages\nOne page layout for every source\nBuilt-in VPN set up once, tested by itself\nCustom installs are kept in My IPAs\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.23.0",
@@ -250,14 +258,6 @@
           "localizedDescription": "Updates keep the App ID they were installed with, and signing is 3-4x faster\nBig apps no longer fail to sign: 32-bit leftovers are skipped, memory use is down\nPhone stays awake while installs and signing run\n.ipa files opened from Safari's download preview land in My IPAs\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.14.0",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.14.0/iFizBox.ipa",
           "size": 15771572,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.13.0",
-          "date": "2026-11-20T08:23:58Z",
-          "localizedDescription": "Sideload queue fixes: the next queued app installs after iFizBox was suspended, and runs no longer end Failed: Cancelled on their own.\nInstallation & Signing settings redesigned, with This iPhone, Certificate, Signing Server and Signed Apps pages.\niFizBox's own update follows through to the end and clears its badge.\nSettings > Account has Sign Out; Sideload Settings > Updates reworked, with Push on by default.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.13.0",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.13.0/iFizBox.ipa",
-          "size": 15713304,
           "minOSVersion": "15.0"
         }
       ]
