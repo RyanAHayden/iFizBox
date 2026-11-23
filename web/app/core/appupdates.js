@@ -12,7 +12,7 @@
 //   upgradeKeys(rows)          -> ["<id> <version>"]: the upgrades already counted on screen (the shell's "known")
 //   updatesTitle(n)            -> "1 Update" | "<n> Updates" (the notification's title; Updates.swift title(_:))
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { compareVersions } from "./apt.js";
+import { compareVersions, IdMap } from "./apt.js";
 
 export const SELF_ID = "com.ryha.ifizbox"; // core/installed.js SELF_ID: iFizBox's own row is essential.js's
 
@@ -81,17 +81,20 @@ export const updatesTitle = (n) => (n === 1 ? "1 Update" : `${n} Updates`);
 // F281: Ignore This Version. `versions` is { id: version } (core/settings.js ignoredVersions): an available row whose
 // version on offer is that one (compareVersions equal, so "1.0" and "1.0.0"-style spellings dpkg calls the same
 // match too) moves to ignored, marked `ignoredVersion: true`, so the badge, the background check and Upgrade All
-// skip it; a newer version is a row like any other.
+// skip it; a newer version is a row like any other. Package names ignore case (B412); apps' rows (`remembered`) are
+// matched by their exact bundle ID.
 const sameVersion = (a, b) => { try { return compareVersions(String(a), String(b)) === 0; } catch { return String(a) === String(b); } };
 const newer = (a, b) => { try { return compareVersions(String(a), String(b)) > 0; } catch { return false; } };
 
 export function splitIgnoredVersions(upgrades, versions = {}) {
   const map = versions ?? {};
+  const stored = new IdMap(); // lower-cased id -> the versions stored under any spelling of it
+  for (const [id, v] of Object.entries(map)) stored.set(id, [...(stored.get(id) ?? []), v]);
   const available = [];
   const moved = [];
   for (const r of upgrades?.available ?? []) {
-    const v = r?.id ? map[r.id] : null;
-    if (v && r.version && sameVersion(r.version, v)) moved.push({ ...r, ignoredVersion: true });
+    const vs = !r?.id ? [] : r.remembered ? [map[r.id]] : stored.get(r.id) ?? [];
+    if (r?.version && vs.some((v) => v && sameVersion(r.version, v))) moved.push({ ...r, ignoredVersion: true });
     else available.push(r);
   }
   if (!moved.length) return upgrades ?? { available: [], ignored: [] };
@@ -145,10 +148,15 @@ export function applyVersionLines(map, { add = [], remove = [] } = {}) {
 // item with no row and no known installed version keeps its entry: nothing says it went.
 export function settleIgnoredVersions(versions = {}, { upgrades = null, installedOf = () => null } = {}) {
   const rows = new Map();
-  for (const r of [...(upgrades?.available ?? []), ...(upgrades?.ignored ?? [])]) if (r?.id && !rows.has(r.id)) rows.set(r.id, r);
+  const pkgRows = new IdMap(); // B412: packages' rows, ignoring case; apps' bundle IDs stay exact
+  for (const r of [...(upgrades?.available ?? []), ...(upgrades?.ignored ?? [])]) {
+    if (!r?.id) continue;
+    if (!rows.has(r.id)) rows.set(r.id, r);
+    if (!r.remembered && !pkgRows.has(r.id)) pkgRows.set(r.id, r);
+  }
   const out = {};
   for (const [id, v] of Object.entries(versions ?? {})) {
-    const row = rows.get(id);
+    const row = rows.get(id) ?? pkgRows.get(id);
     if (row?.version && newer(row.version, v)) continue;
     const have = installedOf(id) ?? row?.installed ?? null;
     if (have && !newer(v, have)) continue;

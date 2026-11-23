@@ -808,11 +808,20 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
   }
   const ignoredVersions = {
     all: readIgnoredVersions,
-    get: (id) => readIgnoredVersions()[id] ?? null,
-    // `version`: the version to hide; null (or "") takes the item's back.
-    set(id, version) {
+    // B412: package names ignore case, the entry kept under the spelling it was made with; `dpkg: false` is an app,
+    // its bundle ID exact (as in holds).
+    get(id, { dpkg: viaDpkg = true } = {}) {
       const map = readIgnoredVersions();
-      if (typeof version === "string" && version.trim()) map[id] = version.trim(); else delete map[id];
+      if (Object.hasOwn(map, id)) return map[id];
+      return (viaDpkg && Object.entries(map).find(([p]) => sameId(p, id))?.[1]) || null;
+    },
+    // `version`: the version to hide; null (or "") takes the item's back.
+    set(id, version, { dpkg: viaDpkg = true } = {}) {
+      const map = readIgnoredVersions();
+      const same = Object.keys(map).filter((p) => (viaDpkg ? sameId(p, id) : p === id));
+      const key = same.includes(id) ? id : same[0] ?? id;
+      for (const p of same) delete map[p];
+      if (typeof version === "string" && version.trim()) map[key] = version.trim();
       writeIgnoredVersions(map);
     },
     replace: (map) => writeIgnoredVersions(map && typeof map === "object" && !Array.isArray(map) ? map : {}),
@@ -832,11 +841,13 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
   }
   const autoMarked = {
     list: readMarked,
-    has: (pkg) => readMarked().includes(pkg),
+    // B412: package names ignore case, as in holds: a mark keeps the spelling it was made with.
+    has: (pkg) => readMarked().some((p) => sameId(p, pkg)),
     set(pkg, on) {
-      const list = new Set(readMarked());
-      if (on) list.add(pkg); else list.delete(pkg);
-      const sorted = [...list].sort();
+      const before = readMarked();
+      const list = before.filter((p) => !sameId(p, pkg));
+      if (on) list.push(before.find((p) => sameId(p, pkg)) ?? pkg);
+      const sorted = list.sort();
       if (JSON.stringify(sorted) === JSON.stringify(readMarked())) return;
       store.set(AUTO_MARKED_KEY, JSON.stringify(sorted));
       notify("autoMarked", sorted);

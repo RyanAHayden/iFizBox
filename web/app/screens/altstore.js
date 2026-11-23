@@ -767,12 +767,12 @@ export function jailbreakModifyButtons({ installed = "", newest = null, held = f
 // F281: Ignore This Version / Stop Ignoring This Version (core/appupdates.js) on an app's sheet, after Upgrade.
 // -> { buttons, run(label) -> true when it was that button }. `iv`: core/settings.js ignoredVersions.
 export function versionButtonOf(buttons, { id, installed, newest, held = false, iv = settings.ignoredVersions } = {}) {
-  const label = id && iv ? ignoreVersionLabel({ installed, newest, ignored: iv?.get?.(id) ?? null, held }) : null;
+  const label = id && iv ? ignoreVersionLabel({ installed, newest, ignored: iv?.get?.(id, { dpkg: false }) ?? null, held }) : null;
   return {
     buttons: withVersionButton(buttons, label),
     run(b) {
       if (!label || b !== label) return false;
-      iv.set(id, versionToStore(label, newest));
+      iv.set(id, versionToStore(label, newest), { dpkg: false });
       return true;
     },
   };

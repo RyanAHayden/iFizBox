@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { createCatalog } from "./catalog.js";
 import { withLowerIds } from "./apt.js";
 import { createSettings } from "./settings.js";
+import { settleIgnoredVersions, splitIgnoredVersions } from "./appupdates.js";
 import { wishCount, wishRows } from "./wishlist.js";
 import { dependedOn, findUpgrades, installedStanzas, markedRows, modeRows } from "./installed.js";
 
@@ -101,4 +102,45 @@ test("the marks, dates and names dpkg and apt give in lower case", () => {
   assert.equal(markedRows(rows, new Set(["oreo"]))[0].tier, 2);
   assert.equal(modeRows(rows, "recent", { oreo: 5 }).length, 1);
   assert.deepEqual(withLowerIds({ Oreo: "Oreo Theme", oreo2: "Two" }), { Oreo: "Oreo Theme", oreo: "Oreo Theme", oreo2: "Two" });
+});
+
+function memSettings() {
+  const m = new Map();
+  return createSettings({ storage: { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) }, mode: "site" });
+}
+
+test("B412: Update Automatically marks match ignoring case", () => {
+  const s = memSettings();
+  s.autoMarked.set("oreo", true);
+  assert.equal(s.autoMarked.has("Oreo"), true);
+  s.autoMarked.set("Oreo", true);
+  assert.deepEqual(s.autoMarked.list(), ["oreo"]);
+  s.autoMarked.set("Oreo", false);
+  assert.deepEqual(s.autoMarked.list(), []);
+});
+
+test("B412: Ignore This Version matches package names ignoring case, bundle IDs exactly", () => {
+  const s = memSettings();
+  s.ignoredVersions.set("oreo", "1.1");
+  assert.equal(s.ignoredVersions.get("Oreo"), "1.1");
+  assert.equal(s.ignoredVersions.get("Oreo", { dpkg: false }), null);
+  s.ignoredVersions.set("Oreo", null, { dpkg: false });
+  s.ignoredVersions.set("Oreo", "1.2");
+  assert.deepEqual(s.ignoredVersions.all(), { oreo: "1.2" });
+  s.ignoredVersions.set("Oreo", null);
+  assert.deepEqual(s.ignoredVersions.all(), {});
+  s.ignoredVersions.set("com.x.App", "1", { dpkg: false });
+  s.ignoredVersions.set("com.x.app", "2", { dpkg: false });
+  assert.deepEqual(s.ignoredVersions.all(), { "com.x.App": "1", "com.x.app": "2" });
+
+  const row = { id: "Oreo", name: "Oreo", version: "1.2", installed: "1.0" };
+  const up = { available: [row], ignored: [] };
+  assert.deepEqual(splitIgnoredVersions(up, { oreo: "1.2" }).ignored.map((r) => r.id), ["Oreo"]);
+  assert.equal(splitIgnoredVersions(up, { oreo: "1.2", Oreo: "1.1" }).available.length, 0);
+  const apps = { available: [{ ...row, remembered: true }], ignored: [] };
+  assert.equal(splitIgnoredVersions(apps, { oreo: "1.2" }).available.length, 1);
+  assert.equal(splitIgnoredVersions(apps, { Oreo: "1.2" }).available.length, 0);
+  assert.deepEqual(settleIgnoredVersions({ oreo: "1.1" }, { upgrades: up }), {});
+  assert.deepEqual(settleIgnoredVersions({ oreo: "1.2" }, { upgrades: up }), { oreo: "1.2" });
+  assert.deepEqual(settleIgnoredVersions({ oreo: "1.1" }, { upgrades: apps }), { oreo: "1.1" });
 });

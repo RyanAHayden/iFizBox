@@ -25,6 +25,7 @@ import { getBackend } from "./backend.js";
 import { apps } from "./core/installed.js";
 import { detectMode, selfUpdateAlertsOn } from "./core/settings.js";
 import { SELF_ALT_URL } from "./core/essential.js";
+import { IdMap } from "./core/apt.js";
 import { rememberedUpgrades, mergeUpgrades, watchList, upgradeKeys, altSourceOf, SELF_ID, splitIgnoredVersions,
   settleIgnoredVersions } from "./core/appupdates.js";
 import { NAME } from "./brand.js";
@@ -76,9 +77,10 @@ async function withIgnoredVersions(merged, records, { versions, settle, installe
   const out = splitIgnoredVersions(merged, versions);
   if (!versions || !Object.keys(versions).length || typeof settle !== "function") return out;
   const have = new Map();
-  try { for (const p of (await installedPkgs()) ?? []) if (p?.id && p.installed) have.set(p.id, String(p.installed)); } catch { /* no status file */ }
+  const pkgs = new IdMap(); // B412: dpkg's, names ignoring case
+  try { for (const p of (await installedPkgs()) ?? []) if (p?.id && p.installed) pkgs.set(p.id, String(p.installed)); } catch { /* no status file */ }
   for (const r of records ?? []) if (r?.id && r.version && r.actual !== null) have.set(r.id, String(r.version));
-  const next = settleIgnoredVersions(versions, { upgrades: out, installedOf: (id) => have.get(id) ?? null });
+  const next = settleIgnoredVersions(versions, { upgrades: out, installedOf: (id) => have.get(id) ?? pkgs.get(id) ?? null });
   if (JSON.stringify(next) !== JSON.stringify(versions)) { try { settle(next); } catch { /* settled again next time */ } }
   return out;
 }

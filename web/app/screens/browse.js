@@ -1869,8 +1869,9 @@ export function ignoreVersionAction(id, { installed = null, newest = null } = {}
 export function versionRowItems(item, { holds = settings.holds, blocked = settings.blocked, iv = settings.ignoredVersions } = {}) {
   if (!item?.id || item.change !== "upgrade" || !item.version || !item.installed) return [];
   if (!item.ignoredVersion && (holds.has(item.id) || blocked?.has?.(item.id))) return [];
-  const label = ignoreVersionLabel({ installed: item.installed, newest: item.version, ignored: iv.get(item.id) });
-  return label ? [{ label, onClick: () => iv.set(item.id, versionToStore(label, item.version)) }] : [];
+  const kind = { dpkg: !item.remembered }; // B412: an app's bundle ID is exact
+  const label = ignoreVersionLabel({ installed: item.installed, newest: item.version, ignored: iv.get(item.id, kind) });
+  return label ? [{ label, onClick: () => iv.set(item.id, versionToStore(label, item.version), kind) }] : [];
 }
 // The hold menu's entries with versionRowItems' put in before Share.
 function withVersionRowItems(entries, item) {
