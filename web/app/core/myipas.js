@@ -566,3 +566,58 @@ export function ipaCountText(counts) {
   const all = total === 1 ? "1 IPA" : `${total} IPAs`;
   return notInstalled > 0 ? `${all} · ${notInstalled} not installed` : all;
 }
+
+// ---- F379: a custom install's IPA, saved in My IPAs ----------------------------------------------------------------
+//
+// A custom IPA install (the sideload app's Custom Install, the jailbreak app's Install from URL, a tapped .ipa link or
+// an ifizbox://install link) saves its IPA in My IPAs with the Sign Options it was signed with, so a later re-sign or
+// tweak change signs that saved IPA instead of downloading it again (core/appqueue.js savedResignJob).
+//
+//   savedIpa(entries, { bundleId, version })   the My IPAs entry of that app at that version (its own bundle ID or the
+//                                        one its Sign Options sign as), or null; both must be known
+//   savedIpaOptions(file, edits)         library.options' params for the install's edits, or null when it had none
+//   await saveInstalledIpa({ url, bundleId, version, edits }, { call })
+//                                        library.list, then library.add {url} and library.options unless that app
+//                                        and version is saved already (a copy that turns out to be one is deleted
+//                                        again) -> { entry, added } or null (no url, no bridge, any failure)
+export function savedIpa(entries, { bundleId = null, version = null } = {}) {
+  const id = typeof bundleId === "string" ? bundleId.trim() : "";
+  const v = version == null ? "" : String(version).trim();
+  if (!id || !v) return null;
+  return (entries ?? []).find((e) => e?.file && !e.error && String(e.version ?? "").trim() === v &&
+    (e.bundleId === id || installedIdOf(e) === id)) ?? null;
+}
+
+const SAVED_OPTION_KEYS = ["name", "bundleId", "icon", "removeExtensions", "fixArm64e", "keepBundleId", "tweaks"];
+export function savedIpaOptions(file, edits = null) {
+  if (!file || !edits || typeof edits !== "object") return null;
+  const out = {};
+  for (const k of SAVED_OPTION_KEYS) {
+    const v = edits[k];
+    if (v == null || v === "" || (Array.isArray(v) && !v.length)) continue;
+    out[k] = Array.isArray(v) ? [...v] : v;
+  }
+  return Object.keys(out).length ? { file, ...out } : null;
+}
+
+export async function saveInstalledIpa({ url = null, bundleId = null, version = null, edits = null } = {}, { call } = {}) {
+  if (typeof url !== "string" || !/^https?:\/\//i.test(url) || typeof call !== "function") return null;
+  try {
+    const had = savedIpa((await call("library.list", {}))?.ipas, { bundleId, version });
+    if (had) return { entry: had, added: false };
+    const r = await call("library.add", { url });
+    const file = r?.file;
+    if (!file) return null;
+    const list = Array.isArray(r.ipas) ? r.ipas : [];
+    const entry = list.find((e) => e?.file === file) ?? { file };
+    // the install didn't say its version (the jailbreak helper's answer): the copy's own says whether it was saved
+    const dup = savedIpa(list.filter((e) => e?.file !== file), { bundleId: entry.bundleId, version: entry.version });
+    if (dup) {
+      try { await call("library.delete", { file }); } catch { /* an extra copy is no harm */ }
+      return { entry: dup, added: false };
+    }
+    const opts = savedIpaOptions(file, edits);
+    if (!opts) return { entry, added: true };
+    try { return { entry: (await call("library.options", opts)) ?? entry, added: true }; } catch { return { entry, added: true }; }
+  } catch { return null; }
+}

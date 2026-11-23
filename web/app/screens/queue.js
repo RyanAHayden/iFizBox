@@ -605,10 +605,22 @@ export async function resignApp(job, { sc, native = nativeBridge(), hud = null, 
 
 // F30/I3: the version Install put on the phone, so Installed and Changes follow it (iFizBox records itself).
 async function recordApp(job) {
+  saveCustomIpa(job); // F379
   if (job.id === SELF_ID || job.mode === "resign") return; // F91: a re-sign changes no version
   const { apps, recordInstall } = await import("../core/installed.js");
   await recordInstall(await apps(), { id: job.id, name: job.name, version: job.version, key: job.key, source: job.source,
     sourceName: job.sourceName || "", icon: job.icon });
+}
+
+// F379: a Custom Install that landed saves its IPA in My IPAs with its edits (core/appqueue.js customInstallSave,
+// core/myipas.js saveInstalledIpa), not awaited: the run goes on while it downloads.
+export function saveCustomIpa(job, { native = nativeBridge() } = {}) {
+  if (typeof native?.call !== "function") return null;
+  return import("../core/appqueue.js").then(async (q) => {
+    const what = q.customInstallSave(job);
+    if (!what) return null;
+    return (await import("../core/myipas.js")).saveInstalledIpa(what, { call: (m, p) => native.call(m, p) });
+  }).catch(() => null);
 }
 
 // The sideload app's first install with something missing opens the Signing walkthrough (F75) instead: nothing runs.
