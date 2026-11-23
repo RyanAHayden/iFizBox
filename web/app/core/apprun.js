@@ -595,12 +595,12 @@ const mb = (n) => (n / 1024 / 1024).toFixed(1);
 
 // B71a: a row of the jailbreak app's run (job.helper: the helper installs the IPA or uninstalls the app, no signing).
 export const helperRow = (row) => Boolean(row?.job?.helper);
+const wordPercent = (row) => { const w = Number(row.wordPercent); return w > 0 && w < 100 ? ` ${w}%` : ""; };
 function helperStatus(row) {
   const p = pct(row.fraction);
   const verb = row.mode === "remove" ? "Removing" : "Installing";
   if (row.state === "installing" && row.word) { // B400: the helper's step and its own percent
-    const w = Number(row.wordPercent);
-    return w > 0 && w < 100 ? `${row.word} ${w}%` : row.word;
+    return `${row.word}${wordPercent(row)}`;
   }
   switch (row.state) {
     case "waiting": case "signed": return "Waiting";
@@ -663,7 +663,8 @@ export function runStatus(rows) {
     return withIos.every((r) => r.phase === "copying") ? `Copying ${withIos.length} apps to iPhone` : `Installing ${withIos.length} apps`;
   }
   const ios = withIos[0];
-  if (ios && helperRow(ios)) return `${ios.state === "installing" && ios.word ? ios.word : ios.mode === "remove" ? "Removing" : "Installing"} ${label(ios)} (${pos(ios)})`;
+  if (ios && helperRow(ios) && ios.state === "installing" && ios.word) return `${ios.word} ${label(ios)}${wordPercent(ios)} (${pos(ios)})`; // B400
+  if (ios && helperRow(ios)) return `${ios.mode === "remove" ? "Removing" : "Installing"} ${label(ios)} (${pos(ios)})`;
   if (ios?.phase === "busy") return busyText(label(ios)); // B312
   if (ios?.phase === "copying") return `Copying ${label(ios)} to iPhone (${pos(ios)})`; // B111: This iPhone
   if (selfClosing(ios)) return `Installing ${label(ios)}: ${SELF_CLOSING}`;

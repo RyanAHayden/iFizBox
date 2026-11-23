@@ -74,6 +74,7 @@ test("the helper's rows read Installing / Removing, never Signed or the iOS prom
   assert.equal(rowStatus(at("Downloading", 40)), "Downloading 40%");
   assert.equal(rowStatus(at("Unpacking", null)), "Unpacking");
   assert.equal(rowStatus(at("Installing", 60)), "Installing 60%");
+  assert.equal(runStatus([at("Downloading", 40)]), "Downloading A 40% (1 of 1)");
   assert.equal(runStatus([at("Unpacking", null)]), "Unpacking A (1 of 1)");
   assert.equal(barOf(at("Unpacking", null)), 0.3);
   assert.equal(barOf({ ...a, state: "signed", fraction: 1 }), 0);
