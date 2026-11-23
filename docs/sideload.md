@@ -290,12 +290,14 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   off until the user turns it on again.
   On cellular (cellular in use, no Wi-Fi joined) iOS refuses these connections while cellular data is on
   (journal/2026-11-21-r72-cellular-this-iphone), so, as SideStore's Cellular Refresh, the user adds two Shortcuts
-  once: "Cellular Data Off" and "Cellular Data On" (each one action, Set Cellular Data, Off or On). With both added,
+  once: "Cellular Data Off" and "Cellular Data On" (each sets Cellular Data Off or On; given a text input it does
+  nothing). Add shares our signed Shortcut (`web/app/shortcuts/`, signed by `tools/shortcuts/sign.sh`) to Shortcuts'
+  Add Shortcut sheet; back in the app it runs once with an input and shows Added only if it ran. With both added,
   the connect runs the first through `shortcuts://x-callback-url/run-shortcut` (Shortcuts comes back to
   `ifizbox://vpn-shortcut`), waits for the path to leave cellular, connects, and runs the second once connected;
   the open connection carries on with data back on. An install that starts on cellular without them asks first (Use
   Server, Try Anyway, Set Up), Home's status slot says Add the Cellular Shortcuts, and so does Installation &
-  Signing's status cell. Bridge calls: `vpn.status` (also `idevice.status`'s `vpn`), `vpn.test`, `vpn.setShortcut`,
+  Signing's status cell. Bridge calls: `vpn.status` (also `idevice.status`'s `vpn`), `vpn.test`, `vpn.checkShortcut`,
   `vpn.openShortcuts`, `vpn.testShortcuts`.
 - **This iPhone over Tailscale** (`native/sideload/tailscale/`, its README): for Tailscale users, who can't run
   LocalDevVPN at the same time. The sideload app embeds tsnet (tailscale.com, BSD-3-Clause, a Go c-archive built on
