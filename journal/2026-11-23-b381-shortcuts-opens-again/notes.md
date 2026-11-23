@@ -68,7 +68,9 @@ native shell, the VPN, and Shortcuts. All with `vpn.test` unless said.
 ## Remaining, by design
 
 - With another VPN on before, leaving during an install means Shortcuts opens on return to bring it back. iOS opens
-  Shortcuts only from the front. Asked the user (run ask).
+  Shortcuts only from the front. Asked the user (run ask); no answer was
+  noted. Decided to keep it: the task allows Shortcuts when another VPN was on before, and the other choice (Tailscale
+  stays off after installs) is F389's open decision.
 
 ## Not verified
 
