@@ -285,11 +285,18 @@ export function trackingSection(app, pkg, source, body = null, { store = apps, s
   const box = el("div");
   const mark = (version) => apps().then((store) => recordInstall(store, { id: app.bundleIdentifier, name: app.name, version, key: pkg.key,
     source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL })).then(draw, () => {});
+  // B372: on the app page (`body`), Mark as Not Installed holds the forget as the nav bar's toggle does, and Mark as
+  // Installed while it is held cancels it (the records as they were, the signature's expiry too)
+  const held = () => forgetHeld(app.bundleIdentifier);
+  const unmark = (rec) => (body
+    ? toggleMarked(app, pkg, source, { store, signedOf, body }).then(draw, () => {})
+    : apps().then((store) => removeInstall(store, rec.id)).then(draw, () => {}));
+  const remark = () => { cancelHeldForget(app.bundleIdentifier); return draw(); };
   async function draw() {
     let rec = null;
-    const signed = await Promise.resolve().then(() => signedOf(app.bundleIdentifier)).catch(() => null);
+    const signed = held() ? null : await Promise.resolve().then(() => signedOf(app.bundleIdentifier)).catch(() => null);
     // B358: a custom bundle ID's record is under the installed ID, not the source's
-    try { rec = recordOf(await (await store()).all(), app.bundleIdentifier, signed); } catch { /* no store */ }
+    if (!held()) try { rec = recordOf(await (await store()).all(), app.bundleIdentifier, signed); } catch { /* no store */ }
     const sigRow = signatureRow(signed); // F91
     const versions = app.versions.map((x) => x.version).filter(Boolean);
     const byHand = handMarking(); // F242: the jailbreak app knows what's installed: no marking rows there
@@ -297,8 +304,8 @@ export function trackingSection(app, pkg, source, body = null, { store = apps, s
       ? [{ label: "Installed Version", detail: rec.version || "Unknown" },
         // B232: installs another of the source's versions (Install Which Version?), as Version History does
         ...(byHand && installWhichButtons(app, rec.version || "", currentDevice().ios ?? null).versions.some(Boolean) ? [{ label: "Change Installed Version", onClick: () => installWhichVersion(app, pkg, source, { installed: rec.version || "" }).catch(() => {}) }] : []),
-        ...(byHand ? [{ label: MARK_NOT_INSTALLED_LABEL, onClick: () => apps().then((store) => removeInstall(store, rec.id)).then(draw, () => {}) }] : [])]
-      : byHand ? [{ label: MARK_INSTALLED_LABEL, onClick: () => (versions.length > 1 ? pick() : mark(versions[0] ?? "")) }] : [];
+        ...(byHand ? [{ label: MARK_NOT_INSTALLED_LABEL, onClick: () => unmark(rec) }] : [])]
+      : byHand ? [{ label: MARK_INSTALLED_LABEL, onClick: () => (held() ? remark() : versions.length > 1 ? pick() : mark(versions[0] ?? "")) }] : [];
     // The nav bar's button says what it will do, as Cydia's does: Upgrade when a newer version is out than the one
     // installed, Reinstall when it's the same, Install when it isn't installed.
     // F80: Modify while the app is queued, as Cydia's does (core/appqueue.js appNavLabel).
@@ -326,6 +333,8 @@ export function trackingSection(app, pkg, source, body = null, { store = apps, s
   box.drawn = draw();
   // F88: an install's record lands when the helper's install ends: redraw, and stop once the page is gone.
   const offApps = onAppsChange(() => { if (box.isConnected) draw(); else offApps(); });
+  // B372: a forget held or cancelled from the toggle or Modify: redraw; the page gone, stop
+  const offHeld = onHeldForget(() => { if (box.isConnected) draw(); else if (!body?.isConnected) offHeld(); });
   // F80: queuing or clearing this app relabels the nav button (Modify); the page gone, it stops listening.
   let shown = false;
   const off = appQueue.subscribe((e) => {
@@ -375,6 +384,64 @@ export async function installWhichVersion(app, pkg, source, { installed = "", as
   return v;
 }
 
+// ---- B372: the app page's Mark as Not Installed waits until the page is left ----------------------------------------
+// Forgetting an app iFizBox signed drops its signed record (signing.forget), and with it the signature's expiry; marking
+// it installed again could only write a bare record. So on the app page (the nav bar's toggle, the Installed section's
+// row, Modify's Mark as Not Installed) the forget is held: the page reads Not Installed at once, and the forget runs
+// when the page leaves the document (popped), or the app or tab is hidden. Marking it installed again before that
+// cancels the held forget, and the records stay as they were. Every reader on the page (the toggle, the Installed
+// section, the nav label, Modify) treats a held app as not installed.
+const heldForgets = new Map(); // bundle ID -> { run, body }
+const heldListeners = new Set();
+const appPageBodies = new Map(); // bundle ID -> the latest app page's body (renderApp), for Modify's hold
+const heldNotify = () => { for (const f of [...heldListeners]) { try { f(); } catch { /* a listener's page is gone */ } } };
+
+export const forgetHeld = (id) => Boolean(id) && heldForgets.has(id);
+export function onHeldForget(fn) { heldListeners.add(fn); return () => heldListeners.delete(fn); }
+
+// `run` does the forget; `body` is the app page whose leaving runs it.
+export function holdForget(id, run, body) {
+  heldForgets.set(id, { run, body });
+  watchLeaving();
+  heldNotify();
+}
+
+// -> true when a held forget was cancelled (nothing was forgotten).
+export function cancelHeldForget(id) {
+  if (!heldForgets.delete(id)) return false;
+  heldNotify();
+  return true;
+}
+
+// Runs the held forgets whose page is gone (`all`: every one, as the app or tab goes away).
+export async function flushHeldForgets({ all = false } = {}) {
+  const due = [...heldForgets].filter(([, h]) => all || h.body?.isConnected === false);
+  for (const [id] of due) heldForgets.delete(id);
+  if (due.length) heldNotify();
+  for (const [, h] of due) { try { await h.run(); } catch { /* run reports its own failure */ } }
+}
+
+let leavingWatched = false;
+function watchLeaving() {
+  if (leavingWatched) return;
+  const doc = globalThis.document, win = globalThis.window;
+  if (!doc?.documentElement) return; // node tests: flushHeldForgets is called directly
+  leavingWatched = true;
+  // a popped page is taken out of the document (app.js drop)
+  if (typeof globalThis.MutationObserver === "function") {
+    new globalThis.MutationObserver(() => { if (heldForgets.size) flushHeldForgets(); })
+      .observe(doc.documentElement, { childList: true, subtree: true });
+  }
+  win?.addEventListener?.("pagehide", () => flushHeldForgets({ all: true }));
+  doc.addEventListener?.("visibilitychange", () => { if (doc.visibilityState === "hidden") flushHeldForgets({ all: true }); });
+}
+
+// The app page now up for `id`, when it is in the document.
+function appPageOf(id) {
+  const b = appPageBodies.get(id);
+  return b?.isConnected ? b : null;
+}
+
 // ---- F210: the nav bar's one-tap Installed toggle, left of Install / Modify ----------------------------------------
 // Not installed: an outline circled checkmark; a tap marks the app installed at the source's latest version (the record
 // trackingSection's Mark as Installed writes, no version picker). Installed (by iFizBox or marked): filled; a tap
@@ -413,18 +480,27 @@ const signatureOf = async (app, signedOf) => {
 
 // The toggle's on/off: an installed record or a signature of iFizBox's.
 async function markedOrSigned(app, store, signedOf) {
+  if (forgetHeld(app.bundleIdentifier)) return false; // B372
   return Boolean(await markedRecord(app, store)) || Boolean(await signatureOf(app, signedOf));
 }
 
 // One tap's work: true when the app is now marked installed, false when it was forgotten.
+// B372: with `body` (the app page), the forget is held until that page is left (holdForget); a tap while it is held
+// cancels it, so the records (the signed one and its expiry too) stay. A held forget that fails shows `warn`.
 export async function toggleMarked(app, pkg, source, { store = apps, signedOf = (id) => signedRecordOf(id), native = undefined,
-  forget = forgetListed } = {}) {
+  forget = forgetListed, body = null, warn = forgetWarning } = {}) {
+  if (cancelHeldForget(app.bundleIdentifier)) return true;
   const s = await store();
   const signed = await signatureOf(app, signedOf);
   const rec = recordOf(await s.all(), app.bundleIdentifier, signed); // B358: by the installed bundle ID first
   if (rec || signed) {
+    const run = () => forget({ id: rec?.id ?? app.bundleIdentifier, signed, signedOnly: !rec }, native ?? nativeBridge(), async (id) => removeInstall(s, id));
+    if (body) {
+      holdForget(app.bundleIdentifier, () => Promise.resolve().then(run).catch(async (e) => { try { await warn(e); } catch { /* no alert here */ } }), body);
+      return false;
+    }
     try {
-      await forget({ id: rec?.id ?? app.bundleIdentifier, signed, signedOnly: !rec }, native ?? nativeBridge(), async (id) => removeInstall(s, id));
+      await run();
     } catch (e) {
       throw Object.assign(e instanceof Error ? e : new Error(String(e)), { forgetFailed: true }); // markToggle says so
     }
@@ -440,7 +516,7 @@ const forgetWarning = (e) => showAlert({ title: "Error", message: deviceError(e)
 // The button. `refresh()` redraws it from the record (renderApp calls it on every onAppsChange).
 // B338: `after()` runs once a tap's change is written (renderApp redraws the Installed section and the nav label).
 export function markToggle(app, pkg, source, { store = apps, signedOf = (id) => signedRecordOf(id), native = undefined, forget = forgetListed,
-  after = null, buzz = haptic, feedback = markFeedback, warn = forgetWarning } = {}) {
+  after = null, buzz = haptic, feedback = markFeedback, warn = forgetWarning, body = null } = {}) {
   const b = document.createElement("button");
   b.type = "button";
   b.className = "bar-button bar-icon mark-toggle";
@@ -455,7 +531,7 @@ export function markToggle(app, pkg, source, { store = apps, signedOf = (id) => 
     busy = true;
     try { buzz(); } catch { /* no haptics here */ }
     try {
-      const on = await toggleMarked(app, pkg, source, { store, signedOf, native, forget });
+      const on = await toggleMarked(app, pkg, source, { store, signedOf, native, forget, body, warn }); // B372: held on the page
       show(on);
       feedback(on ? "Marked as Installed" : "Marked as Not Installed");
       try { await after?.(); } catch { /* the page is gone */ }
@@ -553,13 +629,19 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
   mode = detectMode(), ready = async () => true, store = apps, version = null, signedOf = (id) => signedRecordOf(id, { mode }),
   forget = async (id) => removeInstall(await store(), id), siteInstall = siteInstallVersion, warn = originalWarning,
   iv = settings.ignoredVersions, tweaks = installTweaksChoice,
-  forgetSigned = (s) => nativeBridge()?.call?.("signing.forget", { bundleId: s.bundleId }) } = {}) {
+  forgetSigned = (s) => nativeBridge()?.call?.("signing.forget", { bundleId: s.bundleId }), body = null } = {}) {
   const app = pkg?.stanza?.ipa;
-  if (mode === "site" && app && !version) return siteModify(pkg, source, { ask, store, forget, siteInstall, iv });
+  // B372: an app whose forget is held reads as not installed; installing it again cancels the held forget first, so the
+  // page being left doesn't forget the new install
+  const held = forgetHeld(app?.bundleIdentifier);
+  if (mode === "site" && app && !version) {
+    if (held) { cancelHeldForget(app.bundleIdentifier); return false; } // Install: signed in the browser, as before
+    return siteModify(pkg, source, { ask, store, forget, siteInstall, iv });
+  }
   if (mode !== "sideload" || !app) return false; // F89: the website queues nothing
   let rec = null;
-  const signed = await Promise.resolve().then(() => signedOf(app.bundleIdentifier)).catch(() => null); // F91: Modify offers Re-sign
-  try { rec = recordOf(await (await store()).all(), app.bundleIdentifier, signed); } catch { /* no store */ } // B358
+  const signed = held ? null : await Promise.resolve().then(() => signedOf(app.bundleIdentifier)).catch(() => null); // F91: Modify offers Re-sign
+  if (!held) try { rec = recordOf(await (await store()).all(), app.bundleIdentifier, signed); } catch { /* no store */ } // B358
   const job = appJob(pkg, { installed: rec ? rec.version || null : null, version, source: source ? displayName(source) : null });
   if (!job || !(await ready())) return false;
   // F246: a fresh install (no record) asks F243's once-per-app question before it is queued; Cancel queues nothing.
@@ -567,6 +649,7 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
     // F302a: the install popup, when the app has tweaks added or made for it: what goes in, Tweaks, Install
     if (!(await Promise.resolve().then(() => tweaks({ bundleId: job.id, name: job.name || app.name, version: job.version || "", ask })).catch(() => true))) return true;
     const j = rec ? job : await queueOriginalCheck(job, warn);
+    if (j && held) cancelHeldForget(app.bundleIdentifier); // B372
     if (j) add(j, { queue });
     return true;
   };
@@ -590,8 +673,14 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
   if (buttons[i] === "Clear") queue.clear(queuedId ?? job.id);
   else if (buttons[i] === MARK_NOT_INSTALLED) {
     // B358: iFizBox's signature goes too, or the app still reads as installed (Installed's Remove from List does both)
-    if (signed) await Promise.resolve().then(() => forgetSigned(signed)).catch(() => {});
-    await Promise.resolve().then(() => forget(rec?.id ?? app.bundleIdentifier)).catch(() => {});
+    const run = async () => {
+      if (signed) await Promise.resolve().then(() => forgetSigned(signed)).catch(() => {});
+      await Promise.resolve().then(() => forget(rec?.id ?? app.bundleIdentifier)).catch(() => {});
+    };
+    // B372: from the app page, held until the page is left (Mark as Installed meanwhile keeps the signature's expiry)
+    const page = body ?? appPageOf(app.bundleIdentifier);
+    if (page) holdForget(app.bundleIdentifier, run, page);
+    else await run();
   }
   // B358: signing.resign finds the app by the bundle ID it is installed under (a custom one too), not the source's
   else if (buttons[i] === "Re-sign" && signed) add({ ...resignJob(signed), id: signed.bundleId || job.id, icon: job.icon }, { queue });
@@ -960,13 +1049,16 @@ export function renderApp(body, route, pkg, source, { related = null, onChange =
   // Mark as Installed: an app installed some other way (Feather, AltStore, another device's backup) can be put on
   // the Installed list by hand, so Changes and the update checks follow it; Mark as Not Installed takes it off.
   // F242: not in the jailbreak app, which can tell what's installed: there the section only shows the installed version.
+  appPageBodies.set(app.bundleIdentifier, body); // B372: Modify's Mark as Not Installed holds its forget on this page
   const tracking = trackingSection(app, pkg, source, body);
   details.append(tracking);
   // F210: and the same in one tap from the nav bar (sideload and site only, F242).
   if (markToggleApplies(app)) {
-    const toggle = markToggle(app, pkg, source, { after: () => tracking.redraw() }); // B338: the page follows at once
+    // B338: the page follows at once; B372: the forget waits until the page is left
+    const toggle = markToggle(app, pkg, source, { after: () => tracking.redraw(), body });
     if (!addNavIcon(body, toggle, "mark")) setTimeout(() => addNavIcon(body, toggle, "mark"), 0);
     const offMark = onAppsChange(() => { if (body.isConnected && toggle.isConnected) toggle.refresh(); else offMark(); });
+    const offHeld = onHeldForget(() => { if (body.isConnected && toggle.isConnected) toggle.refresh(); else if (!body.isConnected) offHeld(); });
   }
   // F242a: the jailbreak build puts a queue toggle there instead, following the app queue while the page is up.
   if (queueToggleApplies(app) && appJob(pkg)) {
