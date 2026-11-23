@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "0.24.1",
+          "date": "2026-11-23T08:58:21Z",
+          "localizedDescription": "Install Switch reconnects your VPN more reliably\nInstall Switch no longer stops early on iOS 27 when it reconnects your own VPN after an install, so its next run starts clean.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.24.1",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.24.1/iFizBox.ipa",
+          "size": 39759546,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.24.0",
           "date": "2026-11-23T08:25:37Z",
           "localizedDescription": "Install Switch: one Shortcut for installs on cellular\nYour own VPN comes back after installs\nAn IPA's page looks like an app's Details page\nAdd Tweaks opens as a page you can swipe back from\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.24.0",
@@ -250,14 +258,6 @@
           "localizedDescription": "Inject tweaks when signing: add .dylib, .deb or .framework tweaks to any IPA\nSafety nets: Known Safe / Trusted / Unknown labels on sources, an Unknown Source check when adding one\nA one-time note before untrusted installs on iOS versions with public exploits, and Report as Malicious\nSelf-update on This iPhone closes iFizBox only once iOS is ready to install\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.15.0",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.15.0/iFizBox.ipa",
           "size": 15846917,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.14.0",
-          "date": "2026-11-20T09:37:13Z",
-          "localizedDescription": "Updates keep the App ID they were installed with, and signing is 3-4x faster\nBig apps no longer fail to sign: 32-bit leftovers are skipped, memory use is down\nPhone stays awake while installs and signing run\n.ipa files opened from Safari's download preview land in My IPAs\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.14.0",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.14.0/iFizBox.ipa",
-          "size": 15771572,
           "minOSVersion": "15.0"
         }
       ]
