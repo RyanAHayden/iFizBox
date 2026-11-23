@@ -258,7 +258,8 @@ iOS 13 and iOS 26 need three, each off in iOS 6:
 - **card sheets**: `<html data-sheet="card">`, set by the era's JS when it is chosen. A modal sheet (`nav/sheet.js`)
   stops below the status bar as a card with rounded top corners, and the page behind it (the nav bar, the screens
   and the tab bar) scales back about the screen's centre and dims onto the black ground. It comes back when the
-  last card sheet closes. Transform and opacity only. Hooks, with their card values from `packages.css` (an era may
+  last card sheet closes. A sheet hidden without closing (the run page's Hide) also brings the page forward, and showing
+  it again pushes the page back. Transform and opacity only. Hooks, with their card values from `packages.css` (an era may
   set its own on `html[data-style=…][data-sheet="card"]`):
 
   | Hook | iOS 6 | Card | What it moves |

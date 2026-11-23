@@ -303,14 +303,14 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
     hide() {
       if (closed || hiddenPage) return;
       hiddenPage = true;
-      shell.cover(false); // B401: the theme's status-bar text while it is away
+      shell.away(true); // B401, B408: the theme's status-bar text, and the page behind forward again, while it is away
       sheet.animate([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: DURATION, easing: EASE, fill: "forwards" })
         .finished.then(() => { if (hiddenPage) sheet.style.visibility = "hidden"; }, () => {});
     },
     show() {
       if (closed || !hiddenPage) return;
       hiddenPage = false;
-      shell.cover(true);
+      shell.away(false);
       sheet.style.visibility = "";
       sheet.getAnimations?.().forEach((a) => a.cancel());
       sheet.animate([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: SHEET_IN, easing: EASE });
