@@ -1,6 +1,6 @@
-// A modal sheet's bar (nav/sheet.js, packages.css .navbar.sheet-bar) shows no status-bar strip: style.css's
-// .navbar::before (black in iOS 6, ios6.css --site-strip) is replaced, on a sheet's bar only, by a layer carrying the
-// bar's own art up under the status bar, in every era and shell.
+// A modal sheet's bar (nav/sheet.js, packages.css .navbar.sheet-bar) carries no status-bar strip. iOS 6: the sheet is
+// clipped to below the page's still, black strip. iOS 7, 13, 26: style.css's .navbar::before is replaced, on a
+// sheet's bar only, by a layer carrying the bar's own art up under the status bar.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -27,7 +27,7 @@ function spec(sel) {
   return c * 100 + b;
 }
 
-test("B349: a sheet's bar layer covers the status bar's room and its top half, with the bar's art", () => {
+test("B349: iOS 7, 13 and 26: a sheet's bar layer covers the status bar's room and its top half, with the bar's art", () => {
   const all = rulesOf(packages).filter((r) => r.sel === SEL);
   assert.ok(all.some((r) => /height:\s*calc\(var\(--sheet-bar-top\) \+ 22px\)/.test(r.decl)), "height: the room plus 22 pt");
   const look = stretchesOf(packages).flatMap(rulesOf).filter((r) => r.sel === SEL);
@@ -47,25 +47,26 @@ test("B349: the sheet's layer outranks every other .navbar::before rule, so no s
   }
 });
 
-// B379: the console (nav/progress.js, queue.css .console) keeps iOS 6's plain black strip above its 44 pt bar: the
-// status bar's room tall, painted with the strip colour, and outranking the sheet layer above.
-const queue = readFileSync(new URL("./queue.css", import.meta.url), "utf8");
-const CONSOLE = 'html:not([data-style="ios7"]):not([data-style="ios13"]):not([data-style="ios26"]) .sheet.console > .navbar.sheet-bar::before';
+// F397: in iOS 6 every sheet, the console too, is clipped to below the page's own black strip, and its bar has no layer
+// of its own: the strip stays still while the sheet slides under it.
+const IOS6 = 'html:not([data-style="ios7"]):not([data-style="ios13"]):not([data-style="ios26"])';
+const IOS6_LAYER = `${IOS6} .sheet > .navbar.sheet-bar::before`;
 
-test("B379: the console's bar has the black status-bar strip, the room's height, in the iOS 6 era", () => {
-  const all = rulesOf(queue).filter((r) => r.sel === CONSOLE);
-  assert.ok(all.some((r) => /height:\s*var\(--sheet-bar-top\);/.test(r.decl)), "height: the status bar's room, no more");
-  const look = stretchesOf(queue).flatMap(rulesOf).filter((r) => r.sel === CONSOLE);
-  assert.equal(look.length, 1, "its paint sits in a look-only stretch");
-  assert.match(look[0].decl, /background:\s*var\(--site-strip\);/, "the strip colour, as style.css's .navbar::before in ios6.css");
-  assert.match(readFileSync(new URL("./ios6.css", import.meta.url), "utf8"), /--site-strip:\s*#000;/, "black in iOS 6");
+test("F397: iOS 6 clips a sheet to below the status-bar strip; no other era does", () => {
+  const clips = rulesOf(packages).filter((r) => /clip-path/.test(r.decl) && /\.sheet$/.test(r.sel));
+  assert.deepEqual(clips.map((r) => r.sel), [`${IOS6} .sheet`]);
+  assert.match(clips[0].decl, /clip-path:\s*inset\(var\(--sheet-bar-top\) 0 0 0\);/);
+  assert.match(strip("./ios6.css"), /--site-strip:\s*#000;/, "the page's strip under it is black in iOS 6");
 });
 
-test("B379: the console's strip outranks the sheet layer, and only the console gets it", () => {
-  assert.ok(spec(CONSOLE) > spec(SEL), `${CONSOLE} (${spec(CONSOLE)}) must beat ${SEL} (${spec(SEL)})`);
-  for (const f of ["./queue.css", "./packages.css", "./progress.css"]) {
+test("F397: an iOS 6 sheet's bar draws no strip or gloss layer, and no stylesheet gives one back", () => {
+  const off = rulesOf(packages).filter((r) => r.sel === IOS6_LAYER);
+  assert.equal(off.length, 1);
+  assert.match(off[0].decl, /display:\s*none;/);
+  assert.ok(spec(IOS6_LAYER) > spec(SEL));
+  for (const f of ["./queue.css", "./packages.css", "./progress.css", "./reviews.css", "./ios6.css", "./palettes.css"]) {
     for (const r of rulesOf(strip(f))) for (const s of r.sel.split(/,(?![^(]*\))/).map((x) => x.trim())) {
-      if (!/\.sheet-bar::before$/.test(s) || s === SEL || s === CONSOLE) continue;
+      if (!/\.sheet-bar::before$/.test(s) || s === SEL || s === IOS6_LAYER) continue;
       assert.fail(`${f}: ${s} also reaches a sheet's bar layer`);
     }
   }
