@@ -63,6 +63,12 @@ Chromium can't check this: it is the root helper and apt on the phone. Built `na
 
 The phone was asleep at first (`ssh 7`: No route to host, 7 not on the tailnet); a minute later ssh answered.
 
+## Follow-ups filed
+
+- B347: the Confirm sheet should name "apt can't read its lists" instead of the bare "apt refused this queue".
+- B348: an HTML page saved as a Packages (or other index) file would break apt the same way; drop such files after
+  update.
+
 ## Not verified
 
 - GesturesXV itself was not installed: it changes the 7's navigation gestures, which every phone task drives;
