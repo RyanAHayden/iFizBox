@@ -129,6 +129,7 @@ the app supports iOS 15.0, so cascade layers are out.
 | `--hud-w`, `--hud-pad` | 180px, 28px 12px 22px | the HUD |
 | `--callout-h` | 38px | the menu callout and the queue hint |
 | `--banner-pad` | 6px 12px 7px | the notification banner |
+| `--spinner-turns` | hud-spin | the keyframes every spinner turns by: `hud-spin` holds 12 turns of 30 degrees, `hud-spin-8` holds 8 of 45 (iOS 13+'s 8 spokes) |
 | `--undo-left`, `--undo-right`, `--undo-lift`, `--undo-h`, `--undo-pad` | 0px, 0px, 0px, 44px, 0 max(6px, safe area) 0 max(12px, safe area) | the undo bar: from the screen's sides, its gap over the tab bar (it slides that much further from behind it), its height and padding; iOS 13 floats it as a card, iOS 26 as a glass capsule |
 | `--sw-w`, `--sw-h`, `--sw-knob-size`, `--sw-travel` | 77px, 27px, 27px, 50px | the switch's box, its knob and the knob's travel (`ios6.css`'s on `--x`; `nav/switch.js` reads it when a drag starts) |
 | `--settings-seg-margin` | 0 | Settings > Theme's Mode, inside its group (`settings.css`) |
@@ -297,7 +298,7 @@ against these classes. The classes and states are the hooks: keep them when an o
 | Action sheet | `actionsheet.js` | `.action-scrim`, `.action-dim`, `.action-sheet`, `.action-title`, `.action-list`, `.action-button` (`.destructive`, `.cancel`); iOS 26's anchored menu (a sheet opened from a button): `.action-menu-scrim`, `.action-menu`, `.action-menu-room` | `packages.css`, tokens: `--action-*`; dark `--dk-action-sheet`, `--dk-action-btn`, `--dk-action-cancel`; the menu: `ios26.css`, `--i26-menu`, `--i26-menu-pressed`, `--i26-menu-dim` |
 | Share sheet | `sharesheet.js` | `.share-scrim`, `.share-dim`, `.share-sheet`, `.share-pages`, `.share-grid`, `.share-item`, `.share-icon` (`.system`, `.app`, `.has-image`), `.share-glyph` (`.glyph-copy`, `.glyph-qr`), `.share-letter`, `.share-image`, `.share-label`, `.share-dots` (`span.on`), `.share-cancel`; the nav bar's `.share-button` | `ios6.css`, tokens: `--share-*`, the glyphs `--share-glyph-copy`, `--share-glyph-qr`; an app's own colour comes in `--share-tint` |
 | HUD | `hud.js` | `.hud-scrim`, `.hud`, `.hud-spinner`, `.hud-label`, `.hud-check` | `ios6.css`, tokens: `--hud`, `--hud-text`, `--hud-emboss`, `--spinner-large`, `--hud-check` (the checkmark's art) |
-| Spinners | `spinner.js` | `.hud-spinner`, `.reload-spinner`, `.pull-spinner`, `.badge.spinning`, `.source-row.is-loading` | `ios6.css` tokens `--spinner-white`, `--spinner-gray`, `--spinner-large` |
+| Spinners | `spinner.js` | `.hud-spinner`, `.reload-spinner`, `.pull-spinner`, `.badge.spinning`, `.source-row.is-loading`, `.loading-spinner`, `.bar-button.is-reloading` | tokens `--spinner-white`, `--spinner-gray`, `--spinner-large` in `ios6.css` and again in `ios7.css`, `ios13.css` and `ios26.css`, each era's own; the hook `--spinner-turns` (`style.css`: `hud-spin`, 30 degrees a turn, or `hud-spin-8`, 45) |
 | Reload bar | `reloadbar.js` | `.reload-bar`, `.reload-spinner`, `.reload-text`, `.reload-cancel` (a `.bar-button.done`) | `ios6.css`, tokens: `--reload-bar`, `--reload-text`, `--reload-emboss` |
 | Section index | `sectionindex.js` | `.section-index` (`.held`), its letters (`.section-index span`) | `packages.css`, literal |
 | Row swipe | `rowswipe.js` | `.row-swipe` (`.armed`, `.hint`, `.swiping`, `[data-kind="add"|"remove"|"cancel"]`), `.row-swipe-control` | `packages.css`, literal |
@@ -308,8 +309,20 @@ against these classes. The classes and states are the hooks: keep them when an o
 | Built-in lock | `lock.js` | `.name-lock`, `.source-lock`, `.lock-icon` | `sources.css`, token `--lock-icon` (the padlock's art) |
 | Row icon tint | `ui.js` | `.cell-icon` | `ios6.css`, tokens `--cell-icon`, `--cell-icon-text`; a row's own colour (`icon.color`) comes in `--cell-icon-tint` |
 
-`spinner.js` is not loaded by the app: it generates `ios6.css`'s three spinner tokens from the 4S's measurements, and
-`spinner.test.js` keeps the two the same. An era draws its own spinner by setting those tokens in its stylesheet.
+`spinner.js` is not loaded by the app: it generates every era's spinner tokens (`spinnerURL(kind, era)`), and
+`spinner.test.js` keeps each stylesheet's data URLs the same as it. An era draws its own spinner by setting those
+tokens in its stylesheet:
+
+- iOS 6 (`ios6.css`): 12 chunky spokes, five fading behind the brightest and the rest at one floor, measured from the
+  4S's UIKit frames. Lists take the white one on the dark theme.
+- iOS 7 (`ios7.css`): 12 thinner, shorter spokes whose tail fades all the way round; the grey one is `#8e8e93`. The
+  dark theme takes the white one, as in iOS 6.
+- iOS 13 and iOS 26 (`ios13.css`, `ios26.css`, the same images): 8 thicker, rounder spokes from Apple's iOS 27 UI
+  Kit, in secondaryLabel (its dark value on the dark theme), white on the red tab badge and in the HUD. They set
+  `--spinner-turns: hud-spin-8`, so they turn 45 degrees at a time. An era can't set `animation-name` itself (that
+  counts as layout), so this hook is how it changes the turn.
+
+Home's Reload button takes the grey spinner in iOS 7, 13 and 26, since their bars are light.
 "Literal" means the look rules still hold their iOS 6 colours: an era restyles them with look rules of its own until
 that sheet's cleanup turns them into tokens.
 

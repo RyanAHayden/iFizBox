@@ -296,6 +296,22 @@ a.cell-inner, button.cell-inner { cursor: pointer; }
   91.667%, 100% { transform: rotate(330deg); }
 }
 @media (prefers-reduced-motion: reduce) { .hud-spinner { animation-duration: 3s; } }
+/* F381: iOS 13+'s indicator has 8 spokes (nav/spinner.js), so it turns 45 degrees at a time. An era names the keyframes
+   its spinners run in the hook --spinner-turns (ios13.css, ios26.css: hud-spin-8); the duration and timing stay the
+   ones each spinner's own rule gives. :root lifts these over those rules in the component sheets linked after this. */
+@keyframes hud-spin-8 {
+  0%, 12.499% { transform: rotate(0deg); }
+  12.5%, 24.999% { transform: rotate(45deg); }
+  25%, 37.499% { transform: rotate(90deg); }
+  37.5%, 49.999% { transform: rotate(135deg); }
+  50%, 62.499% { transform: rotate(180deg); }
+  62.5%, 74.999% { transform: rotate(225deg); }
+  75%, 87.499% { transform: rotate(270deg); }
+  87.5%, 100% { transform: rotate(315deg); }
+}
+:root .hud-spinner, :root .reload-spinner, :root .pull-refresh.refreshing .pull-spinner, :root .badge.spinning::after,
+:root .source-row.is-loading .cell-inner::after, :root .loading-spinner, :root .bar-button.is-reloading::after,
+:root .shots-spinner, :root .free-step.is-running .free-mark { animation-name: var(--spinner-turns, hud-spin); }
 /* Zoom (Settings > Appearance > Allow Zoom, off by default): iOS ignores user-scalable=no, so app.js also stops
    the pinch gesture itself. */
 html.no-zoom, html.no-zoom body { touch-action: pan-x pan-y; }

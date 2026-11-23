@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
-import { SPINNERS, spinnerSVG, spinnerURL } from "./spinner.js";
+import { ERA_SPINNERS, SPINNERS, spinnerSVG, spinnerURL } from "./spinner.js";
 
 const dir = new URL("../", import.meta.url);
 const sheets = readdirSync(dir).filter((f) => f.endsWith(".css"))
@@ -84,4 +84,65 @@ test("the images have UIKit's geometry and alphas (measured from the 4S frames)"
   assert.match(w, /rotate\(270 10 10\)' opacity='0\.851'/); // the brightest at 9 o'clock
   assert.match(spinnerSVG("large"), /viewBox='0 0 37 37'.*stroke-width='3'.*y1='2\.5' x2='18\.5' y2='8\.5'/);
   assert.match(spinnerSVG("gray"), /stroke='#000'.*rotate\(270 10 10\)' opacity='0\.384'/);
+});
+
+// F381: each later era draws its own UIActivityIndicatorView (journal/2026-11-23-f381-era-spinners).
+const tokensIn = (f, sel) => rules(sheets.find((s) => s.f === f).css).filter((r) => r.sel === sel && !r.at).map((r) => r.body).join("\n");
+
+test("F381: ios7.css, ios13.css and ios26.css carry their era's images from nav/spinner.js", () => {
+  for (const [f, era] of [["ios7.css", "ios7"], ["ios13.css", "ios13"], ["ios26.css", "ios26"]]) {
+    const root = tokensIn(f, `html[data-style="${era}"]`);
+    for (const k of ["white", "gray", "large"]) {
+      assert.ok(root.includes(`--spinner-${k}: ${spinnerURL(k, era)};`), `${f}: --spinner-${k} is missing or stale: regenerate it from spinnerURL("${k}", "${era}")`);
+    }
+    if (era === "ios7") { assert.doesNotMatch(root, /--spinner-turns/, "iOS 7 keeps 12 spokes and the 30-degree turn"); continue; }
+    assert.match(root, /--spinner-turns: hud-spin-8;/, `${f}: 8 spokes turn 45 degrees at a time`);
+    const dark = tokensIn(f, `html[data-style="${era}"][data-theme="dark"]`);
+    assert.ok(dark.includes(`--spinner-gray: ${spinnerURL("grayDark", era)};`), `${f}: the dark theme's grey is secondaryLabel's dark value, spinnerURL("grayDark", "${era}")`);
+  }
+  assert.equal(spinnerSVG("gray", "ios26"), spinnerSVG("gray", "ios13"), "iOS 26 kept iOS 13's indicator");
+});
+
+test("F381: iOS 7's spinner has 12 thinner, shorter spokes and a tail that fades all the way round", () => {
+  const [i6, i7] = [ERA_SPINNERS.ios6.gray, ERA_SPINNERS.ios7.gray];
+  assert.ok(i7.width < i6.width, "thinner");
+  assert.ok(i7.r2 - i7.r1 + i7.width < i6.r2 - i6.r1 + i6.width && i7.r2 + i7.width / 2 < i6.r2 + i6.width / 2, "shorter, inside iOS 6's reach");
+  const w = spinnerSVG("white", "ios7");
+  assert.equal((w.match(/<line /g) || []).length, 12);
+  assert.match(w, /stroke-width='1\.75' stroke-linecap='round'/);
+  assert.match(w, /rotate\(270 10 10\)' opacity='1'\/>/); // the brightest at 9 o'clock, as iOS 6's
+  // walking counter-clockwise from the brightest, every spoke is dimmer than the one before: no flat floor
+  const a = [...w.matchAll(/opacity='([\d.]+)'/g)].map((m) => Number(m[1]));
+  const behind = Array.from({ length: 12 }, (_, j) => a[(9 - j + 12) % 12]);
+  for (let j = 1; j < 12; j++) assert.ok(behind[j] < behind[j - 1], `spoke ${j} behind the brightest is dimmer`);
+  assert.ok(Math.abs(behind[11] - 0.27) < 0.001);
+  assert.match(spinnerSVG("large", "ios7"), /viewBox='0 0 37 37'.*stroke-width='2\.75'/);
+});
+
+test("F381: iOS 13-26's spinner has 8 thicker, rounder spokes as Apple's UI Kit draws them", () => {
+  const g = spinnerSVG("gray", "ios13");
+  assert.equal((g.match(/<line /g) || []).length, 8);
+  assert.match(g, /stroke='#3c3c43' stroke-width='2\.67' stroke-linecap='round' opacity='0\.6'/); // secondaryLabel
+  assert.match(g, /<line x1='10' y1='1\.335' x2='10' y2='5\.335' opacity='1'\/>/); // 2.67 x 6.67 from the top edge
+  assert.match(g, /rotate\(45 10 10\)' opacity='0\.15'.*rotate\(315 10 10\)' opacity='0\.87'/);
+  assert.ok(ERA_SPINNERS.ios13.gray.width > ERA_SPINNERS.ios6.gray.width, "thicker");
+  assert.match(spinnerSVG("grayDark", "ios13"), /stroke='#ebebf5'.*opacity='0\.6'/);
+  const l = spinnerSVG("large", "ios13");
+  assert.equal((l.match(/<rect /g) || []).length, 8);
+  assert.match(l, /viewBox='0 0 37 37'.*<rect x='16' y='1' width='5' height='13' rx='2' opacity='1'\/>/); // 35 pt, centred
+});
+
+test("F381: @keyframes hud-spin-8 holds each 45-degree turn for 1/8 of the cycle, and every spinner takes the hook", () => {
+  const css = sheets.find((s) => s.f === "style.css").css;
+  const m = /@keyframes hud-spin-8 \{([\s\S]*?)\n\}/.exec(css);
+  assert.ok(m, "no @keyframes hud-spin-8");
+  const holds = [...m[1].matchAll(/([\d.]+)%, ([\d.]+)% \{ transform: rotate\((\d+)deg\); \}/g)].map(([, a, b, d]) => [Number(a), Number(b), Number(d)]);
+  assert.equal(holds.length, 8);
+  holds.forEach(([a, b, d], k) => {
+    assert.equal(d, k * 45);
+    assert.ok(Math.abs(a - k * 12.5) < 0.01 && Math.abs(b - (k + 1) * 12.5) < 0.01, `hold ${k}: ${a}%-${b}%`);
+  });
+  const hook = all.filter((r) => /animation-name:\s*var\(--spinner-turns, hud-spin\)/.test(r.body)).flatMap((r) => r.sel.split(/,\s*/));
+  const drawn = all.filter((r) => /animation:\s*hud-spin/.test(r.body));
+  for (const r of drawn) for (const sel of r.sel.split(/,\s*/)) assert.ok(hook.includes(`:root ${sel}`), `${r.f}: ${sel} has no :root rule taking --spinner-turns`);
 });
