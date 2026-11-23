@@ -239,3 +239,51 @@ test("F375 wiring: the card goes right after Source Warning, before every other 
   assert.ok(piracy < news && news < at("if (plan.options.length) details.append("));
   assert.ok(src.includes("upgradeNewsSlot(st, inst, sileoJson)"), "the Sileo JSON the page already fetched");
 });
+
+test("B365: an HTML depiction never opens as a white sheet: live, its own HTML with scripts off, or Open in Safari", async () => {
+  const { depictionView, framingRefused, corsScripts, visibleText, openHtmlDepiction } = await import("./browse.js");
+  const SITE = "https://ifizbox.com", APP = "ifizbox://app";
+  const text = "<p>Aerial: Stage Manager, redesigned for iOS. Works on iOS 15 to 26.</p>";
+  // Havoc's Next.js page: module scripts need CORS, which origin null never gets, so its server HTML shows instead
+  const next = `<html><head><script type="module" defer src="/_next/static/chunks/a.js" crossorigin></script></head><body>${text}</body></html>`;
+  assert.equal(depictionView({ html: next, origin: APP }), "static");
+  assert.equal(depictionView({ html: `<script src="/a.js" crossorigin="anonymous"></script>${text}`, origin: SITE }), "static");
+  // ...but an empty app shell has nothing to show without its scripts, so it loads live
+  assert.equal(depictionView({ html: '<div id="root"></div><script type="module" src="/main.js"></script>' }), "live");
+  // jQuery-era depictions run from their own URL (they read location)
+  assert.equal(depictionView({ html: `<script src="https://code.jquery.com/jquery.min.js"></script>${text}` }), "live");
+  assert.equal(depictionView({ html: text, mixed: true }), "static", "http on the https site: through the proxy");
+  // hosts that refuse framing: Open in Safari
+  const h = (o) => new Headers(o);
+  assert.equal(depictionView({ html: text, headers: h({ "X-Frame-Options": "deny" }), origin: APP }), "refused");
+  assert.equal(framingRefused(h({ "X-Frame-Options": "SAMEORIGIN" }), SITE), true);
+  assert.equal(framingRefused(h({ "X-Frame-Options": "ALLOWALL" }), SITE), false);
+  assert.equal(framingRefused(h({}), SITE), false);
+  assert.equal(framingRefused(null, SITE), false);
+  assert.equal(framingRefused({ "x-frame-options": "deny" }, SITE), true, "a plain header object");
+  const fa = (v) => h({ "Content-Security-Policy": `default-src 'self'; frame-ancestors ${v}` });
+  assert.equal(framingRefused(fa("cydia.saurik.com"), APP), true, "Chariz");
+  assert.equal(framingRefused(fa("'none'"), SITE), true);
+  assert.equal(framingRefused(fa("'self'"), SITE), true);
+  assert.equal(framingRefused(fa("*"), APP), false);
+  assert.equal(framingRefused(fa("https:"), SITE), false);
+  assert.equal(framingRefused(fa("https:"), APP), true);
+  assert.equal(framingRefused(fa("ifizbox:"), APP), false);
+  assert.equal(framingRefused(fa("*.ifizbox.com"), "https://www.ifizbox.com"), false);
+  assert.equal(framingRefused(fa("*.ifizbox.com"), SITE), true, "CSP: *.host leaves the bare host out");
+  assert.equal(framingRefused(fa("https://ifizbox.com"), SITE), false);
+  assert.equal(framingRefused(fa("http://ifizbox.com"), SITE), true);
+  // frame-ancestors wins over X-Frame-Options when both are there
+  assert.equal(framingRefused(h({ "X-Frame-Options": "deny", "Content-Security-Policy": "frame-ancestors *" }), SITE), false);
+  assert.equal(framingRefused(h({ "Content-Security-Policy": "default-src 'none'; sandbox" }), SITE), false, "the proxy's own CSP");
+  assert.equal(corsScripts('<script src="/a.js"></script>'), false);
+  assert.equal(corsScripts('<script type="module">import "./a.js"</script>'), false, "inline: no src");
+  assert.equal(visibleText(`<head><title>T</title></head><body><script>var a = "hidden";</script><style>p{}</style>${text}</body>`),
+    "Aerial: Stage Manager, redesigned for iOS. Works on iOS 15 to 26.");
+  // the sheet itself: a refusing host and a failed fetch both end on the Open in Safari row, never a bare frame
+  assert.equal(typeof openHtmlDepiction, "function");
+  const src = (await import("node:fs")).readFileSync(new URL("./browse.js", import.meta.url), "utf8");
+  const body = src.slice(src.indexOf("export function openHtmlDepiction"), src.indexOf("const openOutside"));
+  assert.ok(!/allow-same-origin/.test(body.replace(/Never add allow-same-origin/, "")), "the bridge rule: no allow-same-origin");
+  assert.match(body, /\.catch\(\(e\) => \{ if \(box\.isConnected\) outside\(/, "a failed fetch offers Open in Safari");
+});

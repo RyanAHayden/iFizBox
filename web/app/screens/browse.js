@@ -2119,24 +2119,87 @@ function openSileoSheet(url, title) {
 
 // HTML depictions open in a sheet, in a sandboxed iframe (docs/cydia.md). The sandbox keeps it off our origin and
 // storage but not off the bridge: WebKit shows window.webkit.messageHandlers to every frame, so the app's Bridge.swift
-// (fromApp) refuses any call that isn't from the main frame on ifizbox://app. An http
-// depiction on the https site would be blocked as mixed content, so it comes through the proxy instead, as
-// srcdoc with scripts off; everything else loads directly from its own origin.
-function openHtmlDepiction(url, title) {
-  const frame = document.createElement("iframe");
-  frame.className = "depiction-frame";
-  frame.title = title;
-  frame.referrerPolicy = "no-referrer";
-  const mixed = globalThis.location?.protocol === "https:" && /^http:/i.test(url) && getBackend().kind === "http";
-  if (mixed) {
-    frame.setAttribute("sandbox", "allow-popups allow-popups-to-escape-sandbox");
-    getBackend().text(url).then((html) => { frame.srcdoc = withBase(html, url); })
-      .catch((e) => { frame.srcdoc = `<p style="font:17px Helvetica Neue,sans-serif;text-align:center;margin-top:40px">${escapeHtml(e.message)}</p>`; });
-  } else {
-    frame.setAttribute("sandbox", "allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms");
-    frame.src = url;
-  }
-  return showSheet({ title, body: frame });
+// (fromApp) refuses any call that isn't from the main frame on ifizbox://app. Never add allow-same-origin.
+// B365: the page is fetched first (the proxy on the site, the shell in the app), and depictionView picks how it shows,
+// so the sheet is never left white: the live page, the page's own HTML with scripts off, or Open in Safari.
+export function openHtmlDepiction(url, title, { backend = getBackend(), open = openOutside } = {}) {
+  const box = el("div", "sheet-scroll grouped page-body");
+  box.append(spinner("Loading Depiction"));
+  const sheet = showSheet({ title, body: box });
+  const mixed = globalThis.location?.protocol === "https:" && /^http:/i.test(url) && backend.kind === "http";
+  const outside = (text) => {
+    box.replaceChildren(note(text), grouped([{ rows: [{ label: "Open in Safari", chevron: true, onClick: () => open(url) }] }]));
+  };
+  const frame = (live, html) => {
+    const f = document.createElement("iframe");
+    f.className = "depiction-frame";
+    f.title = title;
+    f.referrerPolicy = "no-referrer";
+    f.setAttribute("sandbox", live ? "allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms"
+      : "allow-popups allow-popups-to-escape-sandbox");
+    if (live) f.src = url; else f.srcdoc = withBase(html, url);
+    box.replaceWith(f);
+  };
+  Promise.resolve().then(() => backend.fetch(url)).then(async (res) => {
+    const html = await res.text();
+    const view = depictionView({ html, headers: res.headers, mixed, origin: globalThis.location?.origin });
+    if (!box.isConnected) return;
+    if (view === "refused") outside(`${hostOf(url)} doesn't let its depiction open inside ${NAME}.`);
+    else frame(view === "live", html);
+  }).catch((e) => { if (box.isConnected) outside(e?.message || String(e)); });
+  return sheet;
+}
+
+const openOutside = (url) => window.open(url, "_blank", "noopener"); // LinkOut in the shell, a new tab on the site
+const hostOf = (url) => { try { return new URL(url).host; } catch { return url; } };
+
+// B365: how a fetched HTML depiction shows.
+//   "refused": the host forbids framing (X-Frame-Options, or a CSP frame-ancestors that leaves us out; the app sees
+//              the headers, the site's proxy doesn't pass them on), so Open in Safari instead of a white frame;
+//   "static":  the page's own HTML in srcdoc with scripts off: an http page on the https site (mixed content), or a
+//              page whose scripts can't run in the sandbox's opaque origin anyway (module or crossorigin scripts need
+//              CORS, which a host rarely grants origin null: Havoc's Next.js depictions), and that has text to show;
+//   "live":    everything else loads from its own URL with scripts on (jQuery-era depictions read location).
+export function depictionView({ html = "", headers = null, mixed = false, origin = "" } = {}) {
+  if (framingRefused(headers, origin)) return "refused";
+  if (mixed) return "static";
+  return corsScripts(html) && visibleText(html).length >= 40 ? "static" : "live";
+}
+
+const header = (headers, name) => (typeof headers?.get === "function" ? headers.get(name) : headers?.[name]) ?? null;
+
+// X-Frame-Options or CSP frame-ancestors (which wins when both are there) that keep the page out of a frame on
+// `origin` (https://ifizbox.com on the site, ifizbox://app in the app; never the depiction's own origin).
+export function framingRefused(headers, origin = "") {
+  const csp = String(header(headers, "content-security-policy") ?? "");
+  const ancestors = csp.split(/[,;]/).map((d) => d.trim().split(/\s+/)).find((d) => d[0]?.toLowerCase() === "frame-ancestors");
+  if (ancestors) return !ancestors.slice(1).some((s) => sourceMatches(s, origin));
+  const xfo = String(header(headers, "x-frame-options") ?? "").trim().toLowerCase();
+  return xfo !== "" && xfo !== "allowall";
+}
+
+function sourceMatches(src, origin) {
+  const s = src.toLowerCase();
+  if (s === "*") return true;
+  let o;
+  try { o = new URL(origin); } catch { return false; }
+  if (/^[a-z][a-z0-9+.-]*:$/.test(s)) return s === o.protocol;
+  const m = s.match(/^(?:([a-z][a-z0-9+.-]*):\/\/)?(\*\.)?([^/:]+)(?::(\d+|\*))?/);
+  if (!m) return false;
+  const [, scheme, wild, host, port] = m;
+  if (scheme && `${scheme}:` !== o.protocol) return false;
+  if (!scheme && o.protocol !== "https:" && o.protocol !== "http:") return false;
+  if (port && port !== "*" && port !== o.port) return false;
+  return wild ? o.hostname.endsWith(`.${host}`) : o.hostname === host;
+}
+
+// Scripts with a src that load in CORS mode: type="module", or a crossorigin attribute.
+export const corsScripts = (html) => /<script\b(?=[^>]*\bsrc\s*=)(?=[^>]*(\btype\s*=\s*["']?module\b|\bcrossorigin\b))[^>]*>/i.test(String(html));
+
+// The page's text with its head, scripts, styles and tags taken out: an app shell with nothing in it has none.
+export function visibleText(html) {
+  return String(html).replace(/<head\b[\s\S]*?<\/head>/gi, " ").replace(/<(script|style|noscript|template)\b[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]*>/g, " ").replace(/&[#a-z0-9]+;/gi, " ").replace(/\s+/g, " ").trim();
 }
 
 export function escapeHtml(s) {
