@@ -278,6 +278,17 @@ html[data-style="ios13"] .banner-icon { border-radius: 7px; }
 html[data-style="ios13"] .reload-text { font-size: 15px; font-weight: 600; }
 html[data-style="ios13"] .reload-spinner { background-image: var(--i13-reload-spinner); }
 
+/* B343: the queue's hint over Installed (nav/queuehint.js) as iOS 13's edit menu callout: a flat dark grey bubble
+   with 8pt corners, 36pt tall, white 14pt regular text, no gloss, emboss or drop shadow; a lighter grey in OLED
+   Black so it shows on the black ground. The arrow takes the same fill. */
+html[data-style="ios13"] {
+  --callout-h: 36px;
+  --callout-drop: none; --callout-edge: #2c2c2e; --callout: #2c2c2e; --callout-text: #fff; --callout-emboss: none;
+  --callout-arrow: #2c2c2e;
+}
+html[data-style="ios13"][data-theme="dark"] { --callout-edge: #48484a; --callout: #48484a; --callout-arrow: #48484a; }
+html[data-style="ios13"] .queue-hint-text { border-width: 0; border-radius: 8px; font-weight: 400; letter-spacing: -.01em; }
+
 /* Segmented control: iOS 13's grey track with the chosen segment a white pill (the track's colour as a 1pt ring
    inside it, so the pill sits 2pt in from the track's edge), black 13pt text, semibold when chosen. The
    [data-theme] copies tie with ios6.css's dark rules and win by order. */
