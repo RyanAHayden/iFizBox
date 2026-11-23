@@ -262,6 +262,8 @@ iOS 13 and iOS 26 need three, each off in iOS 6:
   | `--sheet-radius` (look) | 0px | 10px | the sheet's top corners |
   | `--sheet-behind-scale`, `--sheet-behind-shift`, `--sheet-behind-opacity` | not used | 0.92, 0, 0.75 | the page behind (shift in px, down) |
 
+In iOS 6 a sheet is clipped (`clip-path: inset(var(--sheet-bar-top) 0 0 0)`, packages.css) to below the page's own black status-bar strip, which stays still while the sheet slides under it.
+
 ### Native controls
 
 iOS 26 adds a fourth hook: `<html data-controls="native">`, set only under `data-style="ios26"` and only where the

@@ -42,24 +42,11 @@ html[data-theme="dark"] .confirm-issues .group-header { color: var(--dk-issue-he
 .confirm-problem .table { background: #ffcccc; }
 html[data-theme="dark"] .confirm-problem .table { background: var(--dk-issue-table); }
 .confirm-raw, .console-log { font: 11px/15px ui-monospace, Menlo, monospace; }
-
-/* the console's status-bar strip (its height is below the stretch): plain black, as iOS 6's */
-html:not([data-style="ios7"]):not([data-style="ios13"]):not([data-style="ios26"]) .sheet.console > .navbar.sheet-bar::before {
-  background: var(--site-strip);
-}
 .console { background: #000; }
 .console .navbar.sheet-bar { background: var(--console-bar); }
 .console .bar-button { border-color: var(--console-btn-edge); background: var(--console-btn); background-origin: border-box; }
 .console .bar-button:active, .console .bar-button.is-pressed { background: var(--console-btn-pressed); background-origin: border-box; }
 /* ==== } look-only ==== */
-
-/* In the iOS 6 era the console's bar keeps the plain black status-bar strip above its 44 pt bar (style.css
-   .navbar::before, ios6.css), settled and mid-slide, instead of the gloss other sheets carry up under the status bar
-   (packages.css): the strip is the status bar's room (--sheet-bar-top, the top inset), so a card has none. The
-   html:not(...) chain outranks packages.css's :root .sheet > .navbar.sheet-bar::before. */
-html:not([data-style="ios7"]):not([data-style="ios13"]):not([data-style="ios26"]) .sheet.console > .navbar.sheet-bar::before {
-  height: var(--sheet-bar-top);
-}
 
 /* Continue Queuing as on the 4S (ref/4s/screens/queue-81.png): the label centred in Cydia's blue-grey, the chevron
    at the right. */
