@@ -17,6 +17,7 @@ import { onPageOpen } from "../nav/pagestate.js";
 import { showSheet } from "../nav/sheet.js";
 import { format, settingsRoute } from "../router.js";
 import { getBackend } from "../backend.js";
+import { aptHeader, infoGroup } from "./sourcepage.js"; // F384: one source page
 import { catalog, ALL } from "../catalog.js";
 import { NO_SECTION, indexLetter, parseAuthor } from "../core/catalog.js";
 import { packageIcon } from "../core/sectionicons.js";
@@ -54,7 +55,6 @@ import { apps, recordInstall } from "../core/installed.js";
 import { rememberedApps } from "../app-updates.js";
 import { ignoreVersionLabel, versionToStore, IGNORE_VERSION } from "../core/appupdates.js"; // F281
 import { openInGroup, setSourceShare, shareHeadButton } from "./handoff.js";
-import { healthOf } from "../core/health.js";
 import { sourceErrorGroup } from "./sourceerror.js"; // B177
 import { load as loadLazy } from "../lazy.js"; // C38: Add Source from manage.js, loaded on the tap (manage.js imports browse.js)
 import { featuredStrip, paymentGroup, paidStateOf, soldByVendor } from "./extras.js";
@@ -271,7 +271,8 @@ async function drawSections(page) {
   const statusNote = status?.error ? note(status.error) : null; // B177: the error group below takes its place
   if (statusNote) body.append(statusNote);
   else if (editing ? !data.sections.length : !data.total) {
-    body.append(note(data.sections.length ? "Every section is hidden. Tap Edit to show them." : "No packages for this device."));
+    body.append(note(data.sections.length ? "Every section is hidden. Tap Edit to show them."
+      : "No packages for this device. Works on My Phone hides the rest."));
   }
   // F76: Share in the nav bar (the iOS 6 share sheet: Copy Link, Add on Another Device, the APT managers) took the
   // place of F8's Open In group under the sections.
@@ -282,10 +283,14 @@ async function drawSections(page) {
       const failed = sourceErrorGroup(source, { status, ctx: page.ctx, onChange: () => { if (body.isConnected) drawSections(page); } });
       body.prepend(featuredStrip(source)); // F20: the source's sileo-featured.json banners, above its sections
       if (failed) { statusNote?.remove(); body.prepend(failed); }
+      body.prepend(aptHeader(source)); // F384: the same header card as an AltStore source
       setSourceShare(body, source);
-      body.append(grouped([{ footer: healthOf(source).label }])); // F19: last reached, last Release, Not Responding
       if (insecureNote(source)) body.append(grouped([{ footer: insecureNote(source) }])); // F220: an http source
-      body.append(canisterFactsSlot(source)); // F305a: HTTPS and Signed Releases, from Canister's cached facts
+      // F384: Trust, Updated, Last Release and Canister's HTTPS and Signed Releases (F305a, cached a week per repo) in
+      // one Information group (screens/sourcepage.js)
+      const canister = source.uri && !String(source.key ?? "").startsWith("alt:")
+        ? import("./findmore.js").then((m) => m.canisterTrust(source)) : null;
+      body.append(infoGroup(source, { canister }));
       // B23: what apt-get update said about it (the jailbreak app), when the catalog's own load didn't fail
       if (!failed && source.aptError && source.aptError !== status?.error) body.append(el("p", "empty source-apt-error", source.aptError));
     }
@@ -2454,26 +2459,4 @@ export function heroCard(row, { jailbroken = true, href = null } = {}) {
   words.append(foot);
   card.append(words);
   return card;
-}
-
-// ---- F305a: Canister's facts on an added APT source's own page -----------------------------------------------------
-
-// A slot under the source's sections that fills with a Trust group (HTTPS, Signed Releases) once Canister's facts for
-// the repo are in (screens/findmore.js canisterTrust: cached a week per repo). Stays empty for AltStore and GitHub
-// sources, repos Canister doesn't list, and offline. `trust` is a seam for the tests; `slot.ready` resolves with the
-// facts (or null) once it is filled.
-export const yesNoUnknown = (v) => (v == null ? "Unknown" : v ? "Yes" : "No");
-export function canisterFactsGroup(r) {
-  if (!r || (r.https == null && r.gpg == null)) return null;
-  return grouped([{ header: "Trust", rows: [
-    { label: "HTTPS", detail: yesNoUnknown(r.https), cls: r.https === false ? "find-warn" : null },
-    { label: "Signed Releases", detail: yesNoUnknown(r.gpg) },
-  ], footer: "From Canister (canister.me), which checks this repo's files." }]);
-}
-export function canisterFactsSlot(source, { trust = (s) => import("./findmore.js").then((m) => m.canisterTrust(s)) } = {}) {
-  const slot = el("div", "source-canister");
-  slot.ready = Promise.resolve()
-    .then(() => (source?.uri && !String(source.key ?? "").startsWith("alt:") ? trust(source) : null))
-    .then((r) => { const g = canisterFactsGroup(r); if (g) slot.append(g); return g ? r : null; }, () => null);
-  return slot;
 }
