@@ -171,3 +171,52 @@ test("B372 Modify: away from the page, Mark as Not Installed forgets at once, as
   assert.deepEqual(removed, ["com.x.a"]);
   cancelHeldForget("com.x.a");
 });
+
+// B373: the Installed section's Mark as Not Installed row goes the toggle's way: both records, held on the page.
+import { sectionMarkNotInstalled } from "./altstore.js";
+
+test("B373 section row: held on the page; Mark as Installed (the toggle) before leaving keeps the signed record and expiry", async () => {
+  const r = signedRig();
+  const body = { isConnected: true };
+  assert.equal(await sectionMarkNotInstalled(APP, PKG, null, { ...r.opts, body }), true);
+  assert.equal(forgetHeld("com.x.a"), true);
+  assert.equal((await r.mem.all()).length, 1, "nothing forgotten while the page is up");
+  assert.equal(await sectionMarkNotInstalled(APP, PKG, null, { ...r.opts, body }), true, "a second tap leaves the held forget");
+  assert.equal(forgetHeld("com.x.a"), true);
+  assert.equal(await toggleMarked(APP, PKG, null, { ...r.opts, body }), true);
+  body.isConnected = false;
+  await flushHeldForgets();
+  assert.equal(r.forgets(), 0);
+  assert.equal(r.signed.get("com.x.a")?.expires, "2026-12-01T00:00:00Z");
+  assert.deepEqual((await r.mem.all()).map((x) => x.id), ["com.x.a"]);
+});
+
+test("B373 section row: leaving the page forgets both the installed and the signed record", async () => {
+  const r = signedRig();
+  const body = { isConnected: true };
+  await sectionMarkNotInstalled(APP, PKG, null, { ...r.opts, body });
+  body.isConnected = false;
+  await flushHeldForgets();
+  assert.equal(r.forgets(), 1);
+  assert.equal(r.signed.has("com.x.a"), false);
+  assert.deepEqual(await r.mem.all(), []);
+});
+
+test("B373 section row: with no page, both go at once; a failed forget shows the alert", async () => {
+  const r = signedRig();
+  assert.equal(await sectionMarkNotInstalled(APP, PKG, null, r.opts), true);
+  assert.equal(r.forgets(), 1);
+  assert.deepEqual(await r.mem.all(), []);
+  const f = signedRig();
+  const warned = [];
+  f.native.call = async () => { throw new Error("no"); };
+  assert.equal(await sectionMarkNotInstalled(APP, PKG, null, { ...f.opts, warn: async (e) => warned.push(e.message) }), false);
+  assert.deepEqual(warned, ["no"]);
+});
+
+test("B373 section row: nothing left to forget: the row never marks the app installed", async () => {
+  const mem = memoryAppStore([]);
+  assert.equal(await sectionMarkNotInstalled(APP, PKG, null, { store: async () => mem, signedOf: async () => null }), false);
+  assert.deepEqual(await mem.all(), []);
+  assert.equal(forgetHeld("com.x.a"), false);
+});
