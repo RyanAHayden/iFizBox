@@ -75,6 +75,8 @@ enum Sideload {
         b.on("signing.forget") { c in
             SignBridge.run(c) {
                 let id = c.params["bundleId"] as? String ?? ""
+                // F400: the app removed: no IPA waits for it either
+                for r in records() where r.bundleID == id { WaitingIPA.remove(app: r.originalBundleID); IPAFetch.installed(r) }
                 saveRecords(records().filter { $0.bundleID != id })
                 reschedule()
                 return installedJSON()
@@ -128,7 +130,7 @@ enum Sideload {
         let throttle = Throttle()
         let tok = SignBridge.token()
         // B104: download's http rules (the https twin, or "insecure" for the page to ask; insecure: true is plain http)
-        download(url, http: httpPolicy(c), emit: { phase, p in
+        IPAFetch.run(url, listed: .init(c.params), http: httpPolicy(c), emit: { phase, p in // F400
             if throttle.pass(phase, p) { c.emitOnMain([["phase": phase, "progress": p]]) }
         }) { res in
             let file: URL
@@ -154,6 +156,7 @@ enum Sideload {
                                   "profileKind": profile.kind.rawValue], nil)
                 } catch {
                     try? FileManager.default.removeItem(at: file)
+                    IPAFetch.damaged(error, source: url.absoluteString) // F400
                     Apt.reply(c, nil, SignBridge.text(error))
                 }
             }
@@ -274,14 +277,12 @@ enum Sideload {
             return
         }
         guard let url = Apt.httpURL(c.params["url"]) else { job.end(); released(); return Apt.reply(c, nil, "bad_url: not an http(s) URL") }
-        log("Downloading \(url.absoluteString)")
-        let started = Date()
-        let d = download(url, http: httpPolicy(c), emit: emit,
-                         bytes: downloadTicks(log: log, event: { c.emitOnMain([$0]) })) { res in // B262
+        // F400: the one already downloaded when an install of it failed, else a download (its Log lines are IPAFetch's)
+        let d = IPAFetch.run(url, listed: .init(c.params), http: httpPolicy(c), emit: emit, log: log,
+                             bytes: downloadTicks(log: log, event: { c.emitOnMain([$0]) })) { res in // B262
             switch res {
             case .failure(let e): finish(.failure(e))
             case .success(let file):
-                log(Sideload.downloaded(file, since: started))
                 guard hashed(file) else { return }
                 signAndOpen(file, url: url.absoluteString, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish, step: step,
                             sha256: ipaSha) // F343
@@ -414,7 +415,8 @@ enum Sideload {
 
     @discardableResult
     static func download(_ url: URL, http: HTTPPolicy = .ask, emit: @escaping (String, Double) -> Void,
-                         bytes: ((Int64, Int64) -> Void)? = nil, done: @escaping (Result<URL, Error>) -> Void) -> DebFetch {
+                         bytes: ((Int64, Int64) -> Void)? = nil, answer: ((WaitingIPA.Answer) -> Void)? = nil,
+                         done: @escaping (Result<URL, Error>) -> Void) -> DebFetch {
         let file = SignBridge.work.appendingPathComponent("\(SignBridge.token())-in.ipa")
         let progress = { (p: Double) in emit("downloading", p) }
         // R49: KeepAlive (silent audio, mixed with others) while the IPA downloads. Without it iOS 27 suspended
@@ -427,22 +429,25 @@ enum Sideload {
             if let e = err { try? FileManager.default.removeItem(at: file); return done(.failure(Failed(text: e))) }
             SignBridge.queue.async { done(.success(file)) }
         }
+        // F400: the answer's headers, and whether it came over plain http
+        let over = { (plain: Bool) -> ([String: String]) -> Void in { (h: [String: String]) -> Void in answer?(WaitingIPA.Answer(headers: h, plain: plain)) } }
         guard let twin = httpsTwin(url) else {
-            return Download.start(url, to: file, max: SignBridge.maxIPA, progress: progress, bytes: bytes, done: finished)
+            return Download.start(url, to: file, max: SignBridge.maxIPA, progress: progress, bytes: bytes, answer: over(false), done: finished)
         }
         if http == .allow {
             DeviceLog.say("[sideload] plain http download (Install Anyway): " + url.absoluteString)
-            return PlainDownload.start(url, to: file, max: SignBridge.maxIPA, progress: progress, bytes: bytes, done: finished)
+            return PlainDownload.start(url, to: file, max: SignBridge.maxIPA, progress: progress, bytes: bytes, answer: over(true), done: finished)
         }
         let chain = HTTPChain()
-        chain.set(Download.start(twin, to: file, max: SignBridge.maxIPA, timeout: twinTimeout, progress: progress, bytes: bytes) { err in
+        chain.set(Download.start(twin, to: file, max: SignBridge.maxIPA, timeout: twinTimeout, progress: progress, bytes: bytes,
+                                 answer: over(false)) { err in
             guard let e = err else { return finished(nil) }
             if chain.cancelled || !twinMissing(e) { return finished(e) }
             DeviceLog.say("[sideload] no https twin for \(url.absoluteString) (\(e))")
             guard http == .fallback else {
                 return finished("insecure: \(url.host ?? url.absoluteString) offers this IPA only over plain http, without encryption")
             }
-            chain.set(PlainDownload.start(url, to: file, max: SignBridge.maxIPA, progress: progress, bytes: bytes, done: finished))
+            chain.set(PlainDownload.start(url, to: file, max: SignBridge.maxIPA, progress: progress, bytes: bytes, answer: over(true), done: finished))
         })
         return chain
     }
@@ -523,6 +528,7 @@ enum Sideload {
             try job?.check()
         } catch {
             try? FileManager.default.removeItem(at: output)
+            IPAFetch.damaged(error, source: url, log: log) // F400
             opened(.failure(error)); served?(false)
             return
         }
@@ -622,6 +628,7 @@ enum Sideload {
                     log?("iOS installed \(app.name) \(app.version)")
                     if !isSelf { saveRecords(SignedRecords.adding(record, to: records())) }
                     reschedule()
+                    if !isSelf { IPAFetch.installed(record) } // F400
                     if !isSelf { BackgroundCheck.appHandedOff(ids: [record.bundleID, record.originalBundleID], version: record.version) } // B264
                     opened(.success((app, record))); served?(true)
                 }
@@ -829,6 +836,10 @@ enum Sideload {
                 // tag's Stop or Cancel, or the 15-minute expiry, ends it
                 let dismissed = installed == false && InstallPrompt.dismissed(bid)
                 // B85: what the watch saw, so a row that ends wrong says why
+                // F400: iOS took this IPA and has the app (an older copy of it alone doesn't count): nothing to keep for a retry
+                if installed == true, Handoff.wasServed(bid) {
+                    SignBridge.queue.async { if let r = records().first(where: { $0.bundleID == bid }) { IPAFetch.installed(r) } }
+                }
                 let seen = "Install watch ended: installed \(installed.map { String($0) } ?? "unknown")"
                     + (handedOff ? " (handed off to iOS)" : "") + (dismissed ? " (prompt dismissed)" : "")
                     + "; " + InstallPrompt.summary(bid) + ", IPA fetched in full \(Handoff.wasServed(bid) ? "yes" : "no")"
@@ -1116,7 +1127,10 @@ enum Sideload {
                                 opened: { if case .failure(let e) = $0 { SignBridge.queue.async { fail(e) } } },
                                 served: { ok in
                                     SignBridge.queue.async {
-                                        if ok { done.append(r.bundleID) }
+                                        if ok {
+                                            done.append(r.bundleID)
+                                            IPAFetch.installed(r) // F400: iOS has it, and Re-sign's own kept IPA is this one
+                                        }
                                         else if !failed.contains(where: { $0["bundleId"] as? String == r.bundleID }) {
                                             fail(Failed(text: "cancelled: iOS didn't fetch it"))
                                         }
@@ -1141,13 +1155,12 @@ enum Sideload {
                 guard let url = Apt.httpURL(r.url) else { fail(Failed(text: "bad_url: \(r.url)")); return next() }
                 // F343: the IPA kept at install, when it is still there and the one the record was signed from
                 if let file = takeOriginal(r, log: log) { return signThat(file, r.sha256) }
-                log("Downloading \(url.absoluteString)")
-                let started = Date()
-                // B104: its http link was let through at install; B262: the download's Log line once a second
-                let d = download(url, http: .fallback, emit: emit, bytes: downloadTicks(log: log, event: nil)) { res in
+                // B104: its http link was let through at install; B262: the download's Log line once a second; F400
+                let d = IPAFetch.run(url, listed: .init(), http: .fallback, emit: emit, log: log,
+                                     bytes: downloadTicks(log: log, event: nil)) { res in
                     switch res {
                     case .failure(let e): fail(e); next()
-                    case .success(let file): log(Sideload.downloaded(file, since: started)); signThat(file, nil)
+                    case .success(let file): signThat(file, nil)
                     }
                 }
                 job.onCancel { d.cancel() }

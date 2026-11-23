@@ -137,11 +137,11 @@ test("a queued app's row: Cancel on the alert ends the row as cancelled", async 
 
 test("Apt.swift: ipa.install passes insecure, and http links go through fetchHTTP (twin, PlainDownload), not URLSession", () => {
   const src = readFileSync(fileURLToPath(new URL("../../native/Sources/Apt.swift", import.meta.url)), "utf8");
-  assert.match(src, /IPAInstall\.run\(url, insecure: insecure,/);
-  const fetch = src.slice(src.indexOf("static func fetchHTTP"), src.indexOf("static func run(_ url: URL, insecure"));
+  assert.match(src, /IPAInstall\.run\(url, listed: \.init\(c\.params\), insecure: insecure,/);
+  const fetch = src.slice(src.indexOf("static func fetchHTTP"), src.indexOf("static func run(_ url: URL, listed"));
   assert.match(fetch, /PlainDownload\.start\(url,/);
   assert.match(fetch, /Download\.start\(twin,/);
   assert.match(fetch, /"insecure: /);
-  const run = src.slice(src.indexOf("static func run(_ url: URL, insecure"));
+  const run = src.slice(src.indexOf("private static func download(_ url: URL, insecure"));
   assert.ok(run.indexOf("Sideload.httpsTwin(url)") < run.indexOf("session.downloadTask"), "the http branch comes before URLSession");
 });

@@ -644,4 +644,143 @@ test("the IPA kept for Re-sign (F343)") {
     check(SignedRecords.decode(Data(#"[{"bundleID":"x","originalBundleID":"x","name":"x","version":"1","url":"u","signed":"2026-01-01T00:00:00Z","options":{"removeExtensions":[],"fixArm64e":false}}]"#.utf8)).first?.sha256 == nil, "an older record reads with none")
 }
 
+test("a downloaded IPA waits for the retry (F400)") {
+    typealias W = WaitingIPA
+    let dir = work.appendingPathComponent("waiting", isDirectory: true)
+    let spool = work.appendingPathComponent("waiting-in", isDirectory: true)
+    try? FileManager.default.removeItem(at: dir)
+    try? FileManager.default.removeItem(at: spool)
+    try FileManager.default.createDirectory(at: spool, withIntermediateDirectories: true)
+    let hashOf = { (u: URL) -> String? in (try? Data(contentsOf: u)).map { IPALibrary.hex(sha256($0)) } }
+    let exists = { (u: URL) in FileManager.default.fileExists(atPath: u.path) }
+    let names = { () -> [String] in ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []).sorted() }
+    let ipa = fixtures.appendingPathComponent("edit.ipa")
+    let u = "https://x.example/a.ipa", u2 = "https://x.example/b.ipa"
+    let v1 = W.Listed(version: "1.0", size: 100)
+    let answer = W.Answer(headers: ["etag": "\"abc\"", "last-modified": "Mon, 01 Jan 2026 00:00:00 GMT"])
+    let out = spool.appendingPathComponent("out.ipa")
+    var n = 0
+    func put(_ url: String = u, _ l: W.Listed = v1, _ a: W.Answer = answer, link: Bool = true, now: Date = Date()) -> W? {
+        n += 1
+        let src = spool.appendingPathComponent("in\(n).ipa")
+        try? FileManager.default.copyItem(at: ipa, to: src)
+        return W.keep(src, url: url, listed: l, answer: a, link: link, in: dir, now: now, hash: hashOf)
+    }
+
+    // kept and taken back, the download staying the caller's
+    let w = put()!
+    check(w.app == (try Inspect.ipa(ipa)).bundleID && w.sha256 == hashOf(ipa) && w.etag == "\"abc\"" && !w.plain, "kept \(w)")
+    let first = spool.appendingPathComponent("in1.ipa")
+    check(exists(first), "the download stays for the signer")
+    try FileManager.default.removeItem(at: first) // the signer's end, failed or not: any failure after the download
+    check(W.find(u, listed: v1, plain: false, in: dir) == w, "found again")
+    check(W.find(u, listed: W.Listed(), plain: false, in: dir) == w, "a re-sign lists nothing")
+    check(W.find(u2, listed: v1, plain: false, in: dir) == nil, "another URL")
+    check(w.take(to: out, in: dir, hash: hashOf) == out && hashOf(out) == w.sha256, "taken")
+    try FileManager.default.removeItem(at: out)
+    check(W.find(u, listed: v1, plain: false, in: dir) == w && exists(W.file(u, in: dir)), "and again on the next retry")
+    // the jailbreak app's copy has one name only (ifizbox-helper wants that)
+    let copied = put(link: false)!
+    check(try copied.take(to: out, link: false, in: dir, hash: hashOf) == out
+          && (try FileManager.default.attributesOfItem(atPath: out.path))[.referenceCount] as? Int == 1, "a copy, not a link")
+    try FileManager.default.removeItem(at: out)
+
+    // the source lists another version or size
+    check(W.find(u, listed: W.Listed(version: "1.1", size: 100), plain: false, in: dir) == nil && names().isEmpty, "another version: it goes")
+    _ = put()
+    check(W.find(u, listed: W.Listed(version: "1.0", size: 101), plain: false, in: dir) == nil && names().isEmpty, "another size: it goes")
+    let own = put(u, W.Listed())!
+    check(W.find(u, listed: W.Listed(version: own.appVersion), plain: false, in: dir) != nil, "nothing listed then: the IPA's own version")
+    check(W.find(u, listed: W.Listed(version: own.appVersion + ".9"), plain: false, in: dir) == nil, "and not another")
+
+    // corrupt: cut short, or other bytes of the same length
+    _ = put()
+    try Data("short".utf8).write(to: W.file(u, in: dir))
+    check(W.find(u, listed: v1, plain: false, in: dir) == nil && names().isEmpty, "another length: it goes")
+    let bad = put()!
+    var bytes = try Data(contentsOf: W.file(u, in: dir))
+    bytes[bytes.count / 2] ^= 0xFF
+    try FileManager.default.removeItem(at: W.file(u, in: dir))
+    try bytes.write(to: W.file(u, in: dir))
+    check(bad.take(to: out, in: dir, hash: hashOf) == nil && names().isEmpty && !exists(out), "another SHA-256: it goes")
+    _ = put()
+    try FileManager.default.removeItem(at: W.file(u, in: dir))
+    check(W.find(u, listed: v1, plain: false, in: dir) == nil && names().isEmpty, "purged by iOS")
+    // not an IPA, or a partial one: never kept, and what waited for that URL goes
+    _ = put()
+    let junk = spool.appendingPathComponent("junk.ipa")
+    try (try Data(contentsOf: ipa)).prefix(500).write(to: junk)
+    check(W.keep(junk, url: u, listed: v1, answer: answer, in: dir, hash: hashOf) == nil && names().isEmpty, "a partial file isn't kept")
+
+    // what the signer says: the IPA is damaged, or something else
+    for e in [SignError("bad_ipa", "x"), SignError("bad_macho", "x")] { check(W.damaged(e), "damaged: \(e)") }
+    check(W.damaged(ZipError("x is damaged (CRC)")), "a zip that doesn't read")
+    for c in ["cert_expired", "cert_not_in_profile", "bad_options", "cancelled", "appid_mismatch", "keychain", "encrypted"] {
+        check(!W.damaged(SignError(c, "x")), "\(c) isn't the IPA's fault")
+    }
+    check(!W.damaged(ZipError("can't write /x")), "nor a full disk")
+
+    // the server's answer
+    check(!w.changed(status: 200, headers: ["etag": "W/\"abc\"", "last-modified": "other"]), "the same ETag")
+    check(w.changed(status: 200, headers: ["etag": "\"abd\""]), "another ETag")
+    check(w.changed(status: 200, headers: ["last-modified": "Tue, 02 Jan 2026 00:00:00 GMT"]), "another date")
+    check(!w.changed(status: 200, headers: ["last-modified": w.lastModified!]), "the same date")
+    check(w.changed(status: 200, headers: ["content-length": "\(w.size + 1)"]), "another length")
+    check(!w.changed(status: 200, headers: ["content-length": "\(w.size)"]) && !w.changed(status: 200, headers: [:]), "nothing against it")
+    check(!w.changed(status: 200, headers: ["content-length": "5", "content-encoding": "gzip"]), "a compressed length says nothing")
+    check(!w.changed(status: 0, headers: [:]) && !w.changed(status: 403, headers: ["etag": "\"z\""]), "offline or refused: used")
+
+    // plain http only after Install Anyway; it stays meanwhile
+    _ = put(u, v1, W.Answer(headers: [:], plain: true))
+    check(W.find(u, listed: v1, plain: false, in: dir) == nil && W.find(u, listed: v1, plain: true, in: dir) != nil, "asked first")
+
+    // one per app; expiry; cleanup
+    _ = put(u2)
+    check(names().count == 2 && W.find(u, listed: v1, plain: true, in: dir) == nil, "one per app: \(names())")
+    let old = Date(timeIntervalSinceNow: -W.life - 60)
+    _ = put(u, v1, now: old)
+    check(W.find(u, listed: v1, plain: false, in: dir) == nil && names().isEmpty, "a week old: not used")
+    _ = put(u, v1, now: old)
+    W.sweep(in: dir)
+    check(names().isEmpty, "a week old: swept")
+    _ = put()
+    try Data("x".utf8).write(to: dir.appendingPathComponent("orphan.ipa"))
+    W.sweep(in: dir)
+    check(names().count == 2, "a file without its note is swept, the good one stays (the app was killed): \(names())")
+    W.sweep(own: (id: w.app, version: w.appVersion + "x"), in: dir)
+    check(names().count == 2, "this app's update, not running yet")
+    W.sweep(own: (id: w.app, version: w.appVersion), in: dir)
+    check(names().isEmpty, "this app's update, now running")
+    _ = put()
+    W.remove(app: "com.other", in: dir); W.remove(app: "", in: dir)
+    check(names().count == 2, "another app's removal")
+    W.remove(app: w.app, in: dir)
+    check(names().isEmpty, "removed with the app")
+    _ = put()
+    W.remove(sha256: w.sha256.uppercased(), in: dir)
+    check(names().isEmpty, "known malware")
+    _ = put()
+    W.remove(u, in: dir)
+    check(names().isEmpty, "installed")
+
+    // the call's `listed`
+    check(W.Listed(["listed": ["version": "2", "size": 5]]) == W.Listed(version: "2", size: 5), "listed read")
+    check(W.Listed(["listed": ["version": "", "size": 0]]) == W.Listed() && W.Listed([:]) == W.Listed(), "nothing listed")
+
+    // Re-sign's kept IPA is apart: a failed upgrade's staged one goes, the waiting one and the installed one's stay
+    let kept = work.appendingPathComponent("waiting-kept", isDirectory: true)
+    try? FileManager.default.removeItem(at: kept)
+    try FileManager.default.createDirectory(at: kept, withIntermediateDirectories: true)
+    try Data("v1".utf8).write(to: OriginalIPA.url("com.a", in: kept)!)
+    let up = put()!
+    let input = up.take(to: out, in: dir, hash: hashOf)!
+    OriginalIPA.stage(input, bundleID: "com.a", sha256: up.sha256, in: kept)
+    OriginalIPA.discard("com.a", sha256: up.sha256, in: kept)
+    check(try W.find(u, listed: v1, plain: false, in: dir) == up && (try Data(contentsOf: OriginalIPA.url("com.a", in: kept)!)) == Data("v1".utf8), "both stay")
+    OriginalIPA.stage(up.take(to: out, in: dir, hash: hashOf)!, bundleID: "com.a", sha256: up.sha256, in: kept)
+    try Data("x".utf8).write(to: kept.appendingPathComponent("not.ours.pending"))
+    OriginalIPA.sweepPending(in: kept) // the app was killed before its install was recorded
+    check((try FileManager.default.contentsOfDirectory(atPath: kept.path)).sorted() == ["com.a.ipa", "not.ours.pending"], "staged leftovers go")
+}
+
 if failures == 0 { print("all passed") } else { print("\(failures) failed"); exit(1) }

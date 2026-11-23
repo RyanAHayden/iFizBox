@@ -159,17 +159,15 @@ enum SignAhead {
             }
             guard let url = Apt.httpURL(source) else { job.end(); return answer(nil, "bad_url: not an http(s) URL") }
             if let r = record, let file = Sideload.takeOriginal(r, log: log) { return signThat(file) } // F343
-            log("Downloading \(url.absoluteString)")
             // B104: a recorded app's http link was let through at install; a new one follows the page's insecure
             let http: Sideload.HTTPPolicy = (c.params["record"] as? String ?? "").isEmpty ? Sideload.httpPolicy(c) : .fallback
-            let started = Date()
             let keepIt = record == nil && MyIPAs.wantsKeep(c) // F380: not a Re-sign's download
-            let d = Sideload.download(url, http: http, emit: emit, // B262: the Log's line and the row's MB/s once a second
-                                      bytes: Sideload.downloadTicks(log: log, event: { c.emitOnMain([$0]) })) { res in
+            // F400: the one already downloaded when an install of it failed, else a download (its Log lines are IPAFetch's)
+            let d = IPAFetch.run(url, listed: .init(c.params), http: http, emit: emit, log: log, // B262: the Log's line and the row's MB/s once a second
+                                 bytes: Sideload.downloadTicks(log: log, event: { c.emitOnMain([$0]) })) { res in
                 switch res {
                 case .failure(let e): fail(e)
                 case .success(let file):
-                    log(Sideload.downloaded(file, since: started))
                     // F380: a custom install (keepInLibrary) keeps this download for My IPAs: a second name now, as
                     // the signer deletes the first; it moves into the library once signing.open has gone through
                     signHeld(file, keepIt ? IPALibrary.hold(file, in: SignBridge.work, token: SignBridge.token()) : nil)
@@ -223,6 +221,7 @@ enum SignAhead {
             return (app, record, output)
         } catch {
             try? FileManager.default.removeItem(at: output)
+            IPAFetch.damaged(error, source: url, log: log) // F400
             throw error
         }
     }

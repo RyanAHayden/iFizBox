@@ -22,6 +22,9 @@
 //                        essential, download }, so Confirm draws apps with the jailbreak queue's own groups
 //   jobDownloads(job) -> B282: whether the run downloads it (it has a url and is not a My IPAs file):
 //                        only those count toward download
+//   listedOf(job)     -> F400: { listed: { version, size } }, what the source lists for the job's url, for the shell's
+//                        downloading calls (an IPA kept from a failed install is used only when it still matches);
+//                        {} when neither is known or nothing is downloaded
 //   runOrder(jobs)    -> the order Confirm installs in: as queued, iFizBox itself last (installing it closes the app)
 //   appNavLabel({ queued, installed, newest }) -> the app page's nav button: Modify while the app is queued (Cydia),
 //                        else Install, Upgrade or Reinstall
@@ -297,6 +300,13 @@ export function customParams(job, now = Date.now()) {
 //                        Sign Options, as libraryJob's); else the job
 //   await withSavedIpa(job, { call }) -> savedResignJob over library.list (the job as it is when the list fails);
 //                        core/myipas.js is loaded only then, so it stays out of the app's startup modules
+export function listedOf(job) {
+  if (!job?.url || job.library) return {};
+  const version = job.version ? String(job.version) : null;
+  const size = Number(job.size) > 0 ? Number(job.size) : null;
+  return version || size ? { listed: { ...(version ? { version } : {}), ...(size ? { size } : {}) } } : {};
+}
+
 export function customInstallSave(job) {
   if (!job || job.op === "remove" || job.library || job.id === SELF_ID || !job.url || !job.options) return null;
   const edits = { ...(job.options.edits ?? {}) };

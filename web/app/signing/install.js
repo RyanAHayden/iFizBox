@@ -3,6 +3,7 @@ import { IFIZBOX_ID } from "../core/websign.js";
 import { storedKeep, originalState, originalNote } from "../core/keepid.js";
 import { showAlert } from "../nav/alert.js";
 import { NAME } from "../brand.js";
+import { listedOf } from "../core/appqueue.js"; // F400
 import { browserSigning, localSigning } from "./common.js";
 import { firstInstallCheck } from "./device.js";
 import { installOnDevice } from "./route.js";
@@ -34,13 +35,14 @@ export async function signAndInstall({ url, name = "", onInstalled = () => {}, b
   }
   // iFizBox's own IPA: signed here on the phone like any app, then hosted on the Signing Server (host: true) since
   // iOS closes iFizBox, and its install server, while it installs over it. Straight to iOS's Install prompt.
-  if (isSelfIpa(url)) return installOnDevice({ url, name: name || NAME, onInstalled, host: true });
+  const l = listedOf({ url, version, size }); // F400
+  if (isSelfIpa(url)) return installOnDevice({ url, name: name || NAME, onInstalled, host: true, ...l });
   // F75: the first Install with something missing says so, then opens the Signing walkthrough at that step.
   const step = await firstInstallCheck();
   if (step === "cancel") return false;
   if (step) {
     // F177: Signing offers Install Now for this app once it's set up.
-    (await import("../screens/signing.js")).rememberInstall({ name, run: () => signAndInstall({ url, name, onInstalled, bring, bundleId, version, bytes }) });
+    (await import("../screens/signing.js")).rememberInstall({ name, run: () => signAndInstall({ url, name, onInstalled, bring, bundleId, version, bytes, size }) });
     return false;
   }
   // F243: the original app (its own ID, not signed by iFizBox) is on the phone: say so once before iOS refuses.
@@ -48,8 +50,8 @@ export async function signAndInstall({ url, name = "", onInstalled = () => {}, b
   if (choice === "cancel") return false;
   // F81: one tap: Install signs and installs straight away. The look-first sheet (F68, signing-sheet.js) is the app
   // page's Custom Install row (signing-sheet.js customInstall).
-  if (choice === "copy") return installOnDevice({ url, name, onInstalled, params: { url, keepBundleId: false } });
-  return installOnDevice({ url, name, onInstalled });
+  if (choice === "copy") return installOnDevice({ url, name, onInstalled, params: { url, keepBundleId: false }, ...l });
+  return installOnDevice({ url, name, onInstalled, ...l });
 }
 
 // ---- F243: the original app on the phone, before a plain Install ---------------------------------------------

@@ -154,7 +154,7 @@ export async function markIpaNeeds(group, url, { needs = ipaNeeds } = {}) {
 // goes round again), then the IPA's console; installd still refusing the app (no_adhoc) gets the same short alert.
 // `deps` stand in for ensureAppSync, the alert and the console in tests.
 // F380: `keep` (onInstalled saves the IPA in My IPAs) goes on to runIpaConsole and runIpaInstall.
-export async function installWithAppSync({ url, name = "", onInstalled = () => {}, native = undefined, keep = false },
+export async function installWithAppSync({ url, name = "", onInstalled = () => {}, native = undefined, keep = false, listed = null },
   { ensure = ensureAppSync, fallback = appSyncFallback, run = runIpaConsole, needs = ipaNeeds, alert = showAlert } = {}) {
   if (running || preparing) return false;
   const title = name || ipaName(url);
@@ -176,7 +176,7 @@ export async function installWithAppSync({ url, name = "", onInstalled = () => {
       if (await fallback(got.step)) continue;
       return false;
     }
-    const r = await run({ url, name: title, onInstalled, native, ...(keep ? { keep: true } : {}) });
+    const r = await run({ url, name: title, onInstalled, native, ...(listed ? { listed } : {}), ...(keep ? { keep: true } : {}) });
     if (r?.error?.code !== "no_adhoc") return r;
     if (!(await fallback(got.installed || got.present ? "refused" : "absent"))) return r;
     await r.close?.(); // Try Again: this run's console makes way for the next
@@ -193,7 +193,7 @@ export function openIpaInstall(opts) {
 
 // The console part of openIpaInstall. installd's no_adhoc refusal gets no alert here: installWithAppSync's short
 // fallback says it.
-export async function runIpaConsole({ url, name = "", onInstalled = () => {}, native = undefined, keep = false },
+export async function runIpaConsole({ url, name = "", onInstalled = () => {}, native = undefined, keep = false, listed = null },
   { open = openProgress, install = runIpaInstall, logs = runLogs, alert = showAlert } = {}) {
   if (running) return false;
   running = true;
@@ -219,7 +219,7 @@ export async function runIpaConsole({ url, name = "", onInstalled = () => {}, na
   let r;
   try {
     // F380: keep only through the real bridge: share.js's stand-in installs a staged file, no download to keep
-    r = await install({ url, name: title, ...(keep && !native ? { keep: true } : {}) }, view, { ...(native ? { native } : {}), signal: ctl.signal });
+    r = await install({ url, name: title, ...(listed ? { listed } : {}), ...(keep && !native ? { keep: true } : {}) }, view, { ...(native ? { native } : {}), signal: ctl.signal });
   } catch (e) {
     run.line(`E: ${e?.message || String(e)}`);
     run.end({ code: -1 });

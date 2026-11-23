@@ -33,7 +33,7 @@ import { openIpaInstall, markIpaNeeds } from "./ipa-install.js";
 import { ipaInstallAvailable } from "../ipa-install.js";
 import { IPA_FOOTER } from "../core/ipainstall.js";
 import { appQueue } from "../app-queue.js";
-import { appJob, appNavLabel, modifyActions, resignJob, MARK_NOT_INSTALLED, destructiveOf, sizeText as formatSize } from "../core/appqueue.js";
+import { appJob, listedOf, appNavLabel, modifyActions, resignJob, MARK_NOT_INSTALLED, destructiveOf, sizeText as formatSize } from "../core/appqueue.js";
 import { markedVersionOnSource, markedResignJob } from "../core/appqueue.js"; // F221
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
 import { deviceError } from "../core/signing.js"; // B338
@@ -134,7 +134,7 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
   if (o.download && jailbreak) {
     // F88: the helper says whether it installed, so the record waits for its success (openIpaInstall's onInstalled)
     rows.push({ label: o.itms ? "Install IPA" : "Install", subtitle: "With the jailbreak",
-      onClick: () => ipaInstall({ url: o.download, name, onInstalled: () => onInstall() }) });
+      onClick: () => ipaInstall({ url: o.download, name, ...listedOf({ url: o.download, version: own.version, size: own.size }), onInstalled: () => onInstall() }) });
   } else if (o.itms) {
     rows.push({ label: "Install", subtitle: "Signed by the source", onClick: () => { onInstall(); location.href = o.itms; } });
   } else if (o.download && site && !isSelfIpa(o.download)) {
