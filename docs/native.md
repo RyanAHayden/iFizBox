@@ -113,7 +113,10 @@ What (a) does to hold 120 Hz:
   screens decide after 10 px (rightward, more sideways than vertical), so nothing waits on JS and no `touch-action`
   changes. It steps aside in text fields and sliders, `touch-action: none` areas (custom drags), a sideways scroller
   not at its left end, a list showing a row's Delete, selected text and popups (`nav/swipe.js pageSwipeBlocked`).
-  Off on the website, like the edge strip.
+  Off on the website, like the edge strip. While a swipe back is under way (edge strip or page swipe), both pages'
+  scrollers are held with `overflow-y: hidden` from the moment the drag is decided until the slide is at rest
+  (`nav/swipe.js lockScroll`), so the page doesn't scroll vertically and keeps its scroll place; the touch listeners
+  stay passive.
 - Tab swipe: on a package's or app's page the panes follow the finger on Details, Reviews and Related (`nav/swipe.js
   attachTabSwipe` = passive touches; `nav/tabswipe.js tabPager` = the panes, transforms only). The chosen pane stays
   in the flow and the neighbour is lifted out of it (absolute), so the page's height is the chosen pane's. A rightward

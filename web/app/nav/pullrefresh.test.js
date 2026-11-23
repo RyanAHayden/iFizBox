@@ -470,3 +470,19 @@ test("script pull (no rubber band): rows follow the finger, spring back to none 
   t.mock.timers.tick(300);
   assert.deepEqual(p.look(), { spinner: false, armed: false, title: TEXT.pull, shown: false });
 });
+
+test("B387: a list held by a swipe back (overflow-y hidden) is not pulled by it; the next touch pulls again", async (t) => {
+  const p = await page(t, "held");
+  p.fire("touchstart", 100);
+  p.scroller.style.overflowY = "hidden"; // nav/swipe.js lockScroll
+  for (const y of [112, 200, 400]) p.fire("touchmove", y);
+  assert.deepEqual(p.rows(), ["", ""]);
+  p.fire("touchend");
+  assert.equal(p.scroller.style.overflowY, "hidden"); // the lock's to free
+  assert.equal(p.refreshes, 0);
+  p.scroller.style.overflowY = "";
+  p.fire("touchstart", 100);
+  p.fire("touchmove", 112);
+  p.fire("touchmove", 200);
+  assert.notEqual(p.rows()[0], "");
+});
