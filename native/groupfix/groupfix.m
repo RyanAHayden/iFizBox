@@ -362,12 +362,12 @@ static BOOL copySharedPasswords(void) {
         // an item behind Face ID or a passcode (skipped above) would be out of reach once pinned: stay as before
         if (copied < outside) ok = NO;
         [copyLog appendFormat:@" %@ %lu outside, added from [%@], taken over an earlier install's from [%@], already in the own group and left alone [%@]%@", what, (unsigned long)outside,
-                              countList(added), countList(replaced), countList(had), bad ? [NSString stringWithFormat:@", add error %d", (int)bad] : @""];
+                              countList(added), countList(replaced), countList(had), bad ? [NSString stringWithFormat:@", copy error %d", (int)bad] : @""];
     }
     return ok;
 }
 
-// Whether the app ran before this launch: a file in its container that was last changed before this process started
+// Whether the app ran before this launch: a file in its container last changed (or a system-made folder there made) before this process started
 // (its change time, which a copy can't carry over). Not its preferences: a tweak's initialisers write those, and files,
 // before this fix loads (RyukGram does), so a fresh install has some by now. SplashBoard is the system's, at install.
 static BOOL appRanBefore(void) {
@@ -377,6 +377,14 @@ static BOOL appRanBefore(void) {
     if (sysctl(mib, 4, &p, &n, NULL, 0) != 0 || n == 0) return YES; // can't tell: as an app that ran
     struct timeval start = p.kp_proc.p_un.__p_starttime;
     NSString *home = NSHomeDirectory();
+    // Folders the system makes in a process of the app, not at install: an earlier launch's, even when every file in
+    // the container was written anew by now.
+    for (NSString *d in @[ @"Library/Caches/com.apple.dyld", @"Library/Saved Application State" ]) {
+        struct stat st;
+        if (lstat([home stringByAppendingPathComponent:d].fileSystemRepresentation, &st) == 0 && st.st_birthtimespec.tv_sec > 0 &&
+            (st.st_birthtimespec.tv_sec < start.tv_sec ||
+             (st.st_birthtimespec.tv_sec == start.tv_sec && st.st_birthtimespec.tv_nsec / 1000 < start.tv_usec))) return YES;
+    }
     for (NSString *top in @[ @"Library", @"Documents", @"tmp" ]) {
         NSString *root = [home stringByAppendingPathComponent:top];
         NSDirectoryEnumerator *e = [[NSFileManager defaultManager] enumeratorAtPath:root];
@@ -570,7 +578,7 @@ __attribute__((constructor)) static void groupfixInit(void) {
             NSHomeDirectory().lastPathComponent, ownBefore ? @"yes" : @"no", (unsigned long)prefs, entitlement(@"application-identifier"),
             [kc isKindOfClass:[NSArray class]] ? [kc componentsJoinedByString:@", "] : @"none", saw,
             isolate ? (__bridge NSString *)isolate : @"off", isolation, pinned ? @"yes" : @"no", (unsigned long)groups.count,
-            fixedBefore ? @"yes" : @"no", [iso8601 stringFromDate:[NSDate dateWithTimeIntervalSince1970:containerBirth()]]]);
+            fixedBefore ? @"yes" : @"no", containerBirth() ? [iso8601 stringFromDate:[NSDate dateWithTimeIntervalSince1970:containerBirth()]] : @"unknown"]);
         if (keychainStrip || pinned) _dyld_register_func_for_add_image(rebindImage);
     }
 }
