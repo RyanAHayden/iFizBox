@@ -988,6 +988,10 @@ export function rowInfo(r, { storage, sellers = new Set(), known = {} } = {}) {
   const paid = Boolean(r?.paid) || Boolean(info?.paid);
   if (paid && !sellers.has(r?.key)) return info?.unverified ? null : info; // no seller named: not offered
   if (info) return info;
+  // B391: an earlier version this phone checked and found to work (a bought one included): it stays where it was
+  const dev = infoStore(storage);
+  const earlier = dev.keys().reverse().find((k) => k.slice(0, k.lastIndexOf("@")) === r?.id && dev.get(k)?.ok && !dev.get(k).systemOnly);
+  if (earlier) return dev.get(earlier);
   // B391: free or paid, only what its name or description mentions (the catalog's own look read all of it: r.guess)
   const e = guessEntry({ package: r?.id, version: r?.version, name: r?.name, description: r?.short, paid }, known);
   const bundles = [...new Set([...(r?.guess ?? []), ...e.bundles])];

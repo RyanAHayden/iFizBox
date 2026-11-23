@@ -135,6 +135,9 @@ test("B391: with no verdict, free or paid, Add Tweaks lists what mentions the ap
     assert.equal(info.unverified, true);
     assert.equal(info.paid, undefined);
     assert.equal(rowInfo(list[2], { storage: s }), null);
+    // a version with no verdict of a tweak this phone found to work (bought: an earlier one was checked) stays
+    s.setItem("ifizbox.tweakInfo", JSON.stringify({ "n.sb@0.9": { v: 2, ok: true, bundles: ["com.google.ios.youtube"], anyApp: false } }));
+    assert.deepEqual(await of("com.google.ios.youtube"), ["n.yt", "n.long", "n.sb"]);
   } finally { globalThis.fetch = savedFetch; }
 });
 

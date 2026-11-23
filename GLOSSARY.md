@@ -28,7 +28,7 @@ _In code_: PREVIEW_HEADER, previewSlot, galleryGroup
 _Avoid_: Screenshots
 
 **Add Tweaks**:
-The page under an app's Details that lists the tweaks from your Tweak Sources that work in that app, each with ADD, and More Tweaks for the rest
+The page under an app's Details that lists the tweaks from your Tweak Sources that work in that app, each with ADD, and More Tweaks for the rest; a tweak with no verdict yet is listed under Made for as a guess, and left out of the app's tweak count
 _Said_: add tweaks page, add tweaks sheet
 _On screen_: Add Tweaks
 _In code_: renderAddTweaks, addtweaks:<bundle id>, addTweaksItems, addTweakButton, addTweaksGroup
