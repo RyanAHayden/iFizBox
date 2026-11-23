@@ -187,20 +187,18 @@ test("Home: the slot warns on cellular and opens Cellular Shortcuts; a failed in
   assert.match(home, /routeTile\(settings\.mode, routeFailure\(\), settings\.get\(ROUTE_KEY\)\) \?\? cellularTile\(/);
 });
 
-test("an install that starts on cellular asks first: Use Server, Try Anyway or Set Up (opens Cellular Shortcuts)", async () => {
+test("an install that starts on cellular asks first: Use Server or Set Up (opens Cellular Shortcuts); no Try Anyway", async () => {
   assert.deepEqual(decideRoute("iphone", ST({ cellular: true })), { route: "idevice", alert: "cellular" });
-  assert.deepEqual(ALERTS.cellular.buttons, ["Use Server", "Try Anyway", "Set Up"]);
+  assert.deepEqual(ALERTS.cellular.buttons, ["Use Server", "Set Up"]);
   const storage = { getItem: (k) => (k === "ifizbox.installRoute" ? "iphone" : null) };
   const native = { call: (m) => (m === "idevice.status" ? Promise.resolve(ST({ cellular: true })) : Promise.reject(new Error("no"))) };
   const answer = (index) => async (a) => { assert.equal(a.title, CELLULAR.title); return { index }; };
   forgetRoute();
   assert.deepEqual(await chooseRoute({ native, storage, alert: answer(0) }), {}, "Use Server");
   forgetRoute();
-  assert.deepEqual(await chooseRoute({ native, storage, alert: answer(1) }), { route: "idevice" }, "Try Anyway");
-  forgetRoute();
   const was = globalThis.location;
   globalThis.location = { hash: "" };
-  try { assert.equal(await chooseRoute({ native, storage, alert: answer(2) }), null, "Set Up: the install stops"); } finally { globalThis.location = was; }
+  try { assert.equal(await chooseRoute({ native, storage, alert: answer(1) }), null, "Set Up: the install stops"); } finally { globalThis.location = was; }
   forgetRoute();
   const wifi = { call: () => Promise.resolve(ST({ cellular: false })) };
   let asked = false;

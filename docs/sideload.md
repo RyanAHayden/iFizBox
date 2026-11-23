@@ -296,7 +296,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   the connect runs the first through `shortcuts://x-callback-url/run-shortcut` (Shortcuts comes back to
   `ifizbox://vpn-shortcut`), waits for the path to leave cellular, connects, and runs the second once connected;
   the open connection carries on with data back on. An install that starts on cellular without them asks first (Use
-  Server, Try Anyway, Set Up), Home's status slot says Add the Cellular Shortcuts, and so does Installation &
+  Server or Set Up), Home's status slot says Add the Cellular Shortcuts, and so does Installation &
   Signing's status cell. Bridge calls: `vpn.status` (also `idevice.status`'s `vpn`), `vpn.test`, `vpn.checkShortcut`,
   `vpn.openShortcuts`, `vpn.testShortcuts`.
 - **This iPhone over Tailscale** (`native/sideload/tailscale/`, its README): for Tailscale users, who can't run
