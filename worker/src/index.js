@@ -63,7 +63,7 @@ import { NAME, GITHUB_REPO, DOMAIN } from "../../web/app/brand.js";
 import { githubApi, githubApiTarget } from "./github.js"; // F304
 import { blockedHost, REFUSED_CODE } from "./ssrf.js"; // B190
 import { limited } from "./limits.js"; // F312
-import { tweakIndex, isTweakIndexPath, scheduled as tweakIndexScheduled } from "./tweakindex.js"; // F344
+import { tweakIndex, isTweakIndexPath, tweakIndexFile, isTweakIndexFilePath, scheduled as tweakIndexScheduled } from "./tweakindex.js"; // F344
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type" };
@@ -878,6 +878,7 @@ export default {
     if (isApplePath(u.pathname)) return appleRelay(req, env); // F251: Apple sign-in relay (src/apple-relay.js)
     if (isPushPath(u.pathname)) return push(req, env); // F280: push notifications (src/push.js)
     if (isTweakIndexPath(u.pathname)) return tweakIndex(req, env, ctx); // F344: the tweak index (src/tweakindex.js)
+    if (isTweakIndexFilePath(u.pathname)) return tweakIndexFile(req, env, ctx); // F398: the same as one file
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
     const over = await limited(req, u.pathname, env, { headers: SAFE }); // F312: /api/fetch, /sign/host, /sign/upload (src/limits.js)
     if (over) return over;

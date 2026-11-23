@@ -7,6 +7,8 @@ import {
   injectSourcesFrom, githubDefaultsFrom, loadTweakSources, tweakSourceVerdict, tweakIndexDone, usableTweak, askTweakIndex,
   shownTweakSources, TWEAK_SOURCES_FILE,
 } from "./sources.js";
+import { packIndexFile } from "./tweakindexfile.js";
+import { indexSource } from "./tweakindex.js";
 import { githubTweakRecord, isGithubSource } from "./github.js";
 
 const raw = JSON.parse(readFileSync(new URL(`../${TWEAK_SOURCES_FILE}`, import.meta.url), "utf8"));
@@ -57,18 +59,20 @@ test("verdict: a source is out only when the index checked all of it and nothing
   assert.equal(usableTweak({ ok: true, bundles: [], anyApp: true, unverified: true }, new Set()), false);
 });
 
-test("askTweakIndex asks /api/tweaks for every tweak of an APT source, never for a GitHub one", async () => {
-  const asked = [];
-  const get = async (u) => { asked.push(u); return { ok: true, json: async () => done([yt]) }; };
-  const base = "https://x.example/api/tweaks";
-  const a = await askTweakIndex({ uri: "https://havoc.app/", dist: "./", components: [] }, { get, base });
-  assert.equal(a.tweaks.length, 1);
-  assert.equal(asked[0], `${base}?source=https%3A%2F%2Fhavoc.app%2F&dist=.%2F`);
-  assert.ok(!asked[0].includes("bundle="));
-  assert.equal(await askTweakIndex(githubDefaultsFrom([{ github: "a/b" }])[0], { get, base }), null);
-  assert.equal(asked.length, 1);
-  assert.equal(await askTweakIndex({ uri: "https://havoc.app/", dist: "./" }, { get: async () => { throw new Error("offline"); }, base }), null);
-  assert.equal(await askTweakIndex({ uri: "https://havoc.app/", dist: "./" }, { get: async () => ({ ok: false }), base }), null);
+test("askTweakIndex reads the index file, never for a GitHub source; nothing names the source", async () => {
+  const src = { uri: "https://havoc.app/", dist: "./", components: [] };
+  const file = packIndexFile([{ key: indexSource(src).key, refreshed: 5, pending: 0, error: null }],
+    [{ source: indexSource(src).key, checked: 6, entry: JSON.stringify({ ...yt, version: "1" }) }]);
+  let reads = 0;
+  const f = { read: async () => { reads++; return file; } };
+  const a = await askTweakIndex(src, { file: f });
+  assert.equal(tweakSourceVerdict(a, ["com.google.ios.youtube"]), true);
+  assert.equal(tweakSourceVerdict(a, ["x"]), false);
+  assert.equal(await askTweakIndex({ uri: "https://other.example/", dist: "./" }, { file: f }), null, "not in the file");
+  assert.equal(await askTweakIndex(githubDefaultsFrom([{ github: "a/b" }])[0], { file: f }), null);
+  assert.equal(reads, 2);
+  assert.equal(await askTweakIndex(src, { file: { read: async () => { throw new Error("no file"); } } }), null);
+  assert.equal(await askTweakIndex(src, {}), null);
 });
 
 test("shownTweakSources leaves the hidden keys out", () => {
