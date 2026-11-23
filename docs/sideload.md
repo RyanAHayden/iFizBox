@@ -302,9 +302,9 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   (delete the old one in Shortcuts first, then tap Update: Replace in Shortcuts can leave two on iOS 27, and then neither
   runs by name), Set Up's row and the Install Switch page show Update. The app uses a trip only
   when the check run `{"check":1,"actions":1}` reached Wait for Install (`vpn.status`'s `shortcuts.trip`; `trips` says
-  this build can: iOS 16+ and the bundle ID `com.ryha.ifizbox`). That check is also when iOS asks its one-time Allow. An Install Switch that can also bring back an idle VPN
-  (`shortcuts.idle`) reaches Wait for Install twice with the check run `{"check":1,"actions":1,"selected":1}`; an
-  older one shows Update.
+  this build can: iOS 16+ and the bundle ID `com.ryha.ifizbox`). That check is also when iOS asks its one-time Allow.
+  An Install Switch that can also bring back an idle VPN (`shortcuts.idle`) reaches Wait for Install twice with the
+  check run `{"check":1,"actions":1,"selected":1}`; an older one shows Update.
   Otherwise (an older Install Switch, iOS 15, a renamed app, Allow denied) the start, dataOff and end runs below stay as
   they are. A trip is one run with `{"trip":1}`, plus `"cellular":1` on cellular: it remembers the VPN that is on, runs
   Connect VPN (the app's own action, in the background; an error ends the run before data goes off), turns Cellular Data
@@ -328,10 +328,14 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   iOS tells an app nothing of another app's VPN, so the app reads its own saved configuration instead, which is not
   enabled while another VPN is selected (`LocalVPN.otherVPNSelected`, `vpn.status`'s `otherVPNSelected`; false with no
   saved configuration of ours). The run's input then carries `"selected":1`. With no VPN connected, the Shortcut finds
-  the idle VPN with Connect On Demand on (Find VPNs, limit 1), stores it, and at the end runs Set VPN > Set On Demand on
-  it, which selects it without connecting, so the user's rules still decide. A selected VPN that is off without On
-  Demand isn't turned on: the app waits 9 seconds and runs no second trip.
-  The first connect of a queue of installs runs it only on cellular, or when another VPN is up or selected (only the Shortcut's
+  the idle VPN with Connect On Demand on (Find VPNs, limit 1), stores it, and at the end runs Set VPN > Set On Demand
+  on it, which selects it without connecting, so the user's rules still decide. A selected VPN that is off without On
+  Demand isn't turned on. When the trip stored no idle VPN, it ends with one more Wait for Install (a 46th, after the
+  45), which tells the app there is nothing more to put back, so it runs no second trip. Without that signal, and with
+  the VPN not back, the end runs as a retry. With an older Install Switch (`shortcuts.idle` false), the app stops
+  waiting after 9 seconds (`nothingLimit`) and runs no end.
+  The first connect of a queue of installs runs it only on cellular, or when another VPN is up or selected (only the
+  Shortcut's
   Set VPN can bring that one back). On Wi-Fi with no other VPN, the app connects and disconnects the built-in VPN by
   itself, and Shortcuts never opens. When it runs, it goes through `shortcuts://x-callback-url/run-shortcut` (Shortcuts
   comes back to `ifizbox://vpn-shortcut`) with the input `{"start":1}`: it stores the VPN connected now (Get Current
@@ -351,13 +355,14 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   Tailscale back) disables ours silently, and a start on the old copy gives no error and never connects. After
   the last connect, once the VPN goes off and the queue is over (the 3 second linger has passed, so a queue shares one
   start and one end), the end runs only when the start ran and there is something to put back: cellular data that the
-  run turned off and that isn't on again, or another VPN, or an idle one, that was up or selected before the start and isn't up again (its
-  address isn't back). It runs
+  run turned off and that isn't on again, or another VPN, or an idle one, that was up or selected before the start and
+  isn't up again (its address isn't back). It runs
   with `{"end":1}`, plus `"cellular":1` only when Cellular Data Off ran: cellular data goes back on, then the stored VPN
   (Tailscale, say) connects and is forgotten. Shortcuts opens only from the front, so an end due while the app is in
   the background waits until the app is next in front; with nothing to put back, the end doesn't open Shortcuts at all. The
   automatic check that Installation & Signing's pages run after a failure is skipped while a connect would run the
-  Install Switch (it is added, and cellular or another VPN is up or selected), so returning to a page can't open Shortcuts; a
+  Install Switch (it is added, and cellular or another VPN is up or selected), so returning to a page can't open
+  Shortcuts; a
   tapped Check Connection still runs it. The Shortcut reads its input as a dictionary and tests its flags with "has any
   value". Without the Install Switch the built-in VPN connects by itself and the user's VPN stays off after. Phones
   that added the two older Shortcuts, "Cellular Data Off" and "Cellular Data On", still run them (data off before

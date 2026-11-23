@@ -55,6 +55,23 @@ user's rules still decide. Checked on the iPhone 15 Pro (iOS 27.0.1) on Wi-Fi, a
 - New Install Switch, added through the app's share sheet after the old one was deleted: trip and idle true. Allow
   was asked.
 
+## Review findings
+
+- A spec review found that the 9 second wait skipped the retry when Set On Demand was slow or failed. `testTrip`
+  failed with an older Install Switch, and an older one took a useless second trip. The wait is replaced: the trip
+  ends with one more Wait for Install (a 46th) only when it stored no idle VPN. That tells the app there is nothing
+  more to put back, so it runs no second trip. Without that signal, and with the VPN not back, the end runs as a
+  retry. With an older Install Switch (idle false) the app stops waiting after 9 s (nothingLimit) and runs no end.
+- An older added Install Switch doesn't bring an idle VPN back until it is Updated.
+- Final retest on the iPhone 15 Pro (iOS 27.0.1, Wi-Fi), with the final build and the Install Switch re-signed (90+
+  actions), added once after the old one was deleted:
+  - Connected (On Demand Always): one run, back 4 s after.
+  - Idle, twice: one run each, back 1 s after.
+  - Selected but off, three times: one run each, "nothing to put back" 1 s after the VPN went off.
+  - One further selected-but-off run stalled: Open for Install never ran for 25 s. The app fell back by itself, and
+    the end run put nothing back. Cause unknown; not seen in the other 6 runs.
+- The real install (`signing.resign`) was with the build before the review fixes.
+
 ## Gotchas
 
 - Share sheet: taps by accessibility coordinates are relative to the sheet and miss.
@@ -69,6 +86,9 @@ user's rules still decide. Checked on the iPhone 15 Pro (iOS 27.0.1) on Wi-Fi, a
 - A first setup test before any saved configuration of ours: nothing can be told then, so an idle VPN loses its place
   there.
 - The Update row and the alert were seen only by node tests.
+- The older Install Switch with the final build's 9 second path.
+- The cause of the stall above.
+- A failed read of our VPN configuration counts as no other VPN.
 
 ## Phone state
 
