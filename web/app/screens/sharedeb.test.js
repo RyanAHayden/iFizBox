@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { openDebConfirm } from "./sharedeb.js";
+import { catalog } from "../catalog.js";
 import { NAME } from "../brand.js";
 import { fakeDocument } from "../fakes.test-helper.js";
 
@@ -48,4 +49,44 @@ refused("any other reason", "ifizbox-helper: prefix too long", kept(/couldn't as
 refused("a missing helper", "ifizbox-helper is not installed at /var/jb/usr/libexec/ifizbox-helper", (sentences, footer) => {
   assert.match(sentences[0], /is missing from this iPhone/);
   assert.equal(footer, `Reinstalling ${NAME} puts it back.`);
+});
+
+// B410: simulate-deb's own answer (apt refused, an essential package, or exit 74): the same wrapping block.
+function answered(title, answer, check) {
+  test(title, async (t) => {
+    t.mock.method(catalog, "aptProblems", async () => []); // no index to load
+    const saved = [globalThis.document, globalThis.requestAnimationFrame];
+    const doc = globalThis.document = fakeDocument();
+    globalThis.requestAnimationFrame = () => 0;
+    const native = { call: async (method) => (method === "share.debSimulate" ? { stdout: "", output: "", ...answer } : null) };
+    try {
+      const run = openDebConfirm({ file: "x.deb", name: "Tweak.deb" }, { native });
+      await settle();
+      const sheet = doc.body.querySelector(".confirm-sheet");
+      const block = sheet.querySelector(".confirm-problem");
+      assert.equal(sheet.querySelector("h1").textContent, "Cannot Comply");
+      assert.equal(block.querySelectorAll(".cell-label").length, 0, "a wrapping block, not one-line labels");
+      check(block.querySelectorAll(".pkg-description").map((e) => e.textContent), block.querySelector(".group-header").textContent,
+        sheet.querySelector(".confirm-raw")?.textContent);
+      sheet.querySelector(".sheet-left").children[0].click();
+      assert.deepEqual(await run, { ok: false });
+    } finally { [globalThis.document, globalThis.requestAnimationFrame] = saved; }
+  });
+}
+
+answered("apt refuses without a reason of its own", { ok: false, code: 100, output: "E: Broken packages" }, (sentences, header, raw) => {
+  assert.deepEqual(sentences, ["apt refused Tweak.deb (exit 100). Its own words are below."]);
+  assert.equal(header, "Can't Do This Yet");
+  assert.equal(raw, "E: Broken packages");
+});
+answered("an essential package would go", { ok: true, code: 0,
+  stdout: "WARNING: The following essential packages will be removed.\n  apt libapt-pkg (due to apt)\nRemv apt [2.0]\n" }, (sentences, header) => {
+  assert.match(sentences[0], /^Installing Tweak\.deb would remove apt, part of the jailbreak/);
+  assert.equal(header, "Can't Do This Yet");
+});
+answered("exit 74: the helper couldn't copy the file, so apt never ran", { ok: false, code: 74,
+  output: "ifizbox-helper: can't copy the .deb\n" }, (sentences, header, raw) => {
+  assert.deepEqual(sentences, [`${NAME} couldn't ask apt about Tweak.deb: can't copy the .deb`]);
+  assert.equal(header, "Couldn't Ask apt");
+  assert.equal(raw, undefined, "no apt output: it never ran");
 });

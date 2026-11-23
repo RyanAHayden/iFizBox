@@ -357,8 +357,8 @@ function refusedGroups(err, jobs, names) {
 }
 
 // Its red block of whole sentences (helperRefusal's answer); B409: the shared .deb's sheet (screens/sharedeb.js) too.
-export function refusedBlock(why, footer = null) {
-  const frag = grouped([{ header: "Couldn't Ask apt", rows: why.sentences.map(() => ({ label: "" })),
+export function refusedBlock(why, footer = null, header = "Couldn't Ask apt") {
+  const frag = grouped([{ header, rows: why.sentences.map(() => ({ label: "" })),
     footer: why.missing ? `Reinstalling ${NAME} puts it back.` : footer }]);
   const g = frag.querySelector(".group");
   g.classList.add("confirm-problem", "confirm-issues");
