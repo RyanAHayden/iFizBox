@@ -9,7 +9,7 @@
   so it is loaded by the time this page draws.
 - `web/app/core/appoffer.js`: `DISCORD_URL` moved here from `home.js`, beside `REPO_URL`. Both screens import it.
 - `web/app/notiphone.css`: 13px under the pair, so the next header sits as far from it as from a table
-  (the first shots showed it too tight).
+  (the first shots showed it too tight). It's padding: a margin was tried first and collapsed into the header's.
 - Links open with `target="_blank"` and `rel="noopener"`; the page stays up.
 - Test: `notiphone.test.js` new test (place, href, target, rel, page still up after clicks).
 
