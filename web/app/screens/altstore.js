@@ -403,6 +403,12 @@ export function holdForget(id, run, body) {
 }
 
 // -> true when a held forget was cancelled (nothing was forgotten).
+export function cancelHeldForget(id) {
+  if (!heldForgets.delete(id)) return false;
+  heldNotify();
+  return true;
+}
+
 // F392: the version the Version page marks as installed: the record's (B358: by the installed bundle ID first), or what
 // this app signed with no record; "" unknown, null not installed (a held forget too).
 export async function appVersionInstalled(app, { store = apps, signedOf = (id) => signedRecordOf(id) } = {}) {
@@ -412,11 +418,6 @@ export async function appVersionInstalled(app, { store = apps, signedOf = (id) =
   let rec = null;
   try { rec = recordOf(await (await store()).all(), id, signed); } catch { /* no store */ }
   return rec ? rec.version || "" : signed ? signed.version || "" : null;
-}
-export function cancelHeldForget(id) {
-  if (!heldForgets.delete(id)) return false;
-  heldNotify();
-  return true;
 }
 
 // Runs the held forgets whose page is gone (`all`: every one, as the app or tab goes away).
@@ -735,8 +736,8 @@ export async function queueOriginalCheck(job, warn = originalWarning) {
 // B69: the jailbreak app's Modify for an installed app (a record in core/installed.js, as the nav label reads it):
 // Cydia's sheet instead of installing at once. Upgrade or Reinstall, Ignore Upgrades (Settings' Ignored Upgrades,
 // kept on the device: no dpkg hold for an app) while a newer version is out or once it's ignored, Remove (red: the
-// Installed tab's Delete, which asks again), Downgrade (then which version) and Version History. `install(version)`
-// installs one of the app's versions (browse.js: the helper's Install row), `history()` opens Version History (null:
+// Installed tab's Delete, which asks again), Downgrade (then which version) and Version. `install(version)`
+// installs one of the app's versions (browse.js: the helper's Install row), `history()` opens the Version page (null:
 // no row). Resolves false when the app isn't installed (Install keeps its one tap), true once the sheet took over.
 export const IGNORE_UPGRADES = "Ignore Upgrades";
 export const STOP_IGNORING = "Stop Ignoring Upgrades";
@@ -744,7 +745,7 @@ export function jailbreakModifyButtons({ installed = "", newest = null, held = f
   const upgrade = Boolean(newest && installed && compareVersions(newest, installed) > 0);
   return [...modifyActions({ installed, newest, build: "jailbreak" }).filter((b) => b !== "Remove"),
     ...(held ? [STOP_IGNORING] : upgrade ? [IGNORE_UPGRADES] : []), "Remove",
-    ...(older ? ["Downgrade"] : []), ...(history ? ["Version History"] : [])];
+    ...(older ? ["Downgrade"] : []), ...(history ? ["Version"] : [])];
 }
 
 // F281: Ignore This Version / Stop Ignoring This Version (core/appupdates.js) on an app's sheet, after Upgrade.
@@ -789,7 +790,7 @@ export async function jailbreakModify(pkg, { install, history = null, ask = show
   else if (b === "Downgrade") {
     const j = await ask({ title: "Downgrade to", buttons: older.map((x) => x.version) });
     if (j >= 0) await install(older[j]);
-  } else if (b === "Version History") history();
+  } else if (b === "Version") history();
   return true;
 }
 
@@ -1169,7 +1170,7 @@ export function updateNewsGroup(app, record, history = null) {
   if (!record || record.id !== app?.bundleIdentifier || !updateNewsShown(app, record.version)) return null;
   const v = app.versions[0];
   return whatsNewGroup({ version: v.version, date: formatDate(v.date), notes: v.localizedDescription,
-    history: history ? { label: "Version History", ...history } : null });
+    history: history ? { label: "Version", ...history } : null });
 }
 // The slot, filled once the installed list is read and again whenever it changes (Mark as Installed, an install).
 export function updateNewsSlot(app, history = null, { store = apps, onChange = onAppsChange, alive = () => true } = {}) {

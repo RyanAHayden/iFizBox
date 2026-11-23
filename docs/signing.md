@@ -763,7 +763,7 @@ A web page can't read the UDID, but iOS gives it to a "Profile Service" profile 
   the look's token and time, the edits). Confirm signs each in turn with its own options (`queue.js installCustom`):
   the token while it's under 14 minutes old (the phone keeps the looked-at IPA 15), else `{url, ...edits}`, which
   downloads it again; a token goes with one try only. The Queue row says what's custom ("Custom: as \"Name\", ID").
-  A version's row on the Version page opens the Install sheet, not a straight install.
+  A version's row on the Version page opens the Install sheet (on the website it installs straight away).
 - **The queue's run** in the sideload app (Confirm's Confirm, so app pages, Changes' Upgrade (N), Re-sign and Re-sign
   All; `screens/apprun.js` on the black progress page, the brain `core/apprun.js`): one row per app, iFizBox's own
   last. Every app is downloaded and signed first, two at a time (`signing.prepare`, which keeps the signed IPA for 30

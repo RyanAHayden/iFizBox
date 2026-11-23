@@ -365,27 +365,33 @@ export async function addSwitch(native, alert, { whenBack = backInApp, checking 
   const r = await addShortcut(native, "switch", { whenBack, checking, via });
   if (r.opened || r.error) shortcutsFailed.switch = r.ok ? null : r.opened ? r.error : { open: r.error };
   if (!r.ok && r.error) {
-    const message = r.opened ? shortcutDidntRun("switch", r.error) : shortcutDidntOpen("switch", r.error);
-    // F392: the share sheet is the way left when Shortcuts didn't take it
-    const { index } = await alert({ title: "Shortcut Not Added", message, buttons: ["Cancel", "Share File"], cancel: 0 }) || {};
+    const { index } = await alert(addFailedAlert("switch", r)) || {};
     if (index === 1) return addSwitch(native, alert, { whenBack, checking, via: "share" });
   }
   return r;
 }
+// An Add that failed: why, and Share File, the share sheet, as the way left when Shortcuts didn't take it.
+const addFailedAlert = (k, r) => ({ title: "Shortcut Not Added", buttons: ["Cancel", "Share File"], cancel: 0,
+  message: r.opened ? shortcutDidntRun(k, r.error) : shortcutDidntOpen(k, r.error) });
 async function drawShortcuts(box, { native, alert, whenBack = backInApp }) {
   let st = lastStatus?.vpn ?? null;
   let reading = !st, checking = null;
+  const add = async (k, via = "shortcuts") => {
+    if (checking) return;
+    const r = await addShortcut(native, k, { whenBack, via, checking: (on) => { checking = on ? k : null; paint(); } });
+    if (r.opened || r.error) shortcutsFailed[k] = r.ok ? null : r.opened ? r.error : { open: r.error };
+    st = r.status ?? { ...(st ?? {}), shortcuts: { ...(st?.shortcuts ?? {}), [k]: r.ok ? true : Boolean(st?.shortcuts?.[k]) } };
+    if (lastStatus) lastStatus = { ...lastStatus, vpn: { ...(lastStatus.vpn ?? {}), ...st } };
+    paint();
+    if (!r.ok && r.error) { // F392: as Set Up's Add (addSwitch)
+      const { index } = await alert(addFailedAlert(k, r)) || {};
+      if (index === 1) return add(k, "share");
+    }
+  };
   const paint = () => {
     const groups = shortcutGroups(st, {
       reading, testing: shortcutsTesting, checking, failed: shortcutsFailed,
-      add: async (k, via = "shortcuts") => {
-        if (checking) return;
-        const r = await addShortcut(native, k, { whenBack, via, checking: (on) => { checking = on ? k : null; paint(); } });
-        if (r.opened || r.error) shortcutsFailed[k] = r.ok ? null : r.opened ? r.error : { open: r.error };
-        st = r.status ?? { ...(st ?? {}), shortcuts: { ...(st?.shortcuts ?? {}), [k]: r.ok ? true : Boolean(st?.shortcuts?.[k]) } };
-        if (lastStatus) lastStatus = { ...lastStatus, vpn: { ...(lastStatus.vpn ?? {}), ...st } };
-        paint();
-      },
+      add,
       test: async () => {
         if (shortcutsTesting) return;
         shortcutsTesting = true; paint();

@@ -1737,7 +1737,7 @@ async function packageActions(route, button) {
     const { rows, options } = rowsOf(v);
     if (rows[0] && rows[0].label !== "Download IPA") return rows[0].onClick();
     for (const r of rows) actions.push({ label: r.label, run: r.onClick });
-    if (many) actions.push({ label: "Version History", run: () => go(versionsHref(route, id)) });
+    if (many) actions.push({ label: "Version", run: () => go(versionsHref(route, id)) });
     return sheet(options.itms ? "" : "Download IPA keeps the file.", actions);
   }
   const installed = installedOf(history);
@@ -1871,7 +1871,7 @@ export function versionCell({ label, tags = [], sub = null, notes = null, onClic
     mark.classList.add("added"); // a state of the price button, so the eras' own .added draws it
     li.append(mark);
   }
-  if (notes && estimateLines(notes) > NOTE_LINES + 1) foldNotes(li, inner.querySelector(".version-notes"));
+  if (notes && estimateLines(notes) > NOTE_LINES) foldNotes(li, inner.querySelector(".version-notes"));
   return li;
 }
 // "iOS 17.4 or later" on a version's line
