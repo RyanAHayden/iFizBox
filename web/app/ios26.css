@@ -39,6 +39,11 @@ html[data-style="ios26"] {
   /* the floating tab bar (style.css, used under html[data-tabbar="float"]): a 64pt pill 14pt in from the sides,
      the Search circle 8pt to its right */
   --tabbar-float-h: 64px; --tabbar-float-pad: 4px; --tabbar-float-inset: 14px; --tabbar-float-gap: 8px;
+  /* B333: the undo bar floats as a 52pt glass capsule over the content, as wide as the tab pill and Search circle
+     together and 10pt over them, Undo's text button bringing its own 14pt to the right edge */
+  --undo-left: max(var(--tabbar-float-inset), env(safe-area-inset-left));
+  --undo-right: max(var(--tabbar-float-inset), env(safe-area-inset-right));
+  --undo-lift: 10px; --undo-h: 52px; --undo-pad: 0 6px 0 22px;
 }
 /* Search's own circle has no label (below), so nothing goes under its glyph either. */
 html[data-style="ios26"] .tab[data-tab="search"] { --tab-label-gap: 0px; }
@@ -146,6 +151,8 @@ html[data-style="ios26"][data-theme="light"] {
   /* the reload bar (nav/reloadbar.js): the tab bar's #f9f9f9 under a hairline, black text, the grey spinner */
   --reload-bar: linear-gradient(var(--i26-hairline), var(--i26-hairline)) top / 100% .5px no-repeat, #f9f9f9;
   --reload-text: #000; --reload-emboss: none; --i26-reload-spinner: var(--spinner-gray);
+  /* B333: the undo bar, the tab bar's Liquid Glass (fill, blur, rim and float shadow); black message */
+  --undo-bar: var(--i26-glass); --undo-text: #000; --undo-emboss: none;
 }
 
 /* ---- OLED Black: the same shapes, white on black; ios6.css's dark rules read the --dk-* tokens ---- */
@@ -221,6 +228,7 @@ html[data-style="ios26"][data-theme="dark"] {
   --banner-emboss: none; --banner-title: #fff; --banner-text: #fff; --banner-timer: rgba(255,255,255,.3);
   --reload-bar: linear-gradient(var(--i26-hairline), var(--i26-hairline)) top / 100% .5px no-repeat, #000;
   --reload-text: #fff; --reload-emboss: none; --i26-reload-spinner: var(--spinner-white);
+  --undo-bar: var(--i26-glass); --undo-text: #fff; --undo-emboss: none;
 }
 
 /* ---- Look-only rules: type, and the shapes no token carries ---- */
@@ -394,6 +402,20 @@ html[data-style="ios26"] .banner-text strong { font-weight: 600; }
 html[data-style="ios26"] .banner-icon { border-radius: 7px; }
 html[data-style="ios26"] .reload-text { font-size: 15px; font-weight: 600; }
 html[data-style="ios26"] .reload-spinner { background-image: var(--i26-reload-spinner); }
+/* B333: the undo bar floats as a glass capsule like the tab pill (the hooks above place it; the content scrolls
+   under it, so it blurs as the pill does), its message 15pt semibold, and Undo iOS 26's text button: semibold tint
+   with no capsule of its own (the Done capsule's tokens would draw one), dimming while held. */
+html[data-style="ios26"] .undo-bar {
+  border: 1px solid var(--i26-glass-rim); border-radius: 26px; box-shadow: var(--i26-glass-shadow);
+  -webkit-backdrop-filter: var(--i26-glass-blur); backdrop-filter: var(--i26-glass-blur);
+}
+html[data-style="ios26"] .undo-bar-text { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+html[data-style="ios26"][data-theme] .undo-bar .undo-bar-button,
+html[data-style="ios26"][data-theme] .undo-bar .undo-bar-button:is(:active, .is-pressed) {
+  font-size: 17px; font-weight: 600; color: var(--i26-tint);
+  background: none; border-color: transparent; box-shadow: none;
+}
+html[data-style="ios26"][data-theme] .undo-bar .undo-bar-button:is(:active, .is-pressed) { opacity: .3; }
 
 /* Segmented control: iOS 13's grey track with the chosen segment a white pill (the track's colour as a 1pt ring
    inside it, so the pill sits 2pt in from the track's edge), black 13pt text, semibold when chosen. The

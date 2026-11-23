@@ -148,6 +148,13 @@ html.native .navbar, html.native .tabbar { display: none; }
   --alert-buttons-margin: 4px 0 0; --alert-buttons-gap: 8px;        /* its button row; two side by side */
   --alert-stacked-gap: 9px; --alert-button-h: 43px;                 /* stacked buttons; a button's height */
 }
+/* B333: the undo bar (nav/undobar.js), iOS 6's values: the 44pt bar spanning the screen right on the tab bar. An era
+   that floats it as a toast insets it from the sides, lifts it off the tab bar and gives it its own height. */
+:root {
+  --undo-left: 0px; --undo-right: 0px; --undo-lift: 0px;            /* from the screen's sides; gap over the tab bar */
+  --undo-h: 44px;                                                   /* its height */
+  --undo-pad: 0 max(6px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left)); /* message .. Undo */
+}
 /* Large titles: the root page's title, big, bold and left, at the top of its body; it scrolls with the content and
    fades into the nav bar's own title (navbar.js writes only its opacity). Never drawn in iOS 6. */
 .large-title { display: none; }
@@ -454,12 +461,14 @@ html.has-reload :is(.page-body, .sheet-scroll, .search-results, .progress-scroll
   flex: 1; min-width: 0; height: 100%; padding: 0 6px; margin: 0; cursor: pointer; touch-action: manipulation;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
-/* The undo bar after a row's swipe (nav/undobar.js): docked above the tab bar, sliding up from behind it */
+/* The undo bar after a row's swipe (nav/undobar.js): docked above the tab bar (or floating over it: the --undo-*
+   hooks), sliding up from behind it */
 .undo-bar {
-  position: fixed; left: 0; right: 0; bottom: var(--tab-h); z-index: 2; height: 44px; box-sizing: border-box;
+  position: fixed; left: var(--undo-left); right: var(--undo-right); bottom: calc(var(--tab-h) + var(--undo-lift));
+  z-index: 2; height: var(--undo-h); box-sizing: border-box;
   display: flex; align-items: center; gap: 10px;
-  padding: 0 max(6px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
-  transform: translate3d(0,100%,0); pointer-events: none;
+  padding: var(--undo-pad);
+  transform: translate3d(0,calc(100% + var(--undo-lift)),0); pointer-events: none;
   transition: transform .3s cubic-bezier(.25,.1,.25,1), opacity .3s cubic-bezier(.25,.1,.25,1);
 }
 .undo-bar.shown { transform: none; pointer-events: auto; }

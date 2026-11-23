@@ -1,7 +1,8 @@
 // F193: the bar that says what a swipe just queued, with Undo. iOS 6 had no toast, so it is the kit's
 // "Semi-transparent black bar" (the keyboard toolbar, 44pt) docked above the tab bar, the message on the left and the
 // blue bar button on the right. It slides up, hides after `duration` ms, and a new one replaces the old. Styles:
-// ios6.css (.undo-bar). Transform and opacity only.
+// ios6.css (.undo-bar); iOS 7 a flat toolbar, iOS 13 a rounded card and iOS 26 a glass capsule floating over the
+// tab bar (B333: style.css's --undo-* hooks place it, each era's sheet paints it). Transform and opacity only.
 //
 //   showUndoBar({ message, onUndo, duration = 4000 }) -> close()
 

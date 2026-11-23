@@ -25,6 +25,10 @@ html[data-style="ios13"] {
   --seg-h: 32px; --seg-margin: 10px 16px 0;
   --large-title-pad: 3px 16px 8px;
   --sw-w: 51px; --sw-h: 31px; --sw-knob-size: 31px; --sw-travel: 20px; /* iOS 7's 51 x 31 switch (ios7.css), as iOS 13's */
+  /* B333: the undo bar floats as a 50pt card 8pt in from the sides and 8pt over the tab bar, Undo's text button
+     bringing its own 8pt to the right edge */
+  --undo-left: max(8px, env(safe-area-inset-left)); --undo-right: max(8px, env(safe-area-inset-right));
+  --undo-lift: 8px; --undo-h: 50px; --undo-pad: 0 8px 0 16px;
 }
 
 /* ---- White ---- */
@@ -115,6 +119,10 @@ html[data-style="ios13"][data-theme="light"] {
   /* the reload bar (nav/reloadbar.js): the tab bar's #f9f9f9 under a hairline, black text, the grey spinner */
   --reload-bar: linear-gradient(var(--i13-hairline), var(--i13-hairline)) top / 100% .5px no-repeat, #f9f9f9;
   --reload-text: #000; --reload-emboss: none; --i13-reload-spinner: var(--spinner-gray);
+  /* B333: the undo bar, a white card all but opaque where iOS would blur (no backdrop-filter in this era), a hairline
+     ring and a soft float shadow; black message, Undo the tinted text button */
+  --undo-bar: rgba(255,255,255,.97); --undo-text: #000; --undo-emboss: none;
+  --i13-undo-shadow: 0 0 0 .5px rgba(0,0,0,.12), 0 6px 20px rgba(0,0,0,.16);
 }
 
 /* ---- OLED Black: the same shapes, white on black; ios6.css's dark rules read the --dk-* tokens ---- */
@@ -179,6 +187,9 @@ html[data-style="ios13"][data-theme="dark"] {
   --banner-emboss: none; --banner-title: #fff; --banner-text: #fff; --banner-timer: rgba(255,255,255,.3);
   --reload-bar: linear-gradient(var(--i13-hairline), var(--i13-hairline)) top / 100% .5px no-repeat, #000;
   --reload-text: #fff; --reload-emboss: none; --i13-reload-spinner: var(--spinner-white);
+  /* B333: the undo bar, the elevated #2c2c2e card on the black page, a light hairline ring */
+  --undo-bar: rgba(44,44,46,.97); --undo-text: #fff; --undo-emboss: none;
+  --i13-undo-shadow: 0 0 0 .5px rgba(255,255,255,.1), 0 6px 20px rgba(0,0,0,.6);
 }
 
 /* ---- Look-only rules: type, and the shapes no token carries ---- */
@@ -277,6 +288,9 @@ html[data-style="ios13"] .banner-text strong { font-weight: 600; }
 html[data-style="ios13"] .banner-icon { border-radius: 7px; }
 html[data-style="ios13"] .reload-text { font-size: 15px; font-weight: 600; }
 html[data-style="ios13"] .reload-spinner { background-image: var(--i13-reload-spinner); }
+/* B333: the undo bar floats as a rounded card (the hooks above place it), its message 15pt semibold */
+html[data-style="ios13"] .undo-bar { border-radius: 13px; box-shadow: var(--i13-undo-shadow); }
+html[data-style="ios13"] .undo-bar-text { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
 
 /* B343: the queue's hint over Installed (nav/queuehint.js) as iOS 13's edit menu callout: a flat dark grey bubble
    with 8pt corners, 36pt tall, white 14pt regular text, no gloss, emboss or drop shadow; a lighter grey in OLED
