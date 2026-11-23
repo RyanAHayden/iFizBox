@@ -34,8 +34,8 @@ export const builtinVPN = (st) => Boolean(st?.vpn?.available);
 export const SHORTCUT_NAMES = { off: "Cellular Data Off", on: "Cellular Data On", switch: "Install Switch" };
 export const switchAdded = (st) => Boolean(st?.vpn?.shortcuts?.switch);
 // F394: an Install Switch added before the one-trip one, on an app that can use it (`trips`): it works as before, and
-// its page offers Update. `vpn` is vpn.status.
-export const switchOld = (vpn) => Boolean(vpn?.trips && vpn.shortcuts?.switch && !vpn.shortcuts?.trip);
+// its page offers Update. F389: or one that can't bring an idle On Demand VPN back (`idle`). `vpn` is vpn.status.
+export const switchOld = (vpn) => Boolean(vpn?.trips && vpn.shortcuts?.switch && !(vpn.shortcuts?.trip && vpn.shortcuts?.idle));
 // Installs on cellular are covered: the Install Switch, or both Cellular Shortcuts.
 export const shortcutsAdded = (st) => switchAdded(st) || Boolean(st?.vpn?.shortcuts?.off && st?.vpn?.shortcuts?.on);
 // B359: our signed Shortcut on the site (web/app/shortcuts/, signed by tools/shortcuts/sign.sh). The app shares its
@@ -52,8 +52,8 @@ export const shortcutDidntOpen = (k, err) => `"${SHORTCUT_NAMES[k]}" couldn't be
 // This iPhone is set up: paired, and with the built-in VPN tested once (vpn.test). Using it waits for that.
 export const iphoneSetUp = (st) => Boolean(st?.paired) && (!builtinVPN(st) || Boolean(st.vpn.tested));
 // F394 (user 2026-11-23): the app asks for the Install Switch only when a connect now would need it and it isn't there:
-// LocalVPN.switchNeeded, on cellular or with another VPN up. The old two Cellular Shortcuts cover cellular, not the VPN.
-export const switchWanted = (st) => builtinVPN(st) && ((Boolean(st.vpn.cellular) && !shortcutsAdded(st)) || (Boolean(st.vpn.otherVPN) && !switchAdded(st)));
+// LocalVPN.switchNeeded, on cellular or with another VPN up or (F389) selected in Settings > VPN. The old two Cellular Shortcuts cover cellular, not the VPN.
+export const switchWanted = (st) => builtinVPN(st) && ((Boolean(st.vpn.cellular) && !shortcutsAdded(st)) || (Boolean(st.vpn.otherVPN || st.vpn.otherVPNSelected) && !switchAdded(st)));
 // Set Up's footer: the next step, or what is set up.
 export function setupFooter(st) {
   if (!st?.paired) return "Pair this iPhone once to install straight onto it.";
@@ -64,7 +64,7 @@ export function setupFooter(st) {
 }
 // B381: a connect now would run the Install Switch (LocalVPN.switchNeeded: on cellular, or with another VPN up), so
 // iOS would flip to Shortcuts. The checks nobody tapped (autoCheck) stay away then.
-export const switchWouldRun = (st) => builtinVPN(st) && Boolean(st.vpn.shortcuts?.switch) && Boolean(st.vpn.cellular || st.otherVPN || (!st.vpn.on && st.tunnels?.length)); // otherVPN is false when another VPN routes 10.7.0.1
+export const switchWouldRun = (st) => builtinVPN(st) && Boolean(st.vpn.shortcuts?.switch) && Boolean(st.vpn.cellular || st.otherVPN || st.vpn.otherVPNSelected || (!st.vpn.on && st.tunnels?.length)); // otherVPN is false when another VPN routes 10.7.0.1
 // User 2026-11-22: This iPhone in use, the phone on cellular (no Wi-Fi), and the Install Switch not added: iOS
 // refuses the connection, so Home, Installation & Signing's status and an install that starts say so, with a button
 // to the Install Switch's page.
@@ -123,7 +123,8 @@ export function decideRoute(choice, status) {
   if (!status.paired) return { route: "server", alert: "notPaired" };
   if (builtinVPN(status)) {
     if (cellularWarning(choice, status)) return { route: "idevice", alert: "cellular" }; // F372
-    return switchWanted(status) ? { route: "idevice", alert: "vpnStaysOff" } : { route: "idevice" }; // F394: another VPN is on
+    if (!switchWanted(status)) return { route: "idevice" };
+    return { route: "idevice", alert: status.vpn.otherVPN ? "vpnStaysOff" : "vpnIdle" }; // F394: another VPN is on; F389: or selected
   }
   const ts = status.tailscale;
   if (ts?.use) return { route: "idevice" };
@@ -164,6 +165,8 @@ export const ALERTS = {
   cellular: { title: CELLULAR.title, message: CELLULAR.message, buttons: ["Use Server", CELLULAR.button], setup: 1 },
   // F394: another VPN is on and nothing would bring it back; the first button goes on through This iPhone without it
   vpnStaysOff: { title: "Your VPN Stays Off", message: `This install turns your VPN off, and it stays off after. Add the Install Switch, and ${NAME} brings it back.`, buttons: ["Install", CELLULAR.button], setup: 1, goes: true },
+  // F389: selected, not connected: iOS tells an app nothing of its On Demand, so the words say "if"
+  vpnIdle: { title: "Your VPN May Stay Off", message: `If your VPN connects on demand, it stays off after this install. Add the Install Switch, and ${NAME} brings it back.`, buttons: ["Install", CELLULAR.button], setup: 1, goes: true },
 };
 
 // F284: the Tailscale app's VPN is on: idevice.status's tailscale.address is this phone's own tailnet address, there

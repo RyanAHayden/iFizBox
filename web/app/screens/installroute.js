@@ -271,7 +271,7 @@ export function shortcutGroups(st, { add = () => {}, test = () => {}, testing = 
   const f = failed[k];
   const groups = [{ rows: [row], ...(!sc[k] && f && checking !== k
     ? { footer: f.open ? shortcutDidntOpen(k, f.open) : shortcutDidntRun(k, f), warn: true }
-    : switchOld(st) ? { footer: "To open Shortcuts once per install, delete Install Switch in Shortcuts, then tap Update." }
+    : switchOld(st) ? { footer: `To ${sc.trip ? "get an idle VPN back" : "open Shortcuts once per install"}, delete Install Switch in Shortcuts, then tap Update.` } // F389: idle
     : { footer: `${sc[k] ? "" : direct ? "Add opens Shortcuts: tap Add Shortcut, and come back. " : "Tap Shortcuts, then Add Shortcut, and come back. "}It opens Shortcuts only when needed: on cellular, to turn data off and on, or to bring back your VPN.` }) }];
   // F392: the share sheet is the way left when Shortcuts doesn't open from Add or Update
   if (direct && !reading && checking !== k && (!sc[k] || switchOld(st))) groups.push({ rows: [{ label: SHARE_SHORTCUT, icon: rowIcon("share"), onClick: () => add(k, "share"), chevron: true }],

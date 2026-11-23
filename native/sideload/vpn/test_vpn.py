@@ -112,7 +112,7 @@ class App(unittest.TestCase):
         is off after the last; the plist reads JSON flags with "has any value" only (B359: "contains" loses its text)."""
         import plistlib
         src = read("App", "LocalVPN.swift")
-        self.assertIn('runShortcut("switch", input: switchInput("start"))', src)
+        self.assertIn('runShortcut("switch", input: switchInput("start", selected: selected))', src)
         self.assertIn("if stop { down(); endTrip(gen); endSwitch() }", src)
         self.assertIn("UIApplication.didBecomeActiveNotification", src)  # an end found in the background runs later
         self.assertIn('b.on("vpn.testSwitch")', src)
@@ -125,7 +125,7 @@ class App(unittest.TestCase):
             self.assertIn(want, ids)
         self.assertEqual(ids[-1], "nothing")
         keys = [a["WFWorkflowActionParameters"].get("WFDictionaryKey") for a in acts if ids[acts.index(a)] == "getvalueforkey"]
-        self.assertEqual(keys, ["start", "end", "cellular", "dataOff", "trip", "actions"])
+        self.assertEqual(keys, ["start", "end", "cellular", "dataOff", "trip", "actions", "selected"])
         groups = {}
         for a in acts:
             p = a["WFWorkflowActionParameters"]
@@ -137,13 +137,15 @@ class App(unittest.TestCase):
             self.assertEqual(modes[0], 0, g)
             self.assertEqual(modes[-1], 2, g)
         sets = [a["WFWorkflowActionParameters"] for a in acts if a["WFWorkflowActionIdentifier"].endswith("vpn.set")]
-        self.assertEqual([s["WFVPNOperation"] for s in sets], ["Connect", "Connect", "Connect"])
+        self.assertTrue(all(s["WFOnDemandValue"] is True for s in sets if s["WFVPNOperation"] == "Set On Demand"))  # F389
+        self.assertEqual([s["WFVPNOperation"] for s in sets], ["Connect", "Connect", "Set On Demand", "Connect", "Set On Demand"])
         last_set = [i for i, x in enumerate(ids) if x == "vpn.set"][1]  # the end forgets before Set VPN's error 2 ends the run
         self.assertEqual(ids[last_set - 1], "deletestoredcontent")
-        flt = next(a for a in acts if ids[acts.index(a)] == "filter.vpns")["WFWorkflowActionParameters"]
-        tpl = flt["WFContentItemFilter"]["Value"]["WFActionParameterFilterTemplates"][0]
-        self.assertEqual((tpl["Property"], tpl["Values"]["String"]), ("Server Address", "10.7.0.1"))
         self.assertIn('static let peer = "10.7.0.1"', src)  # the address Find VPNs looks for
+        params = [a["WFWorkflowActionParameters"] for a in acts]
+        finds = [p["WFContentItemFilter"]["Value"]["WFActionParameterFilterTemplates"][0] for p in params if "WFContentItemFilter" in p]
+        self.assertEqual([t["Values"].get("String") for t in finds if t["Property"] == "Server Address"], ["10.7.0.1"])
+        self.assertEqual([(t["Property"], t["Values"].get("Bool")) for t in finds if t["Property"] != "Server Address"], [("Is On Demand Enabled", True)] * 2)  # F389: an idle VPN
 
     def test_install_switch_vpn_before_data_off(self):
         """B375: iOS starts no VPN without a network ("No network available"), so Cellular Data goes off only after
@@ -210,9 +212,10 @@ class App(unittest.TestCase):
         last = max(i for i, p in enumerate(params) if p.get("GroupingIdentifier") == params[first]["GroupingIdentifier"])
         me = "com.ryha.ifizbox."
         steps = [i for i in ids[first:last] if i not in ("conditional",)]
-        self.assertEqual(steps, ["vpn.get", "setstoredcontent", "deletestoredcontent", me + "ConnectVPNIntent", "cellulardata.set",
+        self.assertEqual(steps, ["deletestoredcontent", "vpn.get", "setstoredcontent", "deletestoredcontent", "filter.vpns", "setstoredcontent", me + "ConnectVPNIntent", "cellulardata.set",
                                  me + "OpenForInstallIntent", "repeat.count", me + "WaitForInstallIntent", "repeat.count",
-                                 "cellulardata.set", "delay", "getstoredcontent", "vpn.set"])
+                                 "cellulardata.set", "delay", "getstoredcontent", "vpn.set",
+                                 "getstoredcontent", "vpn.set", me + "WaitForInstallIntent"])
         data = [p["OnValue"] for i, p in list(zip(ids, params))[first:last] if i == "cellulardata.set"]
         self.assertEqual(data, [False, True])
         loop = next(p for i, p in zip(ids, params) if i == "repeat.count")
