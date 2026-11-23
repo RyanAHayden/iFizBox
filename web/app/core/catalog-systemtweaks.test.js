@@ -4,7 +4,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createCatalog, ALL } from "./catalog.js";
-import { indexEntry, dropsFromCatalog } from "./tweakindex.js";
+import { indexEntry, indexSource, dropsFromCatalog } from "./tweakindex.js";
+import { packIndexFile } from "./tweakindexfile.js";
 import { APP_TWEAKS } from "./sections.js";
 import { loadTweakIndex, catalogVerdicts, onTweakVerdicts } from "../screens/tweaks.js";
 
@@ -38,7 +39,7 @@ Description: Not checked yet
 Filename: debs/com.b377.aerialfresh_0.9_iphoneos-arm64.deb
 `;
 
-// What GET /api/tweaks answers for the source: Aerial hooks SpringBoard only, AnyFont loads into every app.
+// What the Tweak Index says of the source: Aerial hooks SpringBoard only, AnyFont loads into every app.
 const ANSWER = [
   indexEntry({ package: "jp.uzra.aerial", version: "1.2.0" }, { ok: false, why: "It's for iOS itself", bundles: [], anyApp: false, systemOnly: true }),
   indexEntry({ package: "com.b377.anyfont", version: "1.1" }, { ok: true, bundles: [], anyApp: true }),
@@ -92,8 +93,9 @@ test("B377: the index's answer reaches the catalog (screens/tweaks.js onTweakVer
   const got = [];
   const off = onTweakVerdicts((m) => { got.push(m); c.setTweakVerdicts(m); });
   try {
-    const fetch = async () => ({ ok: true, json: async () => ({ enabled: true, tweaks: ANSWER }) });
-    assert.equal(await loadTweakIndex([{ key: KEY, uri: KEY, dist: "./" }], { fetch, base: "https://ifizbox.example/api/tweaks" }), 2);
+    const { key } = indexSource({ uri: KEY, dist: "./" });
+    const file = packIndexFile([{ key, refreshed: 5, pending: 0 }], ANSWER.map((e) => ({ source: key, checked: 6, entry: JSON.stringify(e) })));
+    assert.equal(await loadTweakIndex([{ key: KEY, uri: KEY, dist: "./" }], { file: { read: async () => file } }), 2);
   } finally { off(); }
   assert.deepEqual(got, [{ "jp.uzra.aerial@1.2.0": true, "com.b377.anyfont@1.1": false }]);
   assert.equal(catalogVerdicts({ storage: { getItem: () => null, setItem() {} } })["jp.uzra.aerial@1.2.0"], true);

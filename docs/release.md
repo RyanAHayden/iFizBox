@@ -111,10 +111,19 @@ Pass that file as `--notes`. Without `--notes`, `release.sh` makes the notes fro
 file. `publish.sh` deletes the committed files (all but `release-notes/README.md`) in its version commit, so the
 next release starts empty.
 
+## Tweak Index file
+
+The sideload app and the site carry a copy of the whole Tweak Index, `web/app/tweak-index.json` (its shape:
+`web/app/core/tweakindexfile.js`). `tools/publish.sh` writes it at each release, into the version commit: `node
+tools/tweak-index.mjs` reads the live Tweak Index from ifizbox.com's D1 database `ifizbox-tweaks` with wrangler, which
+must be logged in (`tools/deploy.sh --check-auth`). A failed or empty read keeps the last file (the tool exits 1 and writes nothing).
+A dry run doesn't run it. The live site has no `/api/tweaks.json` until the first release, which is why the tool reads
+D1 directly.
+
 ## Cutting one
 
 One command does all of it: `tools/publish.sh X.Y.Z [--notes FILE] [--minimum X.Y.Z] [--dry-run]`. It checks main is
-clean and current and the version is new, commits and pushes `native/VERSION`, builds that exact commit in a clean
+clean and current and the version is new, writes the Tweak Index file, commits and pushes `native/VERSION` and that file, builds that exact commit in a clean
 temporary worktree, publishes it with `tools/release.sh` as the repo owner's GitHub account (whichever gh account
 is active; `tools/release.sh --check-auth` runs first, so a missing login stops it before the version commit is
 pushed; `tools/deploy.sh --check-auth` checks wrangler's login the same way), tags a commit that adds the updated

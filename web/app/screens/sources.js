@@ -687,7 +687,11 @@ async function noteFilteredTweakSources(ul, list) {
 //   tweakJudge.enabled   false under node (tests switch it on with their own ask/apps), so tests never fetch
 export const tweakJudge = {
   enabled: typeof globalThis.process?.versions?.node !== "string",
-  ask: (s) => import("./tweaks.js").then((m) => askTweakIndex(s, { base: m.indexBase() })),
+  ask: (s) => import("./tweaks.js").then((m) => {
+    const file = m.indexFile();
+    judged.unwatch ??= file.onChange(() => judged.answers.clear()); // F398: a newer index file: judged anew on the next draw
+    return askTweakIndex(s, { file });
+  }),
   apps: async () => (await (await import("./tweaks.js")).signableApps()).map((a) => a.bundleId),
   every: 10 * 60 * 1000, // an index answer is kept this long
   again: 15 * 1000,      // the user's apps are read again after this long

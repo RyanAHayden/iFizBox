@@ -14,6 +14,9 @@ A new install starts with app-tweak sources only: GitHub repos whose releases ca
 YTMusicUltimate, SCInsta; `web/app/tweak-sources.json` entries with `github` and `"inject": true`). The Sources tab
 leaves out a Tweak Source the Tweak Index has fully checked with no tweak for the user's apps (or for any app);
 searching and Manage still list it.
+The Tweak Index is read from the copy shipped with the app (`web/app/tweak-index.json`, written at each release, see
+docs/release.md), so it works offline. A newer copy is fetched in the background (Settings > General > Update Tweak
+Index); no request says which sources the phone has.
 
 The notes on the other projects come from their source, not from runs on a phone. Sources, at these commits:
 

@@ -7,10 +7,10 @@ detail. (Format after mattpocock/skills domain-modeling, MIT.)
 ## Language
 
 **Tweak Index**:
-ifizbox.com's list of which app each tweak of a Tweak Source works in, read from the tweak's own files before anyone opens it
+ifizbox.com's list of which app each tweak of a Tweak Source works in, read from the tweak's own files before anyone opens it. The app and the site carry a copy of the whole index (web/app/tweak-index.json), so a phone reads it without saying which sources it has
 _Said_: shared tweak index
-_On screen_: Works in: <app>
-_In code_: core/tweakindex.js, worker/src/tweakindex.js, GET /api/tweaks, loadTweakIndex
+_On screen_: Works in: <app>; Update Tweak Index
+_In code_: core/tweakindex.js, core/tweakindexfile.js, worker/src/tweakindex.js, GET /api/tweaks, GET /api/tweaks.json, web/app/tweak-index.json, loadTweakIndex
 _Avoid_: tweak database, tweak cache
 
 **Details**:

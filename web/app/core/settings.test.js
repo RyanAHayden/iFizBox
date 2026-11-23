@@ -31,7 +31,7 @@ test("defaults with nothing stored", () => {
 // F128: the settings audit. What's left, and the ones that went (docs/settings.md).
 test("F128: exactly these settings remain, and the retired ones are gone", () => {
   assert.deepEqual(SETTINGS.map((d) => d.key), ["style", "appearance", "lightTheme", "darkTheme", "iconMatch", "lightIcon", "darkIcon", "device", "arch", "worksOnMyPhone", "compatMarks",
-    "iosVersion", "refreshOnLaunch", "returnHome", "holds", "selfUpdateAlerts", "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring",
+    "iosVersion", "refreshOnLaunch", "tweakIndexRefresh", "returnHome", "holds", "selfUpdateAlerts", "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring",
     "keepVersions", "showExpiry", "resignReminder", "keepBundleId", "showExpiryWarning", "expiryWarning", "installRoute"]);
   assert.deepEqual(RETIRED, ["sideloader", "checkUpdates", "cellular", "notifications", "badge", "allowZoom"]);
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
@@ -89,7 +89,7 @@ test("F128: pages like iOS 6's Settings: General, Theme, Updates (Signing in the
     ["updates", "Updates", [["holds"], ["upgradeNotifications"], ["autoInstall", "respring"], ["autoInstallIdle"], ["keepVersions"]]],
   ]);
   assert.deepEqual(layout("sideload"), [
-    ["general", "General", [...compat, ["refreshOnLaunch"], ["returnHome"]]],
+    ["general", "General", [...compat, ["refreshOnLaunch"], ["tweakIndexRefresh"], ["returnHome"]]], // F398
     theme,
     ["updates", "Updates", [["holds"]]],
     ["installation", "Installation", [["installRoute"]]],
@@ -261,7 +261,7 @@ test("rows each mode shows once every feature exists", () => {
     ["style", "appearance", "lightTheme", "darkTheme", "iconMatch", "lightIcon", "darkIcon", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds",
       "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
   assert.deepEqual(show("sideload"),
-    ["style", "appearance", "lightTheme", "darkTheme", "iconMatch", "lightIcon", "darkIcon", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds", "selfUpdateAlerts", "showExpiry", "resignReminder", "keepBundleId",
+    ["style", "appearance", "lightTheme", "darkTheme", "iconMatch", "lightIcon", "darkIcon", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "tweakIndexRefresh", "returnHome", "holds", "selfUpdateAlerts", "showExpiry", "resignReminder", "keepBundleId",
       "showExpiryWarning", "expiryWarning", "installRoute"]);
 });
 
@@ -295,7 +295,7 @@ test("sections come in page order, empty ones dropped", () => {
   const s = createSettings({ storage: memStorage(), mode: "sideload", features: everything });
   // F315: a section's later groups are named by their first row; `section` keeps the section's id, only the first
   // group carries its title
-  assert.deepEqual(s.sections().map((x) => x.id), ["compat", "compatMarks", "sources", "returnHome", "style", "appearance", "themes", "updates",
+  assert.deepEqual(s.sections().map((x) => x.id), ["compat", "compatMarks", "sources", "tweakIndexRefresh", "returnHome", "style", "appearance", "themes", "updates",
     "installation", "signing", "keepBundleId", "expiry"]);
   assert.deepEqual([...new Set(s.sections().map((x) => x.section))], ["compat", "sources", "style", "appearance", "themes", "updates", "installation", "signing", "expiry"]);
   assert.equal(s.sections().find((x) => x.id === "appearance").settings[0].key, "appearance");

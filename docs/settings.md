@@ -13,7 +13,7 @@ Like iOS 6's Settings app, the root is one list of short rows with no footers. E
 | Root row | Builds | Page |
 |---|---|---|
 | iFizBox Account | all | sign in, create an account (screens/account.js) |
-| General | all | Device and iOS Version (website only, one group); Works on My Phone and Compatibility Marks; Refresh Sources on Launch (apps only) and Return to Home After; Blocked (packages and authors); Sideloading > Open Other Apps' Links (sideload only); Website > Lock Home and Other Apps > Install on the Website (website only; Install on the Website is padlocked while Home is locked) |
+| General | all | Device and iOS Version (website only, one group); Works on My Phone and Compatibility Marks; Refresh Sources on Launch (apps only) and Return to Home After; Update Tweak Index (sideload only: on, the newest Tweak Index is fetched in the background; off, no such request is made and the copy already on the phone is used, which can be older); Blocked (packages and authors); Sideloading > Open Other Apps' Links (sideload only); Website > Lock Home and Other Apps > Install on the Website (website only; Install on the Website is padlocked while Home is locked) |
 | Theme | all | Mode (Automatic / Light / Dark, a segmented control) and Themes (Light and Dark, each a checklist of themes) |
 | Updates | all | Ignored Upgrades; Upgrade Notifications (jailbreak only); Automatic Installs (jailbreak only: Install Updates Automatically, When Charging and Locked, After a Respring Update, Keep Previous Versions); Update Alerts (sideload only) |
 | Installation & Signing | sideload | no detail; how apps install, then the certificate: see "Settings > Installation & Signing" below |
