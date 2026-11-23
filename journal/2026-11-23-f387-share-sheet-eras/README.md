@@ -21,8 +21,15 @@ the last part still drawn in the iOS 6 look in every era.
 - `web/app/ios7.css`, `ios13.css`, `ios26.css`: `--share-layout: action` and each era's row values.
   - iOS 7: 29px icon, 6.5px corners, 15px gap, pad 0 15px.
   - iOS 13: 29px icon, 7px corners, 14px gap, pad 0 16px.
-  - iOS 26: 24px icon, 6px corners, 12px gap, pad 0 18px, icon at the row's end (`row-reverse`, justified
-    `space-between`), so the label comes first as in a UIMenu row.
+  - iOS 26: 24px icon, 6px corners, 12px gap, pad 0 18px. A first build put the icon at the row's end, as in a UIMenu
+    row (`--share-row-dir: row-reverse`). The spec review pointed out that the approved option says "a small icon in
+    front of each label", so iOS 26 now keeps the icon in front like the other eras. The `--share-row-dir` and
+    `--share-row-justify` hooks stay, set to iOS 6's values.
+- The icon slot's rules and hooks are in `style.css`, not `packages.css` as the concept said: the task's file list
+  names `style.css`, and the other share sheet layout already lives there. `actionShare` passes no `title`, because
+  the action sheet would draw it as a visible title row, which neither the grid nor option C's sketch has.
+- The iOS 26 menu needs no `from`: `sourceRect` falls back to the button the last tap landed on (the Share button),
+  as the iOS 26 shots show.
 - `web/app/ios6.css`: `--share-line-copy` and `--share-line-qr`, the Copy and QR glyphs as grey (#8e8e93) line art.
   The eras set `--share-glyph-copy` and `--share-glyph-qr` to them, and set the share icon tokens flat: no gloss,
   shine or emboss, a white tile with a hairline in Light, dark grey in Dark.
