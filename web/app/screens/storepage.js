@@ -8,10 +8,10 @@
 //     nav bar's right button (user 2026-11-18: "keep the install / modify button in the top right"). `action`: an
 //     element for the header's right edge, where the App Store's install button sat (F194: an app page's Share).
 //   headerLine({ version, size, price })   -> "Version 2.1.3 · 412 kB · Free"
-//   storeTabs({ details, reviews, related }) -> { control, panes: { details, reviews, related }, select(i), swipeOn(body), nodes }
+//   storeTabs({ details, reviews, related }) -> { control, panes: { details, reviews, related }, select(i), attach(body), nodes }
 //     The Details / Reviews / Related segmented control (ios6.css .store-segmented) over three panes. Details is
 //     filled by the caller at once; reviews(pane) and related(pane) run the first time their tab is chosen or a swipe
-//     begins to show it. swipeOn(body), once `nodes` are in the page: swipes and taps slide the panes (F390, nav/tabswipe.js).
+//     begins to show it. attach(body), once `nodes` are in the page: taps slide the panes (F390, nav/tabswipe.js).
 //   tileRow({ rating })                    -> { row, set(key, tile | null) }  the sideways info tiles, in TILE_ORDER
 //     (F206: starts with the Rating tile's placeholder, pendingRatingTile(), unless rating: false)
 //   worksOnTile(fit)                       -> { label, value, sub, ok }  compat()'s verdict as the Works On tile
@@ -123,7 +123,7 @@ export function storeTabs({ reviews = null, related = null } = {}) {
   const pager = tabPager({ panes: keys.map((k) => panes[k]), mark: control.mark, fill: fillPane });
   pager.select(0);
   return { control: control.bar, buttons: control.buttons, panes, select: pager.select, selected: () => keys[pager.selected()],
-    swipeOn: pager.attach, nodes: [control.bar, panes.details, panes.reviews, panes.related] };
+    attach: pager.attach, nodes: [control.bar, panes.details, panes.reviews, panes.related] };
 }
 
 // ---- the info tiles --------------------------------------------------------------------------------------------

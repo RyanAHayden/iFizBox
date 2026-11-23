@@ -1291,7 +1291,7 @@ async function renderPackage(body, route, key, id, ctx) {
     depends: relationsOf(st, "depends").map((g) => g[0].name), conflicts: relationsOf(st, "conflicts").map((g) => g[0].name) });
   const relationsHref = (kind) => deeper(route, sourceToken(route, kind, id, key)); // F402
   body.replaceChildren(header.head, ...tabs.nodes);
-  tabs.swipeOn(body); // F390
+  tabs.attach(body); // F390
   // F228: from a source on the piracy list: Source Warning at the top of Details.
   const piracy = piracyBanner(packageWarning({ key: pkg.key, source: source?.uri }));
   if (piracy) details.append(piracy);

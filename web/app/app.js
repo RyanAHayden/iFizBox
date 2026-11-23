@@ -14,7 +14,7 @@ import { load, loaded, mod, missing, loadAll, NotLoaded } from "./lazy.js";
 import { grouped, placeholder } from "./nav/ui.js";
 import { createStacks, swipeCommits, newestRoute } from "./nav/stack.js";
 import { animate, setProgress, clear, DURATION, EASE, EASE_OUT } from "./nav/transition.js";
-import { attachEdgeSwipe, attachPageSwipe, attachTabSwipe, lockScroll, pageSwipeBlocked, tabSwipeTakesBack } from "./nav/swipe.js";
+import { attachEdgeSwipe, attachPageSwipe, lockScroll, pageSwipeBlocked } from "./nav/swipe.js";
 import { keepRow, ghostFor } from "./nav/selection.js";
 import { createTabbar, tapTab, scrollToTop, isSliding } from "./nav/tabbar.js";
 import { scrollerOf } from "./nav/searchbar.js";
@@ -411,14 +411,10 @@ attachPageSwipe(screensEl, {
     dropPress();
     return backSwipe.begin();
   },
-  blocked: (target) => tabSwipeTakesBack(target) || !!pageSwipeBlocked(target, screensEl) || popupOpen(),
+  blocked: (target) => !!pageSwipeBlocked(target, screensEl) || popupOpen(),
   held: () => !!pendingStep(),
   onHeld: () => { askLeave(guardHooks.alert).then((go) => { if (go) goBack(); }); },
 });
-
-// F390: a swipe on a Details page moves between its Details, Reviews and Related tabs (nav/swipe.js attachTabSwipe); on Reviews and
-// Related the rightward one is theirs, and swipe back keeps the edge strip there.
-attachTabSwipe(screensEl, { canStart: () => !running && !gesture, blocked: () => popupOpen(), onBegin: dropPress });
 
 // Tab taps go through selectTab so each tab keeps its place; the href is there for no-JS fallbacks and a11y.
 for (const tab of BAR_TABS) tabbar.items[tab].href = format({ tab });

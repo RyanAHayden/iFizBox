@@ -111,8 +111,7 @@ const sideways = (o) => o === "auto" || o === "scroll";
 //   "scroller"  in something that scrolls sideways and isn't at its left end (the swipe would fight its scroll)
 //   "armed"     in a list showing a row's Delete: a right swipe there puts the Delete away (sources.js & co.)
 //   "selection" text is selected: the drag is the selection's
-// `ends` (F390, the tabs): a sideways scroller steps aside wherever it stands, its left end included.
-export function pageSwipeBlocked(target, root, win = globalThis, { ends = false } = {}) {
+export function pageSwipeBlocked(target, root, win = globalThis) {
   const sel = win.getSelection?.();
   if (sel && !sel.isCollapsed && String(sel)) return "selection";
   for (let el = target; el && el !== root; el = el.parentElement) {
@@ -120,7 +119,7 @@ export function pageSwipeBlocked(target, root, win = globalThis, { ends = false 
     if (el.matches?.(PAGE_SWIPE_SKIP)) return "control";
     const cs = win.getComputedStyle?.(el);
     if (cs?.touchAction === "none") return "drag";
-    if (cs && sideways(cs.overflowX) && el.scrollWidth > el.clientWidth + 1 && (ends || el.scrollLeft > 0)) return "scroller";
+    if (cs && sideways(cs.overflowX) && el.scrollWidth > el.clientWidth + 1 && el.scrollLeft > 0) return "scroller";
     if (el.querySelector?.(":scope > .armed")) return "armed";
   }
   return "";
@@ -129,9 +128,8 @@ export function pageSwipeBlocked(target, root, win = globalThis, { ends = false 
 // root: the screens. canStart() at the touch (nothing else moving, a page to go back to); blocked(target) -> truthy
 // to step aside (the caller adds its own reasons to pageSwipeBlocked's). begin/move/end as attachEdgeSwipe's.
 // held() -> true when a swipe must ask first (the pairing page's running step): once the drag is a swipe, onHeld()
-// runs instead of begin, and nothing is dragged. blocked also gets the touch's point and begin the dx that started it.
-// `decide` and `clamp` (F390, attachTabSwipe) are for swipes that go both ways; end's third argument: it was cancelled.
-export function attachPageSwipe(root, { canStart, blocked = () => false, decide = pageSwipeDecide, clamp = (dx) => Math.max(0, dx), held = () => false, onHeld = () => {}, begin, move, end }, win = globalThis) {
+// runs instead of begin, and nothing is dragged.
+export function attachPageSwipe(root, { canStart, blocked = () => false, held = () => false, onHeld = () => {}, begin, move, end }, win = globalThis) {
   let t = null; // { id, x0, y0, started, width, dx, samples, frame }
   const find = (list, id) => { for (const x of list ?? []) if (x.identifier === id) return x; return null; };
   const finish = (cancelled, ts) => {
@@ -139,7 +137,7 @@ export function attachPageSwipe(root, { canStart, blocked = () => false, decide 
     t = null;
     if (!tt?.started) return;
     if (tt.frame) cancelAnimationFrame(tt.frame);
-    end(tt.dx, cancelled ? -1 : velocity(tt.samples, ts), cancelled);
+    end(tt.dx, cancelled ? -1 : velocity(tt.samples, ts));
   };
   const drop = () => finish(true, performance.now()); // slides back
 
@@ -147,7 +145,7 @@ export function attachPageSwipe(root, { canStart, blocked = () => false, decide 
     if (t) drop(); // a second finger (a pinch: no swipe) or a touch that never ended
     if (e.touches.length !== 1) return;
     const p = e.changedTouches[0];
-    if (!p || !canStart() || blocked(e.target, p)) return;
+    if (!p || !canStart() || blocked(e.target)) return;
     t = { id: p.identifier, x0: p.clientX, y0: p.clientY, started: false, dx: 0, samples: [], frame: 0 };
   }, { passive: true });
 
@@ -157,15 +155,15 @@ export function attachPageSwipe(root, { canStart, blocked = () => false, decide 
     if (!p) return;
     if (!t.started) {
       // A handler under the finger that took the move for itself (preventDefault) keeps it.
-      const d = e.defaultPrevented ? "none" : decide(p.clientX - t.x0, p.clientY - t.y0);
+      const d = e.defaultPrevented ? "none" : pageSwipeDecide(p.clientX - t.x0, p.clientY - t.y0);
       if (d === "wait") return;
       if (d === "none" || !canStart()) { t = null; return; }
       if (held()) { t = null; onHeld(); return; }
       t.started = true;
-      t.width = begin(p.clientX - t.x0);
+      t.width = begin();
       t.x0 = p.clientX; // start from here, so the screen doesn't jump by the slop
     }
-    t.dx = clamp(p.clientX - t.x0);
+    t.dx = Math.max(0, p.clientX - t.x0);
     t.samples.push([e.timeStamp, p.clientX]);
     if (t.samples.length > 6) t.samples.shift();
     if (!t.frame) {
@@ -179,48 +177,4 @@ export function attachPageSwipe(root, { canStart, blocked = () => false, decide 
   win.addEventListener?.("blur", drop);
   win.document?.addEventListener("visibilitychange", () => { if (win.document.visibilityState === "hidden") drop(); });
   return { drop };
-}
-
-// ---- F390: swipes between a page's tabs ---------------------------------------------------------------------------
-// The touch side of nav/tabswipe.js (the Details / Reviews / Related panes): the same passive touch stream as the page
-// swipe, both ways. One touch is never both: rightward it is the tabs' only with a tab before (tabSwipeTakesBack keeps
-// swipe back out), leftward it is never swipe back's.
-const STRIP = 20; // px, the edge strip's width (style.css .edge-swipe)
-export const tabPagers = new WeakMap(); // page body -> the pager it shows
-
-// Rows with swipe actions and a depiction's own tab bar, besides pageSwipeBlocked's list.
-export const TAB_SWIPE_SKIP = ".pkg-row, .source-row, .dep-tabs > .store-segmented";
-
-// Leftward is always the tabs' (the last one rubber-bands); rightward only with a tab before, else it is swipe back's.
-export function tabSwipeDecide(dx, dy, hasPrev) {
-  const ax = Math.abs(dx), ay = Math.abs(dy);
-  if (ay > SLOP && ay >= ax) return "none";
-  if (ax <= SLOP || ax <= ay) return "wait";
-  return dx < 0 || hasPrev ? "swipe" : "none";
-}
-
-// The live pager under a touch, or null.
-function pagerAt(target) {
-  const p = tabPagers.get(target?.closest?.(".page-body"));
-  return p?.live() ? p : null;
-}
-
-export const tabSwipeTakesBack = (target) => (pagerAt(target)?.selected() ?? 0) > 0;
-
-// root: the screens. onBegin() as a drag becomes a swipe.
-export function attachTabSwipe(root, { canStart, blocked = () => false, onBegin = () => {} }, win = globalThis) {
-  let pager = null; // the touched page's
-  return attachPageSwipe(root, {
-    canStart,
-    blocked(target, point) {
-      pager = pagerAt(target);
-      return !pager || point.clientX < STRIP || Boolean(target.closest(TAB_SWIPE_SKIP))
-        || Boolean(pageSwipeBlocked(target, pager.scroller, win, { ends: true })) || blocked(target);
-    },
-    decide: (dx, dy) => (pager.live() ? tabSwipeDecide(dx, dy, pager.selected() > 0) : "none"),
-    clamp: (dx) => dx,
-    begin(dx) { onBegin(); return pager.begin(dx); },
-    move: (dx) => pager.move(dx),
-    end: (dx, vx, cancelled) => pager.end(dx, vx, cancelled),
-  }, win);
 }

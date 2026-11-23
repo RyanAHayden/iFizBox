@@ -1,19 +1,14 @@
 // F390: the panes under a segmented control (the Details / Reviews / Related tabs, screens/storepage.js storeTabs)
-// slide sideways: 1:1 under the finger from a touch anywhere on the page, or by themselves when a tab is tapped.
+// slide sideways by themselves when a tab is tapped. (No swiping between them: F403.)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 //   tabPager({ panes, mark, fill })   -> { select(i), selected(), attach(scroller) }: one control's panes
 //
-// The touches come from swipe.js attachTabSwipe, which is loaded at start (app.js); this file comes with the pages.
-//
 // At rest the chosen pane is in the page's flow and the others are hidden. While it moves, the chosen one stays in
 // the flow (so the page's height is always its own) and the one beside it is absolutely placed over the same spot, both
-// moved by transform alone. Layout is read when a drag begins, when a neighbour comes in and when it is let go, never
-// per frame.
+// moved by transform alone. Layout is read when a slide begins and when a neighbour comes in, never per frame.
 // The neighbour may be shorter than the page is scrolled: it is shown where it will be once chosen, and the page's
 // scroll is set as it is chosen while the header above slides from where it was (FLIP), so nothing jumps.
-import { tabPagers } from "./swipe.js";
-import { swipeCommits } from "./stack.js";
 import { bezier, stillChange } from "./slide.js";
 import { DURATION, EASE } from "./motion.js";
 import { EASE_OUT } from "./transition.js";
@@ -22,21 +17,18 @@ const CURVES = { [EASE]: bezier(.25, .1, .25, 1), [EASE_OUT]: bezier(.2, .8, .4,
 
 const reduced = () => Boolean(globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
 
-// How far past its end a pane follows the finger (UIScrollView's rubber band).
-export const rubber = (dx, width) => Math.sign(dx) * (1 - 1 / (Math.abs(dx) * .55 / width + 1)) * width;
-
 export function tabPager({ panes, mark = () => {}, fill = () => {} }) {
   let now = 0;
   let scroller = null;
+  let attached = false;
   const pos = new Map(); // pane index -> { x, y } where it shows, px from its place; empty at rest
   let headY = 0;         // the same for everything above the panes
   let run = null;        // the slide in progress: { steps: [{ set, from, to }], anims, easing, duration }
-  let drag = null;       // the finger's: { x0, dir, width, still } (still: reduced motion, nothing follows it)
 
   const has = (j) => j >= 0 && j < panes.length;
   const transform = ({ x, y }) => `translate3d(${x}px,${y}px,0)`;
   const heads = () => { const out = []; for (const c of scroller.children) { if (c === panes[0]) break; out.push(c); } return out; };
-  const live = () => Boolean(scroller && tabPagers.get(scroller) === api && panes[0].parentElement === scroller && scroller.isConnected);
+  const live = () => Boolean(scroller && attached && panes[0].parentElement === scroller && scroller.isConnected);
 
   const paint = (j) => { panes[j].style.transform = transform(pos.get(j)); };
   function paintHead(y) {
@@ -159,7 +151,6 @@ export function tabPager({ panes, mark = () => {}, fill = () => {} }) {
 
   function select(j) {
     if (!has(j)) return;
-    if (drag) return;
     if (j === now) { if (!run) switchNow(j); return; }
     if (!live() || reduced() || typeof panes[j].animate !== "function") { switchNow(j); return; }
     const from = now;
@@ -174,63 +165,9 @@ export function tabPager({ panes, mark = () => {}, fill = () => {} }) {
     slideHome(width, { duration: DURATION, easing: EASE });
   }
 
-  // ---- the finger ---------------------------------------------------------------------------------------------
-  function place(x) {
-    const dir = x ? -Math.sign(x) : drag.dir; // the side whose pane shows: 1 the next, -1 the one before
-    const j = now + dir;
-    if (!pos.has(now)) pos.set(now, { x, y: 0 });
-    for (const [k, p] of [...pos]) {
-      const kx = x + (k - now) * drag.width;
-      if (k !== now && k !== j && Math.abs(kx) >= drag.width) { putAway(k); continue; }
-      pos.set(k, { x: kx, y: p.y });
-      paint(k);
-    }
-    if (has(j) && !pos.has(j)) bringIn(j, x + dir * drag.width);
-  }
-  function begin(dx) {
-    take();
-    drag = { x0: pos.get(now)?.x ?? 0, dir: dx < 0 ? 1 : -1, width: scroller.clientWidth, still: reduced() };
-    if (!drag.still) {
-      panes[now].style.willChange = "transform";
-      place(drag.x0);
-    } else if (has(now + drag.dir)) fill(now + drag.dir);
-    return drag.width;
-  }
-  function follow(dx) {
-    let x = drag.x0 + dx;
-    if (!has(now + (x < 0 ? 1 : -1))) x = rubber(x, drag.width);
-    const most = Math.max(drag.width, Math.abs(drag.x0)); // a slide across two tabs taken over is further out
-    return Math.max(-most, Math.min(most, x));
-  }
-  function move(dx) {
-    if (drag && !drag.still) place(follow(dx));
-  }
-  function end(dx, vx, cancelled) {
-    if (!drag) return;
-    const d = drag;
-    const x = follow(dx);
-    const dir = -Math.sign(x);
-    const to = now + dir;
-    const go = !cancelled && dir !== 0 && has(to) && swipeCommits(Math.abs(x), -dir * vx, d.width);
-    if (d.still || !live()) {
-      drag = null;
-      if (d.still && go) switchNow(to); else rest();
-      return;
-    }
-    place(x);
-    drag = null;
-    // Keep the slide's speed close to the finger's: a fast flick finishes fast (as app.js backSwipe).
-    const part = Math.min(1, Math.abs(go ? d.width - Math.abs(x) : x) / d.width);
-    const speed = cancelled ? 0 : Math.abs(vx) * DURATION / d.width;
-    const opts = { duration: Math.max(120, Math.min(DURATION, part * DURATION / Math.max(1, speed))), easing: EASE_OUT };
-    if (go) choose(to);
-    slideHome(d.width, opts);
-  }
-
   const api = {
-    select, selected: () => now, live, begin, move, end,
-    get scroller() { return scroller; },
-    attach(body) { scroller = body; tabPagers.set(body, api); },
+    select, selected: () => now, live,
+    attach(body) { scroller = body; attached = true; },
   };
   return api;
 }
