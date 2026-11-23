@@ -558,7 +558,7 @@ html[data-theme="dark"] .action-button.cancel:not(:active):not(.is-pressed) { ba
 .version-more .cell-label { font-size: 15px; }
 .price-btn.version-mark.added { color: var(--tw-added-text); border-color: var(--tw-added-edge); }
 html[data-theme="dark"] .price-btn.version-mark.added { color: var(--subtitle); }
-.version-row.unavailable .cell-label, .version-row.unavailable .version-notes { color: var(--subtitle); }
+.version-row.unavailable .version-top .cell-label, .version-row.unavailable .version-notes { color: var(--subtitle); }
 /* ==== } look-only ==== */
 
 /* The section index (nav/sectionindex.js): UITableView's, 12px bold slate letters spread down the right edge

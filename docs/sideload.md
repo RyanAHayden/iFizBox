@@ -292,9 +292,12 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   On cellular (cellular in use, no Wi-Fi joined) iOS refuses these connections while cellular data is on
   (journal/2026-11-21-r72-cellular-this-iphone), so, as SideStore's Cellular Refresh, the user adds one Shortcut
   on Set Up, "Install Switch" (signed by `tools/shortcuts/sign.sh` from `tools/shortcuts/install-switch.plist`,
-  shipped in `web/app/shortcuts/`). Add shares it to Shortcuts' Add Shortcut sheet; back in the app it runs once
+  shipped in `web/app/shortcuts/`). Add opens Shortcuts' Add Shortcut sheet with the iCloud link when the Install Switch
+  has one (`SHORTCUT_LINKS.switch` in `core/installroute.js`, null today, since Shortcuts refuses non-iCloud links; an
+  Apple ID owner makes it once by hand: Shortcuts > Share > Copy iCloud Link). Until then Add shares the signed file to
+  that sheet, and the "Shortcut Not Added" alert offers Share File. Back in the app it runs once
   with the input `{"check":1}` (it does nothing) and shows Done only if it ran. Once added, the page
-  `installation/shortcuts` (Install Switch) shows an Added row and Test Install Switch (`vpn.testSwitch`).
+  `installation/shortcuts` (Install Switch) shows an Added row, Test Install Switch (`vpn.testSwitch`) and, once the Install Switch has a link, Share Shortcut File.
   On iOS 16 and later the added Install Switch takes one trip to Shortcuts per queue of installs. Until it is replaced
   (delete the old one in Shortcuts first, then tap Update: Replace in Shortcuts can leave two on iOS 27, and then neither
   runs by name), Set Up's row and the Install Switch page show Update. The app uses a trip only
@@ -358,7 +361,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   offers Install (it goes on through This iPhone) or Set Up; iPhone's Refused and Couldn't Connect messages mention the
   Install Switch only then. Bridge calls: `vpn.status` (also `idevice.status`'s `vpn`; its `shortcuts` is
   `{off, on, switch, trip}`), `vpn.test`, `vpn.testSwitch` (one trip when ready; otherwise runs start, waits for the VPN,
-  runs dataOff on cellular, then end; answers `{ok, start, end, cellular, wentOff, vpnOn}`), `vpn.checkShortcut`, `vpn.openShortcuts`.
+  runs dataOff on cellular, then end; answers `{ok, start, end, cellular, wentOff, vpnOn}`), `vpn.checkShortcut`, `vpn.openShortcuts` (takes the optional `link` above).
 - **This iPhone over Tailscale** (`native/sideload/tailscale/`, its README): for Tailscale users, who can't run
   LocalDevVPN at the same time. The sideload app embeds tsnet (tailscale.com, BSD-3-Clause, a Go c-archive built on
   Linux with a pinned Go; not in the jailbreak executable) and joins the tailnet as its own device ("iFizBox on

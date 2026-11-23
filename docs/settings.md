@@ -74,12 +74,13 @@ rows or change footers. Top to bottom:
   With the built-in VPN (the app's profile has Network Extensions): Ready to Install, "Straight onto this iPhone,
   through iFizBox VPN"; on cellular with the Install Switch not added, Add the Install Switch with Add Install
   Switch (it opens its page).
-- **Install Apps With**: This iPhone ("Works offline - no install popup") and Signing Server ("Default - Uses
-  ifizbox.com"), a row each with its icon. A tap on the row opens its page (`installation/iphone`,
-  `installation/server`) with the push slide; **USE**, the App Store price button beside the row's link (never
-  inside it), uses that way and slides to a green **ACTIVE** (revealed from the right with clip-path, as Sources'
-  Delete). USE on This iPhone before it's set up (paired and its connection tested once) opens its page instead,
-  and the test that finishes setting up makes it ACTIVE.
+- **Install Apps With**: This iPhone ("Works offline") and Signing Server ("Default - Uses ifizbox.com"), a row each
+  with its icon. A tap on a row picks that way: its checkmark moves to it, and the way in use keeps its checkmark. A
+  row for This iPhone that isn't set up yet (not paired, or its connection not tested once) opens its setup page
+  (`installation/iphone`) instead. The first Test Connection that passes makes This iPhone the one in use; later tests
+  keep the pick. On iOS 6 the row has a blue detail disclosure (the 4S's, `--accessory-detail`); on iOS 7, 13 and 26 it
+  is an info circle (`--accessory-info`, in the era's tint). Tapping that button opens the way's page (`installation/iphone`,
+  `installation/server`) with the push slide.
 - **Signing**: Certificate › (`signing/certificate`, days left: the Certificate, Files, Provisioning Profile,
   Apple Developer Account and options groups, and Share Your Certificate), Signed Apps › (`signing/apps`, the
   count: Certificate Status and the list).
@@ -92,10 +93,12 @@ The pages under it:
   the VPN on, connects once with the pairing and turns it off; the first time, iOS asks to allow the VPN
   configuration; Pairing runs it by itself right after pairing, with a "Testing the Connection…" spinner, before it
   says Paired, so setup asks that once), Install Switch (Add / Checking… / Done, "Optional: cellular, and your VPN
-  back after"; Add shares the Shortcut to Shortcuts, and Done shows only once it has run), with a footer that says
+  back after"; Add opens Shortcuts' Add Shortcut directly once the Install Switch has an iCloud link, and until then
+  shares the signed Shortcut file (the "Shortcut Not Added" alert offers Share File), and Done shows only once it has run), with a footer that says
   the next step (pair, test, or add the Install Switch) or that it's set up. A failed check or install is
   said there instead, red, with its fix row. Then **How It Works** › (`installation/how`: the six steps of one install
-  and Offline). **Install Switch** (`installation/shortcuts`, titled Install Switch): an Added row, and Test Install
+  and Offline). **Install Switch** (`installation/shortcuts`, titled Install Switch): an Added row, a Share Shortcut File
+  row only once the Install Switch has an iCloud link (`SHORTCUT_LINKS.switch`, core/installroute.js), and Test Install
   Switch (`vpn.testSwitch` runs its start and end, turning cellular data off and back on and the VPN with it). Phones
   that added the older Cellular Data Off and Cellular Data On Shortcuts still have them to run, but this page no
   longer lists them. **Signing Server** (`installation/server`): Server,

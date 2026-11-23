@@ -68,7 +68,7 @@ One frontend (`web/app/`, plain HTML, CSS and JavaScript modules with no build s
 <p align="center">
   <img src="docs/img/jb-home.png" alt="Home: the jailbreak app" width="24%">
   <img src="docs/img/jb-sources.png" alt="Sources: the jailbreak app's APT repos" width="24%">
-  <img src="docs/img/jb-package.png" alt="A package: ElleKit's details and version history" width="24%">
+  <img src="docs/img/jb-package.png" alt="A package: ElleKit's details and its versions" width="24%">
   <img src="docs/img/jb-log.png" alt="Install log: apt's output after an install" width="24%">
 </p>
 
