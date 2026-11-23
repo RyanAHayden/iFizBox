@@ -18,6 +18,7 @@ import { compat } from "../core/compat.js";
 import { currentDevice } from "../device.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall, removeInstall, onAppsChange } from "../core/installed.js";
+import { recordOf } from "../core/installed.js"; // B358
 import { signAndInstall, isSelfIpa, originalWarning } from "../signing/install.js";
 import { localSigning } from "../signing/common.js";
 import { TOO_BIG_FOOTER } from "../signing/toobig.js";
@@ -286,20 +287,24 @@ export function trackingSection(app, pkg, source, body = null, { store = apps, s
     source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL })).then(draw, () => {});
   async function draw() {
     let rec = null;
-    try { rec = (await (await store()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { /* no store */ }
-    const sigRow = signatureRow(await Promise.resolve().then(() => signedOf(app.bundleIdentifier)).catch(() => null)); // F91
+    const signed = await Promise.resolve().then(() => signedOf(app.bundleIdentifier)).catch(() => null);
+    // B358: a custom bundle ID's record is under the installed ID, not the source's
+    try { rec = recordOf(await (await store()).all(), app.bundleIdentifier, signed); } catch { /* no store */ }
+    const sigRow = signatureRow(signed); // F91
     const versions = app.versions.map((x) => x.version).filter(Boolean);
     const byHand = handMarking(); // F242: the jailbreak app knows what's installed: no marking rows there
     const rows = rec
       ? [{ label: "Installed Version", detail: rec.version || "Unknown" },
         // B232: installs another of the source's versions (Install Which Version?), as Version History does
         ...(byHand && installWhichButtons(app, rec.version || "", currentDevice().ios ?? null).versions.some(Boolean) ? [{ label: "Change Installed Version", onClick: () => installWhichVersion(app, pkg, source, { installed: rec.version || "" }).catch(() => {}) }] : []),
-        ...(byHand ? [{ label: MARK_NOT_INSTALLED_LABEL, onClick: () => apps().then((store) => removeInstall(store, app.bundleIdentifier)).then(draw, () => {}) }] : [])]
+        ...(byHand ? [{ label: MARK_NOT_INSTALLED_LABEL, onClick: () => apps().then((store) => removeInstall(store, rec.id)).then(draw, () => {}) }] : [])]
       : byHand ? [{ label: MARK_INSTALLED_LABEL, onClick: () => (versions.length > 1 ? pick() : mark(versions[0] ?? "")) }] : [];
     // The nav bar's button says what it will do, as Cydia's does: Upgrade when a newer version is out than the one
     // installed, Reinstall when it's the same, Install when it isn't installed.
     // F80: Modify while the app is queued, as Cydia's does (core/appqueue.js appNavLabel).
-    const label = appNavLabel({ queued: Boolean(appQueue.get(app.bundleIdentifier)), installed: rec ? rec.version || "" : null, newest: versions[0] });
+    // B358: an app iFizBox signed is installed even with no record matching the source's entry: Modify stays
+    const label = appNavLabel({ queued: Boolean(appQueue.get(app.bundleIdentifier) || (signed?.bundleId && appQueue.get(signed.bundleId))),
+      installed: rec ? rec.version || "" : signed ? signed.version || "" : null, newest: versions[0] });
     // (the Share icon sits beside it in the same corner: find the button by its label, on this page's own nav item)
     const relabel = () => {
       const b = handleOf(body)?.rightButton((x) => /^(Install|Upgrade|Reinstall|Modify)$/.test(x.textContent));
@@ -415,11 +420,11 @@ async function markedOrSigned(app, store, signedOf) {
 export async function toggleMarked(app, pkg, source, { store = apps, signedOf = (id) => signedRecordOf(id), native = undefined,
   forget = forgetListed } = {}) {
   const s = await store();
-  const rec = (await s.all()).find((r) => r.id === app.bundleIdentifier) ?? null;
   const signed = await signatureOf(app, signedOf);
+  const rec = recordOf(await s.all(), app.bundleIdentifier, signed); // B358: by the installed bundle ID first
   if (rec || signed) {
     try {
-      await forget({ id: app.bundleIdentifier, signed, signedOnly: !rec }, native ?? nativeBridge(), async (id) => removeInstall(s, id));
+      await forget({ id: rec?.id ?? app.bundleIdentifier, signed, signedOnly: !rec }, native ?? nativeBridge(), async (id) => removeInstall(s, id));
     } catch (e) {
       throw Object.assign(e instanceof Error ? e : new Error(String(e)), { forgetFailed: true }); // markToggle says so
     }
@@ -547,12 +552,14 @@ export function queueToggle(pkg, source, { queue = appQueue, store = apps, buzz 
 export async function appPageAction(pkg, source, { queue = appQueue, ask = showActionSheet, add = queueApp,
   mode = detectMode(), ready = async () => true, store = apps, version = null, signedOf = (id) => signedRecordOf(id, { mode }),
   forget = async (id) => removeInstall(await store(), id), siteInstall = siteInstallVersion, warn = originalWarning,
-  iv = settings.ignoredVersions, tweaks = installTweaksChoice } = {}) {
+  iv = settings.ignoredVersions, tweaks = installTweaksChoice,
+  forgetSigned = (s) => nativeBridge()?.call?.("signing.forget", { bundleId: s.bundleId }) } = {}) {
   const app = pkg?.stanza?.ipa;
   if (mode === "site" && app && !version) return siteModify(pkg, source, { ask, store, forget, siteInstall, iv });
   if (mode !== "sideload" || !app) return false; // F89: the website queues nothing
   let rec = null;
-  try { rec = (await (await store()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { /* no store */ }
+  const signed = await Promise.resolve().then(() => signedOf(app.bundleIdentifier)).catch(() => null); // F91: Modify offers Re-sign
+  try { rec = recordOf(await (await store()).all(), app.bundleIdentifier, signed); } catch { /* no store */ } // B358
   const job = appJob(pkg, { installed: rec ? rec.version || null : null, version, source: source ? displayName(source) : null });
   if (!job || !(await ready())) return false;
   // F246: a fresh install (no record) asks F243's once-per-app question before it is queued; Cancel queues nothing.
@@ -565,12 +572,14 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
   };
   if (version) return addFresh();
   const newest = app.versions[0]?.version ?? null;
-  const installed = rec ? rec.version || "" : null;
+  // B358: signed by iFizBox with no record matching the source's entry: installed all the same
+  const installed = rec ? rec.version || "" : signed ? signed.version || "" : null;
   const older = installed ? app.versions.map((x) => x.version).filter((v) => v && compareVersions(v, installed) < 0) : [];
-  const signed = await Promise.resolve().then(() => signedOf(job.id)).catch(() => null); // F91: Modify offers Re-sign
   // F221: marked as installed (no signature of iFizBox's): Re-sign while the source still has the installed version
   const onSource = !signed && Boolean(markedVersionOnSource(pkg, installed));
-  const state = { queued: Boolean(queue.get(job.id)), installed, newest, older: older.length > 0, signed: Boolean(signed), onSource, build: "sideload" };
+  // B358: a Re-sign is queued under the installed bundle ID, which a custom one makes another than the source's
+  const queuedId = queue.get(job.id) ? job.id : signed?.bundleId && queue.get(signed.bundleId) ? signed.bundleId : null;
+  const state = { queued: Boolean(queuedId), installed, newest, older: older.length > 0, signed: Boolean(signed), onSource, build: "sideload" };
   if (!state.queued && installed == null && !state.signed) return addFresh();
   // Modify (installed or queued), as Cydia's: Upgrade/Reinstall, Downgrade (then which version), or Clear.
   const ver = versionButtonOf(modifyActions(state), { id: job.id, installed, newest, iv: state.queued ? null : iv });
@@ -578,9 +587,14 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
   const i = await ask({ title: app.name, buttons, destructive: redWith(buttons, destructiveOf(buttons)) });
   if (i < 0) return true;
   if (ver.run(buttons[i])) return true;
-  if (buttons[i] === "Clear") queue.clear(job.id);
-  else if (buttons[i] === MARK_NOT_INSTALLED) await Promise.resolve().then(() => forget(app.bundleIdentifier)).catch(() => {});
-  else if (buttons[i] === "Re-sign" && signed) add({ ...resignJob(signed), id: job.id, icon: job.icon }, { queue });
+  if (buttons[i] === "Clear") queue.clear(queuedId ?? job.id);
+  else if (buttons[i] === MARK_NOT_INSTALLED) {
+    // B358: iFizBox's signature goes too, or the app still reads as installed (Installed's Remove from List does both)
+    if (signed) await Promise.resolve().then(() => forgetSigned(signed)).catch(() => {});
+    await Promise.resolve().then(() => forget(rec?.id ?? app.bundleIdentifier)).catch(() => {});
+  }
+  // B358: signing.resign finds the app by the bundle ID it is installed under (a custom one too), not the source's
+  else if (buttons[i] === "Re-sign" && signed) add({ ...resignJob(signed), id: signed.bundleId || job.id, icon: job.icon }, { queue });
   else if (buttons[i] === "Re-sign") { // F221
     const r = markedResignJob(pkg, installed, { source: source ? displayName(source) : null });
     if (r) add(r, { queue });

@@ -46,6 +46,10 @@ import { pageViews } from "../nav/pageviews.js"; // C25
 import { go as navGo, handleOf } from "../nav/go.js";
 import { isInsecureSource } from "../core/sources.js"; // B192
 import { nativeBridge } from "../native.js";
+import { forgetInstalled } from "../core/installed.js"; // B358
+import { MARK_NOT_INSTALLED } from "../core/appqueue.js"; // B358
+import { signedIndex } from "../core/signing.js"; // B358
+import { NAME } from "../brand.js"; // B358
 
 export const title = "Changes";
 
@@ -494,12 +498,50 @@ function draw(view) {
   view.note.textContent = items.length ? "" : emptyText({ query: view.query, scope });
   if (!view.list) {
     const results = view.results ?? body;
-    view.list = browse.packageList(results, view.route, items, { letters: false, decorate });
+    view.list = browse.packageList(results, view.route, items, { letters: false, decorate,
+      moreItems: (item) => holdItems(item, { installed: state.data?.installed }).map((it) => ({ label: it.label, onClick: () => runHoldItem(it, item) })) });
     results.append(view.list.el);
   } else {
     browse.rememberNames(items.filter((r) => r.id));
     view.list.setItems(items);
   }
+}
+
+// ---- B358: a row's hold menu: Mark as Not Installed ----------------------------------------------------------------
+// An installed app whose source no longer lists it (a custom bundle ID install whose entry went) opens "Package not
+// found", with nothing there to forget it. Holding a row in Changes (apps and packages alike) lists the row's own items
+// (browse.js) and then, where the phone can't remove apps (the sideload app, the website), Mark as Not Installed for
+// anything installed: Needs Re-sign and upgrade rows always, a day's row when its id is installed. It forgets the
+// device record (matched by the installed bundle ID first, core/installed.js recordOf) and, in the sideload app,
+// iFizBox's signed record, and Changes loads again.
+//   holdItems(item, { mode, installed }) -> [{ kind: "forget", label }] or []
+//   await markRowNotInstalled(item, { mode, native, store }) -> true when anything was forgotten
+export function holdItems(item, { mode = detectMode(), installed = null } = {}) {
+  if (!item?.id || (mode !== "sideload" && mode !== "site") || item.id === SELF_ID) return [];
+  const on = item.change === "resign" || item.change === "upgrade" || Boolean(installed?.has?.(item.id));
+  return on ? [{ kind: "forget", label: MARK_NOT_INSTALLED }] : [];
+}
+
+export async function markRowNotInstalled(item, { mode = detectMode(), native = nativeBridge(), store = apps } = {}) {
+  if (!item?.id) return false;
+  let signed = null;
+  if (mode === "sideload" && typeof native?.call === "function") {
+    try { signed = signedIndex(await native.call("signing.installed", {})).get(item.id) ?? null; } catch { signed = null; }
+  }
+  return forgetInstalled({ id: item.id, signed }, { store, native: mode === "sideload" ? native : null });
+}
+
+export const NOT_RECORDED_TEXT = `${NAME} has no record of it to forget: it shows as installed because the installed packages list says so.`;
+
+async function runHoldItem(it, item) {
+  if (it.kind !== "forget") return;
+  try {
+    // a package whose installed state comes from the installed packages list, not a record of iFizBox's: says so
+    if (!(await markRowNotInstalled(item))) await showAlert({ title: item.name || item.id, message: NOT_RECORDED_TEXT, buttons: ["OK"] });
+  } catch (e) {
+    await showAlert({ title: "Error", message: e?.message || String(e), buttons: ["OK"] });
+  }
+  load();
 }
 
 async function refresh(ctx) {
