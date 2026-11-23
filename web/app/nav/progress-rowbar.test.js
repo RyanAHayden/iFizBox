@@ -24,15 +24,18 @@ function fakeDoc(controls) {
 test("B324: under the native controls hook a row's bar is a <progress>, no value while it sweeps", () => {
   const doc = fakeDoc("native");
   const { bar, set } = rowBar(doc);
-  assert.equal(bar.tagName, "PROGRESS");
-  assert.equal(bar.className, "qr-progress");
-  assert.equal(bar.max, 1);
+  assert.equal(bar.className, "qr-native");
+  const [progress, wait] = bar.children;
+  assert.equal(progress.tagName, "PROGRESS");
+  assert.equal(progress.className, "qr-progress");
+  assert.equal(wait.className, "qr-wait");
+  assert.equal(progress.max, 1);
   set(0.35, false);
-  assert.equal(bar.value, 0.35);
+  assert.equal(progress.value, 0.35);
   set(1.7, false);
-  assert.equal(bar.value, 1, "never past the end");
+  assert.equal(progress.value, 1, "never past the end");
   set(0, true);
-  assert.equal(bar.value, undefined, "indeterminate: WebKit's own sweep");
+  assert.equal(progress.value, undefined, "indeterminate: WebKit's own sweep");
 });
 
 test("B324: without the hook it is the drawn track and fill, scaled (120 Hz), sweeping while indeterminate", () => {
@@ -48,6 +51,17 @@ test("B324: without the hook it is the drawn track and fill, scaled (120 Hz), sw
   set(1, true);
   assert.match(bar.className, /is-indeterminate/);
   assert.equal(fill.style.transform, "scaleX(1)");
+});
+
+test("F391: a signed app waiting its turn covers either bar with the stripes, and takes them off again", () => {
+  for (const controls of ["native", null]) {
+    const { bar, set } = rowBar(fakeDoc(controls));
+    assert.equal(bar.children[1].className, "qr-wait");
+    set(0.5, false, true);
+    assert.match(bar.className, /is-waiting/);
+    set(0.5, false);
+    assert.doesNotMatch(bar.className, /is-waiting/);
+  }
 });
 
 test("B324: the rows pages build their bars through rowBar, and ios26.css draws the Running page's parts", () => {
