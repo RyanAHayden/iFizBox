@@ -211,7 +211,7 @@ test("F203: iOS 26's White and OLED Black, card sheets and floating tab bar, the
 // F203: ios26.css is linked after ios13.css, before wide.css, every rule in it is scoped to html[data-style="ios26"],
 // and its glass holds the frame budget: nothing animates, backdrop-filter only on the tab pill, the Search circle and
 // the undo bar (where the page scrolls under them) and only through the one --i26-glass-blur token per tone, the fallback's switch.
-test("F203: ios26.css is linked after ios13.css, only styles html[data-style=ios26] and blurs only the tab bar", () => {
+test("F203: ios26.css is linked after ios13.css, only styles html[data-style=ios26] and blurs only the tab bar and undo bar", () => {
   const links = [...read("index.html").matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
   assert.ok(links.indexOf("ios26.css") > links.indexOf("ios13.css"));
   assert.ok(links.indexOf("ios26.css") < links.indexOf("wide.css"));
