@@ -293,6 +293,23 @@ export function cappedBody(body, maxBytes = FETCH_MAX_BYTES, ms = FETCH_BODY_MS)
   });
 }
 
+// F383: whether the page lets itself be framed, under names of their own (never as this answer's own CSP, which stays
+// SAFE's), so the website can show Open in Safari for a depiction host that refuses framing (browse.js
+// framingRefused): X-Upstream-Frame-Options is upstream's X-Frame-Options as it came, X-Upstream-Frame-Ancestors
+// each Content-Security-Policy's frame-ancestors sources, one comma-separated entry per policy ('none' for an empty
+// list). Neither is sent when upstream has none.
+export function upstreamFraming(headers) {
+  const out = {};
+  const xfo = (headers?.get("x-frame-options") ?? "").trim();
+  if (xfo) out["X-Upstream-Frame-Options"] = xfo;
+  const lists = String(headers?.get("content-security-policy") ?? "").split(",").flatMap((policy) =>
+    policy.split(";").map((d) => d.trim().split(/\s+/)).filter((d) => d[0]?.toLowerCase() === "frame-ancestors")
+      .map((d) => d.slice(1).join(" ") || "'none'"));
+  if (lists.length) out["X-Upstream-Frame-Ancestors"] = lists.join(", ");
+  if (Object.keys(out).length) out["Access-Control-Expose-Headers"] = "X-Upstream-Frame-Options, X-Upstream-Frame-Ancestors";
+  return out;
+}
+
 async function apiFetch(u, maxBytes = MAX_UPLOAD, token = null, env = {}, range = null) {
   const target = httpUrl(u.searchParams.get("url") ?? "");
   if (!target) return fetchErr("bad_url", "Only http(s) URLs can be fetched.", 400);
@@ -326,7 +343,8 @@ async function apiFetch(u, maxBytes = MAX_UPLOAD, token = null, env = {}, range 
     }
     const ctype = (r.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
     return new Response(cappedBody(r.body), { headers: { ...SAFE, "Content-Type": PASS.includes(ctype) ? r.headers.get("content-type") : "application/octet-stream",
-      "X-Source-URL": encodeURI(r.url), ...(r.headers.get("last-modified") ? { "Last-Modified": r.headers.get("last-modified") } : {}) } });
+      "X-Source-URL": encodeURI(r.url), ...(r.headers.get("last-modified") ? { "Last-Modified": r.headers.get("last-modified") } : {}),
+      ...upstreamFraming(r.headers) } });
   } catch (e) {
     if (e?.code === REFUSED_CODE) return fetchErr("refused", e.message, 403);
     return fetchErr("network", String(e?.message ?? e), 502);
