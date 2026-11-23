@@ -1,0 +1,39 @@
+<!doctype html>
+<!-- B343 render check: the real tab bar (nav/tabbar.js) with the Q'd badge, a tap on Installed, and the queue's hint,
+     in an era. Serve the repo root over http and open
+     /journal/2026-11-22-b343-queue-hint-eras/render.html?style=ios13&dark (style: ios6, ios7, ios13, ios26). -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../../web/app/style.css">
+  <link rel="stylesheet" href="../../web/app/ios6.css">
+  <link rel="stylesheet" href="../../web/app/palettes.css">
+  <link rel="stylesheet" href="../../web/app/ios7.css">
+  <link rel="stylesheet" href="../../web/app/ios13.css">
+  <link rel="stylesheet" href="../../web/app/ios26.css">
+</head>
+<body>
+  <main id="screens"></main>
+  <nav class="tabbar" id="tabbar" aria-label="Tabs"></nav>
+  <script type="module">
+    import { createTabbar } from "../../web/app/nav/tabbar.js";
+    import { createQueueHint } from "../../web/app/nav/queuehint.js";
+    const q = new URLSearchParams(location.search);
+    const root = document.documentElement;
+    const dark = q.has("dark");
+    root.dataset.style = q.get("style") || "ios6";
+    root.dataset.theme = dark ? "dark" : "light";
+    const titles = { home: "Home", sources: "Sources", changes: "Changes", installed: "Installed", search: "Search" };
+    const bar = createTabbar(document.getElementById("tabbar"), Object.keys(titles), (t) => titles[t]);
+    bar.select("home");
+    bar.setBadge("installed", "Q'd");
+    const hint = createQueueHint({ bar: document.getElementById("tabbar"), store: { held: () => false, markHeld() {} }, showMs: 1e9 });
+    hint.update({ queued: true, badge: true, open: () => {} });
+    const shown = hint.tapped();
+    for (const a of document.getAnimations()) a.finish(); // headless screenshots don't run the fade in
+    document.body.style.background = dark ? "#000" : (root.dataset.style === "ios6" ? "#c5ccd4" : "#f2f2f7");
+    document.title = shown ? "shown" : "none";
+  </script>
+</body>
+</html>

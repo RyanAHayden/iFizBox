@@ -75,18 +75,49 @@ function dispatch(doc, t, type, e = {}) {
   for (const n of path) { if (ev.stopped) return ev; run(n, "b"); }
   return ev;
 }
-function setup({ held = false } = {}) {
+function setup({ held = false, style = "ios6", win = {} } = {}) {
   const body = node();
-  const doc = target({ body, createElement: () => node() });
+  const root = { style, getAttribute: (n) => (n === "data-style" ? root.style : null) }; // <html data-style>: the era
+  const doc = target({ body, documentElement: root, createElement: () => node() });
   const bar = node("tabbar");
   const tab = node("tab", "a");
   bar.append(tab);
   bar.querySelector = (sel) => (sel.includes('data-tab="installed"') ? tab : null);
   let isHeld = held;
   const store = { held: () => isHeld, markHeld: () => { isHeld = true; } };
-  const hint = createQueueHint({ bar, store, doc, win: { innerWidth: 320, innerHeight: 480 }, showMs: 60_000 });
-  return { body, doc, bar, tab, hint, store, opened: [] };
+  const hint = createQueueHint({ bar, store, doc, win: { innerWidth: 320, innerHeight: 480, ...win }, showMs: 60_000 });
+  return { body, doc, root, bar, tab, hint, store, opened: [] };
 }
+
+test("B343: the iOS 26 era never shows the hint (the app's own tab bar takes the hold there); every other era does", () => {
+  const t = setup({ style: "ios26" });
+  t.hint.update({ queued: true, badge: true });
+  assert.equal(t.hint.tapped(), false);
+  dispatch(t.doc, t.tab, "click");
+  assert.equal(t.hint.toast, null);
+  assert.equal(t.body.children.length, 0);
+  t.root.style = "ios13"; // switched away in the same run: its first tap still shows it (iOS 26 used up nothing)
+  assert.equal(t.hint.tapped(), true);
+  t.hint.hide();
+  // already showing when Theme > Style switches to iOS 26: it goes at once
+  const watchers = [];
+  class MO { constructor(f) { this.f = f; watchers.push(this); } observe() { this.on = true; } disconnect() { this.on = false; } }
+  const w = setup({ style: "ios13", win: { MutationObserver: MO } });
+  w.hint.update({ queued: true, badge: true });
+  assert.equal(w.hint.tapped(), true);
+  assert.equal(watchers.length, 1);
+  w.root.style = "ios26";
+  watchers[0].f();
+  assert.equal(w.hint.toast, null);
+  assert.equal(w.body.children.length, 0);
+  assert.equal(watchers[0].on, false, "the watch stops with it");
+  for (const style of ["ios6", "ios7", "ios13"]) {
+    const u = setup({ style });
+    u.hint.update({ queued: true, badge: true });
+    assert.equal(u.hint.tapped(), true, style);
+    u.hint.hide();
+  }
+});
 
 test("B130: queuing never shows the hint (it would cover the 'added to queue' toast); a tap on Installed does", () => {
   const t = setup();

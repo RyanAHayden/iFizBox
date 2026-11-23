@@ -8,7 +8,9 @@
 // the "added to queue" toast), and then only while the badge is up, the user has never held the tab (settings'
 // queueHint, kept on the device), and it has not shown yet in this queued run. A run starts when something is queued
 // and ends when the queue is empty again (Confirm run or Cancel); a closed Confirm sheet ("Continue Queuing") is still
-// the same run.
+// the same run. Never in the iOS 26 era (Theme > Style, <html data-style>): the app draws its own tab bar there, so
+// the hold can't reach the web tab; such a tap doesn't count as the run's showing. Each other era draws its own
+// callout (ios6.css .queue-hint tokens, restyled by ios7.css and ios13.css).
 //
 //   const hint = createQueueHint({ bar: tabbarEl, store: settings.queueHint });
 //   hint.update({ queued: true, badge: true, open: () => openConfirm() });  // on every badge change: never shows it
@@ -21,6 +23,7 @@ export const SHOW_MS = 5000; // on screen this long, then it fades
 export const FADE_IN_MS = 200;
 export const FADE_OUT_MS = 300;
 const ARROW_H = 10; // ios6.css .queue-hint-arrow's height
+export const NO_HINT_ERAS = ["ios26"]; // eras (html[data-style]) where it never shows
 const HOLDABLE = "hold-queue"; // the tab's class while a hold opens the queue (the badge is up)
 
 // The rules. `state` { shown } is what this run has done so far; `held` whether the tab was ever held; `tapped`
@@ -38,6 +41,7 @@ export function createQueueHint({ bar, store, doc = globalThis.document, win = g
   let last = { queued: false, badge: false }; // the last update, for a tap
   let open = null; // what a hold opens, from the last update
   let toast = null, timer = 0;
+  const noHintEra = () => NO_HINT_ERAS.includes(doc?.documentElement?.getAttribute?.("data-style"));
   const tab = () => bar?.querySelector?.(`a.tab[data-tab="${HINT_TAB}"]`) ?? null;
 
   if (bar) longPress(bar, `a.tab.${HOLDABLE}`, () => {
@@ -53,6 +57,7 @@ export function createQueueHint({ bar, store, doc = globalThis.document, win = g
   });
 
   function tapped() {
+    if (noHintEra()) return false;
     const next = nextHint(state, { ...last, held: Boolean(store?.held?.()), tapped: true });
     state = next.state;
     if (next.show) show();
@@ -78,6 +83,12 @@ export function createQueueHint({ bar, store, doc = globalThis.document, win = g
     place(el, arrow, t);
     el.replace = () => place(el, arrow, t); // a rotation while it shows moves the tab
     win.addEventListener?.("resize", el.replace);
+    // Theme > Style switched to iOS 26 while it shows: it goes at once.
+    const MO = win.MutationObserver ?? globalThis.MutationObserver;
+    if (MO && doc.documentElement) {
+      el.eraWatch = new MO(() => { if (noHintEra()) hide(true); });
+      el.eraWatch.observe(doc.documentElement, { attributes: true, attributeFilter: ["data-style"] });
+    }
     el.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: FADE_IN_MS, easing: "ease-out" });
     toast = el;
     timer = setTimeout(() => hide(), showMs);
@@ -102,6 +113,7 @@ export function createQueueHint({ bar, store, doc = globalThis.document, win = g
     if (!el) return;
     toast = null;
     win.removeEventListener?.("resize", el.replace);
+    el.eraWatch?.disconnect();
     if (now || !el.animate) { el.remove(); return; }
     const a = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FADE_OUT_MS, easing: "ease-in", fill: "forwards" });
     a.finished.then(() => el.remove(), () => el.remove());
