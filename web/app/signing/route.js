@@ -28,11 +28,11 @@ export async function chooseRoute({ native, alert = showAlert, storage = storage
       heldRoute = { at: now(), params };
       return params;
     }
-    // F372: on cellular without the Cellular Shortcuts: Set Up opens their page and this install stops; Try Anyway
-    // goes on through This iPhone; Use Server through the Signing Server
-    if (a.setup != null && index === a.setup) { heldRoute = null; openRoute(["installation", "shortcuts"]); return null; }
-    if (a.idevice != null) {
-      const params = routeParams(index === a.idevice ? d : { route: "server" });
+    // F372: on cellular without the Cellular Shortcuts: Set Up opens their page and this install stops; Use Server
+    // goes on through the Signing Server (no way on through This iPhone: it always fails there)
+    if (a.setup != null) {
+      if (index === a.setup) { heldRoute = null; openRoute(["installation", "shortcuts"]); return null; }
+      const params = routeParams({ route: "server" });
       heldRoute = { at: now(), params };
       return params;
     }
