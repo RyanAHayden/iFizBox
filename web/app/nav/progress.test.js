@@ -137,6 +137,17 @@ test("openProgress: the page is a dark cover from open to close, not while hidde
     assert.equal(darkCovered(), false);
     page.show();
     assert.equal(darkCovered(), true);
+    const root = globalThis.document.documentElement;
+    root.setAttribute("data-sheet", "card");
+    const card = openProgress();
+    card.sheet.animate = anim;
+    card.hide(); // the page behind stays sunk on the black ground
+    page.hide();
+    assert.equal(darkCovered(), true);
+    card.close();
+    assert.equal(darkCovered(), false);
+    page.show();
+    root.removeAttribute("data-sheet");
     const other = openProgress(); // two at once: until the last one goes
     page.close();
     assert.equal(darkCovered(), true);

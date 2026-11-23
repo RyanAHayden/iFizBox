@@ -228,3 +228,9 @@ _Said_: selected but idle On Demand VPN
 _On screen_: idle VPN
 _In code_: LocalVPN.otherVPNSelected, shortcuts.idle, vpnIdle
 _Avoid_: sleeping VPN, inactive VPN
+
+**Dark cover**:
+Something black under the iOS status bar (the run page, a full-screen photo, the ground around a card sheet) that needs light status-bar text while it is up
+_Said_: black full-screen page
+_In code_: coverDark, darkCovered, onDarkCover
+_Avoid_: overlay, scrim

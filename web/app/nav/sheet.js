@@ -131,6 +131,6 @@ export function showSheet({ title = "", body = null, onClose = () => {}, left = 
     sheet, h1, left: l, right: r, content,
     setTitle(t) { h1.textContent = t; sheet.setAttribute("aria-label", t); },
     closed: () => gone !== null,
-    cover(on) { if (!gone) cover(on); },
+    cover(on) { if (!gone && !card) cover(on); }, // a card's page stays sunk on the black ground until close()
   });
 }
