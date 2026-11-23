@@ -77,3 +77,97 @@ test("installWhichVersion: the installed row and Cancel install nothing; the jai
     assert.deepEqual([...r.queued, ...r.signed], []);
   }
 });
+
+// B372: on the app page, Mark as Not Installed (the nav bar's toggle, Modify's) holds signing.forget until the page is
+// left; marking it installed again before that cancels it, so the signed record and its expiry stay.
+import { toggleMarked, appPageAction, forgetHeld, flushHeldForgets, cancelHeldForget } from "./altstore.js";
+import { memoryAppStore } from "../core/installed.js";
+import { MARK_NOT_INSTALLED, createAppQueue } from "../core/appqueue.js";
+
+function signedRig() {
+  cancelHeldForget("com.x.a"); // a failed test's held forget doesn't reach the next
+  const signed = new Map([["com.x.a", { bundleId: "com.x.a", version: "2.1", expires: "2026-12-01T00:00:00Z" }]]);
+  const mem = memoryAppStore([{ id: "com.x.a", version: "2.1" }]);
+  const calls = [];
+  const native = { call: async (m, a) => { calls.push([m, a]); if (m === "signing.forget") signed.delete(a.bundleId); return {}; } };
+  const opts = { store: async () => mem, signedOf: async (id) => signed.get(id) ?? null, native };
+  return { signed, mem, calls, native, opts, forgets: () => calls.filter(([m]) => m === "signing.forget").length };
+}
+
+test("B372 toggle: off then on before leaving: signing.forget never called, the signed record and its expiry stay", async () => {
+  const r = signedRig();
+  const body = { isConnected: true };
+  assert.equal(await toggleMarked(APP, PKG, null, { ...r.opts, body }), false);
+  assert.equal(forgetHeld("com.x.a"), true);
+  await flushHeldForgets(); // the page is still up: nothing runs
+  assert.equal(r.forgets(), 0);
+  assert.equal(await toggleMarked(APP, PKG, null, { ...r.opts, body }), true);
+  assert.equal(forgetHeld("com.x.a"), false);
+  body.isConnected = false;
+  await flushHeldForgets();
+  assert.equal(r.forgets(), 0);
+  assert.equal(r.signed.get("com.x.a")?.expires, "2026-12-01T00:00:00Z");
+  assert.deepEqual((await r.mem.all()).map((x) => [x.id, x.version]), [["com.x.a", "2.1"]]);
+});
+
+test("B372 toggle: off then leave the page: signing.forget once, the record removed", async () => {
+  const r = signedRig();
+  const body = { isConnected: true };
+  assert.equal(await toggleMarked(APP, PKG, null, { ...r.opts, body }), false);
+  assert.equal(r.forgets(), 0);
+  assert.equal((await r.mem.all()).length, 1, "nothing forgotten while the page is up");
+  body.isConnected = false;
+  await flushHeldForgets();
+  await flushHeldForgets(); // a second pass runs nothing again
+  assert.equal(r.forgets(), 1);
+  assert.equal(r.signed.has("com.x.a"), false);
+  assert.deepEqual(await r.mem.all(), []);
+  assert.equal(forgetHeld("com.x.a"), false);
+});
+
+test("B372 toggle: the app or tab going away runs a held forget although the page is up", async () => {
+  const r = signedRig();
+  await toggleMarked(APP, PKG, null, { ...r.opts, body: { isConnected: true } });
+  await flushHeldForgets({ all: true });
+  assert.equal(r.forgets(), 1);
+});
+
+test("B372 toggle: a held forget that fails shows the alert", async () => {
+  const r = signedRig();
+  const warned = [];
+  r.native.call = async () => { throw new Error("no"); };
+  await toggleMarked(APP, PKG, null, { ...r.opts, body: { isConnected: false }, warn: async (e) => warned.push(e.message) });
+  await flushHeldForgets();
+  assert.deepEqual(warned, ["no"]);
+});
+
+test("B372 Modify: Mark as Not Installed from the page is held; while held the app reads not installed; Install cancels it", async () => {
+  const r = signedRig();
+  const body = { isConnected: true };
+  const queued = [];
+  const base = { queue: createAppQueue(), mode: "sideload", ready: async () => true, store: r.opts.store, signedOf: r.opts.signedOf,
+    forgetSigned: (s) => r.native.call("signing.forget", { bundleId: s.bundleId }), add: (j) => queued.push(j), tweaks: async () => true,
+    warn: async () => "install", body };
+  assert.equal(await appPageAction(PKG, null, { ...base, ask: async (o) => o.buttons.indexOf(MARK_NOT_INSTALLED) }), true);
+  assert.equal(r.forgets(), 0);
+  assert.equal(forgetHeld("com.x.a"), true);
+  // the nav button now reads Install: no Modify sheet, the job queued and the held forget cancelled
+  assert.equal(await appPageAction(PKG, null, { ...base, ask: async () => assert.fail("Modify sheet") }), true);
+  assert.equal(queued.length, 1);
+  assert.equal(forgetHeld("com.x.a"), false);
+  body.isConnected = false;
+  await flushHeldForgets();
+  assert.equal(r.forgets(), 0);
+  assert.ok(r.signed.get("com.x.a")?.expires);
+});
+
+test("B372 Modify: away from the page, Mark as Not Installed forgets at once, as before", async () => {
+  const r = signedRig();
+  const removed = [];
+  await appPageAction(PKG, null, { queue: createAppQueue(), mode: "sideload", ready: async () => true, store: r.opts.store, signedOf: r.opts.signedOf,
+    forgetSigned: (s) => r.native.call("signing.forget", { bundleId: s.bundleId }), forget: async (id) => removed.push(id),
+    ask: async (o) => o.buttons.indexOf(MARK_NOT_INSTALLED) });
+  assert.equal(r.forgets(), 1);
+  assert.deepEqual(removed, ["com.x.a"]);
+  cancelHeldForget("com.x.a");
+});
