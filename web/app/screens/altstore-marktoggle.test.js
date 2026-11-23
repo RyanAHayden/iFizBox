@@ -251,3 +251,77 @@ test("queueToggle: nothing to install, nothing queued and no undo bar claims it 
     assert.deepEqual(bars, []);
   });
 });
+
+// B338: an app iFizBox signed and remembers: the toggle reads filled, and its off tap forgets both, as Installed's
+// Remove from List does (signing.forget for the signature, removeInstall for the record), so the nav button reads
+// Install at once and the Installed section goes (a signature left behind brought the record back: Modify stayed).
+import { trackingSection } from "./altstore.js";
+
+const signedPage = () => {
+  const mem = memoryAppStore([{ id: "com.x.a", version: "2.0", key: PKG.key }]);
+  const removed = [];
+  const store = async () => ({ ...mem, remove: async (id) => { removed.push(id); return mem.remove(id); } });
+  let sig = { bundleId: "com.x.a", name: "A", version: "2.0", expires: null };
+  const calls = [];
+  const native = { call: async (name, args) => { calls.push([name, args]); if (name === "signing.forget") sig = null; return {}; } };
+  const signedOf = async (id) => (sig && id === "com.x.a" ? sig : null);
+  return { mem, removed, store, calls, native, signedOf };
+};
+
+// The page's nav item with its Install / Modify button, handed in as app.js does.
+const navFor = (body) => {
+  const item = fakeElement("div");
+  const right = fakeElement("div");
+  right.className = "nav-right";
+  const button = fakeElement("button");
+  button.className = "bar-button";
+  button.textContent = "Install";
+  right.append(button);
+  item.append(right);
+  pageHandle(item, body);
+  return button;
+};
+
+test("markToggle (B338): a signed + remembered app's off tap calls signing.forget and removeInstall; Install right after", async () => {
+  await withDocument(async (doc) => {
+    const page = signedPage();
+    const body = fakeElement("div");
+    doc.body.append(body);
+    const navButton = navFor(body);
+    const tracking = trackingSection(APP, PKG, null, body, { store: page.store, signedOf: page.signedOf });
+    body.append(tracking);
+    await tracking.drawn;
+    assert.equal(navButton.textContent, "Modify");
+    assert.ok(tracking.querySelector(".group"), "the Installed section shows");
+
+    const b = markToggle(APP, PKG, null, { store: page.store, signedOf: page.signedOf, native: page.native,
+      after: () => tracking.redraw(), buzz() {}, feedback() {} });
+    await b.refreshed;
+    assert.ok(b.classList.contains("is-marked"));
+
+    await b.click();
+    assert.deepEqual(page.calls, [["signing.forget", { bundleId: "com.x.a" }]]);
+    assert.deepEqual(page.removed, ["com.x.a"]);
+    assert.deepEqual(await page.mem.all(), []);
+    assert.equal(b.classList.contains("is-marked"), false, "outline");
+    assert.equal(b.getAttribute("aria-label"), MARK_INSTALLED_LABEL);
+    assert.equal(navButton.textContent, "Install", "the nav button reads Install right after the tap");
+    assert.equal(tracking.querySelector("h2")?.textContent ?? null, "Installed");
+    assert.equal(tracking.querySelector(".group-footer").textContent.startsWith("Installed it another way?"), true,
+      "the section is back to Mark as Installed: the installed app's rows are gone");
+  });
+});
+
+test("markToggle (B338): a signed app with no installed record reads filled, and its off tap forgets the signature", async () => {
+  await withDocument(async () => {
+    const page = signedPage();
+    await page.mem.remove("com.x.a");
+    const b = markToggle(APP, PKG, null, { store: page.store, signedOf: page.signedOf, native: page.native, buzz() {}, feedback() {} });
+    await b.refreshed;
+    assert.ok(b.classList.contains("is-marked"), "a signature counts as marked");
+    await b.click();
+    assert.deepEqual(page.calls, [["signing.forget", { bundleId: "com.x.a" }]]);
+    assert.deepEqual(await page.mem.all(), [], "not marked at the latest version instead");
+    assert.equal(b.classList.contains("is-marked"), false);
+  });
+});
