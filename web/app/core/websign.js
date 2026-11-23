@@ -138,6 +138,13 @@ export function keychainGroups(allowed, team, bundleId, keptId = bundleId) {
   return own !== app && ok(own) ? [own, app] : [app];
 }
 
+// B327: the sign log's keychain line for appEntitlements' result: the groups in order (new items go to the first) and
+// the application-identifier. The same words as the app's signer (native/sign/Profile.swift keychainLine).
+export function keychainLogLine(ents = {}) {
+  const groups = (Array.isArray(ents["keychain-access-groups"]) ? ents["keychain-access-groups"] : []).filter((g) => typeof g === "string");
+  return `Keychain: ${groups.length ? groups.join(", ") : "no keychain groups"} (application-identifier ${ents["application-identifier"] || "none"})`;
+}
+
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 function b64(bytes) {
   let s = "";

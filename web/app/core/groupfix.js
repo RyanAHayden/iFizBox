@@ -99,6 +99,15 @@ export function groupFixPlan(original, profileEnts = {}, previous = null) {
   return plan;
 }
 
+// B327: the sign log's line for the group fix a sign put in, every part of its config, or why none (the same words as
+// native/sign/GroupFix.swift logLine).
+export const GROUPFIX_NOT_NEEDED = "the original signature names no app groups or keychain groups";
+export function groupFixLogLine(plan, none = GROUPFIX_NOT_NEEDED) {
+  if (!plan) return `Group fix: none (${none})`;
+  return `Group fix: ${plan.groups.length ? plan.groups.join(", ") : "no app groups"} -> ${plan.target || "the app's own folder"}`
+    + (plan.keychain ? "; keychain groups stripped" : "") + (plan.legacy ? `; ${plan.legacy} copied in once if the app ran before` : "");
+}
+
 export function readConfig(bytes) {
   try {
     const c = parsePlist(new TextDecoder().decode(bytes));

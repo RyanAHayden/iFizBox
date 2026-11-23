@@ -50,6 +50,16 @@ enum GroupFix {
         return p
     }
 
+    // B327: the sign log's line for the group fix a sign put in, every part of its config (the same words as
+    // core/groupfix.js groupFixLogLine), or why it put none in.
+    static let notNeeded = "the original signature names no app groups or keychain groups"
+    static func logLine(_ p: Plan?, none: String = notNeeded) -> String {
+        guard let p = p else { return "Group fix: none (\(none))" }
+        return "Group fix: \(p.groups.isEmpty ? "no app groups" : p.groups.joined(separator: ", ")) -> "
+            + (p.target.isEmpty ? "the app's own folder" : p.target) + (p.keychain ? "; keychain groups stripped" : "")
+            + (p.legacy.map { "; \($0) copied in once if the app ran before" } ?? "")
+    }
+
     // The tweak set with the dylib and its config added (after the user's own tweaks).
     static func adding(_ p: Plan, dylib: Data, to tweaks: TweakSet?) throws -> TweakSet {
         var c: [String: Any] = ["groups": p.groups, "target": p.target, "keychain": p.keychain]
