@@ -233,7 +233,8 @@ enum LocalVPN {
     /// Cellular Shortcuts added, Cellular Data Off runs: the answer says so, and connected(dataOff:) turns it back on.
     static func begin(cellular: Bool = true, forced: Bool = false, _ step: (String) -> Void = { _ in }) throws -> Bool {
         waitForPutBack(step) // F394: an Install Switch run still putting things back would cut this connect off
-        let onCellular = cellular && Path.now().cellular, before = otherVPNAddresses(), other = !before.isEmpty // F388: read before the lock (getifaddrs)
+        let tunnels = tunnelAddresses() // F388: read before the lock (getifaddrs)
+        let onCellular = cellular && Path.now().cellular, before = otherVPNAddresses(tunnels), other = !before.isEmpty
         lock.lock(); holds += 1; stopGen += 1; switchEndDue = false // B381: the queue goes on
         busy = true
         // F386: the first connect of a queue runs the Install Switch's start. F388: only when it is needed, so an
@@ -241,9 +242,12 @@ enum LocalVPN {
         // VPN up (Tailscale), which only its Set VPN brings back. On Wi-Fi with no other VPN, up() alone does it all.
         // F394: not without a network: up() below fails then (B375), so Shortcuts would open for nothing.
         let start = Path.online() && !switchedOn && (forced || switchAdded() && switchNeeded(cellular: onCellular, otherVPN: other))
+        let deciding = !switchedOn && holds == 1
         if start { switchedOn = true; switchDataOff = false; switchVPNBefore = before }
         let skipped = !start && !switchedOn && holds == 1 && switchAdded() // said once per queue
         lock.unlock()
+        // T77: what the start decided from, for a phone where a carrier's ipsec tunnel may count as another VPN
+        if deciding || start { log("Install Switch: start \(start), added \(switchAdded()), cellular \(onCellular), another VPN \(other); up tunnels: \(tunnelList(tunnels))") }
         if skipped { log("Install Switch: not needed (not on cellular, no other VPN up)") }
         if start { savePending(cellular: false, vpn: before) }
         // F394: one trip for the whole queue, when the added Install Switch can; else the runs below, as before
@@ -342,8 +346,16 @@ enum LocalVPN {
     /// F388: another app's VPN is up now: a tunnel interface (utun, ipsec, ppp) that is up with an IPv4 address that
     /// isn't ours (10.7.0.x). iOS's own utun interfaces carry IPv6 only.
     static func otherVPNUp() -> Bool { !otherVPNAddresses().isEmpty }
-    static func otherVPNAddresses() -> Set<String> {
-        var out = Set<String>()
+    static func otherVPNAddresses(_ tunnels: [TunnelAddress] = tunnelAddresses()) -> Set<String> {
+        Set(tunnels.filter { $0.family == AF_INET && !$0.address.hasPrefix("10.7.0.") }.map(\.address))
+    }
+
+    /// One address entry of a tunnel interface that is up; `address` is empty for a family other than IPv4 and IPv6.
+    struct TunnelAddress { let name: String, family: Int32, address: String }
+
+    /// Every address entry of the tunnel interfaces that are up, ours and iOS's own too.
+    static func tunnelAddresses() -> [TunnelAddress] {
+        var out: [TunnelAddress] = []
         var head: UnsafeMutablePointer<ifaddrs>?
         guard getifaddrs(&head) == 0 else { return out }
         defer { freeifaddrs(head) }
@@ -351,15 +363,32 @@ enum LocalVPN {
         while let i = p {
             defer { p = i.pointee.ifa_next }
             let name = String(cString: i.pointee.ifa_name)
-            guard Int32(i.pointee.ifa_flags) & IFF_UP != 0, ["utun", "ipsec", "ppp"].contains(where: name.hasPrefix),
-                  let a = i.pointee.ifa_addr, a.pointee.sa_family == sa_family_t(AF_INET) else { continue }
-            var buf = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
-            var sin = a.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { $0.pointee.sin_addr }
-            guard inet_ntop(AF_INET, &sin, &buf, socklen_t(buf.count)) != nil else { continue }
-            let a4 = String(cString: buf)
-            if !a4.hasPrefix("10.7.0.") { out.insert(a4) }
+            guard Int32(i.pointee.ifa_flags) & IFF_UP != 0, ["utun", "ipsec", "ppp"].contains(where: name.hasPrefix) else { continue }
+            let family = i.pointee.ifa_addr.map { Int32($0.pointee.sa_family) } ?? AF_UNSPEC
+            var buf = [CChar](repeating: 0, count: Int(INET6_ADDRSTRLEN))
+            if let a = i.pointee.ifa_addr, family == AF_INET {
+                var sin = a.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { $0.pointee.sin_addr }
+                guard inet_ntop(family, &sin, &buf, socklen_t(buf.count)) != nil else { continue }
+            } else if let a = i.pointee.ifa_addr, family == AF_INET6 {
+                var sin6 = a.withMemoryRebound(to: sockaddr_in6.self, capacity: 1) { $0.pointee.sin6_addr }
+                guard inet_ntop(family, &sin6, &buf, socklen_t(buf.count)) != nil else { continue }
+            }
+            out.append(TunnelAddress(name: name, family: family, address: String(cString: buf)))
         }
         return out
+    }
+
+    /// T77: the log's list of them, such as "utun3 IPv4 100.64.0.1, ipsec1 IPv6 fe80::1".
+    static func tunnelList(_ tunnels: [TunnelAddress]) -> String {
+        if tunnels.isEmpty { return "none" }
+        return tunnels.map { t in
+            switch t.family {
+            case AF_INET: return "\(t.name) IPv4 \(t.address)"
+            case AF_INET6: return "\(t.name) IPv6 \(t.address)"
+            case AF_LINK: return "\(t.name) link"
+            default: return "\(t.name) family \(t.family)"
+            }
+        }.joined(separator: ", ")
     }
 
     /// The Install Switch's input: a JSON dictionary of flags, as tools/shortcuts/install-switch.plist reads them.
