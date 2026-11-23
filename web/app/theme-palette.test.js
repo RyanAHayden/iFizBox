@@ -209,8 +209,8 @@ test("F203: iOS 26's White and OLED Black, card sheets and floating tab bar, the
 });
 
 // F203: ios26.css is linked after ios13.css, before wide.css, every rule in it is scoped to html[data-style="ios26"],
-// and its glass holds the frame budget: nothing animates, backdrop-filter only on the tab pill and the Search circle
-// (where the page scrolls under them) and only through the one --i26-glass-blur token per tone, the fallback's switch.
+// and its glass holds the frame budget: nothing animates, backdrop-filter only on the tab pill, the Search circle and
+// the undo bar (where the page scrolls under them) and only through the one --i26-glass-blur token per tone, the fallback's switch.
 test("F203: ios26.css is linked after ios13.css, only styles html[data-style=ios26] and blurs only the tab bar", () => {
   const links = [...read("index.html").matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
   assert.ok(links.indexOf("ios26.css") > links.indexOf("ios13.css"));
@@ -223,9 +223,9 @@ test("F203: ios26.css is linked after ios13.css, only styles html[data-style=ios
   // F370: its own filled tab glyphs, only on the tabs (rowicons.test.js checks them against the icon map)
   for (const m of css.matchAll(/([^{}]+)\{[^}]*--glyph:/g)) assert.match(m[1].trim(), /^html\[data-style="ios26"\] \.tab\[data-tab="\w+"\](\.active)?$/);
   const blurring = rules.filter(([, body]) => /backdrop-filter/.test(body));
-  assert.equal(blurring.length, 2);
+  assert.equal(blurring.length, 3); // B333: the undo bar floats over the content in the same glass
   for (const [sel, body] of blurring) {
-    assert.match(sel, /\.tabbar|\.tab\[data-tab="search"\]/, sel);
+    assert.match(sel, /\.tabbar|\.tab\[data-tab="search"\]|\.undo-bar$/, sel);
     for (const m of body.matchAll(/backdrop-filter:\s*([^;]+)/g)) assert.equal(m[1].trim(), "var(--i26-glass-blur)", sel);
   }
   // 22pt table corners, capsule bar buttons
