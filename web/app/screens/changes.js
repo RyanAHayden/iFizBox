@@ -49,6 +49,7 @@ import { nativeBridge } from "../native.js";
 import { forgetInstalled } from "../core/installed.js"; // B358
 import { MARK_NOT_INSTALLED } from "../core/appqueue.js"; // B358
 import { signedIndex } from "../core/signing.js"; // B358
+import { NAME } from "../brand.js"; // B358
 
 export const title = "Changes";
 
@@ -530,10 +531,13 @@ export async function markRowNotInstalled(item, { mode = detectMode(), native = 
   return forgetInstalled({ id: item.id, signed }, { store, native: mode === "sideload" ? native : null });
 }
 
+export const NOT_RECORDED_TEXT = `${NAME} has no record of it to forget: it shows as installed because the installed packages list says so.`;
+
 async function runHoldItem(it, item) {
   if (it.kind !== "forget") return;
   try {
-    await markRowNotInstalled(item);
+    // a package whose installed state comes from the installed packages list, not a record of iFizBox's: says so
+    if (!(await markRowNotInstalled(item))) await showAlert({ title: item.name || item.id, message: NOT_RECORDED_TEXT, buttons: ["OK"] });
   } catch (e) {
     await showAlert({ title: "Error", message: e?.message || String(e), buttons: ["OK"] });
   }

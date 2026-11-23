@@ -90,6 +90,13 @@ test("app page, sideload: signed under a custom ID with no matching record: Modi
   assert.equal(added[0].mode, "resign");
   assert.equal(added[0].id, CUSTOM_ID, "signing.resign finds the app by the ID it is installed under");
 
+  // queued under the installed ID: the sheet starts with Clear, which takes that job out (not queued twice)
+  q.add(added[0]);
+  let again = null;
+  await appPageAction(PKG, null, { ...base, ask: async (o) => { again = o; return o.buttons.indexOf("Clear"); } });
+  assert.equal(again.buttons[0], "Clear");
+  assert.equal(q.get(CUSTOM_ID), null);
+
   const forgot = [];
   await appPageAction(PKG, null, { ...base, forgetSigned: async (s) => forgot.push(s.bundleId),
     ask: async (o) => o.buttons.indexOf(MARK_NOT_INSTALLED) });

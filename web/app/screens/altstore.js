@@ -303,7 +303,7 @@ export function trackingSection(app, pkg, source, body = null, { store = apps, s
     // installed, Reinstall when it's the same, Install when it isn't installed.
     // F80: Modify while the app is queued, as Cydia's does (core/appqueue.js appNavLabel).
     // B358: an app iFizBox signed is installed even with no record matching the source's entry: Modify stays
-    const label = appNavLabel({ queued: Boolean(appQueue.get(app.bundleIdentifier)),
+    const label = appNavLabel({ queued: Boolean(appQueue.get(app.bundleIdentifier) || (signed?.bundleId && appQueue.get(signed.bundleId))),
       installed: rec ? rec.version || "" : signed ? signed.version || "" : null, newest: versions[0] });
     // (the Share icon sits beside it in the same corner: find the button by its label, on this page's own nav item)
     const relabel = () => {
@@ -577,7 +577,9 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
   const older = installed ? app.versions.map((x) => x.version).filter((v) => v && compareVersions(v, installed) < 0) : [];
   // F221: marked as installed (no signature of iFizBox's): Re-sign while the source still has the installed version
   const onSource = !signed && Boolean(markedVersionOnSource(pkg, installed));
-  const state = { queued: Boolean(queue.get(job.id)), installed, newest, older: older.length > 0, signed: Boolean(signed), onSource, build: "sideload" };
+  // B358: a Re-sign is queued under the installed bundle ID, which a custom one makes another than the source's
+  const queuedId = queue.get(job.id) ? job.id : signed?.bundleId && queue.get(signed.bundleId) ? signed.bundleId : null;
+  const state = { queued: Boolean(queuedId), installed, newest, older: older.length > 0, signed: Boolean(signed), onSource, build: "sideload" };
   if (!state.queued && installed == null && !state.signed) return addFresh();
   // Modify (installed or queued), as Cydia's: Upgrade/Reinstall, Downgrade (then which version), or Clear.
   const ver = versionButtonOf(modifyActions(state), { id: job.id, installed, newest, iv: state.queued ? null : iv });
@@ -585,7 +587,7 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
   const i = await ask({ title: app.name, buttons, destructive: redWith(buttons, destructiveOf(buttons)) });
   if (i < 0) return true;
   if (ver.run(buttons[i])) return true;
-  if (buttons[i] === "Clear") queue.clear(job.id);
+  if (buttons[i] === "Clear") queue.clear(queuedId ?? job.id);
   else if (buttons[i] === MARK_NOT_INSTALLED) {
     // B358: iFizBox's signature goes too, or the app still reads as installed (Installed's Remove from List does both)
     if (signed) await Promise.resolve().then(() => forgetSigned(signed)).catch(() => {});
