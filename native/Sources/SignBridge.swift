@@ -60,6 +60,7 @@ enum SignBridge {
         b.on("signing.hold") { c in Sideload.hold(c) } // B252: KeepAlive from Confirm until signing.install answers
         Sideload.register(b) // F14: inspect, progress, installed, forget, resignAll, checkCertificate, remind
         MyIPAs.register(b) // F77: library.*, My IPAs under Installed (MyIPAs.swift)
+        InstalledApps.register(b) // F374: apps.icon, library.decrypt / addTweaks / share (InstalledApps.swift)
         SignAhead.register(b) // F235: signing.prepare / open / discard, the IPA queue's sign-ahead run
         IDeviceBridge.register(b) // F15: idevice.*, the "no server" install route (native/sideload/idevice/)
         TailscaleBridge.register(b) // tailscale.*, that route over Tailscale (native/sideload/tailscale/)
