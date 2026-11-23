@@ -35,7 +35,7 @@ await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const base = `http://127.0.0.1:${server.address().port}/`;
 
 const PKGS = ["AppSync Unified", "Filza File Manager", "NewTerm 3", "Shadow", "Snowboard", "Velvet 2", "Watusi"]
-  .map((name, i) => `Package: com.test.p${i}\nName: ${name}\nVersion: 1.${i}\nArchitecture: iphoneos-arm64\nSection: Tweaks\nDescription: Test package ${i}\nFilename: debs/p${i}.deb\nSize: 1000\nAuthor: Test <t@example.com>\nMaintainer: Test <t@example.com>\nPre-Depends: firmware (>= 15.0)\nDepends: com.test.p0 (>= 1.0), com.gone.lib | com.test.p1, com.test.virtual\nConflicts: com.test.p4, ${Array.from({ length: 9 }, (_, k) => `com.example.other${k + 1}${k % 3 ? "" : " (<< 2.0)"}`).join(", ")}\n`).join("\n");
+  .map((name, i) => `Package: com.test.p${i}\nName: ${name}\nVersion: 1.${i}\nArchitecture: iphoneos-arm64\nSection: Tweaks\nDescription: Test package ${i}\nFilename: debs/p${i}.deb\nSize: 1000\nAuthor: Test <t@example.com>\nMaintainer: Test <t@example.com>\nPre-Depends: firmware (>= 15.0)\nDepends: com.test.p0 (>= 1.0), com.gone.lib (>= 2.0.1) | com.gone.another-long-library (>= 10.4) | com.test.p1, com.test.virtual-one-long (>= 1.2) | com.test.virtual-two-long, com.test.virtual\nConflicts: com.test.p4, ${Array.from({ length: 9 }, (_, k) => `com.example.other${k + 1}${k % 3 ? "" : " (<< 2.0)"}`).join(", ")}\n`).join("\n");
 const BOOT = (style, theme) => `(() => {
   try {
     localStorage.setItem("ifizbox.style", ${JSON.stringify(style)});
@@ -47,7 +47,7 @@ const BOOT = (style, theme) => `(() => {
   globalThis.ifizboxApp = true;
   globalThis.ifizboxNative = { jailbreak: "rootless", mode: "jailbreak", call(name, a) {
     window.__calls.push(name);
-    if (name === "app.info") return Promise.resolve({ ios: "16.0" });
+    if (name === "app.info") return Promise.resolve({ ios: ${JSON.stringify(style === "ios26" ? "26.0" : "16.0")} });
     if (name === "apt.sources") return Promise.resolve([{ path: "/var/jb/etc/apt/sources.list.d/test.list", text: "deb https://repo.test/ ./\\n" }]);
     if (name === "apt.list") {
       const n = String(a?.name ?? "");

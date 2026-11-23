@@ -1287,7 +1287,7 @@ async function renderPackage(body, route, key, id, ctx) {
   const plan = packageRows({ installed: inst?.version ?? null, version: st.version ?? "", author: author?.name ?? null,
     maintainer: maint?.name ?? null, files: typeof getBackend().packageFiles === "function",
     sideloadTweak: isSideloadTweak(st), installedOnly: pkg.installedOnly, paid: isPaid(st), source: sourceName, section,
-    worksOn: fit.range ?? compatBadge(fitCode), installedSize: isz > 0 ? formatSize(isz * 1024) : null, 
+    worksOn: fit.range ?? compatBadge(fitCode), installedSize: isz > 0 ? formatSize(isz * 1024) : null,
     depends: relationsOf(st, "depends").map((g) => g[0].name), conflicts: relationsOf(st, "conflicts").map((g) => g[0].name) });
   const relationsHref = (kind) => deeper(route, sourceToken(route, kind, id, key)); // F402
   body.replaceChildren(header.head, ...tabs.nodes);
@@ -1511,9 +1511,9 @@ export async function relationRows(groups, route, key, find = (id, k) => catalog
     for (const p of await Promise.all(g.map((r) => look(r.name)))) {
       if (!p?.row || p.stanza?.kind === "ipa") continue;
       const from = key === ALL || p.installedOnly ? key : p.key;
-      return { ...relatedRow(p.row, route), subtitle: text, href: deeper(route, sourceToken(route, "package", p.row.id, from)) };
+      return { ...relatedRow(p.row, route), subtitle: text, cls: "relation-row", href: deeper(route, sourceToken(route, "package", p.row.id, from)) };
     }
-    return { label: text };
+    return { label: text, cls: "relation-row" };
   }));
 }
 
