@@ -294,13 +294,15 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   On cellular (cellular in use, no Wi-Fi joined) iOS refuses these connections while cellular data is on
   (journal/2026-11-21-r72-cellular-this-iphone), so, as SideStore's Cellular Refresh, the user adds one Shortcut
   on Set Up, "Install Switch" (signed by `tools/shortcuts/sign.sh` from `tools/shortcuts/install-switch.plist`,
-  shipped in `web/app/shortcuts/`). Add opens Shortcuts' Add Shortcut sheet with the iCloud link (`SHORTCUT_LINKS.switch`
-  in `core/installroute.js`, since Shortcuts refuses non-iCloud links). The link holds a copy of the Shortcut as it was
+  shipped in `web/app/shortcuts/`). Add opens the iCloud link itself (`SHORTCUT_LINKS.switch` in `core/installroute.js`) as a universal
+  link (`UIApplication.open` with `universalLinksOnly`), and Shortcuts shows its Add Shortcut sheet. (`shortcuts://import-shortcut`
+  with that link doesn't work: Shortcuts answers "The file isn't in the correct format".) The link holds a copy of the Shortcut as it was
   when the link was made, so when `tools/shortcuts/install-switch.plist` changes, the owner re-signs it and makes a new
   link (Shortcuts > Share > Copy iCloud Link) and updates the constant. Share Shortcut File, and the "Shortcut Not Added"
   alert's Share File, share the signed file to that sheet instead. Back in the app it runs once
   with the input `{"check":1}` (it does nothing) and shows Done only if it ran. Once added, the page
-  `installation/shortcuts` (Install Switch) shows an Added row, Test Install Switch (`vpn.testSwitch`) and Share Shortcut File while it needs Update.
+  `installation/shortcuts` (Install Switch) shows an Added row and Test Install Switch (`vpn.testSwitch`); it shows Share Shortcut File
+  while the Install Switch isn't added or needs Update.
   On iOS 16 and later the added Install Switch takes one trip to Shortcuts per queue of installs. Until it is replaced
   (delete the old one in Shortcuts first, then tap Update: Replace in Shortcuts can leave two on iOS 27, and then neither
   runs by name), Set Up's row and the Install Switch page show Update. The app uses a trip only
@@ -390,7 +392,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   Install Switch only then. With an idle VPN selected but not connected and no Install Switch, the alert is "Your VPN
   May Stay Off" (`vpnIdle`), worded with "if" because iOS doesn't say whether the VPN connects on demand. Bridge calls: `vpn.status` (also `idevice.status`'s `vpn`; its `shortcuts` is
   `{off, on, switch, trip, idle}`; `otherVPNSelected` is there too), `vpn.test`, `vpn.testSwitch` (one trip when ready; otherwise runs start, waits for the VPN,
-  runs dataOff on cellular, then end; answers `{ok, start, end, cellular, wentOff, vpnOn}`), `vpn.checkShortcut` (`{which}`: at most two runs, see above), `vpn.openShortcuts` (takes the optional `link` above), `vpn.leftOff` (`{vpn, cellular}`, see above).
+  runs dataOff on cellular, then end; answers `{ok, start, end, cellular, wentOff, vpnOn}`), `vpn.checkShortcut` (`{which}`: at most two runs, see above), `vpn.openShortcuts` (takes the optional `link` above, which it opens as a universal link), `vpn.leftOff` (`{vpn, cellular}`, see above).
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`.
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and
