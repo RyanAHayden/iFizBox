@@ -125,6 +125,8 @@ between the checks and apt. A missing folder lists nothing (exit 0); anything re
 
 **No Translation files:** every apt-get and apt-mark the helper runs gets `-o Acquire::Languages=none` right after the tool's name (left out of the table above), and so do the daemon's. The app reads descriptions from Packages, never from Translation files, and an unsigned repo whose Release lists no hashes can answer its Translation URL with a web page (HTTP 200) that apt keeps in its lists; apt can't parse it, and from then on every apt command fails with "Encountered a section with no Package: header". With the option apt never reads such a file, and `update`'s list cleanup deletes the one already there.
 
+**Web pages saved as lists:** a repo can answer any index URL (Packages too) with its web page the same way. After `update` and `update-source` (apt-get runs as a child for both), the helper deletes every file in apt's lists whose first non-blank byte is `<` and names its source on stderr as apt names a failed fetch: `E: Failed to fetch <url>  the repo answered with a web page, not an apt index`, the URL rebuilt from the file's name and the source URIs in `etc/apt/sources.list(.d)`. A file no source has gets a `W:` line naming the file. When a source other than a Translation file was named, apt's exit 0 becomes 100, as for any failed fetch, so the app marks that source as failed and refreshes the rest.
+
 **Sources:** sources added in the app go into `ifizbox.sources` and nowhere else, so `apt-get update` and
 installs use them; the app never edits apt's other files. Checks: the URI is `http://` or `https://` (lower case), a
 host of `[A-Za-z0-9.-]` with an optional `:port`, and a path that starts and ends with `/` of `[A-Za-z0-9._~%+/:=,-]`
