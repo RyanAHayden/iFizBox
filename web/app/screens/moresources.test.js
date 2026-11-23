@@ -98,17 +98,18 @@ test("F327: Not Jailbroken: no Find Tweak Sources and no Tweak Sources group, on
 test("B272: Find App Sources lists Recommended's app sources and the directory's, in From the Developer / Modded Apps", async () => {
   const { body, bar } = await draw({ tab: "sources", path: ["more", "apps"] });
   assert.equal(bar.title, "App Sources");
-  const names = body.querySelectorAll(".rec-more-row .cell-label").map((n) => n.textContent);
+  assert.equal(bar.right.label, "Add All"); // B344: Find More's page
+  const names = body.querySelectorAll(".find-row .cell-label").map((n) => n.textContent);
   const apps = [...RECOMMENDED_SOURCES.filter((r) => !r.jailbreak), ...APP_SOURCE_DIRECTORY].map((r) => r.name);
   assert.ok(names.length > 0 && names.every((n) => apps.includes(n)), names.join(", "));
   for (const r of [...RECOMMENDED_SOURCES.filter((x) => !x.jailbreak), ...APP_SOURCE_DIRECTORY]) assert.ok(names.includes(r.name), r.name);
   // added ones stay, with ADDED (this file's other tests add some); the rest say ADD (findappsources.test.js checks
   // which is which)
-  const btns = body.querySelectorAll(".rec-more-row .price-btn").map((b) => b.textContent);
+  const btns = body.querySelectorAll(".find-row .price-btn").map((b) => b.textContent);
   assert.equal(btns.length, names.length);
   assert.ok(btns.every((t) => t === "ADD" || t === "ADDED"), btns.join(", "));
   assert.ok(btns.includes("ADD"));
-  assert.deepEqual(headers(body), ["From the Developer", "Modded Apps"]);
+  assert.deepEqual(body.querySelectorAll(".section-header").map((n) => n.textContent), ["From the Developer", "Modded Apps"]);
 });
 
 test("F327: the Sources tab: More Sources under All Sources (plus tile, no green badge), no Recommended or Find More rows", () => {

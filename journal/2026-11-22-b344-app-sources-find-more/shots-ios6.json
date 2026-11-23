@@ -1,0 +1,17 @@
+[
+ {"wait": 3000},
+ {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.style','ios6'); 'ok'"},
+ {"nav": "#/home", "ms": 2000},
+ {"eval": "location.reload(); 'ok'"},
+ {"wait": 4000},
+ {"nav": "#/sources/manage/find", "ms": 9000},
+ {"shot": "find"},
+ {"nav": "#/sources/more/apps", "ms": 8000},
+ {"shot": "apps"},
+ {"eval": "document.querySelector('.page.is-top .find-credit').scrollIntoView(); 'ok'"},
+ {"wait": 800},
+ {"shot": "apps-bottom"},
+ {"clicktext": "Add All"},
+ {"wait": 1500},
+ {"shot": "apps-addall-sheet"}
+]

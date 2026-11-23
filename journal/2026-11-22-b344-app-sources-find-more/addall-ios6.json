@@ -1,0 +1,11 @@
+[
+ {"wait": 3000},
+ {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.style','ios6'); 'ok'"},
+ {"nav": "#/home", "ms": 2000},
+ {"eval": "location.reload(); 'ok'"},
+ {"wait": 4000},
+ {"nav": "#/sources/more/apps", "ms": 8000},
+ {"eval": "(()=>{const b=[...document.querySelectorAll('.nav-right .bar-button')].filter(e=>e.offsetParent!==null&&e.textContent.trim()==='Add All').at(-1); if(!b) return 'none'; b.click(); return 'ok'})()"},
+ {"wait": 1500},
+ {"shot": "apps-addall-sheet"}
+]

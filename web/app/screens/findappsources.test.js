@@ -21,7 +21,7 @@ const { PIRACY_HOSTS } = await import("../core/piracy-list.js");
 
 const appRecs = () => findAppSources(RECOMMENDED_SOURCES);
 const ctx = { go() {}, showHUD: () => () => {} };
-const buttons = (el) => el.querySelectorAll(".rec-more-row .price-btn").map((b) => b.textContent);
+const buttons = (el) => el.querySelectorAll(".find-row .price-btn").map((b) => b.textContent); // B344: Find More's rows
 
 test("B272: the directory: Recommended's app sources first, then the checked extras, each URL once, no APT repos", () => {
   const recs = appRecs();
