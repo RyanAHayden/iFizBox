@@ -353,7 +353,7 @@ async function drawIssues(box, r, names, close) {
   box.append(frag);
 }
 
-// F18's actions: open | remove | add-source | settings (the last has no page in the app: the iOS version is known).
+// F18's actions: open | remove | add-source | refresh | settings (the last has no page in the app: the iOS version is known).
 function actionRow(p, close) {
   const a = p.action;
   if (!a) return null;
@@ -365,6 +365,11 @@ function actionRow(p, close) {
       addSource(ctxRef, { url: a.url });
     }) };
     case "settings": return null;
+    // F378: apt can't read a list file: Changes' Refresh (Reloading Data) downloads the lists again.
+    case "refresh": return { label: a.label, onClick: () => close().then(async () => {
+      const { reloadSources } = await import("./changes.js");
+      await reloadSources();
+    }) };
     default: return null;
   }
 }
