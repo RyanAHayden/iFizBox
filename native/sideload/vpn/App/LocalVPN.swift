@@ -12,7 +12,6 @@
 //                       idevice.status as `vpn`
 //   vpn.test            the VPN on, one connect to iOS with the pairing (idevice.verify), the VPN off: {ok, ms, kind};
 //                       a pass marks This iPhone tested (set up)
-//   vpn.setShortcut     {which: "off"|"on", added} -> status: the user added (or removed) that Shortcut
 //   vpn.openShortcuts   {which, url}: our signed Shortcut in a share sheet, for Shortcuts' Add Shortcut ({opened, via})
 //   vpn.checkShortcut   {which}: runs it with a text input (it then does nothing) and marks it added only when it
 //                       ran: {ok, error, status}
@@ -341,14 +340,6 @@ enum LocalVPNBridge {
                 let ms = Int(Date().timeIntervalSince(t0) * 1000)
                 UserDefaults.standard.set(true, forKey: LocalVPN.testedKey)
                 return ["ok": true, "ms": ms, "kind": kind.rawValue]
-            }
-        }
-        b.on("vpn.setShortcut") { c in
-            quick(c) {
-                if let w = c.params["which"] as? String, let key = LocalVPN.shortcutKeys[w] {
-                    UserDefaults.standard.set((c.params["added"] as? Bool) ?? true, forKey: key)
-                }
-                return LocalVPN.status()
             }
         }
         b.on("vpn.openShortcuts") { c in LocalVPN.importShortcut(c) }
