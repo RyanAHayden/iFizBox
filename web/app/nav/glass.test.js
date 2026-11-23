@@ -342,3 +342,88 @@ test("another error (no window): the CSS bars, and the glass opens again a secon
   assert.deepEqual(calls.slice(0, 1), ["open"]);
   assert.ok(calls.filter((c) => c === "open").length >= 2, `reopened: ${calls}`);
 });
+
+// B346: the back transition's flicker. The shell keeps one glass view per place in the bar (l0, r0, ...), so the page
+// that comes on top after a slide shows in the same views (no new glass drawn in); while the buttons hide, the
+// snapshot keeps what the shell last showed, so a swipe moving the look-alikes sends nothing each frame.
+test("a slide keeps the glass views: ids by place, nothing sent while it moves, the new page's titles at rest", () => {
+  reset();
+  const { native, calls, tap } = fakeShell();
+  const { item, back, install } = app(native);
+  syncGlass(doc, native, win);
+  const shown = calls[0].buttons;
+  assert.deepEqual(shown.map((b) => b.id), ["l0", "r0"]);
+  item.classList.add("is-moving");
+  item.style.transform = "translate3d(40px,0,0)";
+  syncGlass(doc, native, win);
+  assert.equal(calls.at(-1).buttonsHidden, true);
+  assert.deepEqual(calls.at(-1).buttons, shown, "hidden, the views stay as they were");
+  const sent = calls.length;
+  for (const x of [80, 120, 200]) {
+    item.style.transform = `translate3d(${x}px,0,0)`;
+    back.getBoundingClientRect = () => box(5 + x, 63, 80, 38);
+    syncGlass(doc, native, win);
+  }
+  assert.equal(calls.length, sent, "nothing sent while the slide moves the look-alikes");
+  // the page below comes on top: its own Back and button, in the same places
+  back._text = "Sources";
+  install._text = "Edit";
+  back.getBoundingClientRect = () => box(5, 63, 90, 38);
+  item.classList.remove("is-moving");
+  item.style.transform = "";
+  syncGlass(doc, native, win);
+  const up = calls.at(-1);
+  assert.equal(up.buttonsHidden, false);
+  assert.deepEqual(up.buttons.map((b) => [b.id, b.title]), [["l0", "Sources"], ["r0", "Edit"]], "the same views, new titles");
+  const clicked = [];
+  back.addEventListener("click", () => clicked.push("back"));
+  tap("button:l0");
+  assert.deepEqual(clicked, ["back"]);
+});
+
+test("a nav item starting to slide hides the glass buttons at once, not a frame later", async () => {
+  reset();
+  const { native, calls } = fakeShell();
+  const { item } = app(native);
+  const { watchGlass } = await import("./glass.js");
+  let observed = null;
+  class Observer { constructor(cb) { observed = cb; } observe() {} }
+  const raf = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = () => {}; // the watcher's scheduled syncs never run here
+  globalThis.getComputedStyle = win.getComputedStyle; // the observer's sync runs with the real globals
+  try {
+    syncGlass(doc, native, win);
+    const sent = calls.length;
+    watchGlass(doc, { ...win, MutationObserver: Observer, addEventListener() {} }, native);
+    item.classList.add("is-moving");
+    observed([{ type: "attributes", attributeName: "class", target: item }]);
+    assert.equal(calls.length, sent + 1, "sent in the observer's own turn");
+    assert.equal(calls.at(-1).buttonsHidden, true);
+  } finally {
+    globalThis.requestAnimationFrame = raf;
+    delete globalThis.getComputedStyle;
+    resetGlass();
+  }
+});
+
+test("a bar button's look-alike fades out under its glass button, and shows again at once when the glass hides", async () => {
+  reset();
+  const { native } = fakeShell();
+  const { item, back, bar } = app(native);
+  const fades = new Map();
+  for (const n of [back, bar]) n.animate = (frames, timing) => {
+    const a = { frames, timing, cancelled: false, cancel() { this.cancelled = true; } };
+    fades.set(n, a);
+    return a;
+  };
+  syncGlass(doc, native, win);
+  assert.equal(back.dataset.glassShown, "");
+  const fade = fades.get(back);
+  assert.deepEqual(fade?.frames, [{ opacity: 1 }, { opacity: 0 }], "the look-alike fades out under the glass");
+  assert.ok(fade.timing.duration > 0 && fade.timing.duration <= 200);
+  assert.equal(fades.has(bar), false, "the tab bar's look-alike goes at once: the UITabBar is not over its rects");
+  item.classList.add("is-moving");
+  syncGlass(doc, native, win);
+  assert.equal(back.dataset.glassShown, undefined);
+  assert.equal(fade.cancelled, true, "a fade still running stops: the look-alike shows at once");
+});

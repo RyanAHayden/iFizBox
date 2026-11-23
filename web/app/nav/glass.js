@@ -23,9 +23,8 @@ import { FLOAT_OWN_TAB } from "./tabbar.js";
 export const GLASS_KEY = "bars";
 const POPUP = '[aria-modal="true"], [role="dialog"], [role="alertdialog"]'; // nav/popups.js POPUPS, inline (startup modules)
 
-const st = { open: false, ready: false, failed: false, retryAt: 0, sent: null, iconsSent: new Set(), byId: new Map() };
-let ids = new WeakMap(); // a button element -> its id, kept while it lives
-let nextId = 0;
+// held: the buttons the shell last showed, kept in every snapshot while they hide (B346, buttonsSnapshot)
+const st = { open: false, ready: false, failed: false, retryAt: 0, sent: null, iconsSent: new Set(), byId: new Map(), held: null };
 let watching = false;
 let queued = false;
 
@@ -167,30 +166,36 @@ function tabIcon(svg, win) {
   return key;
 }
 
-function buttonId(b) {
-  let id = ids.get(b);
-  if (!id) { id = `b${++nextId}`; ids.set(b, id); }
-  return id;
+// B346: a button's id is its place in the bar (l0 the first on the left, r0, r1 on the right), not the element, so the
+// shell keeps one glass view per place: the page that comes on top after a slide shows in the views already there
+// (new titles and rects) instead of in new ones, which iOS would draw in again while their look-alike goes.
+function placeIds(els) {
+  let left = 0, right = 0;
+  return els.map((b) => (b.closest?.(".nav-left") ? `l${left++}` : `r${right++}`));
 }
 
+// While the buttons hide (a slide, a popup, a sheet over them), the snapshot keeps the ones the shell last showed
+// (st.held), so the views stay as they were and nothing is sent each frame as the slide moves the look-alikes.
 function buttonsSnapshot(doc, win, popup) {
   const tops = [...(doc.querySelectorAll?.(".nav-stack.is-active > .nav-item.is-top") ?? [])];
   const item = tops.length === 1 ? tops[0] : null;
   const els = item ? [...item.querySelectorAll(".nav-left .bar-button, .nav-right .bar-button")].filter((b) => shows(b) && b.getBoundingClientRect().width > 0) : [];
-  const buttons = els.map((b) => {
+  const hidden = !item || popup || moving(item, doc) || els.some((b) => covered(b, doc));
+  if (hidden) return { buttons: st.held ?? [], buttonsHidden: true, els: [], places: [] };
+  const places = placeIds(els);
+  const buttons = els.map((b, i) => {
     const cs = win.getComputedStyle(b);
     const kind = b.classList.contains("back") ? "back" : b.classList.contains("done") ? "done" : "plain";
     const bg = cs.backgroundColor;
     return {
-      id: buttonId(b), rect: rectOf(b, win), kind, title: b.classList.contains("bar-icon") ? "" : b.textContent.trim(),
+      id: places[i], rect: rectOf(b, win), kind, title: b.classList.contains("bar-icon") ? "" : b.textContent.trim(),
       label: b.getAttribute("aria-label") ?? "", size: parseFloat(cs.fontSize) || 15, weight: weightOf(cs), color: cs.color,
       tint: kind === "done" && bg && !/rgba\(0, 0, 0, 0\)|transparent/.test(bg) ? bg : null,
       disabled: b.disabled === true || b.getAttribute("aria-disabled") === "true",
       icon: b.classList.contains("bar-icon") ? iconOf(b, win) : null,
     };
   });
-  const hidden = !item || popup || moving(item, doc) || els.some((b) => covered(b, doc));
-  return { buttons, buttonsHidden: hidden, els };
+  return { buttons, buttonsHidden: false, els, places };
 }
 
 function colorsOf(doc, win) {
@@ -209,10 +214,10 @@ export function glassSnapshot(doc = globalThis.document, win = globalThis, nativ
   if (!glassWanted(doc, native)) return null;
   const popup = popupUp(doc);
   const tabbar = tabbarSnapshot(doc, win, popup);
-  const { buttons, buttonsHidden, els } = buttonsSnapshot(doc, win, popup);
+  const { buttons, buttonsHidden, els, places } = buttonsSnapshot(doc, win, popup);
   const root = doc.documentElement;
   const dark = root.getAttribute("data-theme") === "dark";
-  return { snap: { scale: win.devicePixelRatio || 3, dark, colors: colorsOf(doc, win), tabbar, buttons, buttonsHidden }, els };
+  return { snap: { scale: win.devicePixelRatio || 3, dark, colors: colorsOf(doc, win), tabbar, buttons, buttonsHidden }, els, places };
 }
 
 // ---- keeping the shell in step --------------------------------------------------------------------------------------
@@ -232,8 +237,20 @@ function seethrough(doc, parts) {
   if (parts) root.setAttribute("data-glass", "native");
   else root.removeAttribute("data-glass");
   uncover(doc, parts ?? { tabbar: null, buttons: [] });
-  if (parts) for (const el of [parts.tabbar, ...parts.buttons]) if (el && el.dataset.glassShown == null) el.dataset.glassShown = "";
+  if (parts) for (const el of [parts.tabbar, ...parts.buttons]) if (el && el.dataset.glassShown == null) { el.dataset.glassShown = ""; fadeUnder(el); }
   if (parts?.tabbar) inertTabs(parts.tabbar, true);
+}
+
+// B346: a bar button's look-alike fades out under its glass button instead of going in one frame. The shell's glass
+// and the page's frames don't land together, so for a frame or two both show: faded, that passes as the glass
+// settling, not as a flash at the end of a slide. (An era stylesheet takes no transitions, so a Web Animation; when it
+// ends, ios26.css's [data-glass-shown] rule keeps it see-through.) Showing again is at once: uncover stops the fade.
+const FADE_MS = 150;
+const fades = new WeakMap(); // look-alike -> its running fade
+function fadeUnder(el) {
+  if (!el.classList?.contains("bar-button") || typeof el.animate !== "function") return;
+  fades.get(el)?.cancel();
+  fades.set(el, el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FADE_MS, easing: "ease-out" }));
 }
 
 // Only takes data-glass-shown off what `parts` no longer holds: those look-alikes show at once.
@@ -242,6 +259,8 @@ function uncover(doc, parts) {
   for (const el of [...(doc.querySelectorAll?.("[data-glass-shown]") ?? [])]) {
     if (want.has(el)) continue;
     delete el.dataset.glassShown;
+    fades.get(el)?.cancel();
+    fades.delete(el);
     inertTabs(el, false);
   }
 }
@@ -263,8 +282,9 @@ export function syncGlass(doc = globalThis.document, native = nativeBridge(), wi
   if (!hasNativeCall(native) || st.failed || st.retryAt > Date.now()) return;
   const got = glassSnapshot(doc, win, native);
   if (!got) { closeGlass(doc, native); return; }
-  const { snap, els } = got;
-  st.byId = new Map(els.map((b) => [ids.get(b), b]));
+  const { snap, els, places } = got;
+  st.byId = new Map(els.map((b, i) => [places[i], b]));
+  if (!snap.buttonsHidden) st.held = snap.buttons;
   const icons = pendingIcons(snap);
   const key = JSON.stringify(snap);
   if (key === st.sent && !Object.keys(icons).length) return;
@@ -306,6 +326,7 @@ function lost(doc) {
   st.open = false;
   st.ready = false;
   st.sent = null;
+  st.held = null;
   st.iconsSent.clear();
   seethrough(doc, null);
 }
@@ -337,11 +358,19 @@ export function watchGlass(doc = globalThis.document, win = globalThis, native =
       const el = r.target.nodeType === 1 ? r.target : r.target.parentElement;
       if (!el?.closest) return false;
       if (el.closest(".page-body, [data-scroller]")) return true;
-      // the large title's fade, and the edge swipe's per-frame transforms on a pair already marked .is-moving (its
-      // class change, at the start and the end, is what hides and shows the buttons)
-      return r.type === "attributes" && r.attributeName === "style" && !!el.matches?.(".nav-title, .large-title, .is-moving");
+      // the large title's fade, and the edge swipe's per-frame styles in a pair already marked .is-moving (its pages,
+      // nav items, shades and the opened row's fading copy: the class change, at the start and the end, is what hides
+      // and shows the buttons)
+      return r.type === "attributes" && r.attributeName === "style" && (!!el.matches?.(".nav-title, .large-title") || !!el.closest(".is-moving"));
     };
-    const obs = new Observer((records) => { if (records.some((r) => !quiet(r))) scheduleGlassSync(); });
+    // B346: a nav item starting to slide hides the glass buttons now, before the slide's first frame, not a frame
+    // later, so the glass doesn't stand still over a look-alike already moving.
+    const starts = (r) => r.type === "attributes" && r.attributeName === "class" && !!r.target.classList?.contains("is-moving") &&
+      !!r.target.classList.contains("nav-item");
+    const obs = new Observer((records) => {
+      if (records.some(starts)) syncGlass();
+      else if (records.some((r) => !quiet(r))) scheduleGlassSync();
+    });
     obs.observe(doc.body, { childList: true, subtree: true, characterData: true, attributes: true,
       attributeFilter: ["class", "hidden", "style", "role", "aria-modal", "disabled", "aria-label"] });
     obs.observe(doc.documentElement, { attributes: true, attributeFilter: ["class", "data-controls", "data-tabbar", "data-style", "data-theme", "data-palette"] });
@@ -354,10 +383,9 @@ export function watchGlass(doc = globalThis.document, win = globalThis, native =
 
 // For the tests: forget everything between cases.
 export function resetGlass() {
-  Object.assign(st, { open: false, ready: false, failed: false, retryAt: 0, sent: null, byId: new Map() });
+  Object.assign(st, { open: false, ready: false, failed: false, retryAt: 0, sent: null, byId: new Map(), held: null });
   st.iconsSent.clear();
   icons.clear();
-  ids = new WeakMap();
   watching = false;
   queued = false;
 }
