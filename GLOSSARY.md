@@ -234,3 +234,10 @@ Something black under the iOS status bar (the run page, a full-screen photo, the
 _Said_: black full-screen page
 _In code_: coverDark, darkCovered, onDarkCover
 _Avoid_: overlay, scrim
+
+**Cannot Comply**:
+What the Confirm sheet becomes when apt, or the part that asks it, won't go ahead with the queue: why, the way out per package, and Close, which keeps the queue
+_Said_: the error sheet when queuing
+_On screen_: Cannot Comply; Close; Remove <name> from Queue
+_In code_: openConfirm, refusedGroups, unqueueGroup, helperRefusal, refusalIds
+_Avoid_: error sheet, failed Confirm
