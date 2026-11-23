@@ -1261,6 +1261,9 @@ async function renderPackage(body, route, key, id, ctx) {
   // F228: from a source on the piracy list: Source Warning at the top of Details.
   const piracy = piracyBanner(packageWarning({ key: pkg.key, source: source?.uri }));
   if (piracy) details.append(piracy);
+  // F375: an upgrade is out: What's New in it first, the installed version on the right.
+  const upgradeNews = upgradeNewsSlot(st, inst, sileoJson);
+  if (upgradeNews) details.append(upgradeNews);
   // F350: Change Package Settings (installed: its own page with the package's switches), Maintainer when it isn't the author.
   if (plan.options.length) details.append(grouped([{ rows: detailRows(plan.options, {
     settings: { href: deeper(route, token("pkgsettings", pid)) },
@@ -1359,6 +1362,25 @@ async function renderPackage(body, route, key, id, ctx) {
   details.append(footerGroup(detailsFooter(st.package, pkg.installedOnly ? "" : sourceName, section)));
   rememberPackage(body, route, { id, key, pkg, source, history, payBox });
   if (sileo) sileoJson.then((json) => { if (previews.isConnected) { drawPreviews(json); drawLinks(json); } });
+}
+
+// F375: Details' What's New card when an upgrade is out (the installed version older than the source's): "What's
+// New in <new version>", "Installed: <old version>" on the right and the Sileo depiction's newest changelog entry,
+// drawn at once with NO_RELEASE_NOTES and swapped (sliding) when the JSON comes. No Version History row: Installed
+// Package has it. null when nothing is installed or it's up to date. `.ready` settles once the notes are in.
+export const NO_RELEASE_NOTES = "No release notes for this version.";
+export function upgradeNewsSlot(st, inst, sileoJson = Promise.resolve(null)) {
+  const newer = st?.version, old = inst?.version;
+  if (!newer || !old || compareVersions(newer, old) <= 0) return null;
+  const slot = el("div", "package-whatsnew-slot");
+  const draw = (notes) => slot.replaceChildren(whatsNewGroup({ version: newer, date: `Installed: ${old}`, notes }));
+  draw(NO_RELEASE_NOTES);
+  slot.ready = Promise.resolve(sileoJson).catch(() => null).then((json) => {
+    const text = json ? sileoWhatsNew(json)?.text?.trim() : null;
+    if (text) { if (slot.isConnected) slideChange(slot, () => draw(text)); else draw(text); } // a page left: no slide
+    return text || null;
+  });
+  return slot;
 }
 
 // B328: the description text of a package's own HTML Depiction: (not with a Sileo one, which Details draws, nor the

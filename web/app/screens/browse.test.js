@@ -186,3 +186,56 @@ test("F213: an app row's swipe and hold menu in the sideload build: Install, Upg
   // The undo bar names an app's queued mode with the app queue's labels.
   assert.equal(swipeMessage({ kind: "cancel" }, "App", { mode: "resign" }, { resign: "Re-sign" }), "Re-sign App cancelled");
 });
+
+// F375: an upgrade is out: What's New in it is Details' first card (after Source Warning), the installed version on
+// the right, the depiction's newest changelog entry once its JSON comes, else the fallback line.
+import { upgradeNewsSlot, NO_RELEASE_NOTES } from "./browse.js";
+import { fakeDocument } from "../nav/fakedom.test-helper.js";
+import { readFileSync } from "node:fs";
+
+const withDoc = async (fn) => {
+  const saved = globalThis.document;
+  globalThis.document = fakeDocument();
+  try { await fn(); } finally { globalThis.document = saved; }
+};
+const changelog = { class: "DepictionTabView", tabs: [{ tabname: "Details", views: [] }, { tabname: "Changelog", class: "DepictionStackView",
+  views: [{ class: "DepictionSubheaderView", title: "2.1" }, { class: "DepictionMarkdownView", markdown: "- Fixes a stutter" },
+    { class: "DepictionSubheaderView", title: "2.0" }, { class: "DepictionMarkdownView", markdown: "- older" }] }] };
+
+test("F375: installed older: What's New in the new version, Installed: old on the right, the notes swapped in", () => withDoc(async () => {
+  const slot = upgradeNewsSlot({ version: "2.1" }, { version: "2.0" }, Promise.resolve(changelog));
+  assert.ok(slot);
+  const head = slot.querySelector(".store-whatsnew-head");
+  assert.equal(head.firstElementChild.textContent, "What’s New in 2.1");
+  assert.equal(slot.querySelector(".store-whatsnew-date").textContent, "Installed: 2.0");
+  assert.equal(slot.querySelector(".store-whatsnew-text").textContent, NO_RELEASE_NOTES, "drawn at once with the fallback");
+  assert.equal(await slot.ready, "- Fixes a stutter");
+  assert.equal(slot.querySelector(".store-whatsnew-text").textContent, "- Fixes a stutter");
+  assert.match(slot.textContent, /Installed: 2\.0/);
+  assert.doesNotMatch(slot.textContent, /Version History/, "Installed Package has that row");
+}));
+
+test("F375: no notes (no Sileo depiction, no changelog tab, a failed fetch): the fallback line stays", () => withDoc(async () => {
+  for (const json of [Promise.resolve(null), Promise.resolve({ class: "DepictionStackView", views: [] }), Promise.reject(new Error("x"))]) {
+    const slot = upgradeNewsSlot({ version: "1:3.0" }, { version: "2.9" }, json);
+    assert.equal(await slot.ready, null);
+    assert.equal(slot.querySelector(".store-whatsnew-text").textContent, NO_RELEASE_NOTES);
+    assert.equal(slot.querySelector(".store-whatsnew-date").textContent, "Installed: 2.9");
+  }
+}));
+
+test("F375: same version, newer installed or not installed: no card", () => withDoc(async () => {
+  assert.equal(upgradeNewsSlot({ version: "2.0" }, { version: "2.0" }, Promise.resolve(changelog)), null);
+  assert.equal(upgradeNewsSlot({ version: "2.0" }, { version: "2.1" }), null);
+  assert.equal(upgradeNewsSlot({ version: "2.0" }, null), null);
+  assert.equal(upgradeNewsSlot({ version: "2.0" }, { version: "" }), null);
+}));
+
+test("F375 wiring: the card goes right after Source Warning, before every other Details group", () => {
+  const src = readFileSync(new URL("./browse.js", import.meta.url), "utf8");
+  const at = (s) => { const i = src.indexOf(s); assert.ok(i > 0, s); return i; };
+  const piracy = at("if (piracy) details.append(piracy);");
+  const news = at("details.append(upgradeNews)");
+  assert.ok(piracy < news && news < at("if (plan.options.length) details.append("));
+  assert.ok(src.includes("upgradeNewsSlot(st, inst, sileoJson)"), "the Sileo JSON the page already fetched");
+});
