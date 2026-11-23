@@ -230,7 +230,7 @@ html[data-style="ios26"][data-theme="dark"] {
   --banner: #1c1c1e; --banner-shadow: none; --banner-edge: var(--i26-hairline); --banner-icon-shadow: none;
   --banner-emboss: none; --banner-title: #fff; --banner-text: #fff; --banner-timer: rgba(255,255,255,.3);
   --reload-bar: linear-gradient(var(--i26-hairline), var(--i26-hairline)) top / 100% .5px no-repeat, #000;
-  --reload-text: #fff; --reload-emboss: none; --i26-reload-spinner: var(--spinner-white);
+  --reload-text: #fff; --reload-emboss: none; --i26-reload-spinner: var(--spinner-gray); /* F381: secondaryLabel's dark value */
   --undo-bar: var(--i26-glass); --undo-text: #fff; --undo-emboss: none;
 }
 
@@ -405,6 +405,18 @@ html[data-style="ios26"] .banner-text strong { font-weight: 600; }
 html[data-style="ios26"] .banner-icon { border-radius: 7px; }
 html[data-style="ios26"] .reload-text { font-size: 15px; font-weight: 600; }
 html[data-style="ios26"] .reload-spinner { background-image: var(--i26-reload-spinner); }
+/* F381: iOS 26 kept iOS 13's UIActivityIndicatorView (nav/spinner.js ERA_SPINNERS.ios26, measured from Apple's iOS 27
+   UI Kit; spinner.test.js keeps the two the same): the same tokens as ios13.css, 8 spokes turned 45 degrees at a time. */
+html[data-style="ios26"] .bar-button.is-reloading::after { background-image: var(--spinner-gray); } /* Home's Reload in its capsule */
+html[data-style="ios26"] {
+  --spinner-turns: hud-spin-8;
+  --spinner-white: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg stroke='%23fff' stroke-width='2.67' stroke-linecap='round'%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' opacity='1'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(45 10 10)' opacity='0.15'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(90 10 10)' opacity='0.27'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(135 10 10)' opacity='0.39'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(180 10 10)' opacity='0.51'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(225 10 10)' opacity='0.63'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(270 10 10)' opacity='0.75'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(315 10 10)' opacity='0.87'/%3E%3C/g%3E%3C/svg%3E");
+  --spinner-gray: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg stroke='%233c3c43' stroke-width='2.67' stroke-linecap='round' opacity='0.6'%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' opacity='1'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(45 10 10)' opacity='0.15'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(90 10 10)' opacity='0.27'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(135 10 10)' opacity='0.39'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(180 10 10)' opacity='0.51'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(225 10 10)' opacity='0.63'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(270 10 10)' opacity='0.75'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(315 10 10)' opacity='0.87'/%3E%3C/g%3E%3C/svg%3E");
+  --spinner-large: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 37 37'%3E%3Cg fill='%23fff'%3E%3Crect x='16' y='1' width='5' height='13' rx='2' opacity='1'/%3E%3Crect x='16' y='1' width='5' height='13' rx='2' transform='rotate(45 18.5 18.5)' opacity='0.15'/%3E%3Crect x='16' y='1' width='5' height='13' rx='2' transform='rotate(90 18.5 18.5)' opacity='0.27'/%3E%3Crect x='16' y='1' width='5' height='13' rx='2' transform='rotate(135 18.5 18.5)' opacity='0.39'/%3E%3Crect x='16' y='1' width='5' height='13' rx='2' transform='rotate(180 18.5 18.5)' opacity='0.51'/%3E%3Crect x='16' y='1' width='5' height='13' rx='2' transform='rotate(225 18.5 18.5)' opacity='0.63'/%3E%3Crect x='16' y='1' width='5' height='13' rx='2' transform='rotate(270 18.5 18.5)' opacity='0.75'/%3E%3Crect x='16' y='1' width='5' height='13' rx='2' transform='rotate(315 18.5 18.5)' opacity='0.87'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-style="ios26"][data-theme="dark"] {
+  --spinner-gray: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg stroke='%23ebebf5' stroke-width='2.67' stroke-linecap='round' opacity='0.6'%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' opacity='1'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(45 10 10)' opacity='0.15'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(90 10 10)' opacity='0.27'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(135 10 10)' opacity='0.39'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(180 10 10)' opacity='0.51'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(225 10 10)' opacity='0.63'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(270 10 10)' opacity='0.75'/%3E%3Cline x1='10' y1='1.335' x2='10' y2='5.335' transform='rotate(315 10 10)' opacity='0.87'/%3E%3C/g%3E%3C/svg%3E");
+}
 /* B333: the undo bar floats as a glass capsule like the tab pill (the hooks above place it; the content scrolls
    under it, so it blurs as the pill does), its message 15pt semibold, and Undo iOS 26's text button: semibold tint
    with no capsule of its own (the Done capsule's tokens would draw one), dimming while held. */
