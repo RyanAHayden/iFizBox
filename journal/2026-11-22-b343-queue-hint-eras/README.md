@@ -38,4 +38,4 @@ no hint. `node --test` on queuehint.test.js and ios6-css.test.js pass.
   Whether iOS 13's real edit menu greys are exactly these was not compared against a device (the 7 runs iOS 15, whose
   menu is this style, but the brief doesn't send me to it).
 - The `.menu` callout (nav/menu.js, hold menus) in the iOS 13 era still draws iOS 6's gloss; out of this task's
-  scope, filed as a follow-up.
+  scope, filed as B352.
