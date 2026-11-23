@@ -55,9 +55,14 @@ task's file list. Duration and timing are unchanged (.96 s, linear, no steps(): 
   (1038).
 - `images-zoomed.png`: rsvg-convert at 3x, each @3x pixel drawn 4x. Rows are iOS 6, 7 and 13; columns are grey on
   white, white, large, and iOS 13's dark grey.
-- `eras-3x.png`: headless Chromium at deviceScaleFactor 3 (`shots.py`), using the real stylesheets with each
-  overlay's markup. Animations are paused at frame 0. Rows are iOS 6, 7, 13 and 26; columns are light and dark. Each
-  shot shows the HUD, a loading row, the tab badge, Home's Reload and the reload bar.
+- `eras-3x.png`: headless Chromium at deviceScaleFactor 3, made by
+  `python3 journal/2026-11-23-f381-era-spinners/shots.py web/app OUT`. It uses the real stylesheets with each
+  overlay's markup, and animations are paused at frame 0. Rows are iOS 6, 7, 13 and 26; columns are light and dark.
+  Each shot shows the HUD, a loading row, the tab badge, Home's Reload, pull to refresh (refreshing) and the reload
+  bar.
+- `eras-zoomed.png`: the same Chromium shots with each spinner cropped and every 3x pixel drawn 3x3. There is one
+  row per era and theme (iOS 6 light, iOS 6 dark, … iOS 26 dark). Columns are the HUD, loading row, tab badge,
+  Home's Reload, pull to refresh and reload bar.
 
 ## Not verified
 
@@ -72,5 +77,17 @@ task's file list. Duration and timing are unchanged (.96 s, linear, no steps(): 
 - **The 8-step turn on a real WebKit**: checked in desktop Chromium (paused frames) only, not on iOS 15 WebKit, where
   F166 found that steps() stands still. `hud-spin-8` uses the same hold-keyframes approach as `hud-spin`, which F166
   proved turns on iOS 15. Not looked at on a phone.
-- Pull to refresh's spinner is not in the shots (its strip is positioned off the harness); it uses `--spinner-gray`
-  like the loading row, which is in the shots.
+- **No grey large style.** UIKit has `.large` in grey too, but nothing in the app draws a large spinner except the
+  HUD. The HUD keeps iOS 6's dark box in every era (restyling it is not this task), so only a white large one is
+  drawn. If an era's HUD turns light, add a grey `large` to `ERA_SPINNERS` then.
+
+## Spec review
+
+A fresh reviewer read the diff and the brief.
+- Fixed: the Chromium shots weren't zoomed, and pull to refresh wasn't in them (`eras-zoomed.png`, `shots.py`). The
+  harness path came from a hard-coded worktree; it now comes from an argument.
+- Kept, with the reason: the `style.css` hook (the only way the 8-spoke images can turn 45 degrees: era sheets
+  can't set `animation-name`), `grayDark` and the ios13/26 dark reload bar (secondaryLabel's dark value is what
+  iOS 13+ draws), and Home's Reload taking the grey spinner (it is one of the era's spinners, and white on a light
+  bar can't be seen).
+- Left as written down above: no real iOS 7-12 measurement, and iOS 13 taken from the iOS 27 kit.
