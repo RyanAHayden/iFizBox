@@ -25,7 +25,7 @@ holder() { cat "$lock/owner" 2>/dev/null || echo '?'; }
 # IFIZBOX_UI_TIDY=0 skips it (tests).
 tidy() {
   [ "${IFIZBOX_UI_TIDY:-1}" = 1 ] || return 0
-  s() { ssh -o ConnectTimeout=5 "$host" "$@"; }
+  s() { ssh -o ConnectTimeout=5 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 "$host" "$@"; }
   s "$pc home; sleep 1; $pc home; sleep 1" 2>/dev/null || { echo "couldn't tidy the iPhone 7 (unreachable?)" >&2; return 0; }
   t=${XDG_RUNTIME_DIR:-/tmp}/ifizbox-7-tidy; same() { python3 "$(dirname "$0")/ui-same.py" "$t-$1.png" "$t-$2.png"; }
   s "$pc shot -" > "$t-home.png"; s "$pc home; $pc home; sleep 1"; i=0
@@ -51,7 +51,9 @@ case $1 in
     if [ -n "${AGENT_SLOT:-}" ]; then echo "$AGENT_SLOT" > "$lock/slot"; else rm -f "$lock/slot"; fi
     exit 0 ;;
   unlock)
-    [ "$(holder)" = "$2" ] && { tidy; rm -rf "$lock"; }; exit 0 ;;
+    [ "$(holder)" = "$2" ] || exit 0
+    (tidy) || echo "tidy failed; the lock is freed anyway" >&2  # a subshell: set -e can't skip the rm
+    rm -rf "$lock"; exit 0 ;;
 esac
 
 me=$1; cmd=$2; shift 2

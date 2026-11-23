@@ -47,7 +47,7 @@ case $1 in
     exit 0 ;;
   unlock)
     [ "$(holder)" = "$2" ] || exit 0
-    [ "${IFIZBOX_UI_TIDY:-1}" = 1 ] && { sh "$0" "$2" tidy || echo "couldn't tidy the iPhone 15" >&2; }
+    [ "${IFIZBOX_UI_TIDY:-1}" = 1 ] && { timeout 180 sh "$0" "$2" tidy || echo "couldn't tidy the iPhone 15" >&2; }
     rm -rf "$lock"; exit 0 ;;
 esac
 
