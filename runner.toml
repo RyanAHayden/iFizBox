@@ -26,3 +26,9 @@ push_merge = true
 # Uncommitted edits in the main checkout never hold a tested merge for long: after 3 minutes they move to a
 # wip/main-checkout-<time> branch (and a stash), and the merge lands (agent-runner 0.38.1).
 land_edited = "wip"
+
+# Tests, tooling and releases run on Sonnet, as docs, cleanups and research do by default; a simple B or F gets
+# `--model sonnet` when it is queued (AGENTS.md, Usage) (user 2026-11-23: move simple things to sonnet).
+[models.kinds]
+T = "sonnet"
+V = "sonnet"

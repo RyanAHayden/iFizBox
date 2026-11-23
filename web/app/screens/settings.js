@@ -24,6 +24,7 @@ import { hooksOf } from "../core/settings.js"; // F202
 import { setFloatingTabbar } from "../nav/tabbar.js"; // F203 (app.js loads it at startup already)
 import { launchKey } from "../core/settings.js"; // B235
 import { showAlert, alertOK } from "../nav/alert.js";
+import { userTouch, typing, untilNotTyping } from "../nav/hometop.js";
 import { showHUD } from "../nav/hud.js";
 import { darkCovered, onDarkCover } from "../nav/statusbar.js"; // B401
 import { parseProfile, checkP12Password, deviceSummary, deviceError, summary, profileKind, deviceCheck, deviceCheckText } from "../core/signing.js";
@@ -1411,7 +1412,14 @@ export function returnWatcher({ doc, win, redraw, status, interval, back = () =>
     if (last !== null && now !== last) redraw();
     last = now;
   };
-  const again = () => { if (doc.visibilityState !== "hidden") { back(); redraw(); } };
+  // B406: a redraw would take the field the user is already typing in (iOS's visible event can come after the tap).
+  // Then it redraws once they're done.
+  const again = () => {
+    if (doc.visibilityState === "hidden") return;
+    back();
+    if (userTouch.touched() && typing(doc)) untilNotTyping(doc).then(redraw);
+    else redraw();
+  };
   doc.addEventListener("visibilitychange", again);
   win.addEventListener("pageshow", again);
   win.addEventListener("focus", check);

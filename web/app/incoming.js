@@ -31,6 +31,7 @@ import { parseAddLink } from "./core/handoff.js";
 import { parseOtherLink, otherLinksOn } from "./core/otherlinks.js";
 import { packageIdOf } from "./websign-gate.js";
 import { NAME } from "./brand.js";
+import { userTouch } from "./nav/hometop.js";
 import { markHandoff } from "./handoffclock.js";
 import { nativeBridge } from "./native.js";
 import { leftOffAlert } from "./core/installroute.js"; // B395
@@ -52,10 +53,10 @@ export function startIncoming({ native = nativeBridge(), events = globalThis, do
   runPage = defaultRunPage, alert = showAlert } = {}) {
   if (!native?.call) return;
   // B175: back in front (reopened, or a link or file brought it up) with the app run's log still up and its run over:
-  // that page closes. A link's take does the same before it opens anything (clearRunPage).
+  // that page closes (B406: not once the user touched anything, it is theirs to close). A link's take does the same before it opens anything (clearRunPage).
   doc?.addEventListener?.("visibilitychange", () => {
     if (doc.visibilityState === "hidden") return;
-    Promise.resolve(runPage()).then((p) => { if (p && !p.busy && !p.aside) return p.dismiss(); }).catch(() => {});
+    Promise.resolve(runPage()).then((p) => { if (p && !p.busy && !p.aside && !userTouch.touched()) return p.dismiss(); }).catch(() => {});
   });
   let busy = false;
   let again = false; // B174: an "ifizbox:url" while a take ran: take once more after it

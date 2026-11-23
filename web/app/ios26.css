@@ -286,6 +286,18 @@ html[data-style="ios26"] .bar-button.queue-toggle.is-queued::before {
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M2.5 2.5l13 13M15.5 2.5l-13 13' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M2.5 2.5l13 13M15.5 2.5l-13 13' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
 }
+/* Its Installed mark toggle: the circled check, filled with the check cut out while marked, as Share's. */
+html[data-style="ios26"] .bar-button.mark-toggle::before {
+  filter: none;
+  background-color: var(--i26-label);
+  background-image: none;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='8.6' fill='none' stroke='%23000' stroke-width='1.7'/%3E%3Cpath d='M5.8 10.3l2.9 2.9 5.6-6.2' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 19px 19px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='8.6' fill='none' stroke='%23000' stroke-width='1.7'/%3E%3Cpath d='M5.8 10.3l2.9 2.9 5.6-6.2' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 19px 19px no-repeat;
+}
+html[data-style="ios26"] .bar-button.mark-toggle.is-marked::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cmask id='m'%3E%3Crect width='20' height='20' fill='%23fff'/%3E%3Cpath d='M5.8 10.3l2.9 2.9 5.6-6.2' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/mask%3E%3Ccircle cx='10' cy='10' r='9.4' mask='url(%23m)'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cmask id='m'%3E%3Crect width='20' height='20' fill='%23fff'/%3E%3Cpath d='M5.8 10.3l2.9 2.9 5.6-6.2' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/mask%3E%3Ccircle cx='10' cy='10' r='9.4' mask='url(%23m)'/%3E%3C/svg%3E");
+}
 
 /* Tab bar: the floating glass pill (style.css lays it out under the floating tab bar hook): a translucent fill
    blurred over the page, a light rim and a soft float shadow. 10pt medium labels under ios6.css's filled glyphs,

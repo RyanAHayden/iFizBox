@@ -222,6 +222,11 @@ export function createRouter({ win, onRoute }) {
       if (win.location.hash === hash) return;
       win.location.hash = hash; // fires hashchange -> sync
     },
+    // Like go, but the route shows before this returns, not at the hashchange to come (which then finds nothing to do).
+    goNow(route) {
+      this.go(route);
+      sync();
+    },
     // Like go, but without a history entry (the back button on a deep link that has no history behind it).
     replace(route) {
       const hash = format(route);

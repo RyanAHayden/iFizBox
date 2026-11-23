@@ -673,7 +673,7 @@ An app keeps its data in three places, and a re-sign must leave each where the a
   preferences, and keychain calls lose `kSecAttrAccessGroup` (items land in the app's own group). That place is the
   same under any profile, whatever groups it has or in what order, and no other app shares it. An app an earlier
   sign mapped onto the profile's first group gets that folder and suite copied into its own once (`legacy` in
-  `ifizbox-groupfix.plist`; only for an app that had run before it got this fix, never a fresh install, which would
+  `ifizbox-groupfix.plist`; only for an app that had run before it got this fix (as defined below), never a fresh install, which would
   take in what other apps left in that shared group).
   At the first launch with the fix for a group (its `Library/AppGroups/<group>/` doesn't exist yet), an app that ran
   before and has no `target` brings in what it kept for that group without the fix: the folder the container call
@@ -694,10 +694,19 @@ An app keeps its data in three places, and a re-sign must leave each where the a
   the app gets a group of its own first, both signers give it the group fix with `isolate` (that group), even when
   its original names no groups: the dylib names that group on every generic and internet password call (add, read,
   update, delete), so no other app's call reaches the app's passwords and the app never sees theirs. The first launch
-  with it copies every password the app could see outside its own group into its own (`copySharedPasswords`, never
-  over one it has, in the order a read naming no group finds them, so it keeps the one it read until now), only for
-  an app that had run before (anything of its own in its preferences, Documents, Application Support or
-  Library/AppGroups; a fresh install copies nothing) and marks `ifizbox.groupfix.isolated` in its preferences. Until
+  with it copies every password the app could see outside its own group into its own (`copySharedPasswords`), only for
+  an app that had run before, and marks `ifizbox.groupfix.isolated` in its preferences. "Ran before" means a regular
+  file in the container's Library (SplashBoard skipped), Documents or tmp whose change time is before this process
+  started, or the dyld cache or saved-state folder an earlier launch made; not its preferences, which a tweak's initialisers write before this fix loads. A fresh install copies
+  nothing. The copy is never over an item the own group has, in the order a read naming no group finds them, so the
+  app keeps the one it read until now. Except: when the container shows no earlier group fix (no `Library/AppGroups`,
+  `ifizbox-groupfix.log`, `ifizbox.appgroup.*` suite or `ifizbox.groupfix.*` mark) and no password in the app's own
+  group was written since this install's container was made (the oldest birth of its folders, which survives an
+  update), the app ran signed for the shared groups only. Then the own item is one an earlier install left (the
+  keychain outlives a delete), and the first shared item like it (the one the app was reading) takes its place if it
+  is newer. `ifizbox.groupfix.takeover` is marked until the copy completes, so a retry sees it. Remaining limit: an app
+  another signer gave its own group plus the shared one, with no group fix, that has written no password in this
+  install, can take another app's newer shared item. Until
   every item could be copied (locked before the first unlock after a restart, or behind Face ID or a passcode) calls
   stay as before and the next launch tries again. Keys and certificates keep the plain stripping. Extensions don't
   get the dylib; they have the app's keychain groups, so they still find its items.
@@ -712,7 +721,7 @@ go unmapped). The app's signer writes them to the log (`Profile.keychainLine`, `
 job returns them as `signLog` (`core/websign.js keychainLogLine`, `core/groupfix.js groupFixLogLine`), which the
 page writes to the browser console.
 
-Every launch of an app signed with the group fix adds a line to its own `Library/ifizbox-groupfix.log` (and the system log): the time, bundle ID, version, whether the app ran before and how many preferences it has, its keychain groups by name, how many passwords, internet passwords and keys it can see in each group (counts only, never item names or values), what the group fix copied in from which group (and what it left alone because the own group had it) and whether it pinned the app's keychain. The file keeps its last 200 lines and lives in the app's container, not in its preferences, so an app that clears its own settings leaves it in place. A log that starts anew points to a new container (the app was deleted and installed again, or it is another bundle ID) or an app that cleared its Library; a long log means the container was kept. Calls made before the group fix loads are not in it, and a launch that can't read the old log adds nothing.
+Every launch of an app signed with the group fix adds a line to its own `Library/ifizbox-groupfix.log` (and the system log): the time, bundle ID, version, whether the app ran before and how many preferences it has, its keychain groups by name, how many passwords, internet passwords and keys it can see in each group (counts only, never item names or values), what the group fix copied in from which group, how many shared items (by group) took the place of ones an earlier install left, what it left alone because the own group had it, whether a group fix was in the container before this launch, when the container was made, and whether it pinned the app's keychain. The file keeps its last 200 lines and lives in the app's container, not in its preferences, so an app that clears its own settings leaves it in place. A log that starts anew points to a new container (the app was deleted and installed again, or it is another bundle ID) or an app that cleared its Library; a long log means the container was kept. Calls made before the group fix loads are not in it, and a launch that can't read the old log adds nothing.
 
 What iOS doesn't let a re-sign keep:
 
