@@ -751,11 +751,9 @@ export function pickSourceTweak({ bundleId, onPick, rows = sourceTweakRows, pkg 
 //
 //   addTweaksGroup({ bundleId, name })      the app page's group right under its header (Install): "Add Tweaks", the
 //                                           count made for this app (cached checks) or of those added; opens the page
-//   await openAddTweaks({ bundleId, name }) the Add Tweaks sheet: "Made for <app>" with ADD buttons (green at once, a
-//                                           spinner while the .deb is read and checked), what's added, Browse Tweak
-//                                           Sources, Search All Repos (Canister), From Files…; resolves once it's closed
 //   await installTweaksChoice({ … })        the install popup before an app is queued: "<app> <version>" and what goes in,
-//                                           "Tweaks: N" (or "Add Tweaks…"), Install. true: install, false: cancelled
+//                                           "Tweaks: N" (or "Add Tweaks…": pushes the Add Tweaks page, asks again after
+//                                           back), Install. true: install, false: cancelled
 //   await keptTweakParams(params, job)      signing.prepare's params with the app's kept tweaks (prepared, ElleKit when
 //                                           needed), one log line per tweak; so updates from a source keep the tweaks
 //   await tweakUpdatesFor(bundleId)         the kept .debs a Tweak Source has newer: [{ package, title, from, to, row }]
@@ -1185,160 +1183,32 @@ export function addTweaksGroup({ bundleId, name = "", rows = sourceTweakRows, st
 }
 
 // F305a: Add Tweaks' Search All Repos (screens/findmore.js, loaded when tapped so this module doesn't pull it in).
-export const searchAllFooter = (name) => `Search All Repos finds tweaks for ${name || "this app"} in repos you haven't added.`;
 export const openSearchAllRepos = (o) => import("./findmore.js").then((m) => m.searchAllRepos(o));
 
-// B186: Add Tweaks opens as a pushed page (user: the same back arrow as other pushed pages, and the push slide like
-// every page). nav/sheet.js's scaffold (its own bar and body over everything) with ios6.css's back arrow in place of
-// Done, slid in from the right while the page under it moves a third as far and darkens (nav/transition.js's push);
-// Back (or Escape) slides it out the same way. Transform and opacity only.
-//   const close = showPushedPage({ title, back, body, onClose })   back: the arrow's label, the opener's title
-export const backLabel = (t) => { const s = String(t ?? "").trim(); return s && s.length <= 12 ? s : "Back"; };
-export function showPushedPage({ title = "", back = "", body = null, onClose = () => {} } = {}) {
-  let out = null, gone = false;
-  const close = () => { if (out) return out(); gone = true; return Promise.resolve(); };
-  Promise.all([import("../nav/sheet.js"), import("../nav/transition.js")]).then(([{ showSheet }, { DURATION, EASE }]) => {
-    if (gone) { onClose(); return; }
-    const doc = globalThis.document;
-    const btn = el("button", "bar-button back", backLabel(back));
-    btn.type = "button";
-    const s = showSheet({ title, body, left: btn, right: null, escape: false, onClose });
-    for (const a of s.sheet.getAnimations?.() ?? []) a.cancel(); // showSheet's rise: this page pushes instead
-    const under = doc.querySelector?.(".tab-stack.is-active > .page.is-top") ?? null; // the page shown (style.css)
-    const shade = under?.querySelector?.(".page-shade") ?? null;
-    const item = doc.querySelector?.(".nav-stack.is-active > .nav-item.is-top") ?? null; // its bar's title and buttons
-    const slide = (p0, p1, fill = "none") => {
-      const o = { duration: DURATION, easing: EASE, fill };
-      item?.animate?.([{ transform: `translate3d(${-50 * p0}%,0,0)`, opacity: String(1 - p0) }, { transform: `translate3d(${-50 * p1}%,0,0)`, opacity: String(1 - p1) }], { duration: DURATION, easing: EASE });
-      under?.animate?.([{ transform: `translate3d(${-30 * p0}%,0,0)` }, { transform: `translate3d(${-30 * p1}%,0,0)` }], { duration: DURATION, easing: EASE });
-      shade?.animate?.([{ opacity: String(0.1 * p0) }, { opacity: String(0.1 * p1) }], { duration: DURATION, easing: EASE });
-      return s.sheet.animate?.([{ transform: `translate3d(${(1 - p0) * 100}%,0,0)` }, { transform: `translate3d(${(1 - p1) * 100}%,0,0)` }], o);
-    };
-    slide(0, 1);
-    const onKey = (e) => { if (e.key === "Escape") out(); };
-    let leaving = null;
-    out = () => {
-      leaving ??= new Promise((resolve) => {
-        doc.removeEventListener?.("keydown", onKey);
-        const end = () => {
-          s.sheet.animate = null; // showSheet's close slides down: already off to the right, so it just goes
-          s().then(resolve, resolve);
-        };
-        const a = slide(1, 0, "forwards");
-        if (a?.finished) a.finished.then(end, end); else end();
-      });
-      return leaving;
-    };
-    btn.addEventListener("click", () => out());
-    doc.addEventListener?.("keydown", onKey);
-  });
-  return close;
-}
-
-// The Add Tweaks sheet. `pkg(row)` -> the package's stanza (the catalog's).
-export function openAddTweaks({ bundleId, name = "", rows = sourceTweakRows, store = tweakStore, storage, fetchDeb, alert = showAlert,
-  sheet = showActionSheet, show = null, pkg = async (r) => (await (await import("../catalog.js")).catalog.package(r.id, r.key))?.stanza,
-  browse = pickSourceTweak, onChange = () => {}, searchAll = openSearchAllRepos, paid = null,
-  lister = (o) => appTweakRows(bundleId, o), check = rows === sourceTweakRows ? checkForApp : null } = {}) {
-  style();
+// The install popup's Tweaks / Add Tweaks… (B374): the Add Tweaks page pushed under the page shown now (the app's page),
+// as its Details' row does; resolves true once back on that page, false when the viewer went elsewhere (another tab,
+// a link) so the popup isn't shown again over another page.
+export function pushAddTweaksUntilBack(bundleId, { name = "", loc = globalThis.location, win = globalThis } = {}) {
+  if (bundleId && name) appNames.set(bundleId, name);
+  const trim = (h) => String(h ?? "").replace(/\/$/, "");
+  const from = trim(loc.hash);
   return new Promise((resolve) => {
-    // B186: the page's own scroller with the grouped pinstripes (page-body grouped, as Settings), so From Files scrolls
-    // into view on a short screen; pushed from the right with a back arrow (showPushedPage).
-    const body = el("div", "sheet-scroll page-body grouped tweak-pick tw-add-page");
-    const loading = el("div", "loading");
-    loading.append(el("span", "loading-spinner"), el("span", null, "Loading Tweaks"));
-    body.append(loading);
-    const opened = show ?? showPushedPage;
-    let checking = null, closed = false; // F344: the phone's own check of tweaks nobody has checked yet
-    opened({ title: "Add Tweaks", back: name, body, onClose: () => { closed = true; checking?.stop(); resolve(); } });
-    // F344: tweaks whose filter names this app, then the ones for every app; nothing else
-    let made = [], any = [], infoOf = () => null, listed = [];
-    const input = Object.assign(el("input", "visually-hidden"), { type: "file", accept: TWEAK_ACCEPT, multiple: true });
-    input.id = "tw" + Math.random().toString(36).slice(2);
-    input.addEventListener("change", async () => {
-      const picked = [...(input.files ?? [])];
-      input.value = "";
-      for (const f of picked) {
-        const one = { name: f.name, data: new Uint8Array(await f.arrayBuffer()) };
-        try { prepareTweaks([one]); } catch (e) {
-          if (!/CydiaSubstrate/.test(String(e?.message))) { await alert({ title: "Can't Add This Tweak", message: String(e?.message ?? e), buttons: ["OK"] }); continue; }
-        }
-        await keepItem(bundleId, one, store);
-      }
-      if (picked.length) { onChange(); draw(); }
-    });
-
-    const addButton = (r, on) => addTweakButton(r, { bundleId, on, store, storage, fetchDeb, paid, sheet, alert, pkg, onChange,
-      onRemove: () => draw() });
-    const cell = (label, subtitle, right = null, onClick = null) => {
-      const li = el("li", "cell tw-row");
-      const b = el(onClick ? "button" : "div", `cell-inner${onClick ? " chevron" : ""}`);
-      if (onClick) { b.type = "button"; b.addEventListener("click", onClick); }
-      const t = el("span", "cell-text");
-      t.append(el("span", "cell-label", label));
-      if (subtitle) t.append(el("span", "cell-subtitle", subtitle));
-      b.append(t);
-      if (right) b.append(right);
-      li.append(b);
-      return li;
+    const on = () => {
+      const h = trim(loc.hash);
+      if (h.startsWith(`${from}/`)) return; // the Add Tweaks page, or a tweak's page above it
+      win.removeEventListener?.("hashchange", on);
+      resolve(h === from);
     };
-    const group = (header, lis, footer = null) => {
-      const g = el("div", "group");
-      if (header) g.append(el("h2", "group-header", header));
-      const ul = el("ul", "table grouped");
-      ul.append(...lis);
-      g.append(ul);
-      if (footer) g.append(el("p", "group-footer", footer));
-      return g;
-    };
-    async function draw() {
-      const kept = await savedTweaks(bundleId, { store });
-      const groups = [];
-      // B267: Cydia's list rows (tweakrow.js: 29pt icon, version · author), the ADD button at the end; F344: led by
-      // "Works in: <app>"
-      const rowOf = (r) => worksSubtitle(tweakListRow(r, { right: addButton(r, keptHas(kept, r.id)) }), infoOf(r), { [bundleId]: name });
-      if (made.length) groups.push(group(`Made for ${name || "This App"}`, made.map(rowOf)));
-      if (any.length) groups.push(group("Works in Any App", any.map(rowOf)));
-      listed = [...made, ...any];
-      const others = kept.filter((x) => !listed.some((r) => debOf(x.name)?.package === r.id));
-      if (others.length) {
-        groups.push(group("Added", others.map((x) => cell(tweakTitle(x), tweakKind(x.name), null, async () => {
-          const i = await sheet({ title: tweakTitle(x), buttons: ["Remove"], destructive: 0 });
-          if (i !== 0) return;
-          await dropItem(bundleId, (y) => y.name === x.name, store);
-          onChange();
-          draw();
-        }))));
-      }
-      const browseLi = cell("Browse Tweak Sources", null, null, () => browse({ bundleId, storage, alert, onPick: async (one) => { await keepItem(bundleId, one, store); onChange(); draw(); } }));
-      // F305a: Canister's package search for this app, in repos not added yet (findmore.js searchAllRepos)
-      const searchLi = cell("Search All Repos", null, el("span", "cell-detail", "Canister"), () => searchAll({ appName: name, ctx: null }));
-      searchLi.classList.add("tw-search-all");
-      const filesLi = el("li", "cell tw-row");
-      const files = Object.assign(el("label", "cell-inner chevron ss-tweak-add"), { htmlFor: input.id });
-      files.append(el("span", "cell-label", "From Files…"));
-      filesLi.append(files, input);
-      groups.push(group(listed.length || others.length ? "More Tweaks" : "Tweaks", [browseLi, searchLi, filesLi],
-        `Only tweaks that work in ${name || "this app"} without a jailbreak are listed. ${ELLEKIT.name} goes in for the ones that need it. They go into ${name || "the app"} when it's installed or re-signed. ${searchAllFooter(name)}`));
-      body.replaceChildren(...groups);
-    }
-    lister({ rows, storage }).then((l) => {
-      ({ made, any, infoOf } = l);
-      // F344: the tweaks no index or earlier look has checked: checked here in the background, listed as they pass
-      if (check && !closed) {
-        checking = check(l.rows, bundleId, { storage, name, onChecked: (r, info) => {
-          if (!info?.ok) return;
-          const next = liteTweaks(l.rows, bundleId, infoOf);
-          if (next.made.length !== made.length || next.any.length !== any.length) { ({ made, any } = next); draw(); }
-        } });
-      }
-    }, () => {}).finally(() => draw());
+    win.addEventListener?.("hashchange", on);
+    pushAddTweaks(bundleId, loc);
   });
 }
 
 // The install popup (the app page's Install in the sideload build): shown when the app has tweaks added or made for
-// it, so they're offered on install; an app nobody made a tweak for installs straight away as before.
-export async function installTweaksChoice({ bundleId, name = "", version = "", ask = showActionSheet, open = (o) => openAddTweaks(o),
+// it, so they're offered on install; an app nobody made a tweak for installs straight away as before. Tweaks pushes
+// the Add Tweaks page; back on the app's page the popup asks again with what was added.
+export async function installTweaksChoice({ bundleId, name = "", version = "", ask = showActionSheet,
+  open = (o) => pushAddTweaksUntilBack(o.bundleId, { name: o.name }),
   rows = sourceTweakRows, store = tweakStore, storage } = {}) {
   if (!bundleId) return true;
   const made = await madeForRows(bundleId, { rows, storage }).catch(() => []);
@@ -1350,7 +1220,7 @@ export async function installTweaksChoice({ bundleId, name = "", version = "", a
       buttons: [kept.length ? `Tweaks: ${kept.length}` : "Add Tweaks…", "Install"] });
     if (i === 1) return true;
     if (i !== 0) return false;
-    await open({ bundleId, name, rows, store, storage });
+    if ((await open({ bundleId, name, rows, store, storage })) === false) return false;
   }
 }
 

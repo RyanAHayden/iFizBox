@@ -65,8 +65,6 @@ test("wiring: Browse Tweak Sources, a repo's tweaks and Add to App are page scro
   assert.match(tweaks, /el\("div", "sheet-scroll page-body grouped tweak-pick tw-browse"\)/);
   assert.match(tweaks, /el\("div", "sheet-scroll page-body grouped tweak-pick"\); \/\/ B267/);
   assert.match(tweaks, /tweakListRow\(r, \{ onClick/);
-  assert.match(tweaks, /tweakListRow\(r, \{ right: addButton/, "Add Tweaks' Made for rows too");
-  assert.match(tweaks, /made\.map\(rowOf\)/, "F344: Made for rows, then Works in Any App");
   const find = readFileSync(new URL("./findmore.js", import.meta.url), "utf8");
   assert.match(find, /el\("div", "sheet-scroll page-body grouped tweak-pick find-tweak-list"\)/);
 });

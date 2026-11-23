@@ -1,12 +1,12 @@
 // F302a: tweaks on the app side, screens/tweaks.js: the kept tweaks go with a plain install's signing.prepare (one log
-// line per tweak), the install popup offers them, the app page's Add Tweaks row counts them, the Add Tweaks sheet's
-// ADD goes green at once with a spinner while the .deb is checked, Add to App greys App Store copies, an encrypted IPA
-// picked in Files is flagged, and a newer .deb on a Tweak Source is a tweak update.
+// line per tweak), the install popup offers them (its Tweaks pushes the Add Tweaks page), the app page's Add Tweaks row
+// counts them, Add to App greys App Store copies, an encrypted IPA picked in Files is flagged, and a newer .deb on a
+// Tweak Source is a tweak update.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { keptTweakParams, installTweaksChoice, addTweaksGroup, openAddTweaks, addToApp, isEncrypted, markEncrypted, checkPickedIpa,
+import { keptTweakParams, installTweaksChoice, addTweaksGroup, pushAddTweaksUntilBack, addTweaksAppName, addToApp, isEncrypted, markEncrypted, checkPickedIpa,
   tweakUpdatesFor, updateTweaks, savedTweaks, saveTweaks, addDebTo, ENC_KEY, tweakUpdateApps, runTweakUpdates } from "./tweaks.js";
 import { memoryIpaStore } from "../core/myipas.js";
 import { HOW_TO_GET_ONE } from "../core/tweaks.js";
@@ -95,48 +95,33 @@ test("the app page's Add Tweaks row counts the tweaks made for the app, then the
   assert.equal(g.el.all("cell-detail")[0].textContent, "1 Added");
 }));
 
-test("Add Tweaks: ADD goes green with a spinner at once, keeps the .deb once checked; a failure turns it back", () => withDoc(async () => {
-  const store = memStore();
-  const s = storage();
-  s.setItem("ifizbox.tweakInfo", JSON.stringify({ "com.me.fixture@1.0": { ok: true, bundles: ["com.me.fixture"] } }));
-  let body = null, release;
-  const gate = new Promise((r) => { release = r; });
-  const alerts = [];
-  openAddTweaks({ bundleId: "com.me.fixture", name: "Fixture", store, storage: s, rows: async () => [{ id: "com.me.fixture", name: "Fixture", version: "1.0" }],
-    show: (o) => { body = o.body; return () => {}; }, pkg: async () => st(), alert: async (o) => { alerts.push(o); },
-    fetchDeb: async () => { await gate; return fx("tweak-xz.deb"); } });
-  for (let i = 0; i < 5; i++) await tick();
-  assert.match(body.textContent, /Made for Fixture/);
-  assert.match(body.textContent, /Browse Tweak Sources/);
-  assert.match(body.textContent, /From Files…/);
-  const btn = body.all("tw-add")[0];
-  assert.equal(btn.textContent, "ADD");
-  const tap = btn.fire("click");
-  assert.ok(btn.classList.contains("on"), "green at once");
-  assert.equal(btn.all("loading-spinner").length, 1, "spinner while checked");
-  release();
-  await tap;
-  assert.equal(btn.textContent, "ADDED");
-  assert.equal(btn.all("loading-spinner").length, 0);
-  assert.deepEqual((await savedTweaks("com.me.fixture", { store })).map((x) => x.title), ["Fixture"]);
-  assert.equal(alerts.length, 0);
+test("the install popup's Tweaks pushes the Add Tweaks page and asks again once back; going elsewhere cancels", async () => {
+  // B374: the page under the app's page (addtweaks:<bundle id>), not a sheet of its own
+  const win = new EventTarget();
+  const loc = { hash: "#/sources/pkg:com.x.tube" };
+  const go = (h) => { loc.hash = h; win.dispatchEvent(new Event("hashchange")); };
+  const back = pushAddTweaksUntilBack("com.x.tube", { name: "Tube", loc, win });
+  assert.equal(loc.hash, "#/sources/pkg:com.x.tube/addtweaks%3Acom.x.tube");
+  win.dispatchEvent(new Event("hashchange"));
+  go(`${loc.hash}/pkg:com.t.yt`); // a tweak's page above it: still waiting
+  go("#/sources/pkg:com.x.tube/addtweaks%3Acom.x.tube");
+  go("#/sources/pkg:com.x.tube");
+  assert.equal(await back, true);
+  assert.equal(addTweaksAppName("com.x.tube"), "Tube");
+  const away = pushAddTweaksUntilBack("com.x.tube", { loc, win });
+  go("#/installed");
+  assert.equal(await away, false);
 
-  // a .deb that won't download: back to ADD, with words
-  s.setItem("ifizbox.tweakInfo", JSON.stringify({ "com.me.fixture@2.0": { ok: true, bundles: ["com.me.fixture"] } }));
-  let body2 = null;
-  const store2 = memStore();
-  openAddTweaks({ bundleId: "com.me.fixture", name: "Fixture", store: store2, storage: s, rows: async () => [{ id: "com.me.fixture", name: "Fixture", version: "2.0" }],
-    show: (o) => { body2 = o.body; return () => {}; }, pkg: async () => st({ version: "2.0" }), alert: async (o) => { alerts.push(o); },
-    fetchDeb: async () => { throw new Error("offline"); } });
-  for (let i = 0; i < 5; i++) await tick();
-  const b2 = body2.all("tw-add")[0];
-  await b2.fire("click");
-  assert.equal(b2.classList.contains("on"), false);
-  assert.equal(b2.textContent, "ADD");
-  assert.equal(alerts.at(-1).title, "Can't Add This Tweak");
-  assert.match(alerts.at(-1).message, /couldn't be downloaded/);
-  assert.deepEqual(await savedTweaks("com.me.fixture", { store: store2 }), []);
-}));
+  // the popup: the default opener pushes; back -> asked again, elsewhere -> nothing installed
+  const store = memStore();
+  await saveTweaks("com.x.tube", [{ name: "Plain.dylib", data: new Uint8Array([2]) }], { store });
+  let asks = 0;
+  assert.equal(await installTweaksChoice({ bundleId: "com.x.tube", rows: async () => [], store, open: async () => false,
+    ask: async () => { asks++; return 0; } }), false);
+  assert.equal(asks, 1, "not asked again over another page");
+  const src = readFileSync(new URL("./tweaks.js", import.meta.url), "utf8");
+  assert.doesNotMatch(src, /openAddTweaks|showPushedPage/, "the old Add Tweaks sheet is gone");
+});
 
 test("Add to App: an App Store copy is listed under Can't Take Tweaks, not offered", async () => {
   const s = storage();
@@ -206,21 +191,4 @@ test("Installed rows: '2 Tweaks' after a signed app's subtitle, 'Tweak Update' w
   assert.equal(b.all("tweak-pill")[0].textContent, "Tweak Update");
   assert.ok(b.all("tweak-pill")[0].classList.contains("up"));
   assert.equal(addTweakPill(li(), { bundleId: "com.b" }, []), null);
-}));
-
-test("Add Tweaks: Search All Repos sits beside Browse Tweak Sources (detail Canister), opens findmore's sheet with the app's name", () => withDoc(async () => {
-  let body = null;
-  const opened = [];
-  openAddTweaks({ bundleId: "com.x.tube", name: "YouTube", store: memStore(), storage: storage(), rows: async () => [],
-    show: (o) => { body = o.body; return () => {}; }, searchAll: (o) => { opened.push(o); } });
-  for (let i = 0; i < 5; i++) await tick();
-  const row = body.all("tw-search-all")[0];
-  assert.ok(row, "the row is there");
-  assert.match(row.textContent, /^Search All ReposCanister$/);
-  const labels = body.all("cell-label").map((x) => x.textContent);
-  assert.deepEqual(labels, ["Browse Tweak Sources", "Search All Repos", "From Files…"]);
-  assert.match(body.textContent, /Search All Repos finds tweaks for YouTube in repos you haven't added\./);
-  await row.all("cell-inner")[0].fire("click");
-  assert.equal(opened.length, 1);
-  assert.equal(opened[0].appName, "YouTube");
 }));

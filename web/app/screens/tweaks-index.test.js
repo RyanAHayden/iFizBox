@@ -3,7 +3,7 @@
 // tweaks only from a source that names a seller, and the phone checks the unchecked ones (the app's name first).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadTweakIndex, cachedTweakInfo, rowInfo, appTweakRows, checkForApp, openAddTweaks, madeForRows, sellerKeys,
+import { loadTweakIndex, cachedTweakInfo, rowInfo, appTweakRows, checkForApp, madeForRows, sellerKeys,
   tweakInfo, checkTweakRows } from "./tweaks.js";
 import { memoryIpaStore } from "../core/myipas.js";
 import { DEBS } from "../core/fixtures/tweaks/index-debs.test-helper.js";
@@ -71,19 +71,6 @@ test("Add Tweaks for an app: its tweaks, then every-app ones; no SpringBoard, no
   const keys = await sellerKeys(rows, { sources: async () => [SRC], text: async () => "https://pay.example/api/\n" });
   assert.deepEqual([...keys], ["repo-a"]);
 });
-
-test("the Add Tweaks page lists Made for and Works in Any App rows led by Works in", () => withDoc(async () => {
-  let body = null;
-  openAddTweaks({ bundleId: "com.google.ios.youtube", name: "YouTube", store: memStore(), storage: storage(), rows: async () => rows,
-    show: (o) => { body = o.body; return () => {}; } });
-  for (let i = 0; i < 6; i++) await tick();
-  const text = body.textContent;
-  assert.match(text, /Made for YouTube/);
-  assert.match(text, /Works in Any App/);
-  assert.match(text, /Works in: YouTube · 1\.0/);
-  assert.match(text, /Works in: Any App · 1\.1/);
-  assert.doesNotMatch(text, /SBColor|InstaPro|New/);
-}));
 
 test("checkTweakRows (a Tweak Source's list): the index's refusals dropped at once, no download for them", async () => {
   const refusedSeen = [], checked = [];
