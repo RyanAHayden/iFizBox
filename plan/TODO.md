@@ -11,6 +11,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
+- [ ] **B346** Liquid Glass (ios26 era): the nav bar buttons flicker during the back transition (user report). Find what repaints them mid-slide (glass layer re-created, backdrop-filter toggled, buttons swapped before the slide ends) and keep them steady. Check: Chromium frame capture of a back swipe and a back tap in ios26, no blank or flashing button frames. | files: web/app/ios26.css, web/app/nav/navbuttons.js, web/app/nav/glass.js, web/app/nav/transition.js
 - [ ] **B345** Review buttons don't depress when tapped and don't change with the theme era (user report). Give them pressed states and per-era styling like the bar buttons in ios6.css. Check: Chromium shots, pressed and per era. | files: web/app/screens/reviews.js, web/app/ios6.css
 - [ ] **B344** App Sources (Find More for apps) is missing its Add All button and doesn't match Find Tweaks' Find More page (user report). Make it the same page as Find Tweaks > Find More, Add All included. Check: Chromium shots of both side by side, findmore-addall test covers app sources. | files: web/app/screens/moresources.js, web/app/screens/findmore.js, web/app/screens/findmore-addall.test.js
 - [ ] **B343** Hold-to-see-queue hint doesn't match the theme era (user report). Draw it per era like the other controls, and don't show it at all on iOS 26 (the hold doesn't work there). Check: Chromium shots in each era, none on ios26. | files: web/app/nav/queuehint.js, web/app/ios6.css
