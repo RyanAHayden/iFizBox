@@ -117,11 +117,10 @@ What (a) does to hold 120 Hz:
   scrollers are held with `overflow-y: hidden` from the moment the drag is decided until the slide is at rest
   (`nav/swipe.js lockScroll`), so the page doesn't scroll vertically and keeps its scroll place; the touch listeners
   stay passive.
-- Tab swipe: on a package's or app's page the panes follow the finger on Details, Reviews and Related (`nav/swipe.js
-  attachTabSwipe` = passive touches; `nav/tabswipe.js tabPager` = the panes, transforms only). The chosen pane stays
-  in the flow and the neighbour is lifted out of it (absolute), so the page's height is the chosen pane's. A rightward
-  swipe is the tabs' on Reviews and Related, and swipe back's on Details. The edge strip always goes back, and nothing
-  starts from a sideways scroller at any position.
+- Tabs: on a package's or app's page a tap on Details, Reviews or Related slides the panes (`nav/tabswipe.js
+  tabPager`, transforms only). The chosen pane stays in the flow and the neighbour is lifted out of it (absolute), so
+  the page's height is the chosen pane's. There is no swiping between the tabs, so swipe back works from anywhere on
+  all three.
 - Each screen scrolls in its own `overflow-y: auto` box (a native UIScrollView in the UI process), with a virtualised
   list: a fixed pool of absolutely positioned rows moved by `translate3d`. `web/app/` can take `list.js` from the spike.
 - Parsing in a Web Worker (module workers load from the app scheme; see 4), the index cached in IndexedDB.

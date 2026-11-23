@@ -971,7 +971,7 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   });
   const details = tabs.panes.details;
   body.replaceChildren(page, ...tabs.nodes);
-  tabs.swipeOn(body); // F390
+  tabs.attach(body); // F390
 
   // F161: the App Store's details by bundle ID (core/applookup.js), only now that the page is open; none when the
   // source already gives screenshots, developer and the app's own page.

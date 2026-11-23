@@ -201,13 +201,6 @@ _On screen_: Signed: Waiting to Install
 _In code_: qr-wait, is-waiting
 _Avoid_: barber pole, sweep
 
-**Tab Swipe**:
-A sideways swipe on a package's or app's page that moves to the next or previous of its Details, Reviews and Related tabs.
-_Said_: swipe between the tabs
-_On screen_: (no label)
-_In code_: nav/swipe.js attachTabSwipe, nav/tabswipe.js tabPager
-_Avoid_: pane swipe
-
 **Trip**:
 One run of the Install Switch that covers a whole queue of installs: Shortcuts opens once, and the Shortcut goes on behind the app until the installs are over and puts cellular data and the VPN back
 _Said_: one trip to Shortcuts
