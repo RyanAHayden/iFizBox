@@ -531,7 +531,7 @@ html[data-theme="dark"] .action-sheet { background: var(--dk-action-sheet); }
 html[data-theme="dark"] .action-button:not(.cancel):not(.destructive):not(:active):not(.is-pressed) {
   background: var(--dk-action-btn); background-origin: border-box;
 }
-html[data-theme="dark"] .action-button.cancel { background: var(--dk-action-cancel); background-origin: border-box; }
+html[data-theme="dark"] .action-button.cancel:not(:active):not(.is-pressed) { background: var(--dk-action-cancel); background-origin: border-box; }
 /* ==== } look-only ==== */
 
 /* ---- Version History (F29, browse.js renderVersions): one cell per version, version and marks on top, sources or

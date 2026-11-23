@@ -28,3 +28,9 @@ test("every era sets the red button's held fill and keeps its dark rest rule off
     assert.ok(css.includes(`html[data-style="${era}"][data-theme="dark"] .action-button.destructive:not(:active):not(.is-pressed) {`), era);
   }
 });
+
+test("dark Cancel's rest rule stays off a held Cancel, so it goes down in every era", () => {
+  const css = read("packages.css");
+  assert.ok(css.includes('html[data-theme="dark"] .action-button.cancel:not(:active):not(.is-pressed) {'));
+  assert.ok(!css.includes('html[data-theme="dark"] .action-button.cancel {'));
+});
