@@ -700,3 +700,18 @@ html[data-style="ios26"] .glyph-failed { background-image: url("data:image/svg+x
 html[data-style="ios26"] .glyph-more { background-color: #0088ff; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 4.5v15M4.5 12h15' fill='none' stroke='%23fff' stroke-width='2.53' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
 html[data-style="ios26"] .glyph-jailbreak { background-color: #cb30e0; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5.5 11h13v9.5h-13z' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M8.5 11V7.8a3.5 3.5 0 0 1 6.8-1.2' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M12 14.5v2.5' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
 html[data-style="ios26"] .glyph-theme { background-color: #6155f5; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0 -18z' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M12 3a9 9 0 0 0 0 18z' fill='%23fff'/%3E%3C/svg%3E"); }
+
+/* B345: the review buttons (reviews.css: Write a Review, More Reviews, Report as Malicious) as iOS 26's capsules on
+   a grouped page: the table's fill, tinted text, the price button's held fill. The small text buttons (Report,
+   Remove, your Delete Review) take the tint and fade while held, like the bar buttons. */
+html[data-style="ios26"][data-theme] .review-button {
+  font-size: 15px; font-weight: 600; color: var(--i26-tint); text-shadow: none;
+  border: 1px solid var(--table); border-radius: 22px; background: var(--table); box-shadow: none;
+}
+html[data-style="ios26"][data-theme] .review-button:is(:active, .is-pressed):not(:disabled) {
+  border-color: var(--i26-get-pressed); background: var(--i26-get-pressed); box-shadow: none;
+}
+html[data-style="ios26"][data-theme] .review-button:disabled { color: var(--i26-get-dim-text); }
+html[data-style="ios26"][data-theme] :is(.review-report, .review-tap-remove) { color: var(--i26-tint); }
+html[data-style="ios26"][data-theme] .review-delete-own { color: var(--i26-red); }
+html[data-style="ios26"] :is(.review-report, .review-tap-remove, .review-delete-own):is(:active, .is-pressed) { opacity: .3; }

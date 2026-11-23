@@ -23,8 +23,7 @@
   --review-btn: linear-gradient(#fdfdfd, #e7e8ea);
   --review-btn-edge: #a3a7ae;
   --review-btn-emboss: 0 1px 0 #fff;
-  --review-btn-pressed: linear-gradient(#e2e3e6, #c9cbcf);
-}
+  --review-btn-pressed: linear-gradient(#e2e3e6, #c9cbcf);}
 .review-star {
   border: 0; background: none;
   font: 30px/44px "Helvetica Neue", Helvetica, Arial, sans-serif; color: #a9b0bc; text-shadow: var(--review-star-emboss);
@@ -40,7 +39,7 @@ html[data-theme="dark"] .review-star.on { color: var(--dk-star-on); }
 .review-tap-status { font-size: 12px; color: var(--subtitle); }
 .review-tap-remove { border: 0; background: none; font: 12px "Helvetica Neue", Helvetica, Arial, sans-serif; color: #385487; }
 html[data-theme="dark"] .review-tap-remove { color: var(--dk-link); }
-.review-tap-remove:active { opacity: .5; }
+.review-tap-remove:is(:active, .is-pressed) { opacity: .5; }
 /* ==== } look-only ==== */
 
 /* Write a Review / More Reviews: the concept's white rounded button */
@@ -61,15 +60,20 @@ html[data-theme="dark"] .review-tap-remove { color: var(--dk-link); }
   font: bold 15px "Helvetica Neue", Helvetica, Arial, sans-serif; color: #385487; text-shadow: var(--review-btn-emboss);
   border: 1px solid var(--review-btn-edge); background: var(--review-btn); background-origin: border-box;
 }
-.review-button:active { background: var(--review-btn-pressed); background-origin: border-box; }
+.review-button:is(:active, .is-pressed):not(:disabled) { background: var(--review-btn-pressed); background-origin: border-box; }
 .review-button:disabled { color: #8a96ab; }
 html[data-theme="dark"] .review-button { color: var(--dk-review-btn-text); text-shadow: none; border-color: var(--table-edge); background: var(--dk-review-btn); background-origin: border-box; }
+/* B345: dark has no pressed art; a shade over each palette's --dk-review-btn takes it down a step, the label kept */
+html[data-theme="dark"] .review-button:is(:active, .is-pressed):not(:disabled) {
+  background: var(--dk-review-btn); background-origin: border-box; box-shadow: var(--dk-review-btn-held);
+}
 .review-hidden-note { font-size: 14px; line-height: 18px; text-align: center; color: var(--head); text-shadow: var(--emboss); }
 
 .review-report, .review-reported { border: 0; background: none; font: 12px "Helvetica Neue", Helvetica, Arial, sans-serif; }
 .review-report { color: #385487; }
 .review-reported { color: var(--subtitle); }
 html[data-theme="dark"] .review-report { color: var(--dk-link); }
+.review-report:is(:active, .is-pressed) { opacity: .5; }
 /* ==== } look-only ==== */
 
 /* the Write a Review sheet: pinstripe, stars, a grouped form, a note */
@@ -106,7 +110,7 @@ html[data-theme="dark"] .review-input { color: var(--head); }
 html[data-theme="dark"] .review-error { color: var(--dk-bad); }
 .review-note { font-size: 14px; line-height: 18px; text-align: center; color: var(--head); text-shadow: var(--emboss); }
 .review-delete-own { border: 0; background: none; font: 12px "Helvetica Neue", Helvetica, Arial, sans-serif; color: #c8231a; }
-.review-delete-own:disabled { opacity: .5; }
+.review-delete-own:is(:disabled, :active, .is-pressed) { opacity: .5; }
 html[data-theme="dark"] .review-delete-own { color: var(--dk-bad); }
 /* ==== } look-only ==== */
 
