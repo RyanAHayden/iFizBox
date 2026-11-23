@@ -483,7 +483,7 @@
 			</dict>
 		</dict>
 		<!--     Set VPN: read the VPN the start remembered, forget it, then connect it (the read output keeps it). The
-		         forget comes first because on the 15 Pro (iOS 27) this Set VPN switches back and then reports
+		         forget comes first because on the 15 Pro (iOS 27) this Set VPN has switched back and then reported
 		         NEVPNErrorDomain error 2, which ends the run (LocalVPN.switchEnded takes that error as done) -->
 		<dict>
 			<key>WFWorkflowActionIdentifier</key>
