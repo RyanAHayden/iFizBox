@@ -64,6 +64,10 @@ int helper_cancel_ok(const char *line, size_t len);
 #define HELPER_COMPONENT_MAX 64
 #define HELPER_MAX_COMPONENTS 16
 
+/* B329: the option every apt-get and apt-mark run gets right after the tool's name (policy.c skip_translations):
+ * apt reads no Translation files, so a bad one a repo left in apt's lists can't stop every apt command. */
+#define HELPER_APT_NO_TRANSLATIONS "Acquire::Languages=none"
+
 struct helper_plan {
     enum helper_verb verb;
     char path[PATH_MAX];  /* executable to execve: <prefix>/usr/bin/apt-get, apt-mark or dpkg; for addsource and

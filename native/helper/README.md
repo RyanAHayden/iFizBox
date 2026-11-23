@@ -114,6 +114,8 @@ between the checks and apt. A missing folder lists nothing (exit 0); anything re
 
 **Unsigned repos:** most jailbreak repos have no signed Release (BigBoss, iFizBox's own GitHub repo, and repo.palera.in, whose key palera1n's keyring lacks), and `apt-get update` exits 100 on any one of them, so `update` passes `Acquire::AllowInsecureRepositories=true` and the verbs that install pass `--allow-unauthenticated`, as Sileo and Zebra do. `Acquire::AllowDowngradeToInsecureRepositories` stays false: a repo apt has seen signed can't drop its signature unnoticed. The daemon (`native/daemon/main.m`) passes the same to its update and automatic installs.
 
+**No Translation files:** every apt-get and apt-mark the helper runs gets `-o Acquire::Languages=none` right after the tool's name (left out of the table above), and so do the daemon's. The app reads descriptions from Packages, never from Translation files, and an unsigned repo whose Release lists no hashes can answer its Translation URL with a web page (HTTP 200) that apt keeps in its lists; apt can't parse it, and from then on every apt command fails with "Encountered a section with no Package: header". With the option apt never reads such a file, and `update`'s list cleanup deletes the one already there.
+
 **Sources:** sources added in the app go into `ifizbox.sources` and nowhere else, so `apt-get update` and
 installs use them; the app never edits apt's other files. Checks: the URI is `http://` or `https://` (lower case), a
 host of `[A-Za-z0-9.-]` with an optional `:port`, and a path that starts and ends with `/` of `[A-Za-z0-9._~%+/:=,-]`
