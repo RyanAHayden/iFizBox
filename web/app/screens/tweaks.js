@@ -558,10 +558,10 @@ export async function addToApp(st, opts = {}) {
   }
   const app = await pick({ name, made, locked, not, works });
   if (!app || !made.includes(app)) return null;
-  await addDebTo(app.bundleId, st, data, { store });
   // B342: the app is re-signed from its record with the tweak in, through the queue (as Installed's Re-sign): its kept
-  // tweaks now differ from the record's, so keptTweakParams sends them
+  // tweaks (under the ID it was signed from, as keptTweakParams reads them) now differ from the record's, so they go
   const rec = await signedRecordFor(app.bundleId, records);
+  await addDebTo(rec?.originalBundleId || app.bundleId, st, data, { store });
   const j = rec ? await (job ?? (async (r) => (await import("../core/appqueue.js")).resignJob(r)))(rec) : null;
   if (j) {
     await (queue ?? (async (x) => (await import("./queue.js")).queueApp(x)))(j);
@@ -578,7 +578,9 @@ export async function addToApp(st, opts = {}) {
 export async function signedRecordFor(bundleId, records = signedRecords) {
   if (!bundleId) return null;
   const list = await Promise.resolve().then(records).catch(() => []);
-  return (Array.isArray(list) ? list : []).find((r) => r?.bundleId && (r.bundleId === bundleId || r.originalBundleId === bundleId)) ?? null;
+  const recs = (Array.isArray(list) ? list : []).filter((r) => r?.bundleId);
+  // the picked app's own record first: a copy signed from it shares its originalBundleId
+  return recs.find((r) => r.bundleId === bundleId) ?? recs.find((r) => r.originalBundleId === bundleId) ?? null;
 }
 const signedRecords = async () => (hasNativeCall() ? (await nativeBridge()?.call?.("signing.installed", {}))?.apps ?? [] : []);
 

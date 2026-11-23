@@ -13,11 +13,11 @@ const storage = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?
 const st = (o = {}) => ({ package: "com.me.fixture", name: "Fixture", version: "9", debUrl: "https://repo.x/fixture.deb", depends: "mobilesubstrate", ...o });
 const APP = { bundleId: "com.me.fixture", name: "Fixture" };
 
-function run(records, extra = {}) {
+function run(records, extra = {}, tweak = st()) {
   const mem = memoryIpaStore();
   const store = async () => mem;
   const seen = { alerts: [], queued: [] };
-  const p = addToApp(st(), {
+  const p = addToApp(tweak, {
     hud: () => () => {}, pick: async (o) => o.made[0], alert: async (o) => { seen.alerts.push(o); return 0; },
     apps: async () => [APP], fetchDeb: async () => fx("tweak-xz.deb"), storage: storage(), store,
     records: async () => records, queue: async (j) => { seen.queued.push(j); return j; }, ...extra,
@@ -40,6 +40,17 @@ test("Add to App queues a resign job for the picked app, and that re-sign sends 
   assert.deepEqual(params.tweaks.names, ["com.me.fixture_9.deb"], "the tweak is in the re-sign's options");
 });
 
+test("Add to App on a copy picked by its own ID: the tweak is kept under the ID it was signed from", async () => {
+  const rec = { bundleId: "com.me.fixture.ABCDE", originalBundleId: "com.me.fixture", name: "Fixture", tweaks: [] };
+  // a bare .dylib (F304) goes into any app, so the copy's own ID is offered
+  const { p, seen, store } = run([rec], { apps: async () => [{ bundleId: "com.me.fixture.ABCDE", name: "Fixture" }] },
+    st({ package: "dev.x.any", "x-github-asset": "dylib" }));
+  assert.equal((await p)?.bundleId, "com.me.fixture.ABCDE");
+  assert.equal(seen.queued[0].id, "com.me.fixture.ABCDE");
+  assert.deepEqual((await savedTweaks("com.me.fixture", { store })).map((x) => x.name), ["dev.x.any_9.dylib"]);
+  assert.deepEqual(await savedTweaks("com.me.fixture.ABCDE", { store }), []);
+});
+
 test("Add to App on an app not signed here: says why, keeps the tweak for its next sign, queues nothing", async () => {
   const { p, seen, store } = run([]);
   assert.equal((await p).bundleId, "com.me.fixture");
@@ -56,6 +67,9 @@ test("signedRecordFor: by the record's bundle ID or the one it was signed from; 
   assert.equal((await signedRecordFor("a.b", async () => recs)).bundleId, "a.b");
   assert.equal((await signedRecordFor("c.d", async () => recs)).bundleId, "c.d.X");
   assert.equal(await signedRecordFor("e.f", async () => recs), null);
+  // the app's own record wins over a copy signed from it
+  const both = [{ bundleId: "c.d.X", originalBundleId: "c.d" }, { bundleId: "c.d", originalBundleId: "c.d" }];
+  assert.equal((await signedRecordFor("c.d", async () => both)).bundleId, "c.d");
   assert.equal(await signedRecordFor("a.b", async () => { throw new Error("no bridge"); }), null);
   assert.equal(await signedRecordFor("a.b"), null); // node: no native bridge
 });

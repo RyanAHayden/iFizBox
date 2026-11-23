@@ -24,6 +24,13 @@ pass unchanged: they give no records, so they take the save path, whose title is
 **Tried and failed.** The first version of the new test passed no ElleKit: `keptTweakParams` refuses a substrate tweak
 without it; the test now passes the ellekit fixture, as tweaks-app.test.js does.
 
+**Spec review.** It found two real problems, now fixed and tested. First, picking a copy by its own ID kept the tweak
+under that ID, but `keptTweakParams` reads `originalBundleId`, so the re-sign would have left it out. When a record
+exists, the tweak is now kept under the record's `originalBundleId`. Second, a copy that shares `originalBundleId`
+could be matched ahead of the app the user picked. `signedRecordFor` now tries an exact `bundleId` match first. The
+review also noted that re-adding a tweak the app already has still queues a plain re-sign. That one is left as it is:
+the re-sign is harmless and is what the person asked for.
+
 **Not verified**
 - On a phone (the 15 Pro, sideload build): Add to App from a package page opening Confirm and the re-sign installing
   the app with the tweak. Not run: this session had no phone step in its brief and the unit tests cover the wiring;
