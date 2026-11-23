@@ -292,7 +292,7 @@ function showRoute(route) {
   initLoadedTabs(); // a tab a press or the background load brought in starts before its pages draw
   { // (the body router.onRoute had before F313, kept as it was)
     if (running) running.finish();
-    const r = stacks.sync(route);
+    const r = stacks.sync(route, { linked: router.linked() });
     const all = stacks.stack(r.tab);
     // B148: a kept page on top again (Back, a tab switch) refreshes its state-made details in place; one just built is
     // fresh. A swipe already did it when it began.
