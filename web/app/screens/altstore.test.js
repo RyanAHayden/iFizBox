@@ -213,3 +213,10 @@ test("B373 section row: with no page, both go at once; a failed forget shows the
   assert.equal(await sectionMarkNotInstalled(APP, PKG, null, { ...f.opts, warn: async (e) => warned.push(e.message) }), false);
   assert.deepEqual(warned, ["no"]);
 });
+
+test("B373 section row: nothing left to forget: the row never marks the app installed", async () => {
+  const mem = memoryAppStore([]);
+  assert.equal(await sectionMarkNotInstalled(APP, PKG, null, { store: async () => mem, signedOf: async () => null }), false);
+  assert.deepEqual(await mem.all(), []);
+  assert.equal(forgetHeld("com.x.a"), false);
+});

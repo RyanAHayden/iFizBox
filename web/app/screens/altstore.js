@@ -516,6 +516,9 @@ export async function sectionMarkNotInstalled(app, pkg, source, { store = apps, 
   forget = forgetListed, body = null, warn = forgetWarning } = {}) {
   if (forgetHeld(app.bundleIdentifier)) return true;
   try {
+    // nothing left to forget (gone since the row was drawn): never let the toggle mark it installed
+    const signed = await signatureOf(app, signedOf);
+    if (!signed && !recordOf(await (await store()).all(), app.bundleIdentifier, signed)) return false;
     return !(await toggleMarked(app, pkg, source, { store, signedOf, native, forget, body, warn }));
   } catch (e) {
     if (e?.forgetFailed) { try { await warn(e); } catch { /* no alert here */ } }
