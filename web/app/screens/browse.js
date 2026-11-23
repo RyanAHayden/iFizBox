@@ -1867,7 +1867,9 @@ export function versionCell({ label, tags = [], sub = null, notes = null, onClic
   if (installed && !onClick) {
     loadStyle("myipas.css"); // .price-btn
     li.classList.add("has-mark");
-    li.append(el("span", "price-btn version-mark added", "INSTALLED"));
+    const mark = el("span", "price-btn version-mark", "INSTALLED");
+    mark.classList.add("added"); // a state of the price button, so the eras' own .added draws it
+    li.append(mark);
   }
   if (notes && estimateLines(notes) > NOTE_LINES + 1) foldNotes(li, inner.querySelector(".version-notes"));
   return li;

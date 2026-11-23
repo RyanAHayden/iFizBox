@@ -140,20 +140,38 @@ test("a failed connect through the built-in VPN never says to turn on LocalDevVP
   assert.ok(!/LocalDevVPN|Tailscale/.test(JSON.stringify([why, refused])));
 });
 
-test("the test that finishes setting up uses This iPhone only after USE, and only for a while", async () => {
-  const { vpnTest, setUseAfterSetup, USE_HOLD } = screens;
+test("F392: the first test that passes uses This iPhone; a later one keeps the pick, unless its row was just tapped", async () => {
+  const { vpnTest, setUseAfterSetup, USE_HOLD, rememberStatus, forgetStatus } = screens;
   const m = { installRoute: "server" };
   const store = { get: (k) => m[k], set: (k, v) => { m[k] = v; } };
-  const native = { call: (x) => (x === "vpn.test" ? Promise.resolve({ ok: true, ms: 40 }) : Promise.reject(new Error("no"))) };
-  const alert = async () => ({ index: 0 });
+  let pass = false;
+  const native = { call: (x) => (x === "vpn.test" ? Promise.resolve({ ok: pass, ms: 40, error: "no" }) : Promise.reject(new Error("no"))) };
+  const said = [];
+  const alert = async (a) => { said.push(a.message); return { index: 0 }; };
+  forgetStatus();
+  rememberStatus(ST({ tested: false }));
   await vpnTest(native, alert, store);
-  assert.equal(m.installRoute, "server", "a plain test switches nothing");
+  assert.equal(m.installRoute, "server", "a failed test switches nothing");
+  pass = true;
+  await vpnTest(native, alert, store);
+  assert.equal(m.installRoute, "iphone", "the first pass uses it");
+  assert.match(said.at(-1), /^Set up\. Apps now install straight/);
+  m.installRoute = "server";
+  await vpnTest(native, alert, store);
+  assert.equal(m.installRoute, "server", "a later pass keeps the pick");
+  rememberStatus({ ...ST({ tested: true }), paired: null });
+  await vpnTest(native, alert, store);
+  assert.equal(m.installRoute, "server", "paired again, the test not its first");
   setUseAfterSetup(true, Date.now() - USE_HOLD - 1);
   await vpnTest(native, alert, store);
-  assert.equal(m.installRoute, "server", "USE long ago");
+  assert.equal(m.installRoute, "server", "its row tapped long ago");
   setUseAfterSetup(true);
   await vpnTest(native, alert, store);
-  assert.equal(m.installRoute, "iphone", "USE, then the test: ACTIVE");
+  assert.equal(m.installRoute, "iphone", "its row tapped, then the test");
+  forgetStatus();
+  m.installRoute = "server";
+  await vpnTest(native, alert, store);
+  assert.equal(m.installRoute, "server", "no status: not known to be the first");
 });
 
 // ---- user 2026-11-22: on cellular without the Cellular Shortcuts

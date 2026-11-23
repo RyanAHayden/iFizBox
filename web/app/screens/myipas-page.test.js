@@ -1,11 +1,10 @@
-// F224: Install IPAs' list (screens/myipas.js): Not Installed and Installed groups with price buttons, the SIGN ->
-// INSTALL two-tap, a left swipe's Delete (at once, no sheet), Manage's circles, Select… presets and toolbar runs
+// F224: Install IPAs' list (screens/myipas.js): Not Installed and Installed groups (F392: no button on a row), a left swipe's Delete (at once, no sheet), Manage's circles, Select… presets and toolbar runs
 // (Sign, Unsign keeping the file, Delete) against a fake library, and which IPAs iOS has.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { libraryGroup, swipeDelete, deleteMany, selectButton, runManage, signMany, installedOf, paintPrice,
+import { libraryGroup, swipeDelete, deleteMany, selectButton, runManage, signMany, installedOf,
   sharedInstalls, sharedSections, confirmReplace } from "./myipas.js";
-import { priceTap, priceButton, listState, memoryIpaStore, siteEntries } from "../core/myipas.js";
+import { listState, memoryIpaStore, siteEntries } from "../core/myipas.js";
 import { fakeDocument as fakeDom } from "../fakes.test-helper.js";
 
 function withDom(fn) {
@@ -41,7 +40,7 @@ const groupsOf = (g) => g.el.querySelectorAll(".group").map((x) => ({
   footer: x.querySelector(".group-footer")?.textContent ?? null,
 }));
 
-test("F224: Not Installed then Installed, A-Z, each row's line and price button; the footer under the last", () => withDom(() => {
+test("F224: Not Installed then Installed, A-Z, each row's line, no button (F392); the footer under the last", () => withDom(() => {
   const g = libraryGroup(LIST, { site: false, jailbreak: false, installed: INSTALLED });
   const gs = groupsOf(g);
   assert.deepEqual(gs.map((x) => [x.header, x.rows]), [["Not Installed", ["Broken.ipa", "Delta.ipa"]], ["Installed", ["Alpha.ipa"]]]);
@@ -49,54 +48,18 @@ test("F224: Not Installed then Installed, A-Z, each row's line and price button;
   assert.match(gs[1].footer, /share an \.ipa to iFizBox from Files, Safari or Mail/);
   const delta = g.cellOf("Delta.ipa");
   assert.equal(delta.querySelector(".cell-subtitle").textContent, "Version 1.5 · 10.0 MB · Not signed");
-  assert.equal(g.price("Delta.ipa").textContent, "SIGN");
-  assert.equal(g.price("Alpha.ipa").textContent, "OPEN");
-  assert.equal(g.price("Broken.ipa"), null, "a broken file has no button");
+  for (const f of ["Delta.ipa", "Alpha.ipa", "Broken.ipa"]) assert.equal(g.cellOf(f).querySelector(".price-btn"), null, f);
   assert.ok(delta.querySelector(".cell-inner").classList.contains("chevron"), "the chevron to the IPA's page");
   assert.equal(delta.querySelector(".cell-inner").href, "#/installed/myipas/ipa%3ADelta.ipa");
   // empty, and a search with no match
   assert.match(groupsOf(libraryGroup([], { site: false, jailbreak: false }))[0].footer, /^No IPAs yet/);
   assert.equal(groupsOf(libraryGroup(LIST, { site: false, jailbreak: false, query: "zzz" }))[0].footer, "No Results");
-  // F212: the jailbreak app's rows install in one tap, nothing about signing
+  // F212: the jailbreak app's rows say nothing about signing
   const jb = libraryGroup(LIST, { site: false, jailbreak: true });
-  assert.equal(jb.price("Delta.ipa").textContent, "INSTALL");
   assert.equal(jb.cellOf("Delta.ipa").querySelector(".cell-subtitle").textContent, "Version 1.5 · 10.0 MB");
 }));
 
-test("F224: SIGN -> green INSTALL -> install: the button's tap goes to on.price, not the row's link", () => withDom(() => {
-  let price = { armed: null };
-  const acts = [];
-  const g0 = libraryGroup(LIST, { site: false, jailbreak: false, installed: INSTALLED, price,
-    on: { price: (r) => { const t = priceTap(price, r); price = t.state; acts.push(t.act); } } });
-  const b = g0.price("Delta.ipa");
-  b.click();
-  assert.deepEqual(acts, ["arm"]);
-  // drawn again from the state: the green INSTALL
-  const g1 = libraryGroup(LIST, { site: false, jailbreak: false, installed: INSTALLED, price,
-    on: { price: (r) => { const t = priceTap(price, r); price = t.state; acts.push(t.act); } } });
-  const b1 = g1.price("Delta.ipa");
-  assert.equal(b1.textContent, "INSTALL");
-  assert.ok(b1.classList.contains("go"));
-  b1.click();
-  assert.deepEqual(acts, ["arm", "install"]);
-  assert.equal(price.armed, null);
-  // the row's capture handler lets a price tap through untouched (the link isn't followed for it)
-  assert.ok(tap(g1.ul, b1));
-}));
-
-test("F224: the filling button: SIGNING then INSTALLING, --fill rising; running it is disabled", () => withDom(() => {
-  const b = document.createElement("button");
-  b.style.setProperty = (k, v) => { b.style[k] = v; };
-  paintPrice(b, priceButton({ file: "a.ipa" }, { busy: { label: "INSTALLING", fill: 0.775 } }), "A");
-  assert.equal(b.textContent, "INSTALLING");
-  assert.ok(b.classList.contains("busy") && b.disabled);
-  assert.equal(b.style["--fill"], "0.775");
-  paintPrice(b, priceButton({ file: "a.ipa" }), "A");
-  assert.ok(!b.classList.contains("busy") && !b.disabled);
-  assert.equal(b.getAttribute("aria-label"), "Sign A");
-}));
-
-test("F224: a left swipe shows Delete in the button's place; its tap deletes at once (no sheet); a tap elsewhere hides it", () => withDom(async () => {
+test("F224: a left swipe shows Delete; its tap deletes at once (no sheet); a tap elsewhere hides it", () => withDom(async () => {
   const asked = [];
   const g = libraryGroup(LIST, { site: false, jailbreak: false, installed: INSTALLED, on: { delete: (es) => asked.push(es.map((e) => e.file)) } });
   const a = g.cellOf("Alpha.ipa"), d = g.cellOf("Delta.ipa");
@@ -278,8 +241,6 @@ test("B80: a shared bundle ID: only the IPA Installed's record names is Installe
   assert.equal(g.cellOf("RyukGram No Plugins.ipa").querySelector(".cell-subtitle").textContent,
     "Replaces RyukGram · Version 1.0 · 9.0 MB · Not signed");
   assert.equal(g.cellOf("RyukGram.ipa").querySelector(".cell-subtitle").textContent, "Version 1.0 · 10.0 MB · Not signed");
-  assert.equal(g.price("RyukGram No Plugins.ipa").textContent, "SIGN");
-  assert.equal(g.price("RyukGram.ipa").textContent, "OPEN");
   // its install asks first: Cancel stops it, Replace goes on; the installed one and Delta don't ask
   const asked = [];
   const alert = async (a) => { asked.push(a); return { index: asked.length === 1 ? 0 : 1 }; };

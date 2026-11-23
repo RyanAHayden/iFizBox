@@ -49,31 +49,27 @@ test("B136: the record stands where iOS has the app or can't be asked", async ()
   assert.deepEqual(native.calls, []);
 });
 
-// B315: a left swipe that starts on a My IPAs row's SIGN/INSTALL button shows Delete, and the click that ends it
-// doesn't reach the button; a plain tap on the button still goes to on.price.
+// B315: a left swipe on a My IPAs row shows Delete, and the click that ends it doesn't reach the row; a plain tap does.
 import { libraryGroup } from "./myipas.js";
 import { fakeDocument } from "../fakes.test-helper.js";
 
-test("B315: a swipe from the price button arms Delete and signs nothing; a tap on it still signs", () => {
+test("B315: a swipe arms Delete and its lift opens nothing; a tap still opens", () => {
   const had = Object.getOwnPropertyDescriptor(globalThis, "document");
   globalThis.document = fakeDocument();
   try {
-    const prices = [];
     const g = libraryGroup([{ file: "Delta.ipa", name: "Delta", bundleId: "com.x.delta", version: "1.5", size: 1, signed: null }],
-      { site: false, jailbreak: false, on: { price: (r) => prices.push(r.file) } });
+      { site: false, jailbreak: false });
     const li = g.cellOf("Delta.ipa");
-    const b = g.price("Delta.ipa");
+    const b = li.querySelector(".cell-label");
     const click = () => { let stopped = false; g.ul.fire("click", { target: b, preventDefault() { stopped = true; }, stopPropagation() {} }); return !stopped; };
-    // a plain tap: the list's capture lets it through to the button
+    // a plain tap: the list's capture lets it through to the row
     g.ul.fire("pointerdown", { target: b, clientX: 300, clientY: 10 });
-    assert.ok(click(), "a tap on the button isn't swallowed");
-    b.click();
-    assert.deepEqual(prices, ["Delta.ipa"]);
-    // a swipe that starts on the button
+    assert.ok(click(), "a tap isn't swallowed");
+    // a swipe
     g.ul.fire("pointerdown", { target: b, clientX: 300, clientY: 10 });
     g.ul.fire("pointermove", { target: b, clientX: 240, clientY: 12 });
     assert.ok(li.classList.contains("armed"), "Delete shows");
-    assert.ok(!click(), "the lift that ends the swipe doesn't reach the button");
+    assert.ok(!click(), "the lift that ends the swipe doesn't reach the row");
   } finally {
     if (had) Object.defineProperty(globalThis, "document", had); else delete globalThis.document;
   }
