@@ -1,0 +1,148 @@
+[
+ {
+  "wait": 1000
+ },
+ {
+  "eval": "localStorage.setItem(\"ifizbox.firstVisit\",\"later\"); \"ok\""
+ },
+ {
+  "nav": "#/sources",
+  "ms": 8000
+ },
+ {
+  "eval": "localStorage.setItem(\"ifizbox.style\",\"ios6\"); localStorage.setItem(\"ifizbox.appearance\",\"light\"); \"ok\""
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+  "ms": 5000
+ },
+ {
+  "eval": "setInterval(()=>document.querySelectorAll(\".banner\").forEach(b=>b.remove()),200); \"ok\""
+ },
+ {
+  "tap": ".store-head-share",
+  "ms": 1500
+ },
+ {
+  "shot": "sheet-ios6-light"
+ },
+ {
+  "eval": "localStorage.setItem(\"ifizbox.style\",\"ios6\"); localStorage.setItem(\"ifizbox.appearance\",\"dark\"); \"ok\""
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+  "ms": 5000
+ },
+ {
+  "eval": "setInterval(()=>document.querySelectorAll(\".banner\").forEach(b=>b.remove()),200); \"ok\""
+ },
+ {
+  "tap": ".store-head-share",
+  "ms": 1500
+ },
+ {
+  "shot": "sheet-ios6-dark"
+ },
+ {
+  "eval": "localStorage.setItem(\"ifizbox.style\",\"ios7\"); localStorage.setItem(\"ifizbox.appearance\",\"light\"); \"ok\""
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+  "ms": 5000
+ },
+ {
+  "eval": "setInterval(()=>document.querySelectorAll(\".banner\").forEach(b=>b.remove()),200); \"ok\""
+ },
+ {
+  "tap": ".store-head-share",
+  "ms": 1500
+ },
+ {
+  "shot": "sheet-ios7-light"
+ },
+ {
+  "eval": "localStorage.setItem(\"ifizbox.style\",\"ios7\"); localStorage.setItem(\"ifizbox.appearance\",\"dark\"); \"ok\""
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+  "ms": 5000
+ },
+ {
+  "eval": "setInterval(()=>document.querySelectorAll(\".banner\").forEach(b=>b.remove()),200); \"ok\""
+ },
+ {
+  "tap": ".store-head-share",
+  "ms": 1500
+ },
+ {
+  "shot": "sheet-ios7-dark"
+ },
+ {
+  "eval": "localStorage.setItem(\"ifizbox.style\",\"ios13\"); localStorage.setItem(\"ifizbox.appearance\",\"light\"); \"ok\""
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+  "ms": 5000
+ },
+ {
+  "eval": "setInterval(()=>document.querySelectorAll(\".banner\").forEach(b=>b.remove()),200); \"ok\""
+ },
+ {
+  "tap": ".store-head-share",
+  "ms": 1500
+ },
+ {
+  "shot": "sheet-ios13-light"
+ },
+ {
+  "eval": "localStorage.setItem(\"ifizbox.style\",\"ios13\"); localStorage.setItem(\"ifizbox.appearance\",\"dark\"); \"ok\""
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+  "ms": 5000
+ },
+ {
+  "eval": "setInterval(()=>document.querySelectorAll(\".banner\").forEach(b=>b.remove()),200); \"ok\""
+ },
+ {
+  "tap": ".store-head-share",
+  "ms": 1500
+ },
+ {
+  "shot": "sheet-ios13-dark"
+ },
+ {
+  "eval": "localStorage.setItem(\"ifizbox.style\",\"ios26\"); localStorage.setItem(\"ifizbox.appearance\",\"light\"); \"ok\""
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+  "ms": 5000
+ },
+ {
+  "eval": "setInterval(()=>document.querySelectorAll(\".banner\").forEach(b=>b.remove()),200); \"ok\""
+ },
+ {
+  "tap": ".store-head-share",
+  "ms": 1500
+ },
+ {
+  "shot": "sheet-ios26-light"
+ },
+ {
+  "eval": "localStorage.setItem(\"ifizbox.style\",\"ios26\"); localStorage.setItem(\"ifizbox.appearance\",\"dark\"); \"ok\""
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+  "ms": 5000
+ },
+ {
+  "eval": "setInterval(()=>document.querySelectorAll(\".banner\").forEach(b=>b.remove()),200); \"ok\""
+ },
+ {
+  "tap": ".store-head-share",
+  "ms": 1500
+ },
+ {
+  "shot": "sheet-ios26-dark"
+ }
+]

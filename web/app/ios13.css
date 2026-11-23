@@ -619,3 +619,21 @@ html[data-style="ios13"][data-theme] .review-button:disabled { color: var(--i13-
 html[data-style="ios13"][data-theme] :is(.review-report, .review-tap-remove) { color: var(--i13-tint); }
 html[data-style="ios13"][data-theme] .review-delete-own { color: var(--i13-red); }
 html[data-style="ios13"] :is(.review-report, .review-tap-remove, .review-delete-own):is(:active, .is-pressed) { opacity: .3; }
+
+/* F387: Share opens the action sheet (nav/sharesheet.js shareLayout), each row the item's 29pt tile then its label,
+   16pt in like an inset-grouped row: an app's flat colour (no iOS 6 gloss), Copy and the QR code grey line art on a
+   white tile with a hairline. */
+html[data-style="ios13"] {
+  --share-layout: action;
+  --share-row-icon: 29px; --share-row-radius: 7px; --share-row-glyph: 20px; --share-row-letter: 16px;
+  --share-row-gap: 14px; --share-row-pad: 0 16px;
+  --share-glyph-copy: var(--share-line-copy); --share-glyph-qr: var(--share-line-qr);
+  --share-system-glyph-emboss: none; --share-system-shine: none;
+  --share-app-gloss: none; --share-app-shine: none; --share-letter: #fff; --share-letter-emboss: none;
+}
+html[data-style="ios13"][data-theme="light"] {
+  --share-system: #fff; --share-system-metal: #fff; --share-icon-shadow: 0 0 0 .5px rgba(0,0,0,.18);
+}
+html[data-style="ios13"][data-theme="dark"] {
+  --share-system: #3a3a3c; --share-system-metal: #3a3a3c; --share-icon-shadow: 0 0 0 .5px rgba(255,255,255,.12);
+}

@@ -21,12 +21,36 @@
 // .action-menu): a rounded glass list that grows out of the button's rect, the button's corner pinned, and goes back
 // into it on dismiss; no Cancel (a tap outside or Escape is -1). Transform and opacity only. A sheet with no source
 // button, and every other era, keeps the bottom sheet.
+//
+// F387: icons and onPick, for the share sheet in the iOS 7, 13 and 26 eras (nav/sharesheet.js):
+//   showActionSheet({ buttons, icons: [el | null, …], onPick: (i) => … })
+// icons puts an element in front of each button's label (.action-button.has-icon: .action-icon + .action-label,
+// laid out by style.css's share hooks); a sheet with icons is always the CSS sheet, as the shell's UIAlertController
+// draws none. onPick(i) runs inside the tap, before the answer (clipboard writes and app links need the gesture);
+// i is -1 for Cancel, a tap on the dim or Escape.
 import { EASE, DURATION } from "./motion.js";
 import { nativeBridge, hasNativeCall } from "../native.js";
 
+// A button's label, with its icon in front when it has one.
+function fillButton(b, label, icon) {
+  if (!icon) { b.textContent = label; return; }
+  b.classList.add("has-icon");
+  icon.classList?.add("action-icon");
+  icon.setAttribute?.("aria-hidden", "true");
+  const text = document.createElement("span");
+  text.className = "action-label";
+  text.textContent = label;
+  b.append(icon, text);
+}
+
+// onPick inside the tap; a throw in it never holds the answer.
+function picked(opts, index) {
+  try { opts.onPick?.(index); } catch (e) { console.error(e); }
+}
+
 export function showActionSheet(opts = {}) {
   const native = nativeBridge();
-  if (!wantsNativeControls(native)) return cssSheet(opts);
+  if (!wantsNativeControls(native) || opts.icons?.some(Boolean)) return cssSheet(opts);
   const { title = "", buttons = [], cancel = "Cancel", destructive = -1 } = opts;
   const labels = buttons.map((b) => String(b));
   const params = { title: String(title ?? ""), buttons: labels, cancel: cancel ? String(cancel) : "",
@@ -123,7 +147,8 @@ export function placeMenu(a, size, room, viewWidth = room.right + room.left) {
 }
 
 // The iOS 26 era's anchored menu over the source button `a`.
-function menuSheet({ title = "", buttons = [], destructive = -1 } = {}, a) {
+function menuSheet(opts = {}, a) {
+  const { title = "", buttons = [], destructive = -1, icons = [] } = opts;
   return new Promise((resolve) => {
     const scrim = document.createElement("div");
     scrim.className = "action-scrim action-menu-scrim";
@@ -148,7 +173,7 @@ function menuSheet({ title = "", buttons = [], destructive = -1 } = {}, a) {
       b.type = "button";
       b.className = `action-button${[].concat(destructive).includes(i) ? " destructive" : ""}`;
       b.setAttribute("role", "menuitem");
-      b.textContent = label;
+      fillButton(b, label, icons[i]);
       b.addEventListener("click", (e) => { e.stopPropagation(); if (counts(e)) close(i); });
       list.append(b);
     });
@@ -198,6 +223,7 @@ function menuSheet({ title = "", buttons = [], destructive = -1 } = {}, a) {
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("pointerdown", onDown, true);
       scrim.style.pointerEvents = "none";
+      picked(opts, index);
       resolve(index); // B202: answered before the animation, which can't hold it
       let timer = 0;
       const end = () => { clearTimeout(timer); scrim.remove(); };
@@ -215,7 +241,8 @@ function menuSheet({ title = "", buttons = [], destructive = -1 } = {}, a) {
 }
 
 // The bottom sheet: iOS 6's UIActionSheet, restyled by each era's stylesheet.
-function bottomSheet({ title = "", buttons = [], cancel = "Cancel", destructive = -1 } = {}) {
+function bottomSheet(opts = {}) {
+  const { title = "", buttons = [], cancel = "Cancel", destructive = -1, icons = [] } = opts;
   return new Promise((resolve) => {
     const scrim = document.createElement("div");
     scrim.className = "action-scrim";
@@ -238,7 +265,7 @@ function bottomSheet({ title = "", buttons = [], cancel = "Cancel", destructive 
       const b = document.createElement("button");
       b.type = "button";
       b.className = `action-button${cls ? ` ${cls}` : ""}`;
-      b.textContent = label;
+      fillButton(b, label, index >= 0 ? icons[index] : null);
       b.addEventListener("click", (e) => { e.stopPropagation(); close(index); });
       parent.append(b);
       return b;
@@ -263,6 +290,7 @@ function bottomSheet({ title = "", buttons = [], cancel = "Cancel", destructive 
       scrim.style.pointerEvents = "none";
       // B202: the answer and the sheet's removal never hang on the slide-out. A throw in it (C26's undefined `ease`
       // until B201) left the sheet drawn with dead buttons and the caller never answered: View Repo froze the app.
+      picked(opts, index);
       resolve(index);
       let timer = 0;
       const end = () => { clearTimeout(timer); scrim.remove(); };

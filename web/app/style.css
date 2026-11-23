@@ -148,6 +148,14 @@ html.native .navbar, html.native .tabbar { display: none; }
   --alert-buttons-margin: 4px 0 0; --alert-buttons-gap: 8px;        /* its button row; two side by side */
   --alert-stacked-gap: 9px; --alert-button-h: 43px;                 /* stacked buttons; a button's height */
 }
+/* F387: the share sheet per era (nav/sharesheet.js shareLayout reads --share-layout): "grid" is iOS 6's activity
+   sheet; "action" hands the items to the action sheet, the item's icon in front of its label. The icon's size, its
+   corners, its glyph and initial, the gap to the label, the row's padding and which side the icon sits on. */
+:root {
+  --share-layout: grid;
+  --share-row-icon: 29px; --share-row-radius: 6.5px; --share-row-glyph: 20px; --share-row-letter: 16px;
+  --share-row-gap: 12px; --share-row-pad: 0 16px; --share-row-dir: row; --share-row-justify: flex-start;
+}
 /* B333: the undo bar (nav/undobar.js), iOS 6's values: the 44pt bar spanning the screen right on the tab bar. An era
    that floats it as a toast insets it from the sides, lifts it off the tab bar and gives it its own height. */
 :root {
@@ -426,6 +434,19 @@ input.sign-pw-input:read-only { cursor: default; }
   max-width: 520px; height: 45px; margin: 9px auto 0; padding: 0; cursor: pointer; touch-action: manipulation;
 }
 .share-cancel::before { position: absolute; inset: 3px; z-index: -1; }
+/* F387: a share item as an action sheet button (--share-layout: action): the share icon, smaller, beside the label */
+.action-button.has-icon {
+  display: flex; flex-direction: var(--share-row-dir); align-items: center; justify-content: var(--share-row-justify);
+  gap: var(--share-row-gap); padding: var(--share-row-pad);
+}
+.action-button.has-icon .action-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.action-button .action-icon.share-icon {
+  width: var(--share-row-icon); height: var(--share-row-icon); border-radius: var(--share-row-radius);
+}
+.action-button .action-icon.share-icon .share-glyph {
+  width: var(--share-row-glyph); height: var(--share-row-glyph); background-size: var(--share-row-glyph);
+}
+.action-button .action-icon .share-letter { font-size: var(--share-row-letter); }
 /* Cydia's Sources badge while sources refresh, and a loading source row's spinner */
 .badge.spinning { position: absolute; width: 20px; padding: 0; }
 .badge.spinning::after { position: absolute; inset: 0; animation: hud-spin .96s linear infinite; }
