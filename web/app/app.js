@@ -371,6 +371,7 @@ attachEdgeSwipe(edgeEl, {
     const [top, below] = [all.at(-1), all.at(-2)];
     gesture = { pair: pairOf(top, below, true), top, below, width: screensEl.clientWidth };
     setMoving(gesture.pair, true, false);
+    setProgress(gesture.pair, 1); // B346: .is-moving shows the page below's nav item; pinned at rest until the finger moves
     if (shownBySwipe !== below) { shownBySwipe = below; showAgain(below); } // B148: right as it is revealed
     return gesture.width;
   },
