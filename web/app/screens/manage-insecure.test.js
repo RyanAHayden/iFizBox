@@ -92,7 +92,4 @@ test("F220: the Not Secure mark goes on http sources only, BigBoss included", ()
   assert.equal(insecureNote({}), null);
   assert.equal(isInsecureSource("http://a.test/"), true);
   assert.equal(httpsInput("https://a.test/"), null);
-  assert.equal(insecureNote({ name: "BigBoss", uri: "http://apt.thebigboss.org/repofiles/cydia/", dist: "stable" }), INSECURE_NOTE);
-  // The defaults are all https now (BigBoss and Telesphoreo left them): none gets the mark.
-  for (const s of DEFAULT_SOURCES) assert.equal(insecureNote(s), null, s.name);
-});
+  assert.equal(insecureNote({ name: "BigBoss", uri: "http://apt.thebigboss.org/repofiles/cydia/", dist: "stable" }), INSECURE_NOTE);});

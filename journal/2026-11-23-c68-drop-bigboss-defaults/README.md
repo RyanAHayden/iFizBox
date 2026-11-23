@@ -15,8 +15,9 @@
 - Tests that took BigBoss/Telesphoreo from the defaults now build those records themselves with `tweakSourcesFrom`
   (iconcache, sources), and the tests that list or count the defaults were updated (sources store order,
   sourcelist export and the Cydia list import, where Telesphoreo now reviews as `new`, tweaksources-lite,
-  manage-insecure). tweaksources-lite now also checks that no BigBoss/saurik entry is a default, and
-  manage-insecure checks that every remaining default is https.
+  manage-insecure, which now marks a BigBoss record it builds itself). tweaksources-lite now also checks that no
+  BigBoss/saurik entry is a default. The spec review flagged an extra "every default is https" assertion as not
+  asked for; it was removed.
 
 ## Checks
 
