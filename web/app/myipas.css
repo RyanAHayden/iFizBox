@@ -46,6 +46,7 @@
 
 /* ==== look-only { ==== Install IPAs: Manage's fades and picks, the New note */
 .myipa-row.armed .price-btn, .managing .myipa-row .price-btn { opacity: 0; }
+.myipa-row.swiping > .price-btn { opacity: 0; } /* B356: the full-row Delete swipe: the content slides off without it */
 .managing .myipa-row .cell-inner.chevron::after { opacity: 0; }
 /* A picked or held row: packages.css's .manage-row fill (these rows wear .manage-row), on the row only, as Installed's. */
 .install-ipas > .myipa-fresh-note { font-size: 15px; line-height: 19px; text-align: center;

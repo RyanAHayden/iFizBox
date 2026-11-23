@@ -49,6 +49,7 @@ import { MYIPAS, libraryRows, stateOf, formatBytes, ipaToken, fileOfToken, optio
 import { mediaUrl } from "./depiction.js";
 import { barButton } from "../nav/ui.js";
 import { longPress, showMenu, copyText } from "../nav/menu.js";
+import { attachRowSwipe, fullSwipeEra } from "../nav/rowswipe.js"; // B356
 import { fitFileNames, isFileName } from "../core/midtrunc.js";
 import { readIpaFile } from "../core/ipainfo.js";
 import { localSigning } from "../signing/common.js";
@@ -482,7 +483,8 @@ function attachLibraryGestures(ul, ctl, on) {
   ul.addEventListener("pointerdown", (e) => {
     const li = e.target.closest(".myipa-row");
     swiped = false;
-    start = li && !ctl.state.editing && !e.target.closest(".del-confirm") ? { li, x: e.clientX, y: e.clientY } : null;
+    start = li && !ctl.state.editing && !e.target.closest(".del-confirm") && !fullSwipeEra()
+      ? { li, x: e.clientX, y: e.clientY } : null; // B356: iOS 7 and later swipe the row off instead (attachDeleteSwipe)
   });
   ul.addEventListener("pointermove", (e) => {
     if (!start) return;
@@ -502,6 +504,24 @@ function attachLibraryGestures(ul, ctl, on) {
     if (ctl.state.editing || ctl.state.armed || !li._ipa) return;
     li.querySelector(".cell-inner")?.classList.remove("is-pressed");
     on.hold?.(li._ipa);
+  });
+  attachDeleteSwipe(ul, ctl, on);
+}
+
+// B356: under iOS 7, 13 and 26 (fullSwipeEra) a row's Delete is a full-row swipe, as Installed's apps list (B332):
+// drag the row off its left edge and the IPA goes (on.delete, no sheet, as the button's), red behind it; one that
+// could not be deleted comes back. iOS 6 keeps the swipe that shows the red Delete (attachLibraryGestures).
+function attachDeleteSwipe(ul, ctl, on) {
+  return attachRowSwipe(ul, {
+    rowSelector: ".myipa-row",
+    canStart: (li) => fullSwipeEra() && !!li._ipa && !ctl.state.editing && !ctl.state.armed,
+    prepare: (li) => ({ ipa: li._ipa }),
+    kindOf: () => "remove",
+    full: () => true,
+    commit: async (li, a) => {
+      const r = await on.delete?.([a.ipa]);
+      return !!r && !r.failed?.some((f) => f.file === a.ipa.file);
+    },
   });
 }
 
