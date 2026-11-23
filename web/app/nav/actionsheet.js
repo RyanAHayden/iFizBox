@@ -149,10 +149,10 @@ function menuSheet({ title = "", buttons = [], destructive = -1 } = {}, a) {
       b.className = `action-button${[].concat(destructive).includes(i) ? " destructive" : ""}`;
       b.setAttribute("role", "menuitem");
       b.textContent = label;
-      b.addEventListener("click", (e) => { e.stopPropagation(); if (counts()) close(i); });
+      b.addEventListener("click", (e) => { e.stopPropagation(); if (counts(e)) close(i); });
       list.append(b);
     });
-    dim.addEventListener("click", () => { if (counts()) close(-1); });
+    dim.addEventListener("click", (e) => { if (counts(e)) close(-1); });
     scrim.append(dim, room, menu);
     document.body.append(scrim);
 
@@ -175,7 +175,7 @@ function menuSheet({ title = "", buttons = [], destructive = -1 } = {}, a) {
     // item (Select… picked All Apps, the button turned into Deselect, the next tap cleared it). A press counts only
     // when its touch went down after the menu finished growing and wasn't one of a run of fast taps (each within
     // MENU_REPEAT of the one before, the opening tap included); the others do nothing and the menu stays as it is.
-    // A click with no touch behind it (the keyboard, el.click()) always counts.
+    // A click with no touch behind it (the keyboard, el.click(): detail 0) always counts.
     const opened = clock();
     let prevDown = opened, live = true;
     const onDown = () => {
@@ -183,7 +183,7 @@ function menuSheet({ title = "", buttons = [], destructive = -1 } = {}, a) {
       live = t - opened >= MENU_IN && t - prevDown >= MENU_REPEAT;
       prevDown = t;
     };
-    const counts = () => live;
+    const counts = (e) => e?.detail === 0 || live;
     document.addEventListener("pointerdown", onDown, true);
     const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); close(-1); } };
     document.addEventListener("keydown", onKey);

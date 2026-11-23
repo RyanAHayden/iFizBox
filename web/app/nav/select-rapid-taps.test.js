@@ -5,7 +5,7 @@ import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { fakeDocument } from "./fakedom.test-helper.js";
 import { showActionSheet, MENU_IN, MENU_REPEAT } from "./actionsheet.js";
-import { selectPreset } from "./selection.js";
+import { selectPreset, PRESET_HOLD_MS } from "./selection.js";
 
 let saved, now, savedNow;
 beforeEach(() => {
@@ -37,7 +37,18 @@ test("fast taps on the menu while it grows, and in a run of fast taps after, pic
   assert.equal(answer, null, "still open");
   assert.equal(document.body.querySelectorAll(".action-menu").length, 1);
   assert.deepEqual(items().map((b) => b.textContent), ["All Apps", "Signed (2)"]);
-  now += MENU_REPEAT; // the taps stopped: the next press is a pick
+  items()[0].dispatchEvent({ type: "click", detail: 0, stopPropagation() {} }); // the keyboard, even mid-run
+  await Promise.resolve();
+  assert.equal(answer, 0, "a keyboard press picks");
+  answer = null;
+  globalThis.document = fakeDocument();
+  document.documentElement.setAttribute("data-style", "ios26");
+  showActionSheet({ buttons: ["All Apps", "Signed (2)"], from }).then((i) => { answer = i; });
+  now += 120;
+  press(items()[0]);
+  await Promise.resolve();
+  assert.equal(answer, null, "a fast tap does nothing");
+  now += MENU_REPEAT + MENU_IN; // the taps stopped: the next press is a pick
   press(items()[1]);
   await Promise.resolve();
   assert.equal(answer, 1);
@@ -72,4 +83,16 @@ test("selectPreset: a tap while its sheet is open opens no second sheet and chan
   assert.equal(opened, 2);
   answer(-1);
   assert.equal(await again, null);
+});
+
+test("selectPreset: a sheet that never answers holds the button for PRESET_HOLD_MS at most", async () => {
+  let opened = 0;
+  const parts = { selecting: true, options: () => [{ label: "All", preset: "all" }], apply() {}, clear() {},
+    sheet: () => { opened++; return new Promise(() => {}); } };
+  const t = 5_000_000;
+  selectPreset(parts, t);
+  assert.equal(await selectPreset(parts, t + 1000), null);
+  assert.equal(opened, 1);
+  selectPreset(parts, t + PRESET_HOLD_MS);
+  assert.equal(opened, 2, "the stuck sheet no longer holds it");
 });

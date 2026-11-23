@@ -33,6 +33,9 @@ Select… with 0, tap 4 opened the menu, and so on.
 - `web/app/nav/select-rapid-taps.test.js` (new): fast presses during the grow and in a run pick nothing, and the
   menu keeps the same items. A press after the run stops does pick. A keyboard click picks. Re-entering
   `selectPreset` opens no second sheet.
+- In `menuSheet`, a click with detail 0 (the keyboard, el.click()) now counts even right after a run of fast taps; before, it inherited the last touch's verdict.
+- `selectPreset`'s one-sheet lock holds for `PRESET_HOLD_MS` (30 s, exported) at most, so a sheet that never answers can't leave Select… dead until a reload.
+- Both have cases in `select-rapid-taps.test.js`.
 
 ## How it was checked
 
@@ -47,6 +50,7 @@ Select… with 0, tap 4 opened the menu, and so on.
   All Apps | Expiring Soon (0) | Not Signed Here (3) | With Updates (0). The button stayed Select… and nothing
   was picked. One slow tap after a 1 s pause picked All Apps (Deselect, 3 picked).
 - With taps 500 ms apart, each tap is a real pick: open, All Apps, Deselect, open. That is intended.
+- The probe was run again on the final code with the same result. `after.txt` is updated.
 
 ## Tried and failed
 
@@ -61,3 +65,5 @@ Select… with 0, tap 4 opened the menu, and so on.
 - The bottom sheet in the other styles (iOS 6, 7 and 13) is unchanged. There the sheet rises from the bottom and
   does not cover the button, so a fast tap on the dimmed area still closes it. That is outside this task's iOS 26
   scope.
+- The Chromium probe forces the CSS menu (fake `app.info` says iOS 18.1, `ui.*` calls fail). Chromium cannot draw
+  the iOS 26 glass bars or the shell's native sheet, so neither is checked by the probe.

@@ -82,15 +82,18 @@ export function ghostFor(sel, root, win = globalThis) {
 // Resolves with the preset picked, "none" after a deselect, or null when the sheet is cancelled.
 // B370: one sheet at a time. A tap while it is still open (the glass bar's button sits above the page, so it can
 // still be tapped; the shell's own sheet too) does nothing and resolves null, so fast repeat taps never stack a second
-// sheet or act on the selection the first one is about to change.
-let presetOpen = false;
-export async function selectPreset({ selecting, options, apply, clear, sheet }) {
-  if (presetOpen) return null;
+// sheet or act on the selection the first one is about to change. A sheet that never answers holds the button for
+// PRESET_HOLD_MS at most.
+export const PRESET_HOLD_MS = 30000;
+let presetOpen = null; // the open sheet: { at } (Date.now() when it opened), or null
+export async function selectPreset({ selecting, options, apply, clear, sheet }, now = Date.now()) {
+  if (presetOpen && now - presetOpen.at < PRESET_HOLD_MS) return null;
   if (!selecting) { clear(); return "none"; }
   const opts = options();
-  presetOpen = true;
+  const mine = { at: now };
+  presetOpen = mine;
   let i;
-  try { i = await sheet({ buttons: opts.map((o) => o.label) }); } finally { presetOpen = false; }
+  try { i = await sheet({ buttons: opts.map((o) => o.label) }); } finally { if (presetOpen === mine) presetOpen = null; }
   if (!(i >= 0) || !opts[i]) return null;
   apply(opts[i].preset);
   return opts[i].preset;
