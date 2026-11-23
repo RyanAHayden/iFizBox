@@ -57,11 +57,10 @@ export function queueTweak(target, tweak, { queue = appQueue, records, install =
     const other = otherId(target, rec);
     if (other && data) await addDebTo(other, data.st, data.deb, { store });
     const take = (job) => {
-      // the run may have signed it already: the kept tweak goes in the next time
-      if (running()) return { running: true };
       const has = (job.tweaks ?? []).filter((t) => t.id !== tweak.id);
       queue.setTweaks(job.id, { tweaks: [...has, tweak], tweaksOf: rec ? other ?? target.bundleId : target.bundleId });
-      return { job };
+      // a run going on now may have signed it already (then the kept tweak goes in the next time)
+      return running() ? { running: true } : { job };
     };
     const queued = jobOf(queue, target, rec);
     if (queued) return take(queued);
@@ -80,9 +79,9 @@ export function unqueueTweak(target, row, { queue = appQueue, records, running =
     const other = otherId(target, rec);
     if (other) await saveTweaks(other, (await savedTweaks(other, { store })).filter((x) => !gone(x)), { store });
     const job = jobOf(queue, target, rec);
-    if (!job || running()) return;
+    if (!job) return;
     const tweaks = (job.tweaks ?? []).filter((t) => t.id !== row.id);
-    if (job.forTweaks && !tweaks.length) { queue.clear(job.id); return; }
+    if (job.forTweaks && !tweaks.length && !running()) { queue.clear(job.id); return; }
     const of = other ?? target.bundleId;
     queue.setTweaks(job.id, { tweaks, tweaksOf: of, noTweaks: !(await savedTweaks(of, { store })).length });
   });
@@ -113,7 +112,7 @@ export async function addToThisApp(st, target, { queue = appQueue, records, inst
     const rec = await recordFor(target, records);
     const signedIn = Boolean(rec?.tweaks?.includes(file));
     if (signedIn) {
-      if (!running() && jobOf(queue, target, rec)) open(queue);
+      if (!running() && jobOf(queue, target, rec)) await put();
       else await says("Added", `${name} is in ${target.name}.`);
       return true;
     }

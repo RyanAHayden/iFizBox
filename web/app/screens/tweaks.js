@@ -595,7 +595,12 @@ export async function addToApp(st, opts = {}) {
   await addDebTo(rec?.originalBundleId || app.bundleId, st, data, { store });
   const j = rec ? await (job ?? (async (r) => (await import("../core/appqueue.js")).resignJob(r)))(rec) : null;
   if (j) {
-    await (queue ?? (async (x) => (await import("./queue.js")).queueApp(x)))(j);
+    await (queue ?? (async (x) => {
+      // F401: Confirm names the tweak; a job queued only for its tweaks stays one
+      const prev = (await import("../app-queue.js")).appQueue.get(x.id);
+      const tweaks = [...(prev?.tweaks ?? []).filter((t) => t.id !== st.package), { id: st.package, name }];
+      return (await import("./queue.js")).queueApp({ ...x, tweaks, tweaksOf: rec.originalBundleId || app.bundleId, forTweaks: !prev || Boolean(prev.forTweaks) });
+    }))(j);
     return app;
   }
   await alert({ title: "Tweak Added", message: `${app.name} wasn't signed on this phone, so it can't be re-signed with ${name} now. `

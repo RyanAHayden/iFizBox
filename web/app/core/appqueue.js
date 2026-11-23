@@ -83,7 +83,11 @@ export function createAppQueue() {
       const withTweaks = (job) => {
         const prev = jobs.get(id);
         if (tweaks?.length) { job.tweaks = [...tweaks]; if (forTweaks) job.forTweaks = true; }
-        else if (prev?.tweaks?.length) job.tweaks = prev.tweaks;
+        else if (prev?.tweaks?.length) {
+          const own = job.options?.edits?.tweaks?.names; // a Custom Install's own list: only those it has go in
+          const left = Array.isArray(own) ? prev.tweaks.filter((t) => own.some((n) => String(n).startsWith(`${t.id}_`))) : prev.tweaks;
+          if (left.length) job.tweaks = left;
+        }
         const of = tweaksOf ?? prev?.tweaksOf;
         if (of) job.tweaksOf = of;
         if (!tweaks?.length && prev?.noTweaks) job.noTweaks = true;

@@ -127,13 +127,16 @@ test("Remove of the last tweak a queued re-sign was signed with: the re-sign goe
   assert.deepEqual(await keptTweakParams({ record: job.id }, job, { store: s.store, records: async () => [rec] }), { record: job.id, tweaks: {} });
 }));
 
-test("while a run is going its job isn't changed: the tweak is kept for the next sign", () => withDoc(async () => {
+test("while a run is going the tweak is kept and noted on its job, and Remove never takes a running job out", () => withDoc(async () => {
   const s = setup();
   s.opts.running = () => true;
   s.queue.add({ id: REC.bundleId, name: "My App", mode: "resign", version: "2.0" });
   await s.button(tweak("dev.x.One"), { queue: queueHooks(TARGET, s.opts) }).fire("click");
-  assert.equal(s.queue.get(REC.bundleId).tweaks, undefined);
+  assert.equal(s.queue.get(REC.bundleId).tweaks.length, 1);
   assert.equal((await names(s)).length, 1);
+  s.queue.get(REC.bundleId).forTweaks = true;
+  await s.button(tweak("dev.x.One"), { on: true }).fire("click");
+  assert.equal(s.queue.get(REC.bundleId).noTweaks, true);
 }));
 
 test("Add to App from Add Tweaks: no picker, the app queued with the tweak, Confirm opened; again adds nothing", async () => {
