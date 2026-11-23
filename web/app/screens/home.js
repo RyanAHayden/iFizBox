@@ -660,7 +660,7 @@ function certRow() {
 // The icon on the website and in the sideload (LITE) app: what that version can't do, the jailbreak app can.
 export function versionLimits(kind) {
   if (kind === "web") return { title: `${NAME} Web`, message: "The website can't:\n• install tweaks or themes\n• see the apps on your phone\n• remove apps\n• keep signed copies of your IPAs\n• remind you to re-sign apps\n\nThe app does all of this." };
-  if (kind === "sideload") return { title: `${NAME} Lite`, message: "Without a jailbreak, Lite can't:\n• install tweaks or themes\n• see apps it didn't install\n• remove apps\n• update itself (reinstall it instead)\n\nApps it signs stop opening when your certificate expires: re-sign them before." };
+  if (kind === "sideload") return { title: `${NAME} Lite`, message: "Without a jailbreak, Lite can't:\n• install system-wide tweaks or themes\n• see apps it didn't install\n• remove apps\n\nApps it signs stop opening when your certificate expires: re-sign them before." };
   return null;
 }
 
