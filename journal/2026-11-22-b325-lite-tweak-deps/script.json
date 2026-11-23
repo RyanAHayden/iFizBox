@@ -1,0 +1,22 @@
+[
+ {"wait": 3000},
+ {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"},
+ {"nav": "#/sources", "ms": 6000},
+ {"clicktext": "Add", "ms": 2000},
+ {"eval": "(()=>{const i=[...document.querySelectorAll('input')].filter(x=>x.offsetParent!==null).at(-1); if(!i) return 'no input'; i.value='https://repo.example.test/'; i.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"},
+ {"clicktext": "Add Source", "ms": 3000},
+ {"clicktext": "Add Source", "ms": 8000},
+ {"shot": "added"},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,800)"},
+ {"eval": "(()=>{const a=[...document.querySelectorAll('.page.is-top a')].find(x=>/example\\.test|Fixture/.test(x.textContent)); if(!a) return 'none'; location.hash=a.getAttribute('href').replace(/^.*#/,'#'); return a.getAttribute('href')})()", "ms": 3000},
+ {"wait": 3000},
+ {"eval": "(()=>{const a=[...document.querySelectorAll('.page.is-top a')].find(x=>/All Packages/.test(x.textContent)); if(!a) return 'none'; location.hash=a.getAttribute('href').replace(/^.*#/,'#'); return a.getAttribute('href')})()"},
+ {"wait": 3000},
+ {"shot": "source"},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,800)"},
+ {"eval": "(()=>{const a=[...document.querySelectorAll('.page.is-top a')].find(x=>/Lite Fixture/.test(x.textContent)); if(!a) return 'none'; location.hash=a.getAttribute('href').replace(/^.*#/,'#'); return a.getAttribute('href')})()"},
+ {"wait": 5000},
+ {"shot": "tweak"},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,1500)"},
+ {"eval": "String(document.querySelectorAll('.page.is-top .deps-problem').length)"}
+]
