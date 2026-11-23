@@ -421,3 +421,49 @@ test("F16a: loadAlt reads each IPA format by the record's format", async () => {
   // Scarlet JSON read as AltStore has no apps list: refused, not loaded empty.
   assert.throws(() => runCatalog(c, "loadAlt", ["alt:https://x.dev/wrong", src("scarlet-locus.json"), null, null]), /AltStore/);
 });
+
+// B364: Havoc's paid Aerial (jp.uzra.aerial, cydia::commercial, iphoneos-arm64) and the rootful Aerial 2
+// (com.polytweaks.aerial2, iphoneos-arm), from a cut of Havoc's real Packages.
+test("search finds Havoc's paid Aerial in the jailbreak and sideload builds (B364)", () => {
+  const havoc = readFileSync(new URL("./fixtures/paid/havoc-Packages", import.meta.url), "utf8") + "\n" + packages(
+    { Package: "com.mikifp.griddy", Name: "Griddy", Version: "1.0.5", Architecture: "iphoneos-arm64", Section: "Tweaks",
+      Depends: "mobilesubstrate", Tag: "cydia::commercial", Description: "Place icons anywhere" },
+    { Package: "com.nicho1asdev.novus", Name: "Novus", Version: "1.0", Architecture: "iphoneos-arm64", Section: "Tweaks",
+      Depends: "mobilesubstrate (>= 0.9.5000), com.muirey03.libmryipc", Tag: "cydia::commercial", Description: "Notifications, redesigned" },
+  );
+  // Jailbreak (rootless): any case, paid, newest version, and still there with Works on My Phone on.
+  const jb = createCatalog();
+  jb.load("https://havoc.app/", havoc, "https://havoc.app/", "iphoneos-arm64");
+  for (const q of ["aerial", "Aerial", " AERIAL "]) {
+    const hits = jb.search(q);
+    assert.deepEqual(ids(hits), ["jp.uzra.aerial"], q);
+    assert.equal(hits[0].paid, true);
+  }
+  assert.equal(jb.search("aerial")[0].version, "5.1");
+  assert.deepEqual(ids(jb.search("stage manager")), ["jp.uzra.aerial"], "by its description");
+  assert.deepEqual(ids(jb.search("aerial", { price: "paid", section: "group:Tweaks" })), ["jp.uzra.aerial"]);
+  jb.setDevice({ ios: "16.5", jailbreak: "rootless" });
+  assert.deepEqual(ids(jb.search("aerial")), ["jp.uzra.aerial"]);
+  // Other paid Havoc tweaks too.
+  for (const [q, id] of [["griddy", "com.mikifp.griddy"], ["Novus", "com.nicho1asdev.novus"]]) assert.deepEqual(ids(jb.search(q)), [id], q);
+  // Aerial 2 is built for rootful only: a rootful device finds it, a rootless one doesn't.
+  const rootful = createCatalog();
+  rootful.load("https://havoc.app/", havoc, "https://havoc.app/", "iphoneos-arm");
+  assert.deepEqual(ids(rootful.search("aerial")), ["com.polytweaks.aerial2"]);
+  // Sideload: Havoc as a Tweak Source. An unfiltered Search finds its tweaks beside the apps (they used to be left
+  // out, and Other Sources leaves out what an added source lists, so Aerial was nowhere).
+  const lite = createCatalog();
+  lite.setDevice({ ios: "27.0", jailbreak: "none" });
+  lite.load("https://havoc.app/", havoc, "https://havoc.app/", "iphoneos-arm64", { tweaks: true });
+  lite.loadAlt("alt:https://apps.example/", JSON.stringify({ name: "Apps", apps: [{ name: "Aerial Photos", bundleIdentifier: "com.x.aerialphotos",
+    developerName: "X", version: "1.0", downloadURL: "https://apps.example/a.ipa", localizedDescription: "drone shots" }] }));
+  assert.deepEqual(ids(lite.search("Aerial")), ["jp.uzra.aerial", "com.polytweaks.aerial2", "com.x.aerialphotos"]);
+  assert.deepEqual(ids(lite.search("aerial", { price: "paid" })), ["jp.uzra.aerial", "com.polytweaks.aerial2"]);
+  assert.deepEqual(ids(lite.search("aerial", { section: "group:Apps" })), ["com.x.aerialphotos"], "Apps keeps the apps");
+  assert.deepEqual(ids(lite.search("aerial", { source: "https://havoc.app/" })), ["jp.uzra.aerial", "com.polytweaks.aerial2"]);
+  assert.deepEqual(ids(lite.search("griddy")), ["com.mikifp.griddy"]);
+  assert.deepEqual(ids(lite.search("novus")), [], "needs a library the sideload build can't bring");
+  assert.equal(lite.list(ALL).length, 1, "All Packages stays the apps");
+  lite.setHidden(["App Tweaks"]);
+  assert.deepEqual(ids(lite.search("aerial")), ["com.x.aerialphotos"], "a hidden App Tweaks stays out");
+});

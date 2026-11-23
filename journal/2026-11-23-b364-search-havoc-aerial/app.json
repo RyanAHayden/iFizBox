@@ -1,0 +1,13 @@
+[
+ {"wait": 3000},
+ {"nav": "#/sources", "ms": 15000},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,900)"},
+ {"nav": "#/search", "ms": 4000},
+ {"eval": "(()=>{const i=document.querySelector('.page.is-top input'); i.value='aerial'; i.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"},
+ {"wait": 10000},
+ {"shot": "app-aerial"},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,1500)"},
+ {"eval": "(()=>{const i=document.querySelector('.page.is-top input'); i.value='Aerial'; i.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"},
+ {"wait": 5000},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,1500)"}
+]

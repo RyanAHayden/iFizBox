@@ -688,6 +688,19 @@ export function createCatalog() {
     return spread;
   }
 
+  // B364: the sideload build's unfiltered Search pool: All Sources' apps and the App Tweaks merge, by name (an id in
+  // both keeps the app's row). Cached on the two lists it is made of.
+  let poolOf = [null, null], pool = [];
+  function appsAndTweaks() {
+    tweakEntries();
+    const apps = rowsOf(ALL);
+    if (poolOf[0] === apps && poolOf[1] === tweakSorted) return pool;
+    const ids = new Set(apps.map((r) => r.id));
+    pool = tweakSorted.length ? [...apps, ...tweakSorted.filter((r) => !ids.has(r.id))].sort(compareNames) : apps;
+    poolOf = [apps, tweakSorted];
+    return pool;
+  }
+
   // Every word must appear somewhere (name, id, description, author or maintainer). Ranked: exact name or id,
   // then name or id starting with the query, then the query starting a word in the name or id (F101), then the
   // query inside the name or id, then author or maintainer, then the rest. Within a tier (Sileo): the name
@@ -707,9 +720,12 @@ export function createCatalog() {
     const appTweaks = appsOnly && key === ALL && (section === APP_TWEAKS || section === "group:Tweaks");
     if (appTweaks && hidden.has(APP_TWEAKS)) return [];
     const inSection = appTweaks ? null : sectionTest(section);
+    // B364: and an unfiltered one (no section) takes them in beside the apps, or a tweak whose source was added
+    // dropped out of Search altogether (Other Sources leaves out what added sources list).
+    const withTweaks = appsOnly && key === ALL && !inSection && !appTweaks && !hidden.has(APP_TWEAKS);
     const hits = [];
     const listed = sourceCounts();
-    for (const r of appTweaks ? (tweakEntries(), tweakSorted) : rowsOf(key)) {
+    for (const r of appTweaks ? (tweakEntries(), tweakSorted) : withTweaks ? appsAndTweaks() : rowsOf(key)) {
       if (isHidden(r)) continue;
       if (!words.every((w) => r._hay.includes(w))) continue;
       if (inSection && !inSection(r)) continue;
@@ -733,7 +749,7 @@ export function createCatalog() {
       const out = slim(r);
       if (rank === 0 && isIncompatible(r.compat)) {
         out.exact = true;
-        out.why = needText(compat(judged(entries(key).get(r.id).stanza), device));
+        out.why = needText(compat(judged(entryOf(r.id, key).stanza), device));
       }
       return out;
     });
