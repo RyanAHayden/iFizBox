@@ -66,6 +66,17 @@
 "shot": "jb-filters-bigboss-changed"
 },
 {
+"tap": "text:Same as All Sources",
+"ms": 1500
+},
+{
+"eval": "JSON.stringify([localStorage.getItem('ifizbox.sourceFilters'), document.querySelectorAll('.page.is-top .filters-reset').length, document.querySelector('.page.is-top .switch[aria-label=\\'Hide Unknown\\']').getAttribute('aria-checked')])"
+},
+{
+"tap": ".page.is-top .switch[aria-label='Hide Unknown']",
+"ms": 1500
+},
+{
 "eval": "history.back(); 'ok'"
 },
 {

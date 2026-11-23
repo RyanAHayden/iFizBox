@@ -13,11 +13,10 @@ const BIGBOSS = "deb:http://apt.thebigboss.org/repofiles/cydia/:stable";
 const MODERN = "deb:https://havoc.app/:./";
 const OTHER = "deb:https://repo.example/:./";
 
-test("old firmware: a stated range of iOS 10 or earlier is old, a modern or unstated one is not", () => {
+test("old firmware: a stated minimum of iOS 10 or earlier is old, a modern or unstated one is not", () => {
   assert.equal(isOldPackage({ depends: "firmware (>= 7.0)" }), true);
   assert.equal(isOldPackage({ depends: "mobilesubstrate, firmware (>= 10.3)" }), true);
-  assert.equal(isOldPackage({ depends: "firmware (<< 11.0)" }), true);
-  assert.equal(isOldPackage({ depends: "firmware (<= 9.3)" }), true);
+  assert.equal(isOldPackage({ depends: "firmware (<< 11.0)" }), false, "only the stated minimum counts");
   assert.equal(isOldPackage({ depends: "firmware (>= 11.0)" }), false);
   assert.equal(isOldPackage({ depends: "firmware (>= 15.0)" }), false);
   assert.equal(isOldPackage({ depends: "mobilesubstrate" }), false, "nothing stated is Unknown, not Old");

@@ -8,14 +8,13 @@
 //
 //   SOURCE_FILTERS                      -> the switches, in the order the pages draw them
 //   filtersFor(key, { lite })           -> the switches a page shows (All Sources or one source)
-//   isLegacySource(key)                 -> an old source (BigBoss, ModMyi, ZodTTD, MacCiti): Hide Unknown is on there
+//   isLegacySource(key)                 -> an old source (BigBoss, ModMyi, ZodTTD): Hide Unknown is on there
 //   filterOn(stored, key, id, { fit })  -> whether a switch is on for All Sources (key ALL_SOURCES) or a source;
 //                                          `fit` is the worksOnMyPhone setting, All Sources' Works on My Phone
 //   isCustom(stored, key, { lite, fit })-> whether a source (or All Sources) differs from what it would follow
 //   resolveFilters(stored, keys, { lite, fit }) -> { dupes, byKey: { key: { fit?, old, unknown, paid, appTweaks } } }
 //                                          what the worker gets; `fit` is there only where the source changed it
-//   isOldPackage(stanza)                -> its stated iOS range is iOS 10 or earlier (lowest iOS 10 or below, or
-//                                          highest below 11); never an app
+//   isOldPackage(stanza)                -> its stated minimum iOS is 10 or earlier; never an app
 //   isUnknownIos(stanza)                -> it says nothing about the iOS version (core/compat.js iosRequirement)
 //   isAppTweak(stanza)                  -> a tweak that can go into an app on a recent iPhone: an iphoneos-arm64 build,
 //                                          or one stating firmware 15 or later (rootful-only tweaks are dropped)
@@ -47,7 +46,7 @@ export const filtersFor = (key, { lite = false } = {}) =>
   SOURCE_FILTERS.filter((f) => (!f.lite || lite) && (!f.allOnly || key === ALL_SOURCES));
 
 // Old sources whose packages mostly state no iOS range: written for iOS 3 to 10, rootful.
-const LEGACY = /(?:^|[/.:])(?:thebigboss\.org|apt\.thebigboss\.org|modmyi\.com|apt\.modmyi\.com|zodttd\.com|macciti\.com)(?:[/:]|$)/i;
+const LEGACY = /(?:^|[/.:])(?:thebigboss\.org|apt\.thebigboss\.org|modmyi\.com|apt\.modmyi\.com|zodttd\.com)(?:[/:]|$)/i;
 export const isLegacySource = (key) => LEGACY.test(String(key ?? ""));
 
 // The stored object, cleaned: only booleans of known switches.
@@ -104,36 +103,29 @@ export function resolveFilters(stored, keys = [], { lite = false, fit = true } =
 
 // ---- Package tests, from the Packages fields alone ----------------------------------------------------------
 
-// The lowest and highest iOS a package states (single-alternative firmware groups, min/maxOSVersion), or null.
-function bounds(st) {
-  const req = iosRequirement(st);
-  let lo = null, hi = null;
-  for (const g of req.groups) {
+// The lowest iOS a package states (single-alternative firmware groups, minOSVersion), or null.
+function lowest(st) {
+  let lo = null;
+  for (const g of iosRequirement(st).groups) {
     if (g.length !== 1 || !g[0].op) continue;
     const { op, version } = g[0];
     if ([">=", ">>", ">", "="].includes(op) && (!lo || compareVersions(version, lo) > 0)) lo = version;
-    if ([">>", ">"].includes(op)) continue;
-    if (["<<", "<"].includes(op) && (!hi || compareVersions(version, hi.version) < 0)) hi = { op: "<<", version };
-    if (["<=", "="].includes(op) && (!hi || compareVersions(version, hi.version) < 0)) hi = { op: "<=", version };
   }
-  return { lo, hi, stated: req.stated };
+  return lo;
 }
 const major = (v) => Number.parseInt(String(v), 10);
 
 // An app (AltStore source) is never old by this test: its minOSVersion is the oldest iOS it still runs on.
 export function isOldPackage(st) {
   if (st?.kind === "ipa") return false;
-  const { lo, hi } = bounds(st);
-  if (lo && major(lo) <= 10) return true;
-  if (!hi) return false;
-  // "<< 11.0" and "<< 11" both end at iOS 10.
-  return hi.op === "<<" ? compareVersions(String(hi.version).replace(/(?:\.0+)+$/, ""), "11") <= 0 : major(hi.version) <= 10;
+  const lo = lowest(st);
+  return Boolean(lo && major(lo) <= 10);
 }
 
 export const isUnknownIos = (st) => !iosRequirement(st).stated;
 
 export function isAppTweak(st) {
   if (String(st?.architecture ?? "").trim() === "iphoneos-arm64") return true;
-  const { lo } = bounds(st);
+  const lo = lowest(st);
   return Boolean(lo && compareVersions(lo, "15") >= 0);
 }

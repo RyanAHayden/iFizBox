@@ -50,6 +50,7 @@ import { confirmUnknownSource, markTrusted } from "./safety.js"; // F291
 import * as findMore from "./findmore.js"; // F305: #/sources/manage/find(/<slug>), Find More Sources
 import { nativeBridge } from "../native.js";
 import { ALL_SOURCES, filtersFor } from "../core/sourcefilters.js"; // F382
+import { slideChange } from "../nav/slide.js"; // F382: Same as All Sources slides in and out
 
 export const SEGMENT = "manage";
 export const isManage = (route) => route.path[0] === SEGMENT;
@@ -205,13 +206,17 @@ const isLite = () => detectMode() === "sideload";
 
 // Redraws `draw` whenever the filters (or Works on My Phone) change while `body` is on screen, so the Filters list
 // says Custom on the way back from a source's page; a page left behind unsubscribes.
-function redrawOnFilterChange(body, draw) {
+// One listener per page (`id`): a page drawn again replaces its old one, so going back and forth piles up nothing.
+const filterListeners = new Map();
+function redrawOnFilterChange(body, id, draw) {
+  filterListeners.get(id)?.();
   const off = settings.onChange((key) => {
     if (key !== "sourceFilters" && key !== "worksOnMyPhone") return;
     // A page under a pushed one may be out of the document; it goes only once no Filters page is in the address.
-    if (!body.isConnected && !location.hash.includes(`${SEGMENT}/filters`)) { off(); return; }
+    if (!body.isConnected && !location.hash.includes(`${SEGMENT}/filters`)) { off(); filterListeners.delete(id); return; }
     draw();
   });
+  filterListeners.set(id, off);
 }
 
 async function renderFilters(body) {
@@ -229,10 +234,9 @@ async function renderFilters(body) {
     const icons = [...ul.querySelectorAll(".cell-icon")].slice(1);
     icons.forEach((ic, i) => ic.append(sourceIconImage(shown[i].key, sourceIcons(shown[i]), getBackend())));
     body.replaceChildren(ul);
-    body.dataset.filtersDrawn = "1";
   };
   draw();
-  redrawOnFilterChange(body, draw);
+  redrawOnFilterChange(body, "filters", draw);
 }
 
 async function renderFilter(body, key) {
@@ -243,25 +247,34 @@ async function renderFilter(body, key) {
     filterNames.set(key, displayName(s));
   }
   const list = filtersFor(key, { lite: isLite() });
+  const ul = grouped(list.map((f) => ({ rows: [{ label: f.label, chevron: false }], footer: f.footer })));
+  const switches = new Map();
+  const makeSwitch = (f) => createSwitch({ label: f.label, checked: settings.sourceFilters.isOn(key, f.id),
+    onToggle: (on) => setTimeout(() => settings.sourceFilters.set(key, f.id, on), 250) }); // the switch slides first
+  const cells = ul.querySelectorAll(".cell .cell-inner");
+  list.forEach((f, i) => {
+    cells[i].classList.add("has-switch");
+    switches.set(f.id, makeSwitch(f));
+    cells[i].append(switches.get(f.id));
+  });
+  // A source changed here goes back to following All Sources; All Sources back to the defaults. The row slides in
+  // and out (nav/slide.js slideChange) as the page turns custom or not; the switches change in place.
+  const reset = grouped([{ rows: [{ label: key === ALL_SOURCES ? "Reset" : "Same as All Sources", chevron: false,
+    cls: "filters-reset", onClick: () => settings.sourceFilters.reset(key) }] }]).firstChild; // its one .group
   const draw = () => {
-    const groups = list.map((f) => ({ rows: [{ label: f.label, chevron: false }], footer: f.footer }));
-    // A source changed here goes back to following All Sources; All Sources back to the defaults.
-    if (settings.sourceFilters.isCustom(key)) {
-      groups.push({ rows: [{ label: key === ALL_SOURCES ? "Reset" : "Same as All Sources", chevron: false, cls: "filters-reset",
-        onClick: () => settings.sourceFilters.reset(key) }] });
+    for (const f of list) {
+      const sw = switches.get(f.id);
+      if ((sw.getAttribute("aria-checked") === "true") === settings.sourceFilters.isOn(key, f.id)) continue;
+      const next = makeSwitch(f);
+      sw.replaceWith(next);
+      switches.set(f.id, next);
     }
-    const ul = grouped(groups);
-    const cells = ul.querySelectorAll(".cell .cell-inner");
-    list.forEach((f, i) => {
-      cells[i].classList.add("has-switch");
-      cells[i].append(createSwitch({ label: f.label, checked: settings.sourceFilters.isOn(key, f.id),
-        onToggle: (on) => setTimeout(() => settings.sourceFilters.set(key, f.id, on), 250) })); // the switch slides first
-    });
-    body.replaceChildren(ul);
-    body.dataset.filtersDrawn = "1";
+    const custom = settings.sourceFilters.isCustom(key);
+    if (custom !== (reset.parentNode === body)) slideChange(body, () => (custom ? body.append(reset) : reset.remove()));
   };
-  draw();
-  redrawOnFilterChange(body, draw);
+  body.replaceChildren(ul);
+  if (settings.sourceFilters.isCustom(key)) body.append(reset);
+  redrawOnFilterChange(body, `filter:${key}`, draw);
 }
 
 // ---- Sources: the edit list ------------------------------------------------------------------------------------

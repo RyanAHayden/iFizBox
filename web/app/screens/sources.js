@@ -643,6 +643,7 @@ function draw(view) {
 // tweaks, Hide Unknown BigBoss's unstated ones), and one left with none says so under its name. Only for a source
 // whose packages are in the catalog already: this never starts a load.
 export const NO_APP_TWEAKS = "No app tweaks: this is a jailbreak source";
+export const ALL_FILTERED = "Filters hide everything here";
 async function noteFilteredTweakSources(ul, list) {
   // Sources not in the catalog yet are noted once a load put them there (catalog.onLoaded), if the list is still up.
   const later = list.filter((s) => !catalog.status(s.key));
@@ -667,9 +668,11 @@ async function noteFilteredTweakSources(ul, list) {
     const sub = li.querySelector(".cell-subtitle");
     if (total !== 0 || !sub || sub.dataset.error === "1") continue;
     // The URL (the subtitle's last text) gives way; the Known Safe / Unknown pill before it stays (safety.js).
+    // "jailbreak source" only where App Tweaks Only is on for it; another switch that emptied it gets the plain words.
+    const text = settings.sourceFilters.isOn(s.key, "appTweaks") ? NO_APP_TWEAKS : ALL_FILTERED;
     const url = [...sub.childNodes].reverse().find((n) => n.nodeType === 3 && n.textContent.trim());
-    if (url) url.textContent = NO_APP_TWEAKS;
-    else sub.append(NO_APP_TWEAKS);
+    if (url) url.textContent = text;
+    else sub.append(text);
   }
 }
 
