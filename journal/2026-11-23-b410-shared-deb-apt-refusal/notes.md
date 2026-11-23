@@ -16,7 +16,8 @@
 
 ## Checks
 
-- `web/app/screens/sharedeb.test.js` (node --test): 3 new tests, for apt refusing, an essential package and exit 74.
+- `web/app/screens/sharedeb.test.js` (node --test): 4 new tests, for apt refusing with and without
+  its problems explained, an essential package and exit 74.
 - `journal/2026-11-23-b410-shared-deb-apt-refusal/shots.mjs`: Chromium with a fake bridge, states apt, essential and io,
   iOS 6 and 26, light and dark. Nothing is cut off and there are no page errors.
 

@@ -52,9 +52,9 @@ refused("a missing helper", "ifizbox-helper is not installed at /var/jb/usr/libe
 });
 
 // B410: simulate-deb's own answer (apt refused, an essential package, or exit 74): the same wrapping block.
-function answered(title, answer, check) {
+function answered(title, answer, check, problems = []) {
   test(title, async (t) => {
-    t.mock.method(catalog, "aptProblems", async () => []); // no index to load
+    t.mock.method(catalog, "aptProblems", async () => problems); // no index to load
     const saved = [globalThis.document, globalThis.requestAnimationFrame];
     const doc = globalThis.document = fakeDocument();
     globalThis.requestAnimationFrame = () => 0;
@@ -90,3 +90,6 @@ answered("exit 74: the helper couldn't copy the file, so apt never ran", { ok: f
   assert.equal(header, "Couldn't Ask apt");
   assert.equal(raw, undefined, "no apt output: it never ran");
 });
+answered("apt's problems, each in a cell", { ok: false, code: 100, output: "E: Broken packages" }, (sentences) => {
+  assert.deepEqual(sentences, ["a needs b.", "a needs c."]);
+}, [{ sentence: "a needs b." }, { sentence: "a needs c." }]);
