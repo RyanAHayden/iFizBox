@@ -123,6 +123,7 @@ test("the tests' answers in words", () => {
   // F386: the Install Switch's test
   assert.equal(switchTestResult({ ok: true, start: { ok: true }, end: { ok: true }, vpnOn: true, cellular: false }).title, "Install Switch Works");
   assert.match(switchTestResult({ ok: true, start: { ok: true }, end: { ok: true }, vpnOn: true, cellular: true, wentOff: true }).message, /Cellular Data off, then your VPN came back/);
+  assert.equal(switchTestResult({ ok: false, busy: true, start: { ok: false } }).title, "Not Tested");
   const none = (r) => switchTestResult({ ok: true, start: { ok: true }, end: { ok: true }, vpnOn: true, vpnBack: false, ...r }).message;
   assert.equal(none({ cellular: false }), `${BUILTIN_VPN} came on, then went off again.`, "B397: no VPN to bring back, none claimed");
   assert.match(none({ cellular: true, wentOff: true }), /Cellular Data off, then data came back on/);

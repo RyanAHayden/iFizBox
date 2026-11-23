@@ -264,7 +264,7 @@ class App(unittest.TestCase):
         self.assertIn(".now() + (now ? 0 : linger)", src)
         trip = src[src.index("private static func testTrip("):src.index("static func connectedNow()")]
         self.assertIn("end(now: true)", trip)
-        self.assertNotIn("linger +", trip)
+        self.assertNotIn("linger", trip[trip.index("try begin(forced: true)"):])  # only an earlier queue's is waited for
         self.assertIn("let open = tripOpen && failure == nil", trip)
         self.assertLess(trip.index("tripOpen = false"), trip.index("try begin(forced: true)"))  # not an earlier trip's answer
         web = read("web", "app", "screens", "installroute.js", base=os.path.dirname(NATIVE))

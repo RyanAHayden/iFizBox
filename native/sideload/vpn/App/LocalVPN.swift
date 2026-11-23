@@ -888,9 +888,12 @@ enum LocalVPN {
         }
         say("back")
         // B395: not found: an end would open Shortcuts for nothing
-        var end = SwitchOpens.notFound(start.error) ? start : switchEnded(runShortcut("switch", input: switchInput("end", cellular: cellular)))
+        var end = SwitchOpens.notFound(start.error) || notOpened(start.error) ? start : switchEnded(runShortcut("switch", input: switchInput("end", cellular: cellular)))
         UserDefaults.standard.set(start.ok && end.ok, forKey: shortcutKeys["switch"]!)
         let back = end.ok && waitBack(before, selected: selected)
+        let t2 = Date()
+        while end.ok && wentOff && !Path.now().cellular && Date().timeIntervalSince(t2) < leftOffLimit { Thread.sleep(forTimeInterval: 0.2) }
+        if end.ok && wentOff && !Path.now().cellular { end = (false, "it didn't turn Cellular Data back on") }
         if end.ok && !before.isEmpty && !back { end = (false, notBack) } // B397: its run passing isn't the VPN being back
         return ["ok": start.ok && end.ok, "cellular": cellular, "wentOff": wentOff, "vpnOn": vpnOn, "vpnBack": back,
                 "start": ["ok": start.ok, "error": (start.error as Any?) ?? NSNull()],
@@ -915,12 +918,21 @@ enum LocalVPN {
     /// testSwitch in one trip, as a queue takes it. B397: the VPN goes off at once, and only what the trip changed is waited for.
     private static func testTrip(_ cellular: Bool) -> [String: Any] {
         var failure: String?
+        // a queue that just ended (its linger, its put-back) is waited for; one that goes on is said at once
+        let w0 = Date()
+        var said = false
+        while Date().timeIntervalSince(w0) < linger + putBackLimit {
+            lock.lock(); let tail = holds == 0 && installs == 0 && (busy || tripOn || tailing); lock.unlock()
+            if !tail { break }
+            if !said { said = true; say("back") }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
         lock.lock()
         let going = busy || holds > 0 || installs > 0
         if !going { tripOpen = false; tripError = nil; tripWhy = nil; tripBack = false } // an earlier trip's
         lock.unlock()
         if going {
-            return ["ok": false, "cellular": cellular, "wentOff": false, "vpnOn": false, "vpnBack": false,
+            return ["ok": false, "busy": true, "cellular": cellular, "wentOff": false, "vpnOn": false, "vpnBack": false,
                     "start": ["ok": false, "error": "\(Brand.name) is installing an app"], "end": ["ok": true, "error": NSNull()]]
         }
         let before = otherVPNAddresses(), selected = otherVPNSelected()
@@ -944,7 +956,7 @@ enum LocalVPN {
         let back = tripDid || (vpnBack || before.isEmpty && !selected) && !(wentOff && !Path.now().cellular)
         let startErr = open ? nil : why ?? failure ?? "\(Brand.name) wasn't opened again"
         let endErr = open && !back ? notBack : nil
-        if open || why != nil { UserDefaults.standard.set(open && endErr == nil, forKey: shortcutKeys["switch"]!) } // not when Shortcuts never opened (no network)
+        if open || (why != nil && !notOpened(why)) { UserDefaults.standard.set(open && endErr == nil, forKey: shortcutKeys["switch"]!) } // not when Shortcuts never opened (no network)
         return ["ok": open && endErr == nil, "cellular": cellular, "wentOff": wentOff, "vpnOn": vpnOn, "vpnBack": vpnBack,
                 "start": ["ok": open, "error": (startErr as Any?) ?? NSNull()],
                 "end": ["ok": endErr == nil, "error": (endErr as Any?) ?? NSNull()]]

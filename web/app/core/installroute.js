@@ -97,6 +97,7 @@ export function vpnTestResult(r, err = null) {
 // F386: vpn.testSwitch's answer as the alert's words: the start and the end ran, and what the start did.
 export function switchTestResult(r) {
   const name = SHORTCUT_NAMES.switch;
+  if (r?.busy) return { title: "Not Tested", message: `${NAME} is installing an app. Test again when it's done.` };
   if (!r?.start?.ok || !r?.end?.ok) {
     const err = (!r?.start?.ok ? r?.start?.error : r?.end?.error) || "it didn't run";
     return { title: "Shortcut Didn't Run", message: `"${name}": ${err}. Check that it's in Shortcuts with exactly that name.` };

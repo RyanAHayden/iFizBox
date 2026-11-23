@@ -326,7 +326,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   after the waits ran out, whichever comes first), the app runs the separate `{"end":1}` run described below as a retry,
   once the app is in front. The rules for when a start or an end is needed are unchanged.
   `vpn.testSwitch` does one trip when ready. It emits `{step}` events (`opening`, `connecting`, `back`), which its row
-  on `installation/shortcuts` shows as Opening Shortcuts…, Connecting…, Putting Things Back…. In a test the built-in VPN
+  on `installation/shortcuts` shows as the row's subtitle: Opening Shortcuts…, Connecting…, Putting Things Back…. In a test the built-in VPN
   goes off at once, with no 3 second wait, and putting things back is waited for 12 seconds at most before the end run
   retries. When the Install Switch doesn't run, the test fails without connecting the built-in VPN, so your VPN stays on.
   Coming back to the front for 5 seconds without Open counts as failed too. The answer's `vpnBack` says another VPN was
