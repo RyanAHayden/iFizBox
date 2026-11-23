@@ -6,11 +6,11 @@
 //   section:<name>   the packages in that section ("section:*" = All Packages)
 //   package:<id>     a package's page, in the source of the route (the newest version for All Sources/Search)
 //   author:<name>    every package whose Author or Maintainer is <name>
-//   versions:<id>    a package's Version History (F29): every version the sources offer, or an app's versions[]
+//   versions:<id>    a package's Version page (F29): every version the sources offer, or an app's versions[]
 // e.g. #/sources/deb%3Ahttps%3A%2F%2Frepo.chariz.com%2F%3A.%2F/section%3ATweaks/package%3Acom.example.tweak
 //
 // Lists come from the catalog in the parse worker (catalog.js); long ones are virtualised (nav/vlist.js).
-import { grouped, placeholder, el, segments, note } from "../nav/ui.js";
+import { grouped, placeholder, el, segments, note, buttonZone } from "../nav/ui.js";
 import { createVList, withLetterHeaders } from "../nav/vlist.js";
 import { createSectionIndex } from "../nav/sectionindex.js";
 import { onPageOpen } from "../nav/pagestate.js";
@@ -38,7 +38,7 @@ import { previewText } from "./altstore.js"; // B328: the depiction page's fetch
 import { loadDepictionDescription, betterDescription } from "../core/previews.js"; // B328
 import { slideChange } from "../nav/slide.js"; // B328: the longer description slides in
 import { jailbreakModify } from "./altstore.js"; // B69
-import { descriptionGroup } from "./description.js";
+import { descriptionGroup, estimateLines, growOpen, endGrow } from "./description.js";
 import { packageLinks, packageGithub, aptShots, sileoShots, sileoRatings, sileoWhatsNew } from "../core/previews.js";
 import { storeHeader, headerLine, storeTabs, whatsNewGroup } from "./storepage.js";
 import { reviewsTab } from "./reviews.js";
@@ -84,11 +84,11 @@ import { runLogs } from "../queue.js";
 import { appQueue } from "../app-queue.js"; // F213: the sideload build's rows queue apps
 import { APP_MODE_LABEL } from "../core/appqueue.js";
 import { rowAppJob, queueOriginalCheck } from "./altstore.js";
+import { signedRecordOf, forgetHeld, cancelHeldForget, appVersionInstalled } from "./altstore.js"; // F392
 import { queueApp } from "./queue.js";
 import { worksInGroup, addToApp, addableTweakRows, checkTweakRows } from "./tweaks.js"; // F302
-import { installWhichVersion, INSTALL_WHICH_TITLE } from "./altstore.js"; // F346: a hold on Install
 import { loadRowsIndex } from "./tweaks.js"; // F344
-import { DETAILS_TITLE, packageRows, moreInfoShown, detailRows, descGroup, changeButton, footerGroup,
+import { DETAILS_TITLE, packageRows, moreInfoShown, detailRows, descGroup, footerGroup,
   detailsFooter, MORE_INFO_LABEL } from "./details.js"; // F350
 import { rowIcon } from "../icons/rowicons.js";
 import { appInfoNodes } from "./altstore.js"; // F350: an app's More Information
@@ -199,8 +199,8 @@ export function nav(route, sourceName = () => null) {
     case "files": return { title: "Files", style: "plain" };
     case "package": return { title: DETAILS_TITLE,
       right: { label: "Install", onClick: (e) => installTap(route, e.currentTarget).catch(() => {}),
-        onHold: (b) => installHold(route, b).catch(() => {}) } }; // B330: tap queues, hold opens the options
-    case "versions": return { title: "Versions" };
+        onHold: (b) => installHold(route, b).catch(() => {}) } }; // B330: a tap queues; F392: a hold too, quietly
+    case "versions": return { title: "Version" };
     case "addtweaks": return { title: "Add Tweaks", style: "plain" }; // F352
     default: return { title: "Not Found" };
   }
@@ -871,9 +871,9 @@ function attachAppSwipe(listEl, route) {
 }
 
 // Undo: the queue as it was for that app (the job it held, or none). B71a: `quiet` in the jailbreak app (no Confirm).
-function restoreApp(id, prev, { quiet = false } = {}) {
-  if (!prev) return appQueue.clear(id);
-  try { appQueue.add(prev, { quiet }); } catch { /* it can't be queued again: leave it out */ }
+function restoreApp(id, prev, { quiet = false, queue = appQueue } = {}) {
+  if (!prev) return queue.clear(id);
+  try { queue.add(prev, { quiet }); } catch { /* it can't be queued again: leave it out */ }
 }
 
 // F193's first-run hint: ~0.7 s after the list opens, its top row on screen eases left by 44pt and back, once.
@@ -998,7 +998,7 @@ async function renderAddTweaks(body, route, bundleId) {
     else a.href = deeper(route, keyedToken(item.id, item.key));
     const b = tw.addTweakButton(item, { bundleId, on: Boolean(item.added), cls: "price-btn tw-row-add", onCls: "added", busyCls: "adding",
       onChange: reload });
-    a.append(b);
+    buttonZone(row, b);
     row._.add = b;
   };
   const more = tw.moreTweaksGroup({ bundleId, name: appName, onChange: reload });
@@ -1164,6 +1164,15 @@ function blockGroup({ id, name, author, tile = null }) {
   return box;
 }
 
+// Add to / Remove from Wish List as a row of its own, for a page whose nav button opens no sheet with it.
+function wishRow(id) {
+  const li = grouped([{ rows: [{ label: wishLabel(wishlist().has(id)), icon: rowIcon("pkgWish"), onClick: () => {
+    wishlist().set(id, !wishlist().has(id));
+    li.querySelector(".cell-label").replaceChildren(wishLabel(wishlist().has(id)));
+  } }] }]).firstElementChild;
+  return li;
+}
+
 const httpUrl = (u) => (/^https?:\/\//i.test(String(u ?? "").trim()) ? String(u).trim() : null);
 
 async function renderPackage(body, route, key, id, ctx) {
@@ -1185,15 +1194,10 @@ async function renderPackage(body, route, key, id, ctx) {
     names.set(id, st.name);
     const altSrc = sources.find((s) => s.key === pkg.key);
     // F181: its Related tab is the same as a package's: the source's other apps in that category.
-    // F350: the same Details layout; Version's CHANGE opens Install Which Version? as the nav button's hold does.
-    const { tail } = renderApp(body, route, pkg, altSrc, { related: (pane) => relatedPane(pane, route, pkg, id),
-      onChange: () => installVersionHold(route).catch(() => {}) });
+    // F350: the same Details layout.
+    const { tail } = renderApp(body, route, pkg, altSrc, { related: (pane) => relatedPane(pane, route, pkg, id) });
     // F102 for apps: their nav button installs at once (no sheet to hold Wish List), so it's a row on the page.
-    const wishLi = grouped([{ rows: [{ label: wishLabel(wishlist().has(id)), icon: rowIcon("pkgWish"), onClick: () => {
-      wishlist().set(id, !wishlist().has(id));
-      wishLi.querySelector(".cell-label").replaceChildren(wishLabel(wishlist().has(id)));
-    } }] }]).firstElementChild;
-    tail.append(wishLi);
+    tail.append(wishRow(id));
     if (detectMode() === "jailbreak") installedAppGroup(st.ipa.bundleIdentifier).then((g) => { if (g && tail.isConnected) tail.append(g); });
     rememberPackage(body, route, { id, pkg, source: altSrc, history: await catalog.history(id, key).catch(() => null) });
     return;
@@ -1266,7 +1270,7 @@ async function renderPackage(body, route, key, id, ctx) {
   const section = pkg.row.section && pkg.row.section !== NO_SECTION ? pkg.row.section : null;
   const isz = Number(st["installed-size"]);
   const plan = packageRows({ installed: inst?.version ?? null, version: st.version ?? "", author: author?.name ?? null,
-    maintainer: maint?.name ?? null, versions: history?.versions.length ?? 0, files: typeof getBackend().packageFiles === "function",
+    maintainer: maint?.name ?? null, files: typeof getBackend().packageFiles === "function",
     sideloadTweak: isSideloadTweak(st), installedOnly: pkg.installedOnly, paid: isPaid(st), source: sourceName, section,
     worksOn: fit.range ?? compatBadge(fitCode), installedSize: isz > 0 ? formatSize(isz * 1024) : null, depends: rels.map((g) => g[0].name) });
   body.replaceChildren(header.head, ...tabs.nodes);
@@ -1331,12 +1335,11 @@ async function renderPackage(body, route, key, id, ctx) {
     if (better !== descText && descSlot.isConnected) slideChange(descSlot, () => drawDesc(better));
   });
 
-  // Installed Package (or Version): Version with CHANGE (Install Which Version?), Version History, Filesystem Content.
+  // Installed Package (or Version): Version (F392: its row opens the Version page), Filesystem Content.
   const versionBox = grouped([{ header: plan.versionHeader, rows: detailRows(plan.version, {
-    history: history?.versions.length ? versionHistoryCell(route, id, history) : {},
+    version: history?.versions.length ? { href: versionsHref(route, id) } : {},
     files: { href: deeper(route, token("files", pid)) },
   }) }]).firstElementChild;
-  changeButton(versionBox, () => installVersionHold(route).catch(() => {}), { disabled: !plan.change });
   details.append(versionBox);
   // F71: the copies N7's daemon kept, filled in when the helper answers (screens/rollback.js).
   if (inst && hasRollback()) details.append(rollbackSlot(pid, { installed: installedOf(history), name: pkg.row?.name }));
@@ -1372,6 +1375,8 @@ async function renderPackage(body, route, key, id, ctx) {
     if (/(^|,)\s*cydia::commercial\s*(,|$)/.test(st.tag ?? "")) details.append(grouped([paidDebSection()]));
     else details.append(downloadGroup(st));
   }
+  // F392: the jailbreak app's Install opens no sheet with Wish List (a tap queues, a hold queues quietly)
+  if (queueOf() && (!inst || wishlist().has(pid))) details.append(wishRow(pid));
   details.append(blockGroup({ id: pid, name, author: headAuthor?.name ?? null, tile: "pkgBlock" })); // F226
   details.append(footerGroup(detailsFooter(st.package, pkg.installedOnly ? "" : sourceName, section)));
   rememberPackage(body, route, { id, key, pkg, source, history, payBox });
@@ -1603,76 +1608,11 @@ async function sheet(title, actions) {
   if (i >= 0) actions[i].run();
 }
 
-// ---- F346: a hold on Install (Modify, Upgrade, Reinstall, the price) picks the version to install ---------------
-// The nav bar's button held (app.js button: nav/menu.js holdButton) opens Install Which Version?, the sheet of
-// Change Installed Version (altstore.js installWhichVersion): the source's versions newest first, the installed one
-// marked and left alone. An app's pick installs as Version History does (the sideload app queues that version, the
-// website signs it, the jailbreak app queues its IPA through the helper or runs its first install row); a package's
-// pick goes in the install queue as Modify > Downgrade's list does, and on the website it is that version's .deb.
-// A tap is unchanged. Add to App (a sideload tweak) and pages with nothing to offer get no sheet.
-
-// A package's sheet: -> { buttons, versions } as installWhichButtons, from its Version History (`history`, newest
-// first): versions some source still offers, the installed one marked "(Installed)" with null at its index.
-// `canInstall(v)`: whether a pick could do anything with it (the queue, or the .deb on the website).
-export function packageWhichButtons(history, { canInstall = (v) => v.keys?.length > 0 } = {}) {
-  const installed = history?.versions?.find((v) => v.installed)?.version ?? null;
-  const list = (history?.versions ?? []).filter((v) => v?.version && (v.version === installed || canInstall(v)));
-  return {
-    buttons: list.map((v) => (v.version === installed ? `${v.version} (Installed)` : v.version)),
-    versions: list.map((v) => (v.version === installed ? null : v)),
-  };
-}
-
-// The hold's sheet and install for a package page. -> the version picked (installed, queued or downloaded), or null.
-// `queue`: the install queue's add (undefined: the backend's; null: none, as on the website).
-export async function packageWhichVersion(page, { ask = showActionSheet, queue = undefined, site = undefined,
-  download = downloadDeb, vendorPaid = (st, source) => soldByVendor(st, source) } = {}) {
-  const { id, pkg, source, history } = page;
-  const st = pkg.stanza;
-  const pid = st.package || id;
-  const installed = installedOf(history);
-  const q = queue === undefined ? queueOf({ installed, name: pkg.row?.name }) : queue;
-  site ??= getBackend().kind === "http";
-  if (q && isPaid(st) && await vendorPaid(st, source)) return null; // B11: apt can't fetch what a vendor sells
-  const canInstall = (v) => (q ? v.keys?.length > 0 : site && Boolean(v.debUrl) && !isPaid(st));
-  const { buttons, versions } = packageWhichButtons(history, { canInstall });
-  if (!versions.some(Boolean)) return null;
-  const i = await ask({ title: INSTALL_WHICH_TITLE, buttons });
-  const v = i >= 0 ? versions[i] : null;
-  if (!v) return null;
-  if (q) await q({ op: "install", id: pid, version: v.version });
-  else download(v.debUrl, pid);
-  return v;
-}
-
-// The hold itself, for the page at `route`.
-export async function installVersionHold(route, { pages = packagePages, mode = detectMode(), store = apps, ask = showActionSheet } = {}) {
-  const page = pages.get(format(route));
-  if (!page || !page.body.isConnected) return null;
-  const { pkg, source } = page;
-  const st = pkg.stanza;
-  if (isSideloadTweak(st, mode)) return null; // F302: Add to App picks apps, not versions
-  if (st.kind !== "ipa" || !st.ipa) return packageWhichVersion(page, { ask });
-  const app = st.ipa;
-  let installed = "";
-  try { installed = (await (await store()).all()).find((r) => r?.id === app.bundleIdentifier)?.version ?? ""; } catch { installed = ""; }
-  // The jailbreak app: that version's IPA into the app queue (Confirm) where the helper runs it, else its first row.
-  const jailbreakInstall = async (v) => {
-    const jbq = jbAppQueue() ? jbModifyQueue(pkg, source) : null;
-    if (jbq && appJob(pkg, { version: v.version })) return jbq.install(v);
-    const row = installRows(v, app.sourceUrl, undefined, recordApp(pkg, source, v), undefined, app.name,
-      { bundleId: appBundleId(app, pkg.row?.id ?? page.id), iconUrl: app.iconURL }).rows[0];
-    return row?.onClick();
-  };
-  return installWhichVersion(app, pkg, source, { installed, ask, mode, jailbreakInstall });
-}
-
-// ---- B330: Install taps straight into the queue; the options wait for a hold ------------------------------------
+// ---- B330: Install taps straight into the queue; F392: a hold queues quietly -------------------------------------
 // A package that isn't installed (the button says Install, not Modify): a tap queues its version and the Confirm
-// sheet opens (screens/queue.js, on the queue's add), and a hold opens the options sheet a tap used to
-// (packageActions: Other Versions, Wish List...). Modify keeps its tap (the Modify sheet) and its hold (Install Which
-// Version?, F346), as its options already cover the rest. An app's Install already installs on a tap and keeps its
-// hold; Add to App, a paid package (its Purchase steps) and the website (no install queue) keep the options on a tap.
+// sheet opens (screens/queue.js, on the queue's add). Modify's tap opens its sheet (packageActions). An app's Install
+// already installs on a tap; Add to App, a paid package (its Purchase steps) and the website (no install queue) keep
+// the options on a tap.
 
 // Whether the page's button is Install for an apt package: no Modify, no app, no Add to App.
 export function installNoModify(page, { mode = detectMode() } = {}) {
@@ -1702,14 +1642,65 @@ export async function installTap(route, button, { pages = packagePages, mode = d
   return "options";
 }
 
-// The hold. -> "options" where the button is Install (packageActions ran), else what F346's hold returns.
-export async function installHold(route, button, { pages = packagePages, mode = detectMode(), options = packageActions,
-  versions = installVersionHold } = {}) {
+// F392: the hold. It queues what a row's left swipe would, Install or an upgrade, quietly (no Confirm) with the undo bar,
+// for a package and an app alike. Anything else (installed and up to date, queued already, a paid package, Add to App,
+// the website: no queue) opens the page's usual menu. -> "queued", "options" (packageActions ran), or null: a page gone,
+// or Cancel on F249's original-app question.
+// `queue`: the install queue (undefined: installQueue where the backend has one; null: none, as on the website).
+export async function installHold(route, button, { pages = packagePages, mode = detectMode(), options = packageActions, queue = undefined,
+  appState = holdAppState, appJobs = appQueue, undo = showUndoBar, check = queueOriginalCheck } = {}) {
   const page = pages.get(format(route));
   if (!page || !page.body.isConnected) return null;
-  if (!installNoModify(page, { mode })) return versions(route);
-  await options(route, button);
-  return "options";
+  const { id, pkg } = page;
+  const st = pkg.stanza;
+  const usual = async () => { await options(route, button); return "options"; };
+  const queues = (a) => a?.kind === "add" && a.label !== "Reinstall";
+  if (st.kind === "ipa") {
+    const state = st.ipa ? await appState(page) : null;
+    const item = { ...pkg.row, id: pkg.row?.id ?? id, kind: "ipa" };
+    const action = state ? rowSwipeAction(item, state) : null;
+    if (!queues(action)) return usual();
+    const job = state.jbApps ? action.job : await appRowQueueJob(action.job, state.installed, { check }); // F249
+    if (!job || !page.body.isConnected) return null;
+    const prev = appJobs.get(state.id);
+    if (state.held) cancelHeldForget(st.ipa.bundleIdentifier); // B372
+    appJobs.add(job, { quiet: true });
+    markHintSeen();
+    undo({ message: swipeMessage(action, job.name || pkg.row?.name || id, prev), onUndo: () => restoreApp(state.id, prev, { quiet: true, queue: appJobs }) });
+    return "queued";
+  }
+  const q = queue === undefined ? (queueOf() ? installQueue : null) : queue;
+  if (!q || isPaid(st) || isSideloadTweak(st, mode)) return usual();
+  const installed = installedOf(page.history);
+  const newest = installed ? page.history.versions.find((v) => v.keys.length)?.version ?? null : st.version || null;
+  const action = rowSwipeAction({ id, kind: "apt" }, { queue: true, installed, newest, queued: Boolean(q.get(id)) });
+  if (!queues(action)) return usual();
+  const name = pkg.row?.name ?? id;
+  q.add({ ...action.job, installed, name }, { quiet: true });
+  markHintSeen();
+  undo({ message: swipeMessage(action, name), onUndo: () => q.restore(id, null) });
+  return "queued";
+}
+
+// The app page's state for its hold: its row's swipe's (appRowState, jbAppRowState), with the page's own package and
+// source. An app this app signed is installed even with no record of it (B358); a held forget reads as not installed
+// (B372). null on the website.
+async function holdAppState({ pkg, source }) {
+  const bid = pkg.stanza.ipa.bundleIdentifier;
+  if (jbAppQueue()) {
+    let rec = null;
+    try { rec = (await (await apps()).all()).find((r) => r?.id === bid) ?? null; } catch { rec = null; }
+    const st = jailbreakAppRowState(pkg.row, { pkg, rec, source: source ? displayName(source) : null });
+    return { jbApps: true, ...st, queued: Boolean(appQueue.get(st.id)) };
+  }
+  if (queueKind() !== "apps") return null;
+  const r = await rowAppJob(pkg, source).catch(() => null);
+  if (!r) return null;
+  const held = forgetHeld(bid);
+  const signed = held ? null : await signedRecordOf(bid).catch(() => null);
+  const id = r.job?.id || bid;
+  return { apps: true, id, job: r.job, installed: held ? null : r.installed ?? (signed ? signed.version || "" : null), newest: r.newest, held,
+    queued: Boolean(appQueue.get(id) || (signed?.bundleId && appQueue.get(signed.bundleId))) };
 }
 
 async function packageActions(route, button) {
@@ -1858,28 +1849,50 @@ async function signIfReady(app, v, record) {
   return true;
 }
 
-// The package page's row to its Version History: how many versions are on offer.
-// Version History's row (F29), for the What's New card (F181, screens/storepage.js whatsNewGroup).
-export function versionHistoryCell(route, id, history) {
-  const n = history.versions.filter((v) => (history.kind === "ipa" ? true : v.keys.length)).length;
-  return { label: "Version History", detail: n === 1 ? "1 version" : `${n} versions`, href: versionsHref(route, id) };
-}
-
-// One version's cell: version (and build), its tags, the detail on the right, a line under it, release notes.
-function versionCell({ label, tags = [], detail = null, sub = null, notes = null, onClick = null, unavailable = false }) {
+// One version's cell: version (and build), its tags, a line under it (the date, size and iOS, or the sources), release
+// notes. F392: one that can be installed is a button with the chevron; an installed one that can't says INSTALLED,
+// greyed as More Sources' ADDED. Long notes fold under their own Show More row.
+export function versionCell({ label, tags = [], sub = null, notes = null, onClick = null, unavailable = false, installed = false }) {
   const li = el("li", "cell version-row");
   if (unavailable) li.classList.add("unavailable");
   const inner = el(onClick ? "button" : "div", "cell-inner");
-  if (onClick) { inner.type = "button"; inner.addEventListener("click", onClick); }
+  if (onClick) { inner.type = "button"; inner.classList.add("version-go", "chevron"); inner.addEventListener("click", onClick); }
   const top = el("div", "version-top");
   top.append(el("span", "cell-label", label));
-  for (const t of tags) top.append(el("span", "version-tag", t));
-  if (detail) top.append(el("span", "cell-detail", detail));
+  for (const t of installed && onClick ? [...tags, "Installed"] : tags) top.append(el("span", "version-tag", t));
   inner.append(top);
   if (sub) inner.append(el("span", "version-sub", sub));
   if (notes) inner.append(el("p", "version-notes", notes));
   li.append(inner);
+  if (installed && !onClick) {
+    loadStyle("myipas.css"); // .price-btn
+    li.classList.add("has-mark");
+    li.append(el("span", "price-btn version-mark added", "INSTALLED"));
+  }
+  if (notes && estimateLines(notes) > NOTE_LINES + 1) foldNotes(li, inner.querySelector(".version-notes"));
   return li;
+}
+// "iOS 17.4 or later" on a version's line
+const shortRange = (range) => (range ? range.replace(/ or later$/, "+") : range);
+
+// A version's notes: their first lines with Show More under them, as Permissions' row (altstore.css .perm-more), which
+// opens them in place (description.js growOpen: what's below slides) and becomes Show Less.
+const NOTE_LINES = 3;
+function foldNotes(li, box) {
+  const more = el("button", "cell-inner");
+  more.type = "button";
+  const label = el("span", "cell-label");
+  more.append(label);
+  const wrap = el("div", "perm-more version-more");
+  wrap.append(more);
+  const fold = (on) => { box.classList.toggle("folded", on); wrap.classList.toggle("up", !on); label.textContent = on ? "Show More" : "Show Less"; };
+  fold(true);
+  more.addEventListener("click", () => {
+    if (box.classList.contains("folded")) return growOpen(box, () => fold(false));
+    endGrow(box);
+    slideChange(li, () => fold(true));
+  });
+  li.append(wrap);
 }
 
 // The title of a Version History version's sheet (altstore.js installRows' rows). The sideloader line only fits when
@@ -1900,7 +1913,7 @@ function versionsGroup(cells, footer) {
   return g;
 }
 
-// The Version History page. APT: every version any source offers, newest first, with the sources that carry it;
+// The Version page (F29's Version History). APT: every version any source offers, newest first, with the sources that carry it;
 // tapping one offers installing it (N4's queue: Downgrade) or, on the site, its .deb. AltStore: every versions[]
 // entry with its date, size, iOS range and notes; one this iPhone runs installs from its own row when it has an
 // IPA (or a signed link); the others are greyed.
@@ -1922,15 +1935,18 @@ async function renderVersions(body, route, key, id) {
   body.replaceChildren();
   if (history.kind === "ipa") {
     const source = sources.find((s) => s.key === history.key);
+    const mine = await appVersionInstalled(pkg.stanza.ipa ?? { bundleIdentifier: history.id });
+    if (!body.isConnected) return;
+    const on = mine ? history.versions.find((v) => v.version === mine) : null; // the newest entry of that version
     const cells = history.versions.map((v) => {
       const can = v.runs && v.installable;
       return versionCell({
         label: `Version ${v.version}${v.buildVersion ? ` (${v.buildVersion})` : ""}`,
         tags: v.candidate ? ["Latest"] : [],
-        detail: formatDate(v.date),
-        sub: [formatSize(v.size), v.runs ? osRange(v) : `Needs ${osRange(v) ?? "another iOS version"}`].filter(Boolean).join(" · ") || null,
+        sub: [formatDate(v.date), formatSize(v.size), v.runs ? shortRange(osRange(v)) : `Needs ${shortRange(osRange(v)) ?? "another iOS version"}`]
+          .filter(Boolean).join(" · ") || null,
         notes: v.localizedDescription || null,
-        unavailable: !can,
+        unavailable: !can, installed: v === on,
         onClick: can ? async () => {
           const record = recordApp(pkg, source, v);
           // F85: Install and Custom Install go through the queue (Confirm) like the app page's (F84): that version's job.
@@ -1962,7 +1978,6 @@ async function renderVersions(body, route, key, id) {
   const cells = history.versions.map((v) => {
     const tags = [];
     if (v.candidate) tags.push("Latest");
-    if (v.installed) tags.push("Installed");
     const actions = [];
     if (queue && !vendorPaid && v.keys.length) {
       const label = v.version === installed ? "Reinstall" : installed && compareVersions(v.version, installed) < 0 ? "Downgrade" : "Install";
@@ -1971,9 +1986,8 @@ async function renderVersions(body, route, key, id) {
     if (site && v.debUrl && !isPaid(st)) actions.push({ label: "Download .deb", run: () => downloadDeb(v.debUrl, id) });
     return versionCell({
       label: v.version, tags,
-      detail: formatSize(v.size),
-      sub: v.keys.length ? v.keys.map(sourceLabel).join(", ") : "No source offers it any more",
-      unavailable: !v.keys.length,
+      sub: [formatSize(v.size), v.keys.length ? v.keys.map(sourceLabel).join(", ") : "No source offers it any more"].filter(Boolean).join(" · "),
+      unavailable: !v.keys.length, installed: v.installed,
       onClick: actions.length ? () => sheet(`${history.name} ${v.version}`, actions) : null,
     });
   });

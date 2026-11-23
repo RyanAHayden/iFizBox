@@ -129,7 +129,7 @@ export const ROW_ICONS = {
   otherLinks: [C.purple, "link"], lockHome: [C.dark, "lock"], websiteApps: [C.blue, "apps"],
   // F350: the Details page (screens/details.js)
   pkgSettings: [C.dark, "gear"], pkgAuthor: [C.dark, "envelope"], pkgMore: [C.purple, "laptop"],
-  pkgVersion: [C.grey, "badge"], pkgBundle: [C.indigo, "badge"], pkgFiles: [C.orange, "folder"], pkgHistory: [C.indigo, "clock"],
+  pkgVersion: [C.grey, "badge"], pkgBundle: [C.indigo, "badge"], pkgFiles: [C.orange, "folder"],
   pkgSection: [C.brown, "apps"], pkgBlock: [C.red, "minusCircle"], pkgTweaks: [C.green, "bolt"], pkgWish: [C.pink, "plus"],
   pkgSize: [C.teal, "download"], pkgDepends: [C.purple, "link"], pkgLink: [C.blue, "globe"],
   help: [C.blue, "question"], server: [C.teal, "globe"], checkServer: [C.green, "pulse"], runYourOwn: [C.orange, "cloud"],

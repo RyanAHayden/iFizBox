@@ -14,9 +14,9 @@ export const VPNS = ["LocalDevVPN", "Tailscale"];
 export const vpnList = (vpns = VPNS) => vpns.length < 2 ? vpns.join("") : `${vpns.slice(0, -1).join(", ")} or ${vpns.at(-1)}`;
 
 // F300: This iPhone first, then the Signing Server (still the default). F372: one line each, as Installation &
-// Signing's rows show them beside USE.
+// Signing's rows show them beside the checkmark and the disclosure.
 export const ROUTE_OPTIONS = [
-  { value: "iphone", label: "This iPhone", subtitle: "Works offline - no install popup" },
+  { value: "iphone", label: "This iPhone", subtitle: "Works offline" },
   { value: "server", label: "Signing Server", subtitle: `Default - Uses ${DOMAIN}` },
 ];
 
@@ -41,11 +41,15 @@ export const shortcutsAdded = (st) => switchAdded(st) || Boolean(st?.vpn?.shortc
 // B359: our signed Shortcut on the site (web/app/shortcuts/, signed by tools/shortcuts/sign.sh). The app shares its
 // own copy; this link is the fallback it opens in Safari. Shortcuts names an imported Shortcut after its file.
 export const shortcutFileURL = (k) => `https://${DOMAIN}/shortcuts/${encodeURIComponent(SHORTCUT_NAMES[k])}.shortcut`;
+// F392: our Shortcut's iCloud link (Shortcuts > Share > Copy iCloud Link, made once by hand by the Apple ID that owns
+// it): the only link Shortcuts' own Add Shortcut opens from (shortcuts://import-shortcut refuses any other). null:
+// Add shares the file instead.
+export const SHORTCUT_LINKS = { switch: null };
 // B359: a group footer for a Shortcut whose check run (vpn.checkShortcut) didn't pass: it isn't marked added.
 export const shortcutDidntRun = (k, err) => `"${SHORTCUT_NAMES[k]}" didn't run: ${err || "Shortcuts didn't say why"}. ${/could not find/i.test(err ?? "") ? "If Shortcuts has two of it, delete both, then tap Add." : "Tap Add to try again."}`; // F394: Replace can leave two (iOS 27), and neither runs by name
 // ... and for an Add whose share sheet never opened (nothing was imported, so nothing ran either).
 export const shortcutDidntOpen = (k, err) => `"${SHORTCUT_NAMES[k]}" couldn't be shared to Shortcuts: ${err || "no reason given"}. Tap Add to try again.`;
-// This iPhone is set up: paired, and with the built-in VPN tested once (vpn.test). USE waits for it.
+// This iPhone is set up: paired, and with the built-in VPN tested once (vpn.test). Using it waits for that.
 export const iphoneSetUp = (st) => Boolean(st?.paired) && (!builtinVPN(st) || Boolean(st.vpn.tested));
 // F394 (user 2026-11-23): the app asks for the Install Switch only when a connect now would need it and it isn't there:
 // LocalVPN.switchNeeded, on cellular or with another VPN up. The old two Cellular Shortcuts cover cellular, not the VPN.

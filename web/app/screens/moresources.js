@@ -17,7 +17,7 @@
 //
 // The rows' data and adds are manage.js's (recRows, loadPreview, addRecommended, recHref); a row opens the source
 // (added) or its preview (#/sources/manage/recommended/<key>).
-import { el, grouped, plain, note, barButton } from "../nav/ui.js";
+import { el, grouped, plain, note, barButton, buttonZone } from "../nav/ui.js";
 import { searchBar, pinned } from "../nav/searchbar.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
@@ -146,7 +146,7 @@ function decorate(li, r, ctx, redraw, { find = false } = {}) {
   setIcon(li, r.key, r.icons);
   const b = addButton(r, ctx, redraw);
   if (find) b.classList.add("find-add");
-  li.append(b);
+  buttonZone(li, b);
   // An AltStore source not read yet gets its icon from its JSON (read once per visit; tweak repos wait for Refresh).
   if (!r.rec.jailbreak && !r.record.iconURL) {
     loadPreview(r).then((p) => {

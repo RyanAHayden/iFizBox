@@ -351,3 +351,16 @@ export function segmented(labels, { selected = 0, onSelect = () => {} } = {}) {
   mark(selected);
   return { bar, buttons, mark };
 }
+
+// F392: a row's own button stays beside the row's link, and the row's whole right end is the button's (style.css
+// .tap-zone), so a near miss never opens the row behind it. A row drawn again gets its new button's zone in place of
+// the old one.
+export function buttonZone(li, btn) {
+  for (const old of [...li.children]) if (old.classList?.contains("tap-zone")) old.remove();
+  const zone = el("span", "tap-zone");
+  zone.setAttribute("aria-hidden", "true");
+  zone.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); if (!btn.disabled) btn.click(); });
+  li.classList.add("has-zone");
+  li.append(zone, btn);
+  return zone;
+}

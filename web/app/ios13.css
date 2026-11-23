@@ -416,19 +416,16 @@ html[data-style="ios13"] .action-title + .action-list > .action-button:first-chi
 html[data-style="ios13"] .action-title { background: var(--i13-action-cell); border-radius: 13px 13px 0 0; }
 html[data-style="ios13"] .action-title + .action-list { border-top-left-radius: 0; border-top-right-radius: 0; }
 
-/* The price button (myipas.css .price-btn: My IPAs' SIGN / INSTALL / OPEN, the confirm tap's INSTALL .go, and
-   More Sources' and Find More's ADD / ADDED, sources.css .rec-add, which wears .price-btn too): the iOS 13 App
-   Store's GET, a grey capsule with bold tinted text and no outline, darker while held; the confirm tap's INSTALL
-   the tint capsule with white text; disabled (and ADDED) keeps the capsule with grey text; busy keeps the tinted
-   label over a pale tint fill growing from the left. [data-theme] so myipas.css (lazy) can't win back. Every class
+/* The price button (myipas.css .price-btn: More Sources', Find More's and Add Tweaks' ADD / ADDED, sources.css .rec-add,
+   which wears .price-btn too, and the Version page's INSTALLED): the iOS 13 App
+   Store's GET, a grey capsule with bold tinted text and no outline, darker while held; disabled (and ADDED) keeps
+   the capsule with grey text. [data-theme] so myipas.css (lazy) can't win back. Every class
    a price button can wear needs a rule here: price-btn-eras.test.js checks it. */
 html[data-style="ios13"][data-theme="light"] {
   --i13-get: #eff0f5; --i13-get-pressed: #d8d9df; --i13-get-dim-text: #8e8e93;
-  --i13-get-fill: rgba(0, 122, 255, .18); --i13-get-go-held: rgba(0, 0, 0, .2);
 }
 html[data-style="ios13"][data-theme="dark"] {
   --i13-get: #2c2c2e; --i13-get-pressed: #3a3a3c; --i13-get-dim-text: #8e8e93;
-  --i13-get-fill: rgba(10, 132, 255, .3); --i13-get-go-held: rgba(0, 0, 0, .3);
 }
 html[data-style="ios13"][data-theme] .price-btn {
   font-size: 13px; font-weight: 700; color: var(--i13-tint); text-shadow: none;
@@ -437,16 +434,10 @@ html[data-style="ios13"][data-theme] .price-btn {
 html[data-style="ios13"][data-theme] .price-btn:active:not(:disabled) {
   border-color: var(--i13-get-pressed); background: var(--i13-get-pressed); box-shadow: none;
 }
-html[data-style="ios13"][data-theme] .price-btn.go { color: #fff; border-color: var(--i13-tint); background: var(--i13-tint); }
-html[data-style="ios13"][data-theme] .price-btn.go:active:not(:disabled) {
-  border-color: var(--i13-tint); background: var(--i13-tint); box-shadow: inset 0 0 0 99px var(--i13-get-go-held);
-}
 html[data-style="ios13"][data-theme] .price-btn.added,
-html[data-style="ios13"][data-theme] .price-btn:disabled:not(.busy):not(.adding) {
+html[data-style="ios13"][data-theme] .price-btn:disabled:not(.adding) {
   color: var(--i13-get-dim-text); border-color: var(--i13-get); background: var(--i13-get); box-shadow: none;
 }
-html[data-style="ios13"][data-theme] .price-btn.busy { color: var(--i13-tint); border-color: var(--i13-get); background: var(--i13-get); }
-html[data-style="ios13"][data-theme] .price-btn.busy::before { background: var(--i13-get-fill); }
 html[data-style="ios13"][data-theme] .price-btn.adding { color: var(--i13-tint); }
 
 /* ---- B270: the leftovers that still drew iOS 6 ---- */
@@ -654,4 +645,9 @@ html[data-style="ios13"][data-theme="light"] {
 }
 html[data-style="ios13"][data-theme="dark"] {
   --share-system: #3a3a3c; --share-system-metal: #3a3a3c; --share-icon-shadow: 0 0 0 .5px rgba(255,255,255,.12);
+}
+
+/* F392: the detail disclosure (settings.css .cell-accessory): iOS's info circle in the tint. */
+html[data-style="ios13"] .cell-accessory::after {
+  background: var(--i13-tint); -webkit-mask: var(--accessory-info) center / 22px 22px no-repeat; mask: var(--accessory-info) center / 22px 22px no-repeat;
 }

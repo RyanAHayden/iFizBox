@@ -1,7 +1,7 @@
 /* F77: My IPAs (screens/myipas.js). The list reuses the grouped table, the page the package page's header and grouped
    tables; only what's new is here.
    Each part's layout is in its own rules; what it paints is in the look-only stretch after them (docs/eras.md), and
-   the iOS 6 decorations (the price button's glosses and embosses) come from the tokens in the last stretch. */
+   the iOS 6 decorations (the price button's gloss and emboss) come from the tokens in the last stretch. */
 .myipa-row .cell-icon { position: relative; overflow: hidden; }
 .myipa-row .cell-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 /* B92: a file name is never cut on the IPA's page. The header's name wraps when it is the file's; the File row's
@@ -28,15 +28,9 @@
 /* ==== } look-only ==== */
 
 /* F224: Install IPAs. Rows wear sources.css's .source-row (the swipe's red Delete, .armed) and packages.css's
-   .manage-row / .manage-check (Installed's Manage circles, F222). The price button sits left of the chevron; a swipe's
-   Delete takes its place, Manage hides it and the chevron while the circles slide the row's content right. */
-/* The chevron is the cell's last flex item (ios6.css): the button's room is kept before it, so name and line
-   ellipsize short of the button and the chevron stays at the cell's right edge. A swipe or Manage gives the room back. */
-/* The room changes at once (120 Hz: no layout transitions): the chevron stays put, only the name's ellipsis moves. */
-.myipa-row.has-price .cell-inner.chevron::after { margin-left: 96px; transition: opacity .2s ease; }
-.myipa-row.has-price.armed .cell-inner.chevron::after, .managing .myipa-row.has-price .cell-inner.chevron::after { margin-left: 0; }
-.myipa-row .price-btn { position: absolute; right: 28px; top: 50%; margin-top: -12px; transition: opacity .2s ease; }
-.myipa-row.armed .price-btn, .managing .myipa-row .price-btn { pointer-events: none; }
+   .manage-row / .manage-check (Installed's Manage circles, F222). A swipe's Delete takes
+   the row's right end; Manage hides the chevron while the circles slide the row's content right. */
+.myipa-row .cell-inner.chevron::after { transition: opacity .2s ease; }
 .managing .myipa-row .cell-inner { transform: translateX(37px); width: calc(100% - 37px); }
 .install-ipas > .manage-summary { margin-top: 0; }
 /* F257: the Too Big alert's Download IPA, back in the web app: a note under the bar in the grouped footer's type
@@ -44,8 +38,6 @@
 .install-ipas > .myipa-fresh-note { margin: 10px 12px 2px; overflow-wrap: anywhere; }
 
 /* ==== look-only { ==== Install IPAs: Manage's fades and picks, the New note */
-.myipa-row.armed .price-btn, .managing .myipa-row .price-btn { opacity: 0; }
-.myipa-row.swiping > .price-btn { opacity: 0; } /* B356: the full-row Delete swipe: the content slides off without it */
 .managing .myipa-row .cell-inner.chevron::after { opacity: 0; }
 /* A picked or held row: packages.css's .manage-row fill (these rows wear .manage-row), on the row only, as Installed's. */
 .install-ipas > .myipa-fresh-note { font-size: 15px; line-height: 19px; text-align: center;
@@ -53,20 +45,12 @@
 /* ==== } look-only ==== */
 
 /* iOS 6's App Store price button (packages.css .store-btn's: slate text embossed on a pale gradient, a grey-blue
-   outline, 24pt high, 4pt corners). SIGN / INSTALL / OPEN in the grey; the confirm tap's INSTALL in the store's green
-   (white text, a dark emboss, the gloss split at half); while it signs and installs a pale blue fill grows from the
-   left under the label (transform only, ::before). */
+   outline, 24pt high, 4pt corners): ADD / ADDED (More Sources, Find More, Add Tweaks) and the Version page's INSTALLED. */
 .price-btn {
   flex: none; display: inline-flex; align-items: center; justify-content: center; position: relative; overflow: hidden;
   box-sizing: border-box; height: 24px; min-width: 62px; padding: 0 9px; margin: 0; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.price-btn.busy { cursor: default; }
-.price-btn.busy::before {
-  position: absolute; inset: 0; z-index: -1; transform-origin: left center;
-  transform: scaleX(var(--fill, 0)); transition: transform .3s linear;
-}
-.price-btn.busy { isolation: isolate; }
 
 /* ==== look-only { ==== the price button */
 :root {
@@ -76,11 +60,6 @@
   --price-btn-emboss: 0 1px 0 #fff;
   --price-btn-pressed: linear-gradient(#d6dbe3, #eceff3);
   --price-btn-pressed-inset: inset 0 1px 2px rgba(0,0,0,.25);
-  --price-btn-go: linear-gradient(#8fd35d, #62b52c 49%, #52a61d 50%, #5cb024);
-  --price-btn-go-edge: #3a7a17; --price-btn-go-edge-top: #2f6612;
-  --price-btn-go-emboss: 0 -1px 0 rgba(0,0,0,.35);
-  --price-btn-go-pressed: linear-gradient(#73b446, #4c9a1d 49%, #3f8b11 50%, #489616);
-  --price-btn-fill: linear-gradient(#d3e2f8, #a9c3ea);
 }
 .price-btn {
   border-radius: 4px;
@@ -88,15 +67,7 @@
   border: 1px solid var(--price-btn-edge); background: var(--price-btn); background-origin: border-box;
 }
 .price-btn:active { background: var(--price-btn-pressed); background-origin: border-box; box-shadow: var(--price-btn-pressed-inset); }
-.price-btn.go {
-  color: #fff; text-shadow: var(--price-btn-go-emboss); border-color: var(--price-btn-go-edge); border-top-color: var(--price-btn-go-edge-top);
-  background: var(--price-btn-go); background-origin: border-box;
-}
-.price-btn.go:active { background: var(--price-btn-go-pressed); background-origin: border-box; box-shadow: none; }
-.price-btn.busy::before { content: ""; background: var(--price-btn-fill); }
 .price-btn:disabled { opacity: 1; }
 html[data-theme="dark"] .price-btn { color: var(--text); text-shadow: none; border-color: var(--dk-btn-edge); background: var(--dk-btn); background-origin: border-box; }
 html[data-theme="dark"] .price-btn:active { background: var(--dk-btn-pressed); background-origin: border-box; }
-html[data-theme="dark"] .price-btn.go { color: var(--text); border-color: var(--dk-btn-edge); background: var(--dk-green); }
-html[data-theme="dark"] .price-btn.busy::before { background: var(--dk-bar-fill); }
 /* ==== } look-only ==== */

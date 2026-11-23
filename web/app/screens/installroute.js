@@ -35,9 +35,9 @@ import { builtinVPN, shortcutsAdded, setupFooter, iphoneSetUp, HOW_STEPS, SHORTC
 import { shortcutFileURL, shortcutDidntRun, shortcutDidntOpen } from "../core/installroute.js"; // B359
 import { switchAdded, switchTestResult, BUILTIN_VPN } from "../core/installroute.js"; // F386
 import { switchOld } from "../core/installroute.js"; // F394
+import { SHORTCUT_LINKS } from "../core/installroute.js"; // F392
 import { switchWouldRun } from "../core/installroute.js"; // B381
-import { loadStyle } from "../nav/motion.js";
-import { NAME, DOMAIN } from "../brand.js";
+import { NAME } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
 import { showHUD } from "../nav/hud.js";
 import { slideChange } from "../nav/slide.js";
@@ -150,7 +150,7 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
   addSwitch = () => {}, switchChecking = false } = {}) {
   const groups = [{
     header: "Install Apps With",
-    rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", icon: rowIcon(ROUTE_ROW[o.value].icon), checked: o.value === choice, onClick: () => pick(o.value),
+    rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", icon: rowIcon(ROUTE_ICON[o.value]), checked: o.value === choice, onClick: () => pick(o.value),
       ...(picking && o.value === choice ? { spin: true } : {}) })),
     footer: choice === "iphone"
       ? `Signed apps go straight to iOS through ${vpnList()}. When it's off, installs use the Signing Server.`
@@ -257,7 +257,11 @@ export function howGroups() {
 // Add Shortcut sheet); back in the app it runs once (`checking`, the Shortcut being run) and only a run that passed
 // marks it Added. `failed` ({switch}: the run's error, or {open: error} when the share sheet didn't open) turns the
 // footer into what went wrong.
-export function shortcutGroups(st, { add = () => {}, test = () => {}, testing = false, reading = false, checking = null, failed = {} } = {}) {
+// F392: `direct`: Add opens Shortcuts itself (core SHORTCUT_LINKS has our iCloud link); Share Shortcut File is then the
+// backup, the share sheet. Without the link Add is the share sheet, so the row isn't there.
+export const SHARE_SHORTCUT = "Share Shortcut File";
+export function shortcutGroups(st, { add = () => {}, test = () => {}, testing = false, reading = false, checking = null, failed = {},
+  direct = Boolean(SHORTCUT_LINKS.switch) } = {}) {
   const sc = st?.shortcuts ?? {};
   const k = "switch";
   const row = reading || checking === k ? { label: SHORTCUT_NAMES[k], icon: rowIcon("cellular"), detail: "Checking…", spin: true }
@@ -268,7 +272,10 @@ export function shortcutGroups(st, { add = () => {}, test = () => {}, testing = 
   const groups = [{ rows: [row], ...(!sc[k] && f && checking !== k
     ? { footer: f.open ? shortcutDidntOpen(k, f.open) : shortcutDidntRun(k, f), warn: true }
     : switchOld(st) ? { footer: "To open Shortcuts once per install, delete Install Switch in Shortcuts, then tap Update." }
-    : { footer: `${sc[k] ? "" : "Tap Shortcuts, then Add Shortcut, and come back. "}It opens Shortcuts only when needed: on cellular, to turn data off and on, or to bring back your VPN.` }) }];
+    : { footer: `${sc[k] ? "" : direct ? "Add opens Shortcuts: tap Add Shortcut, and come back. " : "Tap Shortcuts, then Add Shortcut, and come back. "}It opens Shortcuts only when needed: on cellular, to turn data off and on, or to bring back your VPN.` }) }];
+  // F392: the share sheet is the way left when Shortcuts doesn't open from Add or Update
+  if (direct && !reading && checking !== k && (!sc[k] || switchOld(st))) groups.push({ rows: [{ label: SHARE_SHORTCUT, icon: rowIcon("share"), onClick: () => add(k, "share"), chevron: true }],
+    footer: `If ${sc[k] ? "Update" : "Add"} doesn't open Shortcuts, share the file and pick Shortcuts.` });
   if (sc[k]) {
     groups.push({ rows: [{ label: "Test Install Switch", icon: rowIcon("testConnection"), onClick: test, ...(testing ? { detail: "Testing…", spin: true } : {}) }],
       footer: `${sc.trip ? "Runs it once" : "Runs it once each way"}: ${BUILTIN_VPN} on, then your VPN back.` });
@@ -276,7 +283,8 @@ export function shortcutGroups(st, { add = () => {}, test = () => {}, testing = 
   return groups;
 }
 
-// F372: USE on This iPhone before it was set up opened its setup; the test that finishes it uses This iPhone.
+// F372: a tap on This iPhone's row before it was set up opened its setup; the test that finishes it uses This iPhone
+// (F392: the first test that passes does so either way; this covers pairing again, a later test).
 // It holds for USE_HOLD ms: a test long after the user backed out of the setup doesn't switch the way in.
 let useAfterSetup = 0;
 export const USE_HOLD = 10 * 60 * 1000;
@@ -285,20 +293,25 @@ const takeUseAfterSetup = (now = Date.now()) => { const on = useAfterSetup > 0 &
 export const TEST_MS = 120000; // vpn.test: the first one waits for the user's Allow on iOS's Add VPN Configurations
 
 // Test Connection with the built-in VPN: vpn.test (on, one connect with the pairing, off). A pass clears a remembered
-// failure, marks This iPhone set up and, after USE, uses it.
+// failure and marks This iPhone set up. F392: the first pass uses This iPhone; a later one keeps the pick (unless its
+// row was just tapped).
 export async function vpnTest(native, alert, store, { ended = () => {}, onPass = () => {} } = {}) {
   let r = null, err = null;
+  let usedNow = false;
+  const before = lastStatus ?? await status(native);
+  const first = Boolean(before) && !before.vpn?.tested; // not known: a later test, the pick stays
   try { r = await within(call(native, "vpn.test"), TEST_MS); } catch (e) { err = e; }
   // the row says Connected under the alert: the status is marked tested before the row repaints (ended)
   if (r?.ok && lastStatus) lastStatus = { ...lastStatus, vpn: { ...(lastStatus.vpn ?? {}), tested: true } };
   ended();
   if (r?.ok) {
     clearRouteFailure();
-    if (takeUseAfterSetup() && store?.get(ROUTE_KEY) !== "iphone") store?.set(ROUTE_KEY, "iphone");
+    if ((takeUseAfterSetup() || first) && store?.get(ROUTE_KEY) !== "iphone") { store?.set(ROUTE_KEY, "iphone"); usedNow = true; }
     onPass();
   } else if (isLate(err)) rememberRouteFailure(NO_ANSWER_FAILURE);
   else { const f = routeFailureOf(err, lastStatus); if (f) rememberRouteFailure(f); }
   const why = isLate(err) ? { title: NOT_RESPONDING, message: `This iPhone didn't answer in ${Math.round(TEST_MS / 1000)} seconds. Try again.` } : vpnTestResult(r, err);
+  if (usedNow) why.message = "Set up. Apps now install straight onto this iPhone.";
   if (why.again) {
     const { index } = await alert({ title: why.title, message: why.message, buttons: ["Cancel", "Pair Again"], cancel: 0 }) || {};
     if (index === 1) recheckHooks.goPair();
@@ -324,12 +337,14 @@ export function backInApp(doc = globalThis.document, { leaveMs = 4000, limit = 1
 // (native shortcutLimit, 25 s) isn't tried again, so the worst case stays well inside this
 export const CHECK_MS = 100000;
 
-// B359: Add on Cellular Shortcuts. vpn.openShortcuts shares our signed Shortcut; Shortcuts never says it was added,
+// B359: Add on the Install Switch. vpn.openShortcuts opens our Shortcut in Shortcuts by its iCloud link (F392, core
+// SHORTCUT_LINKS), or shares our signed file (no link, or `via` "share"); Shortcuts never says it was added,
 // so once the user is back the app runs it (vpn.checkShortcut, input "check": it does nothing) and only a run that
 // passed marks it added. `checking(true)` while it runs. Answers {opened, ok, error, status} (status: vpn.status).
-export async function addShortcut(native, k, { whenBack = backInApp, checking = () => {} } = {}) {
+export async function addShortcut(native, k, { whenBack = backInApp, checking = () => {}, via = "shortcuts", link = SHORTCUT_LINKS[k] } = {}) {
   let o;
-  try { o = await call(native, "vpn.openShortcuts", { which: k, url: shortcutFileURL(k) }); } catch (e) { return { opened: false, ok: false, error: e?.message || "Shortcuts didn't open" }; }
+  const params = { which: k, url: shortcutFileURL(k), ...(via !== "share" && link ? { link } : {}) };
+  try { o = await call(native, "vpn.openShortcuts", params); } catch (e) { return { opened: false, ok: false, error: e?.message || "Shortcuts didn't open" }; }
   if (!o?.opened) return { opened: false, ok: false, error: null }; // the share sheet was closed: nothing to say
   if (await whenBack() === false) return { opened: true, ok: false, error: null }; // still away: the row stays Add
   checking(true);
@@ -346,12 +361,14 @@ const shortcutsFailed = {}; // B359: the last check run's error per Shortcut, fo
 // F386: Add on Set Up's Install Switch row: addShortcut, then the outcome in an alert when it didn't pass (Set Up's
 // footer says the next step, so the reason goes in the alert). `checking(on)` while the check run is out. Answers
 // addShortcut's {opened, ok, error, status}.
-export async function addSwitch(native, alert, { whenBack = backInApp, checking = () => {} } = {}) {
-  const r = await addShortcut(native, "switch", { whenBack, checking });
+export async function addSwitch(native, alert, { whenBack = backInApp, checking = () => {}, via = "shortcuts" } = {}) {
+  const r = await addShortcut(native, "switch", { whenBack, checking, via });
   if (r.opened || r.error) shortcutsFailed.switch = r.ok ? null : r.opened ? r.error : { open: r.error };
   if (!r.ok && r.error) {
     const message = r.opened ? shortcutDidntRun("switch", r.error) : shortcutDidntOpen("switch", r.error);
-    await alert({ title: "Shortcut Not Added", message, buttons: ["OK"] });
+    // F392: the share sheet is the way left when Shortcuts didn't take it
+    const { index } = await alert({ title: "Shortcut Not Added", message, buttons: ["Cancel", "Share File"], cancel: 0 }) || {};
+    if (index === 1) return addSwitch(native, alert, { whenBack, checking, via: "share" });
   }
   return r;
 }
@@ -361,9 +378,9 @@ async function drawShortcuts(box, { native, alert, whenBack = backInApp }) {
   const paint = () => {
     const groups = shortcutGroups(st, {
       reading, testing: shortcutsTesting, checking, failed: shortcutsFailed,
-      add: async (k) => {
+      add: async (k, via = "shortcuts") => {
         if (checking) return;
-        const r = await addShortcut(native, k, { whenBack, checking: (on) => { checking = on ? k : null; paint(); } });
+        const r = await addShortcut(native, k, { whenBack, via, checking: (on) => { checking = on ? k : null; paint(); } });
         if (r.opened || r.error) shortcutsFailed[k] = r.ok ? null : r.opened ? r.error : { open: r.error };
         st = r.status ?? { ...(st ?? {}), shortcuts: { ...(st?.shortcuts ?? {}), [k]: r.ok ? true : Boolean(st?.shortcuts?.[k]) } };
         if (lastStatus) lastStatus = { ...lastStatus, vpn: { ...(lastStatus.vpn ?? {}), ...st } };
@@ -781,8 +798,8 @@ async function openVPN(native, alert) {
 // never add or remove rows or change footers; only a tap changes the layout (by opening another page).
 //   (top)         the status cell (core installStatus: two lines, always two lines tall) and one action row whose
 //                 label changes (Check Connection, Open LocalDevVPN, Start Pairing, Sign In to Tailscale…)
-//   Install Apps With  F372: This iPhone > (installation/iphone: Set Up, How It Works) and Signing Server >
-//                 (installation/server), each with USE beside its link, the way in use ACTIVE (green)
+//   Install Apps With  F372/F392: This iPhone and Signing Server: a tap uses that way (a checkmark on the one in use),
+//                 the detail disclosure opens its page (installation/iphone: Set Up, How It Works; installation/server)
 //   Signing       Certificate > (days left), Signed Apps > (count)
 //   How Signing Works >
 // `links` holds the hrefs, `signing()` resolves {certificate: {text, red}, ready} (`ready`: a certificate kept; false turns
@@ -791,7 +808,7 @@ async function openVPN(native, alert) {
 export const MAIN_ROWS = ["status", "action", "iphone", "server", "certificate", "apps", "help"]; // F372: both ways
 
 // F300/F351: Install Apps With's detail on the main page: This iPhone's pairing once idevice.status said (`st`
-// undefined: not answered yet; null: it failed). The route itself is the row's label, subtitle and icon (ROUTE_ROW).
+// undefined: not answered yet; null: it failed). The route itself is the row's label, subtitle and icon (ROUTE_ICON).
 // B316: paired, with the last check or install failed (`failure`, core routeFailure): "Failing", red, until a check
 // passes (the user's page said a green Paired while every install was refused).
 export const FAILING = "Failing";
@@ -799,12 +816,8 @@ export function withDetail(choice, st, failure = null) {
   if (choice !== "iphone" || !st) return "";
   return st.paired ? (failure ? FAILING : "Paired") : "Not Paired";
 }
-// F351: each route's row: its icon (icons/rowicons.js), its name and one line under it, on the main page and the
-// Install Apps With page.
-const ROUTE_ROW = {
-  server: { icon: "signingServer", label: "Signing Server", sub: `iOS installs each app from ${DOMAIN}` },
-  iphone: { icon: "installation", label: "This iPhone", sub: "Straight onto this iPhone, no popup" },
-};
+// F351: each route's row icon (icons/rowicons.js), on the main page and the Install Apps With page.
+const ROUTE_ICON = { server: "signingServer", iphone: "installation" };
 
 function slotOf(node, waitText = null) {
   const value = el("span", "slot-value");
@@ -829,11 +842,11 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
   };
   const sections = [
     { rows: [{ label: "", subtitle: " ", cls: "install-status" }, { label: STATUS_ACTIONS.check, cls: "install-action", onClick: act }] },
-    // F372: both ways, a row each (its icon, name and one line). A tap on the row opens its page; USE at its right
-    // uses it (This iPhone not set up yet: its setup opens, and finishing it uses it); the way in use says ACTIVE.
-    { header: "Install Apps With", rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, icon: rowIcon(ROUTE_ROW[o.value].icon),
-      href: route(o.value), cls: "route-pick" })),
-      footer: "Tap USE to install that way." },
+    // F372/F392: both ways, a row each (its icon, name and one line). A tap on the row uses it (This iPhone not set up
+    // yet: its setup opens, and finishing it uses it) and its disclosure opens its page.
+    { header: "Install Apps With", rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, icon: rowIcon(ROUTE_ICON[o.value]),
+      onClick: () => use(o.value), cls: "route-pick" })),
+      footer: "Tap one to install that way." },
     { header: "Signing", rows: [{ label: "Certificate", detail: "", href: links.certificate, icon: rowIcon("signing") },
       { label: "Signed Apps", detail: "", href: links.apps, icon: rowIcon("websiteApps") }] },
     { rows: [{ label: "How Signing Works", href: links.help, icon: rowIcon("help") }] },
@@ -851,37 +864,30 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
   const cellSpin = checkMark(statusCell); // B320: the status cell's spinner while a sign-in's checks run (spinStatus)
   actionCell.classList.add("is-dim");
   actionCell.setAttribute("aria-disabled", "true");
-  // F372: USE / ACTIVE at the right of each way's row: the App Store price button (myipas.css), the green ACTIVE
-  // revealed over it from the right as the red Delete is in Sources (clip-path, settings.css .route-active). Beside the
-  // row's link, not inside it (as My IPAs' price buttons): a tap on USE never also follows the link.
-  loadStyle("myipas.css");
+  // F392: the checkmark on the way in use (both rows have one, shown by opacity: settings.css .route-pick) and, beside
+  // the row's button, iOS's detail disclosure, the link to that way's page.
   const routeCells = { iphone: cells[2], server: cells[3] };
-  const useButtons = {};
-  for (const [v, c] of Object.entries(routeCells)) {
-    const wrap = el("span", "route-use");
-    const useBtn = el("button", "price-btn route-use-btn", "USE");
-    useBtn.type = "button";
-    useBtn.setAttribute("aria-label", `Use ${ROUTE_ROW[v].label}`);
-    const active = el("span", "price-btn route-active", "ACTIVE");
-    active.classList.add("go"); // the green state, added apart so the era sheets keep .go a state of the button
-    active.setAttribute("aria-hidden", "true");
-    useBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); use(v); });
-    wrap.append(useBtn, active);
-    useButtons[v] = useBtn;
-    c.parentElement?.append(wrap);
-    c.parentElement?.classList.add("has-use");
+  for (const o of ROUTE_OPTIONS) {
+    const c = routeCells[o.value];
+    const tick = el("span", "cell-check");
+    tick.setAttribute("aria-hidden", "true");
+    c.append(tick);
+    const acc = el("a", "cell-accessory");
+    acc.href = route(o.value);
+    acc.setAttribute("aria-label", `${o.label} Settings`);
+    c.parentElement.append(acc);
   }
   const showRoute = (choice) => {
     for (const [v, c] of Object.entries(routeCells)) {
       const on = v === (choice === "iphone" ? "iphone" : "server");
       c.parentElement?.classList.toggle("route-on", on);
-      useButtons[v].tabIndex = on ? -1 : 0;
+      c.setAttribute("aria-pressed", String(on));
     }
   };
   const use = (v) => {
     if (v === "iphone" && !iphoneSetUp(known ?? lastStatus)) { setUseAfterSetup(true); return goTo("iphone"); } // not set up: its setup
     showRoute(v);
-    // the store's change redraws the page; it waits for the reveal to finish
+    // the store's change redraws the page; it waits for the checkmarks to fade
     if (store.get(ROUTE_KEY) !== v) setTimeout(() => { store.set(ROUTE_KEY, v); refresh(); }, 260);
   };
   const slots = { with: slotOf(el("span", "cell-detail")) }; // This iPhone's pairing is said on its own page now

@@ -22,7 +22,8 @@
 //                       idevice.status as `vpn`
 //   vpn.test            the VPN on, one connect to iOS with the pairing (idevice.verify), the VPN off: {ok, ms, kind};
 //                       a pass marks This iPhone tested (set up)
-//   vpn.openShortcuts   {which, url}: our signed Shortcut in a share sheet, for Shortcuts' Add Shortcut ({opened, via})
+//   vpn.openShortcuts   {which, url, link?}: Shortcuts' Add Shortcut on our iCloud link (F392), or without one our signed
+//                       Shortcut in a share sheet ({opened, via})
 //   vpn.checkShortcut   {which}: runs it with a text input (it then does nothing) and marks it added only when it
 //                       ran: {ok, error, status}
 //   vpn.testSwitch      F386: runs the Install Switch's start, then its end: {ok, start: {ok, error}, end: {ok, error},
@@ -714,12 +715,23 @@ enum LocalVPN {
     /// B359: vpn.openShortcuts {which, url}: our signed Shortcut (web/shortcuts/<name>.shortcut in the app, signed by
     /// tools/shortcuts/sign.sh) in a share sheet, where Shortcuts opens it on its Add Shortcut sheet (shortcuts://
     /// import-shortcut takes only iCloud links). Without the bundled file, `url` (the same file on the site) opens in
-    /// Safari. Replies {opened, via: "share"|"site"} when the sheet closes; Shortcuts never says it was added, so the
+    /// Safari. F392: with `link`, our Shortcut's iCloud link, Shortcuts opens on its Add Shortcut at once, no share
+    /// sheet. Replies {opened, via: "shortcuts"|"share"|"site"} when the sheet closes; Shortcuts never says it was added, so the
     /// page runs vpn.checkShortcut once the user is back.
     static func importShortcut(_ c: Bridge.Call) {
         let w = c.params["which"] as? String ?? ""
         guard let name = shortcutNames[w] else { return c.reply(nil, "no Shortcut \(w)") }
         DispatchQueue.main.async {
+            if let s = c.params["link"] as? String { // F392
+                let host = URL(string: s)?.host
+                var u = URLComponents(string: "shortcuts://import-shortcut")
+                u?.queryItems = [URLQueryItem(name: "url", value: s), URLQueryItem(name: "name", value: name)]
+                guard host == "www.icloud.com" || host == "icloud.com", let url = u?.url else { return c.reply(nil, "not an iCloud link") }
+                return UIApplication.shared.open(url, options: [:]) { ok in
+                    log("Shortcut \(name): Shortcuts \(ok ? "opened" : "didn't open") on its link")
+                    if ok { c.reply(["opened": true, "via": "shortcuts"], nil) } else { c.reply(nil, "Shortcuts didn't open") }
+                }
+            }
             let file = Bundle.main.url(forResource: name, withExtension: "shortcut", subdirectory: "web/shortcuts")
             guard let file, let top = MyIPAs.topController() else {
                 guard let s = c.params["url"] as? String, let u = URL(string: s) else { return c.reply(["opened": false], nil) }
