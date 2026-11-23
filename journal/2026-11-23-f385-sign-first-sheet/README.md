@@ -39,17 +39,21 @@ Signing after the Developer Account pick, with the page fitting on screen.
 
 ## Tried / notes
 
-- The free option was only checked through the eval, not through the relay: the local static server answers
-  no `/apple/status`, so the real tap path shows no free option.
-- A Developer Account pick lands on a Signing page that fits on screen, so the scroll is not visible in that
-  shot.
+- The local static server answers no `/apple/status`, so `shots-free.json` fakes it in the page (a `fetch`
+  wrapper answering `{"on": true}`, then `resetRelayAnswer()`) and taps the real Install iFizBox Lite tile:
+  sheet-free-tap.png shows all three ways. Tapping Use a Free Apple ID landed on Signing with the page scrolled
+  so the Free Apple ID group sits mid-screen (after-free-apple-id.png). That is the scroll-to-group working.
+- A Developer Account pick lands on a Signing page that fits on screen, so no scroll shows in that shot.
+- "Each option opens its page": all three ways are groups on the one Settings > Signing page (none has a page
+  of its own), so a pick opens Signing and scrolls to that group.
+- After the spec review: the certificate group is found by its `.mobileprovision` file input, because
+  `.sign-import` also marks other rows. The free option also needs `!nativeBridge()`, as signing.js does. A test
+  pins the free hint to `FREE_ENTRY_FOOTER`.
 
 ## Not verified
 
 - On a real iPhone Safari. Web changes are checked in Chromium only.
-- The free option on the real tap path with the relay on (no Worker run locally).
-- The scroll-to-group on a page long enough to need it. The site Signing page with no certificate fits on
-  screen.
+- The free option against the real Worker relay (only a faked `/apple/status`; no Worker run locally).
 - The iOS 7 and iOS 13 era looks of the sheet. The first iOS 26 shot showed that the later eras draw no panel
   behind an action sheet, so the title and hints were unreadable over the page. signsheet.css now puts them on
   button-coloured cards in the ios7/ios13/ios26 eras. sheet-ios26.png (eval-opened, light) shows the fix. iOS 7

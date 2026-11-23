@@ -1,0 +1,12 @@
+[
+ {"wait": 1500},
+ {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.removeItem('ifizbox.appearance'); 'ok'"},
+ {"nav": "#/home", "ms": 4000},
+ {"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); const f=window.fetch; window.fetch=(u,o)=>String(u).endsWith('/apple/status')?Promise.resolve(new Response('{\"on\":true}',{headers:{'content-type':'application/json'}})):f(u,o); import('./screens/free-apple-id.js').then(m=>{m.resetRelayAnswer(); return 'relay faked on'})"},
+ {"tap": "text:Install iFizBox Lite", "ms": 1500},
+ {"eval": "[...document.querySelectorAll('.sign-first .action-button')].map(b=>b.textContent).join(' | ')"},
+ {"shot": "sheet-free-tap"},
+ {"tap": "doc:[data-way=free]", "ms": 3500},
+ {"eval": "location.hash + ' free group top: ' + Math.round(document.querySelector('.free-route')?.getBoundingClientRect().top)"},
+ {"shot": "after-free-apple-id"}
+]

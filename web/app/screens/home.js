@@ -92,7 +92,7 @@ export const MORE_SOURCES_TILE = { label: "More Sources", href: MORE_SOURCES_HRE
 // F385: not straight to Signing any more: Sign iFizBox First (signing-sheet.js signFirstSheet) says why and lists the
 // ways (Use a Free Apple ID only while the Apple relay is on); a pick opens Signing at its group, Cancel stays here.
 // -> "install" | "signing" | "cancelled"
-const freeRouteOn = async () => (await import("./free-apple-id.js")).relayAvailable();
+const freeRouteOn = async () => !nativeBridge() && (await import("./free-apple-id.js")).relayAvailable(); // as signing.js
 const signFirst = async (opts) => (await import("../signing-sheet.js")).signFirstSheet(opts);
 const focusWay = async (id) => (await import("../signing-sheet.js")).focusSigningGroup(id);
 export async function installApp({ ready = signingReady, install = signAndInstall, bring = getBring, go = navGo,

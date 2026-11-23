@@ -461,7 +461,8 @@ export function signFirstSheet({ free = false } = {}, { doc = globalThis.documen
 
 // Each way's group on Settings > Signing (screens/settings.js certificateGroup, devaccount.js accountGroup,
 // free-apple-id.js freeRouteBlock), found by what it draws.
-export const SIGNING_GROUP_OF = { certificate: ".sign-import", free: ".free-route", account: ".asc-add, .asc-guide-link" };
+// The certificate group by its file input (.p12 and .mobileprovision): .sign-import alone also marks other rows.
+export const SIGNING_GROUP_OF = { certificate: 'input[accept*=".mobileprovision"]', free: ".free-route", account: ".asc-add, .asc-guide-link" };
 export function focusSigningGroup(id, { doc = globalThis.document, later = setTimeout, tries = 40 } = {}) {
   const sel = SIGNING_GROUP_OF[id];
   if (!sel || !doc) return;

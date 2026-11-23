@@ -3,7 +3,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { installApp } from "./home.js";
-import { signFirstOptions, SIGNING_GROUP_OF, focusSigningGroup } from "../signing-sheet.js";
+import { signFirstOptions, SIGNING_GROUP_OF, focusSigningGroup, FREE_HINT } from "../signing-sheet.js";
+import { FREE_ENTRY_FOOTER } from "./free-apple-id.js";
 import { APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
 
 const deps = (ready, way, { free = false } = {}) => {
@@ -55,6 +56,7 @@ test("the ways: Import Certificate first, Free Apple ID only where the free rout
     const sentences = o.hint.split(/(?<=\.)\s+/).filter(Boolean);
     assert.ok(sentences.length <= 2, `${o.id}: one or two short sentences`);
   }
+  assert.equal(FREE_HINT, FREE_ENTRY_FOOTER, "the free hint says what Settings > Signing's free group says");
   assert.match(signFirstOptions()[0].hint, /\.p12/);
   assert.match(signFirstOptions()[0].hint, /\.mobileprovision/);
 });
