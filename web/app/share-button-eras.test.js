@@ -47,6 +47,8 @@ for (const [era, colour] of Object.entries(ERAS)) for (const [toggle, on] of Obj
     assert.ok(body.includes(`background-color: var(${colour})`), `the glyph isn't painted in ${colour}`);
     const onBody = ruleFor(css, `${sel}.${on}::before`);
     assert.match(onBody ?? "", /-webkit-mask-image:\s*url\(.*[\s;]mask-image:\s*url\(/s);
+    const glyph = (b) => /url\("[^"]*"\)/.exec(b)?.[0];
+    assert.notEqual(glyph(onBody), glyph(body), "on and off draw the same glyph");
     assert.doesNotMatch(onBody ?? "", /background-image/, "the iOS 6 glyph comes back while on");
   });
 }
