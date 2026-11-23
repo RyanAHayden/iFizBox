@@ -71,6 +71,7 @@ import { NAME } from "../brand.js";
 import { PACKAGE } from "../brand.js"; // B71: iFizBox's own row never queues its Remove
 import { appJob } from "../core/appqueue.js"; // B71
 import { showMenu, longPress, copyText } from "../nav/menu.js";
+const showRowMenu = (...a) => showMenu(...a); // B358: attachRowMenu adds a list's own items
 import { showShareSheet } from "../nav/sharesheet.js";
 import { showHUD } from "../nav/hud.js";
 import { packageLinks as managerLinks, siteOrigin, formatOf } from "../core/handoff.js";
@@ -475,7 +476,8 @@ function loadIcon(row, item) {
 // `rows` may hold { header } items of their own when `letters` is off. `decorate(row, item)` runs after each bind.
 // `wide` (F348): Cydia's tall rows (WIDE_ROW_HEIGHT), for Installed and a source's section lists; Search keeps the
 // compact ones.
-export function packageList(body, route, rows, { letters = true, decorate = null, wide = false } = {}) {
+// B358: `moreItems(item)` -> more hold-menu items ({ label, onClick }) after the list's own (Changes' Mark as Not Installed).
+export function packageList(body, route, rows, { letters = true, decorate = null, wide = false, moreItems = null } = {}) {
   rememberNames(rows.filter((r) => r.id));
   const items = letters ? withLetterHeaders(rows, (r) => indexLetter(r.name)) : rows;
   let swipe = null; // F193: a recycled row drops any swipe it was in
@@ -487,7 +489,7 @@ export function packageList(body, route, rows, { letters = true, decorate = null
   });
   list.el.classList.add("pkg-vlist"); // placeholder rows show through wherever real rows aren't drawn yet
   list.el.classList.toggle("wide", wide); // F348: the placeholders at the wide rows' height
-  attachRowMenu(list.el, route); // F192: hold a row for Install / Share / Source
+  attachRowMenu(list.el, route, moreItems); // F192: hold a row for Install / Share / Source
   swipe = attachQueueSwipe(list.el, route); // F193: swipe a row left to queue it
   // Sorted by name with A–Z headers: Cydia's index down the right edge, instead of the scroll indicator.
   if (letters && body.parentElement) createSectionIndex(body, list);
@@ -561,13 +563,15 @@ export function packageShareItems(item, source, { origin = siteOrigin(globalThis
   return items;
 }
 
-function attachRowMenu(listEl, route) {
+function attachRowMenu(listEl, route, moreItems = null) {
   const listKey = route.tab === "sources" ? route.path[0] ?? null : null;
   longPress(listEl, ".pkg-row", async (row, e) => {
     const item = row._item;
     // Not while editing or showing a Delete (Wish List), nor on rows with no page (an unadded repo's preview).
     if (!item?.id || !row._.a.getAttribute("href") || row.classList.contains("armed") || row.closest(".editing")) return;
     const x = e.clientX;
+    const more = moreItems ? await Promise.resolve().then(() => moreItems(item)).catch(() => []) ?? [] : []; // B358
+    const showMenu = (anchor, items, opts) => showRowMenu(anchor, [...items, ...more], opts);
     if (item.kind === "ipa" && jbAppQueue()) { // B71a: the jailbreak app's app queue
       const st = await jbAppRowState(item);
       if (!row.isConnected || row._item !== item) return;

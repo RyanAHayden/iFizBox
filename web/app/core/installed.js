@@ -205,6 +205,44 @@ export async function removeInstall(store, id) {
   for (const f of appListeners) f();
 }
 
+// ---- B358: an app installed under a custom bundle ID ---------------------------------------------------------------
+// An install with its own bundle ID (Custom Install) is on the phone under that ID while its source lists the IPA's
+// own, and the shell's signed record keeps both (`bundleId`, `originalBundleId`). The record is matched by the
+// installed bundle ID first, then the asked one, then the signed record's original ID, so a source entry that no longer
+// lists the app (or lists another app under the custom ID) still finds it.
+//   recordOf(records, id, signed)                  -> the device record standing for that app, or null
+//   await forgetInstalled({ id, signed }, { store, native }) -> Mark as Not Installed: its record(s) go and, where the
+//                                                    shell signed it, its signed record (signing.forget); -> true if
+//                                                    anything was forgotten
+export function recordOf(records, id, signed = null) {
+  const list = (records ?? []).filter((r) => r?.id && !r.self);
+  for (const want of [signed?.bundleId, id, signed?.originalBundleId]) {
+    const r = want ? list.find((x) => x.id === want) : null;
+    if (r) return r;
+  }
+  return null;
+}
+
+export async function forgetInstalled({ id = null, signed = null } = {}, { store = apps, native = null } = {}) {
+  let gone = false;
+  if (signed?.bundleId && typeof native?.call === "function") {
+    await native.call("signing.forget", { bundleId: signed.bundleId });
+    gone = true;
+  }
+  const s = await store();
+  const records = await s.all();
+  const ids = new Set([id, signed?.bundleId].filter(Boolean));
+  const rec = recordOf(records, id, signed);
+  if (rec) ids.add(rec.id);
+  for (const rid of ids) {
+    if (!records.some((r) => r?.id === rid && !r.self)) continue;
+    await removeInstall(s, rid);
+    gone = true;
+  }
+  if (gone && !rec) for (const f of appListeners) f(); // a signed record only: the lists load again too
+  return gone;
+}
+
 // B170: undo a record an IPA run wrote for an app iOS then reported missing: the record that stood before it (`before`,
 // an upgrade's older version or a Mark as Installed) goes back, else the app's record goes. A record changed since
 // (`wrote`: the one the run wrote, by its date) is left alone: something newer recorded the app.
