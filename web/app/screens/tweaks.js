@@ -25,7 +25,7 @@ import { detectMode } from "../core/settings.js"; // F302
 import { debOf, tweakTitle, withTweaksText, tweakSteps, madeFor, tweakUpdates, ipaEncrypted, ENCRYPTED_ALERT, HOW_TO_GET_ONE,
   HOW_TO_TEXT, tweakParams } from "../core/tweaks.js"; // F302a
 import { BUNDLE_ID } from "../brand.js"; // F302a
-import { INDEX_PATH, INDEX_URL, indexSource, indexQuery, entryInfo, paidEntry, paidHint, liteTweaks, worksInLine } from "../core/tweakindex.js"; // F344
+import { INDEX_PATH, INDEX_URL, indexSource, indexQuery, entryInfo, paidEntry, paidHint, liteTweaks, worksInLine, dropsFromCatalog } from "../core/tweakindex.js"; // F344
 import { appNameOf } from "../core/tweaks.js"; // F344
 import { loadStyle } from "../nav/motion.js";
 import { filterRows } from "../core/changes.js"; // F352: Add Tweaks' search
@@ -200,6 +200,9 @@ export function tweaksGroup({ bundleId = "", store = tweakStore, alert = showAle
 //   await tweakInfo(stanza, { fetchDeb })   core/tweaks.js inspectTweakDeb of the package's .deb, cached per package and
 //                                           version on this device (INFO_KEY); the .deb itself is kept for the session
 //   cachedTweakInfo(stanza)                 the cached check, or null when the .deb wasn't read yet
+//   catalogVerdicts()  onTweakVerdicts(f)   B377: { "id@version": true } for every checked tweak that can't go into an
+//                                           app (core/tweakindex.js dropsFromCatalog), and f(map) for each new batch
+//                                           (the index's answer, a check on this device): catalog.js setTweakVerdicts
 //   await tweakDeb(stanza, { fetchDeb })    the .deb's bytes (the session's copy, else fetched)
 //   await addDebTo(bundleId, stanza, data)  puts the .deb in that app's kept tweaks (the next sign injects it)
 //   await signableApps()                    [{ bundleId, name, from }] My IPAs and the apps signed here
@@ -225,6 +228,7 @@ function infoStore(storage = globalThis.localStorage) {
   return {
     // B185: a refusal kept by an older build (no INFO_V) is checked again: its reason may be the old jargon
     get: (k) => (map && typeof map[k] === "object" && map[k] && (map[k].ok || map[k].v === INFO_V) ? map[k] : null),
+    keys: () => Object.keys(map ?? {}), // B377
     set(k, v) {
       map[k] = v;
       const keys = Object.keys(map);
@@ -239,6 +243,26 @@ export function cachedTweakInfo(st, { storage } = {}) {
   if (!st?.package) return null;
   const k = debKey(st);
   return infoStore(storage).get(k) ?? indexed.get(k) ?? null;
+}
+
+// B377: the catalog's side of the verdicts (core/catalog.js setTweakVerdicts): what this device and the index know.
+const verdictListeners = new Set();
+export function onTweakVerdicts(f) { verdictListeners.add(f); return () => verdictListeners.delete(f); }
+function verdictsFor(keys, storage) {
+  const dev = infoStore(storage);
+  const out = {};
+  // a check on this device that says the tweak works (after the index refused it) brings it back: false
+  for (const k of keys) { const info = dev.get(k) ?? indexed.get(k); if (info) out[k] = dropsFromCatalog(info); }
+  return out;
+}
+export function catalogVerdicts({ storage } = {}) {
+  return verdictsFor(new Set([...indexed.keys(), ...infoStore(storage).keys()]), storage);
+}
+function tellVerdicts(keys, storage) {
+  if (!verdictListeners.size) return;
+  const map = verdictsFor(keys, storage);
+  if (!Object.keys(map).length) return;
+  for (const f of [...verdictListeners]) { try { f(map); } catch { /* one listener's error stops no other */ } }
 }
 
 // B269: a Tweak Source's list rows without the tweaks whose .deb was checked on this device and can't go into an app
@@ -490,6 +514,7 @@ export async function tweakInfo(st, { fetchDeb = defaultFetchDeb, storage, paid 
   // F344: read again after the download: checks running side by side (checkTweakRows, checkForApp) would otherwise
   // each write back the cache as it was when they started, and drop each other's verdicts
   infoStore(storage).set(debKey(st), kept);
+  tellVerdicts([debKey(st)], storage); // B377
   return kept;
 }
 
@@ -919,11 +944,15 @@ export async function loadTweakIndex(sources, { fetch: get = (u, o) => globalThi
         const j = await r.json();
         if (!j?.enabled || !Array.isArray(j.tweaks)) return 0;
         let k = 0;
+        const got = [];
         for (const e of j.tweaks) {
           if (!e?.package) continue;
-          indexed.set(`${e.package}@${e.version ?? ""}`, { v: INFO_V, ...entryInfo(e) });
+          const key = `${e.package}@${e.version ?? ""}`;
+          indexed.set(key, { v: INFO_V, ...entryInfo(e) });
+          got.push(key);
           k++;
         }
+        tellVerdicts(got); // B377
         return k;
       } catch { return 0; } finally { clearTimeout(timer); }
     })();

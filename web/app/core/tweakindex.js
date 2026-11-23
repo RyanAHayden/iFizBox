@@ -21,7 +21,9 @@
 //   liteTweaks(rows, bundleId, infoOf)          Add Tweaks for an app in the sideload build: { made, any }: tweaks
 //                                                whose filter names that bundle ID, then the ones for every app
 //                                                (UIKit/Foundation); nothing else (unchecked, system-only, others)
-//   worksInLine(info, known)                    "Works in: YouTube", "Works in: Any App", "Works in: YouTube
+//   dropsFromCatalog(info)                      B377: the verdict says the tweak can't go into an app (systemOnly or
+//                                                refused, not a paid guess): core/catalog.js setTweakVerdicts drops it
+//   worksInLine(info, known)                   "Works in: YouTube", "Works in: Any App", "Works in: YouTube
 //                                                (unverified)" for a paid tweak's guess; null when not known
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -149,6 +151,10 @@ export function liteTweaks(rows, bundleId, infoOf) {
   }
   return { made, any };
 }
+
+// B377: whether a verdict takes the tweak out of the sideload catalog's lists (App Tweaks, Search, Sections): for iOS
+// itself, or refused. A paid tweak's guess (unverified) is no verdict; no info (unchecked) keeps it.
+export const dropsFromCatalog = (info) => Boolean(info) && !info.unverified && (!info.ok || Boolean(info.systemOnly));
 
 export function worksInLine(info, known = {}, nameOf = (id) => id) {
   if (!info?.ok) return null;
