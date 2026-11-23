@@ -662,12 +662,14 @@ export function keepRoute({ settings, native = null, storage = globalThis.localS
 // An install through This iPhone that couldn't reach the phone (refused, the pairing lost, Tailscale or LocalDevVPN
 // down, not paired: routeFailureOf) offers the Signing Server at once, besides the fix: the same apps again through the
 // default Signing Server for that install or run only. Install Apps With stays This iPhone.
-//   serverFallback(err, route)   the failure's { title, message, short, fix, button } when it offers the Signing
-//                                Server (`route`: the install's params, { route: "idevice" } on This iPhone), else null
+//   serverFallback(err, route, st)  the failure's { title, message, short, fix, button } when it offers the Signing
+//                                Server (`route`: the install's params, { route: "idevice" } on This iPhone), else null;
+//                                `st`: idevice.status read after the failure (B375: through the built-in VPN the fix
+//                                is never Open LocalDevVPN)
 export const USE_SERVER = "Use the Signing Server";
 export const USE_SERVER_LINE = `${DOMAIN} can install it instead, this time only.`;
 export const serverStep = (name) => `Installing ${name || "the app"} through the Signing Server`;
-export function serverFallback(err, route = { route: "idevice" }) {
+export function serverFallback(err, route = { route: "idevice" }, st = null) {
   if (route?.route !== "idevice" || err?.code === "cancelled") return null;
-  return routeFailureOf(err);
+  return routeFailureOf(err, st);
 }

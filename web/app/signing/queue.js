@@ -96,6 +96,11 @@ export async function prepareOnDevice(job, { tag, signal = null, progress = () =
   }
 }
 
+// B375: idevice.status for a This iPhone row that failed (null on the Signing Server or when the shell can't say)
+const routeStatus = (route, native) => (route?.route === "idevice"
+  ? Promise.resolve().then(() => bridge(native).call("idevice.status", {})).catch(() => null)
+  : Promise.resolve(null));
+
 // F380: core/myipas.js noteKeptIpa, loaded only when the shell kept a file (it stays out of the startup modules)
 const keptIpa = (url, file) => import("../core/myipas.js").then((m) => m.noteKeptIpa(url, file)).catch(() => {});
 const dropKeptIpa = (url, file, native) => import("../core/myipas.js").then(async (m) => {
@@ -135,7 +140,8 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
     if (route.route) return { installed: opened?.installed ?? true, expires: opened?.expires ?? null };
   } catch (e) {
     const err = rowError(e, name);
-    const fallback = route ? serverFallback(e, route) : null; // F366
+    // F366; B375: with idevice.status, so a failure through the built-in VPN offers no Open LocalDevVPN
+    const fallback = route ? serverFallback(e, route, await routeStatus(route, native)) : null;
     throw fallback ? Object.assign(err, { fallback }) : err;
   }
   progress("asking", 0);
