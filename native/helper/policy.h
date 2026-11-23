@@ -4,6 +4,7 @@
 #define IFIZBOX_HELPER_POLICY_H
 
 #include <limits.h>
+#include <stdio.h>
 #include <sys/types.h>
 
 #define HELPER_MAX_PACKAGES 256
@@ -218,5 +219,14 @@ int helper_first_unknown(const char *prefix, const struct helper_plan *plan);
  * effective uid are root_uid, and parent_exe is the same file (device + inode) as expected_exe. 0 or -1 + *err. */
 int helper_caller_ok(uid_t uid, uid_t euid, uid_t root_uid, const char *parent_exe, const char *expected_exe,
                      const char **err);
+
+/* B348: after apt-get update (update, update-source), delete every file in <prefix>/var/lib/apt/lists whose first
+ * byte that isn't blank is '<': a repo that answered an index URL with its web page (HTTP 200, unsigned or with no
+ * hash to catch it) left a file apt can't parse, which breaks every apt command after. Each one deleted is named on
+ * `out` as apt names a failed fetch, "E: Failed to fetch <url>  <reason>", with the URL rebuilt from the file's name
+ * and the source URIs in <prefix>/etc/apt/sources.list(.d), or for update-source only its own `source_line`
+ * ("deb <uri> ..."; NULL for update); a file no source has gets a "W:" line naming the file instead (a file that
+ * can't be deleted also gets one, and its source is still named). Returns the number of files deleted. */
+int helper_drop_web_lists(const char *prefix, const char *source_line, FILE *out);
 
 #endif

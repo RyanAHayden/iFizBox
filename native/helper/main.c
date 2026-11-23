@@ -326,11 +326,14 @@ static int remove_malware(int argc, char *const argv[], const char *prefix, char
 
 /* F233a: update-source. The temp sources file holding the one source, apt-get update on it as a child, then the
  * file deleted whatever apt did. Exit: 74 the file couldn't be made, 126 apt-get couldn't be run, else apt's
- * status (128 + signal). */
-static int update_source(struct helper_plan *plan, char *const env[]) {
+ * status (128 + signal).
+ * B348: update runs here too (as a child, no temp file), and after either one helper_drop_web_lists deletes the
+ * web pages apt saved as lists and names their sources on stderr; the exit stays apt's. */
+static int update_source(struct helper_plan *plan, char *const env[], const char *prefix) {
     const char *err = NULL;
     errno = 0;
-    if (helper_update_source_file(plan, &err)) {
+    int one = plan->verb == HV_UPDATE_SOURCE;
+    if (one && helper_update_source_file(plan, &err)) {
         fprintf(stderr, "ifizbox-helper: %s%s%s\n", err, errno ? ": " : "", errno ? strerror(errno) : "");
         return HELPER_EX_IOERR;
     }
@@ -338,7 +341,7 @@ static int update_source(struct helper_plan *plan, char *const env[]) {
     pid_t pid = fork();
     if (pid < 0) {
         perror("ifizbox-helper: fork");
-        unlink(plan->source_tmp);
+        if (one) unlink(plan->source_tmp);
         return HELPER_EX_EXEC;
     }
     if (pid == 0) {
@@ -349,8 +352,9 @@ static int update_source(struct helper_plan *plan, char *const env[]) {
     int st = 0;
     pid_t w;
     while ((w = waitpid(pid, &st, 0)) < 0 && errno == EINTR) {}
-    if (unlink(plan->source_tmp))
+    if (one && unlink(plan->source_tmp))
         fprintf(stderr, "ifizbox-helper: can't delete %s: %s\n", plan->source_tmp, strerror(errno));
+    helper_drop_web_lists(prefix, one ? plan->source_line : NULL, stderr);
     if (w < 0) { perror("ifizbox-helper: waitpid"); return HELPER_EX_EXEC; }
     return WIFEXITED(st) ? WEXITSTATUS(st) : 128 + WTERMSIG(st);
 }
@@ -686,7 +690,7 @@ int main(int argc, char *argv[]) {
         if (plan.verb != HV_CONFIGURE) repair_dpkg(prefix, status_fd, env);
     }
     if (malware) return remove_malware(argc - 2, argv + 2, prefix, env);
-    if (plan.verb == HV_UPDATE_SOURCE) return update_source(&plan, env);
+    if (plan.verb == HV_UPDATE_SOURCE || plan.verb == HV_UPDATE) return update_source(&plan, env, prefix); /* B348 */
     if (plan.verb == HV_INSTALL_IPA) {
         int rc = helper_install_ipa(prefix, plan.path, status_fd, env, &err);
         if (rc) fprintf(stderr, "ifizbox-helper: %s\n", err);
