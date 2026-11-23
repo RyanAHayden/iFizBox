@@ -67,6 +67,10 @@ test("the website (no queue), a paid package and an app keep the options on a ta
     { paidState: async () => ({ label: "$1.99", actions: [] }) });
   assert.equal(await installTap(ROUTE, "btn", paid.opts), "options");
   assert.deepEqual(paid.jobs, []);
+  const failing = deps(page(NOT_INSTALLED, { package: "com.ex.tweak", version: "3.0", tag: "cydia::commercial" }),
+    { paidState: async () => { throw new Error("vendor down"); } });
+  assert.equal(await installTap(ROUTE, "btn", failing.opts), "options", "a failed paid check opens the options, never queues");
+  assert.deepEqual(failing.jobs, []);
   const app = deps(page(NOT_INSTALLED, { kind: "ipa", ipa: { versions: [] } }));
   assert.equal(await installTap(ROUTE, "btn", app.opts), "options");
   assert.equal(await installHold(ROUTE, "btn", app.opts), "versions");

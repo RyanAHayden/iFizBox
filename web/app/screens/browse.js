@@ -1674,7 +1674,9 @@ export async function installTap(route, button, { pages = packagePages, mode = d
   if (installNoModify(page, { mode })) {
     const { id, pkg } = page;
     const q = queue === undefined ? queueOf({ installed: null, name: pkg.row?.name }) : queue;
-    if (q && !(isPaid(pkg.stanza) && await paidState(page.payBox))) {
+    // A paid check that fails counts as paid: the options sheet, never a queue that skips the purchase.
+    const paid = isPaid(pkg.stanza) && await Promise.resolve().then(() => paidState(page.payBox)).catch(() => true);
+    if (q && !paid) {
       if (!page.body.isConnected) return null;
       await q({ op: "install", id, version: pkg.stanza.version });
       return "queued";

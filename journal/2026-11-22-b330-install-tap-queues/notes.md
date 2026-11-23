@@ -21,6 +21,8 @@
 - A paid package (price on the button, or the vendor's Purchase steps) keeps its sheet on a tap: queuing it would
   skip the purchase. Its hold, when not installed, now opens that same sheet (F346's version sheet never opened for
   a package its vendor sells anyway).
+- A paid check that fails (the vendor unreachable) counts as paid: the tap opens the options sheet instead of
+  doing nothing or queuing past the purchase (found by the spec review).
 - The website has no install queue, so its tap keeps the sheet (Install in iFizBox, Download .deb); nothing to queue.
 - A package already queued: a tap queues it again, which reopens Confirm (core/queue.js add replaces the job).
   Clear stays in the hold's sheet.
@@ -40,6 +42,8 @@ errors:
 - com.ex.old hold: Install Which Version? (2.0, 1.0 (Installed)) as before.
 
 Run: `node probe.mjs web/app <outdir>`.
+
+`node --test` in web/app: 3239 tests, all passing.
 
 ## Not verified
 
