@@ -90,12 +90,17 @@ function reset(button) {
 // Add opens the Enter APT URL alert inside the tap. Neither build reads the clipboard on its own: the alert's Paste
 // button reads it when tapped (nav/alert.js), so there is no Paste bubble or Allow Paste on Add and no blue Type
 // state. The app shows that Paste only when a URL was copied (addFromPasteboard, below).
-// `native` and `open` are for tests (screens/addsource.test.js): the bridge, and manage.addSource.
-export async function addFromClipboard(ctx, button, { native = nativeBridge(), open = manage.addSource } = {}) {
+// `native` and `open` are for tests (screens/addsource.test.js): the bridge, and addSourceNow.
+export async function addFromClipboard(ctx, button, { native = nativeBridge(), open = addSourceNow } = {}) {
   if (native) return addFromPasteboard(ctx, button, native, open);
   reset(button);
   return open(ctx, null);
 }
+
+// B335: Sources' Add alert (manage.addSource) whose Paste adds the pasted URL at once, with no Add Source tap after it.
+// Manage's Add, Edit Source and the other paste alerts keep Paste filling the field only. `alert` is for tests.
+export const addSourceNow = (ctx, prefill = null, alert = undefined) =>
+  manage.addSource(ctx, prefill, null, { pasteSubmits: true, ...(alert ? { alert } : {}) });
 
 // The app (F105): no Paste bubble, so no Type. Enter APT URL opens inside the tap, the field "https://" with the
 // keyboard up. Opened after a bridge round trip (as ffaf27e did) the alert came outside the tap: WKWebView raised no
