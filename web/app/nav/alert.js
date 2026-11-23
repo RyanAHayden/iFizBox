@@ -20,7 +20,8 @@
 // {index, value} answer. A countdown alert stays the CSS one (UIAlertAction titles can't count down), so does one
 // with `onTap` (the bridge's answer comes after the tap, outside the user gesture its window.open or link needs), `input.paste`
 // is dropped (the native field has Paste in its own menu), and a shell without ui.alert, the site and every other
-// style get the CSS alert.
+// style get the CSS alert. F377: `input.pasteSubmits` goes along, so the native field's Paste answers for that button
+// too.
 import { nativeBridge, hasNativeCall } from "../native.js";
 
 export const alertOK = (title, message, alert = showAlert) => alert({ title, message, buttons: ["OK"] });
@@ -32,9 +33,19 @@ export function showAlert(opts = {}) {
   const params = { title: String(title ?? ""), message: String(message ?? ""), buttons: buttons.map((b) => String(b)),
     cancel: buttons.length > 1 && Number.isInteger(cancel) ? cancel : -1, colors: nativeColors(colors, buttons.length) };
   if (input) params.input = { placeholder: String(input.placeholder ?? ""), value: String(input.value ?? ""), type: String(input.type || "text") };
+  const submit = input?.pasteSubmits;
+  if (Number.isInteger(submit) && submit >= 0 && submit < buttons.length) params.input.pasteSubmits = submit;
   return native.call("ui.alert", params).then((r) => {
     const index = Number.isInteger(r?.index) && r.index >= 0 && r.index < buttons.length ? r.index : (params.cancel >= 0 ? params.cancel : 0);
-    const value = input ? String(r?.value ?? "") : undefined;
+    let value = input ? String(r?.value ?? "") : undefined;
+    // F377: the field's Paste answered for the pasteSubmits button (`pasted`). As the CSS alert's Paste, `input.paste`
+    // turns the text into the value; what it can't use ("") opens the alert again with the text in the field, where
+    // the CSS alert would have stayed open.
+    if (r?.pasted && input && params.input.pasteSubmits === index && input.paste) {
+      const v = typeof input.paste === "function" ? input.paste(value) : value.trim();
+      if (!v) return showAlert({ ...opts, input: { ...input, value } });
+      value = v;
+    }
     return { index, value };
   }, () => cssAlert(opts)); // an older shell ("unknown method ui.alert") or no window to show it in
 }

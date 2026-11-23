@@ -102,3 +102,42 @@ test("F345b: the shell answers ui.alert with a UIAlertController: cancel, destru
   const bridge = readFileSync(new URL("../../../native/Sources/Bridge.swift", import.meta.url), "utf8");
   assert.match(bridge, /NativeAlerts\.register\(self\)/);
 });
+
+const pasteOpts = (extra = {}) => ({
+  title: "Enter APT URL", buttons: ["Cancel", "Add Source"], cancel: 0,
+  input: { placeholder: "https://", value: "https://", type: "url", paste: (t) => (/\.[a-z]{2,}/.test(t) ? t.trim() : ""), pasteSubmits: 1, ...extra },
+});
+
+test("F377: pasteSubmits goes to ui.alert; a paste answer resolves the button with input.paste's value", async () => {
+  const native = shell(() => ({ index: 1, value: " repo.test/x ", pasted: true }));
+  const { out, made } = await withPage({ native }, () => showAlert(pasteOpts()));
+  assert.deepEqual(native.calls[0][1].input, { placeholder: "https://", value: "https://", type: "url", pasteSubmits: 1 });
+  assert.deepEqual(out, { index: 1, value: "repo.test/x" });
+  assert.equal(made.length, 0, "no CSS alert drawn");
+});
+
+test("F377: pasteSubmits off the buttons is not sent; a typed answer keeps its value as it is", async () => {
+  const native = shell(() => ({ index: 1, value: " typed " }));
+  const { out } = await withPage({ native }, () => showAlert(pasteOpts({ pasteSubmits: 5 })));
+  assert.equal("pasteSubmits" in native.calls[0][1].input, false);
+  assert.deepEqual(out, { index: 1, value: " typed " });
+});
+
+test("F377: a paste input.paste can't use opens the alert again with the text in the field", async () => {
+  const answers = [{ index: 1, value: "hello", pasted: true }, { index: 0, value: "hello" }];
+  const native = shell(() => answers.shift());
+  const { out } = await withPage({ native }, () => showAlert(pasteOpts()));
+  assert.equal(native.calls.length, 2);
+  assert.equal(native.calls[1][1].input.value, "hello");
+  assert.equal(native.calls[1][1].input.pasteSubmits, 1);
+  assert.deepEqual(out, { index: 0, value: "hello" });
+});
+
+test("F377: the shell's field takes a paste delegate that answers for the pasteSubmits button", () => {
+  const swift = readFileSync(new URL("../../../native/Sources/NativeAlerts.swift", import.meta.url), "utf8");
+  assert.match(swift, /input\["pasteSubmits"\]/);
+  assert.match(swift, /f\.pasteDelegate = d/);
+  assert.match(swift, /class PasteSubmits: NSObject, UITextPasteDelegate/);
+  assert.match(swift, /performPasteOf/);
+  assert.match(swift, /out\["pasted"\] = true/);
+});
