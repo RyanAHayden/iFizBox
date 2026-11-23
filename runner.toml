@@ -8,6 +8,7 @@ auto_upgrade = true  # upgrade agent-runner by itself when a newer release is ou
 weekly_max = 98
 test = "tools/check.sh"
 slots = 5
+auto_release = { every = 20, idle = true }  # a release every 20 landed tasks, and when the run goes idle with landed work (user 2026-11-22)
 rules = "AGENTS.md"
 notes = ".runner"
 joinable = ["plan/TODO.md", "plan/DONE.md", "journal/*/*.md"]
