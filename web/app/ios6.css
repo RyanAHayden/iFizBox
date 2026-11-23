@@ -121,6 +121,7 @@ html[data-theme="dark"] {
   --dk-issue-table: #2a1212;
   --dk-review-btn-text: #c9d6f0;
   --dk-review-btn: linear-gradient(#3a3a3e, #1c1c1f);
+  --dk-review-btn-held: inset 0 0 0 99px rgba(0,0,0,.35); /* B345: a shade over any theme's --dk-review-btn */
   --dk-warn-table: #241f08;
   --dk-warn-edge: #5a4f1a;
   --dk-warn-text: #fff3b0;
