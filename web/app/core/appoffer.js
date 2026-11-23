@@ -11,7 +11,9 @@
 //   site and the sideload app only (F178 ownBuilds: the jailbreak app hides it).
 import { NAME, GITHUB_REPO, DOMAIN, BUNDLE_ID } from "../brand.js";
 
+// The GitHub | Discord pair (Cydia: Facebook | Twitter) on Home and the Not-an-iPhone page.
 export const REPO_URL = `https://github.com/${GITHUB_REPO}`;
+export const DISCORD_URL = "https://discord.gg/3XASvpjbgp";
 // The release assets native/build.sh makes (tools/release.sh uploads them): latest/download always names the newest.
 export const APP_IPA_URL = `${REPO_URL}/releases/latest/download/${NAME}.ipa`;
 export const APP_DEB_URL = `${REPO_URL}/releases/latest/download/${NAME}.deb`; // rootless, iphoneos-arm64
