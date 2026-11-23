@@ -353,7 +353,7 @@ enum LocalVPNBridge {
         }
         b.on("vpn.openShortcuts") { c in LocalVPN.importShortcut(c) }
         b.on("vpn.checkShortcut") { c in
-            guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: the jailbreak app installs IPAs through its helper") }
+            guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: Cellular Shortcuts are for the sideload app's This iPhone installs") }
             guard let w = c.params["which"] as? String, let key = LocalVPN.shortcutKeys[w] else { return Apt.reply(c, nil, "no Shortcut given") }
             DispatchQueue.global(qos: .userInitiated).async {
                 var r = LocalVPN.runShortcut(w, check: true)

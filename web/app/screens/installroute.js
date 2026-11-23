@@ -32,7 +32,7 @@ import { leaveQuestion, LEAVE } from "../core/installroute.js";
 import { tailscaleVPNOn, installStatus, CHECKING, CHECKING_SERVER, STATUS_ACTIONS } from "../core/installroute.js";
 import { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, NO_ANSWER_FAILURE } from "../core/installroute.js"; // B316
 import { builtinVPN, shortcutsAdded, setupFooter, iphoneSetUp, HOW_STEPS, SHORTCUT_NAMES, vpnTestResult, shortcutsTestResult } from "../core/installroute.js"; // F372
-import { shortcutFileURL, shortcutDidntRun } from "../core/installroute.js"; // B359
+import { shortcutFileURL, shortcutDidntRun, shortcutDidntOpen } from "../core/installroute.js"; // B359
 import { loadStyle } from "../nav/motion.js";
 import { NAME, DOMAIN } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
@@ -245,13 +245,15 @@ export function howGroups() {
 // Cellular Shortcuts (installation/shortcuts): each Shortcut in its own group with its Add row, then Test Shortcuts
 // once both are. `st` is vpn.status (or idevice.status's vpn). B359: Add shares our signed Shortcut (Shortcuts'
 // Add Shortcut sheet); back in the app it runs once (`checking`, the Shortcut being run) and only a run that passed
-// marks it Added. `failed` ({off, on}: the run's error) turns that group's footer into what went wrong.
+// marks it Added. `failed` ({off, on}: the run's error, or {open: error} when the share sheet didn't open) turns that
+// group's footer into what went wrong.
 export function shortcutGroups(st, { add = () => {}, test = () => {}, testing = false, reading = false, checking = null, failed = {} } = {}) {
   const sc = st?.shortcuts ?? {};
   const row = (k) => reading || checking === k ? { label: SHORTCUT_NAMES[k], icon: rowIcon("cellular"), detail: "Checking…", spin: true }
     : sc[k] ? { label: SHORTCUT_NAMES[k], icon: rowIcon("cellular"), detail: "Added" }
     : { label: SHORTCUT_NAMES[k], icon: rowIcon("cellular"), detail: "Add", chevron: true, onClick: () => add(k) };
-  const footer = (k, text) => !sc[k] && failed[k] && checking !== k ? { footer: shortcutDidntRun(k, failed[k]), warn: true } : { footer: text };
+  const why = (k, f) => f?.open ? shortcutDidntOpen(k, f.open) : shortcutDidntRun(k, f);
+  const footer = (k, text) => !sc[k] && failed[k] && checking !== k ? { footer: why(k, failed[k]), warn: true } : { footer: text };
   const groups = [
     { header: "Turn Off", rows: [row("off")], ...footer("off", "Tap Shortcuts, then Add Shortcut, and come back. It turns data off for the moment an install connects.") },
     { header: "Turn On", rows: [row("on")], ...footer("on", "The same for the one that turns data back on once the install has connected.") },
@@ -307,7 +309,9 @@ export function backInApp(doc = globalThis.document, { leaveMs = 4000, limit = 1
     t = setTimeout(() => (left ? end(false) : end(true)), left ? limit : leaveMs);
   });
 }
-export const CHECK_MS = 75000; // vpn.checkShortcut: up to two runs through Shortcuts and back (native shortcutLimit 25 s each)
+// vpn.checkShortcut: up to four runs through Shortcuts and back with 9.5 s of waits between; a run that times out
+// (native shortcutLimit, 25 s) isn't tried again, so the worst case stays well inside this
+export const CHECK_MS = 75000;
 
 // B359: Add on Cellular Shortcuts. vpn.openShortcuts shares our signed Shortcut; Shortcuts never says it was added,
 // so once the user is back the app runs it (vpn.checkShortcut, input "check": it does nothing) and only a run that
@@ -335,7 +339,7 @@ async function drawShortcuts(box, { native, alert, whenBack = backInApp }) {
       add: async (k) => {
         if (checking) return;
         const r = await addShortcut(native, k, { whenBack, checking: (on) => { checking = on ? k : null; paint(); } });
-        if (r.opened || r.error) shortcutsFailed[k] = r.ok ? null : r.error;
+        if (r.opened || r.error) shortcutsFailed[k] = r.ok ? null : r.opened ? r.error : { open: r.error };
         st = r.status ?? { ...(st ?? {}), shortcuts: { ...(st?.shortcuts ?? {}), [k]: r.ok ? true : Boolean(st?.shortcuts?.[k]) } };
         if (lastStatus) lastStatus = { ...lastStatus, vpn: { ...(lastStatus.vpn ?? {}), ...st } };
         paint();

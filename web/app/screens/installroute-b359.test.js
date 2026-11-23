@@ -60,6 +60,15 @@ test("Add: a check run that fails leaves the row Add, and its footer says it did
   assert.notEqual(gs[0].warn, true, "the other Shortcut's footer is its own hint");
 });
 
+test("Add: a share sheet that never opened says so, not that the Shortcut didn't run", async () => {
+  const native = { call: (m) => m === "vpn.openShortcuts" ? Promise.reject(new Error("no window to show the share sheet in")) : Promise.resolve({}) };
+  const r = await addShortcut(native, "off", { whenBack: async () => true });
+  assert.deepEqual(r, { opened: false, ok: false, error: "no window to show the share sheet in" });
+  const gs = shortcutGroups({ shortcuts: { off: false, on: false } }, { failed: { off: { open: r.error } } });
+  assert.equal(gs[0].footer, `"${SHORTCUT_NAMES.off}" couldn't be shared to Shortcuts: no window to show the share sheet in. Tap Add to try again.`);
+  assert.equal(gs[0].warn, true);
+});
+
 test("Add: a closed share sheet, or the user still away, runs nothing and marks nothing", async () => {
   const closed = phone({ opened: false });
   assert.deepEqual(await addShortcut(closed.native, "off", { whenBack: async () => true }), { opened: false, ok: false, error: null });

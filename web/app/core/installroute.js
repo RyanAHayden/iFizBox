@@ -35,6 +35,8 @@ export const shortcutsAdded = (st) => Boolean(st?.vpn?.shortcuts?.off && st?.vpn
 export const shortcutFileURL = (k) => `https://${DOMAIN}/shortcuts/${encodeURIComponent(SHORTCUT_NAMES[k])}.shortcut`;
 // B359: a group footer for a Shortcut whose check run (vpn.checkShortcut) didn't pass: it isn't marked added.
 export const shortcutDidntRun = (k, err) => `"${SHORTCUT_NAMES[k]}" didn't run: ${err || "Shortcuts didn't say why"}. Tap Add to try again.`;
+// ... and for an Add whose share sheet never opened (nothing was imported, so nothing ran either).
+export const shortcutDidntOpen = (k, err) => `"${SHORTCUT_NAMES[k]}" couldn't be shared to Shortcuts: ${err || "no reason given"}. Tap Add to try again.`;
 // This iPhone is set up: paired, and with the built-in VPN tested once (vpn.test). USE waits for it.
 export const iphoneSetUp = (st) => Boolean(st?.paired) && (!builtinVPN(st) || Boolean(st.vpn.tested));
 // Set Up's footer: the next step, or what is set up.
