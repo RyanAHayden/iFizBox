@@ -77,5 +77,5 @@
 html:is([data-style="ios7"], [data-style="ios13"], [data-style="ios26"]) .sign-first :is(.action-title, .action-hint) {
   margin: 0; padding: 8px 14px; border-radius: 13px; background: var(--action-btn); }
 html[data-style="ios7"] .sign-first :is(.action-title, .action-hint) { border-radius: 3px; }
-html:is([data-style="ios7"], [data-style="ios13"], [data-style="ios26"])[data-theme="dark"] .sign-first :is(.action-title, .action-hint) {
+html:is([data-style="ios7"], [data-style="ios13"], [data-style="ios26"])[data-theme="dark"] .sign-first .action-sheet :is(.action-title, .action-hint) {
   background: var(--dk-action-btn); }
