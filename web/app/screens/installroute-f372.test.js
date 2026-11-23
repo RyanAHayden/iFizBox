@@ -16,7 +16,7 @@ const core = await import("../core/installroute.js");
 const { decideRoute, installStatus, builtinVPN, iphoneSetUp, setupFooter, cellularWarning, shortcutsAdded, verifyFailure,
   vpnTestResult, switchTestResult, routeFailureOf, HOW_STEPS, SHORTCUT_NAMES, ALERTS, CELLULAR, BUILTIN_VPN, setupState } = core;
 const screens = await import("./installroute.js");
-const { installationGroups, subGroups, localGroups, shortcutGroups, howGroups, SUB_TITLES } = screens;
+const { installationGroups, subGroups, localGroups, shortcutGroups, howGroups, SUB_TITLES, SHARE_SHORTCUT } = screens;
 const { cellularTile, slotVPN, routeTile, slotOrRoute } = await import("./home.js");
 const { chooseRoute, forgetRoute, runFix } = await import("../signing/route.js");
 const { NAME } = await import("../brand.js");
@@ -103,13 +103,13 @@ test("How It Works: one install's steps, a row each, and offline", () => {
 test("Install Switch's page: one Add row (no Cellular Shortcuts rows); Test once it is added", () => {
   const added = [];
   const gs = shortcutGroups({ shortcuts: { off: false, on: false } }, { add: (k) => added.push(k) });
-  assert.equal(gs.length, 1);
+  assert.deepEqual(gs.slice(1).map((g) => g.rows.map((r) => r.label)), [[SHARE_SHORTCUT]]);
   assert.deepEqual(gs[0].rows.map((r) => [r.label, r.detail]), [[SHORTCUT_NAMES.switch, "Add"]]);
   assert.deepEqual(SHORTCUT_NAMES, { off: "Cellular Data Off", on: "Cellular Data On", switch: "Install Switch" });
   gs[0].rows[0].onClick();
   assert.deepEqual(added, ["switch"]);
   assert.match(gs[0].footer, /Add Shortcut/);
-  assert.equal(shortcutGroups({ shortcuts: { off: true, on: true } }).length, 1, "the old two don't count as added here");
+  assert.equal(shortcutGroups({ shortcuts: { off: true, on: true } })[0].rows[0].detail, "Add", "the old two don't count as added here");
   const on = shortcutGroups({ shortcuts: { switch: true } });
   assert.deepEqual(on.map((g) => g.rows[0].detail ?? null), ["Added", null]);
   assert.equal(on[1].rows[0].label, "Test Install Switch");

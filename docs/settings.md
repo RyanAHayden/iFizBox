@@ -90,12 +90,12 @@ The pages under it:
   the VPN on, connects once with the pairing and turns it off; the first time, iOS asks to allow the VPN
   configuration; Pairing runs it by itself right after pairing, with a "Testing the Connection…" spinner, before it
   says Paired, so setup asks that once), Install Switch (Add / Checking… / Done, "Optional: cellular, and your VPN
-  back after"; Add opens Shortcuts' Add Shortcut directly once the Install Switch has an iCloud link, and until then
-  shares the signed Shortcut file (the "Shortcut Not Added" alert offers Share File), and Done shows only once it has run), with a footer that says
+  back after"; Add opens Shortcuts' Add Shortcut directly with the iCloud link, and Done shows only once it has run;
+  Share Shortcut File and the "Shortcut Not Added" alert's Share File share the signed file instead), with a footer that says
   the next step (pair, test, or add the Install Switch) or that it's set up. A failed check or install is
   said there instead, red, with its fix row. Then **How It Works** › (`installation/how`: the six steps of one install
   and Offline). **Install Switch** (`installation/shortcuts`, titled Install Switch): an Added row, a Share Shortcut File
-  row only once the Install Switch has an iCloud link (`SHORTCUT_LINKS.switch`, core/installroute.js), and Test Install
+  row while the Install Switch isn't added or needs Update (the signed file, as a backup), and Test Install
   Switch (`vpn.testSwitch` runs its start and end, turning cellular data off and back on and the VPN with it). Phones
   that added the older Cellular Data Off and Cellular Data On Shortcuts still have them to run, but this page no
   longer lists them. **Signing Server** (`installation/server`): Server,

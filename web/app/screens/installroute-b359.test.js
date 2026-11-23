@@ -11,7 +11,7 @@ const mem = new Map();
 globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
 globalThis.document ??= fakeDocument();
 
-const { SHORTCUT_NAMES, shortcutFileURL, shortcutDidntRun } = await import("../core/installroute.js");
+const { SHORTCUT_LINKS, SHORTCUT_NAMES, shortcutFileURL, shortcutDidntRun } = await import("../core/installroute.js");
 const { shortcutGroups, addShortcut, addSwitch, backInApp, SHARE_SHORTCUT } = await import("./installroute.js");
 const { DOMAIN } = await import("../brand.js");
 
@@ -38,7 +38,8 @@ test("Add: not Added on open, only once the check run passed", async () => {
   const p = addShortcut(native, "switch", { whenBack: () => new Promise((r) => { back = r; }), checking: (on) => states.push(on) });
   await new Promise((r) => setTimeout(r, 0));
   assert.deepEqual(calls.map((c) => c[0]), ["vpn.openShortcuts"], "nothing runs or is marked until the user is back");
-  assert.deepEqual(calls[0][1], { which: "switch", url: shortcutFileURL("switch") });
+  assert.deepEqual(calls[0][1], { which: "switch", url: shortcutFileURL("switch"), link: SHORTCUT_LINKS.switch });
+  assert.match(SHORTCUT_LINKS.switch, /^https:\/\/www\.icloud\.com\/shortcuts\/[0-9a-f]{32}$/); // the shell opens no other host
   back(true);
   const r = await p;
   assert.deepEqual(calls.map((c) => c[0]), ["vpn.openShortcuts", "vpn.checkShortcut"]);
