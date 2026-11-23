@@ -4,6 +4,7 @@
 //
 //   installSlides()            once, at start (nav/scroller.js initScroller): watches every slide root below
 //   slideChange(node, change)  run change() now and slide what it moved at once (for code that measures right after)
+//   stillChange(node, change)  run change() now and slide nothing (the caller animates it itself)
 //   isWatched(node)            whether node sits in a watched root
 //
 // A slide root is a scroller whose content flows (ROOT: a page's .page-body, a sheet's body, the pinned Search
@@ -373,6 +374,15 @@ export function slideChange(node, change) {
   if (root) update(root, !measures.has(root));
   change();
   if (root) update(root);
+}
+
+// The same change without a slide: whoever makes it moves things itself (F390, nav/tabswipe.js). What was pending
+// before it still slides.
+export function stillChange(node, change) {
+  const root = installed ? rootFor(node) : null;
+  if (root) update(root, !measures.has(root));
+  change();
+  if (root) update(root, true);
 }
 
 // A change of text alone (a ticking label, a count, a percentage): no box comes or goes, so nothing can move unless a

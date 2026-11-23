@@ -193,3 +193,10 @@ _Said_: waiting bar, moving stripes
 _On screen_: Signed: Waiting to Install
 _In code_: qr-wait, is-waiting
 _Avoid_: barber pole, sweep
+
+**Tab Swipe**:
+A sideways swipe on a package's or app's page that moves to the next or previous of its Details, Reviews and Related tabs.
+_Said_: swipe between the tabs
+_On screen_: (no label)
+_In code_: nav/swipe.js attachTabSwipe, nav/tabswipe.js tabPager
+_Avoid_: pane swipe

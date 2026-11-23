@@ -1270,6 +1270,7 @@ async function renderPackage(body, route, key, id, ctx) {
     sideloadTweak: isSideloadTweak(st), installedOnly: pkg.installedOnly, paid: isPaid(st), source: sourceName, section,
     worksOn: fit.range ?? compatBadge(fitCode), installedSize: isz > 0 ? formatSize(isz * 1024) : null, depends: rels.map((g) => g[0].name) });
   body.replaceChildren(header.head, ...tabs.nodes);
+  tabs.swipeOn(body); // F390
   // F228: from a source on the piracy list: Source Warning at the top of Details.
   const piracy = piracyBanner(packageWarning({ key: pkg.key, source: source?.uri }));
   if (piracy) details.append(piracy);
