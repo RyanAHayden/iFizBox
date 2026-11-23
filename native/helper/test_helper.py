@@ -657,6 +657,31 @@ class Helper(unittest.TestCase):
                 with open(done) as f:
                     self.assertRegex(f.read().strip(), r"^\d+$")  # the postinst's IFIZBOX_HELPER_PID
 
+    def test_chain_html_translation_file(self):
+        """B329's cause, through the app -> helper -> apt chain: a repo's web page saved as its Translation file
+        (repo.twickd.com_._en) is in apt's lists. The stand-in apt-get refuses as the real one did on the iPhone 7
+        unless told to read no Translation files; with the helper's option the Confirm sheet's simulate goes through."""
+        p, app, helper = self.b84_prefix(
+            'lists="$(dirname "$0")/../../var/lib/apt/lists"\n'
+            'case " $* " in *" Acquire::Languages=none "*) echo "Inst com.repo.tweak (1.0 Repo [iphoneos-arm64])"; exit 0;; esac\n'
+            'for f in "$lists"/*_en; do if [ -f "$f" ] && head -c 1 "$f" | grep -q "<"; then\n'
+            '  echo "E: Encountered a section with no Package: header" >&2\n'
+            '  echo "E: Problem with MergeList $f" >&2; exit 100; fi; done\n'
+            'echo "Inst com.repo.tweak (1.0 Repo [iphoneos-arm64])"\n')
+        lists = os.path.join(p, "var/lib/apt/lists")
+        os.makedirs(lists, exist_ok=True)
+        with open(os.path.join(lists, "repo.twickd.com_._en"), "w") as f:
+            f.write("<!DOCTYPE html>\n<html lang=\"en\">\n<head><title>Featured</title></head></html>\n")
+        out = self.run_driver("spawn", helper, "simulate", "com.repo.tweak", driver=app)
+        self.assertIn("1: Inst com.repo.tweak (1.0 Repo [iphoneos-arm64])", out)
+        self.assertFalse(any("MergeList" in l for l in out), out)
+        self.assertEqual(out[-1], "exit: 0")
+        # the stand-in does refuse without the option (what every simulate met before the fix)
+        stand_in = os.path.join(p, "usr/bin/apt-get")
+        r = subprocess.run([stand_in, "-s", "install", "com.repo.tweak"], capture_output=True, text=True, timeout=10)
+        self.assertEqual(r.returncode, 100)
+        self.assertIn("Problem with MergeList", r.stderr)
+
     def test_chain_helper_pid(self):
         """B84: IFIZBOX_HELPER_PID is the pid the app waits on (the postinst holds uicache until it is gone), only for
         verbs that run dpkg; the apt-get child runs in a session of its own, away from the app's process group."""

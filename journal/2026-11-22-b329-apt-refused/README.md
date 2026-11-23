@@ -42,6 +42,9 @@ Nothing on the web side or in Apt.swift/Bridge.swift was wrong: the request (`he
 - `native/helper/test_helper.py` `test_no_translations_for_any_apt_run`: every apt verb's plan has the option
   right after the tool name, once; the caller's names still end the plan; `configure` (dpkg) gets none. The other
   argv expectations gained the option (`NOLANG`).
+- `test_chain_html_translation_file`: the cause itself through app -> helper -> apt: an HTML `repo.twickd.com_._en`
+  in the lists, a stand-in apt-get that refuses with the MergeList error (exit 100) unless given the option, and
+  the helper's simulate goes through.
 - `native/daemon/test_no_translations.py`: every apt argv in main.m carries `NO_TRANSLATIONS` (main.m only builds
   for the phone, so a source check).
 
@@ -53,7 +56,7 @@ Chromium can't check this: it is the root helper and apt on the phone. Built `na
 
 - `ifizbox://package?id=com.ps.ytautofullscreen` (YTAutoFullScreen 1.0.4, PoomSmart's Repo, Section Tweaks; it
   hooks only YouTube, which isn't on the 7, so it changes nothing there) > Install > Install: Confirm listed
-  "Install YTAutoFullScreen" (before the fix this was Cannot Comply, "apt refused this queue").
+  "Install YTAutoFullScreen" (the sheet's Install queues the package and opens Confirm over the queue; before the fix this was Cannot Comply, "apt refused this queue").
 - Confirm: the console ran apt and dpkg to "Installed YTAutoFullScreen / 1 installed" and the Restart SpringBoard
   button (Complete for a tweak). `dpkg-query`: `install ok installed`.
 - Removed it again over ssh (`apt-get remove`), tapped Restart SpringBoard. After the respring the app refreshed
@@ -70,6 +73,9 @@ The phone was asleep at first (`ssh 7`: No route to host, 7 not on the tailnet);
   update.
 
 ## Not verified
+
+- A source's Retry (`update-source`) keeps other lists (`List-Cleanup=0`), so only a full Refresh deletes a bad
+  file already there; with the option it no longer matters to iFizBox either way.
 
 - GesturesXV itself was not installed: it changes the 7's navigation gestures, which every phone task drives;
   apt's simulate of it plans `Inst com.nahtedetihw.gesturesxv (1.6 Havoc ...)` with the option (by hand over ssh).
