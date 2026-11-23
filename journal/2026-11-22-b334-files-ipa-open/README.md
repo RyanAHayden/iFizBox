@@ -65,6 +65,15 @@ Why the phone: the bug is in iOS's hand-off to the native shell (UIKit, fileprov
 - Turning off `LSSupportsOpeningDocumentsInPlace` (copy-into-Inbox instead of a bookmark) would avoid the bookmark,
   but it also takes iFizBox's folder out of Files (F77 needs both keys). Not done.
 
+## Spec review
+
+A fresh reviewer flagged as extra the pick route and a docs/iphone15.md note. I kept the pick route: for an .ipa
+outside iFizBox's folder it's the only way to reach the IPA's page, which is what the task asks for. I took out the
+docs note; this journal keeps the finding. The reviewer also said the "no double open" rule is time-based (any file
+the delegate delivers counts) and that the hook covers the parent class's `url`. Both are on purpose: the delegate
+delivers synchronously, and the hook only notes file URLs and returns UIKit's value unchanged. The jailbreak build
+and share-from-another-app are under Not verified.
+
 ## Not verified
 
 - **The jailbreak build**: not changed (OpenRescue is sideload only). It opens .ipa files by copy into
