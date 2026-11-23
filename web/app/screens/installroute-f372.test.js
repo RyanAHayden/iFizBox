@@ -105,7 +105,7 @@ test("Cellular Shortcuts: each Shortcut its own group with Add; Test Shortcuts o
   gs[0].rows[0].onClick();
   gs[1].rows[0].onClick();
   assert.deepEqual(added, ["off", "on"]);
-  assert.match(gs[0].footer, /Set Cellular Data/);
+  assert.match(gs[0].footer, /Add Shortcut/);
   const both = shortcutGroups({ shortcuts: { off: true, on: true } });
   assert.deepEqual(both.map((g) => g.rows[0].detail ?? null), ["Added", "Added", null]);
   assert.equal(both[2].rows[0].label, "Test Shortcuts");

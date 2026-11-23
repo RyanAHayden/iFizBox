@@ -12,8 +12,9 @@
 //                       idevice.status as `vpn`
 //   vpn.test            the VPN on, one connect to iOS with the pairing (idevice.verify), the VPN off: {ok, ms, kind};
 //                       a pass marks This iPhone tested (set up)
-//   vpn.setShortcut     {which: "off"|"on", added} -> status: the user added (or removed) that Shortcut
-//   vpn.openShortcuts   opens the Shortcuts app on a new Shortcut ({opened})
+//   vpn.openShortcuts   {which, url}: our signed Shortcut in a share sheet, for Shortcuts' Add Shortcut ({opened, via})
+//   vpn.checkShortcut   {which}: runs it with a text input (it then does nothing) and marks it added only when it
+//                       ran: {ok, error, status}
 //   vpn.testShortcuts   runs Cellular Data Off, then Cellular Data On: {ok, off: {ok, error}, on: {ok, error},
 //                       cellular, wentOff}; a pass marks both added
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -246,7 +247,9 @@ enum LocalVPN {
     /// Runs the Shortcut `which` ("off"/"on") through Shortcuts' x-callback-url and waits until Shortcuts comes back
     /// (blocking, never on the main thread). iOS opens another app only from the front, so a run from the background
     /// fails at once.
-    static func runShortcut(_ which: String) -> (ok: Bool, error: String?) {
+    /// B359: `check` runs it with a text input, which our Shortcuts (tools/shortcuts/) take as "do nothing": it proves
+    /// the Shortcut is there under its name and runs, without turning cellular data off.
+    static func runShortcut(_ which: String, check: Bool = false) -> (ok: Bool, error: String?) {
         guard let name = shortcutNames[which] else { return (false, "no Shortcut \(which)") }
         let id = UUID().uuidString
         let back = { (r: String) in "ifizbox://vpn-shortcut?id=\(id)&r=\(r)" }
@@ -254,6 +257,13 @@ enum LocalVPN {
         c.scheme = "shortcuts"; c.host = "x-callback-url"; c.path = "/run-shortcut"
         c.queryItems = [URLQueryItem(name: "name", value: name), URLQueryItem(name: "x-success", value: back("ok")),
                         URLQueryItem(name: "x-error", value: back("error")), URLQueryItem(name: "x-cancel", value: back("cancel"))]
+        if check { c.queryItems! += [URLQueryItem(name: "input", value: "text"), URLQueryItem(name: "text", value: "check")] }
+        // B359: the page sees itself visible again, and Shortcuts' callback for the run before arrives, a moment before
+        // iOS calls the app active: wait for it a little, or the open below is refused
+        let t0 = Date()
+        while !DispatchQueue.main.sync(execute: { UIApplication.shared.applicationState == .active }) && Date().timeIntervalSince(t0) < 3 {
+            Thread.sleep(forTimeInterval: 0.1)
+        }
         guard let url = c.url else { return (false, "bad Shortcut link") }
         let sem = DispatchSemaphore(value: 0)
         var out: (Bool, String?) = (false, nil)
@@ -274,6 +284,33 @@ enum LocalVPN {
     private static func finish(_ id: String, _ ok: Bool, _ err: String?) {
         lock.lock(); let f = waiting.removeValue(forKey: id); lock.unlock()
         f?(ok, err)
+    }
+
+    /// B359: vpn.openShortcuts {which, url}: our signed Shortcut (web/shortcuts/<name>.shortcut in the app, signed by
+    /// tools/shortcuts/sign.sh) in a share sheet, where Shortcuts opens it on its Add Shortcut sheet (shortcuts://
+    /// import-shortcut takes only iCloud links). Without the bundled file, `url` (the same file on the site) opens in
+    /// Safari. Replies {opened, via: "share"|"site"} when the sheet closes; Shortcuts never says it was added, so the
+    /// page runs vpn.checkShortcut once the user is back.
+    static func importShortcut(_ c: Bridge.Call) {
+        let w = c.params["which"] as? String ?? ""
+        guard let name = shortcutNames[w] else { return c.reply(nil, "no Shortcut \(w)") }
+        DispatchQueue.main.async {
+            let file = Bundle.main.url(forResource: name, withExtension: "shortcut", subdirectory: "web/shortcuts")
+            guard let file, let top = MyIPAs.topController() else {
+                guard let s = c.params["url"] as? String, let u = URL(string: s) else { return c.reply(["opened": false], nil) }
+                return UIApplication.shared.open(u, options: [:]) { ok in c.reply(["opened": ok, "via": "site"], nil) }
+            }
+            let vc = UIActivityViewController(activityItems: [file], applicationActivities: nil)
+            vc.completionWithItemsHandler = { type, done, _, _ in
+                log("Shortcut \(name): share sheet \(done ? "sent to \(type?.rawValue ?? "?")" : "closed")")
+                c.reply(["opened": done, "via": "share"], nil)
+            }
+            if let pop = vc.popoverPresentationController {
+                pop.sourceView = top.view
+                pop.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.maxY, width: 1, height: 1)
+            }
+            top.present(vc, animated: true)
+        }
     }
 
     /// ifizbox://vpn-shortcut?id=…&r=ok|error|cancel[&errorMessage=…], Shortcuts coming back. True when it was one.
@@ -305,18 +342,21 @@ enum LocalVPNBridge {
                 return ["ok": true, "ms": ms, "kind": kind.rawValue]
             }
         }
-        b.on("vpn.setShortcut") { c in
-            quick(c) {
-                if let w = c.params["which"] as? String, let key = LocalVPN.shortcutKeys[w] {
-                    UserDefaults.standard.set((c.params["added"] as? Bool) ?? true, forKey: key)
+        b.on("vpn.openShortcuts") { c in LocalVPN.importShortcut(c) }
+        b.on("vpn.checkShortcut") { c in
+            guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: Cellular Shortcuts are for the sideload app's This iPhone installs") }
+            guard let w = c.params["which"] as? String, let key = LocalVPN.shortcutKeys[w] else { return Apt.reply(c, nil, "no Shortcut given") }
+            DispatchQueue.global(qos: .userInitiated).async {
+                var r = LocalVPN.runShortcut(w, check: true)
+                // just after Add Shortcut's Replace, Shortcuts can't find it for some seconds: try again (not after a
+                // cancel or a run that never came back)
+                for wait in [1.5, 3, 5] where !r.ok && r.error != "the Shortcut was canceled" && !(r.error ?? "").contains("didn't come back") {
+                    LocalVPN.log("Shortcut \(w): \(r.error ?? "failed"), again in \(wait) s")
+                    Thread.sleep(forTimeInterval: wait)
+                    r = LocalVPN.runShortcut(w, check: true)
                 }
-                return LocalVPN.status()
-            }
-        }
-        b.on("vpn.openShortcuts") { c in
-            DispatchQueue.main.async {
-                guard let u = URL(string: "shortcuts://create-shortcut") else { return c.reply(["opened": false], nil) }
-                UIApplication.shared.open(u, options: [:]) { ok in c.reply(["opened": ok], nil) }
+                UserDefaults.standard.set(r.ok, forKey: key) // Added only once it ran
+                Apt.reply(c, ["ok": r.ok, "error": (r.error as Any?) ?? NSNull(), "status": LocalVPN.status()], nil)
             }
         }
         b.on("vpn.testShortcuts") { c in
@@ -331,8 +371,8 @@ enum LocalVPNBridge {
                     wentOff = !LocalVPN.Path.now().cellular
                 }
                 let on = off.ok ? LocalVPN.runShortcut("on") : (ok: false, error: "not run")
-                if off.ok { UserDefaults.standard.set(true, forKey: LocalVPN.shortcutKeys["off"]!) }
-                if on.ok { UserDefaults.standard.set(true, forKey: LocalVPN.shortcutKeys["on"]!) }
+                UserDefaults.standard.set(off.ok, forKey: LocalVPN.shortcutKeys["off"]!) // B359: Added only while it runs
+                if off.ok { UserDefaults.standard.set(on.ok, forKey: LocalVPN.shortcutKeys["on"]!) }
                 let r: [String: Any] = ["ok": off.ok && on.ok, "cellular": cellular, "wentOff": wentOff,
                                         "off": ["ok": off.ok, "error": (off.error as Any?) ?? NSNull()],
                                         "on": ["ok": on.ok, "error": (on.error as Any?) ?? NSNull()]]

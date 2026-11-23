@@ -32,6 +32,7 @@ import { leaveQuestion, LEAVE } from "../core/installroute.js";
 import { tailscaleVPNOn, installStatus, CHECKING, CHECKING_SERVER, STATUS_ACTIONS } from "../core/installroute.js";
 import { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, NO_ANSWER_FAILURE } from "../core/installroute.js"; // B316
 import { builtinVPN, shortcutsAdded, setupFooter, iphoneSetUp, HOW_STEPS, SHORTCUT_NAMES, vpnTestResult, shortcutsTestResult } from "../core/installroute.js"; // F372
+import { shortcutFileURL, shortcutDidntRun, shortcutDidntOpen } from "../core/installroute.js"; // B359
 import { loadStyle } from "../nav/motion.js";
 import { NAME, DOMAIN } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
@@ -241,16 +242,21 @@ export function howGroups() {
   ];
 }
 
-// Cellular Shortcuts (installation/shortcuts): each Shortcut in its own group with its Add row (it opens Shortcuts on a
-// new Shortcut and marks it added), then Test Shortcuts once both are. `st` is vpn.status (or idevice.status's vpn).
-export function shortcutGroups(st, { add = () => {}, test = () => {}, testing = false, reading = false } = {}) {
+// Cellular Shortcuts (installation/shortcuts): each Shortcut in its own group with its Add row, then Test Shortcuts
+// once both are. `st` is vpn.status (or idevice.status's vpn). B359: Add shares our signed Shortcut (Shortcuts'
+// Add Shortcut sheet); back in the app it runs once (`checking`, the Shortcut being run) and only a run that passed
+// marks it Added. `failed` ({off, on}: the run's error, or {open: error} when the share sheet didn't open) turns that
+// group's footer into what went wrong.
+export function shortcutGroups(st, { add = () => {}, test = () => {}, testing = false, reading = false, checking = null, failed = {} } = {}) {
   const sc = st?.shortcuts ?? {};
-  const row = (k) => reading ? { label: SHORTCUT_NAMES[k], icon: rowIcon("cellular"), detail: "Checking…", spin: true }
+  const row = (k) => reading || checking === k ? { label: SHORTCUT_NAMES[k], icon: rowIcon("cellular"), detail: "Checking…", spin: true }
     : sc[k] ? { label: SHORTCUT_NAMES[k], icon: rowIcon("cellular"), detail: "Added" }
     : { label: SHORTCUT_NAMES[k], icon: rowIcon("cellular"), detail: "Add", chevron: true, onClick: () => add(k) };
+  const why = (k, f) => f?.open ? shortcutDidntOpen(k, f.open) : shortcutDidntRun(k, f);
+  const footer = (k, text) => !sc[k] && failed[k] && checking !== k ? { footer: why(k, failed[k]), warn: true } : { footer: text };
   const groups = [
-    { header: "Turn Off", rows: [row("off")], footer: `Opens Shortcuts on a new Shortcut: add Set Cellular Data, set it to Off, and name it "${SHORTCUT_NAMES.off}". Then come back.` },
-    { header: "Turn On", rows: [row("on")], footer: `The same with Cellular Data set to On, named "${SHORTCUT_NAMES.on}". It turns data back on once the install has connected.` },
+    { header: "Turn Off", rows: [row("off")], ...footer("off", "Tap Shortcuts, then Add Shortcut, and come back. It turns data off for the moment an install connects.") },
+    { header: "Turn On", rows: [row("on")], ...footer("on", "The same for the one that turns data back on once the install has connected.") },
   ];
   if (sc.off && sc.on) {
     groups.push({ rows: [{ label: "Test Shortcuts", icon: rowIcon("testConnection"), onClick: test, ...(testing ? { detail: "Testing…", spin: true } : {}) }],
@@ -291,16 +297,50 @@ export async function vpnTest(native, alert, store, { ended = () => {}, onPass =
   return r;
 }
 
+// B359: resolves once the user is back in the app: the page went hidden (Shortcuts in front) and visible again. A
+// page that doesn't go hidden within `leaveMs` (the share sheet sent the file elsewhere) resolves then; false after
+// `limit` with the user still away.
+export function backInApp(doc = globalThis.document, { leaveMs = 4000, limit = 15 * 60 * 1000 } = {}) {
+  return new Promise((done) => {
+    let left = Boolean(doc?.hidden), t = 0;
+    const end = (v) => { clearTimeout(t); doc?.removeEventListener?.("visibilitychange", seen); done(v); };
+    const seen = () => { if (doc.hidden) { left = true; clearTimeout(t); t = setTimeout(() => end(false), limit); } else if (left) end(true); };
+    doc?.addEventListener?.("visibilitychange", seen);
+    t = setTimeout(() => (left ? end(false) : end(true)), left ? limit : leaveMs);
+  });
+}
+// vpn.checkShortcut: up to four runs through Shortcuts and back with 9.5 s of waits between; a run that times out
+// (native shortcutLimit, 25 s) isn't tried again, so the worst case stays well inside this
+export const CHECK_MS = 75000;
+
+// B359: Add on Cellular Shortcuts. vpn.openShortcuts shares our signed Shortcut; Shortcuts never says it was added,
+// so once the user is back the app runs it (vpn.checkShortcut, input "check": it does nothing) and only a run that
+// passed marks it added. `checking(true)` while it runs. Answers {opened, ok, error, status} (status: vpn.status).
+export async function addShortcut(native, k, { whenBack = backInApp, checking = () => {} } = {}) {
+  let o;
+  try { o = await call(native, "vpn.openShortcuts", { which: k, url: shortcutFileURL(k) }); } catch (e) { return { opened: false, ok: false, error: e?.message || "Shortcuts didn't open" }; }
+  if (!o?.opened) return { opened: false, ok: false, error: null }; // the share sheet was closed: nothing to say
+  if (await whenBack() === false) return { opened: true, ok: false, error: null }; // still away: the row stays Add
+  checking(true);
+  let r;
+  try { r = await within(call(native, "vpn.checkShortcut", { which: k }), CHECK_MS); } catch (e) { r = { ok: false, error: e?.message }; }
+  checking(false);
+  return { opened: true, ok: Boolean(r?.ok), error: r?.ok ? null : (r?.error || "it didn't run"), status: r?.status ?? null };
+}
+
 let shortcutsTesting = false;
-async function drawShortcuts(box, { native, alert }) {
+const shortcutsFailed = {}; // B359: the last check run's error per Shortcut, for its footer
+async function drawShortcuts(box, { native, alert, whenBack = backInApp }) {
   let st = lastStatus?.vpn ?? null;
-  let reading = !st;
+  let reading = !st, checking = null;
   const paint = () => {
     const groups = shortcutGroups(st, {
-      reading, testing: shortcutsTesting,
+      reading, testing: shortcutsTesting, checking, failed: shortcutsFailed,
       add: async (k) => {
-        try { await call(native, "vpn.openShortcuts"); } catch { /* the footer says what to make */ }
-        try { st = await call(native, "vpn.setShortcut", { which: k, added: true }); } catch { st = { ...(st ?? {}), shortcuts: { ...(st?.shortcuts ?? {}), [k]: true } }; }
+        if (checking) return;
+        const r = await addShortcut(native, k, { whenBack, checking: (on) => { checking = on ? k : null; paint(); } });
+        if (r.opened || r.error) shortcutsFailed[k] = r.ok ? null : r.opened ? r.error : { open: r.error };
+        st = r.status ?? { ...(st ?? {}), shortcuts: { ...(st?.shortcuts ?? {}), [k]: r.ok ? true : Boolean(st?.shortcuts?.[k]) } };
         if (lastStatus) lastStatus = { ...lastStatus, vpn: { ...(lastStatus.vpn ?? {}), ...st } };
         paint();
       },
