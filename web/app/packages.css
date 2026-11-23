@@ -483,6 +483,21 @@ body:has(.action-scrim) .scroll-indicator { z-index: 31; } /* the iOS 6 indicato
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .action-button.cancel { margin-top: var(--action-cancel-gap); }
+/* The anchored menu (the iOS 26 era's sheet opened from a button, actionsheet.js menuSheet): placed by script over
+   the source button (inline left/top, maybe max-height), as wide as its longest row within 200-280px; the room is
+   the screen inside the safe areas and an 8px gap, measured by the script. ios26.css paints it. */
+.action-menu-room {
+  position: absolute; top: calc(var(--top-inset, env(safe-area-inset-top)) + 8px); bottom: calc(var(--safe-bottom) + 8px);
+  left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); visibility: hidden; pointer-events: none;
+}
+.action-sheet.action-menu {
+  right: auto; bottom: auto; width: max-content; min-width: 200px; max-width: min(280px, calc(100% - 16px));
+  max-height: calc(100% - 16px - var(--top-inset, env(safe-area-inset-top)) - var(--safe-bottom));
+  gap: 0; padding: 6px 0; will-change: transform, opacity;
+}
+.action-menu .action-list { gap: 0; margin: 0; padding: 0; }
+.action-menu .action-title { margin: 0; padding: 8px 18px 4px; }
+.action-menu .action-button { padding: 0 18px; }
 /* ==== look-only { ==== The action sheet */
 .action-dim { background: var(--action-dim); }
 .action-sheet { background: var(--action-sheet); }

@@ -60,6 +60,8 @@ html[data-style="ios26"][data-theme="light"] {
   --i26-glass-rim: rgba(255,255,255,.85);
   --i26-glass-shadow: 0 8px 28px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.9), inset 0 -1px 2px rgba(0,0,0,.05);
   --i26-capsule: rgba(255,255,255,.78); --i26-capsule-pressed: rgba(228,228,234,.9);
+  /* the anchored menu (nav/actionsheet.js, .action-menu): a thicker glass than the pill, its pressed row, the dim */
+  --i26-menu: rgba(255,255,255,.8); --i26-menu-pressed: rgba(0,0,0,.08); --i26-menu-dim: rgba(0,0,0,.1);
   --i26-capsule-shadow: 0 2px 12px rgba(0,0,0,.08), inset 0 0 0 .5px rgba(0,0,0,.06);
   --i26-back-shadow: 0 2px 12px rgba(0,0,0,.08), 0 0 0 .5px rgba(0,0,0,.06); /* outside: its border is the chevron's slot */
   --i26-tab-chosen: rgba(0,0,0,.07);
@@ -165,6 +167,7 @@ html[data-style="ios26"][data-theme="dark"] {
   --i26-glass-rim: rgba(255,255,255,.14);
   --i26-glass-shadow: 0 8px 28px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.12);
   --i26-capsule: #1c1c1e; --i26-capsule-pressed: #2c2c2e;
+  --i26-menu: rgba(36,36,40,.82); --i26-menu-pressed: rgba(255,255,255,.12); --i26-menu-dim: rgba(0,0,0,.3);
   --i26-capsule-shadow: inset 0 0 0 .5px rgba(255,255,255,.1);
   --i26-back-shadow: 0 0 0 .5px rgba(255,255,255,.1);
   --i26-tab-chosen: rgba(255,255,255,.12);
@@ -480,6 +483,24 @@ html[data-style="ios26"][data-theme="dark"] .search-cancel { background: none; b
 html[data-style="ios26"] .action-button { font-size: 20px; font-weight: 400; border-radius: 13px; }
 html[data-style="ios26"] .action-button.cancel { font-weight: 600; }
 html[data-style="ios26"][data-theme="dark"] .action-button.destructive { background: var(--action-destructive); }
+/* The anchored menu (a sheet opened from a button, nav/actionsheet.js .action-menu): iOS 26's UIMenu, a rounded glass
+   list over a light dim; rows of label-coloured 17pt text, red for destructive, no separators, a grey pressed row.
+   The sheet's tokens are re-pointed inside it, so packages.css's look rules (dark ones too) paint the rows. */
+html[data-style="ios26"] .action-menu {
+  --action-btn: none; --dk-action-btn: none; --action-destructive: none; --action-btn-edge: transparent;
+  --action-btn-shadow: none; --action-btn-emboss: none; --action-btn-text: var(--i26-label);
+  --action-btn-pressed: var(--i26-menu-pressed); --action-btn-pressed-text: var(--i26-label);
+  --action-btn-pressed-emboss: none; --action-destructive-text: var(--i26-red); --action-destructive-emboss: none;
+  --action-sheet: var(--i26-menu); --dk-action-sheet: var(--i26-menu);
+  border: 1px solid var(--i26-glass-rim); border-radius: 24px; box-shadow: var(--i26-glass-shadow);
+  -webkit-backdrop-filter: var(--i26-glass-blur); backdrop-filter: var(--i26-glass-blur);
+}
+html[data-style="ios26"] .action-menu-scrim .action-dim { background: var(--i26-menu-dim); }
+html[data-style="ios26"] .action-menu .action-button {
+  font-size: 17px; font-weight: 400; line-height: 44px; text-align: left; border-width: 0; border-radius: 0;
+}
+html[data-style="ios26"] .action-menu .action-button.destructive:active { background: var(--i26-menu-pressed); }
+html[data-style="ios26"] .action-menu .action-title { font-size: 13px; line-height: 17px; text-align: left; }
 
 /* The price button (myipas.css .price-btn: My IPAs' SIGN / INSTALL / OPEN, the confirm tap's INSTALL .go, and
    More Sources' and Find More's ADD / ADDED, sources.css .rec-add, which wears .price-btn too): the iOS 13 App
