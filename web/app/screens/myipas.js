@@ -992,8 +992,9 @@ async function syncLibraryTweaks(entry) {
     const [t, { tweakParams }, { toBase64 }] = await Promise.all([import("./tweaks.js"), import("../core/tweaks.js"), import("../core/signing.js")]);
     const p = await t.preparedFor(entry.bundleId);
     const fresh = await entryOf(entry.file).then((r) => r.entry, () => null); // Sign Options may have been saved since
-    const o = (fresh ?? entry).options ?? {};
-    await libraryCall("options", { ...optionsParams(entry, { ...o, tweaks: p ? tweakParams(p, toBase64) : null }),
+    const now = fresh ?? entry;
+    const o = now.options ?? {};
+    await libraryCall("options", { ...optionsParams(now, { ...o, tweaks: p ? tweakParams(p, toBase64) : null }),
       ...(typeof o.keepBundleId === "boolean" ? { keepBundleId: o.keepBundleId } : {}) });
     afterInstall({ list: () => {} }); // B361: the IPA's page again (Sign Options: Changed), once its entry changed
   } catch (e) {
