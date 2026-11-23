@@ -26,10 +26,13 @@ class MyIPAsAppID(unittest.TestCase):
         self.assertGreater(ask, sign.index("let signer = IPASigner("))
         self.assertLess(ask, sign.index("try library.sign(file, signer: signer"))
 
-    def test_install_forwards_the_sign_log(self):
-        # B327: the install call's sign log (Keychain:/Group fix: lines, and now the App ID asked) reaches the run log
-        install = body(read("MyIPAs.swift"), "static func install(")
-        self.assertIn("log: { c.emitOnMain([[\"log\": $0]]) }", install)
+    def test_sign_and_install_forward_the_sign_log(self):
+        # Both logged runs (core/signing.js SIDELOAD_RUNS) get the sign's lines: Keychain:/Group fix: and the App ID asked
+        src = read("MyIPAs.swift")
+        sign = src[src.index('b.on("library.sign")'):src.index('b.on("library.install")')]
+        install = body(src, "static func install(")
+        for call in (sign, install):
+            self.assertIn("log: { c.emitOnMain([[\"log\": $0]]) }", call)
 
 
 if __name__ == "__main__":

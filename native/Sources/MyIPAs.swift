@@ -60,7 +60,8 @@ enum MyIPAs {
                 defer { job.end() }
                 do {
                     let file = c.params["file"] as? String ?? ""
-                    _ = try signIfNeeded(file, id: id, profile: profile, emit: emit, job: job, keep: keep(c))
+                    _ = try signIfNeeded(file, id: id, profile: profile, emit: emit, job: job, keep: keep(c),
+                                         log: { c.emitOnMain([["log": $0]]) }) // B340: Sign's run log too
                     Apt.reply(c, library.json(file, certificate: certificate(), keep: keep(c)), nil)
                 } catch { Apt.reply(c, nil, SignBridge.text(job.cancelled ? SignJob.cancelledError : error)) }
             }

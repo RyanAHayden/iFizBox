@@ -6,8 +6,9 @@
   `signer.installedAppID = { Sideload.installedAppID($0, log: log) }`, as `SignAhead.sign` (B280) and
   `Sideload.signAndOpen` (B138) do. An IPA whose installed copy has another App ID is signed for that one by
   AppIDMatch, or stopped before signing, instead of iOS answering installd error 15.
-- The log half of the brief was already done by B327 (`signIfNeeded(log:)` from `install`); the App ID lookup's own
-  lines ("… is installed under App ID …") now go to the same run log.
+- The log half was done by B327 for `library.install` only. `library.sign` is a logged run too (core/signing.js
+  `SIDELOAD_RUNS`, "Sign …" in Console Logs) but passed no `log:`, so its Keychain:/Group fix: lines and the App ID
+  lookup's lines went only to NSLog; it now passes the same `log:` (found by the spec review).
 - `native/test_my_ipas_appid.py`: source checks (the shell can't run off the phone), like
   `native/test_sign_ahead_appid.py`. The brief said to test in `native/sign/tests/sideload`, but that binary is built
   from `native/sign/*.swift` only; `MyIPAs.swift` needs UIKit/the bridge and can't compile on Linux. The signer's own
