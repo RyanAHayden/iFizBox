@@ -399,6 +399,21 @@ where WebKit has no `DecompressionStream` (before iOS 16.4).
 
 Nothing listens on Wi-Fi or cellular; every path has a random 128-bit token.
 
+A download that ends is kept whole and unsigned, one per app, in the app's Caches (`WaitingIPA` in
+`native/sign/OriginalIPA.swift`, `Caches/com.ryha.ifizbox/waiting`), so an install that then fails (signing, the route
+check, the copy, the iOS prompt, a killed app) doesn't download it again: the next install of that URL and version
+takes the kept file. `IPAFetch.run` (`native/Sources/IPAFetch.swift`) is the one fetch behind `signing.install`,
+`signing.prepare`, `signing.inspect` and Re-sign; the jailbreak app's `ipa.install` uses the same kept file, as a copy
+since its helper takes no IPA with two names. Before a kept file is used, a HEAD (5 s) asks the server: an ETag,
+Last-Modified or length that says it is another file downloads it again; offline or no answer, the kept file is used.
+A size the source lists is compared with the size it listed at download time, since listed sizes are often wrong.
+The file goes once an install of that same file (SHA-256) succeeds, on `signing.forget` or the jailbreak app's uninstall,
+when the signer says the IPA is damaged (`bad_ipa`, or `bad_macho` unless injected tweaks are the cause), or when the
+helper exits 64 and the file really doesn't read. A file over 7 days old or incomplete goes at launch and whenever another
+file is kept. `library.add` downloads are not kept. On the
+Signing Server route iOS 27 can't confirm an install, so that file stays until it expires; it takes no extra space,
+as Re-sign's kept IPA is the same file.
+
 ### Plain http IPA links
 
 App Transport Security keeps URLSession off plain http, and the app has no ATS exception (the WKWebView must never

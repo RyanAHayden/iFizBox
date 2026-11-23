@@ -40,7 +40,7 @@ import { installQueue, runLogs } from "../queue.js";
 import { MODES, MODE_LABEL, changeCount, runTitle, createRepeatFilter, CONFFILE_TITLE,
   CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine, debUrlOf, debLinkOf, mergePlans, runStatusText } from "../core/queue.js";
 import { appQueue } from "../app-queue.js";
-import { appPlan, runOrder, sizeText, SELF_ID, customParams, APP_MODES, APP_MODE_LABEL } from "../core/appqueue.js";
+import { appPlan, runOrder, sizeText, SELF_ID, customParams, listedOf, APP_MODES, APP_MODE_LABEL } from "../core/appqueue.js";
 import { NAME } from "../brand.js";
 import { storedRoute } from "../core/installroute.js"; // B137
 import { rowIcon } from "../icons/rowicons.js";
@@ -527,7 +527,7 @@ async function installApp(job) {
   const sc = await import("../signing-client.js");
   if (job.mode === "resign") return resignApp(job, { sc });
   if (job.options && sc.localSigning()) return installCustom(job, { sc });
-  if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "" });
+  if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "", ...listedOf(job) });
   return sc.signAndInstall(siteInstallArgs(job));
 }
 
@@ -554,7 +554,7 @@ export async function installCustom(job, { sc, follow = null, now = Date.now(), 
   if (params.token) job.options.token = null;
   const after = follow ?? (async (result, h) => (await import("../signing-sheet.js")).followInstall(native, result?.bundleId || job.options.signsAs || "", h));
   return sc.installOnDevice({ url: job.url, name: job.options.name || job.name || "", params,
-    after, ...(sc.isSelfIpa(job.url) ? { host: true } : {}) });
+    after, ...listedOf(job), ...(sc.isSelfIpa(job.url) ? { host: true } : {}) });
 }
 
 // F91: a "resign" job: signing.resign {bundleId} signs the app again from the phone's record (Re-sign All's path,
@@ -566,7 +566,7 @@ export async function installCustom(job, { sc, follow = null, now = Date.now(), 
 export async function resignApp(job, { sc, native = nativeBridge(), hud = null, alert = showAlert, deps, stallOpts = null } = {}) {
   sc ??= await import("../signing-client.js");
   if (job.url) {
-    if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "" }, deps);
+    if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "", ...listedOf(job) }, deps);
     return sc.signAndInstall(siteInstallArgs(job));
   }
   const { resignLabel, deviceError, callWithStall } = await import("../core/signing.js");

@@ -173,7 +173,9 @@ function serverRetry(opts, deps) {
   };
 }
 
-async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, params = null, after = null, host = false, server = false },
+// F400: `listed` ({ version, size }, core/appqueue.js listedOf): what the source lists for `url`; the shell uses an IPA
+// it kept from a failed install of that url only when it still matches
+async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, params = null, after = null, host = false, server = false, listed = null },
   { native, hud = progressHUD, alert = showAlert, go = openRoute, later = setTimeout, follow = null } = {}) {
   forgetRoute();
   // F366: `server`: this install goes through the default Signing Server whatever Install Apps With says
@@ -191,7 +193,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   try {
     // manifestServer: the signing server hands iOS the manifest while iFizBox serves the IPA over plain HTTP at
     // 127.0.0.1 (nothing to set up on the phone; the server sees only the app's ID, version and name).
-    result = await untilCancel(h, askInsecure((extra) => bridge(native).call("signing.install", { ...withKeep(params ?? { url }), manifestServer, ...refusing(), ...(host ? { host: true } : {}), ...route, ...extra }, (ev) => {
+    result = await untilCancel(h, askInsecure((extra) => bridge(native).call("signing.install", { ...withKeep(params ?? { url }), ...(listed ? { listed } : {}), manifestServer, ...refusing(), ...(host ? { host: true } : {}), ...route, ...extra }, (ev) => {
       if (ev?.log) h.page?.raw?.(ev.log); // the shell's console lines (Sideload.swift install's log)
       // B111: This iPhone: the copy's and installd's own percents ({here}), not the overall "Installing on this iPhone"
       const here = route.route ? hereLabel(ev) : null;
@@ -217,7 +219,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
     failed(h, why.message);
     const fix = why.fix && why.button ? why : null;
     // F366: This iPhone couldn't be reached: the Signing Server for this install, besides the fix (alert and log)
-    const fallback = serverFallback(e, route) ? serverRetry({ url, name, onInstalled, params, after, host }, { native, hud, alert, go, later, follow }) : null;
+    const fallback = serverFallback(e, route) ? serverRetry({ url, name, onInstalled, params, after, host, ...(listed ? { listed } : {}) }, { native, hud, alert, go, later, follow }) : null;
     if (fallback) h.page?.help?.(USE_SERVER_LINE, { label: USE_SERVER, action: () => { fallback.run(); } });
     const buttons = [...(fix ? ["OK", fix.button] : ["OK"]), ...(fallback ? [USE_SERVER] : [])];
     const { index } = await alert({ title: e?.code === "malware" ? KNOWN_MALWARE : why.title, message: why.message, buttons, ...(buttons.length > 1 ? { cancel: 0 } : {}) }) || {};
@@ -268,7 +270,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
     if (host) recordSelfUpdate(storageOf(), result?.version);
     // B123: hosted, "Waiting for iOS" until the shell says it is closing
     lockSelfUpdate(h, { later, ...(host ? { label: WAITING_LABEL } : {}) });
-    if (host) followSelfUpdate(h, { native, waiting: true, later, retry: () => installOnDevice({ url, name, onInstalled, params, after, host }, { native, hud, alert, go, later, follow }) });
+    if (host) followSelfUpdate(h, { native, waiting: true, later, retry: () => installOnDevice({ url, name, onInstalled, params, after, host, ...(listed ? { listed } : {}) }, { native, hud, alert, go, later, follow }) });
     return true;
   }
   // iOS asks "Install …?" over the app: the progress page ends on Done (signed and handed to iOS), Return under it.

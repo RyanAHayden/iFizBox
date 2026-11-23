@@ -33,7 +33,7 @@ import { openIpaInstall, markIpaNeeds } from "./ipa-install.js";
 import { ipaInstallAvailable } from "../ipa-install.js";
 import { IPA_FOOTER } from "../core/ipainstall.js";
 import { appQueue } from "../app-queue.js";
-import { appJob, appNavLabel, modifyActions, resignJob, MARK_NOT_INSTALLED, destructiveOf, sizeText as formatSize } from "../core/appqueue.js";
+import { appJob, listedOf, appNavLabel, modifyActions, resignJob, MARK_NOT_INSTALLED, destructiveOf, sizeText as formatSize } from "../core/appqueue.js";
 import { markedVersionOnSource, markedResignJob } from "../core/appqueue.js"; // F221
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
 import { deviceError } from "../core/signing.js"; // B338
@@ -134,7 +134,7 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
   if (o.download && jailbreak) {
     // F88: the helper says whether it installed, so the record waits for its success (openIpaInstall's onInstalled)
     rows.push({ label: o.itms ? "Install IPA" : "Install", subtitle: "With the jailbreak",
-      onClick: () => ipaInstall({ url: o.download, name, onInstalled: () => onInstall() }) });
+      onClick: () => ipaInstall({ url: o.download, name, ...listedOf({ url: o.download, version: own.version, size: own.size }), onInstalled: () => onInstall() }) });
   } else if (o.itms) {
     rows.push({ label: "Install", subtitle: "Signed by the source", onClick: () => { onInstall(); location.href = o.itms; } });
   } else if (o.download && site && !isSelfIpa(o.download)) {
@@ -154,7 +154,7 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
   if (o.download && custom) {
     const run = customize ?? (async (opts) => (await import("../signing-sheet.js")).customInstall(opts));
     rows.push({ label: "Custom Install", subtitle: "Bundle ID, name, icon, extensions",
-      onClick: () => run({ url: o.download, name, onInstalled: () => onInstall() }) });
+      onClick: () => run({ url: o.download, name, ...listedOf({ url: o.download, version: own.version, size: own.size }), onInstalled: () => onInstall() }) });
   }
   if (o.download) rows.push(downloadRow(o.download, opener));
   return { rows: tapOnly(rows), options: o };
@@ -858,7 +858,7 @@ export async function appPageCustom(pkg, source, opts, { queue = appQueue, add =
     job = appJob(pkg, { installed: rec ? rec.version || null : null, version, source: source ? displayName(source) : null });
   }
   if (!job) return custom(opts);
-  return custom({ url: job.url, name: opts?.name || job.name || "", queue: (options) => add({ ...job, options }, { queue }) });
+  return custom({ url: job.url, name: opts?.name || job.name || "", ...listedOf(job), queue: (options) => add({ ...job, options }, { queue }) });
 }
 
 // The website's Install group (F93: it signs in the browser; F92: only Install and Download IPA).

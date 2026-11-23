@@ -21,7 +21,7 @@ class SignAheadKeeps(unittest.TestCase):
     def test_prepare_holds_the_url_download_before_signing(self):
         prep = body(read("SignAhead.swift"), "static func prepare(")
         self.assertIn("let keepIt = record == nil && MyIPAs.wantsKeep(c)", prep)  # not a Re-sign's download
-        dl = prep[prep.index("let d = Sideload.download("):]
+        dl = prep[prep.index("let d = IPAFetch.run("):]
         self.assertIn("signHeld(file, keepIt ? IPALibrary.hold(file, in: SignBridge.work", dl)
         # the held name rides with the kept IPA, and goes when signing fails
         self.assertIn("kept[tok] = Kept(output: output, app: app, record: record, mine: mine)", prep)

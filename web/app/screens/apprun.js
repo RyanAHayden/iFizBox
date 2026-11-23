@@ -40,6 +40,7 @@ import { fitFileNames } from "../core/midtrunc.js";
 import { appRows, createAppRun, rowStatus, helperRow, summaryLine, runStatus, runPercent, ended, isSelf, DIDNT_DOWNLOAD, barOf } from "../core/apprun.js";
 import { recordWhen } from "../core/apprun.js"; // B136
 import { HERE_PARALLEL } from "../core/apprun.js"; // F359
+import { listedOf } from "../core/appqueue.js"; // F400
 import { apps as appStore, undoRecord } from "../core/installed.js"; // B170
 import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, HERE_CLOSING_LINE, DOWNLOAD_HINT, DOWNLOAD_BY_HAND } from "../signing/selfupdate.js";
 import { nativeBridge, hasNativeCall } from "../native.js";
@@ -144,7 +145,7 @@ export function helperLanes({ backend, install, needs, native } = {}) {
         status: () => {},
         progress: (pct) => progress("installing", Math.min(99, Number(pct) || 0) / 100),
       };
-      const res = await install({ url: r.job.url, name: r.name }, view, { ...(native ? { native } : {}), signal });
+      const res = await install({ url: r.job.url, name: r.name, ...listedOf(r.job) }, view, { ...(native ? { native } : {}), signal });
       if (res?.cancelled) throw new Error("cancelled");
       if (!res?.ok) throw new Error(res?.error?.message || res?.error?.title || "the helper didn't install it");
       return { installed: true };

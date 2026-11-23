@@ -69,7 +69,7 @@ import { dailyPick, browseKind, collectionsFor, dayKey } from "../core/catalog.j
 import { readSpins, currentStreak, rouletteRow } from "./roulette-row.js"; // C38: not roulette.js, which imports browse.js
 import { NAME } from "../brand.js";
 import { PACKAGE } from "../brand.js"; // B71: iFizBox's own row never queues its Remove
-import { appJob } from "../core/appqueue.js"; // B71
+import { appJob, listedOf } from "../core/appqueue.js"; // B71
 import { showMenu, longPress, copyText } from "../nav/menu.js";
 const showRowMenu = (...a) => showMenu(...a); // B358: attachRowMenu adds a list's own items
 import { showShareSheet } from "../nav/sharesheet.js";
@@ -1823,7 +1823,7 @@ async function signIfReady(app, v, record) {
   // F75: Install goes straight to signAndInstall, which opens the Signing walkthrough at the missing step when the
   // certificate or the server isn't there yet (no sheet first, no alert)
   if (!url || !localSigning()) return false;
-  await signAndInstall({ url, name: app.name, bundleId: app.bundleIdentifier || null, onInstalled: () => record?.() }); // F243: the original-app check
+  await signAndInstall({ url, name: app.name, bundleId: app.bundleIdentifier || null, ...listedOf({ url, version: v?.version, size: v?.size }), onInstalled: () => record?.() }); // F400; F243: the original-app check
   return true;
 }
 

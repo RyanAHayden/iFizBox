@@ -95,7 +95,11 @@ enum Apt {
             }
             let stream = (c.params["stream"] as? Bool) ?? false
             DispatchQueue.global(qos: .userInitiated).async {
-                do { reply(c, try Helper.run(words, emit: stream ? { c.emitOnMain($0) } : nil), nil) }
+                do {
+                    let r = try Helper.run(words, emit: stream ? { c.emitOnMain($0) } : nil)
+                    if words.first == "uninstall-app", words.count > 1, r["code"] as? Int == 0 { WaitingIPA.remove(app: words[1]) } // F400
+                    reply(c, r, nil)
+                }
                 catch let e as BridgeError { reply(c, nil, e.text) }
                 catch { reply(c, nil, "helper: \(error.localizedDescription)") }
             }
@@ -118,7 +122,7 @@ enum Apt {
             let stream = (c.params["stream"] as? Bool) ?? false
             // B113: insecure: true is the page's Install Anyway (web/app/ipa-install.js): plain http, no https twin
             let insecure = c.params["insecure"] as? Bool == true
-            IPAInstall.run(url, insecure: insecure, keep: MyIPAs.wantsKeep(c), // F380
+            IPAInstall.run(url, listed: .init(c.params), insecure: insecure, keep: MyIPAs.wantsKeep(c), // F380
                            emit: stream ? { c.emitOnMain($0) } : nil) { reply(c, $0, $1) }
         }
         // F196: ipa.cancel, the IPA install page's Cancel (web/app/screens/ipa-install.js): stops ipa.install's download,
@@ -529,7 +533,7 @@ enum IPAInstall {
     // through F238's PlainDownload (Network.framework; no ATS exception). The file lands at `path` (in `dir`, where
     // the helper takes IPAs from); progress goes out as dlstatus lines. -> the running download, for ipa.cancel.
     static func fetchHTTP(_ url: URL, twin: URL, insecure: Bool, to path: String, emit: (([[String: Any]]) -> Void)?,
-                          done: @escaping (String?) -> Void) -> DebFetch {
+                          answer: (([String: String]) -> Void)? = nil, done: @escaping (String?) -> Void) -> DebFetch {
         let dest = URL(fileURLWithPath: path)
         var shown = -1
         let progress = { (p: Double) in
@@ -547,9 +551,9 @@ enum IPAInstall {
         }
         if insecure {
             NSLog("[ipa.install] plain http download (Install Anyway): %@", url.absoluteString)
-            return PlainDownload.start(url, to: dest, max: SignBridge.maxIPA, progress: progress, done: finished)
+            return PlainDownload.start(url, to: dest, max: SignBridge.maxIPA, progress: progress, answer: answer, done: finished)
         }
-        return Download.start(twin, to: dest, max: SignBridge.maxIPA, timeout: Sideload.twinTimeout, progress: progress) { err in
+        return Download.start(twin, to: dest, max: SignBridge.maxIPA, timeout: Sideload.twinTimeout, progress: progress, answer: answer) { err in
             guard let e = err else { return finished(nil) }
             if !Sideload.twinMissing(e) { return finished(e) }
             NSLog("[ipa.install] no https twin for %@ (%@)", url.absoluteString, e)
@@ -559,7 +563,8 @@ enum IPAInstall {
 
     // F380: `keep` (keepInLibrary: true, a custom install) moves the download into My IPAs once the helper installed
     // it (it installs from a copy of its own), instead of removing it; the reply adds {libraryFile}.
-    static func run(_ url: URL, insecure: Bool = false, keep: Bool = false, emit: (([[String: Any]]) -> Void)?,
+    // F400: an IPA downloaded by an install that failed is used again (IPAFetch.waiting), checked as the sideload app's.
+    static func run(_ url: URL, listed: WaitingIPA.Listed = .init(), insecure: Bool = false, keep: Bool = false, emit: (([[String: Any]]) -> Void)?,
                     done finished: @escaping (Any?, String?) -> Void) {
         let job = Run()
         runLock.lock(); running = job; runLock.unlock()
@@ -571,7 +576,6 @@ enum IPAInstall {
         do {
             try fm.createDirectory(atPath: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         } catch { return done(nil, "install: can't make \(dir): \(error.localizedDescription)") }
-        emit?([["fd": "status", "line": "dlstatus:ipa:0:Downloading"]])
         // The downloaded IPA at `path` (in dir) to the helper, then removed.
         let install = { (path: String) in
             DispatchQueue.global(qos: .userInitiated).async {
@@ -584,6 +588,7 @@ enum IPAInstall {
                     let code = r["code"] as? Int ?? 1
                     let out = r["stdout"] as? String ?? "", errText = r["stderr"] as? String ?? ""
                     if code == 0 {
+                        WaitingIPA.remove(url.absoluteString) // F400: installed
                         let id = out.split(separator: "\n").last { $0.hasPrefix("Installed ") }.map { String($0.dropFirst(10)) }
                         var ok: [String: Any] = ["code": 0, "stdout": out, "stderr": errText, "bundleId": id ?? ""]
                         if keep, let f = SignBridge.queue.sync(execute: { MyIPAs.keepDownload(URL(fileURLWithPath: path), url: url) }) {
@@ -593,18 +598,47 @@ enum IPAInstall {
                     }
                     let why = errText.split(separator: "\n").last { $0.hasPrefix("ifizbox-helper: ") }
                         .map { String($0.dropFirst(16)) } ?? "ifizbox-helper exited with \(code)"
+                    if code == 64, !WaitingIPA.sound(URL(fileURLWithPath: path)) { WaitingIPA.remove(url.absoluteString) } // F400: damaged
                     let kind = code == 64 ? "bad_ipa" : code == 69 ? "no_adhoc" : code == 77 ? "helper" : "install"
                     done(nil, "\(kind): \(why)")
                 } catch let e as BridgeError { done(nil, e.text) }
                 catch { done(nil, "helper: \(error.localizedDescription)") }
             }
         }
+        // F400: the download at `path`, kept until it is installed
+        let downloaded = { (path: String, answer: WaitingIPA.Answer) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                WaitingIPA.keep(URL(fileURLWithPath: path), url: url.absoluteString, listed: listed, answer: answer, link: false, hash: IPAHash.of)
+                install(path)
+            }
+        }
+        let kept = dir + "/" + UUID().uuidString + ".ipa"
+        IPAFetch.waiting(url, listed: listed, plain: insecure, to: URL(fileURLWithPath: kept), link: false, began: { check in
+            runLock.lock(); job.fetch = check; let early = job.cancelled; runLock.unlock()
+            if early { check.cancel() }
+        }, log: { emit?([["fd": "out", "line": $0]]) }) { found in
+            runLock.lock(); let stop = job.cancelled; job.fetch = nil; runLock.unlock()
+            if stop { try? FileManager.default.removeItem(atPath: kept); return done(nil, "cancelled: Cancelled") }
+            if found != nil {
+                emit?([["fd": "out", "line": IPAFetch.usingLine(URL(fileURLWithPath: kept))]])
+                return install(kept)
+            }
+            download(url, insecure: insecure, job: job, emit: emit, downloaded: downloaded, done: done)
+        }
+    }
+
+    // ipa.install's download, when no IPA waits for `url`.
+    private static func download(_ url: URL, insecure: Bool, job: Run, emit: (([[String: Any]]) -> Void)?,
+                                 downloaded: @escaping (String, WaitingIPA.Answer) -> Void, done: @escaping (Any?, String?) -> Void) {
+        let fm = FileManager.default
+        emit?([["fd": "status", "line": "dlstatus:ipa:0:Downloading"]])
         // B113: http links: the https twin, or "insecure" for the page to ask, or plain http after Install Anyway.
         if let twin = Sideload.httpsTwin(url) {
             let path = dir + "/" + UUID().uuidString + ".ipa"
-            let fetch = fetchHTTP(url, twin: twin, insecure: insecure, to: path, emit: emit) { err in
+            var answer = WaitingIPA.Answer(plain: insecure)
+            let fetch = fetchHTTP(url, twin: twin, insecure: insecure, to: path, emit: emit, answer: { answer.headers = $0 }) { err in
                 if let e = err { try? fm.removeItem(atPath: path); return done(nil, e) }
-                install(path)
+                downloaded(path, answer)
             }
             runLock.lock(); job.fetch = fetch; let stop = job.cancelled; runLock.unlock()
             if stop { fetch.cancel() }
@@ -622,7 +656,7 @@ enum IPAInstall {
             let path = dir + "/" + UUID().uuidString + ".ipa"
             do { try FileManager.default.moveItem(atPath: tmp.path, toPath: path) }
             catch { return done(nil, "install: can't keep the download: \(error.localizedDescription)") }
-            install(path)
+            downloaded(path, WaitingIPA.Answer(headers: IPAFetch.headers(http)))
         }
         runLock.lock(); job.task = task; let early = job.cancelled; runLock.unlock()
         if early { task.cancel() }
