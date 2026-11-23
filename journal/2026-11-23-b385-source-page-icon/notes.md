@@ -10,12 +10,13 @@ banner is drawn there. The picture that filled the screen was an app row's icon.
 
 F384 put app rows on the source page as `.cell-icon.alt-app-icon`. `.alt-app-icon img` is `position: absolute; inset: 0;
 100%`, but `.alt-app-icon` itself was not positioned. Its other user, `.pkg-icon`, is `position: relative`, so the image
-filled the nearest positioned ancestor, `.page-body`. Every style was affected, not only iOS 26.
+filled the nearest positioned ancestor, `.page-body`. Seen in iOS 6 and iOS 26; the rule is shared, so iOS 7
+and 13 should have had it too.
 
 ## Fix
 
 - `web/app/altstore.css`: `.alt-app-icon` gets `position: relative`.
-- `web/app/sourcepage.js` needed no change.
+- `web/app/screens/sourcepage.js` needed no change.
 - New test `web/app/alt-app-icon-css.test.js` checks that `.alt-app-icon` and `.source-head-icon` are positioned and
   that their `img` is absolute. It passes. It also covers `.source-head-icon`, which has the same pattern.
 
@@ -25,9 +26,9 @@ filled the nearest positioned ancestor, `.page-body`. Every style was affected, 
   17 Pro Max, iOS 26 dark OLED (`ios26:dark:oled`) and iOS 6 light Classic.
 - A stand-in picture appended to the icon slot is 29x29. The iOS 26 screenshot shows the header card and the row right.
 - With the slot forced back to static, the ancestors' computed positions show `.page-body` is the first positioned one.
-- An earlier measurement of the unfixed size gave 408x71 and 420x73, the row and not the screen. It was taken while the
-  row was probably still sliding. A transform makes a containing block; that is inferred, not measured. So it was not a
-  reproduction of the full-screen case.
+- Reproduced at rest: with the slot static the picture measures 440x956, the whole screen, in both styles; 29x29 with
+  the fix. A measurement 0.3 s after adding it gave 408x71 and 420x73, the row: the row was probably still sliding (a
+  transform makes a containing block; inferred).
 
 ## Process notes
 
