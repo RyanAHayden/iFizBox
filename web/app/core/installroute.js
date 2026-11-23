@@ -137,8 +137,8 @@ export const ALERTS = {
   otherVPNTailscale: { title: "Another VPN Is On", message: "Installing on this iPhone needs the Tailscale app's VPN, and iOS runs one VPN at a time. Turn Tailscale on, or install through the Signing Server.", buttons: ["OK"] },
   tailscaleConnect: { title: "Tailscale Is On", message: "This install goes through the Signing Server because Connect With is LocalDevVPN. Pick Automatic in Settings > Installation & Signing > This iPhone to install through Tailscale.", buttons: ["OK"] },
   // F372 (user 2026-11-22): on cellular without the Cellular Shortcuts. `setup` opens their page (the install stops);
-  // `idevice` tries This iPhone anyway (cellular data may be off by hand).
-  cellular: { title: CELLULAR.title, message: CELLULAR.message, buttons: ["Use Server", "Try Anyway", CELLULAR.button], idevice: 1, setup: 2 },
+  // the other button installs through the Signing Server. No Try Anyway: the user found This iPhone always fails there.
+  cellular: { title: CELLULAR.title, message: CELLULAR.message, buttons: ["Use Server", CELLULAR.button], setup: 1 },
 };
 
 // F284: the Tailscale app's VPN is on: idevice.status's tailscale.address is this phone's own tailnet address, there
