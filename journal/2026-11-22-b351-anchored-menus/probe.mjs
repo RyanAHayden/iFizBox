@@ -64,10 +64,11 @@ await send("Page.addScriptToEvaluateOnNewDocument", { source: `window.ifizboxNat
 
 const results = {};
 try {
-  for (const style of ["ios26", "ios6", "ios7", "ios13"]) {
+  for (const [era, tone] of [["ios26", "light"], ["ios26", "dark"], ["ios6", "light"], ["ios7", "light"], ["ios13", "light"]]) {
+    const style = tone === "dark" ? `${era}-dark` : era;
     await send("Page.navigate", { url: base + "#/installed" });
     await sleep(800);
-    await ev(`localStorage.setItem("ifizbox.style", ${JSON.stringify(style)}); true`);
+    await ev(`localStorage.setItem("ifizbox.style", ${JSON.stringify(era)}); localStorage.setItem("ifizbox.appearance", ${JSON.stringify(tone)}); true`);
     await send("Page.reload");
     for (let i = 0; i < 60 && !(await ev("!!document.querySelector('#navbar .bar-button')").catch(() => false)); i++) await sleep(200);
     await sleep(1500);
@@ -100,7 +101,7 @@ try {
         await sleep(600);
       }
       results[style][mode] = opens;
-      if (style === "ios26") { // frames of the grow, paused at fixed times
+      if (era === "ios26") { // frames of the grow, paused at fixed times
         await tapAt(at);
         await sleep(30);
         for (const t of [0, 60, 140, 380]) {
@@ -110,13 +111,7 @@ try {
         }
         await ev(`for (const a of document.getAnimations()) a.finish?.(); (document.querySelector('.action-dim') || {}).click?.(); true`);
         await sleep(600);
-        // and dark
       }
-    }
-    if (style === "ios26") {
-      await ev(`localStorage.setItem("ifizbox.appearance", "dark"); true`);
-      await send("Page.reload");
-      await sleep(2500);
     }
   }
   results.errors = errors;

@@ -91,6 +91,16 @@ test("placeMenu: covers the button, its corner pinned, and stays in the room", (
   at = placeMenu({ x: 2, y: 64, width: 40, height: 38 }, { width: 250, height: 900 }, room, 390);
   assert.equal(at.left, 8);
   assert.equal(at.maxHeight, 736);
+  // a button reaching above the room: the menu starts at the room's top and still ends inside it
+  at = placeMenu({ x: 10, y: 40, width: 80, height: 38 }, { width: 250, height: 900 }, room, 390);
+  assert.equal(at.top, 60);
+  assert.equal(at.top + at.maxHeight, 800);
+});
+
+test("the package page's Install / Modify sheets name their button as the source", () => {
+  const js = readFileSync(new URL("../screens/browse.js", import.meta.url), "utf8");
+  assert.match(js, /async function packageActions\(route, button\) \{\n  sheetFrom = button/);
+  assert.match(js, /showActionSheet\(\{ title, from: sheetFrom/);
 });
 
 test("the menu animates transform and opacity only, and the Select… sheet comes out of Select…", () => {

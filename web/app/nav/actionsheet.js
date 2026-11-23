@@ -107,11 +107,13 @@ const MENU_GAP = 8; // px kept clear of the screen's edges and safe areas (the r
 // button's left, or its right edge at the button's right for a button on the right half. Clamped into the room;
 // `maxHeight` is set when the menu is taller than the room on its side. -> { left, top, maxHeight, down, right }.
 export function placeMenu(a, size, room, viewWidth = room.right + room.left) {
-  const below = room.bottom - a.y, above = a.y + a.height - room.top;
+  // measured from the button's edges clamped into the room (a button partly outside it still keeps the menu in)
+  const start = Math.max(a.y, room.top), end = Math.min(a.y + a.height, room.bottom);
+  const below = room.bottom - start, above = end - room.top;
   const down = below >= size.height || below >= above;
   const fits = down ? below : above;
   const height = Math.min(size.height, fits);
-  const top = down ? a.y : a.y + a.height - height;
+  const top = down ? start : end - height;
   const right = a.x + a.width / 2 > viewWidth / 2;
   let left = right ? a.x + a.width - size.width : a.x;
   left = Math.max(room.left, Math.min(left, room.right - size.width));

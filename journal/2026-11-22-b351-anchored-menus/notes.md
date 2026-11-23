@@ -39,4 +39,13 @@ click with no pointerdown) and how long the caller took before opening the sheet
   `showActionSheet` call with no `from` from a nav bar button tap, which is the path browse.js's Modify takes.
 - Safe-area insets in Chromium: the emulation has none, so the room probe's inset handling was seen only with zero
   insets (the menu clamps to 8px from the top there).
-- The dark theme frames of the menu were not shot (the tokens are defined for dark; the unit and palette tests pass).
+- The open/close morph scales the menu non-uniformly from the button's rect, so text stretches for a few frames
+  mid-animation; iOS 26's own menu morphs its shape instead. Judged acceptable at 220-380 ms; not compared with a
+  real iOS 26 menu side by side.
+
+## Spec review
+Fixed: the package page's Install / Modify sheets now name their button (`browse.js` `sheetFrom`) instead of
+relying on the last click; `placeMenu` measures from the button's edges clamped into the room (a button above the
+room left the menu running past the bottom); the probe now shoots iOS 26 dark (light and dark both checked, same
+rect each open). Kept: the click listener in `watchTaps` (it is the fix for taps that reach the page as a click
+only), no Cancel in the menu (UIMenu has none).
