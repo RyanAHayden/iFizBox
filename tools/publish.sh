@@ -4,7 +4,8 @@
 #   tools/publish.sh X.Y.Z [--notes FILE] [--minimum X.Y.Z] [--dry-run]
 #
 #   1. checks: on main, no uncommitted changes, up to date with origin, X.Y.Z newer than the last v* tag
-#   2. writes native/VERSION, commits "Version X.Y.Z" and pushes it
+#   2. writes native/VERSION, deletes release-notes/*.md (README.md stays; a copy is the default notes), commits
+#      "Version X.Y.Z" and pushes it
 #   3. builds that commit in a clean temporary worktree and publishes it with tools/release.sh --tag-source:
 #      iFizBox.ipa, the .debs and iFizBox's own APT repo, as the repo owner's GitHub account, under tag vX.Y.Z on a
 #      commit that adds the updated AltStore source (web/app/source.json, the built-in source) to the built one
@@ -50,21 +51,34 @@ if [ $dry = 0 ]; then
   tools/deploy.sh --check-auth || die "wrangler can't deploy https://$BRAND_DOMAIN (see above)"
 fi
 
-# 2. the version commit
-if [ "$(cat native/VERSION)" != "$version" ]; then
-  echo "$version" > native/VERSION
-  if [ $dry = 0 ]; then
-    git commit -q -m "Version $version" native/VERSION
+tmp=$(mktemp -d)
+trap 'git worktree remove --force "$tmp/w" >/dev/null 2>&1 || true; rm -rf "$tmp"; [ $dry = 1 ] && git checkout -q -- native/VERSION' EXIT
+
+# D27: the release notes waiting in release-notes/*.md (one per task; README.md stays). release.sh reads a copy of
+# them as the default notes (when no --notes), and the version commit deletes them, so the next release starts empty.
+mkdir "$tmp/release-notes"
+notefiles=() # committed ones only: an untracked file is someone's unfinished work, left alone
+while IFS= read -r f; do
+  if [ "$f" != release-notes/README.md ]; then notefiles+=("$f"); fi
+done < <(git ls-files -- 'release-notes/*.md')
+[ ${#notefiles[@]} = 0 ] || cp "${notefiles[@]}" "$tmp/release-notes/"
+echo "publish: ${#notefiles[@]} release note(s) in release-notes/"
+
+# 2. the version commit (with the release notes deleted)
+[ "$(cat native/VERSION)" = "$version" ] || echo "$version" > native/VERSION
+if [ $dry = 0 ]; then
+  git add native/VERSION
+  [ ${#notefiles[@]} = 0 ] || git rm -q -- "${notefiles[@]}"
+  if ! git diff --cached --quiet -- native/VERSION release-notes; then
+    git commit -q -m "Version $version" -- native/VERSION release-notes
     git push -q origin main
   fi
 fi
 
 # 3. build and publish from a clean worktree of exactly that commit (the runner may merge into main meanwhile)
-tmp=$(mktemp -d)
-trap 'git worktree remove --force "$tmp/w" >/dev/null 2>&1 || true; rm -rf "$tmp"; [ $dry = 1 ] && git checkout -q -- native/VERSION' EXIT
 git worktree add -q --detach "$tmp/w" HEAD
 [ $dry = 1 ] && echo "$version" > "$tmp/w/native/VERSION"
-(cd "$tmp/w" && tools/release.sh "${pass[@]}" --tag-source --out "$tmp/out")
+(cd "$tmp/w" && IFIZBOX_RELEASE_NOTES_DIR="$tmp/release-notes" tools/release.sh "${pass[@]}" --tag-source --out "$tmp/out")
 if [ $dry = 1 ]; then
   echo "publish: dry run: a real run would merge v$version into main, push it and deploy https://$BRAND_DOMAIN from it (tools/deploy.sh v$version)"
   echo "publish: dry run done; nothing was committed or published"

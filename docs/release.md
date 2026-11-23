@@ -82,6 +82,35 @@ never goes through the local install server, because iOS closes iFizBox, and the
 installing. Instead it is signed on the phone and held on the Signing Server (worker/, `POST /sign/host`) for iOS to install from, or, with no
 bridge to sign with, the user is sent to ifizbox.com in Safari.
 
+## Release notes
+
+Notes are kept as we go: a task that changes something users see adds `release-notes/<ID>.md` with one plain
+sentence (what a user notices or must do; no task IDs, file/API names or internal terms). One file per task, so
+merges never clash.
+
+The release reads only `release-notes/*.md` (not the commits) and writes the notes from them:
+
+- 4 short summary lines first, each under about 60 characters, the most important first (the app shows these).
+- Then at most 6 bullets, one sentence each. Small fixes go together in one "Smaller fixes" bullet.
+- Internal-only changes are left out.
+
+Example:
+
+```
+Install apps straight from a source's page.
+Updates now download in the background.
+Search finds packages by their author.
+Faster start on older iPhones.
+
+- Tap Get on any app in a source to sign and install it on the phone.
+- Updates keep downloading when you leave the app, and Changes shows their progress.
+- Smaller fixes: the Sources list no longer jumps when it reloads, and long package names wrap.
+```
+
+Pass that file as `--notes`. Without `--notes`, `release.sh` makes the notes from the same files, one bullet per
+file. `publish.sh` deletes the committed files (all but `release-notes/README.md`) in its version commit, so the
+next release starts empty.
+
 ## Cutting one
 
 One command does all of it: `tools/publish.sh X.Y.Z [--notes FILE] [--minimum X.Y.Z] [--dry-run]`. It checks main is
@@ -159,8 +188,9 @@ Options:
 - `--dist DIR`: publish `DIR/iFizBox.deb` and `DIR/iFizBox.ipa` as they are, without building.
 - `--draft`: create a draft. The app ignores drafts (and GitHub's `releases/latest` doesn't return them) until it
   is published on the site.
-- Without `--notes`, the notes are the commit subjects since the last `v*` tag (minus `plan:` commits), followed by
-  the standard footer about the two files. Those subjects are long, so write notes for a real release.
+- Without `--notes`, the notes are one bullet per `release-notes/*.md` ("Release notes" above), or, when there are
+  none, "Smaller fixes and improvements.", followed by the standard footer about the two files. The commit subjects
+  are never used. Write the notes from those files for a real release.
 - `IFIZBOX_RELEASE_REPO=owner/name` publishes somewhere else, for a trial run on a fork.
 - `--minimum X.Y.Z`: the oldest iFizBox that may keep running without upgrading first (above).
 - `--out DIR`: also leave `Packages`, `Packages.gz`, `Release`, the notes and the updated `source.json` in DIR. With

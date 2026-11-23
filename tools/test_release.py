@@ -45,12 +45,13 @@ class Release(unittest.TestCase):
             plistlib.dump({"CFBundleShortVersionString": ipa_version, "CFBundleIdentifier": "com.ryha.ifizbox"}, f)
         mkipa.build(app, os.path.join(self.dist, "iFizBox.ipa"), mtime=0)
 
-    def dry_run(self, *extra, env_extra=None):
+    def dry_run(self, *extra, env_extra=None, notes_file=True):
         notes = os.path.join(self.tmp, "notes.md")
         with open(notes, "w") as f:
             f.write("- A test release\n")
         env = {k: v for k, v in os.environ.items()
-               if k not in ("IFIZBOX_RELEASE_REPO", "IFIZBOX_PIRACY_SYNC_ARGS", "IFIZBOX_RELEASE_HISTORY")}
+               if k not in ("IFIZBOX_RELEASE_REPO", "IFIZBOX_PIRACY_SYNC_ARGS", "IFIZBOX_RELEASE_HISTORY",
+                            "IFIZBOX_RELEASE_NOTES_DIR")}
         # T47's stray-file check looks at an empty checkout, so a leftover in this one's web/app/ doesn't fail these
         # (tools/test_stray_check.py tests that check)
         clean = os.path.join(self.tmp, "clean")
@@ -58,8 +59,45 @@ class Release(unittest.TestCase):
             subprocess.run(["git", "init", "-q", clean], check=True)
         env["IFIZBOX_STRAY_ROOT"] = clean
         env.update(env_extra or {})
-        return subprocess.run([SCRIPT, "--dry-run", "--dist", self.dist, "--notes", notes, *extra], cwd=ROOT,
+        args = ["--notes", notes] if notes_file else []
+        return subprocess.run([SCRIPT, "--dry-run", "--dist", self.dist, *args, *extra], cwd=ROOT,
                               env=env, capture_output=True, text=True, timeout=60)
+
+    def test_notes_from_release_notes_files(self):
+        """D27: without --notes, the notes are one bullet per release-notes/*.md (README.md left out), then the
+        footer; not the commit subjects."""
+        self.fake_build("%s-7" % VERSION, VERSION)
+        notesdir = os.path.join(self.tmp, "release-notes")
+        os.makedirs(notesdir)
+        for name, text in (("F1.md", "Apps install straight from a source's page.\n"),
+                           ("B2.md", "Search no longer\nskips packages with long names.\n"),
+                           ("README.md", "How to write these.\n")):
+            with open(os.path.join(notesdir, name), "w") as f:
+                f.write(text)
+        out = os.path.join(self.tmp, "out")
+        r = self.dry_run("--out", out, notes_file=False, env_extra={"IFIZBOX_RELEASE_NOTES_DIR": notesdir})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(os.path.join(out, "notes.md")) as f:
+            lines = f.read().splitlines()
+        self.assertEqual(lines[:3], ["- Search no longer skips packages with long names.",
+                                     "- Apps install straight from a source's page.", ""])
+        self.assertNotIn("How to write these.", "\n".join(lines))
+        self.assertIn("rootless jailbreak build", lines[-1])
+        self.assertIn("  - Apps install straight from a source's page.", r.stdout)
+
+    def test_notes_without_files_skip_commits(self):
+        """D27: with no release-notes files, the default notes are one plain line, never the commit subjects."""
+        self.fake_build("%s-7" % VERSION, VERSION)
+        empty = os.path.join(self.tmp, "none")
+        os.makedirs(empty)
+        out = os.path.join(self.tmp, "out")
+        r = self.dry_run("--out", out, notes_file=False, env_extra={"IFIZBOX_RELEASE_NOTES_DIR": empty})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(os.path.join(out, "notes.md")) as f:
+            notes = f.read()
+        self.assertTrue(notes.startswith("Smaller fixes and improvements.\n\n"), notes)
+        self.assertNotIn("\n- ", notes)
+        self.assertIn("rootless jailbreak build", notes)
 
     def assets(self, out):
         line = next(l for l in out.splitlines() if l.startswith("release: assets: "))

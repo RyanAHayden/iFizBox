@@ -90,6 +90,8 @@ UI concepts (a screen proposed before it's built) go through the concept skill, 
   stalls every phone task for its 30-minute stale timeout.
 - License: GPL-3.0-or-later. Code taken from GPLv3 projects (Cydia) is fine; never copy code under a license GPLv3 can't include.
 - Write findings worth keeping to `journal/<ID>/notes.md`.
+- A task that changes something users see adds `release-notes/<ID>.md`: one plain sentence on what a user notices or
+  must do, no task IDs, file/API names or internal terms (`release-notes/README.md`).
 
 ## The main checkout
 
