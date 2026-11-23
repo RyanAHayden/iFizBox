@@ -6,9 +6,10 @@
 // native/Sources/NativeGlass.swift). The screens already scroll under both bars, so the glass refracts the page.
 //
 // The CSS bars stay in the page underneath. While the shell's bars are up, <html data-glass="native"> is set, and each
-// look-alike the glass bars cover right now carries data-glass-shown, which ios26.css hides. Whenever the glass
-// can't follow the page it hides and the look-alike shows at once: the buttons while their nav item slides (a push, a
-// pop, the edge swipe), either part while a popup is up or one of the page's own sheets or pages covers it. A tap on
+// look-alike the glass bars cover right now carries data-glass-shown, which ios26.css hides. The buttons stay glass
+// through a page slide (B382): the shell cross-fades them to the coming page's (slideGlass), as iOS 26's own nav bar
+// does, and both pages' look-alikes stay see-through. Whenever the glass can't follow the page it hides and the
+// look-alike shows at once: while a popup is up or one of the page's own sheets or pages covers it. A tap on
 // the glass comes back as {tap} and clicks the look-alike, so tabs and buttons run their own handlers (a tab's
 // reselect, Back, a button's action).
 //
@@ -24,7 +25,9 @@ export const GLASS_KEY = "bars";
 const POPUP = '[aria-modal="true"], [role="dialog"], [role="alertdialog"]'; // nav/popups.js POPUPS, inline (startup modules)
 
 // held: the buttons the shell last showed, kept in every snapshot while they hide (B346, buttonsSnapshot)
-const st = { open: false, ready: false, failed: false, retryAt: 0, sent: null, iconsSent: new Set(), byId: new Map(), held: null };
+// shown: the glass buttons are up now; slide: the running slide's coming nav item, its buttons and timing
+// (slideGlass); blocked: at the last rest without a popup, a sheet or page covered the buttons
+const st = { open: false, ready: false, failed: false, retryAt: 0, sent: null, iconsSent: new Set(), byId: new Map(), held: null, shown: false, slide: null, parts: null, blocked: false };
 let watching = false;
 let queued = false;
 
@@ -35,10 +38,11 @@ export function glassWanted(doc = globalThis.document, native = nativeBridge()) 
 }
 
 const round = (n) => Math.round(n * 2) / 2;
-function rectOf(el, win) {
+// off: how far a slide has moved it (in WebKit's 1/64px units, so a float error never rounds it another way than at rest)
+function rectOf(el, win, off = 0) {
   const r = el.getBoundingClientRect();
   const vv = win.visualViewport;
-  return { x: round(r.left - (vv?.offsetLeft ?? 0)), y: round(r.top - (vv?.offsetTop ?? 0)), width: round(r.width), height: round(r.height) };
+  return { x: round(Math.round((r.left - off) * 64) / 64 - (vv?.offsetLeft ?? 0)), y: round(r.top - (vv?.offsetTop ?? 0)), width: round(r.width), height: round(r.height) };
 }
 const shows = (el) => !!el && !el.hidden && (!el.getClientRects || el.getClientRects().length > 0);
 
@@ -174,28 +178,64 @@ function placeIds(els) {
   return els.map((b) => (b.closest?.(".nav-left") ? `l${left++}` : `r${right++}`));
 }
 
-// While the buttons hide (a slide, a popup, a sheet over them), the snapshot keeps the ones the shell last showed
-// (st.held), so the views stay as they were and nothing is sent each frame as the slide moves the look-alikes.
+// While the buttons hide (a popup, a sheet over them), the snapshot keeps the ones the shell last showed (st.held), so
+// the views stay as they were. While a page slide moves two nav items: the coming page's buttons where they come to
+// rest, once the slide knows which page that is (slideGlass), else (the edge swipe under the finger) the ones shown;
+// nothing is sent as the look-alikes move, and what that page changes meanwhile shows when the slide ends. Glass that
+// one of the page's sheets or pages covered when the slide began stays away until it ends.
+// covers: every look-alike the glass stands in for; els/places: those a tap on the glass clicks.
 function buttonsSnapshot(doc, win, popup) {
+  const hide = { buttons: st.held ?? [], buttonsHidden: true, covers: [], els: [], places: [] };
+  const sliding = [...(doc.querySelectorAll?.(".nav-stack.is-active > .nav-item.is-moving") ?? [])];
+  if (sliding.length) {
+    if (popup || moving(sliding[0].parentElement, doc)) return hide;
+    // Glass not up yet (a popup just closed, or the shell hasn't answered) comes with the slide, already the coming page's.
+    if (!st.shown && (st.blocked || !st.ready || !st.slide)) return hide;
+    const buttons = st.slide?.buttons ?? st.held ?? [];
+    return { buttons, buttonsHidden: false, covers: sliding.flatMap(buttonEls), els: [], places: [] };
+  }
+  st.slide = null;
   const tops = [...(doc.querySelectorAll?.(".nav-stack.is-active > .nav-item.is-top") ?? [])];
   const item = tops.length === 1 ? tops[0] : null;
-  const els = item ? [...item.querySelectorAll(".nav-left .bar-button, .nav-right .bar-button")].filter((b) => shows(b) && b.getBoundingClientRect().width > 0) : [];
-  const hidden = !item || popup || moving(item, doc) || els.some((b) => covered(b, doc));
-  if (hidden) return { buttons: st.held ?? [], buttonsHidden: true, els: [], places: [] };
+  const els = item ? buttonEls(item) : [];
+  if (popup) return hide;
+  st.blocked = !item || moving(item, doc) || els.some((b) => covered(b, doc));
+  if (st.blocked) return hide;
+  return { buttons: buttonsOf(item, els, win), buttonsHidden: false, covers: els, els, places: placeIds(els) };
+}
+
+function buttonEls(item) {
+  return [...item.querySelectorAll(".nav-left .bar-button, .nav-right .bar-button")].filter((b) => shows(b) && b.getBoundingClientRect().width > 0);
+}
+
+// The buttons as the shell shows them, at their place at rest (a sliding item is translated off its stack's left edge).
+function buttonsOf(item, els, win) {
+  const off = item.classList.contains("is-moving") ? item.getBoundingClientRect().left - item.parentElement.getBoundingClientRect().left : 0;
   const places = placeIds(els);
-  const buttons = els.map((b, i) => {
+  return els.map((b, i) => {
     const cs = win.getComputedStyle(b);
     const kind = b.classList.contains("back") ? "back" : b.classList.contains("done") ? "done" : "plain";
     const bg = cs.backgroundColor;
+    const glyph = b.classList.contains("bar-icon") ? iconOf(b, win) : null;
     return {
-      id: places[i], rect: rectOf(b, win), kind, title: b.classList.contains("bar-icon") ? "" : b.textContent.trim(),
+      id: places[i], rect: rectOf(b, win, off), kind, title: b.classList.contains("bar-icon") ? "" : b.textContent.trim(),
       label: b.getAttribute("aria-label") ?? "", size: parseFloat(cs.fontSize) || 15, weight: weightOf(cs), color: cs.color,
       tint: kind === "done" && bg && !/rgba\(0, 0, 0, 0\)|transparent/.test(bg) ? bg : null,
       disabled: b.disabled === true || b.getAttribute("aria-disabled") === "true",
-      icon: b.classList.contains("bar-icon") ? iconOf(b, win) : null,
+      icon: glyph && { ...glyph, rect: { ...glyph.rect, x: round(glyph.rect.x - off) } },
     };
   });
-  return { buttons, buttonsHidden: false, els, places };
+}
+
+// B382: a page slide to nav item `item` runs `ms` from now (app.js slide(), a push, a pop, the end of a swipe): the
+// shell's buttons cross-fade to that page's over the slide. A slide back to the page on top (a cancelled swipe)
+// changes nothing.
+export function slideGlass({ item, ms, easing }, doc = globalThis.document, native = nativeBridge(), win = globalThis) {
+  if (!glassWanted(doc, native)) return;
+  // measured once, before the slide's first frame: under a running animation WebKit's rects move between two reads
+  const buttons = buttonsOf(item, buttonEls(item), win);
+  st.slide = { item, ms, buttons, curve: easing?.match(/-?[\d.]+/g)?.map(Number) };
+  syncGlass(doc, native, win);
 }
 
 function colorsOf(doc, win) {
@@ -214,10 +254,10 @@ export function glassSnapshot(doc = globalThis.document, win = globalThis, nativ
   if (!glassWanted(doc, native)) return null;
   const popup = popupUp(doc);
   const tabbar = tabbarSnapshot(doc, win, popup);
-  const { buttons, buttonsHidden, els, places } = buttonsSnapshot(doc, win, popup);
+  const { buttons, buttonsHidden, covers, els, places } = buttonsSnapshot(doc, win, popup);
   const root = doc.documentElement;
   const dark = root.getAttribute("data-theme") === "dark";
-  return { snap: { scale: win.devicePixelRatio || 3, dark, colors: colorsOf(doc, win), tabbar, buttons, buttonsHidden }, els, places };
+  return { snap: { scale: win.devicePixelRatio || 3, dark, colors: colorsOf(doc, win), tabbar, buttons, buttonsHidden }, covers, els, places };
 }
 
 // ---- keeping the shell in step --------------------------------------------------------------------------------------
@@ -253,6 +293,11 @@ function fadeUnder(el) {
   fades.set(el, el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FADE_MS, easing: "ease-out" }));
 }
 
+// See-through at once, with no fade.
+function coverNow(els) {
+  for (const el of els) if (el.dataset.glassShown == null) el.dataset.glassShown = "";
+}
+
 // Only takes data-glass-shown off what `parts` no longer holds: those look-alikes show at once.
 function uncover(doc, parts) {
   const want = new Set([parts.tabbar, ...parts.buttons].filter(Boolean));
@@ -273,8 +318,8 @@ function inertTabs(el, on) {
 
 const barOf = (doc) => doc.getElementById?.("tabbar") ?? doc.querySelector?.(".tabbar");
 
-function partsShown(snap, els, doc) {
-  return { tabbar: snap.tabbar && !snap.tabbar.hidden ? barOf(doc) : null, buttons: snap.buttonsHidden ? [] : els };
+function partsShown(snap, covers, doc) {
+  return { tabbar: snap.tabbar && !snap.tabbar.hidden ? barOf(doc) : null, buttons: snap.buttonsHidden ? [] : covers };
 }
 
 // Brings the shell's glass in step with the page: opens, updates and closes it. Exported for the tests.
@@ -282,17 +327,30 @@ export function syncGlass(doc = globalThis.document, native = nativeBridge(), wi
   if (!hasNativeCall(native) || st.failed || st.retryAt > Date.now()) return;
   const got = glassSnapshot(doc, win, native);
   if (!got) { closeGlass(doc, native); return; }
-  const { snap, els, places } = got;
+  const { snap, covers, els, places } = got;
   st.byId = new Map(els.map((b, i) => [places[i], b]));
   if (!snap.buttonsHidden) st.held = snap.buttons;
+  const parts = st.parts = partsShown(snap, covers, doc);
+  // B382: glass buttons that are up and stay up already stand in for the new page's: its look-alikes go see-through at
+  // once, never drawn for a frame under (or beside) the glass.
+  if (st.shown && !snap.buttonsHidden) coverNow(parts.buttons);
   const icons = pendingIcons(snap);
   const key = JSON.stringify(snap);
-  if (key === st.sent && !Object.keys(icons).length) return;
+  if (key === st.sent && !Object.keys(icons).length) {
+    if (st.shown) uncover(doc, parts); // a slide ended: the page that left keeps no mark
+    return;
+  }
+  const slide = st.slide?.ms && !snap.buttonsHidden ? { slide: st.slide.ms, ...(st.slide.curve?.length === 4 ? { curve: st.slide.curve } : {}) } : {};
+  if (st.slide) st.slide.ms = 0; // sent once: anything else sent meanwhile (the tab bar) starts no second fade
   st.sent = key;
   for (const k of Object.keys(icons)) st.iconsSent.add(k);
-  const parts = partsShown(snap, els, doc);
   uncover(doc, parts); // what the glass stops covering shows at once; what it starts covering waits for the answer
-  const answered = () => { if (st.sent === key && st.ready) seethrough(doc, parts); };
+  if (snap.buttonsHidden) st.shown = false;
+  const answered = () => {
+    if (st.sent !== key || !st.ready) return;
+    st.shown = !snap.buttonsHidden;
+    seethrough(doc, st.parts); // the last sync's: a slide may have ended, with nothing new to send
+  };
   if (!st.open) {
     st.open = true;
     st.ready = false;
@@ -307,7 +365,7 @@ export function syncGlass(doc = globalThis.document, native = nativeBridge(), wi
       lost(doc);
     });
   } else {
-    native.call("ui.glass", { op: "update", key: GLASS_KEY, ...snap, icons }).then(answered, () => { lost(doc); scheduleGlassSync(); });
+    native.call("ui.glass", { op: "update", key: GLASS_KEY, ...snap, icons, ...slide }).then(answered, () => { lost(doc); scheduleGlassSync(); });
   }
 }
 
@@ -327,6 +385,8 @@ function lost(doc) {
   st.ready = false;
   st.sent = null;
   st.held = null;
+  st.shown = false;
+  st.parts = null;
   st.iconsSent.clear();
   seethrough(doc, null);
 }
@@ -359,12 +419,11 @@ export function watchGlass(doc = globalThis.document, win = globalThis, native =
       if (!el?.closest) return false;
       if (el.closest(".page-body, [data-scroller]")) return true;
       // the large title's fade, and the edge swipe's per-frame styles in a pair already marked .is-moving (its pages,
-      // nav items, shades and the opened row's fading copy: the class change, at the start and the end, is what hides
-      // and shows the buttons)
+      // nav items, shades and the opened row's fading copy: the class change, at the start and the end, is what counts)
       return r.type === "attributes" && r.attributeName === "style" && (!!el.matches?.(".nav-title, .large-title") || !!el.closest(".is-moving"));
     };
-    // B346: a nav item starting to slide hides the glass buttons now, before the slide's first frame, not a frame
-    // later, so the glass doesn't stand still over a look-alike already moving.
+    // A nav item starting to slide syncs now, before the slide's first frame, so the coming page's look-alike buttons
+    // are see-through under the glass from that frame on (B382), or shown where the glass must hide.
     const starts = (r) => r.type === "attributes" && r.attributeName === "class" && !!r.target.classList?.contains("is-moving") &&
       !!r.target.classList.contains("nav-item");
     const obs = new Observer((records) => {
@@ -375,6 +434,7 @@ export function watchGlass(doc = globalThis.document, win = globalThis, native =
       attributeFilter: ["class", "hidden", "style", "role", "aria-modal", "disabled", "aria-label"] });
     obs.observe(doc.documentElement, { attributes: true, attributeFilter: ["class", "data-controls", "data-tabbar", "data-style", "data-theme", "data-palette"] });
   }
+  doc.addEventListener?.("ifizbox:slide", (e) => slideGlass(e.detail, doc, native, win));
   win.addEventListener?.("resize", scheduleGlassSync);
   win.visualViewport?.addEventListener?.("resize", scheduleGlassSync);
   win.matchMedia?.("(prefers-color-scheme: dark)")?.addEventListener?.("change", scheduleGlassSync);
@@ -383,7 +443,7 @@ export function watchGlass(doc = globalThis.document, win = globalThis, native =
 
 // For the tests: forget everything between cases.
 export function resetGlass() {
-  Object.assign(st, { open: false, ready: false, failed: false, retryAt: 0, sent: null, byId: new Map(), held: null });
+  Object.assign(st, { open: false, ready: false, failed: false, retryAt: 0, sent: null, byId: new Map(), held: null, shown: false, slide: null, parts: null, blocked: false });
   st.iconsSent.clear();
   icons.clear();
   watching = false;
