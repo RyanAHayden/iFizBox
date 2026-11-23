@@ -483,6 +483,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     const d = def(key);
     const hit = d.options.find((o) => o.value === value) ?? (d.accepts?.(value) ? { value } : null); // F329
     if (!hit) throw new Error(`${key}: ${JSON.stringify(value)} is not one of its options`);
+    if (key === "style" && mode === "site") return; // C69: the website is iOS 6; nothing stored
     const was = key === "upgradeNotifications" ? get(key) : undefined;
     store.set(PREFIX + key, String(value));
     notify(key, value);
