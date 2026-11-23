@@ -21,6 +21,7 @@ import { scrollerOf } from "./nav/searchbar.js";
 import { showHUD } from "./nav/hud.js";
 import { showAlert } from "./nav/alert.js";
 import { initScroller } from "./nav/scroller.js";
+import { respinOnReturn } from "./nav/respin.js"; // B397
 import { makeScrollToTop } from "./nav/statusbar.js";
 import { pageOpened, pageShown } from "./nav/pagestate.js";
 import { createHomeTop, homeRootOf, createReturnHome, userTouch, untilNotTyping } from "./nav/hometop.js";
@@ -498,6 +499,7 @@ document.addEventListener("click", (e) => {
 document.addEventListener("touchstart", () => {}, { passive: true });
 
 initScroller(document.getElementById("screens"));
+respinOnReturn(); // B397
 // The other tabs' init runs once their screens load (initLoadedTabs: after the first page, below).
 for (const tab of TABS) if (STATIC_SCREENS[tab]?.init) STATIC_SCREENS[tab].init(ctx);
 // N4: the install queue (jailbreak build: the backend has one): Confirm opens when a package is queued. F313: queue.js

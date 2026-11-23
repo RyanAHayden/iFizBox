@@ -113,7 +113,7 @@ class App(unittest.TestCase):
         import plistlib
         src = read("App", "LocalVPN.swift")
         self.assertIn('runShortcut("switch", input: switchInput("start", selected: selected))', src)
-        self.assertIn("if stop { down(); endTrip(gen); endSwitch(); sayLost() }", src)
+        self.assertIn("if stop { down(); endTrip(gen, limit: now ? testBackLimit : putBackLimit); endSwitch(); sayLost() }", src)
         self.assertIn("UIApplication.didBecomeActiveNotification", src)  # an end found in the background runs later
         self.assertIn('b.on("vpn.testSwitch")', src)
         repo = os.path.dirname(NATIVE)
@@ -254,6 +254,22 @@ class App(unittest.TestCase):
         idev = read("idevice", "IDevice.swift", base=os.path.dirname(HERE))
         self.assertIn("LocalVPN.installBegan()", idev)
         self.assertIn("defer { LocalVPN.installEnded() }", idev)
+
+    def test_switch_test_answers_early(self):
+        """B397: Test Install Switch has no linger, says a failure before this VPN takes another's place, emits its
+        steps, and never reports a VPN back that wasn't seen back."""
+        src = read("App", "LocalVPN.swift")
+        begin = src[src.index("static func begin("):src.index("static func waitOffCellular(")]
+        self.assertLess(begin.index("if !ran && forced {"), begin.index("try up(step)"))
+        self.assertIn(".now() + (now ? 0 : linger)", src)
+        trip = src[src.index("private static func testTrip("):src.index("static func connectedNow()")]
+        self.assertIn("end(now: true)", trip)
+        self.assertNotIn("linger +", trip)
+        self.assertIn("let open = tripOpen && failure == nil", trip)
+        self.assertLess(trip.index("tripOpen = false"), trip.index("try begin(forced: true)"))  # not an earlier trip's answer
+        web = read("web", "app", "screens", "installroute.js", base=os.path.dirname(NATIVE))
+        for step in re.findall(r'\bsay\("(\w+)"\)', src):
+            self.assertRegex(web, r"TEST_STEPS = \{.*\b%s: " % step)
 
 
 if __name__ == "__main__":

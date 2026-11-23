@@ -146,3 +146,22 @@ test("F381: @keyframes hud-spin-8 holds each 45-degree turn for 1/8 of the cycle
   const drawn = all.filter((r) => /animation:\s*hud-spin/.test(r.body));
   for (const r of drawn) for (const sel of r.sel.split(/,\s*/)) assert.ok(hook.includes(`:root ${sel}`), `${r.f}: ${sel} has no :root rule taking --spinner-turns`);
 });
+
+// B397: the spinners are started again when the app comes back from a trip (Shortcuts and back).
+test("B397: coming back restarts the running spinners where they were, and nothing else", async () => {
+  const { respinOnReturn } = await import("./respin.js");
+  const anim = (animationName, playState = "running") => ({ animationName, playState, currentTime: 480, log: [],
+    pause() { this.log.push("pause"); this.currentTime = 0; }, play() { this.log.push("play"); } });
+  const all = [anim("hud-spin"), anim("hud-spin-8"), anim("fade"), anim("hud-spin", "paused"), anim(undefined)];
+  const on = {};
+  const doc = { visibilityState: "hidden", getAnimations: () => all, addEventListener: (e, f) => { on[e] = f; } };
+  respinOnReturn(doc, { addEventListener() {} });
+  on.visibilitychange();
+  assert.deepEqual(all.map((a) => a.log.length), [0, 0, 0, 0, 0], "going away: nothing");
+  doc.visibilityState = "visible";
+  on.visibilitychange();
+  assert.deepEqual(all.map((a) => a.log.join()), ["pause,play", "pause,play", "", "", ""]);
+  assert.equal(all[0].currentTime, 480);
+  on.visibilitychange(); // a second return
+  assert.equal(all[0].log.length, 4);
+});

@@ -75,3 +75,55 @@ test("another VPN on, not added: the install says it stays off and goes on; Set 
   assert.equal(await chooseRoute({ native, storage, alert: async () => ({ index: 1 }) }), null);
   forgetRoute();
 });
+
+// B397: the test's row says what it is doing, and what the trip's redraw leaves behind ends with the test.
+const { drawInstallation, forgetStatus } = await import("./installroute.js");
+const every = (e) => [e, ...e.children.flatMap(every)];
+const cell = (box, label) => every(box).filter((n) => n._cls.has("cell-inner")).find((n) => every(n).some((x) => x._cls.has("cell-label") && x.textContent === label));
+const detail = (box, label) => every(cell(box, label)).find((n) => n._cls.has("cell-detail"))?.textContent;
+const spins = (box, label) => every(cell(box, label)).some((n) => n._cls.has("loading-spinner"));
+const flush = async () => { for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0)); };
+const pending = () => { let answer; const p = new Promise((r) => { answer = r; }); return { p, answer }; };
+const store = { get: () => "iphone", set() {} };
+
+test("B397: Test Install Switch's row says each step, also on the page the trip redraws", async () => {
+  forgetStatus();
+  const run = pending(), alerts = [];
+  let emit;
+  const native = { call: (m, p, ev) => { if (m === "vpn.testSwitch") { emit = ev; return run.p; } return Promise.resolve(ST({ shortcuts: { switch: true, trip: true, idle: true } }).vpn); } };
+  const o = { store, native, alert: async (a) => { alerts.push(a.title); return { index: 0 }; } };
+  const box = document.createElement("div"), again = document.createElement("div");
+  await drawInstallation(box, "shortcuts", o);
+  const done = Promise.all(cell(box, "Test Install Switch").listeners.click.map((f) => f({})));
+  await flush();
+  assert.equal(detail(box, "Test Install Switch"), "Opening Shortcuts…");
+  emit({ step: "connecting" });
+  assert.equal(detail(box, "Test Install Switch"), "Connecting…");
+  await drawInstallation(again, "shortcuts", o); // back from Shortcuts
+  emit({ step: "back" });
+  assert.equal(detail(again, "Test Install Switch"), "Putting Things Back…");
+  assert.ok(spins(again, "Test Install Switch"));
+  assert.deepEqual(alerts, [], "nothing is said before the answer");
+  run.answer({ ok: true, start: { ok: true }, end: { ok: true }, vpnOn: true, vpnBack: true });
+  await done;
+  emit({ step: "connecting" }); // a late one
+  assert.ok(!spins(again, "Test Install Switch"));
+  assert.deepEqual(alerts, ["Install Switch Works"]);
+});
+
+test("B397: Test Connection's row stops on the page drawn again while it ran", async () => {
+  forgetStatus();
+  const run = pending();
+  const native = { call: (m) => (m === "vpn.test" ? run.p : Promise.resolve(ST())) };
+  const o = { store, native, alert: async () => ({ index: 0 }) };
+  const box = document.createElement("div");
+  await drawInstallation(box, "iphone", o);
+  const done = Promise.all(cell(box, "Test Connection").listeners.click.map((f) => f({})));
+  await flush();
+  await drawInstallation(box, "iphone", o); // back from Shortcuts
+  assert.ok(spins(box, "Test Connection"));
+  run.answer({ ok: true, ms: 40 });
+  await done; await flush();
+  assert.ok(!spins(box, "Test Connection"));
+  assert.equal(detail(box, "Test Connection"), "Connected");
+});

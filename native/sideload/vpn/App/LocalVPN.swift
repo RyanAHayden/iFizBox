@@ -35,7 +35,9 @@
 //                       ran: {ok, error, status}
 //   vpn.leftOff         B395: answers {vpn, cellular} once something stayed off after a queue, however long that takes
 //   vpn.testSwitch      F386: runs the Install Switch's start, then its end: {ok, start: {ok, error}, end: {ok, error},
-//                       cellular, wentOff, vpnOn (this VPN was connected after the start)}; a pass marks it added
+//                       cellular, wentOff, vpnOn (this VPN was connected after the start), vpnBack (another VPN
+//                       was on or selected, and is again)}; a pass marks it added. B397: events {step: opening |
+//                       connecting | back}. A run that failed takes no VPN's place; no linger
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 import Network
@@ -275,7 +277,7 @@ enum LocalVPN {
         var ran = start || !want // B395: the Install Switch did its part, or wasn't needed
         var trip = false, why: String?
         if start && ready { // F394: one trip for the whole queue, when the added Install Switch can
-            let t = takeTrip(cellular: onCellular, selected: selected, step)
+            let t = takeTrip(cellular: onCellular, selected: selected, test: forced, step)
             trip = t.ran
             ran = t.ran && t.error == nil
             why = t.error
@@ -296,12 +298,16 @@ enum LocalVPN {
         // another one's place. On Wi-Fi the install goes on without it.
         if !ran && onCellular && Path.now().cellular {
             log("Install Switch: cellular data is on and the Install Switch didn't run: stopping")
-            end()
+            end(now: forced)
             throw IDevice.Failure(code: "switch_failed", text: why ?? "it didn't run a moment ago")
+        }
+        if !ran && forced { // B397: the test has its answer, and connecting now would take the user's VPN off for nothing
+            end(now: true)
+            throw IDevice.Failure(code: "switch_failed", text: why ?? "it didn't run")
         }
         do { try up(step) } catch {
             lock.lock(); lastFailure = Date(); lock.unlock()
-            end()
+            end(now: forced)
             if !ran { throw IDevice.Failure(code: "switch_failed", text: "\(why ?? "it didn't run a moment ago"), and \((error as? IDevice.Failure)?.text ?? error.localizedDescription)") } // B395
             throw error
         }
@@ -356,12 +362,13 @@ enum LocalVPN {
     }
 
     /// A connection ended: the VPN goes off `linger` seconds after the last one, unless another begins first.
-    static func end() {
+    /// B397: `now` (Test Install Switch): at once, and what doesn't come back is tried again sooner.
+    static func end(now: Bool = false) {
         lock.lock()
         holds = max(0, holds - 1)
         stopGen += 1
         lock.unlock()
-        stopLater()
+        stopLater(now: now)
     }
 
     /// B395: an install, its reconnects and the pauses between them (up to 15 s, HereRecheck.pause) are one queue:
@@ -372,12 +379,12 @@ enum LocalVPN {
         stopLater()
     }
 
-    private static func stopLater() {
+    private static func stopLater(now: Bool = false) {
         lock.lock(); let gen = stopGen, idle = holds == 0 && installs == 0; lock.unlock()
         guard idle else { return }
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + linger) {
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + (now ? 0 : linger)) {
             lock.lock(); let stop = holds == 0 && installs == 0 && stopGen == gen; if stop { switchEndDue = switchedOn && !tripOn; if tripOn { tailing = true } }; lock.unlock()
-            if stop { down(); endTrip(gen); endSwitch(); sayLost() }
+            if stop { down(); endTrip(gen, limit: now ? testBackLimit : putBackLimit); endSwitch(); sayLost() }
         }
     }
 
@@ -621,6 +628,8 @@ enum LocalVPN {
     static let waitTurns = 45 // the Shortcut's Repeat: after them it puts things back, whatever the queue does
     static let callbackGrace: TimeInterval = 3 // after Shortcuts' callback, for our own actions to say it runs
     static let putBackLimit: TimeInterval = 25 // from the queue's end until the Shortcut put things back
+    static let testBackLimit: TimeInterval = 12 // ... in Test Install Switch (about 5 s with Tailscale on the 15 Pro)
+    static let backInFront: TimeInterval = 5 // Test Install Switch: the app in front again this long without Open: it won't come
     static let nothingLimit: TimeInterval = 9 // ... with an Install Switch that can't put an idle VPN back, until the app stops waiting for it
     private static var busy = false // guarded by lock: from a begin until the VPN goes off after the last connection
     private static var tripOn = false // guarded by lock: a one-trip run goes on in the background
@@ -674,7 +683,7 @@ enum LocalVPN {
     /// that ignores it). An `error` with `ran`: it began and didn't come back; the end puts back what it took.
     /// Shortcuts' callback decides nothing once our actions ran: on the 15 Pro (iOS 27) a new run gets the error of the
     /// one before, when that ended behind the app (Set VPN's error 2).
-    private static func takeTrip(cellular: Bool, selected: Bool, _ step: (String) -> Void) -> (ran: Bool, error: String?, older: Bool) {
+    private static func takeTrip(cellular: Bool, selected: Bool, test: Bool = false, _ step: (String) -> Void) -> (ran: Bool, error: String?, older: Bool) {
         step("running the Shortcut \(shortcutNames["switch"]!)")
         let sem = DispatchSemaphore(value: 0)
         lock.lock()
@@ -687,10 +696,16 @@ enum LocalVPN {
             lock.lock(); called = (Date(), ok, err); lock.unlock()
         }
         let t0 = Date()
+        var left = false, front: Date? // B397: the app went behind Shortcuts; in front again since
         while Date().timeIntervalSince(t0) < shortcutLimit {
             if sem.wait(timeout: .now() + 0.2) == .success { break }
             lock.lock(); let seen = tripSeen, c = called; lock.unlock()
-            if let c, !seen, Date().timeIntervalSince(c.at) > callbackGrace || notOpened(c.error) { break }
+            if let c, !seen, Date().timeIntervalSince(c.at) > (SwitchOpens.notFound(c.error) ? 1 : callbackGrace) || notOpened(c.error) { break }
+            guard test else { continue }
+            if !DispatchQueue.main.sync(execute: { UIApplication.shared.applicationState == .active }) { left = true; front = nil } else if left {
+                front = front ?? Date()
+                if Date().timeIntervalSince(front!) > backInFront { log("Install Switch: in front without Open"); break }
+            }
         }
         lock.lock()
         let open = tripOpen, seen = tripSeen, failed = tripError, c = called
@@ -705,11 +720,11 @@ enum LocalVPN {
         if older { // an older Install Switch ignores "trip": its own runs, from the next queue on
             UserDefaults.standard.set(false, forKey: tripKey)
             log("Install Switch: the added one can't do it in one trip")
-        } else { log("Install Switch: the trip didn't come back: \(failed ?? c?.error ?? "no answer in \(Int(shortcutLimit)) s")") }
+        } else { log("Install Switch: the trip didn't come back: \(failed ?? c?.error ?? "no answer in \(Int(Date().timeIntervalSince(t0))) s")") }
         if seen && cellular && failed == nil { // between data off and Open: the end must turn it on
             lock.lock(); switchDataOff = true; lock.unlock()
         } else { savePending(cellular: false, vpn: before, selected: selected) }
-        let error = failed ?? c?.error ?? (older ? "the added one is an older one" : "Shortcuts didn't come back in \(Int(shortcutLimit)) s")
+        let error = failed ?? c?.error ?? (older ? "the added one is an older one" : front != nil ? "it didn't open \(Brand.name) again" : "Shortcuts didn't come back in \(Int(shortcutLimit)) s")
         lock.lock(); tripWhy = error; lock.unlock()
         let began = seen || !(older || notOpened(c?.error) || SwitchOpens.notFound(c?.error))
         if began { lock.lock(); opens.fail(); lock.unlock() }
@@ -718,7 +733,7 @@ enum LocalVPN {
 
     /// After a trip's queue, the VPN off: lets the Shortcut go on and waits until it put things back. What it didn't
     /// put back is left to endSwitch (switchEndDue).
-    private static func endTrip(_ gen: Int) {
+    private static func endTrip(_ gen: Int, limit: TimeInterval = putBackLimit) {
         lock.lock()
         let waits = tripWaits, canIdle = UserDefaults.standard.bool(forKey: idleKey)
         if stopGen == gen { busy = false }
@@ -728,7 +743,7 @@ enum LocalVPN {
         lock.unlock()
         let t0 = Date()
         var back = false, ranOut: Date?, nothing = false
-        while !back && Date().timeIntervalSince(t0) < putBackLimit {
+        while !back && Date().timeIntervalSince(t0) < limit {
             Thread.sleep(forTimeInterval: 0.3)
             back = !switchEndNeeded(dataOff: dataOff, vpnBefore: !before.isEmpty || selected, dataBack: Path.now().cellular, vpnBack: otherVPNBack(before, selected: selected))
             lock.lock(); let over = tripWaits >= waitTurns, past = tripWaits > waits, told = canIdle && tripWaits > waitTurns; lock.unlock()
@@ -747,7 +762,7 @@ enum LocalVPN {
         tailing = false
         lock.unlock()
         if done { clearPending() }
-        log("Install Switch: after the trip, \(back ? nothing ? "nothing to put back" : "everything is back" : "not everything is")")
+        log("Install Switch: after the trip, \(back ? nothing ? "nothing to put back" : "everything is back" : "not everything is") (\(String(format: "%.1f", Date().timeIntervalSince(t0))) s)")
     }
 
     /// Connect VPN (blocking): our VPN for the trip's queue. Outside one nothing would turn it off again.
@@ -755,6 +770,7 @@ enum LocalVPN {
         lock.lock(); let on = busy; lock.unlock()
         guard on else { throw IDevice.Failure(code: "vpn_failed", text: "\(Brand.name) isn't installing an app") }
         lock.lock(); tripSeen = true; lock.unlock()
+        say("connecting")
         do { try up() } catch {
             lock.lock(); tripError = (error as? IDevice.Failure)?.text ?? error.localizedDescription; let go = tripGo; lock.unlock()
             go?.signal()
@@ -840,13 +856,23 @@ enum LocalVPN {
 
     /// vpn.testSwitch (blocking): the start, then (whatever it did) the end, as around one install, without an install.
     /// `vpnOn`: this VPN was connected after the start, so Set VPN found it. A run that passed marks it added.
-    static func testSwitch() -> [String: Any] {
+    /// B397: `event` gets each step as it begins (the page's row says it).
+    static func testSwitch(_ event: @escaping (String) -> Void = { _ in }) -> [String: Any] {
+        let t0 = Date()
+        lock.lock(); testStep = event; lock.unlock()
+        defer {
+            lock.lock(); testStep = nil; lock.unlock()
+            log("Install Switch: the test took \(String(format: "%.1f", Date().timeIntervalSince(t0))) s")
+        }
         let cellular = Path.now().cellular
         lock.lock(); opens.forgive(); lock.unlock() // B395: the user's own tap
         if tripReady() { return testTrip(cellular) }
-        let start = runShortcut("switch", input: switchInput("start", selected: otherVPNSelected())) // B375: data off only once the VPN is up
+        say("opening")
+        let before = otherVPNAddresses(), selected = otherVPNSelected()
+        let start = runShortcut("switch", input: switchInput("start", selected: selected)) // B375: data off only once the VPN is up
         var wentOff = false, vpnOn = false
         if start.ok {
+            say("connecting")
             let t0 = Date()
             while Date().timeIntervalSince(t0) < startLimit && !vpnOn {
                 vpnOn = connectedNow()
@@ -860,32 +886,66 @@ enum LocalVPN {
                 }
             }
         }
+        say("back")
         // B395: not found: an end would open Shortcuts for nothing
-        let end = SwitchOpens.notFound(start.error) ? start : switchEnded(runShortcut("switch", input: switchInput("end", cellular: cellular)))
+        var end = SwitchOpens.notFound(start.error) ? start : switchEnded(runShortcut("switch", input: switchInput("end", cellular: cellular)))
         UserDefaults.standard.set(start.ok && end.ok, forKey: shortcutKeys["switch"]!)
-        return ["ok": start.ok && end.ok, "cellular": cellular, "wentOff": wentOff, "vpnOn": vpnOn,
+        let back = end.ok && waitBack(before, selected: selected)
+        if end.ok && !before.isEmpty && !back { end = (false, notBack) } // B397: its run passing isn't the VPN being back
+        return ["ok": start.ok && end.ok, "cellular": cellular, "wentOff": wentOff, "vpnOn": vpnOn, "vpnBack": back,
                 "start": ["ok": start.ok, "error": (start.error as Any?) ?? NSNull()],
                 "end": ["ok": end.ok, "error": (end.error as Any?) ?? NSNull()]]
     }
 
-    /// testSwitch in one trip, as a queue takes it.
+    private static var testStep: ((String) -> Void)? // guarded by lock: Test Install Switch's row
+    private static func say(_ step: String) { lock.lock(); let f = testStep; lock.unlock(); f?(step) }
+    private static let notBack = "it didn't put your VPN back"
+
+    /// Another VPN that was on or selected before is again; false when there was none (or it didn't come back in time).
+    private static func waitBack(_ before: Set<String>, selected: Bool) -> Bool {
+        guard !before.isEmpty || selected else { return false }
+        let t0 = Date()
+        while !otherVPNBack(before, selected: selected) {
+            if Date().timeIntervalSince(t0) > (before.isEmpty ? 2 : leftOffLimit) { return false } // selected and off: maybe nothing to put back
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        return true
+    }
+
+    /// testSwitch in one trip, as a queue takes it. B397: the VPN goes off at once, and only what the trip changed is waited for.
     private static func testTrip(_ cellular: Bool) -> [String: Any] {
         var failure: String?
-        do { _ = try begin(forced: true) } catch { failure = error.localizedDescription }
-        lock.lock(); let open = tripOpen, why = tripError ?? tripWhy; lock.unlock()
-        let vpnOn = connectedNow(), wentOff = cellular && !Path.now().cellular
-        if failure == nil { end() } // begin() ended its own hold when it threw
-        let t0 = Date()
-        while Date().timeIntervalSince(t0) < linger + putBackLimit + shortcutLimit {
-            Thread.sleep(forTimeInterval: 0.3)
-            lock.lock(); let going = busy || tripOn || tailing; lock.unlock()
-            if !going { break }
+        lock.lock()
+        let going = busy || holds > 0 || installs > 0
+        if !going { tripOpen = false; tripError = nil; tripWhy = nil; tripBack = false } // an earlier trip's
+        lock.unlock()
+        if going {
+            return ["ok": false, "cellular": cellular, "wentOff": false, "vpnOn": false, "vpnBack": false,
+                    "start": ["ok": false, "error": "\(Brand.name) is installing an app"], "end": ["ok": true, "error": NSNull()]]
         }
-        lock.lock(); let back = tripBack; lock.unlock()
+        let before = otherVPNAddresses(), selected = otherVPNSelected()
+        say("opening")
+        do { _ = try begin(forced: true) } catch { failure = error.localizedDescription }
+        lock.lock(); let open = tripOpen && failure == nil, why = tripError ?? tripWhy; lock.unlock()
+        let vpnOn = connectedNow(), wentOff = cellular && !Path.now().cellular
+        say("back")
+        if failure == nil { end(now: true) } // begin() ended its own hold when it threw
+        let t0 = Date()
+        while Date().timeIntervalSince(t0) < testBackLimit + shortcutLimit {
+            // switchEndDue: what the trip didn't put back, its end run is about to
+            lock.lock(); let going = busy || tripOn || tailing || (switchedOn && switchEndDue); lock.unlock()
+            if !going { break }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        lock.lock(); let tripDid = tripBack; lock.unlock()
+        let vpnBack = tripDid ? (!before.isEmpty || selected) && otherVPNBack(before, selected: selected) : waitBack(before, selected: selected)
+        let t1 = Date() // the end run's Cellular Data On
+        while !tripDid && wentOff && !Path.now().cellular && Date().timeIntervalSince(t1) < leftOffLimit { Thread.sleep(forTimeInterval: 0.2) }
+        let back = tripDid || (vpnBack || before.isEmpty && !selected) && !(wentOff && !Path.now().cellular)
         let startErr = open ? nil : why ?? failure ?? "\(Brand.name) wasn't opened again"
-        let endErr = open && !back ? "it didn't put your VPN back" : nil
-        UserDefaults.standard.set(open && endErr == nil, forKey: shortcutKeys["switch"]!)
-        return ["ok": open && endErr == nil, "cellular": cellular, "wentOff": wentOff, "vpnOn": vpnOn,
+        let endErr = open && !back ? notBack : nil
+        if open || why != nil { UserDefaults.standard.set(open && endErr == nil, forKey: shortcutKeys["switch"]!) } // not when Shortcuts never opened (no network)
+        return ["ok": open && endErr == nil, "cellular": cellular, "wentOff": wentOff, "vpnOn": vpnOn, "vpnBack": vpnBack,
                 "start": ["ok": open, "error": (startErr as Any?) ?? NSNull()],
                 "end": ["ok": endErr == nil, "error": (endErr as Any?) ?? NSNull()]]
     }
@@ -1044,7 +1104,7 @@ enum LocalVPNBridge {
         b.on("vpn.leftOff") { c in LocalVPN.waitLeftOff(c) }
         b.on("vpn.testSwitch") { c in
             guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: the jailbreak app installs IPAs through its helper") }
-            DispatchQueue.global(qos: .userInitiated).async { Apt.reply(c, LocalVPN.testSwitch(), nil) }
+            DispatchQueue.global(qos: .userInitiated).async { Apt.reply(c, LocalVPN.testSwitch { c.emitOnMain([["step": $0]]) }, nil) }
         }
         // F386: an Install Switch end that found the app in the background runs once it is in front again
         NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: nil) { _ in

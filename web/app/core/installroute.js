@@ -103,7 +103,7 @@ export function switchTestResult(r) {
   }
   if (!r.vpnOn) return { title: "Shortcut Ran", message: `It ran, but ${BUILTIN_VPN} didn't connect. Installs still work: ${NAME} connects it itself, and your VPN may stay off after.` };
   if (r.cellular && !r.wentOff) return { title: "Shortcut Ran", message: "It ran, but cellular stayed in use. Check that Cellular Data can be turned off in Settings." };
-  return { title: "Install Switch Works", message: `${BUILTIN_VPN} came on${r.cellular ? " with Cellular Data off" : ""}, then your VPN came back.` };
+  return { title: "Install Switch Works", message: `${BUILTIN_VPN} came on${r.cellular ? " with Cellular Data off" : ""}, then ${r.vpnBack === false ? r.cellular ? "data came back on" : "went off again" : "your VPN came back"}.` }; // B397: no word of a VPN that wasn't there
 }
 
 // This iPhone's page says what it gives in one sentence under its title. Installs through installation_proxy never
