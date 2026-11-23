@@ -59,7 +59,9 @@ test("app and native shells: only the setting's background refresh", async () =>
 test("app.js starts launch refreshes only through launchRefresh", () => {
   const src = readFileSync(new URL("./app.js", import.meta.url), "utf8");
   assert.ok(!/refreshOnLaunch\(/.test(src), "app.js calls refreshOnLaunch directly");
-  const direct = src.split("\n").filter((l) => l.includes("refreshInBackground") && !l.includes("background: ()"));
+  // B399: a tapped update alert is no launch refresh; its one listener may refresh
+  const direct = src.split("\n").filter((l) => l.includes("refreshInBackground") && !l.includes("background: ()") &&
+    !l.startsWith('addEventListener("ifizbox:update-alert"'));
   assert.deepEqual(direct, [], "app.js calls refreshInBackground outside launchRefresh");
   assert.equal(src.match(/refreshAtOpen\(\)/g)?.length, 2, "launch and back-from-background");
 });

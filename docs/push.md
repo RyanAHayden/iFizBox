@@ -56,7 +56,7 @@ never logged.
 | **Signature Expiring** | iFizBox's signature ends within two days |
 | **Test Push** | `POST /api/push/test` with the device's token (server admins; no button in the app) |
 
-Each version is pushed once. A tap opens Changes.
+Each version is pushed once. A tap opens Changes and refreshes the sources.
 
 ## When push can't work
 
