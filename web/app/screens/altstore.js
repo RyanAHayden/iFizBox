@@ -849,6 +849,8 @@ export function renderApp(body, route, pkg, source, { related = null, onChange =
   // F350: with its tile, and no footer naming every tweak (user 2026-11-21): the row's own detail says how many.
   const rowsPlan = appRows({ sideload: detectMode() === "sideload", bundleId: app.bundleIdentifier, versions: app.versions.length,
     version: `${v.version}${v.buildVersion ? ` (${v.buildVersion})` : ""}` });
+  // F376: an update is out for this app: What's New in the newest version at the very top of Details.
+  details.append(updateNewsSlot(app, { href: deeper(route, `versions:${pkg.row.id}`) }, { alive: () => body.isConnected }));
   if (rowsPlan.addTweaks) {
     const tw = addTweaksGroup({ bundleId: app.bundleIdentifier, name: app.name }).el;
     tw.querySelector(".group-footer")?.remove();
@@ -1023,6 +1025,33 @@ export function appInfoNodes(app, { lookup = (id) => storeLookup(id) } = {}) {
   const rows = permissionRows(app);
   if (rows.length) out.push(grouped([{ header: "Permissions", rows, footer: PERMISSIONS_FOOTER }]).firstElementChild);
   return out;
+}
+
+// F376: the update's What's New on top of an app's Details. Shown only when the app's installed record (core/installed.js
+// apps()) is older than the newest version on the source and that version has notes; More Information keeps its own.
+export function updateNewsShown(app, installedVersion) {
+  const v = app?.versions?.[0];
+  const have = installedVersion == null ? "" : String(installedVersion);
+  return Boolean(v?.version && v.localizedDescription && have && compareVersions(String(v.version), have) > 0);
+}
+export function updateNewsGroup(app, record, history = null) {
+  if (!record || record.id !== app?.bundleIdentifier || !updateNewsShown(app, record.version)) return null;
+  const v = app.versions[0];
+  return whatsNewGroup({ version: v.version, date: formatDate(v.date), notes: v.localizedDescription,
+    history: history ? { label: "Version History", ...history } : null });
+}
+// The slot, filled once the installed list is read and again whenever it changes (Mark as Installed, an install).
+export function updateNewsSlot(app, history = null, { store = apps, onChange = onAppsChange, alive = () => true } = {}) {
+  const slot = el("div", "alt-update-news");
+  const draw = () => Promise.resolve().then(store).then((s) => s.all()).then((list) => {
+    if (!alive()) return;
+    const card = updateNewsGroup(app, (list ?? []).find((r) => r?.id === app.bundleIdentifier) ?? null, history);
+    if (!card && !slot.firstChild) return;
+    slideChange(slot, () => slot.replaceChildren(...(card ? [card] : [])));
+  }, () => {});
+  slot.drawn = draw();
+  const off = onChange?.(() => { if (alive()) slot.drawn = draw(); else off?.(); });
+  return slot;
 }
 
 // F161: an app's App Store details on this device: the website asks the Worker (/api/applookup, cached at the edge),
