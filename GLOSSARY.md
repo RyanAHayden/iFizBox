@@ -102,3 +102,10 @@ _Said_: era app icon, iOS 7 icon
 _On screen_: Theme > App Icon > Eras: iOS 7, iOS 13, iOS 26
 _In code_: ERA_ICONS, APP_ICONS era entries, native/icon/era/, alternates.ERAS
 _Avoid_: style icon, retro icon
+
+**Swipe Back**:
+Dragging a pushed page to the right to go back to the page below it, from the left edge or from anywhere on the page
+_Said_: swipe back, back swipe, edge swipe
+_On screen_: (a gesture: no wording)
+_In code_: nav/swipe.js attachEdgeSwipe, attachPageSwipe, pageSwipeBlocked
+_Avoid_: back gesture, pop gesture

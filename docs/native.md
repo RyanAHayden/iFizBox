@@ -109,6 +109,11 @@ What (a) does to hold 120 Hz:
 - Edge swipe: a 24 pt strip with `touch-action: none` takes the pointer. Content areas get `touch-action: pan-y` so
   vertical scrolling stays native. Write `transform` once per rAF from the latest coalesced pointer position. On
   release, finish or cancel by distance (> half) or velocity (> 0.4 pt/ms) with a short ease-out animation.
+- Page swipe (as iOS 26): the same pop from a rightward drag anywhere on a pushed page. Passive touch listeners on the
+  screens decide after 10 px (rightward, more sideways than vertical), so nothing waits on JS and no `touch-action`
+  changes. It steps aside in text fields and sliders, `touch-action: none` areas (custom drags), a sideways scroller
+  not at its left end, a list showing a row's Delete, selected text and popups (`nav/swipe.js pageSwipeBlocked`).
+  Off on the website, like the edge strip.
 - Each screen scrolls in its own `overflow-y: auto` box (a native UIScrollView in the UI process), with a virtualised
   list: a fixed pool of absolutely positioned rows moved by `translate3d`. `web/app/` can take `list.js` from the spike.
 - Parsing in a Web Worker (module workers load from the app scheme; see 4), the index cached in IndexedDB.
