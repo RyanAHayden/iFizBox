@@ -1,0 +1,8 @@
+Origin: B361 Test Repo
+Label: B361 Test Repo
+Suite: stable
+Version: 1.0
+Codename: b361
+Architectures: iphoneos-arm64
+Components: main
+Description: One tweak for the B361 check

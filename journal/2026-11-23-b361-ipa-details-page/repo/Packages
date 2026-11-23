@@ -1,0 +1,11 @@
+Package: com.example.fixture
+Name: Fixture Tweak
+Version: 1.0
+Architecture: iphoneos-arm64
+Section: Tweaks
+Author: Example <dev@example.com>
+Description: Extra options for the test app
+Depends: mobilesubstrate
+Filename: debs/tweak-xz.deb
+Size: 1116
+

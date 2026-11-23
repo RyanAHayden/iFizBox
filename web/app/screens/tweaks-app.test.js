@@ -86,7 +86,7 @@ test("the app page's Add Tweaks row counts the tweaks made for the app, then the
   const s = storage();
   s.setItem("ifizbox.tweakInfo", JSON.stringify({ "com.t.yt@2": { ok: true, bundles: ["com.x.tube"] }, "com.t.other@1": { ok: true, bundles: ["com.y"] } }));
   const rows = async () => [{ id: "com.t.yt", name: "YTLite", version: "2" }, { id: "com.t.other", name: "Other", version: "1" }];
-  const g = addTweaksGroup({ bundleId: "com.x.tube", name: "Tube", rows, store, storage: s, open: async () => {} });
+  const g = addTweaksGroup({ bundleId: "com.x.tube", name: "Tube", rows, store, storage: s, push: () => {} });
   await g.ready;
   assert.equal(g.el.all("cell-detail")[0].textContent, "1 for This App");
   assert.equal(g.el.all("group-footer")[0].textContent, ""); // F352: no footer naming the tweaks

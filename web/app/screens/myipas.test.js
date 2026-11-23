@@ -17,9 +17,14 @@ test("My IPAs' pages", () => {
   assert.deepEqual(pageOf(r("myipas", "ipa:A.ipa", "options")), { page: "options", file: "A.ipa" });
   assert.deepEqual(pageOf(r("myipas", "junk")), { page: "missing" });
   assert.equal(nav(r("myipas")).right.label, "Manage"); // F224: Manage only; Add is the page's own group
-  assert.equal(nav(r("myipas", "ipa:A b.ipa")).title, "A b");
+  assert.equal(nav(r("myipas", "ipa:A b.ipa")).title, "Details"); // B361: the app page's Details, for a file
   assert.equal(nav(r("myipas", "ipa:A b.ipa")).right.label, "Install");
   assert.equal(nav(r("myipas", "ipa:A.ipa", "options")).title, "Sign Options");
+  // B361: its Add Tweaks page and the tweak pages it opens are browse.js's, as under an app's page
+  assert.deepEqual(pageOf(r("myipas", "ipa:A.ipa", "addtweaks:com.x.a")), { page: "browse" });
+  assert.equal(nav(r("myipas", "ipa:A.ipa", "addtweaks:com.x.a")).title, "Add Tweaks");
+  assert.deepEqual(pageOf(r("myipas", "ipa:A.ipa", "addtweaks:com.x.a", "package:com.t.yt@k1")), { page: "browse" });
+  assert.equal(nav(r("myipas", "ipa:A.ipa", "addtweaks:com.x.a", "package:com.t.yt@k1")).title, "Details");
 });
 
 test("the website has no Sign Options page (the Signing Server signs as the IPA is)", () => {

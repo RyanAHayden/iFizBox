@@ -79,6 +79,21 @@ export function appRows({ sideload = false, bundleId = "", versions = 0, version
   return { addTweaks: Boolean(sideload && bundleId), version: ver, change: versions > 1, info };
 }
 
+// An IPA in My IPAs (myipas.js renderIpa), as an app's rows with what a local file doesn't have left out (Source,
+// Category, Version History, CHANGE): Version, then Information with Works On (its MinimumOSVersion), Size,
+// Extensions, Bundle ID and the File.
+//   sideload: the sideload build (Add Tweaks)   minimumOS: "15.0"   extensions: how many   file: its file name
+export function ipaRows({ sideload = false, bundleId = "", version = "", minimumOS = "", size = null, extensions = 0, file = "" } = {}) {
+  const ver = [row("version", "Version", version || "—", "pkgVersion")];
+  const info = [];
+  if (minimumOS) info.push(row("worksOn", "Works On", `iOS ${minimumOS} or later`, "worksOnMyPhone"));
+  info.push(row("size", "Size", size || "—", "pkgSize"));
+  if (extensions > 0) info.push(row("extensions", "Extensions", String(extensions), "pkgDepends"));
+  info.push(row("bundleId", "Bundle ID", bundleId || "—", "pkgBundle", { cls: "store-info-long" }));
+  if (file) info.push(row("file", "File", file, "pkgFiles"));
+  return { addTweaks: Boolean(sideload && bundleId), version: ver, info };
+}
+
 // Cydia's footer: the id, then "· source - section" (either may be missing).
 export function detailsFooter(id, source = "", section = null) {
   const where = [source, section].filter(Boolean).join(" - ");

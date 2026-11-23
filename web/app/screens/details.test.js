@@ -163,3 +163,20 @@ test("F350: the fake shell's apt.files reads info/<id>[:arch].list, as Apt.swift
     await assert.rejects(native.call("apt.files", { id: "../x" }));
   } finally { fx.cleanup(); }
 });
+
+test("B361: an IPA's rows: an app's without Source, Category, Version History or CHANGE; its file's facts in Information", async () => {
+  const { ipaRows } = await import("./details.js");
+  const lite = ipaRows({ sideload: true, bundleId: "com.x.delta", version: "1.5", minimumOS: "14.0", size: "10.0 MB", extensions: 2, file: "Delta 1.5.ipa" });
+  assert.equal(lite.addTweaks, true);
+  assert.deepEqual(labels(lite.version), ["Version"]);
+  assert.equal(lite.version[0].detail, "1.5");
+  assert.equal(lite.change, undefined, "one file, one version: no CHANGE");
+  assert.deepEqual(labels(lite.info), ["Works On", "Size", "Extensions", "Bundle ID", "File"]);
+  assert.equal(lite.info[0].detail, "iOS 14.0 or later");
+  assert.equal(lite.info.at(-1).detail, "Delta 1.5.ipa");
+  for (const r of [...lite.version, ...lite.info]) assert.ok(ROW_ICONS[r.icon], `${r.label}: a tile`);
+  const bare = ipaRows({ file: "x.ipa" });
+  assert.equal(bare.addTweaks, false, "no bundle ID (or not the sideload build): no Add Tweaks");
+  assert.deepEqual(labels(bare.info), ["Size", "Bundle ID", "File"]);
+  assert.equal(bare.version[0].detail, "—");
+});

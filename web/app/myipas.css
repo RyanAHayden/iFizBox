@@ -4,11 +4,11 @@
    the iOS 6 decorations (the price button's glosses and embosses) come from the tokens in the last stretch. */
 .myipa-row .cell-icon { position: relative; overflow: hidden; }
 .myipa-row .cell-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.myipa-bundle { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 /* B92: a file name is never cut on the IPA's page. The header's name wraps when it is the file's; the File row's
    value takes the room beside its label and wraps, anywhere when a name has no break, the row growing with it
    (screens/myipas.js markFileRow: a hold copies it). In the list, core/midtrunc.js cuts file names in the middle. */
-.pkg-head-name.myipa-head-file { white-space: normal; overflow-wrap: anywhere; }
+.store-head-name.myipa-head-file { white-space: normal; overflow-wrap: anywhere; }
+.myipa-file .cell-icon { align-self: center; }
 .myipa-file .cell-inner { align-items: flex-start; padding-top: 11px; padding-bottom: 11px; }
 .myipa-file .cell-text { flex: none; }
 .myipa-file .cell-detail { flex: 1; min-width: 0; max-width: none; margin-left: 6px;
@@ -22,7 +22,6 @@
 .myipa-row .cell-icon img { background: #fff; }
 .myipa-row .cell-icon img:not(.loaded) { opacity: 0; }
 .myipa-row.is-broken .cell-subtitle { color: #b5322c; }
-.myipa-bundle { font-size: 13px; }
 .myipa-file .cell-label { line-height: 21px; }
 .myipa-file .cell-detail { text-align: right; line-height: 21px; }
 .cell-inner.myipa-delete .cell-label { color: #b5322c; text-align: center; }
