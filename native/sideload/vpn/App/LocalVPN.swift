@@ -296,8 +296,19 @@ enum LocalVPN {
         switchedOn = false
         let cell = switchCellular
         lock.unlock()
-        let r = runShortcut("switch", input: switchInput("end", cellular: cell))
+        let r = switchEnded(runShortcut("switch", input: switchInput("end", cellular: cell)))
         log(r.ok ? "Install Switch: end ran" : "Install Switch: end didn't run: \(r.error ?? "?")")
+    }
+
+    /// The end's run, with Set VPN's last word forgiven: on the 15 Pro (iOS 27) Set VPN on the remembered VPN switches
+    /// back to it (Settings shows it selected and connected) and then reports NEVPNErrorDomain error 2
+    /// (configuration disabled), which ends the run. Through x-callback-url iOS shows no alert for it.
+    static func switchEnded(_ r: (ok: Bool, error: String?)) -> (ok: Bool, error: String?) {
+        if !r.ok, let e = r.error, e.contains("NEVPNErrorDomain error 2") {
+            log("Install Switch: Set VPN said \(e); the VPN switched back regardless")
+            return (true, nil)
+        }
+        return r
     }
 
     /// vpn.testSwitch (blocking): the start, then (whatever it did) the end, as around one install, without an install.
@@ -314,7 +325,7 @@ enum LocalVPN {
                 Thread.sleep(forTimeInterval: 0.2)
             }
         }
-        let end = runShortcut("switch", input: switchInput("end", cellular: cellular))
+        let end = switchEnded(runShortcut("switch", input: switchInput("end", cellular: cellular)))
         UserDefaults.standard.set(start.ok && end.ok, forKey: shortcutKeys["switch"]!)
         return ["ok": start.ok && end.ok, "cellular": cellular, "wentOff": wentOff, "vpnOn": vpnOn,
                 "start": ["ok": start.ok, "error": (start.error as Any?) ?? NSNull()],

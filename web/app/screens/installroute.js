@@ -264,7 +264,7 @@ export function shortcutGroups(st, { add = () => {}, test = () => {}, testing = 
   const f = failed[k];
   const groups = [{ rows: [row], ...(!sc[k] && f && checking !== k
     ? { footer: f.open ? shortcutDidntOpen(k, f.open) : shortcutDidntRun(k, f), warn: true }
-    : { footer: "Tap Shortcuts, then Add Shortcut, and come back. Around installs it turns cellular data off and on, and brings your VPN back." }) }];
+    : { footer: `${sc[k] ? "" : "Tap Shortcuts, then Add Shortcut, and come back. "}Around installs it turns cellular data off and on, and brings your VPN back.` }) }];
   if (sc[k]) {
     groups.push({ rows: [{ label: "Test Install Switch", icon: rowIcon("testConnection"), onClick: test, ...(testing ? { detail: "Testing…", spin: true } : {}) }],
       footer: `Runs it once each way: ${BUILTIN_VPN} on, then your VPN back.` });
@@ -442,10 +442,13 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
       refreshing: { device: devWait && cached, tailscale: tsWait && Boolean(view?.tailscale) }, late, testing, pairChecking, switchChecking,
       addSwitch: async () => {
         if (switchChecking) return;
-        const r = await addSwitch(native, alert, { checking: (on) => { switchChecking = on; paint(); } });
+        // coming back from Shortcuts repaints the page with a new paintInstallation; this one's paint() then stops,
+        // so the spinner and the answer go to whichever painter the page has now (redraw)
+        const repaint = () => (mine() ? paint() : redraw());
+        const r = await addSwitch(native, alert, { checking: (on) => { switchChecking = on; repaint(); } });
         if (r.status && lastStatus) lastStatus = { ...lastStatus, vpn: { ...(lastStatus.vpn ?? {}), ...r.status } };
         if (r.status && view) view = { ...view, vpn: { ...(view.vpn ?? {}), ...r.status } };
-        paint();
+        repaint();
       },
       connectPick, connectBusy, hint: lastStatus, server, picking: devWait && picked === choice,
       failure: choice === "iphone" ? routeFailure() : null, // B316

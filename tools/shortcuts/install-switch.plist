@@ -480,7 +480,9 @@
 				<integer>2</integer>
 			</dict>
 		</dict>
-		<!--     Set VPN: connect the VPN the start remembered, then forget it -->
+		<!--     Set VPN: connect the VPN the start remembered, then forget it. On the 15 Pro (iOS 27) this Set VPN
+		         switches back and then reports NEVPNErrorDomain error 2, which ends the run before the forget
+		         (LocalVPN.switchEnded takes that error as done; the next start overwrites or deletes it) -->
 		<dict>
 			<key>WFWorkflowActionIdentifier</key>
 			<string>is.workflow.actions.getstoredcontent</string>
