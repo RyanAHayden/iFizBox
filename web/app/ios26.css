@@ -294,7 +294,7 @@ html[data-style="ios26"] .badge { font-size: 14px; font-weight: 400; line-height
 
 /* F367: real Liquid Glass in the app on iOS 26+ (nav/glass.js, the shell's ui.glass). While the shell's glass is up
    (<html data-glass="native">), the look-alike it covers right now (data-glass-shown: the tab bar, a bar button) goes
-   see-through and its taps land on the glass above it; whenever the glass hides (a push sliding, a sheet over it) the
+   see-through and its taps land on the glass above it; whenever the glass hides (a popup, a sheet over it) the
    attribute goes and the look-alike shows. The nav bar's ground becomes iOS 26's scroll edge: the page's ground
    fading from the status bar to nothing at the bar's foot, so the content scrolling under the buttons is there for
    the glass to bend. */

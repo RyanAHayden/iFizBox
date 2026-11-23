@@ -336,7 +336,7 @@ export function syncGlass(doc = globalThis.document, native = nativeBridge(), wi
     return;
   }
   const slide = st.slide?.ms && !snap.buttonsHidden ? st.slide.ms : 0;
-  if (st.slide) st.slide.ms = 0; // sent once: a later change during the slide shows at once
+  if (st.slide) st.slide.ms = 0; // sent once: anything else sent meanwhile (the tab bar) starts no second fade
   st.sent = key;
   for (const k of Object.keys(icons)) st.iconsSent.add(k);
   uncover(doc, parts); // what the glass stops covering shows at once; what it starts covering waits for the answer

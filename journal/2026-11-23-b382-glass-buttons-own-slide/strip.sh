@@ -1,0 +1,1 @@
+ffmpeg -v error -y -ss $2 -t $3 -i $1.mp4 -fps_mode passthrough -vf "crop=1178:170:0:170,scale=500:-1,drawtext=text='%{pts}':fontsize=14:fontcolor=yellow:x=200:y=56,tile=4x16:padding=3:nb_frames=${5:-64}" -frames:v 1 $4.png
