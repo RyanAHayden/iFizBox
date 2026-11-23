@@ -180,3 +180,10 @@ test("B380: Installation & Signing by its other route while on screen changes no
   assert.equal(results.at(-1).kind, "pop");
   assert.equal(win.location.hash, "#/home");
 });
+
+test("B380: Settings' root from This iPhone's page pops to it", () => {
+  const { win, open } = setup("#/home");
+  for (const h of ["#/home/settings", SIGNING, sub("installation", "iphone")]) open(h);
+  assert.equal(open("#/home/settings").kind, "pop");
+  assert.equal(win.location.hash, "#/home/settings");
+});

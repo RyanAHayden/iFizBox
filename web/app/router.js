@@ -65,12 +65,12 @@ export function mounted(route) {
 // "~settings"), any other page as "~<tab>" again. Left as a plain route, the stack swapped the mounted page for the new
 // one without a slide.
 // B380: Settings' pages: Installation & Signing is one page under two routes (settings/signing, settings/installation:
-// the sideload build), and its pages hang off either. A link to a Settings page that isn't above or below the one on
+// the sideload build), and its pages hang off either. A link to one of its pages that isn't above or below the one on
 // screen (settings/signing -> settings/installation/iphone -> settings/installation/pair) is a push, mounted as
 // "~settings"; left as a plain route the stack swapped the page without a slide. One the route's Settings pages already
 // stand on (onSettings) is a pop to it.
 export function mountLink(from, to) {
-  const on = from && inHome(to) && to.path.length > 1 ? onSettings(from, to) : null;
+  const on = from && inHome(to) ? onSettings(from, to) : null;
   if (on) return on;
   if (from && from.tab !== "home" && inHome(to)) to = { tab: IN_HOME, path: to.path.slice(1) };
   else if (from && from.path.some(isMount) && inHome(to)) {
@@ -81,7 +81,7 @@ export function mountLink(from, to) {
     }
   }
   if (!from || !to.path.length) return null;
-  if (from.tab === "home" && inHome(from) && inHome(to) && !from.path.some(isMount) && !related(from.path, to.path)) {
+  if (from.tab === "home" && inHome(from) && inHome(to) && ofSigning(to.path[1]) && !from.path.some(isMount) && !related(from.path, to.path)) {
     return { tab: from.tab, path: [...from.path, MOUNT + IN_HOME, ...to.path.slice(1)] };
   }
   if (to.tab === from.tab && to.path.length <= from.path.length && to.path.every((s, i) => s === from.path[i])) return null;
@@ -89,7 +89,7 @@ export function mountLink(from, to) {
   if (to.tab === from.tab && k < 0 && from.path.some(isMount)) return { tab: from.tab, path: [...from.path, MOUNT + to.tab, ...to.path] };
   const inner = k >= 0 ? from.path.slice(k + 1) : to.tab === from.tab ? from.path : null;
   const branches = inner && inner.length && !inner.some(isMount)
-    && (to.tab === IN_HOME ? !related(inner, to.path) : inner[0] !== to.path[0]);
+    && (to.tab === IN_HOME && ofSigning(to.path[0]) ? !related(inner, to.path) : inner[0] !== to.path[0]);
   if (branches) return { tab: from.tab, path: [...from.path, MOUNT + to.tab, ...to.path] };
   if (to.tab === from.tab && k < 0) return null; // within the tab: a plain push, pop or sibling
   const base = k >= 0 ? from.path.slice(0, k) : from.path;
@@ -98,6 +98,7 @@ export function mountLink(from, to) {
 
 // Whether one path is on the way to the other.
 const related = (a, b) => a.slice(0, b.length).every((s, i) => s === b[i]);
+const ofSigning = (seg) => seg === "signing" || seg === "installation";
 // The Settings page's path, Installation & Signing's two routes as one.
 const settingsPage = (path) => (path.length === 1 && path[0] === "installation" ? "signing" : path.join("\n"));
 // B380: the page of `from`'s topmost run of Settings pages (one mounted on another) that shows `to`, as a route; null
