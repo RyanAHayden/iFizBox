@@ -660,6 +660,18 @@ An app keeps its data in three places, and a re-sign must leave each where the a
   sign mapped onto the profile's first group gets that folder and suite copied into its own once (`legacy` in
   `ifizbox-groupfix.plist`; only for an app that had run before it got this fix, never a fresh install, which would
   take in what other apps left in that shared group).
+  At the first launch with the fix for a group (its `Library/AppGroups/<group>/` doesn't exist yet), an app that ran
+  before and has no `target` brings in what it kept for that group without the fix: the folder the container call
+  gave then (a tweak's own shim such as zxPluginsInject, which uses a subfolder of a profile group; nil without one)
+  and the suite's file `Library/Preferences/<group>.plist` in the app's own container (only when its own suite is
+  still empty). Nothing is copied over what's there, and this comes before the `legacy` copy, so it wins over it.
+  `Library/Caches` and top-level folders named after the original groups are left behind. It is done at launch for
+  every group, whether or not the app asks, and the folder is made then, so a fresh install never brings in what an
+  earlier install left. While a copy isn't complete (launch cut short, or files unreadable before first unlock)
+  `Library/AppGroups/.<group>.copying` stays and the next launch tries again. The fix's log
+  (`Library/ifizbox-groupfix.log`) gets one extra line then: `<time> brought in from before the group fix: <group>
+  folder <files>, suite <keys>` (the files and keys found there). Extensions don't get the dylib, so they keep the
+  old place.
 - **Keeping an app's passwords to itself**: `TEAM.<App ID>` (and the profile's app groups) stay keychain groups every
   app under that App ID can reach, and a read that names no group finds what is there: a fresh app took over another
   app's item, and one app's delete that named no group (a fresh install clearing its keychain, a logout, any app the
