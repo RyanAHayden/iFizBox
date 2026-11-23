@@ -307,7 +307,7 @@ export function backInApp(doc = globalThis.document, { leaveMs = 4000, limit = 1
     t = setTimeout(() => (left ? end(false) : end(true)), left ? limit : leaveMs);
   });
 }
-export const CHECK_MS = 60000; // vpn.checkShortcut: one run through Shortcuts and back (native shortcutLimit is 25 s)
+export const CHECK_MS = 75000; // vpn.checkShortcut: up to two runs through Shortcuts and back (native shortcutLimit 25 s each)
 
 // B359: Add on Cellular Shortcuts. vpn.openShortcuts shares our signed Shortcut; Shortcuts never says it was added,
 // so once the user is back the app runs it (vpn.checkShortcut, input "check": it does nothing) and only a run that

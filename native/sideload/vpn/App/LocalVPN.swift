@@ -259,6 +259,12 @@ enum LocalVPN {
         c.queryItems = [URLQueryItem(name: "name", value: name), URLQueryItem(name: "x-success", value: back("ok")),
                         URLQueryItem(name: "x-error", value: back("error")), URLQueryItem(name: "x-cancel", value: back("cancel"))]
         if check { c.queryItems! += [URLQueryItem(name: "input", value: "text"), URLQueryItem(name: "text", value: "check")] }
+        // B359: the page sees itself visible again, and Shortcuts' callback for the run before arrives, a moment before
+        // iOS calls the app active: wait for it a little, or the open below is refused
+        let t0 = Date()
+        while !DispatchQueue.main.sync(execute: { UIApplication.shared.applicationState == .active }) && Date().timeIntervalSince(t0) < 3 {
+            Thread.sleep(forTimeInterval: 0.1)
+        }
         guard let url = c.url else { return (false, "bad Shortcut link") }
         let sem = DispatchSemaphore(value: 0)
         var out: (Bool, String?) = (false, nil)
@@ -350,7 +356,14 @@ enum LocalVPNBridge {
             guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: the jailbreak app installs IPAs through its helper") }
             guard let w = c.params["which"] as? String, let key = LocalVPN.shortcutKeys[w] else { return Apt.reply(c, nil, "no Shortcut given") }
             DispatchQueue.global(qos: .userInitiated).async {
-                let r = LocalVPN.runShortcut(w, check: true)
+                var r = LocalVPN.runShortcut(w, check: true)
+                // just after Add Shortcut's Replace, Shortcuts can't find it for some seconds: try again (not after a
+                // cancel or a run that never came back)
+                for wait in [1.5, 3, 5] where !r.ok && r.error != "the Shortcut was canceled" && !(r.error ?? "").contains("didn't come back") {
+                    LocalVPN.log("Shortcut \(w): \(r.error ?? "failed"), again in \(wait) s")
+                    Thread.sleep(forTimeInterval: wait)
+                    r = LocalVPN.runShortcut(w, check: true)
+                }
                 UserDefaults.standard.set(r.ok, forKey: key) // Added only once it ran
                 Apt.reply(c, ["ok": r.ok, "error": (r.error as Any?) ?? NSNull(), "status": LocalVPN.status()], nil)
             }
