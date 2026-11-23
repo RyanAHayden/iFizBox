@@ -25,6 +25,7 @@ export const APP_SOURCES = "App Sources";
 const refreshFilter = () => sourceFilter(settings.deviceType(), { tweaks: tweakSourcesOn(settings.deviceType(), detectMode()) });
 import { sourceIconImage } from "../source-icon.js";
 import { settings } from "../settings-store.js";
+import { catalog } from "../catalog.js"; // F382
 import * as manage from "./manage.js";
 import { orderSources, loadOrder, filterSources } from "../core/sourcelist.js";
 import { healthOf } from "../core/health.js";
@@ -393,7 +394,7 @@ function paintRow(li) {
   if ((st === ROW.done && r.count != null) || st === ROW.failed) {
     if (!count) { count = Object.assign(document.createElement("span"), { className: "cell-count" }); inner.append(count); }
     count.classList.toggle("row-failed-badge", st === ROW.failed);
-    count.textContent = st === ROW.failed ? "!" : r.count.toLocaleString();
+    count.textContent = st === ROW.failed ? "!" : li.dataset.shownCount ?? r.count.toLocaleString(); // F382: filtered
   } else count?.classList.remove("row-failed-badge");
   const sub = inner.querySelector(".cell-subtitle");
   if (sub) {
@@ -630,8 +631,48 @@ function draw(view) {
   attachRowGestures(ul);
   attachDeleteSwipe(ul); // B356
   box.replaceChildren(ul);
+  if (tweakList.length) noteFilteredTweakSources(ul, tweakList); // F382
   if (!list.length && !tweakList.length) {
     box.append(note(searching ? "No sources match." : "No sources. Tap Manage, then Sources."));
+  }
+}
+
+// ---- F382: Tweak Sources the Source Filters leave empty ----------------------------------------------------------
+//
+// A Tweak Source's badge counts what the Source Filters keep (core/sourcefilters.js: App Tweaks Only drops rootful-only
+// tweaks, Hide Unknown BigBoss's unstated ones), and one left with none says so under its name. Only for a source
+// whose packages are in the catalog already: this never starts a load.
+export const NO_APP_TWEAKS = "No app tweaks: this is a jailbreak source";
+export const ALL_FILTERED = "Filters hide everything here";
+async function noteFilteredTweakSources(ul, list) {
+  // Sources not in the catalog yet are noted once a load put them there (catalog.onLoaded), if the list is still up.
+  const later = list.filter((s) => !catalog.status(s.key));
+  if (later.length) {
+    const off = catalog.onLoaded(() => {
+      if (!ul.isConnected) { off(); return; }
+      const now = later.filter((s) => catalog.status(s.key));
+      if (now.length === later.length) off();
+      if (now.length) noteFilteredTweakSources(ul, now);
+    });
+  }
+  for (const s of list) {
+    const st = catalog.status(s.key);
+    if (!st || st.error) continue;
+    let total;
+    try { ({ total } = await catalog.sections(s.key)); } catch { continue; }
+    const li = [...ul.querySelectorAll(":scope > .source-row")].find((x) => x.dataset.key === s.key);
+    if (!li?.isConnected || li.classList.contains("is-loading") || li.classList.contains("is-failed")) continue;
+    li.dataset.shownCount = total.toLocaleString(); // paintRow keeps it over the refresh's own count
+    const count = li.querySelector(".cell-count");
+    if (count) count.textContent = li.dataset.shownCount;
+    const sub = li.querySelector(".cell-subtitle");
+    if (total !== 0 || !sub || sub.dataset.error === "1") continue;
+    // The URL (the subtitle's last text) gives way; the Known Safe / Unknown pill before it stays (safety.js).
+    // "jailbreak source" only where App Tweaks Only is on for it; another switch that emptied it gets the plain words.
+    const text = settings.sourceFilters.isOn(s.key, "appTweaks") ? NO_APP_TWEAKS : ALL_FILTERED;
+    const url = [...sub.childNodes].reverse().find((n) => n.nodeType === 3 && n.textContent.trim());
+    if (url) url.textContent = text;
+    else sub.append(text);
   }
 }
 

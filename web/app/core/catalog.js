@@ -52,6 +52,13 @@
 //                                             A device with jailbreak "none" (F37, Not Jailbroken) sees AltStore
 //                                             sources only: APT sources' packages drop out of everything, filter or
 //                                             not (lists, Search, package pages, installed rows and upgrades)
+//   c.setFilters(stored, { lite })         -> Source Filters (F382, core/sourcefilters.js): each row's own source
+//                                             decides (All Sources' choices unless changed there) whether old,
+//                                             unknown-iOS, paid and (lite) rootful-only tweaks drop out of sections,
+//                                             list, search and author like hidden ones; a source's Works on My Phone
+//                                             overrides setDevice's filter for its rows; Newest Copy Only leaves a
+//                                             package out of a source's own list when another source has it newer.
+//                                             package() and upgrades() still see everything
 //   c.setIpaInfo(map)                      -> F160: { downloadURL: info } read from IPAs on this device (core/ipainfo.js);
 //                                             merged into what is kept, and apps whose candidate is one of them are
 //                                             judged with it (the source's own range wins, unless the IPA's own
@@ -68,6 +75,7 @@ import { needsRestart } from "./queue.js";
 import { packageKind } from "./progress.js";
 import { injectableFromFields } from "./tweakfields.js"; // F302; C32: not tweaks.js, which pulls unpack.js in
 import { NO_SECTION, sectionName, simpleSection, parseAuthor, compareNames, SECTION_GROUPS, sectionGroup, APP_TWEAKS } from "./sections.js";
+import { normalizeFilters, resolveFilters, filterOn, ALL_SOURCES, isOldPackage, isUnknownIos, isAppTweak } from "./sourcefilters.js"; // F382
 
 export const ALL = "*";
 
@@ -106,6 +114,8 @@ function makeRow(st, key) {
     // search fields, lower-cased once at load; dropped before rows leave the worker
     _hay: [name, st.package, desc.short, desc.long, author, maint].join("\n").toLowerCase(),
     _n: name.toLowerCase(), _id: st.package.toLowerCase(), _a: author.toLowerCase(), _m: maint.toLowerCase(),
+    // F382: what the Source Filters test, worked out once at load (core/sourcefilters.js)
+    _old: isOldPackage(st), _unk: isUnknownIos(st), _app: isAppTweak(st),
   };
 }
 
@@ -444,6 +454,60 @@ export function createCatalog() {
   const inAll = (key) => !appsOnly || isAltKey(key);
   const ipaInfo = new Map(); // F160: downloadURL -> what the IPA itself says (core/ipainfo.js), from the UI
   const judged = (st) => (st?.kind === "ipa" && st.downloadURL && ipaInfo.has(st.downloadURL) ? withIpaInfo(st, ipaInfo.get(st.downloadURL)) : st);
+  // F382: Source Filters. `filterStore` is the stored choices (null until the UI sent them: nothing filtered), each
+  // source's resolved switches cached by key; `filterGen` tells the list caches built on them that they changed.
+  let filterStore = null, filterLite = false, filterGen = 0;
+  const keyFilters = new Map();
+  function filtersOf(key) {
+    if (!filterStore) return null;
+    let f = keyFilters.get(key);
+    if (!f) { f = resolveFilters(filterStore, [key], { lite: filterLite }).byKey[key]; keyFilters.set(key, f); }
+    return f;
+  }
+  const filteredOut = (r) => {
+    const f = filtersOf(r.key);
+    return Boolean(f) && ((f.old && r._old) || (f.unknown && r._unk) || (f.paid && r.paid) || (f.appTweaks && tweakKeys.has(r.key) && !r._app));
+  };
+  // Works on My Phone: a source's own switch, else All Sources' (setDevice's filter).
+  const misfit = (r) => {
+    if (!device || !isIncompatible(r.compat)) return false;
+    const own = filtersOf(r.key)?.fit;
+    return typeof own === "boolean" ? own : fitFilter;
+  };
+  function setFilters(stored, { lite = false } = {}) {
+    filterStore = stored == null ? null : normalizeFilters(stored);
+    filterLite = Boolean(lite);
+    keyFilters.clear();
+    filterGen++;
+    sorted.clear();
+    shown.clear();
+    fitting.clear();
+    return filterStore ? Object.keys(filterStore).length : 0;
+  }
+  // F382: the newest version of each id across the counted sources, unfiltered rows only (Newest Copy Only), and All
+  // Sources' merge without filtered rows (an id whose newest copy is filtered out falls back to the next one).
+  let listCacheOf = [null, -1], newestCopy = new Map(), listMerged = new Map();
+  function listMerges() {
+    const all = entries(ALL);
+    if (listCacheOf[0] === all && listCacheOf[1] === filterGen) return;
+    newestCopy = new Map();
+    listMerged = new Map();
+    for (const [k, { byId }] of sources) {
+      if (!counts(k)) continue;
+      for (const [id, e] of byId) {
+        if (filteredOut(e.row) || !listed(e.row)) continue;
+        const v = newestCopy.get(id);
+        if (v == null || compareVersions(v, e.stanza.version) < 0) newestCopy.set(id, e.stanza.version);
+        if (!inAll(k)) continue;
+        const cur = listMerged.get(id);
+        if (!cur || compareVersions(cur.stanza.version, e.stanza.version) < 0) listMerged.set(id, e);
+      }
+    }
+    listCacheOf = [all, filterGen];
+  }
+  const dupesOn = () => Boolean(filterStore) && filterOn(filterStore, ALL_SOURCES, "dupes");
+  const olderCopy = (e) => compareVersions(newestCopy.get(e.row.id) ?? e.stanza.version, e.stanza.version) > 0;
+
   // F302: an injectable tweak goes into a signed app, so a phone without a jailbreak takes it.
   const judge = (e) => { e.row.compat = device && !(e.stanza.injectable && device.jailbreak === "none") ? compatCode(judged(e.stanza), device) : null; };
 
@@ -596,26 +660,31 @@ export function createCatalog() {
 
   // B341: the Tweak Sources' injectable tweaks merged like All Sources (newest version wins), for the sideload
   // build's App Tweaks section; empty elsewhere. Rebuilt with the All Sources merge (the sourceCounts trick).
-  let tweakMerged = new Map(), tweakOf = null, tweakSorted = [];
+  let tweakMerged = new Map(), tweakOf = null, tweakSorted = [], tweakGen = -1;
   function tweakEntries() {
     if (!appsOnly || !tweakKeys.size) return new Map();
     const all = entries(ALL);
-    if (tweakOf === all) return tweakMerged;
+    if (tweakOf === all && tweakGen === filterGen) return tweakMerged;
     tweakMerged = new Map();
+    const kept = new Map(); // F382: the same merge over the rows the Source Filters keep, for the section's list
     for (const k of tweakKeys) {
       for (const [id, e] of sources.get(k)?.byId ?? []) {
         const cur = tweakMerged.get(id);
         if (!cur || compareVersions(cur.stanza.version, e.stanza.version) < 0) tweakMerged.set(id, e);
+        if (filteredOut(e.row)) continue;
+        const was = kept.get(id);
+        if (!was || compareVersions(was.stanza.version, e.stanza.version) < 0) kept.set(id, e);
       }
     }
-    tweakSorted = [...tweakMerged.values()].map((e) => e.row).sort(compareNames);
+    tweakSorted = [...kept.values()].map((e) => e.row).sort(compareNames);
     tweakOf = all;
+    tweakGen = filterGen;
     return tweakMerged;
   }
   // What App Tweaks lists: those rows outside hidden sections, blocked ids and hidden authors (and misfits).
   function tweakRows() {
     if (!tweakEntries().size) return [];
-    return tweakSorted.filter((r) => !(fitFilter && isIncompatible(r.compat)) && !isHidden(r));
+    return tweakSorted.filter((r) => !misfit(r) && !isHidden(r));
   }
   // An entry of `key`, or (All Sources, sideload build) of the App Tweaks merge: a tweak opened from that section.
   const entryOf = (id, key) => entries(key).get(id) ?? (key === ALL ? tweakEntries().get(id) : undefined);
@@ -623,7 +692,12 @@ export function createCatalog() {
   function rowsOf(key) {
     let rows = sorted.get(key);
     if (!rows) {
-      rows = [...entries(key).values()].map((e) => e.row).filter(listed).sort(compareNames);
+      // F382: the Source Filters' rows left out; All Sources from the merge of what they keep, and a source's own
+      // list without what another source has newer (Newest Copy Only).
+      const from = filterStore ? (listMerges(), key === ALL ? listMerged : entries(key)) : entries(key);
+      const dupes = key !== ALL && dupesOn();
+      rows = [...from.values()].filter((e) => listed(e.row) && !filteredOut(e.row) && !(dupes && olderCopy(e)))
+        .map((e) => e.row).sort(compareNames);
       sorted.set(key, rows);
     }
     return rows;
@@ -631,10 +705,10 @@ export function createCatalog() {
 
   // rowsOf without what can't work on the device (F17), when that filter is on.
   function fitOf(key) {
-    if (!fitFilter) return rowsOf(key);
+    if (!device) return rowsOf(key);
     let rows = fitting.get(key);
     if (!rows) {
-      rows = rowsOf(key).filter((r) => !isIncompatible(r.compat));
+      rows = rowsOf(key).filter((r) => !misfit(r));
       fitting.set(key, rows);
     }
     return rows;
@@ -738,7 +812,7 @@ export function createCatalog() {
       else if (r._n.startsWith(q) || r._id.startsWith(q)) rank = 1;
       else if (r._n.includes(q) || r._id.includes(q)) rank = wordStart(r._n, q) || wordStart(r._id, q) ? 2 : 3;
       else if (r._a.includes(q) || r._m.includes(q)) rank = 4;
-      if (fitFilter && rank !== 0 && isIncompatible(r.compat)) continue;
+      if (rank !== 0 && misfit(r)) continue;
       // One number sorts by tier, then length gap, then sources (most first); rows come in name order (rowsOf)
       // and the sort is stable, so name breaks the last tie without the collator. Twice R12's ~4 ms otherwise.
       const gap = Math.min(Math.abs(r._n.length - q.length), 9999);
@@ -830,7 +904,7 @@ export function createCatalog() {
       const id = ref?.id;
       if (typeof id !== "string" || seen.has(id)) continue;
       const e = (ref.key !== ALL && counts(ref.key) && sources.get(ref.key)?.byId.get(id)) || entries(ALL).get(id);
-      if (!e || isHidden(e.row) || !listed(e.row) || (fitFilter && isIncompatible(e.row.compat))) continue;
+      if (!e || isHidden(e.row) || !listed(e.row) || misfit(e.row) || filteredOut(e.row)) continue;
       seen.add(id);
       out.push(slim(e.row));
     }
@@ -989,7 +1063,7 @@ export function createCatalog() {
 
   return { load, loadAlt, altSource, remove, setHidden, setHiddenAuthors, setBlocked, sections, list, search, author, package: pkg, history, has, versions, keys: () => [...sources.keys()],
     categories, browse, popular, free, featured, collection: collectionRows, roulette,
-    setInstalled, installed, upgrades, setDevice, setIpaInfo,
+    setInstalled, installed, upgrades, setDevice, setIpaInfo, setFilters,
     deps, aptProblems, queueInfo, runInfo };
 }
 
@@ -1004,7 +1078,7 @@ export function runCatalog(catalog, op, args = []) {
   const f = { load: catalog.load, loadAlt: catalog.loadAlt, altSource: catalog.altSource, remove: catalog.remove, sections: catalog.sections, list: catalog.list,
     search: catalog.search, author: catalog.author, package: catalog.package, history: catalog.history, has: catalog.has, keys: catalog.keys,
     versions: catalog.versions, setHidden: catalog.setHidden, setHiddenAuthors: catalog.setHiddenAuthors, setBlocked: catalog.setBlocked, setInstalled: catalog.setInstalled,
-    installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice, setIpaInfo: catalog.setIpaInfo,
+    installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice, setIpaInfo: catalog.setIpaInfo, setFilters: catalog.setFilters,
     categories: catalog.categories, browse: catalog.browse, popular: catalog.popular, free: catalog.free, featured: catalog.featured,
     collection: catalog.collection, roulette: catalog.roulette,
     deps: catalog.deps, aptProblems: catalog.aptProblems, queueInfo: catalog.queueInfo, runInfo: catalog.runInfo }[op];

@@ -1,7 +1,8 @@
 // This iPhone, for "Works on my phone" (F17; the rules are core/compat.js). The iOS version comes from the bridge in
 // the app (Bridge.swift app.info `ios`) and on the site from the user agent, unless Settings > iOS Version picks one;
 // the jailbreak type is Settings > Device's (F37: core/settings.js deviceType(), "none" when not jailbroken). Both stay on the device (core/settings.js). The worker's catalog
-// hears every change (catalog.setDevice), so lists, Search and Changes follow the Works on My Phone switch.
+// hears every change (catalog.setDevice), so lists, Search and Changes follow the Works on My Phone switch, and the
+// Source Filters (F382, catalog.setFilters).
 //
 //   currentDevice()          -> { ios: "16.5" | null, jailbreak: "rootless" | "rootful" | "roothide" | "none" (sideload build) }
 //   compatFilterOn()         -> whether rows that can't work are hidden (on by default)
@@ -51,6 +52,10 @@ export function deviceLabel(d = currentDevice()) {
 }
 
 const send = () => catalog.setDevice(currentDevice(), { filter: compatFilterOn() });
+// F382: Source Filters reach the worker's catalog the same way (core/sourcefilters.js, Sources > Manage > Filters).
+const sendFilters = () => catalog.setFilters(settings.sourceFilters.all(), { lite: settings.mode === "sideload" });
+// F382: in the app, the first send waits for app.info (the iOS 26+ web view's user agent says 18.6), at most this long.
+const APP_INFO_WAIT_MS = 2500;
 
 // The switch row: a one-row plain table with the device under the label, above the Sections list and Search's
 // results. `onChange()` runs after the setting changed and the catalog heard it, for the page to redraw its list.
@@ -94,13 +99,19 @@ let wired = false;
 export function initDevice() {
   if (wired) return;
   wired = true;
-  send();
-  settings.onChange((key) => { if (DEVICE_KEYS.includes(key)) send(); });
+  sendFilters();
+  settings.onChange((key) => { if (key === "sourceFilters") sendFilters(); });
   const n = globalThis.ifizboxNative;
+  // F382: the catalog answers nothing until the device is sent (catalog.js deviceReady), so lists show their loading
+  // state rather than rows judged for the user agent's iOS.
+  let sent = false;
+  const first = () => { if (!sent) { sent = true; send(); } };
+  settings.onChange((key) => { if (DEVICE_KEYS.includes(key) && sent) send(); });
   if (n?.call) {
+    setTimeout(first, APP_INFO_WAIT_MS);
     n.call("app.info", {}).then((info) => {
       applyNativeJailbreak(info); // a changed arch tells the catalog through settings.onChange
-      if (typeof info?.ios === "string" && info.ios) { nativeIos = info.ios; send(); }
-    }).catch(() => {});
-  }
+      if (typeof info?.ios === "string" && info.ios) { nativeIos = info.ios; if (sent) send(); }
+    }).catch(() => {}).finally(first);
+  } else first();
 }

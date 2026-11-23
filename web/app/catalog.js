@@ -9,6 +9,7 @@
 //   catalog.setBlocked(ids)                            // Block (F226): blocked packages, sent likewise
 //   catalog.setHidden(names)                           // Section Visibility: sent to the worker before the next question
 //   catalog.setDevice(device, { filter })              // Works on my phone (F17, device.js): likewise
+//   catalog.setFilters(stored, { lite })               // Source Filters (F382, device.js): likewise
 //   catalog.installed()  catalog.upgrades(holds)       // dpkg's status file (F7): rows or null; { available, ignored }
 //   catalog.setIgnoredVersions(map, { onSettle })      // Ignore This Version (F281): { id: version }, kept in the page
 //   catalog.altSource(key)                     // an AltStore source's page data (F9, core/altstore.js), or null
@@ -271,6 +272,26 @@ function setDevice(next, { filter = true } = {}) {
   if (device?.device.jailbreak === "none" && v?.device.jailbreak !== "none") first = null;
   device = v;
   deviceSent = false;
+  if (v) deviceKnown?.(); // F382
+  for (const f of changeListeners) f();
+}
+
+// F382: no question is answered before the device is known (device.js initDevice sends it once the app said which
+// iOS it runs), so a list shows its loading state instead of rows judged for the wrong phone. Never waits for ever:
+// after DEVICE_WAIT_MS the questions go ahead with what there is.
+const DEVICE_WAIT_MS = 4000;
+let deviceKnown;
+const deviceReady = new Promise((resolve) => { deviceKnown = resolve; setTimeout(resolve, DEVICE_WAIT_MS)?.unref?.(); });
+
+// F382: Source Filters (core/sourcefilters.js): the stored choices and the build, sent like the hidden sections
+// (core/catalog.js setFilters). Null until device.js sends them: the worker then filters nothing.
+let filters = null;
+let filtersSent = true;
+function setFilters(stored, { lite = false } = {}) {
+  const next = { stored: stored ?? {}, lite: Boolean(lite) };
+  if (JSON.stringify(next) === JSON.stringify(filters)) return;
+  filters = next;
+  filtersSent = false;
   for (const f of changeListeners) f();
 }
 
@@ -322,6 +343,7 @@ async function reloadInstalled() {
 }
 
 const ask = async (op, args) => {
+  await deviceReady; // F382
   await (running ?? ready());
   await sendStatus();
   if (!hiddenSent) {
@@ -339,6 +361,10 @@ const ask = async (op, args) => {
   if (!deviceSent) {
     deviceSent = true;
     await getParser().catalog("setDevice", device ? [device.device, { filter: device.filter }] : [null]);
+  }
+  if (!filtersSent) {
+    filtersSent = true;
+    await getParser().catalog("setFilters", filters ? [filters.stored, { lite: filters.lite }] : [null]);
   }
   if (!ipaLoaded) {
     ipaLoaded = true;
@@ -365,6 +391,7 @@ export const catalog = {
   ignoredVersions: () => ({ ...ignoredVersionMap }),
   settleIgnoredVersions: settleIgnoredVersionMap,
   setDevice,
+  setFilters, // F382
   setIpaInfo, // F160
   list: (key = ALL, section = ALL) => ask("list", [key, section]),
   search: (q, filters) => ask("search", filters ? [q, filters] : [q]), // F35: core/catalog.js search filters

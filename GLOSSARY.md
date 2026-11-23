@@ -172,3 +172,10 @@ _Said_: Information
 _On screen_: Information
 _In code_: screens/sourcepage.js infoGroup, .source-info
 _Avoid_: status footer, facts group, Trust group
+
+**Source Filters**:
+The switches in Sources > Manage > Filters that leave kinds of packages (old, unknown iOS, paid, older copies, jailbreak-only tweaks in Lite) out of every list, for all sources or one source
+_Said_: filters
+_On screen_: Filters
+_In code_: core/sourcefilters.js, settings.sourceFilters, catalog.setFilters
+_Avoid_: source rules, package filters
