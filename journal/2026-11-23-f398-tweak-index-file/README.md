@@ -66,3 +66,12 @@ addresses stay out of it.
 - The live `ifizbox.com/api/tweaks.json`: it deploys only on a release.
 - A full `publish.sh` run: it publishes, so only `bash -n` was run.
 - On a device: there is no device-only code in this change.
+
+## Review fixes
+
+- A verdict a newer file no longer has is taken back from the catalog; a newer file judges the Tweak Sources again at once.
+- "Not known hides nothing" holds for a source never hidden before: one hidden by an earlier file stays hidden until a
+  file says otherwise (the rule from before this task).
+- `checkTweakRows` skips paid rows also for sources the file doesn't have; kept, as B391 removes those checks.
+- Chromium also recorded the page's requests: on, only `https://ifizbox.com/api/tweaks.json`, its file used after a
+  relaunch with no new request; off (and no kept copy), no request and the bundled file.

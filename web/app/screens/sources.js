@@ -682,21 +682,25 @@ async function noteFilteredTweakSources(ul, list) {
 // apps (My IPAs and the apps it signed, screens/tweaks.js signableApps) or in any app, is left out of the Tweak
 // Sources group (core/sources.js tweakSourceVerdict). Searching still finds it, and Manage still lists it (delete,
 // reorder). Unknown (no index, still being read, GitHub sources) shows it. A row that goes collapses (nav/ui.js), its
-// header with it when it was the group's last; one that comes back redraws the list. The index is asked once per ten
-// minutes a source, the user's apps re-read every 15 s at most; the hidden keys are kept on the device so the next launch draws without them.
+// header with it when it was the group's last; one that comes back redraws the list. The index file is read once per ten
+// minutes a source (and again when a newer file comes), the user's apps re-read every 15 s at most; the hidden keys are kept on the device so the next launch draws without them.
 //   tweakJudge.enabled   false under node (tests switch it on with their own ask/apps), so tests never fetch
 export const tweakJudge = {
   enabled: typeof globalThis.process?.versions?.node !== "string",
   ask: (s) => import("./tweaks.js").then((m) => {
     const file = m.indexFile();
-    judged.unwatch ??= file.onChange(() => judged.answers.clear()); // F398: a newer index file: judged anew on the next draw
+    // F398: a newer index file: the same sources judged again
+    judged.unwatch ??= file.onChange(() => {
+      judged.answers.clear();
+      Promise.resolve(judged.p).then(() => { judged.at = 0; judgeTweakSources(judged.list); });
+    });
     return askTweakIndex(s, { file });
   }),
   apps: async () => (await (await import("./tweaks.js")).signableApps()).map((a) => a.bundleId),
   every: 10 * 60 * 1000, // an index answer is kept this long
   again: 15 * 1000,      // the user's apps are read again after this long
 };
-const judged = { at: 0, keys: "", p: null, answers: new Map() }; // answers: key -> { at, a }, the index's, `every` ms
+const judged = { at: 0, keys: "", p: null, list: [], answers: new Map() }; // answers: key -> { at, a }, the index's, `every` ms
 
 function loadTweakHidden(storage = globalThis.localStorage) {
   try {
@@ -715,7 +719,7 @@ export function judgeTweakSources(list, { now = Date.now() } = {}) {
   if (!tweakJudge.enabled || judged.p) return null;
   const keys = list.map((s) => s.key).join("\n");
   if (keys === judged.keys && now - judged.at < tweakJudge.again) return null;
-  Object.assign(judged, { at: now, keys });
+  Object.assign(judged, { at: now, keys, list });
   const answerOf = async (s) => {
     const had = judged.answers.get(s.key);
     if (had && now - had.at < tweakJudge.every) return had.a;

@@ -262,7 +262,8 @@ export function catalogVerdicts({ storage } = {}) {
 }
 function tellVerdicts(keys, storage) {
   if (!verdictListeners.size) return;
-  const map = verdictsFor(keys, storage);
+  // F398: a verdict a newer index file no longer has is taken back (false)
+  const map = { ...Object.fromEntries([...keys].map((k) => [k, false])), ...verdictsFor(keys, storage) };
   if (!Object.keys(map).length) return;
   for (const f of [...verdictListeners]) { try { f(map); } catch { /* one listener's error stops no other */ } }
 }

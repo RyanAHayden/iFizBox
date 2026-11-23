@@ -70,6 +70,9 @@ test("F398: a newer file's verdicts reach what's loaded; the same package in two
   told(fileOf(packed([no], { src: A, at: 9 }), packed([yes], { src: B, at: 9 })));
   assert.deepEqual(get().bundles, ["com.b.app"]);
   assert.deepEqual(told2.map((m) => m["com.two@1"]), [true, false]);
+  told(fileOf(packed([{ ...yes, package: "com.else" }], { src: A, at: 12 })));
+  assert.equal(get(), null);
+  assert.equal(told2.at(-1)["com.two@1"], false, "a verdict the newer file dropped is taken back");
   off();
   await loadTweakIndex([SRC], { file: { read: async () => fileOf(packed(entries)) } });
 });
