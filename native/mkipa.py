@@ -227,7 +227,8 @@ def check(path):
 
 # N8: the IPA carries the intents that work without a jailbreak (native/build.sh SIDELOAD_INTENTS), and a widget
 # extension without controls (no intents of its own) and without jailbreak entitlements.
-SIDELOAD_INTENTS = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent"}
+SIDELOAD_INTENTS = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent",
+                    "ConnectVPNIntent", "OpenForInstallIntent", "WaitForInstallIntent"}  # F394: the Install Switch's
 WIDGET = APP + "PlugIns/%sWidget.appex/" % NAME
 
 
@@ -242,7 +243,7 @@ def intents_problems(files):
     except ValueError as e:
         return ["Metadata.appintents: %s" % e]
     if actions != SIDELOAD_INTENTS:
-        problems.append("App Intents %s, want the both-modes %s" % (sorted(actions), sorted(SIDELOAD_INTENTS)))
+        problems.append("App Intents %s, want %s" % (sorted(actions), sorted(SIDELOAD_INTENTS)))
     if WIDGET + "Metadata.appintents/extract.actionsdata" in files:
         problems.append("the widget extension carries intents (the controls are the .deb's)")
     exe = files.get(WIDGET + NAME + "Widget")

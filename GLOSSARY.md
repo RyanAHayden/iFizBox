@@ -200,3 +200,10 @@ _Said_: swipe between the tabs
 _On screen_: (no label)
 _In code_: nav/swipe.js attachTabSwipe, nav/tabswipe.js tabPager
 _Avoid_: pane swipe
+
+**Trip**:
+One run of the Install Switch that covers a whole queue of installs: Shortcuts opens once, and the Shortcut goes on behind the app until the installs are over and puts cellular data and the VPN back
+_Said_: one trip to Shortcuts
+_On screen_: (none)
+_In code_: LocalVPN.takeTrip, tripReady, endTrip, switchOld, {"trip":1}
+_Avoid_: flip, hop

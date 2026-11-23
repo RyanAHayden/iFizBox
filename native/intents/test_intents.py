@@ -15,6 +15,7 @@ import gzip
 import json
 import os
 import plistlib
+import re
 import shutil
 import subprocess
 import sys
@@ -35,7 +36,8 @@ from mkipa import macho_entitlements  # noqa: E402
 SWIFTC = toolchain()
 JAILBREAK = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent", "InstallAllUpdatesIntent",
              "RespringIntent", "UserspaceRebootIntent", "ExportPackagesIntent"}
-SIDELOAD = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent"}
+SWITCH = ["ConnectVPNIntent", "OpenForInstallIntent", "WaitForInstallIntent"]  # F394: the Install Switch's
+SIDELOAD = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent", *SWITCH}
 
 
 def read(*p):
@@ -243,13 +245,21 @@ class Wiring(unittest.TestCase):
         self.assertIn("-emit-const-values-path", b)
         self.assertIn("-weak_framework,AppIntents", b)
         self.assertIn("widget/build.sh", b)
-        self.assertIn("SIDELOAD_INTENTS=" + ",".join(["CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent"]), b)
+        self.assertIn("SIDELOAD_INTENTS=" + ",".join(["CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent", *SWITCH]), b)
+        self.assertIn("JAILBREAK_INTENTS", b)
+        for name in SWITCH:
+            self.assertNotIn(name, re.search(r"^JAILBREAK_INTENTS=.*", b, re.M).group(0))
 
     def test_intents_match_the_lists(self):
         src = read("intents", "App", "Intents.swift")
         for name in JAILBREAK:
             self.assertIn("struct %s: AppIntent" % name, src)
         self.assertNotIn("import UIKit", src)
+        switch = read("intents", "App", "InstallSwitch.swift")
+        for name in SWITCH:
+            self.assertIn("struct %s: AppIntent" % name, switch)
+        self.assertNotIn("ReturnsValue", switch)  # output as the last action makes iOS ask over the app
+        self.assertNotIn("import UIKit", switch)
         self.assertNotIn("import WidgetKit", src)
 
     def test_shell_takes_ifizbox_add(self):

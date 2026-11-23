@@ -50,7 +50,7 @@ test("set up = paired and tested once; the footer says the next step", () => {
   assert.equal(iphoneSetUp({ paired: "rp" }), true, "an older shell: paired is set up");
   assert.equal(setupFooter(ST({}, { paired: null })), "Pair this iPhone once to install straight onto it.");
   assert.equal(setupFooter(ST()), "Test the connection to finish setting up.");
-  assert.equal(setupFooter(ST({ tested: true })), "Set up for Wi-Fi and offline. Add the Install Switch to install on cellular and get your VPN back after.");
+  assert.equal(setupFooter(ST({ tested: true, cellular: true })), "Set up for Wi-Fi and offline. Add the Install Switch to install on cellular and get your VPN back after.");
   assert.equal(setupFooter(ST({ tested: true, shortcuts: { off: true, on: true } })), "Set up. Apps install straight onto this iPhone, on Wi-Fi, cellular or offline.");
   assert.equal(setupFooter(ST({ tested: true, shortcuts: { switch: true } })), "Set up. Apps install straight onto this iPhone, on Wi-Fi, cellular or offline.");
 });

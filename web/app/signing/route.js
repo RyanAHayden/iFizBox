@@ -32,7 +32,7 @@ export async function chooseRoute({ native, alert = showAlert, storage = storage
     // goes on through the Signing Server (no way on through This iPhone: it always fails there)
     if (a.setup != null) {
       if (index === a.setup) { heldRoute = null; openRoute(["installation", "shortcuts"]); return null; }
-      const params = routeParams({ route: "server" });
+      const params = routeParams(a.goes ? d : { route: "server" }); // F394: goes on without the Install Switch
       heldRoute = { at: now(), params };
       return params;
     }

@@ -38,7 +38,7 @@ test("the end is wired to the rule, and coming to the front ends nothing before 
   assert.ok(end.indexOf("guard switchEndNeeded(") > 0 && end.indexOf("guard switchEndNeeded(") < end.indexOf("runShortcut("));
   assert.match(end, /guard switchedOn, switchEndDue, holds == 0, active/);
   assert.match(swift, /holds \+= 1; stopGen \+= 1; switchEndDue = false/);
-  assert.match(swift, /if stop \{ switchEndDue = switchedOn \}/);
+  assert.match(swift, /if stop \{ switchEndDue = switchedOn && !tripOn;/);
   assert.match(end, /vpnBack = before\.isSubset\(of: otherVPNAddresses\(\)\)/, "that VPN, not just any tunnel");
   assert.match(swift, /if !notOpened\(r\.error\) \{ lock\.lock\(\); switchDataOff = true/);
 });
