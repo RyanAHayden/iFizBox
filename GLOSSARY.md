@@ -102,3 +102,17 @@ _Said_: era app icon, iOS 7 icon
 _On screen_: Theme > App Icon > Eras: iOS 7, iOS 13, iOS 26
 _In code_: ERA_ICONS, APP_ICONS era entries, native/icon/era/, alternates.ERAS
 _Avoid_: style icon, retro icon
+
+**Built-in VPN**:
+The app's own VPN that lets This iPhone installs reach iOS on the phone itself; on only while an install connects
+_Said_: built-in VPN
+_On screen_: iFizBox VPN
+_In code_: LocalVPN, BUILTIN_VPN, builtinVPN, vpn.*
+_Avoid_: LocalDevVPN, loopback VPN
+
+**Cellular Shortcuts**:
+Two Shortcuts the user adds once so This iPhone installs work on cellular: data off while the install connects, back on after
+_Said_: cellular shortcuts
+_On screen_: Cellular Shortcuts, Cellular Data Off, Cellular Data On
+_In code_: SHORTCUT_NAMES, shortcutGroups, LocalVPN.runShortcut
+_Avoid_: cellular refresh

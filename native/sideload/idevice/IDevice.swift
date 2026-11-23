@@ -703,14 +703,18 @@ enum IDevice {
         /// F372: the built-in VPN first, whenever this app can run it (LocalVPN.available): it turns on here and the
         /// connect goes to the same 10.7.0.1; Tailscale and LocalDevVPN are left for an app signed without it.
         private func endpoint(_ port: UInt16) throws -> (String, UInt16) {
-            if LocalVPN.available && pinnedTailscale != true {
-                if !second && !builtIn {
-                    watch.begin("turning on \(LocalVPN.name)", Limit.tunnel)
-                    let w = watch
+            if LocalVPN.available && pinnedTailscale != true && !LocalVPN.failedNow() {
+                if second || builtIn { return (address, port) } // a second look rides on the install's own session's VPN
+                watch.begin("turning on \(LocalVPN.name)", Limit.tunnel)
+                let w = watch
+                do {
                     dataOff = try LocalVPN.begin { w.alive($0) }
                     builtIn = true
+                    return (address, port)
+                } catch {
+                    // an install still goes through LocalDevVPN or Tailscale when they're on; vpn.test says the error
+                    ilog("\(LocalVPN.name) didn't start (\(error.localizedDescription)); trying LocalDevVPN or Tailscale")
                 }
-                return (address, port) // a second look rides on the install's own session's VPN
             }
             let tailnet = Tailscale.useForInstall()
             // B246: connecting again after a drop keeps the first connection's route. Automatic chose LocalDevVPN

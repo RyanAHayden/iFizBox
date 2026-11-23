@@ -101,6 +101,14 @@ enum LocalVPN {
     private static var cached: NETunnelProviderManager? // guarded by lock
     private static var holds = 0 // guarded by lock
     private static var stopGen = 0 // guarded by lock: a scheduled stop runs only if nothing came after it
+    private static var lastFailure: Date? // guarded by lock: begin() couldn't turn it on
+
+    /// begin() failed less than a minute ago: a reconnect or the next install of a queue goes the other ways in
+    /// instead of waiting on it again. vpn.test always tries.
+    static func failedNow() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return lastFailure.map { Date().timeIntervalSince($0) < 60 } ?? false
+    }
 
     /// Blocking, never on the main thread: our configuration, saved and enabled, loaded again (iOS wants a load after
     /// a save before the tunnel starts). The first save shows iOS's "Add VPN Configurations" and waits for Allow.
@@ -188,10 +196,15 @@ enum LocalVPN {
 
     /// Before a connect to iOS (blocking, on IDevice.queue): the VPN on, held until end(). On cellular with both
     /// Shortcuts added, Cellular Data Off runs too: the answer says so, and connected(dataOff:) turns it back on.
-    static func begin(_ step: (String) -> Void = { _ in }) throws -> Bool {
+    static func begin(cellular: Bool = true, _ step: (String) -> Void = { _ in }) throws -> Bool {
         lock.lock(); holds += 1; stopGen += 1; lock.unlock()
-        do { try up(step) } catch { end(); throw error }
-        guard Path.now().cellular, shortcutsAdded() else { return false }
+        do { try up(step) } catch {
+            lock.lock(); lastFailure = Date(); lock.unlock()
+            end()
+            throw error
+        }
+        lock.lock(); lastFailure = nil; lock.unlock()
+        guard cellular, Path.now().cellular, shortcutsAdded() else { return false }
         step("running the Shortcut \(shortcutNames["off"]!)")
         let r = runShortcut("off")
         guard r.ok else { log("Cellular Data Off didn't run: \(r.error ?? "?"); connecting anyway"); return false }
@@ -283,6 +296,9 @@ enum LocalVPNBridge {
             IDeviceBridge.run(c) {
                 guard LocalVPN.available else { throw IDevice.Failure(code: "vpn_failed", text: "this app can't run \(LocalVPN.name): its profile has no Network Extensions capability") }
                 let t0 = Date()
+                // on first, so a VPN that doesn't start is this test's error (an install would go another way in)
+                _ = try LocalVPN.begin(cellular: false) // the connect below runs the Cellular Shortcuts when needed
+                defer { LocalVPN.end() }
                 let kind = try IDevice.verify()
                 let ms = Int(Date().timeIntervalSince(t0) * 1000)
                 UserDefaults.standard.set(true, forKey: LocalVPN.testedKey)

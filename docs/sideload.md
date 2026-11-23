@@ -273,6 +273,26 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   log, and on the IPA queue run's Log (each failed app's fix, then Use the Signing Server) and at its bottom. It
   runs the same install, or the same failed apps, again through the default Signing Server for that install or run
   only; Install Apps With stays This iPhone.
+- **This iPhone with the built-in VPN** (`native/sideload/vpn/`): the sideload IPA carries its own packet tunnel,
+  `PlugIns/iFizBoxVPN.appex` (`com.ryha.ifizbox.vpn`), the loopback idea of StosVPN and LocalDevVPN: the phone is
+  10.7.0.0 on the tunnel, only 10.7.0.1 is routed into it (no default route), and every packet is written back with
+  its source and destination swapped, so a connect to 10.7.0.1 reaches this phone's own RemotePairing and lockdownd
+  as from a peer. Nothing leaves the phone and no internet is needed. It needs the Network Extensions capability on
+  the App ID (iFizBox's own App IDs get it, `APP_ID_CAPS`; the app and the extension are signed with the profile's
+  `networkextension` entitlement); when the app's embedded profile lacks `packet-tunnel-provider`, This iPhone keeps
+  using LocalDevVPN or Tailscale. `IDevice.Session` turns the VPN on just before it connects to iOS (`LocalVPN.begin`,
+  saving the configuration the first time: iOS asks to allow it) and off 3 seconds after the last connection ends,
+  so a queue of installs or a reconnect finds it on. The configuration is never On Demand: iOS runs one VPN at a
+  time, so the user's own VPN (Tailscale) pauses for the install and comes back through its own VPN On Demand.
+  On cellular (cellular in use, no Wi-Fi joined) iOS refuses these connections while cellular data is on
+  (journal/2026-11-21-r72-cellular-this-iphone), so, as SideStore's Cellular Refresh, the user adds two Shortcuts
+  once: "Cellular Data Off" and "Cellular Data On" (each one action, Set Cellular Data, Off or On). With both added,
+  the connect runs the first through `shortcuts://x-callback-url/run-shortcut` (Shortcuts comes back to
+  `ifizbox://vpn-shortcut`), waits for the path to leave cellular, connects, and runs the second once connected;
+  the open connection carries on with data back on. An install that starts on cellular without them asks first (Use
+  Server, Try Anyway, Set Up), Home's status slot says Add the Cellular Shortcuts, and so does Installation &
+  Signing's status cell. Bridge calls: `vpn.status` (also `idevice.status`'s `vpn`), `vpn.test`, `vpn.setShortcut`,
+  `vpn.openShortcuts`, `vpn.testShortcuts`.
 - **This iPhone over Tailscale** (`native/sideload/tailscale/`, its README): for Tailscale users, who can't run
   LocalDevVPN at the same time. The sideload app embeds tsnet (tailscale.com, BSD-3-Clause, a Go c-archive built on
   Linux with a pinned Go; not in the jailbreak executable) and joins the tailnet as its own device ("iFizBox on
