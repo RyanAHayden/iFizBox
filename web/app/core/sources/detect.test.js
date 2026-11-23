@@ -328,7 +328,7 @@ test("detectSource: a dist repo's root, Release URL, or Packages.xz URL", async 
   assert.deepEqual(got(await detectSource(fakeBackend(files), PROCURSUS + "Release")), want);
   const viaPackages = await detectSource(fakeBackend(files), PKG_DIR + "Packages.xz");
   assert.deepEqual(got(viaPackages), want);
-  assert.equal(viaPackages.source.count, 3);
+  assert.equal(viaPackages.source.count, 2); // 2048 in two versions and adv-cmds: two packages (B366)
 });
 
 test("detectSource: a page with no repo or source behind it is refused, saying what it was", async () => {

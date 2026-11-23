@@ -89,6 +89,48 @@ test("add: the count can come from the worker parser", async () => {
   assert.equal(displayName(s), "r.example");
 });
 
+test("count: a package listed in several versions counts once, inline and in the worker parser (B366)", async () => {
+  const multi = [
+    "Package: com.a.tweak\nVersion: 1.0\nArchitecture: iphoneos-arm64\n",
+    "Package: com.a.tweak\nVersion: 1.1\nArchitecture: iphoneos-arm64\n",
+    "Package: com.a.tweak\nVersion: 1.2\nArchitecture: iphoneos-arm64\n",
+    "Package: com.b.lib\nVersion: 2.0\nArchitecture: all\n",
+    "Package: com.b.lib\nVersion: 2.1\nArchitecture: all\n",
+    "Package: com.c.old\nVersion: 1.0\nArchitecture: iphoneos-arm\n",
+    "Package: com.c.old\nVersion: 1.1\nArchitecture: iphoneos-arm\n",
+  ].join("\n");
+  const b = fakeBackend({ "https://m.example/Packages": multi });
+  assert.equal((await verifySource(b, "https://m.example/")).count, 2);
+  assert.equal((await verifySource(b, "https://m.example/", { arch: "iphoneos-arm" })).count, 2);
+  const parser = createParser({ Worker: null });
+  assert.equal((await verifySource(b, "https://m.example/", { count: parser.count })).count, 2);
+  const d = fakeBackend({
+    "https://d.example/dists/stable/Release": "Origin: D\nArchitectures: iphoneos-arm64\nComponents: main\n",
+    "https://d.example/dists/stable/main/binary-iphoneos-arm64/Packages": multi,
+  });
+  const fresh = await refreshSource(d, { uri: "https://d.example/", dist: "stable", components: ["main"] });
+  assert.equal(fresh.count, 2);
+  assert.equal(fresh.countBy, "id");
+  // a count stored before B366 counted stanzas: recounted even though the Release is the same
+  const old = { uri: "https://d.example/", dist: "stable", components: ["main"], count: 5, releaseHash: fresh.releaseHash,
+    countArch: fresh.countArch };
+  const again = await refreshSource(d, old);
+  assert.equal(again.count, 2);
+  assert.equal(again.unchanged, undefined);
+  assert.equal((await refreshSource(d, { ...old, count: 2, countBy: "id" })).unchanged, true);
+  // a package two components carry counts once
+  const two = fakeBackend({
+    "https://t.example/dists/stable/Release": "Origin: T\nArchitectures: iphoneos-arm64\nComponents: main extra\n",
+    "https://t.example/dists/stable/main/binary-iphoneos-arm64/Packages": multi,
+    "https://t.example/dists/stable/extra/binary-iphoneos-arm64/Packages": multi + "\nPackage: com.d.new\nArchitecture: all\n",
+  });
+  assert.equal((await refreshSource(two, { uri: "https://t.example/", dist: "stable", components: ["main", "extra"] })).count, 3);
+  // a refresh that fails saves no countBy
+  const failed = await refreshSource(fakeBackend({}), { uri: "https://x.example/", dist: "stable", components: ["main"] });
+  assert.ok(failed.error);
+  assert.equal(failed.countBy, undefined);
+});
+
 test("add: repos Cydia's check misses (Release only, .zst only) still pass", async () => {
   const rel = await verifySource(fakeBackend({ "https://r.example/Release": "Origin: R\nSuite: stable\n" }), "https://r.example/");
   assert.equal(rel.count, null);
