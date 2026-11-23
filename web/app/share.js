@@ -6,6 +6,8 @@
 //               Install signs it on the phone and installs it
 //   deb         jailbreak: the Confirm sheet and console for that file (screens/sharedeb.js); a link is fetched first
 //   refuse      an alert saying why (a .deb in the sideload app, no AppSync Unified, something iFizBox can't open)
+//   pick-ipa    sideload, B334: an .ipa iOS opened without access: "Choose the IPA", then the Files picker in its
+//               folder, then its page in My IPAs (pickAgain)
 //
 //   await handleShared(url, deps) -> the route, or null when it isn't one
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -24,6 +26,7 @@ export async function handleShared(url, { native = globalThis.ifizboxNative, ale
     await alert({ title: s.title, message: s.message, buttons: ["OK"] });
     return s.route;
   }
+  if (s.route === "pick-ipa") return pickAgain(s, { native, alert });
   const name = s.name || "this app";
   if (s.route === "helper-ipa") {
     const { index } = await alert({ title: `Install ${name}?`, message: `${NAME} installs it with the jailbreak's app installer (AppSync Unified).`,
@@ -80,6 +83,28 @@ export async function handleShared(url, { native = globalThis.ifizboxNative, ale
     return s.route;
   }
   return null;
+}
+
+// B334: iOS opened an .ipa from Files but gave iFizBox no access to it (native/Sources/OpenRescue.swift). Choose opens
+// the Files picker in that file's folder; the picked copy goes into My IPAs (library.pick) and its page opens, as a
+// file iOS handed over does. Cancel, or nothing picked: nothing changes.
+export const PICK_TITLE = "Choose the IPA";
+export const pickText = (name) =>
+  `iOS opened ${name} in ${NAME} but didn't let it read the file. Choose it once more to open it.`;
+
+async function pickAgain(s, { native, alert }) {
+  const { index } = await alert({ title: PICK_TITLE, message: pickText(s.name), buttons: ["Cancel", "Choose"], cancel: 0 });
+  if (index !== 1) return s.route;
+  let r = null;
+  try {
+    r = await native.call("library.pick", { ...(s.dir ? { dir: s.dir } : {}), single: true });
+  } catch (e) {
+    await alert({ title: "Couldn't Open", message: deviceError(e, s.name).message, buttons: ["OK"] });
+    return s.route;
+  }
+  const file = Array.isArray(r?.files) ? r.files[0] : null;
+  if (file) location.hash = format({ tab: "installed", path: ["myipas", `ipa:${file}`] }).replace(/^#/, "");
+  return s.route;
 }
 
 async function remember(rec) {
