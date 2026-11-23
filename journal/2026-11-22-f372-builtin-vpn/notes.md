@@ -37,6 +37,31 @@ markTested are replaced by real bridge calls.
   and the route became This iPhone, Cellular Shortcuts Add/Added/Test Shortcuts, How It Works, the ACTIVE reveal
   caught mid-way, USE on the Signing Server set it. Shots were looked at, not committed.
 
+## iPhone 15 Pro (after the user plugged it in, 21:52-22:17, lock F372)
+
+Installed with `tools/ui-15.sh F372 install` (the rig's RSideload profile has networkextension incl.
+packet-tunnel-provider), driven with taps and the web view over `pymobiledevice3 webinspector cdp` (`ev.mjs` here).
+Screens in `ref/15/screens/f372-*.png` (not committed).
+
+- `idevice.status.vpn`: `available: true, entitled: true, bundled: true`; already paired (rp); Tailscale VPN on.
+- Installation & Signing (iOS 26 style): both ways with ACTIVE / USE; This iPhone page Set Up + How It Works.
+- Test Connection: iOS showed "iFizBox Would Like to Add VPN Configurations"; after Allow, "Connected" (the first
+  try's ms counted the Allow wait; now the ms is the connect alone: 147-158 ms later).
+- Install of Probe from My IPAs: "Connected to iOS through iFizBox VPN (RemotePairing tunnel)", "iOS installed
+  Probe 1.0". (A first try hit `appid_mismatch` for the copy already installed under another App ID; uninstalled it
+  with go-ios, then it installed.)
+- **Tailscale after**: with the configuration kept (first build), Settings > VPN's checkmark stayed on iFizBox VPN
+  and Tailscale never came back (polled 1 min+). Setting ours `isEnabled = false` after: the checkmark stayed on
+  ours, Tailscale didn't come back. Removing ours (`removeFromPreferences`) after: the checkmark went back to
+  Tailscale and its On Demand reconnected it (seen in Settings and in idevice.status: utun4, 100.109.186.91, within
+  1-4 minutes). The cost: the next save is a new configuration, so iOS asks Allow again (seen). Shipped: removed
+  only when another VPN was up when ours turned on; without one it stays and iOS asks once.
+- Fixed from what the phone showed: the install log said "through LocalDevVPN (10.7.0.1)" (Sideload.swift), now
+  iFizBox VPN; the Test row stayed "Test" under the Connected alert (now marked tested before it repaints).
+
+Seen, left for later (filed): the main page's This iPhone subtitle truncates in the iOS 26 style ("Works offline -
+no install pop..."); My IPAs' sign page footer still says "(LocalDevVPN or Tailscale)".
+
 ## Tried and failed
 
 - The iPhone 15 Pro: `tools/ui-15.sh F372 install` failed, `/var/run/usbmuxd` missing; `lsusb` shows no Apple
@@ -58,9 +83,13 @@ markTested are replaced by real bridge calls.
 
 ## Not verified
 
-- **Anything on a phone**: the tunnel starting, iOS's "Add VPN Configurations" prompt, pair/test/install through it,
-  Tailscale coming back after (VPN On Demand), whether enabling our configuration deselects Tailscale's so it does
-  not come back by itself. Why: the 15 Pro isn't plugged in (above). The task blocks on that.
+- **Pairing from scratch with the built-in VPN**: the 15 was already paired; forgetting the pairing to redo it would
+  have needed the Developer Mode code typed in Settings again. The pairing code path itself didn't change (vpnOn is
+  true with the built-in VPN, so the page goes straight to pairing).
+- **Tailscale's return without traffic**: it came back between 1 and 4 minutes after the install; it reconnected by
+  the time Settings was opened, so what triggers its On Demand (time, or another app's traffic) wasn't pinned down.
+- **The final build's keep-when-no-other-VPN branch**: every phone run had Tailscale on, so the path that keeps the
+  configuration (no other VPN up) ran only in the first build, where it worked (no second Allow).
 - **Cellular Shortcuts**: running them through x-callback-url, the path leaving cellular, the connection surviving
   data coming back. Needs a phone with a SIM (the user's); filed as a follow-up.
 - Adding a Shortcut: Shortcuts can't be pre-filled without a signed .shortcut file, so Add opens a blank Shortcut and

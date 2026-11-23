@@ -102,6 +102,7 @@ enum LocalVPN {
     private static var holds = 0 // guarded by lock
     private static var stopGen = 0 // guarded by lock: a scheduled stop runs only if nothing came after it
     private static var lastFailure: Date? // guarded by lock: begin() couldn't turn it on
+    private static var otherWasOn = false // guarded by lock: another VPN was up when ours turned on (down() removes ours)
 
     /// begin() failed less than a minute ago: a reconnect or the next install of a queue goes the other ways in
     /// instead of waiting on it again. vpn.test always tries.
@@ -189,15 +190,29 @@ enum LocalVPN {
     /// The tunnel down now.
     static func down() {
         lock.lock(); let m = cached; lock.unlock()
-        guard let m = m, m.connection.status != .disconnected else { return }
-        m.connection.stopVPNTunnel()
-        log("off")
+        guard let m = m else { return }
+        if m.connection.status != .disconnected { m.connection.stopVPNTunnel(); log("off") }
+        lock.lock(); let giveBack = otherWasOn; otherWasOn = false; lock.unlock()
+        guard giveBack else { return }
+        // Enabling ours took Settings > VPN's checkmark from the user's own VPN (Tailscale), whose On Demand then never
+        // runs again. Disabling ours left the checkmark on it (iPhone 15 Pro, iOS 27); removing it gives the checkmark
+        // back, and Tailscale's On Demand reconnected within about a minute. The cost: the next save is a new
+        // configuration, so iOS asks Allow again. So it's removed only when another VPN was on before.
+        let t0 = Date()
+        while m.connection.status != .disconnected && Date().timeIntervalSince(t0) < 3 { Thread.sleep(forTimeInterval: 0.05) }
+        m.removeFromPreferences { err in log(err.map { "couldn't remove the configuration: \($0.localizedDescription)" } ?? "configuration removed: the VPN that was on before gets its place back") }
+        lock.lock(); if cached === m { cached = nil }; lock.unlock()
     }
 
     /// Before a connect to iOS (blocking, on IDevice.queue): the VPN on, held until end(). On cellular with both
     /// Shortcuts added, Cellular Data Off runs too: the answer says so, and connected(dataOff:) turns it back on.
     static func begin(cellular: Bool = true, _ step: (String) -> Void = { _ in }) throws -> Bool {
-        lock.lock(); holds += 1; stopGen += 1; lock.unlock()
+        lock.lock()
+        // another VPN up (a tunnel interface while ours is off): down() gives its place back after
+        let mineOn = cached?.connection.status == .connected
+        lock.unlock()
+        let other = !mineOn && !VPNCheck.tunnels().isEmpty
+        lock.lock(); holds += 1; stopGen += 1; if other { otherWasOn = true }; lock.unlock()
         do { try up(step) } catch {
             lock.lock(); lastFailure = Date(); lock.unlock()
             end()
@@ -295,10 +310,10 @@ enum LocalVPNBridge {
         b.on("vpn.test") { c in
             IDeviceBridge.run(c) {
                 guard LocalVPN.available else { throw IDevice.Failure(code: "vpn_failed", text: "this app can't run \(LocalVPN.name): its profile has no Network Extensions capability") }
-                let t0 = Date()
                 // on first, so a VPN that doesn't start is this test's error (an install would go another way in)
                 _ = try LocalVPN.begin(cellular: false) // the connect below runs the Cellular Shortcuts when needed
                 defer { LocalVPN.end() }
+                let t0 = Date() // the connect alone, not iOS's Allow on the first save
                 let kind = try IDevice.verify()
                 let ms = Int(Date().timeIntervalSince(t0) * 1000)
                 UserDefaults.standard.set(true, forKey: LocalVPN.testedKey)

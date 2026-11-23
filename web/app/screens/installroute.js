@@ -272,10 +272,11 @@ export const TEST_MS = 120000; // vpn.test: the first one waits for the user's A
 export async function vpnTest(native, alert, store, { ended = () => {}, onPass = () => {} } = {}) {
   let r = null, err = null;
   try { r = await within(call(native, "vpn.test"), TEST_MS); } catch (e) { err = e; }
+  // the row says Connected under the alert: the status is marked tested before the row repaints (ended)
+  if (r?.ok && lastStatus) lastStatus = { ...lastStatus, vpn: { ...(lastStatus.vpn ?? {}), tested: true } };
   ended();
   if (r?.ok) {
     clearRouteFailure();
-    if (lastStatus) lastStatus = { ...lastStatus, vpn: { ...(lastStatus.vpn ?? {}), tested: true } };
     if (takeUseAfterSetup() && store?.get(ROUTE_KEY) !== "iphone") store?.set(ROUTE_KEY, "iphone");
     onPass();
   } else if (isLate(err)) rememberRouteFailure(NO_ANSWER_FAILURE);
