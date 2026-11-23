@@ -214,3 +214,10 @@ _Said_: one trip to Shortcuts
 _On screen_: (none)
 _In code_: LocalVPN.takeTrip, tripReady, endTrip, switchOld, {"trip":1}
 _Avoid_: flip, hop
+
+**Idle VPN**:
+Another app's VPN that is selected in Settings > VPN with Connect On Demand on, but not connected right now
+_Said_: selected but idle On Demand VPN
+_On screen_: idle VPN
+_In code_: LocalVPN.otherVPNSelected, shortcuts.idle, vpnIdle
+_Avoid_: sleeping VPN, inactive VPN

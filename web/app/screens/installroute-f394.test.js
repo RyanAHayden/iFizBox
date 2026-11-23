@@ -8,7 +8,7 @@ const { shortcutGroups } = await import("./installroute.js");
 const { switchOld } = await import("../core/installroute.js");
 
 test("Update shows only for an added Install Switch that can't do one trip, on an app that can", () => {
-  const vpn = (trips, sw, trip) => ({ trips, shortcuts: { switch: sw, trip } });
+  const vpn = (trips, sw, trip) => ({ trips, shortcuts: { switch: sw, trip, idle: trip } });
   assert.equal(switchOld(vpn(true, true, false)), true);
   for (const v of [vpn(true, true, true), vpn(true, false, false), vpn(false, true, false), null, { shortcuts: { switch: true } }]) assert.equal(switchOld(v), false);
   const added = [];

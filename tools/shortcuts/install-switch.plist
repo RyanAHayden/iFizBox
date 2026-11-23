@@ -3,15 +3,21 @@
 <!-- Install Switch: the one Shortcut a queue of This iPhone installs runs before and after (LocalVPN.runSwitch).
      Its input is a JSON dictionary of flags, read with Get Dictionary Value and tested with "has any value" only
      (B359: a "contains" condition loses its text on import):
-       {"start":1[,"cellular":1]}  remember the VPN that is on now (Store Content "previous VPN"), then Set VPN: connect
+       {"start":1[,"cellular":1][,"selected":1]}
+                                   remember the VPN that is on now (Store Content "previous VPN"; F389: none on and
+                                   "selected", another VPN selected in Settings: the one with Connect On Demand on, as
+                                   "idle VPN", for Get Current VPN gives only a connected one), then Set VPN: connect
                                    the built-in VPN (Find VPNs, server 10.7.0.1), then Cellular Data Off when
                                    "cellular" (sent only by app builds before B375; this one sends dataOff)
        {"dataOff":1}               Cellular Data Off: the app runs it once the built-in VPN is connected. B375: iOS
                                    starts no VPN without a network ("No network available"), so data goes off only
                                    after the VPN is up; an open VPN stays up without it (SideStore's order)
        {"end":1[,"cellular":1]}    Cellular Data On when "cellular", then Set VPN: connect the remembered VPN, forgotten
-       {"check":1}                 nothing: the app's check run after Add; with "actions":1 one Wait for Install
-       {"trip":1[,"cellular":1]}   F394, iOS 16+: all of it in one run. Remember the VPN, Connect VPN (the app's action),
+                                   (an idle one: Set On Demand on, which selects it without connecting it)
+       {"check":1}                 nothing: the app's check run after Add; with "actions":1 one Wait for Install,
+                                   with "selected":1 too a second one (F389: tells it from an older Install Switch)
+       {"trip":1[,"cellular":1][,"selected":1]}
+                                   F394, iOS 16+: all of it in one run. Remember the VPN, Connect VPN (the app's action),
                                    Cellular Data Off when "cellular", Open for Install (the app in front), Wait for
                                    Install until the queue is over, Cellular Data On, Set VPN back
      The VPN to bring back isn't chosen at Add (no import question): the start's Store Content keeps whichever VPN
@@ -215,6 +221,35 @@
 				</dict>
 			</dict>
 		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.getvalueforkey</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>CustomOutputName</key>
+				<string>Selected</string>
+				<key>UUID</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A30</string>
+				<key>WFDictionaryKey</key>
+				<string>selected</string>
+				<key>WFGetDictionaryValueType</key>
+				<string>Value</string>
+				<key>WFInput</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>OutputName</key>
+						<string>Dictionary</string>
+						<key>OutputUUID</key>
+						<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A01</string>
+						<key>Type</key>
+						<string>ActionOutput</string>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFTextTokenAttachment</string>
+				</dict>
+			</dict>
+		</dict>
 		<!-- If Start has any value -->
 		<dict>
 			<key>WFWorkflowActionIdentifier</key>
@@ -249,6 +284,16 @@
 			</dict>
 		</dict>
 		<!--   remember the VPN that is on now, or forget an old one -->
+		<!--   forget an old idle VPN (F389) -->
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.deletestoredcontent</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>WFStoredContentKey</key>
+				<string>idle VPN</string>
+			</dict>
+		</dict>
 		<dict>
 			<key>WFWorkflowActionIdentifier</key>
 			<string>is.workflow.actions.vpn.get</string>
@@ -341,6 +386,169 @@
 			<dict>
 				<key>WFStoredContentKey</key>
 				<string>previous VPN</string>
+			</dict>
+		</dict>
+		<!--     F389: none is connected, but another one is selected: the idle VPN is the one with Connect On Demand on -->
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A31</string>
+				<key>WFControlFlowMode</key>
+				<integer>0</integer>
+				<key>WFCondition</key>
+				<integer>100</integer>
+				<key>WFInput</key>
+				<dict>
+					<key>Type</key>
+					<string>Variable</string>
+					<key>Variable</key>
+					<dict>
+						<key>Value</key>
+						<dict>
+							<key>OutputName</key>
+							<string>Selected</string>
+							<key>OutputUUID</key>
+							<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A30</string>
+							<key>Type</key>
+							<string>ActionOutput</string>
+						</dict>
+						<key>WFSerializationType</key>
+						<string>WFTextTokenAttachment</string>
+					</dict>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.filter.vpns</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>UUID</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A33</string>
+				<key>WFContentItemInputParameter</key>
+				<string>Library</string>
+				<key>WFContentItemLimitEnabled</key>
+				<true/>
+				<key>WFContentItemLimitNumber</key>
+				<real>1</real>
+				<key>WFContentItemFilter</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>WFActionParameterFilterPrefix</key>
+						<integer>1</integer>
+						<key>WFContentPredicateBoundedDate</key>
+						<false/>
+						<key>WFActionParameterFilterTemplates</key>
+						<array>
+							<dict>
+								<key>Operator</key>
+								<integer>4</integer>
+								<key>Property</key>
+								<string>Is On Demand Enabled</string>
+								<key>Removable</key>
+								<true/>
+								<key>Values</key>
+								<dict>
+									<key>Bool</key>
+									<true/>
+								</dict>
+							</dict>
+						</array>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFContentPredicateTableTemplate</string>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A32</string>
+				<key>WFControlFlowMode</key>
+				<integer>0</integer>
+				<key>WFCondition</key>
+				<integer>100</integer>
+				<key>WFInput</key>
+				<dict>
+					<key>Type</key>
+					<string>Variable</string>
+					<key>Variable</key>
+					<dict>
+						<key>Value</key>
+						<dict>
+							<key>OutputName</key>
+							<string>VPNs</string>
+							<key>OutputUUID</key>
+							<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A33</string>
+							<key>Type</key>
+							<string>ActionOutput</string>
+						</dict>
+						<key>WFSerializationType</key>
+						<string>WFTextTokenAttachment</string>
+					</dict>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.setstoredcontent</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>UUID</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A34</string>
+				<key>WFInput</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>attachmentsByRange</key>
+						<dict>
+							<key>{0, 1}</key>
+							<dict>
+								<key>OutputName</key>
+								<string>VPNs</string>
+								<key>OutputUUID</key>
+								<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A33</string>
+								<key>Type</key>
+								<string>ActionOutput</string>
+							</dict>
+						</dict>
+						<key>string</key>
+						<string>￼</string>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFTextTokenString</string>
+				</dict>
+				<key>WFStoredContentKey</key>
+				<string>idle VPN</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A32</string>
+				<key>WFControlFlowMode</key>
+				<integer>2</integer>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A31</string>
+				<key>WFControlFlowMode</key>
+				<integer>2</integer>
 			</dict>
 		</dict>
 		<dict>
@@ -667,6 +875,97 @@
 				<integer>2</integer>
 			</dict>
 		</dict>
+		<!--     F389: an idle VPN is selected again with its Connect On Demand, not connected: its own rules decide -->
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.getstoredcontent</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>UUID</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A36</string>
+				<key>WFStoredContentKey</key>
+				<string>idle VPN</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A35</string>
+				<key>WFControlFlowMode</key>
+				<integer>0</integer>
+				<key>WFCondition</key>
+				<integer>100</integer>
+				<key>WFInput</key>
+				<dict>
+					<key>Type</key>
+					<string>Variable</string>
+					<key>Variable</key>
+					<dict>
+						<key>Value</key>
+						<dict>
+							<key>OutputName</key>
+							<string>Stored Content</string>
+							<key>OutputUUID</key>
+							<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A36</string>
+							<key>Type</key>
+							<string>ActionOutput</string>
+						</dict>
+						<key>WFSerializationType</key>
+						<string>WFTextTokenAttachment</string>
+					</dict>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.deletestoredcontent</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>WFStoredContentKey</key>
+				<string>idle VPN</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.vpn.set</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>UUID</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A37</string>
+				<key>WFVPNOperation</key>
+				<string>Set On Demand</string>
+				<key>WFOnDemandValue</key>
+				<true/>
+				<key>WFVPN</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>OutputName</key>
+						<string>Stored Content</string>
+						<key>OutputUUID</key>
+						<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A36</string>
+						<key>Type</key>
+						<string>ActionOutput</string>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFTextTokenAttachment</string>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A35</string>
+				<key>WFControlFlowMode</key>
+				<integer>2</integer>
+			</dict>
+		</dict>
 		<!--   Otherwise: If Data Off has any value, Cellular Data Off (the app runs it once the VPN is up) -->
 		<dict>
 			<key>WFWorkflowActionIdentifier</key>
@@ -788,6 +1087,16 @@
 			</dict>
 		</dict>
 		<!--   remember the VPN that is on now, or forget an old one -->
+		<!--   forget an old idle VPN (F389) -->
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.deletestoredcontent</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>WFStoredContentKey</key>
+				<string>idle VPN</string>
+			</dict>
+		</dict>
 		<dict>
 			<key>WFWorkflowActionIdentifier</key>
 			<string>is.workflow.actions.vpn.get</string>
@@ -880,6 +1189,169 @@
 			<dict>
 				<key>WFStoredContentKey</key>
 				<string>previous VPN</string>
+			</dict>
+		</dict>
+		<!--     F389: none is connected, but another one is selected: the idle VPN is the one with Connect On Demand on -->
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A38</string>
+				<key>WFControlFlowMode</key>
+				<integer>0</integer>
+				<key>WFCondition</key>
+				<integer>100</integer>
+				<key>WFInput</key>
+				<dict>
+					<key>Type</key>
+					<string>Variable</string>
+					<key>Variable</key>
+					<dict>
+						<key>Value</key>
+						<dict>
+							<key>OutputName</key>
+							<string>Selected</string>
+							<key>OutputUUID</key>
+							<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A30</string>
+							<key>Type</key>
+							<string>ActionOutput</string>
+						</dict>
+						<key>WFSerializationType</key>
+						<string>WFTextTokenAttachment</string>
+					</dict>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.filter.vpns</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>UUID</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A3A</string>
+				<key>WFContentItemInputParameter</key>
+				<string>Library</string>
+				<key>WFContentItemLimitEnabled</key>
+				<true/>
+				<key>WFContentItemLimitNumber</key>
+				<real>1</real>
+				<key>WFContentItemFilter</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>WFActionParameterFilterPrefix</key>
+						<integer>1</integer>
+						<key>WFContentPredicateBoundedDate</key>
+						<false/>
+						<key>WFActionParameterFilterTemplates</key>
+						<array>
+							<dict>
+								<key>Operator</key>
+								<integer>4</integer>
+								<key>Property</key>
+								<string>Is On Demand Enabled</string>
+								<key>Removable</key>
+								<true/>
+								<key>Values</key>
+								<dict>
+									<key>Bool</key>
+									<true/>
+								</dict>
+							</dict>
+						</array>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFContentPredicateTableTemplate</string>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A39</string>
+				<key>WFControlFlowMode</key>
+				<integer>0</integer>
+				<key>WFCondition</key>
+				<integer>100</integer>
+				<key>WFInput</key>
+				<dict>
+					<key>Type</key>
+					<string>Variable</string>
+					<key>Variable</key>
+					<dict>
+						<key>Value</key>
+						<dict>
+							<key>OutputName</key>
+							<string>VPNs</string>
+							<key>OutputUUID</key>
+							<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A3A</string>
+							<key>Type</key>
+							<string>ActionOutput</string>
+						</dict>
+						<key>WFSerializationType</key>
+						<string>WFTextTokenAttachment</string>
+					</dict>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.setstoredcontent</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>UUID</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A3B</string>
+				<key>WFInput</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>attachmentsByRange</key>
+						<dict>
+							<key>{0, 1}</key>
+							<dict>
+								<key>OutputName</key>
+								<string>VPNs</string>
+								<key>OutputUUID</key>
+								<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A3A</string>
+								<key>Type</key>
+								<string>ActionOutput</string>
+							</dict>
+						</dict>
+						<key>string</key>
+						<string>￼</string>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFTextTokenString</string>
+				</dict>
+				<key>WFStoredContentKey</key>
+				<string>idle VPN</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A39</string>
+				<key>WFControlFlowMode</key>
+				<integer>2</integer>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A38</string>
+				<key>WFControlFlowMode</key>
+				<integer>2</integer>
 			</dict>
 		</dict>
 		<dict>
@@ -1161,6 +1633,88 @@
 				<integer>2</integer>
 			</dict>
 		</dict>
+		<!--     F389: an idle VPN is selected again with its Connect On Demand, not connected: its own rules decide (kept: the end may retry) -->
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.getstoredcontent</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>UUID</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A3D</string>
+				<key>WFStoredContentKey</key>
+				<string>idle VPN</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A3C</string>
+				<key>WFControlFlowMode</key>
+				<integer>0</integer>
+				<key>WFCondition</key>
+				<integer>100</integer>
+				<key>WFInput</key>
+				<dict>
+					<key>Type</key>
+					<string>Variable</string>
+					<key>Variable</key>
+					<dict>
+						<key>Value</key>
+						<dict>
+							<key>OutputName</key>
+							<string>Stored Content</string>
+							<key>OutputUUID</key>
+							<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A3D</string>
+							<key>Type</key>
+							<string>ActionOutput</string>
+						</dict>
+						<key>WFSerializationType</key>
+						<string>WFTextTokenAttachment</string>
+					</dict>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.vpn.set</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>UUID</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A3E</string>
+				<key>WFVPNOperation</key>
+				<string>Set On Demand</string>
+				<key>WFOnDemandValue</key>
+				<true/>
+				<key>WFVPN</key>
+				<dict>
+					<key>Value</key>
+					<dict>
+						<key>OutputName</key>
+						<string>Stored Content</string>
+						<key>OutputUUID</key>
+						<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A3D</string>
+						<key>Type</key>
+						<string>ActionOutput</string>
+					</dict>
+					<key>WFSerializationType</key>
+					<string>WFTextTokenAttachment</string>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A3C</string>
+				<key>WFControlFlowMode</key>
+				<integer>2</integer>
+			</dict>
+		</dict>
 		<dict>
 			<key>WFWorkflowActionIdentifier</key>
 			<string>is.workflow.actions.conditional</string>
@@ -1219,6 +1773,66 @@
 					<key>Name</key>
 					<string>iFizBox</string>
 				</dict>
+			</dict>
+		</dict>
+		<!--   F389: one more when "selected": the check tells this Install Switch from an older one -->
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A3F</string>
+				<key>WFControlFlowMode</key>
+				<integer>0</integer>
+				<key>WFCondition</key>
+				<integer>100</integer>
+				<key>WFInput</key>
+				<dict>
+					<key>Type</key>
+					<string>Variable</string>
+					<key>Variable</key>
+					<dict>
+						<key>Value</key>
+						<dict>
+							<key>OutputName</key>
+							<string>Selected</string>
+							<key>OutputUUID</key>
+							<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A30</string>
+							<key>Type</key>
+							<string>ActionOutput</string>
+						</dict>
+						<key>WFSerializationType</key>
+						<string>WFTextTokenAttachment</string>
+					</dict>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>com.ryha.ifizbox.WaitForInstallIntent</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>AppIntentDescriptor</key>
+				<dict>
+					<key>AppIntentIdentifier</key>
+					<string>WaitForInstallIntent</string>
+					<key>BundleIdentifier</key>
+					<string>com.ryha.ifizbox</string>
+					<key>Name</key>
+					<string>iFizBox</string>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A3F</string>
+				<key>WFControlFlowMode</key>
+				<integer>2</integer>
 			</dict>
 		</dict>
 		<dict>
