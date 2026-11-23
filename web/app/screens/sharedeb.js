@@ -16,6 +16,12 @@ import { nativeBridge } from "../native.js";
 
 const call = (native, method, params, onEvent) => native.call(`share.${method}`, params, onEvent);
 
+// B410: policy.h's HELPER_EX_IOERR: the helper couldn't copy the file, so apt never ran (apt-get itself never exits
+// 74). The shell answers it like an apt refusal, the helper's reason among the output.
+const HELPER_IOERR = 74;
+const helperReason = (r) => (r?.code === HELPER_IOERR
+  ? String(r.output ?? "").split("\n").filter((l) => l.startsWith("ifizbox-helper: ")).pop() ?? "" : null);
+
 // { file: the staged name, name: what the user knows it as }. Resolves once the sheet (and any console) is done.
 export async function openDebConfirm({ file, name = "" }, { native = nativeBridge() } = {}) {
   const cancel = barButton("Cancel");
@@ -34,9 +40,10 @@ export async function openDebConfirm({ file, name = "" }, { native = nativeBridg
   try { r = await call(native, "debSimulate", { file }); } catch (e) { err = e; }
   m.scroll.replaceChildren();
   const plan = r ? parseSimulation(r.stdout) : null;
-  if (err) {
+  const unasked = err ? err.message || String(err) : helperReason(r);
+  if (unasked !== null) {
     m.setTitle("Cannot Comply");
-    m.scroll.append(refusedBlock(debRefusal(err.message || String(err), name), "Nothing was changed."));
+    m.scroll.append(refusedBlock(debRefusal(unasked, name), "Nothing was changed."));
   } else if (!r.ok || plan.essential.length) {
     m.setTitle("Cannot Comply");
     let problems = [];
@@ -46,7 +53,7 @@ export async function openDebConfirm({ file, name = "" }, { native = nativeBridg
       ...problems.map((p) => p.sentence),
     ];
     if (!lines.length) lines.push(`apt refused ${name || "this package"}${r.code ? ` (exit ${r.code})` : ""}. Its own words are below.`);
-    m.scroll.append(grouped([{ header: "Can't Do This Yet", rows: lines.map((label) => ({ label })) }]));
+    m.scroll.append(refusedBlock({ sentences: lines }, null, "Can't Do This Yet"));
     const g = el("div", "group");
     g.append(el("h2", "group-header", "apt's Output"), el("pre", "table grouped confirm-raw", String(r.output ?? "").trim() || "(no output)"));
     m.scroll.append(g);
