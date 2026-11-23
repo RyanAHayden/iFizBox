@@ -325,3 +325,20 @@ test("markToggle (B338): a signed app with no installed record reads filled, and
     assert.equal(b.classList.contains("is-marked"), false);
   });
 });
+
+test("markToggle (B338): signing.forget fails: an alert says why, no HUD, and the toggle stays filled", async () => {
+  await withDocument(async () => {
+    const page = signedPage();
+    const native = { call: async () => { throw new Error("The helper is not running."); } };
+    const said = [];
+    const warned = [];
+    const b = markToggle(APP, PKG, null, { store: page.store, signedOf: page.signedOf, native, buzz() {}, feedback: (t) => said.push(t),
+      warn: (e) => warned.push(e.message) });
+    await b.refreshed;
+    await b.click();
+    assert.equal(warned.length, 1);
+    assert.deepEqual(said, []);
+    assert.ok(b.classList.contains("is-marked"));
+    assert.equal((await page.mem.all()).length, 1, "the record stays: nothing was forgotten");
+  });
+});

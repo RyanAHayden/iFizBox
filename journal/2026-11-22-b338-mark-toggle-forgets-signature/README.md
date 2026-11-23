@@ -15,6 +15,8 @@ signed-only app showed an outline check.
 - `markToggle` takes `after()`; `renderApp` passes the Installed section's `redraw`, so the section and the nav label
   follow at once even for a signed-only app (where no `removeInstall` fires `onAppsChange`).
 - `trackingSection` is exported, takes `store` / `signedOf` for tests, and exposes `redraw` and `drawn`.
+- A failed `signing.forget` shows an Error alert (as Remove from List does) instead of failing silently; the toggle
+  stays filled. Found by the spec review.
 - The Modify sheet's Mark as Not Installed is untouched, as asked.
 - The nav label itself still counts only the installed record (not the signature): the brief asked only the toggle to
   count a signature, and a signed app a source offers gets its record back anyway.

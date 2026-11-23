@@ -35,6 +35,7 @@ import { appQueue } from "../app-queue.js";
 import { appJob, appNavLabel, modifyActions, resignJob, MARK_NOT_INSTALLED, destructiveOf, sizeText as formatSize } from "../core/appqueue.js";
 import { markedVersionOnSource, markedResignJob } from "../core/appqueue.js"; // F221
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
+import { deviceError } from "../core/signing.js"; // B338
 import { compareVersions } from "../core/apt.js";
 import { altVersionList } from "../core/catalog.js"; // B232: Install Which Version? offers what Version History does
 import { ignoreVersionLabel, withVersionButton, versionToStore, IGNORE_VERSION } from "../core/appupdates.js"; // F281
@@ -414,7 +415,11 @@ export async function toggleMarked(app, pkg, source, { store = apps, signedOf = 
   const rec = (await s.all()).find((r) => r.id === app.bundleIdentifier) ?? null;
   const signed = await signatureOf(app, signedOf);
   if (rec || signed) {
-    await forget({ id: app.bundleIdentifier, signed, signedOnly: !rec }, native ?? nativeBridge(), async (id) => removeInstall(s, id));
+    try {
+      await forget({ id: app.bundleIdentifier, signed, signedOnly: !rec }, native ?? nativeBridge(), async (id) => removeInstall(s, id));
+    } catch (e) {
+      throw Object.assign(e instanceof Error ? e : new Error(String(e)), { forgetFailed: true }); // markToggle says so
+    }
     return false;
   }
   await recordInstall(s, markRecordOf(app, pkg, source, app.versions.map((x) => x.version).find(Boolean) ?? ""));
@@ -422,11 +427,12 @@ export async function toggleMarked(app, pkg, source, { store = apps, signedOf = 
 }
 
 const markFeedback = (text) => showHUD("").done(text, 900);
+const forgetWarning = (e) => showAlert({ title: "Error", message: deviceError(e).message, buttons: ["OK"] });
 
 // The button. `refresh()` redraws it from the record (renderApp calls it on every onAppsChange).
 // B338: `after()` runs once a tap's change is written (renderApp redraws the Installed section and the nav label).
 export function markToggle(app, pkg, source, { store = apps, signedOf = (id) => signedRecordOf(id), native = undefined, forget = forgetListed,
-  after = null, buzz = haptic, feedback = markFeedback } = {}) {
+  after = null, buzz = haptic, feedback = markFeedback, warn = forgetWarning } = {}) {
   const b = document.createElement("button");
   b.type = "button";
   b.className = "bar-button bar-icon mark-toggle";
@@ -445,7 +451,10 @@ export function markToggle(app, pkg, source, { store = apps, signedOf = (id) => 
       show(on);
       feedback(on ? "Marked as Installed" : "Marked as Not Installed");
       try { await after?.(); } catch { /* the page is gone */ }
-    } catch { /* no store: nothing changed */ } finally { busy = false; }
+    } catch (e) {
+      // B338: signing.forget failed: an alert, as Installed's Remove from List shows; no store: nothing changed
+      if (e?.forgetFailed) { try { await warn(e); } catch { /* no alert here */ } }
+    } finally { busy = false; }
   });
   b.refresh = async () => show(await markedOrSigned(app, store, signedOf));
   b.refreshed = b.refresh();
