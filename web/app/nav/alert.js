@@ -2,7 +2,7 @@
 // a gloss, bold title, message, an optional text field and one or two buttons side by side (three or more
 // stack). Pops in with the iOS bounce, by transform/opacity only.
 //
-//   const { index, value } = await showAlert({ title, message, input: { placeholder, value, type, paste? },
+//   const { index, value } = await showAlert({ title, message, input: { placeholder, value, type, paste?, pasteSubmits? },
 //                                              buttons: ["Cancel", "Add Source"], cancel: 0 });
 //
 // Resolves with the tapped button's index and the field's text. Return in the field taps the last button,
@@ -94,7 +94,13 @@ function cssAlert({ title = "", message = "", input = null, buttons = ["OK"], ca
           if (text == null) try { text = await navigator.clipboard.readText(); } catch { return; }
           // B168: `paste: true` (Sign In With Key) pastes the text as it is, trimmed; it used to throw here.
           const v = typeof input.paste === "function" ? input.paste(text) : String(text ?? "").trim();
-          if (v) { field.value = v; field.focus({ preventScroll: true }); }
+          if (!v) return;
+          field.value = v;
+          // B335: `pasteSubmits` (Sources' Add: the Add Source button's index) taps that button once something
+          // usable was pasted, so the alert answers as if it were tapped.
+          const submit = input.pasteSubmits;
+          if (Number.isInteger(submit) && submit >= 0 && submit < buttons.length) close(submit);
+          else field.focus({ preventScroll: true });
         });
         row.append(field, paste);
         box.append(row);

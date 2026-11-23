@@ -384,13 +384,16 @@ export const addSourceText = (apt = aptKept()) => apt
 // a dist repo's suite and components are named in the message and go along while the URL is left as it was.
 // B177: `edit` ({ title, button }: a failed source's Edit Source, screens/sourceerror.js) renames the alert, and an
 // unchanged URL saves nothing. Resolves to the saved record (null when nothing was added).
-export async function addSource(ctx, prefill = null, edit = null) {
+// B335: `pasteSubmits` (Sources' Add only, screens/sources.js addSourceNow) makes the alert's Paste add the pasted URL
+// at once, as Add Source would; `alert` is for tests (the first alert only).
+export async function addSource(ctx, prefill = null, edit = null, { pasteSubmits = false, alert = showAlert } = {}) {
   const dist = prefill?.dist ? `Suite ${prefill.dist}${prefill.components?.length ? `, ${prefill.components.join(" ")}` : ""}.` : "";
-  const { index, value } = await showAlert({
+  const { index, value } = await alert({
     ...addSourceText(),
     ...(dist ? { message: dist } : {}),
     ...(edit?.title ? { title: edit.title } : {}),
-    input: { placeholder: "https://", value: prefill?.url || "https://", type: "url", paste: cleanSourceUrl },
+    input: { placeholder: "https://", value: prefill?.url || "https://", type: "url", paste: cleanSourceUrl,
+      ...(pasteSubmits ? { pasteSubmits: 1 } : {}) },
     buttons: ["Cancel", edit?.button || "Add Source"],
     cancel: 0,
   });

@@ -4,7 +4,9 @@
 // Never the website's navigator.clipboard, never the blue Type state.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addFromClipboard, nav } from "./sources.js";
+import { addFromClipboard, addSourceNow, nav } from "./sources.js";
+import { addSource as manageAddSource } from "./manage.js";
+import { showAlert } from "../nav/alert.js";
 import { nativeHasUrl } from "../nav/menu.js";
 
 function fakeButton() {
@@ -112,4 +114,53 @@ test("Sources' Add has no Type switch anywhere; the website's opens the alert an
     assert.equal(opened, null);
     assert.equal(reads, 0, "Paste in the alert reads, not Add");
   } finally { if (nav0) Object.defineProperty(globalThis, "navigator", nav0); }
+});
+
+// B335: Sources' Add: Paste with a URL copied adds it at once, as if Add Source were tapped. Manage's Add (the same
+// alert without the opt-in) keeps Paste filling the field only, and a copy with no URL in it leaves the alert as it was.
+async function pasteInAdd(clipboard, open) {
+  const { fakeDocument } = await import("../nav/fakedom.test-helper.js");
+  const document = fakeDocument();
+  const all = [];
+  const make = document.createElement;
+  document.createElement = (tag) => { const e = make(tag); all.push(e); return e; };
+  const saved = { document: globalThis.document, native: globalThis.ifizboxNative,
+    navigator: Object.getOwnPropertyDescriptor(globalThis, "navigator") };
+  globalThis.document = document;
+  delete globalThis.ifizboxNative;
+  Object.defineProperty(globalThis, "navigator", { configurable: true, value: { clipboard: { readText: async () => clipboard } } });
+  let answer = null;
+  // The real showAlert with the screen's options; its answer is kept, and the flow stops there (Cancel).
+  const alert = (opts) => showAlert(opts).then((r) => { answer = r; return { index: 0, value: "" }; });
+  try {
+    const done = open(alert);
+    const paste = all.find((e) => e.className === "alert-paste");
+    const field = all.find((e) => e.className === "alert-field");
+    await paste.listeners.click[0]();
+    await new Promise((r) => setTimeout(r, 0));
+    if (answer) await done;
+    return { answer, field: field.value };
+  } finally {
+    globalThis.document = saved.document;
+    if (saved.native === undefined) delete globalThis.ifizboxNative; else globalThis.ifizboxNative = saved.native;
+    if (saved.navigator) Object.defineProperty(globalThis, "navigator", saved.navigator); else delete globalThis.navigator;
+  }
+}
+
+test("B335: Paste with a copied URL resolves Sources' Add alert as Add Source with that URL", async () => {
+  const r = await pasteInAdd(" repo.example.test/apt ", (alert) => addFromClipboard({}, fakeButton(),
+    { native: null, open: (ctx, prefill) => addSourceNow(ctx, prefill, alert) }));
+  assert.deepEqual(r.answer, { index: 1, value: "https://repo.example.test/apt" });
+});
+
+test("B335: nothing usable copied: the field stays as it was and the alert stays up", async () => {
+  const r = await pasteInAdd("no link here", (alert) => addSourceNow({}, null, alert));
+  assert.equal(r.answer, null);
+  assert.equal(r.field, "https://");
+});
+
+test("B335: Manage's Add (no opt-in) still only fills the field on Paste", async () => {
+  const r = await pasteInAdd("https://repo.example.test/", (alert) => manageAddSource({}, null, null, { alert }));
+  assert.equal(r.answer, null);
+  assert.equal(r.field, "https://repo.example.test/");
 });
