@@ -17,7 +17,9 @@
 //     group-less read finds another app's; a group-less delete by any of them (a fresh install clearing its keychain,
 //     a logout) wiped every app's items there, which signed them out. The first launch with it copies what the app
 //     could see in those shared groups into its own once (an app that ran before only), then every password call
-//     names the app's own group.
+//     names the app's own group. B392: that copy leaves what the own group has, unless the app was signed for the
+//     shared groups only until now and the own item is an older one from an earlier install (the keychain outlives
+//     a delete).
 // What to map comes from ifizbox-groupfix.plist beside this dylib: { groups: [original IDs], target: "" (or a profile
 // group an earlier sign chose), keychain: bool, legacy: the profile group older signs mapped to, copied in once,
 // isolate: the app's own keychain group (the first of its keychain-access-groups) }.
@@ -36,6 +38,9 @@
 #include <mach-o/nlist.h>
 #include <os/log.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/sysctl.h>
+#include <unistd.h>
 
 static NSSet<NSString *> *groups;
 // The original named keychain groups: strip kSecAttrAccessGroup from every call (passwords are pinned instead once isolated).
@@ -43,7 +48,7 @@ static BOOL keychainStrip;
 static NSString *target;
 // B227: the profile group an older fix mapped these groups to (its first one), whose folder and suite are copied into
 // the app's own the first time, so an app signed that way keeps its data; nil for none. Only for an app that ran
-// before this fix (its own preferences weren't empty at its first launch with it): a fresh install has nothing to
+// before this fix (appRanBefore at its first launch with it): a fresh install has nothing to
 // bring, and must not take in what other apps left in that shared group.
 static NSString *legacy;
 
@@ -277,8 +282,79 @@ static NSString *countList(NSCountedSet *n) {
     return [[out sortedArrayUsingSelector:@selector(compare:)] componentsJoinedByString:@", "];
 }
 
+// ---- B392: an item an earlier install left in the app's own group ----
+
+// Whether a shared item newer than the app's own one takes its place in the first copy (set by groupfixInit: the app
+// was signed for the shared groups only until now, so it reads and writes that one).
+static BOOL replaceStale;
+
+// When this install's container was made: the oldest of its folders (their birth survives an update; a restore from a
+// backup makes new ones). 0 when unknown.
+static NSTimeInterval containerBirth(void) {
+    NSTimeInterval oldest = 0;
+    for (NSString *d in @[ @"", @"Documents", @"Library", @"Library/Preferences", @"Library/Caches", @"tmp" ]) {
+        struct stat st;
+        if (stat([NSHomeDirectory() stringByAppendingPathComponent:d].fileSystemRepresentation, &st) != 0) continue;
+        NSTimeInterval t = st.st_birthtimespec.tv_sec + st.st_birthtimespec.tv_nsec / 1e9;
+        if (t > 0 && (!oldest || t < oldest)) oldest = t;
+    }
+    return oldest;
+}
+
+static NSTimeInterval modified(NSDictionary *item) {
+    NSDate *d = item[(__bridge id)kSecAttrModificationDate];
+    return [d isKindOfClass:[NSDate class]] ? d.timeIntervalSince1970 : 0;
+}
+
+// What makes two items of a class the same one, but for their group.
+static NSArray *itemKey(NSDictionary *item, BOOL internet) {
+    NSMutableArray *key = [NSMutableArray arrayWithObject:[item[(__bridge id)kSecAttrSynchronizable] boolValue] ? @1 : @0];
+    NSArray *of = internet ? @[ (__bridge id)kSecAttrAccount, (__bridge id)kSecAttrSecurityDomain, (__bridge id)kSecAttrServer,
+                                (__bridge id)kSecAttrProtocol, (__bridge id)kSecAttrAuthenticationType, (__bridge id)kSecAttrPort,
+                                (__bridge id)kSecAttrPath ]
+                           : @[ (__bridge id)kSecAttrAccount, (__bridge id)kSecAttrService ];
+    for (id k in of) {
+        id v = item[k] ?: @"";
+        if ([v isKindOfClass:[NSNumber class]] && [v integerValue] == 0) v = @"";
+        [key addObject:v];
+    }
+    return key;
+}
+
+// Whether the app's own group holds a password written since this install: it was signed for that group then, so what
+// is there is its live data. Also YES when that can't be told.
+static BOOL ownGroupUsed(void) {
+    NSTimeInterval birth = containerBirth();
+    if (!birth) return YES;
+    for (int k = 0; k < 2; k++) {
+        CFTypeRef all = NULL;
+        OSStatus st = realCopyMatching((__bridge CFDictionaryRef)@{
+            (__bridge id)kSecClass: (__bridge id)(k ? kSecClassInternetPassword : kSecClassGenericPassword),
+            (__bridge id)kSecAttrAccessGroup: (__bridge id)isolate, (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitAll,
+            (__bridge id)kSecReturnAttributes: @YES, (__bridge id)kSecAttrSynchronizable: (__bridge id)kSecAttrSynchronizableAny }, &all);
+        if (st == errSecItemNotFound) continue;
+        if (st != errSecSuccess) return YES;
+        for (NSDictionary *a in (__bridge_transfer NSArray *)all) if (modified(a) >= birth) return YES;
+    }
+    return NO;
+}
+
+// Whether the container shows an earlier launch with a group fix (ours or SideDrop's: the same folder and marks).
+static BOOL groupFixedBefore(void) {
+    NSString *home = NSHomeDirectory();
+    for (NSString *f in @[ @"Library/AppGroups", @"Library/ifizbox-groupfix.log" ]) {
+        if ([[NSFileManager defaultManager] fileExistsAtPath:[home stringByAppendingPathComponent:f]]) return YES;
+    }
+    for (NSString *f in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:[home stringByAppendingPathComponent:@"Library/Preferences"] error:NULL]) {
+        if ([f hasPrefix:@"ifizbox.appgroup."]) return YES;
+    }
+    NSArray *keys = CFBridgingRelease(CFPreferencesCopyKeyList(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost));
+    for (NSString *k in keys) if ([k hasPrefix:@"ifizbox.groupfix."]) return YES;
+    return NO;
+}
+
 // B327: copies every password the app can see outside its own group (TEAM.<App ID>, app groups) into its own group,
-// never over one it has there. YES when every item was read (none locked away, as before the first unlock).
+// never over one it has there, except (B392, replaceStale) an older one left by an earlier install. YES when every item was read (none locked away, as before the first unlock).
 // The log's words for it: per class, the read's status, or how many were outside and how many of them are in the own group now.
 static NSMutableString *copyLog;
 static BOOL copySharedPasswords(void) {
@@ -303,6 +379,17 @@ static BOOL copySharedPasswords(void) {
         for (NSDictionary *a in (__bridge_transfer NSArray *)all) {
             if ([a isKindOfClass:[NSDictionary class]] && ![a[(__bridge id)kSecAttrAccessGroup] isEqual:(__bridge id)isolate]) outside++;
         }
+        // the own items as they are before any copy; each is looked at for the first shared item like it only
+        NSMutableDictionary<NSArray *, NSDictionary *> *own = [NSMutableDictionary dictionary];
+        if (replaceStale) {
+            NSMutableDictionary *oq = [base mutableCopy];
+            oq[(__bridge id)kSecAttrAccessGroup] = (__bridge id)isolate;
+            oq[(__bridge id)kSecReturnPersistentRef] = @YES;
+            CFTypeRef mine = NULL;
+            st = realCopyMatching((__bridge CFDictionaryRef)oq, &mine);
+            if (st != errSecSuccess && st != errSecItemNotFound) { ok = NO; [copyLog appendFormat:@" %@ own %d", what, (int)st]; continue; }
+            for (NSDictionary *a in (__bridge_transfer NSArray *)mine) if ([a isKindOfClass:[NSDictionary class]]) own[itemKey(a, k)] = a;
+        }
         NSMutableDictionary *q = [base mutableCopy];
         q[(__bridge id)kSecReturnData] = @YES;
 #pragma clang diagnostic push
@@ -313,7 +400,7 @@ static BOOL copySharedPasswords(void) {
         st = realCopyMatching((__bridge CFDictionaryRef)q, &out);
         if (st != errSecSuccess) { ok = NO; [copyLog appendFormat:@" %@ data %d", what, (int)st]; continue; }
         NSUInteger copied = 0;
-        NSCountedSet *added = [NSCountedSet set], *had = [NSCountedSet set]; // by the group they came from, for the log
+        NSCountedSet *added = [NSCountedSet set], *had = [NSCountedSet set], *replaced = [NSCountedSet set]; // by the group they came from, for the log
         OSStatus bad = errSecSuccess;
         // in the order a read that names no group finds them, so the app keeps the one it read until now
         for (NSDictionary *item in (__bridge_transfer NSArray *)out) {
@@ -330,30 +417,60 @@ static BOOL copySharedPasswords(void) {
             if (as == errSecSuccess || as == errSecDuplicateItem) copied++;
             else { ok = NO; bad = as; }
             id from = item[(__bridge id)kSecAttrAccessGroup] ?: @"?";
+            NSArray *key = itemKey(item, k);
+            NSDictionary *old = as == errSecDuplicateItem ? own[key] : nil;
+            [own removeObjectForKey:key];
+            id ref = old[(__bridge id)kSecValuePersistentRef];
+            if (ref && modified(old) < containerBirth() && modified(item) > modified(old)) {
+                static const CFStringRef *identity[] = { &kSecClass, &kSecAttrAccessGroup, &kSecAttrService, &kSecAttrAccount, &kSecAttrSynchronizable,
+                    &kSecAttrServer, &kSecAttrProtocol, &kSecAttrAuthenticationType, &kSecAttrPort, &kSecAttrPath, &kSecAttrSecurityDomain };
+                NSMutableDictionary *set = [add mutableCopy];
+                for (size_t i = 0; i < sizeof(identity) / sizeof(identity[0]); i++) [set removeObjectForKey:(__bridge id)*identity[i]];
+                OSStatus us = realUpdate((__bridge CFDictionaryRef)@{ (__bridge id)kSecClass: (__bridge id)cls, (__bridge id)kSecValuePersistentRef: ref },
+                                         (__bridge CFDictionaryRef)set);
+                if (us == errSecSuccess) { [replaced addObject:from]; continue; }
+                ok = NO; bad = us;
+                continue;
+            }
             if (as == errSecSuccess) [added addObject:from];
             else if (as == errSecDuplicateItem) [had addObject:from];
         }
         // an item behind Face ID or a passcode (skipped above) would be out of reach once pinned: stay as before
         if (copied < outside) ok = NO;
-        [copyLog appendFormat:@" %@ %lu outside, added from [%@], already in the own group and left alone [%@]%@", what, (unsigned long)outside,
-                              countList(added), countList(had), bad ? [NSString stringWithFormat:@", add error %d", (int)bad] : @""];
+        [copyLog appendFormat:@" %@ %lu outside, added from [%@], taken over an earlier install's from [%@], already in the own group and left alone [%@]%@", what, (unsigned long)outside,
+                              countList(added), countList(replaced), countList(had), bad ? [NSString stringWithFormat:@", copy error %d", (int)bad] : @""];
     }
     return ok;
 }
 
-// Whether the app ran before: anything of its own in its preferences (not this fix's marks), Documents, Application
-// Support or the group fix's folders. A fresh install's container has none of these.
+// Whether the app ran before this launch: a file in its container last changed (or a system-made folder there made) before this process started
+// (its change time, which a copy can't carry over). Not its preferences: a tweak's initialisers write those, and files,
+// before this fix loads (RyukGram does), so a fresh install has some by now. SplashBoard is the system's, at install.
 static BOOL appRanBefore(void) {
-    CFArrayRef keys = CFPreferencesCopyKeyList(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
-    BOOL ran = NO;
-    for (NSString *k in (__bridge NSArray *)keys) if (![k hasPrefix:@"ifizbox.groupfix."]) { ran = YES; break; }
-    if (keys) CFRelease(keys);
-    if (ran) return YES;
-    NSFileManager *fm = [NSFileManager defaultManager];
+    struct kinfo_proc p;
+    size_t n = sizeof(p);
+    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid() };
+    if (sysctl(mib, 4, &p, &n, NULL, 0) != 0 || n == 0) return YES; // can't tell: as an app that ran
+    struct timeval start = p.kp_proc.p_un.__p_starttime;
     NSString *home = NSHomeDirectory();
-    if ([fm contentsOfDirectoryAtPath:[home stringByAppendingPathComponent:@"Documents"] error:NULL].count) return YES;
-    for (NSString *d in @[ @"Library/Application Support", @"Library/AppGroups" ]) {
-        if ([fm fileExistsAtPath:[home stringByAppendingPathComponent:d]]) return YES;
+    // Folders the system makes in a process of the app, not at install: an earlier launch's, even when every file in
+    // the container was written anew by now.
+    for (NSString *d in @[ @"Library/Caches/com.apple.dyld", @"Library/Saved Application State" ]) {
+        struct stat st;
+        if (lstat([home stringByAppendingPathComponent:d].fileSystemRepresentation, &st) == 0 && st.st_birthtimespec.tv_sec > 0 &&
+            (st.st_birthtimespec.tv_sec < start.tv_sec ||
+             (st.st_birthtimespec.tv_sec == start.tv_sec && st.st_birthtimespec.tv_nsec / 1000 < start.tv_usec))) return YES;
+    }
+    for (NSString *top in @[ @"Library", @"Documents", @"tmp" ]) {
+        NSString *root = [home stringByAppendingPathComponent:top];
+        NSDirectoryEnumerator *e = [[NSFileManager defaultManager] enumeratorAtPath:root];
+        for (NSString *f in e) {
+            if ([top isEqualToString:@"Library"] && [f isEqualToString:@"SplashBoard"]) { [e skipDescendants]; continue; }
+            struct stat st;
+            if (lstat([root stringByAppendingPathComponent:f].fileSystemRepresentation, &st) != 0 || !S_ISREG(st.st_mode)) continue;
+            if (st.st_ctimespec.tv_sec < start.tv_sec ||
+                (st.st_ctimespec.tv_sec == start.tv_sec && st.st_ctimespec.tv_nsec / 1000 < start.tv_usec)) return YES;
+        }
     }
     return NO;
 }
@@ -476,23 +593,21 @@ __attribute__((constructor)) static void groupfixInit(void) {
         groups = [NSSet setWithArray:g];
         NSString *t = c[@"target"];
         target = [t isKindOfClass:[NSString class]] && t.length ? t : nil;
-        // The legacy copy's test (its preferences weren't empty), read before anything below writes one.
         CFArrayRef keys = CFPreferencesCopyKeyList(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
-        NSUInteger keyCount = keys ? (NSUInteger)CFArrayGetCount(keys) : 0;
-        BOOL ranBefore = keyCount > 0;
+        NSUInteger keyCount = keys ? (NSUInteger)CFArrayGetCount(keys) : 0; // for the log
         if (keys) CFRelease(keys);
-        BOOL ownBefore = appRanBefore(); // isolate's test, before ownFolder makes Library/AppGroups
+        BOOL ownBefore = appRanBefore(), fixedBefore = groupFixedBefore(); // before anything below writes a file or a mark
         NSUInteger prefs = keyCount;
         NSString *saw = [NSString stringWithFormat:@"passwords %@; internet %@; keys %@", itemCounts(kSecClassGenericPassword),
                                                    itemCounts(kSecClassInternetPassword), itemCounts(kSecClassKey)];
         NSString *isolation = @"none";
         NSString *l = c[@"legacy"];
         if (!target && [l isKindOfClass:[NSString class]] && l.length) {
-            // A fresh install (no preferences yet) is marked at once, so it never copies the shared group in later.
+            // A fresh install is marked at once, so it never copies the shared group in later.
             CFStringRef fresh = CFSTR("ifizbox.groupfix.fresh");
             CFPropertyListRef was = CFPreferencesCopyValue(fresh, kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
             if (was) CFRelease(was);
-            else if (ranBefore) legacy = l;
+            else if (ownBefore) legacy = l;
             else {
                 CFPreferencesSetValue(fresh, kCFBooleanTrue, kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
                 CFPreferencesSynchronize(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
@@ -507,8 +622,19 @@ __attribute__((constructor)) static void groupfixInit(void) {
             // unlock), calls stay as before and the next launch tries again.
             CFStringRef mark = CFSTR("ifizbox.groupfix.isolated");
             CFPropertyListRef done = CFPreferencesCopyValue(mark, kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+            // B392: the app ran under the shared groups only (no group fix here before, nothing of this install in its
+            // own group). Marked until the copy is done: the next try sees this one's traces.
+            CFStringRef pending = CFSTR("ifizbox.groupfix.takeover");
+            CFPropertyListRef was = CFPreferencesCopyValue(pending, kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+            replaceStale = !done && ownBefore && (was || (!fixedBefore && !ownGroupUsed()));
+            if (was) CFRelease(was);
+            if (replaceStale) {
+                CFPreferencesSetValue(pending, kCFBooleanTrue, kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+                CFPreferencesSynchronize(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+            }
             if (done) { CFRelease(done); pinned = YES; isolation = @"marked earlier"; }
             else if (!ownBefore || copySharedPasswords()) {
+                CFPreferencesSetValue(pending, NULL, kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
                 CFPreferencesSetValue(mark, kCFBooleanTrue, kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
                 CFPreferencesSynchronize(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
                 pinned = YES;
@@ -535,11 +661,12 @@ __attribute__((constructor)) static void groupfixInit(void) {
         NSDictionary *info = [NSBundle mainBundle].infoDictionary;
         NSISO8601DateFormatter *iso8601 = [NSISO8601DateFormatter new];
         NSArray *kc = entitlement(@"keychain-access-groups");
-        logLaunch([NSString stringWithFormat:@"%@ %@ %@ (%@) container %@; ran before %@, %lu preferences; application-identifier %@, keychain groups %@; saw %@; isolate %@: %@; pinned %@; app groups %lu",
+        logLaunch([NSString stringWithFormat:@"%@ %@ %@ (%@) container %@; ran before %@, %lu preferences; application-identifier %@, keychain groups %@; saw %@; isolate %@: %@; pinned %@; app groups %lu; group fix before %@; container made %@",
             [iso8601 stringFromDate:[NSDate date]], info[@"CFBundleIdentifier"], info[@"CFBundleShortVersionString"], info[@"CFBundleVersion"],
             NSHomeDirectory().lastPathComponent, ownBefore ? @"yes" : @"no", (unsigned long)prefs, entitlement(@"application-identifier"),
             [kc isKindOfClass:[NSArray class]] ? [kc componentsJoinedByString:@", "] : @"none", saw,
-            isolate ? (__bridge NSString *)isolate : @"off", isolation, pinned ? @"yes" : @"no", (unsigned long)groups.count]);
+            isolate ? (__bridge NSString *)isolate : @"off", isolation, pinned ? @"yes" : @"no", (unsigned long)groups.count,
+            fixedBefore ? @"yes" : @"no", containerBirth() ? [iso8601 stringFromDate:[NSDate dateWithTimeIntervalSince1970:containerBirth()]] : @"unknown"]);
         if (keychainStrip || pinned) _dyld_register_func_for_add_image(rebindImage);
     }
 }
