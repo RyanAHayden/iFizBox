@@ -9,14 +9,17 @@
 //
 // All text goes in through textContent.
 //
-// F345c: in the app under the native controls hook (<html data-controls="native">) the sheet is the shell's own
-// UIAlertController (.actionSheet, bridge call ui.actionSheet, native/Sources/NativeMenus.swift): same options, same
-// answer. Its popover (iOS 26+ shows one on the iPhone too) points at the element the last touch went down on, when
-// that touch was recent. A shell without ui.actionSheet, the site and every other style get the CSS sheet.
+// F345c, B383: in the app under the native controls hook (<html data-controls="native">) a sheet with a source (the
+// button, or the row, it was opened from) is the shell's own UIMenu out of that source (bridge call ui.menu with sheet:
+// true, native/Sources/NativeMenus.swift), opened by the glass nav bar button itself where the shell draws one: the
+// title, the red buttons and the icons with it, no Cancel (a tap outside is -1). One way for every sheet; a call while
+// a menu is up (a fast repeat tap) answers -1 and the menu stays. Only a sheet with no source (a timer, a slow answer)
+// is the shell's UIAlertController (.actionSheet, ui.actionSheet). A shell without the call, the site and every other
+// style get the CSS sheet.
 //
 // The source button: `from` (an element, or a rect {x, y, width, height}) names the button that opened the sheet;
 // without it, the button the last tap or click landed on, while that was recent (sourceRect). A tap on a sheet's own
-// button (Modify > Downgrade) keeps the button that opened the first sheet. The native sheet's popover points at it.
+// button (Modify > Downgrade) keeps the button that opened the first sheet.
 // In the iOS 26 era (<html data-style="ios26">) a CSS sheet with a source button is an anchored menu (UIMenu-style,
 // .action-menu): a rounded glass list that grows out of the button's rect, the button's corner pinned, and goes back
 // into it on dismiss; no Cancel (a tap outside or Escape is -1). Transform and opacity only. A sheet with no source
@@ -25,9 +28,10 @@
 // F387: icons and onPick, for the share sheet in the iOS 7, 13 and 26 eras (nav/sharesheet.js):
 //   showActionSheet({ buttons, icons: [el | null, …], onPick: (i) => … })
 // icons puts an element in front of each button's label (.action-button.has-icon: .action-icon + .action-label,
-// laid out by style.css's share hooks); a sheet with icons is always the CSS sheet, as the shell's UIAlertController
-// draws none. onPick(i) runs inside the tap, before the answer (clipboard writes and app links need the gesture);
-// i is -1 for Cancel, a tap on the dim or Escape.
+// laid out by style.css's share hooks). The native menu draws nativeIcons instead, one per button: null, {symbol} (an SF
+// Symbol's name), {image} (a data: URL) or {letter, color}; a sheet with icons but no nativeIcons, or no source, is the
+// CSS sheet. onPick(i) runs inside the tap, before the answer (clipboard writes and app links need the gesture; after a
+// native menu's answer copyText falls back to the shell's clipboard); i is -1 for Cancel, a tap on the dim or Escape.
 import { EASE, DURATION } from "./motion.js";
 import { nativeBridge, hasNativeCall } from "../native.js";
 
@@ -50,17 +54,26 @@ function picked(opts, index) {
 
 export function showActionSheet(opts = {}) {
   const native = nativeBridge();
-  if (!wantsNativeControls(native) || opts.icons?.some(Boolean)) return cssSheet(opts);
+  const hasIcons = Boolean(opts.icons?.some(Boolean));
+  if (!wantsNativeControls(native)) return cssSheet(opts);
+  const rect = sourceRect(opts.from) ?? tapRect();
+  if (hasIcons && !(rect && opts.nativeIcons)) return cssSheet(opts);
   const { title = "", buttons = [], cancel = "Cancel", destructive = -1 } = opts;
   const labels = buttons.map((b) => String(b));
-  const params = { title: String(title ?? ""), buttons: labels, cancel: cancel ? String(cancel) : "",
-    destructive: [].concat(destructive).filter((i) => Number.isInteger(i) && i >= 0 && i < labels.length) };
-  const rect = sourceRect(opts.from) ?? tapRect();
-  if (rect) params.rect = rect;
-  return native.call("ui.actionSheet", params).then((r) => {
-    const i = r?.index;
-    return Number.isInteger(i) && i >= 0 && i < labels.length ? i : -1;
-  }, () => cssSheet(opts)); // an older shell ("unknown method ui.actionSheet") or no window to show it in
+  const red = [].concat(destructive).filter((i) => Number.isInteger(i) && i >= 0 && i < labels.length);
+  const answer = (r) => {
+    const i = Number.isInteger(r?.index) && r.index >= 0 && r.index < labels.length ? r.index : -1;
+    if (lastTap) lastTapAt = Date.now(); // a sheet this answer opens (Modify > Downgrade) has the same source
+    picked(opts, i);
+    return i;
+  };
+  const alone = () => native.call("ui.actionSheet", { title: String(title ?? ""), buttons: labels,
+    cancel: cancel ? String(cancel) : "", destructive: red, ...(rect ? { rect } : {}) })
+    .then(answer, () => cssSheet(opts)); // an older shell ("unknown method ui.actionSheet") or no window to show it in
+  if (!rect || !labels.length) return alone();
+  const params = { sheet: true, title: String(title ?? ""), items: labels, destructive: red, rect };
+  if (hasIcons) params.icons = labels.map((_, i) => opts.nativeIcons[i] ?? null);
+  return native.call("ui.menu", params).then(answer, () => (hasIcons ? cssSheet(opts) : alone())); // no menu showed
 }
 
 // F345c: the native sheets and menus only in the app (the bridge takes calls) under the native controls hook.
@@ -72,17 +85,19 @@ export function wantsNativeControls(native = nativeBridge(), doc = globalThis.do
 export const TAP_FRESH_MS = 3000; // a sheet later than this after the touch (a timer, a slow answer) points at no row
 let lastTap = null;
 let lastTapAt = 0;
+let lastRect = null; // where it was, for a row redrawn before its sheet opens
 let watching = null;
 export function watchTaps(doc = globalThis.document) {
   if (!doc?.addEventListener || watching === doc) return;
   watching = doc;
   const seen = (e) => {
     // A tap on an open sheet's own button keeps the element that opened it (the next sheet grows from it too).
-    if (!e.target?.closest?.(".action-scrim")) lastTap = e.target;
+    if (!e.target?.closest?.(".action-scrim")) { lastTap = e.target; lastRect = rectOf(tapped(lastTap)); }
     lastTapAt = Date.now();
   };
   doc.addEventListener("pointerdown", seen, true);
   doc.addEventListener("click", seen, true); // a click with no touch first: the native glass bar buttons, the keyboard
+  doc.addEventListener("menupick", seen, true); // nav/menu.js: a held row's native menu chose an item
 }
 watchTaps();
 
@@ -107,11 +122,15 @@ export function sourceRect(from = null, now = Date.now()) {
 // The anchored menu: the iOS 26 era, with a source button.
 const menuEra = (doc = globalThis.document) => doc?.documentElement?.getAttribute?.("data-style") === "ios26";
 
+// The button or row a touch on `el` belongs to.
+const tapped = (el) => el?.closest?.("button, a, .cell, li, [role=button]") ?? el;
+
 // {x, y, width, height} in CSS px from the viewport's top left (the web view's own points: the page isn't zoomed), of
-// the button/row the last touch went down on; null when there was none in the last TAP_FRESH_MS or it left the page.
+// the button/row the last touch went down on (where it was then, if it has left the page); null when there was none in
+// the last TAP_FRESH_MS.
 export function tapRect(now = Date.now()) {
   if (!lastTap || now - lastTapAt > TAP_FRESH_MS) return null;
-  return rectOf(lastTap.closest?.("button, a, .cell, li, [role=button]") ?? lastTap);
+  return rectOf(tapped(lastTap)) ?? lastRect;
 }
 
 // The CSS sheet: iOS 6's UIActionSheet, restyled by each era's stylesheet; the iOS 26 era's anchored menu.

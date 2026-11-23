@@ -1,5 +1,5 @@
-// F345c: showActionSheet and showMenu go through the shell's ui.actionSheet (UIAlertController .actionSheet) and
-// ui.menu (a UIMenu at the anchor's rect, native/Sources/NativeMenus.swift) only in the app under the native controls
+// F345c, B383: showActionSheet and showMenu go through the shell's ui.menu (a UIMenu at the source's rect,
+// native/Sources/NativeMenus.swift; ui.actionSheet for a sheet with no source) only in the app under the native controls
 // hook; a shell without them, the site and every other style get the CSS sheet and callout.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -38,30 +38,51 @@ function touch(document, el) {
   listeners.pointerdown({ target: el });
 }
 
-test("F345c: under the native hook, showActionSheet sends ui.actionSheet with the tapped button's rect and answers its index", async () => {
-  const native = shell({ "ui.actionSheet": () => ({ index: 1 }) });
+test("B383: under the native hook, a sheet from a button is one ui.menu at that button, and answers its index", async () => {
+  const native = shell({ "ui.menu": () => ({ index: 1 }) });
   await withPage({ native }, async (document) => {
     const modify = placed(document.createElement("button"));
     document.body.append(modify);
     touch(document, modify);
-    const i = await showActionSheet({ title: "Modify", buttons: ["Reinstall", "Remove"], destructive: [1, 7] });
-    modify.remove();
-    assert.equal(i, 1);
-    assert.deepEqual(native.calls, [["ui.actionSheet", {
-      title: "Modify", buttons: ["Reinstall", "Remove"], cancel: "Cancel", destructive: [1], // only real buttons
+    const picks = [];
+    const open = () => showActionSheet({ title: "Modify", buttons: ["Reinstall", "Remove"], destructive: [1, 7], onPick: (i) => picks.push(i) });
+    for (let n = 0; n < 3; n++) assert.equal(await open(), 1);
+    assert.deepEqual(picks, [1, 1, 1]);
+    for (const c of native.calls) assert.deepEqual(c, ["ui.menu", {
+      sheet: true, title: "Modify", items: ["Reinstall", "Remove"], destructive: [1], // only real buttons
       rect: { x: 10, y: 300, width: 320, height: 44 },
-    }]]);
+    }]);
+    assert.equal(native.calls.length, 3);
     assert.equal(document.body.querySelector(".action-scrim"), null, "no CSS sheet drawn");
   });
 });
 
-test("F345c: Cancel, an answer out of range and no cancel button", async () => {
+test("B383: icons go with the native menu; with icons and no nativeIcons, or no menu, the CSS sheet draws them", async () => {
+  const opts = (document, more) => ({ buttons: ["Copy Link", "Feather"], from: { x: 1, y: 2, width: 3, height: 4 },
+    icons: [document.createElement("span"), document.createElement("span")], ...more });
+  const nativeIcons = [{ symbol: "doc.on.doc" }, { letter: "F", color: "#123456" }];
+  const native = shell({ "ui.menu": () => ({ index: 0 }) });
+  await withPage({ native }, async (document) => {
+    assert.equal(await showActionSheet(opts(document, { nativeIcons })), 0);
+    assert.deepEqual(native.calls[0][1].icons, nativeIcons);
+    showActionSheet(opts(document));
+    assert.ok(document.body.querySelector(".action-scrim"), "no nativeIcons");
+  });
+  await withPage({ native: shell({}) }, async (document) => {
+    showActionSheet(opts(document, { nativeIcons }));
+    await tick();
+    assert.ok(document.body.querySelector(".action-scrim"), "an older shell");
+  });
+});
+
+test("F345c: no source: ui.actionSheet; Cancel, an answer out of range and no cancel button", async () => {
   const native = shell({ "ui.actionSheet": (p) => ({ index: p.buttons.length ? 9 : -1 }) });
   await withPage({ native }, async () => {
+    touch(document, document.createElement("div")); // a tap with no place on the page
     assert.equal(await showActionSheet({ buttons: ["One"] }), -1);
     assert.equal(await showActionSheet({ buttons: [], cancel: "" }), -1);
     assert.equal(native.calls[1][1].cancel, "");
-    assert.equal("rect" in native.calls[0][1], false, "no tap seen, no rect: the shell points at the bottom");
+    assert.equal("rect" in native.calls[0][1], false);
   });
 });
 
@@ -75,7 +96,7 @@ test("F345c: the rect is the button the last touch went down on, only while that
     assert.deepEqual(tapRect(), { x: 0, y: 100, width: 200, height: 44 });
     assert.equal(tapRect(Date.now() + TAP_FRESH_MS + 1), null, "a sheet long after the touch points at no row");
     row.remove();
-    assert.equal(tapRect(), null, "an element gone from the page has no rect");
+    assert.deepEqual(tapRect(), { x: 0, y: 100, width: 200, height: 44 }, "a row redrawn since: where it was");
   });
 });
 
@@ -165,4 +186,14 @@ test("F345c: the shell's handlers: an .actionSheet with its popover at the rect,
   const bridge = readFileSync(new URL("../../../native/Sources/Bridge.swift", import.meta.url), "utf8");
   assert.match(bridge, /NativeMenus\.register\(self\)/);
   assert.match(bridge, /on\("clipboard\.write"\)/);
+});
+
+test("B383: one menu at a time; early taps keep it up; the glass button opens its own; a put-away answers at once", () => {
+  const read = (f) => readFileSync(new URL(`../../../native/Sources/${f}`, import.meta.url), "utf8");
+  const swift = read("NativeMenus.swift");
+  assert.match(swift, /if live\.answered, live\.next == nil \{ live\.next = \{ menu\(c\) \} \} else \{ c\.reply\(\["index": -1\], nil\) \}/);
+  assert.match(swift, /keepsMenuPresented/);
+  assert.match(swift, /NativeGlass\.button\(at: area, in: web\)/);
+  assert.match(swift, /isUserInteractionEnabled = false/, "the invisible button takes no taps once its menu goes");
+  assert.match(read("NativeGlass.swift"), /class GlassButton: NativeMenus\.MenuButton/);
 });

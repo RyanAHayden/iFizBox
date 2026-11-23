@@ -45,6 +45,14 @@ function iconOf(item) {
   return box;
 }
 
+// B383: the same icon for the shell's UIMenu (actionsheet.js nativeIcons), its SF Symbols for the system activities.
+const SYMBOLS = { copy: "doc.on.doc", qr: "qrcode" };
+function nativeIconOf(item) {
+  if (SYMBOLS[item.glyph]) return { symbol: SYMBOLS[item.glyph] };
+  if (/^data:image\//.test(item.image ?? "")) return { image: item.image };
+  return { letter: String(item.letter ?? item.label ?? "?").slice(0, 2), color: item.color ?? "" };
+}
+
 // F387: the era's share layout, style.css's --share-layout hook. "grid" (iOS 6) is the activity sheet below; "action"
 // (iOS 7, 13 and 26) hands the items to the action sheet (nav/actionsheet.js), each with its icon (iconOf, painted
 // smaller by the era's --share-* tokens) in front of its label, Cancel under them; the iOS 26 era's sheet is its
@@ -59,6 +67,7 @@ function actionShare(items, cancel) {
   return showActionSheet({
     buttons: items.map((item) => String(item.label ?? "")),
     icons: items.map(iconOf),
+    nativeIcons: items.map(nativeIconOf),
     cancel,
     // inside the tap, as the grid's close() does: clipboard writes and app links need the user's gesture
     onPick: (i) => { if (i >= 0) try { items[i]?.onSelect?.(); } catch (e) { console.error(e); } },

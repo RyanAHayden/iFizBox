@@ -88,6 +88,15 @@ enum NativeGlass {
         }
     }
 
+    // B383: the bar button showing at `rect` (the web view's points), which opens its own menu (NativeMenus).
+    static func button(at rect: CGRect, in web: WKWebView) -> NativeMenus.MenuButton? {
+        guard #available(iOS 26.0, *) else { return nil }
+        for bars in open.values.compactMap({ $0 as? GlassBars }) {
+            if let b = bars.button(at: CGPoint(x: rect.midX, y: rect.midY), from: web) { return b }
+        }
+        return nil
+    }
+
     private static func close(_ key: String) {
         guard let v = open.removeValue(forKey: key) else { return }
         if #available(iOS 26.0, *), let bars = v as? GlassBars {
@@ -197,6 +206,11 @@ private final class GlassBars: UIView {
     }
 
     // MARK: the nav bar's buttons
+
+    func button(at point: CGPoint, from view: UIView) -> NativeMenus.MenuButton? {
+        let p = convert(point, from: view)
+        return buttons.values.first { !$0.isHidden && $0.frame.contains(p) } as? GlassButton
+    }
 
     private func layoutButtons(_ list: [[String: Any]]) {
         var keep = Set<String>()
@@ -412,7 +426,7 @@ private final class NativeTabs: NSObject, UITabBarControllerDelegate {
 
 // One nav bar button: a glass capsule (prominent for Done), the page's title or glyph in it.
 @available(iOS 26.0, *)
-private final class GlassButton: UIButton {
+private final class GlassButton: NativeMenus.MenuButton {
     private var info: [String: Any] = [:]
 
     func update(_ b: [String: Any], images: [String: UIImage]) {
