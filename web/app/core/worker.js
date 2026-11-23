@@ -3,7 +3,7 @@
 // Messages in: {id, type: "packages" | "release" | "control" | "count", text | bytes, root, arch}. `bytes` (an ArrayBuffer, best
 // transferred) is decoded here as UTF-8, with U+FFFD for bad bytes (BigBoss's list has some), so the decode is
 // off the UI thread too. Messages out: {id, ok: true, result} or {id, ok: false, error}.
-import { parseControl, parsePackages, parseRelease, matchesArch } from "./apt.js";
+import { parseControl, parsePackages, parseRelease, countPackages } from "./apt.js";
 import { createCatalog, runCatalog } from "./catalog.js";
 
 // The package catalog (core/catalog.js) lives here, so sections, lists and search never run on the UI thread.
@@ -29,7 +29,7 @@ export function handle(msg) {
     case "release": return parseRelease(text);
     case "control": return parseControl(text);
     // How many packages install on msg.arch: the Sources tab's count, without shipping every stanza back.
-    case "count": return parseControl(text).filter((s) => s.package && matchesArch(s, msg.arch)).length;
+    case "count": return countPackages(text, msg.arch); // unique package ids, not stanzas (B366)
     default: throw new Error(`unknown parse type ${msg.type}`);
   }
 }

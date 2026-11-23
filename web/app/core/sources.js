@@ -9,7 +9,7 @@
 // and throws errors with a `code` (BackendError: bad_url, refused, too_large, timeout, upstream, not_found,
 // network, rate_limited). Cydia's behaviour this follows: docs/cydia.md, "Fetching a source" and "Sources tab".
 import { DOMAIN } from "../brand.js";
-import { repoLayout, parseRelease, parseControl, matchesArch, DEFAULT_ARCH } from "./apt.js";
+import { repoLayout, parseRelease, DEFAULT_ARCH, countPackages } from "./apt.js";
 import { isAltKey, neverLoaded } from "./altstore.js";
 import { releaseTime, fingerprint, healthFields, withTimeout, pool, REFRESH_TIMEOUT, REFRESH_CONCURRENCY } from "./health.js";
 import { githubApiRepo, isGithubSource, refreshGithubSource } from "./github.js"; // F304
@@ -360,10 +360,14 @@ async function hasMagic(res, magic) {
   return magic.every((b, i) => head[i] === b);
 }
 
+// What a stored count counts: "id" is unique package ids (B366). A count saved without it counted stanzas, one per
+// version, so refreshSource recounts it even when the Release is unchanged.
+const COUNT_BY = "id";
+
 // Counts the packages in a Packages text that install on `arch`. Pass `count` (core/parser.js's, which runs in
 // the worker) to keep big lists off the UI thread; this inline one is the fallback.
 function countInline(text, arch) {
-  return parseControl(text).filter((s) => s.package && matchesArch(s, arch)).length;
+  return countPackages(text, arch); // B366: unique ids, not one per version
 }
 
 async function releaseOf(backend, base) {
@@ -429,7 +433,7 @@ export async function verifySource(backend, input, { arch = DEFAULT_ARCH, count 
     source.releaseDate = releaseTime(release);
     source.releaseHash = fingerprint(release.raw);
   }
-  if (source.count != null) source.countArch = arch;
+  if (source.count != null) Object.assign(source, { countArch: arch, countBy: COUNT_BY });
   return source;
 }
 
@@ -521,8 +525,9 @@ export async function refreshSource(backend, source, { arch = DEFAULT_ARCH, coun
       out.releaseHash = fingerprint(release.raw);
     }
     out.countArch = arch;
+    out.countBy = COUNT_BY;
     if (release && out.releaseHash === source?.releaseHash && source?.countArch === arch
-        && typeof source?.count === "number" && !source?.error) {
+        && source?.countBy === COUNT_BY && typeof source?.count === "number" && !source?.error) {
       out.count = source.count;
       out.unchanged = true;
       return out;
