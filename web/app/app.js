@@ -38,7 +38,7 @@ import { showReloadBar } from "./nav/reloadbar.js";
 import { catalog } from "./catalog.js";
 import { createUpgradeNotices } from "./settings.js";
 import { createPrefsMirror } from "./settings.js";
-import { keepRoute } from "./core/installroute.js"; // B218
+import { keepRoute, ROUTE_KEY } from "./core/installroute.js"; // B218
 import { nativeBridge } from "./native.js";
 import { NAME } from "./brand.js";
 import { takeInstallParam, askFromInstallLink, launchRefresh } from "./websign-gate.js";
@@ -571,6 +571,7 @@ if (nativeBridge()) {
 }
 upgradeNotices.start();
 createPrefsMirror({ settings: settingsScreen.settings }).start(); // F70: N7's settings to the daemon
+if (settingsScreen.settings.isShown(ROUTE_KEY)) import("./incoming.js").then((m) => m.watchLeftOff()).catch(() => {}); // B395 (sideload)
 keepRoute({ settings: settingsScreen.settings, native: nativeBridge() }); // B218: Install Apps With kept in the Keychain (sideload)
 if (addFrom) requestAnimationFrame(() => load("manage").then((m) => m.addSource({ showHUD: ctx.showHUD, fromLink: true }, addFrom)).catch(() => {}));
 
