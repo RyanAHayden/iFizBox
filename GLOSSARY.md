@@ -186,3 +186,10 @@ _Said_: one iFizBox Shortcut
 _On screen_: Install Switch
 _In code_: SHORTCUT_NAMES.switch, switchAdded, LocalVPN.endSwitch, vpn.testSwitch, install-switch.plist
 _Avoid_: VPN Shortcut, switch shortcut
+
+**Waiting Bar**:
+The full bar with moving stripes on a run's row whose app is signed and waiting its turn to install
+_Said_: waiting bar, moving stripes
+_On screen_: Signed: Waiting to Install
+_In code_: qr-wait, is-waiting
+_Avoid_: barber pole, sweep
