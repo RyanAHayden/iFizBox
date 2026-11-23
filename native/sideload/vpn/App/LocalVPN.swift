@@ -78,7 +78,7 @@ enum LocalVPN {
         sc["trip"] = tripReady() // F394: the added Install Switch does it in one trip
         lock.lock(); let on = cached?.connection.status == .connected; lock.unlock()
         return ["available": available, "bundled": providerID != nil, "entitled": entitled, "tested": tested, "on": on,
-                "cellular": path.cellular, "wifi": path.wifi, "shortcuts": sc, "trips": tripAvailable, "name": name]
+                "cellular": path.cellular, "wifi": path.wifi, "shortcuts": sc, "trips": tripAvailable, "otherVPN": otherVPNUp(), "name": name]
     }
 
     // ---- The network path (cellular or Wi-Fi)
