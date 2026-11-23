@@ -36,7 +36,7 @@ test("the Install Switch's end runs only when the run turned data off or another
 test("the end is wired to the rule, and coming to the front ends nothing before the queue is over", () => {
   const end = swift.slice(swift.indexOf("static func endSwitch()"), swift.indexOf("static func switchEnded("));
   assert.ok(end.indexOf("guard switchEndNeeded(") > 0 && end.indexOf("guard switchEndNeeded(") < end.indexOf("runShortcut("));
-  assert.match(end, /guard switchedOn, switchEndDue, holds == 0, active/);
+  assert.match(end, /guard switchedOn, switchEndDue, holds == 0, installs == 0, active/);
   assert.match(swift, /holds \+= 1; stopGen \+= 1; switchEndDue = false/);
   assert.match(swift, /if stop \{ switchEndDue = switchedOn && !tripOn;/);
   assert.match(end, /vpnBack = otherVPNBack\(before, selected: selected\)/, "that VPN, not just any tunnel");

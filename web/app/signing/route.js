@@ -82,7 +82,7 @@ import { SELF_RESTART } from "../core/apprun.js";
 import { KNOWN_MALWARE, askInsecure, bridge, failed, keepIpaHash, refusing, stopNative, storageOf,
   untilCancel } from "./common.js";
 import { getServer, defaultServer } from "./identity.js";
-import { serverFallback, USE_SERVER, USE_SERVER_LINE } from "../core/installroute.js"; // F366
+import { serverFallback, switchFailedAlert, USE_SERVER, USE_SERVER_LINE } from "../core/installroute.js"; // F366
 import { isSelfIpa, finishHere, hereLabel, shownName } from "./common.js";
 import { lastDevice, openRoute } from "./device.js";
 import { followHereSelf, followSelfUpdate } from "./selfupdate.js";
@@ -222,6 +222,12 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
     const fallback = serverFallback(e, route) ? serverRetry({ url, name, onInstalled, params, after, host, ...(listed ? { listed } : {}) }, { native, hud, alert, go, later, follow }) : null;
     if (fallback) h.page?.help?.(USE_SERVER_LINE, { label: USE_SERVER, action: () => { fallback.run(); } });
     const buttons = [...(fix ? ["OK", fix.button] : ["OK"]), ...(fallback ? [USE_SERVER] : [])];
+    if (e?.code === "switch_failed" && fix && fallback) { // B395: one plain alert
+      const { index } = await alert(switchFailedAlert(fix)) || {};
+      if (index === 1) runFix(fix.fix, { native, go });
+      if (index === 2) return fallback.run({ inline: true });
+      return false;
+    }
     const { index } = await alert({ title: e?.code === "malware" ? KNOWN_MALWARE : why.title, message: why.message, buttons, ...(buttons.length > 1 ? { cancel: 0 } : {}) }) || {};
     if (why.open === "signing") go(["signing"]);
     if (fix && index === 1) runFix(fix.fix, { native, go });

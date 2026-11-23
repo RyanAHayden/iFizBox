@@ -88,6 +88,7 @@ export const HOW_STEPS = [
 export function vpnTestResult(r, err = null) {
   if (r?.ok) return { title: "Connected", message: `${BUILTIN_VPN} reached this iPhone${r.ms ? ` in ${r.ms} ms` : ""}, then turned off again.` };
   const raw = String(err?.message ?? err ?? "");
+  if (/^switch_failed:/.test(raw)) { const f = switchFailed(raw); return { title: f.title, message: f.message }; } // B395
   if (/^vpn_failed:/.test(raw)) return { title: `${BUILTIN_VPN} Didn't Start`, message: `${raw.replace(/^vpn_failed:\s*/, "")}.` };
   const why = verifyFailure(err, { paired: true, vpn: { available: true } });
   return { title: why.title, message: why.message, again: why.again };
@@ -568,7 +569,7 @@ export function routeRefused(vpn = VPNS[0], st = null) {
 // { title, message, short, fix, button }, or null when the error isn't about reaching this iPhone (Developer Mode,
 // signing, a download): those don't make the route broken.
 // B378: vpn_failed: the built-in VPN didn't start and no other way in was on (the shell says why, e.g. no network)
-const ROUTE_CODES = new Set([...CONNECT_CODES, "route_refused", "tailscale_signed_out", "needs_login", "expired", "not_paired", "vpn_failed"]);
+const ROUTE_CODES = new Set([...CONNECT_CODES, "route_refused", "tailscale_signed_out", "needs_login", "expired", "not_paired", "vpn_failed", "switch_failed"]);
 export function routeFailureOf(err, st = null) {
   const raw = String(err?.message ?? err ?? "");
   const code = err?.code ?? raw.split(":")[0];
@@ -578,7 +579,7 @@ export function routeFailureOf(err, st = null) {
   const fix = why.fix ?? (why.again ? "pair" : /^Turn On/.test(why.title) ? (why.title.includes(VPNS[1]) ? "openTailscale" : "openVPN") : "check");
   const short = why.short ?? (why.again ? "Installs are refused. Pair again." : "Installs can't reach this iPhone.");
   const button = why.button ?? (fix === "pair" ? "Pair Again" : fix === "openVPN" ? `Open ${VPNS[0]}` : fix === "openTailscale" ? "Open Tailscale" : "Check Again");
-  return { title: why.title, message: why.message, short, fix, button };
+  return { title: why.title, message: why.message, short, fix, button, ...(code === "switch_failed" ? { code } : {}) };
 }
 
 // Kept in this browser's storage (it outlives a relaunch: the route stays broken until a check passes), and told to
@@ -621,6 +622,23 @@ export function vpnFailed(raw) {
   return { title: `${BUILTIN_VPN} Didn't Start`, message: `${first || `${BUILTIN_VPN} didn't start`}.`,
     short: noNetwork ? `${BUILTIN_VPN} needs Wi-Fi or cellular data to start.` : `${BUILTIN_VPN} didn't start.`, fix: "check", button: "Check Again", again: false };
 }
+// B395: the Install Switch didn't run and the install couldn't go on without it (on cellular, or the VPN didn't start
+// either). The shell ran it once and stopped.
+export function switchFailed(raw) {
+  const why = String(raw ?? "").replace(/^switch_failed:\s*/, "").trim().replace(/[.\s]+$/, "");
+  return { title: "Install Switch Didn't Run", again: false, fix: "shortcuts", button: "Update",
+    message: `The install stopped${why ? `: ${why}` : ""}. Delete Install Switch in Shortcuts and tap Update, or install through the Signing Server this time.`,
+    short: "Update the Install Switch, or use the Signing Server." };
+}
+// One alert for it: Update (the Install Switch's page) and Use Server, Cancel always there.
+export const switchFailedAlert = (f) => ({ title: f.title, message: f.message, buttons: ["Cancel", f.button, "Use Server"], cancel: 0 });
+// B395: what stayed off after a queue (vpn.leftOff's {vpn, cellular}) as an alert, or null when nothing did.
+export function leftOffAlert(off) {
+  if (!off?.vpn && !off?.cellular) return null;
+  const what = off.vpn && off.cellular ? "cellular data and your VPN" : off.vpn ? "your VPN" : "cellular data";
+  const title = off.vpn && off.cellular ? "Data and VPN Are Off" : off.vpn ? "Your VPN Is Off" : "Cellular Data Is Off";
+  return { title, message: `${NAME} couldn't turn ${what} back on after installing. ${off.cellular ? "Turn cellular data on in Settings. " : ""}${off.vpn ? "Choose your VPN in Settings > VPN and turn it on." : ""}`.trim(), buttons: ["OK"] };
+}
 // What a failed idevice.verify means: { title, message, again } (`again`: offer Pair Again). `st` is the
 // idevice.status read for the check (null or left out: not known), which names the VPN the check went through.
 export function verifyFailure(err, st = null) {
@@ -630,6 +648,7 @@ export function verifyFailure(err, st = null) {
   // while Tailscale is the way in and iFizBox isn't signed in to it (or its VPN is off): the fix is Tailscale's.
   if (code === "tailscale_signed_out" || code === "needs_login" || code === "expired") return TAILSCALE_SIGNED_OUT;
   if (code === "vpn_failed") return vpnFailed(raw); // B378
+  if (code === "switch_failed") return switchFailed(raw); // B395
   if (code === "route_refused") return routeRefused(builtinVPN(st) ? BUILTIN_VPN : /Tailscale/i.test(raw) ? VPNS[1] : VPNS[0], st);
   if (CONNECT_CODES.has(code)) {
     const t = tailscaleProblem(st);

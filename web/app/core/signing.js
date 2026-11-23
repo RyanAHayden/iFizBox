@@ -473,7 +473,7 @@ export function deviceError(err, name = "") {
   if (dm) return { ...dm, open: null };
   // B316: This iPhone's route broken by Tailscale or refusing everything: the route's words and its fix (`fix`, the
   // alert's second button `button`), not the pairing's. signing/route.js re-words the rest with idevice.status.
-  if (code === "tailscale_signed_out" || code === "route_refused") {
+  if (code === "tailscale_signed_out" || code === "route_refused" || code === "switch_failed") {
     const f = routeFailureOf(err);
     if (f) return { title: f.title, open: null, message: f.message, fix: f.fix, button: f.button };
   }
