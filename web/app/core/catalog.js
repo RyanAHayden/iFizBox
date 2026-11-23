@@ -67,13 +67,13 @@ import { withIpaInfo } from "./ipainfo.js";
 import { needsRestart } from "./queue.js";
 import { packageKind } from "./progress.js";
 import { injectableFromFields } from "./tweakfields.js"; // F302; C32: not tweaks.js, which pulls unpack.js in
-import { NO_SECTION, sectionName, simpleSection, parseAuthor, compareNames, SECTION_GROUPS, sectionGroup } from "./sections.js";
+import { NO_SECTION, sectionName, simpleSection, parseAuthor, compareNames, SECTION_GROUPS, sectionGroup, APP_TWEAKS } from "./sections.js";
 
 export const ALL = "*";
 
 // C36: the section, author and name helpers live in core/sections.js (installed.js needs them, and importing them
 // from here made an import cycle); re-exported so the catalog's callers keep importing them from here.
-export { NO_SECTION, sectionName, simpleSection, parseAuthor, compareNames, SECTION_GROUPS, sectionGroup };
+export { NO_SECTION, sectionName, simpleSection, parseAuthor, compareNames, SECTION_GROUPS, sectionGroup, APP_TWEAKS };
 
 const tagsOf = (st) => String(st.tag ?? "").split(",").map((t) => t.trim()).filter(Boolean);
 
@@ -594,6 +594,32 @@ export function createCatalog() {
     return merged;
   }
 
+  // B341: the Tweak Sources' injectable tweaks merged like All Sources (newest version wins), for the sideload
+  // build's App Tweaks section; empty elsewhere. Rebuilt with the All Sources merge (the sourceCounts trick).
+  let tweakMerged = new Map(), tweakOf = null, tweakSorted = [];
+  function tweakEntries() {
+    if (!appsOnly || !tweakKeys.size) return new Map();
+    const all = entries(ALL);
+    if (tweakOf === all) return tweakMerged;
+    tweakMerged = new Map();
+    for (const k of tweakKeys) {
+      for (const [id, e] of sources.get(k)?.byId ?? []) {
+        const cur = tweakMerged.get(id);
+        if (!cur || compareVersions(cur.stanza.version, e.stanza.version) < 0) tweakMerged.set(id, e);
+      }
+    }
+    tweakSorted = [...tweakMerged.values()].map((e) => e.row).sort(compareNames);
+    tweakOf = all;
+    return tweakMerged;
+  }
+  // What App Tweaks lists: those rows outside hidden sections, blocked ids and hidden authors (and misfits).
+  function tweakRows() {
+    if (!tweakEntries().size) return [];
+    return tweakSorted.filter((r) => !(fitFilter && isIncompatible(r.compat)) && !isHidden(r));
+  }
+  // An entry of `key`, or (All Sources, sideload build) of the App Tweaks merge: a tweak opened from that section.
+  const entryOf = (id, key) => entries(key).get(id) ?? (key === ALL ? tweakEntries().get(id) : undefined);
+
   function rowsOf(key) {
     let rows = sorted.get(key);
     if (!rows) {
@@ -633,10 +659,17 @@ export function createCatalog() {
     const list = [...counts].filter(([name]) => withHidden || !hidden.has(name))
       .map(([name, count]) => (withHidden ? { name, count, hidden: hidden.has(name) } : { name, count }))
       .sort((a, b) => collator.compare(a.name, b.name));
+    // B341: the sideload build's App Tweaks, under All Sources (each Tweak Source keeps its own sections).
+    const tweaks = key === ALL ? tweakRows().length : 0;
+    if (tweaks && (withHidden || !hidden.has(APP_TWEAKS))) {
+      list.push(withHidden ? { name: APP_TWEAKS, count: tweaks, hidden: hidden.has(APP_TWEAKS) } : { name: APP_TWEAKS, count: tweaks });
+      list.sort((a, b) => collator.compare(a.name, b.name));
+    }
     return { total: visibleOf(key).length, sections: list };
   }
 
   function list(key = ALL, section = ALL) {
+    if (key === ALL && section === APP_TWEAKS && appsOnly) return hidden.has(APP_TWEAKS) ? [] : tweakRows().map(slim);
     const rows = visibleOf(key);
     return (section === ALL ? rows : rows.filter((r) => r.section === section)).map(slim);
   }
@@ -670,10 +703,13 @@ export function createCatalog() {
     const words = q.split(/\s+/);
     const key = source && sources.has(source) ? source : ALL;
     if (source && key === ALL) return []; // a source that isn't loaded has nothing
-    const inSection = sectionTest(section);
+    // B341: in the sideload build, App Tweaks (or All Tweaks) searches the Tweak Sources' app tweaks instead.
+    const appTweaks = appsOnly && key === ALL && (section === APP_TWEAKS || section === "group:Tweaks");
+    if (appTweaks && hidden.has(APP_TWEAKS)) return [];
+    const inSection = appTweaks ? null : sectionTest(section);
     const hits = [];
     const listed = sourceCounts();
-    for (const r of rowsOf(key)) {
+    for (const r of appTweaks ? (tweakEntries(), tweakSorted) : rowsOf(key)) {
       if (isHidden(r)) continue;
       if (!words.every((w) => r._hay.includes(w))) continue;
       if (inSection && !inSection(r)) continue;
@@ -711,7 +747,7 @@ export function createCatalog() {
   }
 
   function pkg(id, key = ALL) {
-    const e = entries(key).get(id);
+    const e = entryOf(id, key);
     if (!e) return installedOnly(id);
     const others = [];
     for (const [k, { byId }] of sources) {
@@ -726,7 +762,7 @@ export function createCatalog() {
   // and the older ones a Packages file also lists), merged by version (aptVersionList); AltStore: every versions[]
   // entry of the app in the source of the page (altVersionList). Null when the package isn't in the catalog.
   function history(id, key = ALL) {
-    const e = entries(key).get(id);
+    const e = entryOf(id, key);
     if (!e) {
       const st = statusById.get(id);
       return st ? { kind: "apt", id, name: st.name || id, versions: aptVersionList([], { installed: st.version }) } : null;
@@ -803,7 +839,7 @@ export function createCatalog() {
   // packages (older versions too) and dpkg's status. The index is rebuilt when a source or the status file changes.
   let depCache = null; // { all, status, index }
   function deps(id, key = ALL) {
-    const e = entries(key).get(id);
+    const e = entryOf(id, key);
     const st = e?.stanza ?? statusById.get(id);
     if (!st || st.kind === "ipa") return null;
     return explain(st, { device, index: currentDepIndex() });

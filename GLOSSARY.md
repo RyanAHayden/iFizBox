@@ -123,3 +123,10 @@ _Said_: cellular shortcuts
 _On screen_: Cellular Shortcuts, Cellular Data Off, Cellular Data On
 _In code_: SHORTCUT_NAMES, shortcutGroups, LocalVPN.runShortcut
 _Avoid_: cellular refresh
+
+**App Tweaks**:
+The section under All Sources in the sideload build that lists every tweak from your Tweak Sources that can be added to an app
+_Said_: App Tweaks
+_On screen_: App Tweaks
+_In code_: APP_TWEAKS, tweakRows
+_Avoid_: injectable section, tweak apps

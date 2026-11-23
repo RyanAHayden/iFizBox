@@ -1,0 +1,10 @@
+[
+ {"wait": 3000},
+ {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.swipeHint','1'); 'ok'"},
+ {"nav": "#/sources/*", "ms": 8000},
+ {"shot": "jb-sections"},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,600)"},
+ {"nav": "#/sources/*/section%3ATweaks", "ms": 5000},
+ {"shot": "jb-tweaks"},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,400)"}
+]

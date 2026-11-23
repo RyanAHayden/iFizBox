@@ -1,0 +1,16 @@
+[
+ {"wait": 3000},
+ {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.swipeHint','1'); 'ok'"},
+ {"nav": "#/sources", "ms": 6000},
+ {"clicktext": "Edit", "ms": 2000},
+ {"clicktext": "Add", "ms": 2000},
+ {"eval": "(()=>{const i=[...document.querySelectorAll('input')].filter(x=>x.offsetParent!==null).at(-1); if(!i) return 'no input'; i.value='http://127.0.0.1:8732/'; i.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"},
+ {"clicktext": "Add Source", "ms": 4000},
+ {"clicktext": "Add Source", "ms": 10000},
+ {"nav": "#/search", "ms": 8000},
+ {"clicktext": "Filter", "ms": 4000},
+ {"eval": "(()=>{const b=document.querySelector('.search-filters, .filter-panel, .drop'); const t=[...document.querySelectorAll('.cell-inner')].map(e=>e.textContent.trim()).filter(Boolean); const i=t.indexOf('All Sections'); return t.slice(i, i+12).join(' | ')})()"},
+ {"eval": "(()=>{const e=[...document.querySelectorAll('.cell-inner')].find(x=>x.textContent.trim()==='All Sections'); if(e) e.scrollIntoView(); return Boolean(e)})()"},
+ {"wait": 800},
+ {"shot": "sl-search-filter"}
+]
