@@ -38,9 +38,12 @@ in either form. Chariz's deck JSON is fine.
 ## Fix
 
 - `core/previews.js isScreenshotUrl`: an extensionless URL counts when its `<img>` had a srcset with width
-  descriptors (`htmlImgs` sets `responsive`), or its query has image-CDN resize keys (`w`, `width`, `h`, `height`,
-  `q`, `quality`, `fm`, `format`, `fit`, `auto`, `dpr`). A `w`/`width`/`h`/`height` under 120 is an icon. Next.js
-  `/_next/image?url=` is judged by the wrapped URL. Paths containing `profile-image`, `picture` or `photo` are avatars.
+  descriptors (`htmlImgs` sets `responsive`), or its query asks for a width or height (`w`, `width`, `h`, `height`;
+  `q`/`format` alone don't count: search pages and README widgets carry those). A `w`/`width`/`h`/`height`/`s`/`size`
+  under 120 is an icon. Next.js `/_next/image?url=` is judged by the wrapped URL. A path segment `profile-image`,
+  `profile-picture`, `profile-pic` or `profile-photo` (also with `_` or none) is an avatar.
+- Preview cache entries now carry `v: 2`; older ones (an empty result an earlier build saved for an HTML-only
+  package) are ignored instead of hiding the pictures for up to a day.
 - `screens/browse.js drawPreviews` always passes the HTML depiction. `loadPreviews` still prefers the Sileo/APT
   pictures and falls back to the page only when those are empty.
 - Tests in `core/previews.test.js`: Aerial's real JSON and HTML shape (trimmed), and `isScreenshotUrl` cases.

@@ -183,6 +183,8 @@ test("isScreenshotUrl: extensionless pictures an image CDN resizes or a srcset o
   assert.equal(isScreenshotUrl("https://media.havoc.app/69458937a008e49d802748fa", { responsive: true }), true);
   assert.equal(isScreenshotUrl("https://cdn.x.dev/abc?w=64"), false); // an icon's width
   assert.equal(isScreenshotUrl("https://x.dev/page.html?w=800"), false);
+  assert.equal(isScreenshotUrl("https://x.dev/search?q=75"), false); // a quality or a search: not enough alone
+  assert.equal(isScreenshotUrl("https://x.dev/avatar-ish/abc?w=800&s=40"), false);
   assert.equal(isScreenshotUrl("https://x.dev/_next/image?url=%2Fshots%2F1.png&w=1080&q=75"), true);
   assert.equal(isScreenshotUrl("https://x.dev/_next/image?url=%2Fimg%2Flogo.png&w=1080&q=75"), false);
   assert.equal(isScreenshotUrl("https://x.dev/_next/image?url=https%3A%2F%2Fmedia.x.dev%2Fabc123&w=1080&q=75"), true);
@@ -297,6 +299,12 @@ test("loadPreviews: the source's own first; else the depiction page; else GitHub
   assert.ok(asked.length > n, "refetched after a day");
 
   assert.deepEqual(await loadPreviews("d", {}, { text, store }), []);
+
+  // B362: an entry an earlier build kept (no version: an empty list from before extensionless pictures counted) is
+  // looked up again.
+  clearPreviewMemory();
+  store.setItem("ifizbox.previews.e", JSON.stringify({ at: 1000, shots: [] }));
+  assert.deepEqual(urls(await loadPreviews("e", { html: "https://repo.dev/dep.html" }, { text, store, now: 2000 })), ["https://repo.dev/s.png"]);
 });
 
 test("githubShots: a README under another name is found through the API; a failed release is no error", async () => {

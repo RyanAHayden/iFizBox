@@ -254,10 +254,11 @@ const NOT_A_ALT = /(badge|shield|\bicons?\b|\blogo\b|avatar|sponsor|donate)/i;
 const PICTURE = /\.(png|jpe?g|webp|gif|heic|avif)([?#]|$)/i;
 
 // B362: an image CDN's resizing query (Havoc's media.havoc.app/<id>?w=3840&q=75, imgix, Next.js): `w`/`width` and the
-// like. A width under 120 is an icon's.
-const RESIZE_KEYS = ["w", "width", "h", "height", "q", "quality", "fm", "format", "fit", "auto", "dpr"];
-const resized = (u) => RESIZE_KEYS.some((k) => u.searchParams.has(k));
-const tooSmall = (u) => ["w", "width", "h", "height"].some((k) => { const v = num(u.searchParams.get(k)); return v !== null && v < 120; });
+// like: a width or height asked for (not `q`, `format` alone: search pages and README widgets have those). Under 120
+// (or a `s`/`size` under 120, Gravatar-style) is an icon's.
+const RESIZE_KEYS = ["w", "width", "h", "height"];
+const resized = (u) => RESIZE_KEYS.some((k) => num(u.searchParams.get(k)) !== null);
+const tooSmall = (u) => [...RESIZE_KEYS, "s", "size"].some((k) => { const v = num(u.searchParams.get(k)); return v !== null && v < 120; });
 
 // `responsive`: the <img> had a srcset with width descriptors ("640w"), which only pictures get (B362: Havoc's and
 // other Next.js depiction pages serve every screenshot that way, extensionless).
@@ -411,6 +412,7 @@ export function dedupeShots(list) {
 // ---- Loading (fetched text, cached per app) --------------------------------------------------------------------
 
 const PREVIEW_CACHE_PREFIX = "ifizbox.previews.";
+const PREVIEW_CACHE_VERSION = 2;
 export const PREVIEW_TTL = 24 * 3600 * 1000;
 const memory = new Map();
 
@@ -421,14 +423,15 @@ function cached(store, key, now) {
     const raw = store?.getItem(PREVIEW_CACHE_PREFIX + key);
     if (!raw) return null;
     const v = JSON.parse(raw);
-    if (!v || !Array.isArray(v.shots) || now - v.at >= PREVIEW_TTL) return null;
+    // B362: entries from before v2 may hold an empty list from when extensionless pictures didn't count.
+    if (!v || v.v !== PREVIEW_CACHE_VERSION || !Array.isArray(v.shots) || now - v.at >= PREVIEW_TTL) return null;
     memory.set(key, v);
     return v.shots;
   } catch { return null; }
 }
 
 function keep(store, key, shots, now) {
-  const v = { at: now, shots };
+  const v = { v: PREVIEW_CACHE_VERSION, at: now, shots };
   memory.set(key, v);
   try { store?.setItem(PREVIEW_CACHE_PREFIX + key, JSON.stringify(v)); } catch { /* full or private: memory only */ }
 }
