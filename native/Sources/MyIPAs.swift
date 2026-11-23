@@ -4,7 +4,8 @@
 //
 //   library.list                    -> {ipas: [entry], identity: bool}   (entry: IPALibrary.json)
 //   library.add {url} (stream: {phase: "downloading", progress})  -> {file, ipas}
-//   library.pick                    the iOS Files picker (.ipa, several at once) -> {files: [name], ipas} ([] on Cancel)
+//   library.pick {dir?, single?}    the iOS Files picker (.ipa, several at once) -> {files: [name], ipas} ([] on Cancel);
+//                                   B334: dir opens it in that folder, single allows one file
 //   library.options {file, name?, bundleId?, icon?, removeExtensions?, fixArm64e?, keepBundleId?}  Sign Options -> entry
 //   library.sign {file} (stream: {phase: "signing", progress})   signs offline into the signed copy -> entry
 //   F243: every call takes keepBundleId (Settings > Signing's Keep Bundle IDs, false when off): an IPA without Sign
@@ -206,7 +207,9 @@ enum MyIPAs {
             guard let top = topController() else { return c.reply(nil, "internal: no window to show the picker in") }
             let types = [UTType("com.apple.itunes.ipa"), UTType(filenameExtension: "ipa")].compactMap { $0 }
             let picker = UIDocumentPickerViewController(forOpeningContentTypes: types.isEmpty ? [.data] : types, asCopy: true)
-            picker.allowsMultipleSelection = true
+            picker.allowsMultipleSelection = c.params["single"] as? Bool != true
+            // B334: in the folder of a file iOS opened without access (OpenRescue.pickLink), so one tap gives it
+            if let dir = c.params["dir"] as? String, dir.hasPrefix("/") { picker.directoryURL = URL(fileURLWithPath: dir, isDirectory: true) }
             let d = PickDelegate { urls in
                 SignBridge.queue.async {
                     var files = [String]()
