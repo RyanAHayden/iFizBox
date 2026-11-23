@@ -90,7 +90,8 @@ The pages under it:
 - **This iPhone with the built-in VPN** (`installation/iphone`, when `idevice.status`'s `vpn.available`): **Set Up**:
   Pair This iPhone (Start / Done, opens Pairing), Test Connection (Test / Testing… / Connected: `vpn.test` turns
   the VPN on, connects once with the pairing and turns it off; the first time, iOS asks to allow the VPN
-  configuration), Cellular Shortcuts (Add / Done, "Optional, for installs on cellular"), with a footer that says
+  configuration; Pairing runs it by itself right after pairing, with a "Testing the Connection…" spinner, before it
+  says Paired, so setup asks that once), Cellular Shortcuts (Add / Done, "Optional, for installs on cellular"), with a footer that says
   the next step (pair, test, or add the Shortcuts for cellular) or that it's set up. A failed check or install is
   said there instead, red, with its fix row. Then **How It Works** › (`installation/how`: the six steps of one install
   and Offline). **Cellular Shortcuts** (`installation/shortcuts`): Turn Off (Cellular Data Off) and Turn On (Cellular
