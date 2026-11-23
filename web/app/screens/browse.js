@@ -6,6 +6,7 @@
 //   section:<name>   the packages in that section ("section:*" = All Packages)
 //   package:<id>     a package's page, in the source of the route (the newest version for All Sources/Search)
 //   author:<name>    every package whose Author or Maintainer is <name>
+//   depends:<id>, conflicts:<id>  the packages it depends on / conflicts with (F402)
 //   versions:<id>    a package's Version page (F29): every version the sources offer, or an app's versions[]
 // e.g. #/sources/deb%3Ahttps%3A%2F%2Frepo.chariz.com%2F%3A.%2F/section%3ATweaks/package%3Acom.example.tweak
 //
@@ -149,7 +150,7 @@ export function parseToken(seg) {
   const s = String(seg ?? "");
   const i = s.indexOf(":");
   const kind = i > 0 ? s.slice(0, i) : "";
-  return ["section", "package", "author", "versions", "info", "pkgsettings", "files", "addtweaks"].includes(kind) ? { kind, value: s.slice(i + 1) } : { kind: "unknown", value: s };
+  return ["section", "package", "author", "versions", "info", "pkgsettings", "files", "addtweaks", "depends", "conflicts"].includes(kind) ? { kind, value: s.slice(i + 1) } : { kind: "unknown", value: s };
 }
 
 export const token = (kind, value) => `${kind}:${value}`;
@@ -162,6 +163,12 @@ export const keyedToken = (id, key) => token("package", key && key !== ALL ? `${
 const names = new Map();
 export const rememberNames = (rows) => { for (const r of rows) names.set(r.id, r.name); };
 
+// F402: the pages whose token may name the source ("package:<id>@<key>", "depends:<id>@<key>").
+const KEYED = new Set(["package", "depends", "conflicts"]);
+// The token naming its source only where `route` (a route it goes below) wouldn't give that one.
+const sourceToken = (route, kind, id, key) => (key === (route.tab === "sources" ? route.path[0] : ALL) || !key || key === ALL
+  ? token(kind, id) : `${kind}:${id}@${key}`);
+
 // What a route below the tab's own root shows: { key, page: "sections" | token kind, value }.
 export function pageOf(route) {
   if (route.tab === "sources") {
@@ -169,12 +176,12 @@ export function pageOf(route) {
     if (route.path.length === 1) return { key, page: "sections" };
     const t = parseToken(route.path.at(-1));
     // F352: a tweak opened from an app's Add Tweaks is in its Tweak Source, not the app's ("package:<id>@<key>")
-    const at = t.kind === "package" ? t.value.indexOf("@") : -1;
+    const at = KEYED.has(t.kind) ? t.value.indexOf("@") : -1;
     if (at > 0) return { key: t.value.slice(at + 1), page: t.kind, value: t.value.slice(0, at) };
     return { key, page: t.kind, value: t.value };
   }
   const t = parseToken(route.path.at(-1));
-  const at = t.kind === "package" ? t.value.indexOf("@") : -1;
+  const at = KEYED.has(t.kind) ? t.value.indexOf("@") : -1;
   if (at > 0) return { key: t.value.slice(at + 1), page: t.kind, value: t.value.slice(0, at) };
   return { key: ALL, page: t.kind, value: t.value };
 }
@@ -194,6 +201,8 @@ export function nav(route, sourceName = () => null) {
     case "info": return { title: MORE_INFO_LABEL };
     case "pkgsettings": return { title: "Settings" };
     case "files": return { title: "Files", style: "plain" };
+    case "depends": return { title: "Depends" }; // F402
+    case "conflicts": return { title: "Conflicts" };
     case "package": return { title: DETAILS_TITLE,
       right: { label: "Install", onClick: (e) => installTap(route, e.currentTarget).catch(() => {}),
         onHold: (b) => installHold(route, b).catch(() => {}) } }; // B330: a tap queues; F392: a hold too, quietly
@@ -213,6 +222,7 @@ export function render(body, route, ctx) {
     case "info": return renderInfo(body, p.key, p.value);
     case "pkgsettings": return renderPackageSettings(body, p.value);
     case "files": return renderFiles(body, p.value);
+    case "depends": case "conflicts": return renderRelations(body, route, p);
     case "versions": return renderVersions(body, route, p.key, p.value);
     case "addtweaks": return renderAddTweaks(body, route, p.value); // F352
     default:
@@ -1272,13 +1282,14 @@ async function renderPackage(body, route, key, id, ctx) {
   const inst = installedList?.find((r) => r.id === pid) ?? null;
   const author = parseAuthor(st.author);
   const maint = parseAuthor(st.maintainer);
-  const rels = [...parseRelations(st["pre-depends"]), ...parseRelations(st.depends)];
   const section = pkg.row.section && pkg.row.section !== NO_SECTION ? pkg.row.section : null;
   const isz = Number(st["installed-size"]);
   const plan = packageRows({ installed: inst?.version ?? null, version: st.version ?? "", author: author?.name ?? null,
     maintainer: maint?.name ?? null, files: typeof getBackend().packageFiles === "function",
     sideloadTweak: isSideloadTweak(st), installedOnly: pkg.installedOnly, paid: isPaid(st), source: sourceName, section,
-    worksOn: fit.range ?? compatBadge(fitCode), installedSize: isz > 0 ? formatSize(isz * 1024) : null, depends: rels.map((g) => g[0].name) });
+    worksOn: fit.range ?? compatBadge(fitCode), installedSize: isz > 0 ? formatSize(isz * 1024) : null, 
+    depends: relationsOf(st, "depends").map((g) => g[0].name), conflicts: relationsOf(st, "conflicts").map((g) => g[0].name) });
+  const relationsHref = (kind) => deeper(route, sourceToken(route, kind, id, key)); // F402
   body.replaceChildren(header.head, ...tabs.nodes);
   tabs.swipeOn(body); // F390
   // F228: from a source on the piracy list: Source Warning at the top of Details.
@@ -1356,9 +1367,8 @@ async function renderPackage(body, route, key, id, ctx) {
   details.append(grouped([{ header: "Information", footer: fit.detail, rows: detailRows(plan.info, {
     source: route.tab === "sources" && route.path[0] === pkg.key ? {} : { href: format({ tab: "sources", path: [pkg.key] }) },
     section: section ? { href: deeper(route, token("section", section)) } : {},
+    depends: { href: relationsHref("depends") }, conflicts: { href: relationsHref("conflicts") },
   }) }]));
-  const conflicts = parseRelations(st.conflicts).map((g) => ({ label: g.map((r) => r.name + (r.op ? ` (${r.op} ${r.version})` : "")).join(" | ") }));
-  if (conflicts.length) details.append(grouped([{ header: "Conflicts", rows: conflicts }]));
   // The same package from other sources, each with its version.
   const others = pkg.others.filter((o) => o.key !== pkg.key).map((o) => {
     const s = sourceOf(o.key);
@@ -1477,6 +1487,48 @@ async function renderFiles(body, id) {
   }
   body.replaceChildren(list);
   if (files.length > shown.length) body.append(note(`${shown.length} of ${files.length} files.`));
+}
+
+// F402: the Depends and Conflicts pages: one row per group of the field (Depends: Pre-Depends first). The row of a
+// package a source here has, or that is installed, opens its page and shows its name and icon, with the group as the
+// field has it (versions, alternatives) under the name; the first alternative found is the one it opens. Any other
+// group, a virtual package's too, is plain text.
+export function relationsOf(st, kind) {
+  return kind === "conflicts" ? parseRelations(st?.conflicts) : [...parseRelations(st?.["pre-depends"]), ...parseRelations(st?.depends)];
+}
+export const relationText = (group) => group.map((r) => r.name + (r.op ? ` (${r.op} ${r.version})` : "")).join(" | ");
+
+// key: the page's source. find(id, key): catalog.package.
+export async function relationRows(groups, route, key, find = (id, k) => catalog.package(id, k)) {
+  const look = async (id) => {
+    const here = await find(id, key).catch(() => null);
+    if (key === ALL || (here && !here.installedOnly)) return here;
+    const any = await find(id, ALL).catch(() => null);
+    return any && !any.installedOnly ? any : here ?? any;
+  };
+  return Promise.all(groups.map(async (g) => {
+    const text = relationText(g);
+    for (const p of await Promise.all(g.map((r) => look(r.name)))) {
+      if (!p?.row || p.stanza?.kind === "ipa") continue;
+      const from = key === ALL || p.installedOnly ? key : p.key;
+      return { ...relatedRow(p.row, route), subtitle: text, href: deeper(route, sourceToken(route, "package", p.row.id, from)) };
+    }
+    return { label: text };
+  }));
+}
+
+async function renderRelations(body, route, { page, key, value: id }) {
+  body.append(placeholder("list", 5));
+  let rows;
+  try {
+    await catalog.ensure();
+    const pkg = await catalog.package(id, key);
+    rows = pkg ? await relationRows(relationsOf(pkg.stanza, page), route, key) : [];
+  } catch (e) {
+    body.replaceChildren(note(e.message));
+    return;
+  }
+  body.replaceChildren(rows.length ? grouped([{ rows }]) : note(page === "conflicts" ? "No conflicts." : "No dependencies."));
 }
 
 // F181: the Related tab: other packages in the same section from the same source (All Sources: from every source),

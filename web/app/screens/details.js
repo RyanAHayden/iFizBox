@@ -39,11 +39,12 @@ const row = (key, label, detail = null, icon = key, extra = {}) => ({ key, label
 //   installed: the installed version (null: not installed)   version: the page's version
 //   author / maintainer: names (Maintainer only when it isn't the author)
 //   files: Filesystem Content can be listed (the jailbreak app)   sideloadTweak: Add to App picks apps, not versions
-//   installedOnly: no source carries it   source, section, worksOn, installedSize, depends: Information's facts
+//   installedOnly: no source carries it   source, section, worksOn, installedSize: Information's facts
+//   depends, conflicts: the names, one per group of alternatives (each row opens its list: browse.js renderRelations)
 //   paid: cydia::commercial (the header's price, and the payment group: extras.js paymentGroup)
 export function packageRows({ installed = null, version = "", author = null, maintainer = null, files = false,
   sideloadTweak = false, installedOnly = false, paid = false, source = "", section = null, worksOn = "", installedSize = null,
-  depends = [] } = {}) {
+  depends = [], conflicts = [] } = {}) {
   const options = [];
   if (installed) options.push(row("settings", SETTINGS_LABEL, null, "pkgSettings"));
   if (maintainer && author && maintainer.toLowerCase() !== author.toLowerCase()) options.push(row("maintainer", "Maintainer", maintainer, "pkgAuthor"));
@@ -55,6 +56,7 @@ export function packageRows({ installed = null, version = "", author = null, mai
   info.push(row("worksOn", "Works On", worksOn || "", "worksOnMyPhone"));
   if (installedSize) info.push(row("size", "Installed Size", installedSize, "pkgSize"));
   if (depends.length) info.push(row("depends", "Depends", depends.join(", "), "pkgDepends", { cls: "store-info-long" }));
+  if (conflicts.length) info.push(row("conflicts", "Conflicts", conflicts.join(", "), "pkgConflicts", { cls: "store-info-long" }));
   return { options, versionHeader: installed ? "Installed Package" : "Version", version: ver, info,
     price: installedOnly ? null : paid ? "Paid" : "Free", payment: paid && !installedOnly && !sideloadTweak };
 }
