@@ -303,6 +303,22 @@ html[data-style="ios13"] {
 html[data-style="ios13"][data-theme="dark"] { --callout-edge: #48484a; --callout: #48484a; --callout-arrow: #48484a; }
 html[data-style="ios13"] .queue-hint-text { border-width: 0; border-radius: 8px; font-weight: 400; letter-spacing: -.01em; }
 
+/* The hold menu (nav/menu.js) as the same flat callout: the hint's grey, 8pt corners, 36pt tall, white 14pt
+   regular items split by a light hairline, a lighter grey when pressed, no gloss, emboss or drop shadow. OLED
+   Black takes the hint's lighter grey. */
+html[data-style="ios13"] {
+  --menu: #2c2c2e; --menu-drop: none; --menu-edge: transparent; --menu-shine: none;
+  --menu-text: #fff; --menu-emboss: none; --menu-divider: rgba(255,255,255,.22); --menu-divider-hi: none;
+  --menu-pressed: #48484a; --menu-arrow: #2c2c2e; --menu-arrow-below: #2c2c2e;
+}
+html[data-style="ios13"][data-theme="dark"] {
+  --menu: #48484a; --menu-divider: rgba(255,255,255,.28); --menu-pressed: #636366;
+  --menu-arrow: #48484a; --menu-arrow-below: #48484a;
+}
+html[data-style="ios13"] .menu-items { border-width: 0; border-radius: 8px; }
+html[data-style="ios13"] .menu-item { font-size: 14px; font-weight: 400; letter-spacing: -.01em; line-height: 36px; }
+html[data-style="ios13"] .menu-item + .menu-item { border-left-width: .5px; }
+
 /* Segmented control: iOS 13's grey track with the chosen segment a white pill (the track's colour as a 1pt ring
    inside it, so the pill sits 2pt in from the track's edge), black 13pt text, semibold when chosen. The
    [data-theme] copies tie with ios6.css's dark rules and win by order. */
