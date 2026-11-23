@@ -23,7 +23,8 @@
   --review-btn: linear-gradient(#fdfdfd, #e7e8ea);
   --review-btn-edge: #a3a7ae;
   --review-btn-emboss: 0 1px 0 #fff;
-  --review-btn-pressed: linear-gradient(#e2e3e6, #c9cbcf);}
+  --review-btn-pressed: linear-gradient(#e2e3e6, #c9cbcf);
+}
 .review-star {
   border: 0; background: none;
   font: 30px/44px "Helvetica Neue", Helvetica, Arial, sans-serif; color: #a9b0bc; text-shadow: var(--review-star-emboss);
