@@ -100,6 +100,8 @@ function cssSheet(opts = {}) {
 export const MENU_IN = 380, MENU_OUT = 220;
 export const MENU_EASE_IN = "cubic-bezier(.3,1.2,.5,1)", MENU_EASE_OUT = "cubic-bezier(.4,0,.8,.6)";
 const MENU_GAP = 8; // px kept clear of the screen's edges and safe areas (the room probe's inset)
+export const MENU_REPEAT = 300; // ms: B370, taps closer than this to the one before are a run of fast taps, not a pick
+const clock = () => (globalThis.performance ?? Date).now();
 
 // Where the menu goes: `size` {width, height} beside `a` (the source button, {x, y, width, height}) inside `room`
 // {left, top, right, bottom}. It covers the button, the button's corner pinned: its top at the button's top and
@@ -147,10 +149,10 @@ function menuSheet({ title = "", buttons = [], destructive = -1 } = {}, a) {
       b.className = `action-button${[].concat(destructive).includes(i) ? " destructive" : ""}`;
       b.setAttribute("role", "menuitem");
       b.textContent = label;
-      b.addEventListener("click", (e) => { e.stopPropagation(); close(i); });
+      b.addEventListener("click", (e) => { e.stopPropagation(); if (counts()) close(i); });
       list.append(b);
     });
-    dim.addEventListener("click", () => close(-1));
+    dim.addEventListener("click", () => { if (counts()) close(-1); });
     scrim.append(dim, room, menu);
     document.body.append(scrim);
 
@@ -169,6 +171,20 @@ function menuSheet({ title = "", buttons = [], destructive = -1 } = {}, a) {
     const asButton = `translate(${+(a.x - at.left).toFixed(2)}px, ${+(a.y - at.top).toFixed(2)}px) scale(${+sx.toFixed(4)}, ${+sy.toFixed(4)})`;
     menu.style.transformOrigin = "0 0";
 
+    // B370: the menu grows over the button that opened it, so a fast second tap on that button lands on its first
+    // item (Select… picked All Apps, the button turned into Deselect, the next tap cleared it). A press counts only
+    // when its touch went down after the menu finished growing and wasn't one of a run of fast taps (each within
+    // MENU_REPEAT of the one before, the opening tap included); the others do nothing and the menu stays as it is.
+    // A click with no touch behind it (the keyboard, el.click()) always counts.
+    const opened = clock();
+    let prevDown = opened, live = true;
+    const onDown = () => {
+      const t = clock();
+      live = t - opened >= MENU_IN && t - prevDown >= MENU_REPEAT;
+      prevDown = t;
+    };
+    const counts = () => live;
+    document.addEventListener("pointerdown", onDown, true);
     const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); close(-1); } };
     document.addEventListener("keydown", onKey);
     dim.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: MENU_IN, easing: "ease-out" });
@@ -180,6 +196,7 @@ function menuSheet({ title = "", buttons = [], destructive = -1 } = {}, a) {
       if (done) return;
       done = true;
       document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onDown, true);
       scrim.style.pointerEvents = "none";
       resolve(index); // B202: answered before the animation, which can't hold it
       let timer = 0;
