@@ -13,8 +13,8 @@
 //
 //   ui.glass {op: "open", key, ...bars}  stream: {ready: true} once the bars are in place, then {tap: id} on each tap
 //     of a tab ("tab:<id>") or a button ("button:<id>"). Settles (null) only when closed.
-//   ui.glass {op: "update", key, slide?, ...bars} -> null. slide: ms of the page slide that starts now; the buttons
-//     cross-fade to the new ones over it instead of changing at once (B382)
+//   ui.glass {op: "update", key, slide?, curve?, ...bars} -> null. slide: ms of the page slide that starts now; the buttons
+//     cross-fade to the new ones over it instead of changing at once (B382); curve: its cubic bezier, 4 numbers
 //   ui.glass {op: "close", key} -> null (also settles the open call)
 //
 // bars (every field optional on update; a missing one keeps what is there):
@@ -201,7 +201,11 @@ private final class GlassBars: UIView {
         if p.keys.contains("tabbar") || p["icons"] != nil || p["colors"] != nil {
             tabs.apply(lastTabbar, images: images, colors: colors)
         }
-        if let list = p["buttons"] as? [[String: Any]] { layoutButtons(list, slide: (NativeGlass.number(p["slide"]) ?? 0) / 1000) }
+        if let list = p["buttons"] as? [[String: Any]] { 
+            // hidden buttons show an old page's titles: those change at once, then show
+            let hidden = buttons.values.contains { $0.isHidden }
+            layoutButtons(list, slide: hidden ? 0 : (NativeGlass.number(p["slide"]) ?? 0) / 1000, curve: p["curve"])
+        }
         else if p["icons"] != nil { for b in buttons.values { (b as? GlassButton)?.refreshIcon(images) } }
         if let hidden = p["buttonsHidden"] as? Bool { for b in buttons.values { b.isHidden = hidden } }
     }
@@ -215,8 +219,9 @@ private final class GlassBars: UIView {
 
     // Without a slide everything changes at once. With one, a button that stays keeps its glass: the capsule goes to its
     // new rect while the old and new title or glyph cross-fade in it; a button that comes, goes or changes its kind of
-    // glass fades. The curve is the page slide's (web/app/nav/transition.js EASE).
-    private func layoutButtons(_ list: [[String: Any]], slide: TimeInterval) {
+    // glass fades. The curve is the page slide's (web/app/nav/transition.js EASE
+    // unless the page names another).
+    private func layoutButtons(_ list: [[String: Any]], slide: TimeInterval, curve: Any?) {
         var keep = Set<String>()
         var motions: [() -> Void] = [], ends: [() -> Void] = []
         let fade = slide > 0 && !UIAccessibility.isReduceMotionEnabled
@@ -250,8 +255,10 @@ private final class GlassBars: UIView {
         }
         for (id, v) in buttons where !keep.contains(id) { drop(v); buttons[id] = nil }
         guard !motions.isEmpty else { return }
-        let curve = UICubicTimingParameters(controlPoint1: CGPoint(x: 0.36, y: 0.66), controlPoint2: CGPoint(x: 0.04, y: 1))
-        let a = UIViewPropertyAnimator(duration: slide, timingParameters: curve)
+        var c = [0.36, 0.66, 0.04, 1]
+        if let given = curve as? [NSNumber], given.count == 4 { c = given.map(\.doubleValue) }
+        let timing = UICubicTimingParameters(controlPoint1: CGPoint(x: c[0], y: c[1]), controlPoint2: CGPoint(x: c[2], y: c[3]))
+        let a = UIViewPropertyAnimator(duration: slide, timingParameters: timing)
         a.addAnimations { for m in motions { m() } }
         a.addCompletion { _ in for e in ends { e() } }
         a.startAnimation()
@@ -480,8 +487,15 @@ private final class GlassButton: NativeMenus.MenuButton {
             configuration = c
             addSubview(faces)
         }
-        let same = face != nil && (info as NSDictionary).isEqual(to: b) && !(face?.waitsForIcon ?? false)
-        let kept = same && frame == rect
+        // what the face shows and its size, not where it is or how VoiceOver reads it
+        func look(_ d: [String: Any]) -> NSDictionary {
+            var l = d
+            for k in ["id", "rect", "label"] { l[k] = nil }
+            if let i = d["icon"] as? [String: Any] { l["icon"] = [i["key"] as? String ?? "", i["template"] as? Bool ?? true] as [Any] }
+            return l as NSDictionary
+        }
+        let same = face.map { !$0.waitsForIcon && $0.bounds.size == rect.size && look(info).isEqual(look(b)) } ?? false
+        let kept = same && frame == rect && (info as NSDictionary).isEqual(to: b)
         if kept { return ({}, {}) }
         info = b
         let title = b["title"] as? String ?? ""

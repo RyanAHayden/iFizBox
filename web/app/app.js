@@ -13,7 +13,7 @@ import { TABS, BAR_TABS, createRouter, format, parent, mounted, parse, mountLink
 import { load, loaded, mod, missing, loadAll, NotLoaded } from "./lazy.js";
 import { grouped, placeholder } from "./nav/ui.js";
 import { createStacks, swipeCommits } from "./nav/stack.js";
-import { animate, setProgress, clear, DURATION, EASE_OUT } from "./nav/transition.js";
+import { animate, setProgress, clear, DURATION, EASE, EASE_OUT } from "./nav/transition.js";
 import { attachEdgeSwipe, attachPageSwipe, attachTabSwipe, pageSwipeBlocked, tabSwipeTakesBack } from "./nav/swipe.js";
 import { keepRow, ghostFor } from "./nav/selection.js";
 import { createTabbar, tapTab, scrollToTop, isSliding } from "./nav/tabbar.js";
@@ -262,7 +262,7 @@ function slide(top, below, p0, p1, cleanup, { withSelect = false, ...opts } = {}
   setMoving(pair, true);
   setProgress(pair, p0);
   // B382: the shell's glass buttons go along (nav/glass.js slideGlass, loaded only in the app)
-  document.dispatchEvent(new CustomEvent("ifizbox:slide", { detail: { item: (p1 ? top : below).page.item, ms: opts.duration ?? DURATION * Math.abs(p1 - p0) } }));
+  document.dispatchEvent(new CustomEvent("ifizbox:slide", { detail: { item: (p1 ? top : below).page.item, ms: opts.duration ?? DURATION * Math.abs(p1 - p0), easing: opts.easing ?? EASE } }));
   running = animate(pair, p0, p1, {
     ...opts,
     onEnd() {

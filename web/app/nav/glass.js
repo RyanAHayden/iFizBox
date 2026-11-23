@@ -25,8 +25,9 @@ export const GLASS_KEY = "bars";
 const POPUP = '[aria-modal="true"], [role="dialog"], [role="alertdialog"]'; // nav/popups.js POPUPS, inline (startup modules)
 
 // held: the buttons the shell last showed, kept in every snapshot while they hide (B346, buttonsSnapshot)
-// shown: the glass buttons are up now; slide: the running slide's coming nav item and how long it takes (slideGlass)
-const st = { open: false, ready: false, failed: false, retryAt: 0, sent: null, iconsSent: new Set(), byId: new Map(), held: null, shown: false, slide: null, parts: null };
+// shown: the glass buttons are up now; slide: the running slide's coming nav item, its buttons and timing
+// (slideGlass); blocked: at the last rest without a popup, a sheet or page covered the buttons
+const st = { open: false, ready: false, failed: false, retryAt: 0, sent: null, iconsSent: new Set(), byId: new Map(), held: null, shown: false, slide: null, parts: null, blocked: false };
 let watching = false;
 let queued = false;
 
@@ -181,15 +182,15 @@ function placeIds(els) {
 // the views stay as they were. While a page slide moves two nav items: the coming page's buttons where they come to
 // rest, once the slide knows which page that is (slideGlass), else (the edge swipe under the finger) the ones shown;
 // nothing is sent as the look-alikes move, and what that page changes meanwhile shows when the slide ends. Glass that
-// wasn't up when the slide began stays away until it ends.
+// one of the page's sheets or pages covered when the slide began stays away until it ends.
 // covers: every look-alike the glass stands in for; els/places: those a tap on the glass clicks.
 function buttonsSnapshot(doc, win, popup) {
   const hide = { buttons: st.held ?? [], buttonsHidden: true, covers: [], els: [], places: [] };
   const sliding = [...(doc.querySelectorAll?.(".nav-stack.is-active > .nav-item.is-moving") ?? [])];
   if (sliding.length) {
-    if (!st.shown || popup || moving(sliding[0].parentElement, doc)) return hide;
-    // measured once, before the slide's first frame: under a running animation WebKit's rects move between two reads
-    if (sliding.includes(st.slide?.item)) st.slide.buttons ??= buttonsOf(st.slide.item, buttonEls(st.slide.item), win);
+    if (popup || moving(sliding[0].parentElement, doc)) return hide;
+    // Glass not up yet (a popup just closed, or the shell hasn't answered) comes with the slide, already the coming page's.
+    if (!st.shown && (st.blocked || !st.ready || !st.slide)) return hide;
     const buttons = st.slide?.buttons ?? st.held ?? [];
     return { buttons, buttonsHidden: false, covers: sliding.flatMap(buttonEls), els: [], places: [] };
   }
@@ -197,7 +198,9 @@ function buttonsSnapshot(doc, win, popup) {
   const tops = [...(doc.querySelectorAll?.(".nav-stack.is-active > .nav-item.is-top") ?? [])];
   const item = tops.length === 1 ? tops[0] : null;
   const els = item ? buttonEls(item) : [];
-  if (!item || popup || moving(item, doc) || els.some((b) => covered(b, doc))) return hide;
+  if (popup) return hide;
+  st.blocked = !item || moving(item, doc) || els.some((b) => covered(b, doc));
+  if (st.blocked) return hide;
   return { buttons: buttonsOf(item, els, win), buttonsHidden: false, covers: els, els, places: placeIds(els) };
 }
 
@@ -227,9 +230,11 @@ function buttonsOf(item, els, win) {
 // B382: a page slide to nav item `item` runs `ms` from now (app.js slide(), a push, a pop, the end of a swipe): the
 // shell's buttons cross-fade to that page's over the slide. A slide back to the page on top (a cancelled swipe)
 // changes nothing.
-export function slideGlass(item, ms, doc = globalThis.document, native = nativeBridge(), win = globalThis) {
+export function slideGlass({ item, ms, easing }, doc = globalThis.document, native = nativeBridge(), win = globalThis) {
   if (!glassWanted(doc, native)) return;
-  st.slide = { item, ms };
+  // measured once, before the slide's first frame: under a running animation WebKit's rects move between two reads
+  const buttons = buttonsOf(item, buttonEls(item), win);
+  st.slide = { item, ms, buttons, curve: easing?.match(/-?[\d.]+/g)?.map(Number) };
   syncGlass(doc, native, win);
 }
 
@@ -335,7 +340,7 @@ export function syncGlass(doc = globalThis.document, native = nativeBridge(), wi
     if (st.shown) uncover(doc, parts); // a slide ended: the page that left keeps no mark
     return;
   }
-  const slide = st.slide?.ms && !snap.buttonsHidden ? st.slide.ms : 0;
+  const slide = st.slide?.ms && !snap.buttonsHidden ? { slide: st.slide.ms, ...(st.slide.curve?.length === 4 ? { curve: st.slide.curve } : {}) } : {};
   if (st.slide) st.slide.ms = 0; // sent once: anything else sent meanwhile (the tab bar) starts no second fade
   st.sent = key;
   for (const k of Object.keys(icons)) st.iconsSent.add(k);
@@ -360,7 +365,7 @@ export function syncGlass(doc = globalThis.document, native = nativeBridge(), wi
       lost(doc);
     });
   } else {
-    native.call("ui.glass", { op: "update", key: GLASS_KEY, ...snap, icons, ...(slide ? { slide } : {}) }).then(answered, () => { lost(doc); scheduleGlassSync(); });
+    native.call("ui.glass", { op: "update", key: GLASS_KEY, ...snap, icons, ...slide }).then(answered, () => { lost(doc); scheduleGlassSync(); });
   }
 }
 
@@ -429,7 +434,7 @@ export function watchGlass(doc = globalThis.document, win = globalThis, native =
       attributeFilter: ["class", "hidden", "style", "role", "aria-modal", "disabled", "aria-label"] });
     obs.observe(doc.documentElement, { attributes: true, attributeFilter: ["class", "data-controls", "data-tabbar", "data-style", "data-theme", "data-palette"] });
   }
-  doc.addEventListener?.("ifizbox:slide", (e) => slideGlass(e.detail.item, e.detail.ms, doc, native, win));
+  doc.addEventListener?.("ifizbox:slide", (e) => slideGlass(e.detail, doc, native, win));
   win.addEventListener?.("resize", scheduleGlassSync);
   win.visualViewport?.addEventListener?.("resize", scheduleGlassSync);
   win.matchMedia?.("(prefers-color-scheme: dark)")?.addEventListener?.("change", scheduleGlassSync);
@@ -438,7 +443,7 @@ export function watchGlass(doc = globalThis.document, win = globalThis, native =
 
 // For the tests: forget everything between cases.
 export function resetGlass() {
-  Object.assign(st, { open: false, ready: false, failed: false, retryAt: 0, sent: null, byId: new Map(), held: null, shown: false, slide: null, parts: null });
+  Object.assign(st, { open: false, ready: false, failed: false, retryAt: 0, sent: null, byId: new Map(), held: null, shown: false, slide: null, parts: null, blocked: false });
   st.iconsSent.clear();
   icons.clear();
   watching = false;
