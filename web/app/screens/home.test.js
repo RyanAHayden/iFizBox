@@ -106,7 +106,8 @@ test("F123: every Settings link in the screens goes through settingsRoute (Home'
 
 test("the Home icon tells the website and Lite what they can't do; the jailbreak app has no popup", () => {
   assert.match(versionLimits("web").message, /tweaks/);
-  assert.match(versionLimits("sideload").message, /update itself/);
+  assert.match(versionLimits("sideload").message, /• install system-wide tweaks or themes\n/);
+  assert.doesNotMatch(versionLimits("sideload").message, /update itself/);
   assert.equal(versionLimits("jailbreak"), null);
 });
 
