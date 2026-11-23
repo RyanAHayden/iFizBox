@@ -114,7 +114,8 @@ rcodesign=${RCODESIGN:-$(command -v rcodesign || true)}
 ldid=${LDID:-$(command -v ldid || true)}
 if [ -z "$rcodesign$ldid" ] && [ -x "$HOME/.cargo/bin/rcodesign" ]; then rcodesign=$HOME/.cargo/bin/rcodesign; fi
 
-SIDELOAD_INTENTS=CheckForUpdatesIntent,AddSourceIntent,RestorePackagesIntent # N8: the both-modes intents
+SIDELOAD_INTENTS=CheckForUpdatesIntent,AddSourceIntent,RestorePackagesIntent,ConnectVPNIntent,OpenForInstallIntent,WaitForInstallIntent # N8: the both-modes intents, F394: the Install Switch's
+JAILBREAK_INTENTS=CheckForUpdatesIntent,AddSourceIntent,RestorePackagesIntent,InstallAllUpdatesIntent,RespringIntent,UserspaceRebootIntent,ExportPackagesIntent # all but the Install Switch's
 
 # bundle <iFizBox.app dir> <entitlements> <Info.plist overlay or "">: the executable signed ad hoc with the
 # entitlements (the jailbreak trusts ad hoc code; a sideload signer re-signs it), web/app/, icons, Info.plist.
@@ -176,7 +177,7 @@ bundle() {
   sed -e "s/@VERSION@/$version/" -e "s/@BUILD@/$build/" -e "s/@MIN@/$min/" "${brand_sed[@]}" Info.plist > "$app/Info.plist"
   # N8: App Intents (intents/metadata.py stands in for Xcode's metadata step) and the widget extension. The sideload
   # IPA lists only the intents that work without a jailbreak, and its widget has no controls.
-  local variant=jailbreak only=()
+  local variant=jailbreak only=(--only "$JAILBREAK_INTENTS")
   [ -z "$overlay" ] || { variant=sideload; only=(--only "$SIDELOAD_INTENTS"); }
   rm -rf "$app/Metadata.appintents"
   python3 intents/metadata.py build "$out/$BRAND_NAME.swiftconstvalues" "$app/Metadata.appintents" "${only[@]}" >/dev/null

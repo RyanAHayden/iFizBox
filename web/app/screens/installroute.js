@@ -34,6 +34,7 @@ import { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, 
 import { builtinVPN, shortcutsAdded, setupFooter, iphoneSetUp, HOW_STEPS, SHORTCUT_NAMES, vpnTestResult } from "../core/installroute.js"; // F372
 import { shortcutFileURL, shortcutDidntRun, shortcutDidntOpen } from "../core/installroute.js"; // B359
 import { switchAdded, switchTestResult, BUILTIN_VPN } from "../core/installroute.js"; // F386
+import { switchOld } from "../core/installroute.js"; // F394
 import { switchWouldRun } from "../core/installroute.js"; // B381
 import { loadStyle } from "../nav/motion.js";
 import { NAME, DOMAIN } from "../brand.js";
@@ -230,7 +231,7 @@ export function localGroups(st, { reading = false, refreshing = false, test = ()
     { label: "Test Connection", icon: rowIcon("testConnection"), onClick: test,
       detail: testing ? "Testing…" : failure ? FAILING : tested ? "Connected" : "Test", ...(testing ? { spin: true } : {}) },
     switchChecking ? { ...switchRow, detail: "Checking…", spin: true }
-      : switchAdded(st) ? { ...switchRow, detail: "Done", href: route("shortcuts") }
+      : switchAdded(st) ? { ...switchRow, detail: switchOld(st?.vpn) ? "Update" : "Done", href: route("shortcuts") }
       : { ...switchRow, detail: "Add", chevron: true, onClick: addSwitch },
     ...(failure && !testing ? [{ label: failure.button, cls: "sign-import", onClick: fix }] : []),
   ];
@@ -260,15 +261,17 @@ export function shortcutGroups(st, { add = () => {}, test = () => {}, testing = 
   const sc = st?.shortcuts ?? {};
   const k = "switch";
   const row = reading || checking === k ? { label: SHORTCUT_NAMES[k], icon: rowIcon("cellular"), detail: "Checking…", spin: true }
+    : switchOld(st) ? { label: SHORTCUT_NAMES[k], icon: rowIcon("cellular"), detail: "Update", chevron: true, onClick: () => add(k) } // F394
     : sc[k] ? { label: SHORTCUT_NAMES[k], icon: rowIcon("cellular"), detail: "Added" }
     : { label: SHORTCUT_NAMES[k], icon: rowIcon("cellular"), detail: "Add", chevron: true, onClick: () => add(k) };
   const f = failed[k];
   const groups = [{ rows: [row], ...(!sc[k] && f && checking !== k
     ? { footer: f.open ? shortcutDidntOpen(k, f.open) : shortcutDidntRun(k, f), warn: true }
+    : switchOld(st) ? { footer: "Update it to open Shortcuts once per install, not twice. Tap Shortcuts, then Replace, and come back." }
     : { footer: `${sc[k] ? "" : "Tap Shortcuts, then Add Shortcut, and come back. "}It opens Shortcuts only when needed: on cellular, to turn data off and on, or to bring back your VPN.` }) }];
   if (sc[k]) {
     groups.push({ rows: [{ label: "Test Install Switch", icon: rowIcon("testConnection"), onClick: test, ...(testing ? { detail: "Testing…", spin: true } : {}) }],
-      footer: `Runs it once each way: ${BUILTIN_VPN} on, then your VPN back.` });
+      footer: `${sc.trip ? "Runs it once" : "Runs it once each way"}: ${BUILTIN_VPN} on, then your VPN back.` });
   }
   return groups;
 }
@@ -319,7 +322,7 @@ export function backInApp(doc = globalThis.document, { leaveMs = 4000, limit = 1
 }
 // vpn.checkShortcut: up to four runs through Shortcuts and back with 9.5 s of waits between; a run that times out
 // (native shortcutLimit, 25 s) isn't tried again, so the worst case stays well inside this
-export const CHECK_MS = 75000;
+export const CHECK_MS = 100000;
 
 // B359: Add on Cellular Shortcuts. vpn.openShortcuts shares our signed Shortcut; Shortcuts never says it was added,
 // so once the user is back the app runs it (vpn.checkShortcut, input "check": it does nothing) and only a run that
@@ -336,7 +339,7 @@ export async function addShortcut(native, k, { whenBack = backInApp, checking = 
   return { opened: true, ok: Boolean(r?.ok), error: r?.ok ? null : (r?.error || "it didn't run"), status: r?.status ?? null };
 }
 
-export const SWITCH_TEST_MS = 75000;
+export const SWITCH_TEST_MS = 150000 // F394: its one trip, then an older Install Switch's runs;
 let shortcutsTesting = false;
 const shortcutsFailed = {}; // B359: the last check run's error per Shortcut, for its footer
 

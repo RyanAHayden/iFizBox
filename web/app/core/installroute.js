@@ -33,6 +33,9 @@ export const builtinVPN = (st) => Boolean(st?.vpn?.available);
 // Shortcuts it replaces, still work on phones that added them before.
 export const SHORTCUT_NAMES = { off: "Cellular Data Off", on: "Cellular Data On", switch: "Install Switch" };
 export const switchAdded = (st) => Boolean(st?.vpn?.shortcuts?.switch);
+// F394: an Install Switch added before the one-trip one, on an app that can use it (`trips`): it works as before, and
+// its page offers Update. `vpn` is vpn.status.
+export const switchOld = (vpn) => Boolean(vpn?.trips && vpn.shortcuts?.switch && !vpn.shortcuts?.trip);
 // Installs on cellular are covered: the Install Switch, or both Cellular Shortcuts.
 export const shortcutsAdded = (st) => switchAdded(st) || Boolean(st?.vpn?.shortcuts?.off && st?.vpn?.shortcuts?.on);
 // B359: our signed Shortcut on the site (web/app/shortcuts/, signed by tools/shortcuts/sign.sh). The app shares its
