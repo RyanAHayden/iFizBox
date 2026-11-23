@@ -143,6 +143,7 @@ enum MyIPAs {
         let signer = IPASigner(profile: profile, identity: identity)
         if let job = job { signer.stop = { job.cancelled } }
         if let log = log { let nslog = signer.log; signer.log = { nslog($0); log($0) } } // B327: Keychain:/Group fix: lines in the run's log
+        signer.installedAppID = { Sideload.installedAppID($0, log: log) } // B340: an update keeps its App ID, as SignAhead.sign (B280)
         return try library.sign(file, signer: signer, certificate: identity.certificate,
                                 expires: profile.signatureExpiry(certificate: identity.certificate), work: SignBridge.work,
                                 progress: { emit($0, $1) }, keep: keep)
