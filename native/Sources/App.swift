@@ -8,6 +8,7 @@ import UserNotifications
 final class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        OpenRescue.start() // B334: a file from Files that UIKit drops (a refused File Provider bookmark) still opens
         application.applicationSupportsShakeToEdit = false // no "Undo Typing" alert on an accidental shake
         Notifications.shared.start() // F65: permission for N5's daemon, and notification taps (Notifications.swift)
         // The new iFizBox is open: the "iFizBox Updated, tap to open" notices have done their job.
@@ -107,6 +108,7 @@ enum Incoming {
 
     static func receive(_ url: URL) {
         OpenLog.hop("Incoming: \(OpenLog.url(url))")
+        if url.isFileURL { OpenRescue.delivered(url) } // B334: the delegate had it; no rescue needed
         if LocalVPN.receive(url) { return } // F372: Shortcuts coming back from a Cellular Shortcut's run
         if SharedInbox.receive(url) { return } // N9: shared .ipa/.deb files and the share extension's links
         if MyIPAs.receive(url) { return } // F77: an .ipa file goes into My IPAs, which then sends ifizbox://myipas

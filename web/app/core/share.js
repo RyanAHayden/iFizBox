@@ -7,10 +7,12 @@
 //              "sign-ipa"     sideload: the IPA in My IPAs (file) or a link to add there (url), signed on the phone
 //              "deb"          jailbreak: Confirm sheet (simulate-deb), console (install-deb); file, or url to fetch
 //              "refuse"       an alert: title, message (a .deb in the sideload app, no AppSync, unknown things)
+//              "pick-ipa"     sideload, B334: iOS opened an .ipa (name) from Files without letting iFizBox read it
+//                             (native/Sources/OpenRescue.swift); dir: its folder, where the Files picker opens
 //   sharedRecord(result, name) -> I3's record ({ id, name, version, source: null, sourceName: "Shared" }) | null
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-const ROUTES = ["helper-ipa", "sign-ipa", "deb", "refuse"];
+const ROUTES = ["helper-ipa", "sign-ipa", "deb", "refuse", "pick-ipa"];
 
 const FILE = /^[A-Za-z0-9][^/\\\0]{0,250}\.(ipa|deb)$/i;
 
@@ -24,6 +26,12 @@ export function parseShared(url) {
   const name = (q.get("name") ?? "").slice(0, 200);
   if (route === "refuse") {
     return { route, file: null, url: null, name, title: q.get("title") || "Can't Open This", message: q.get("message") || "" };
+  }
+  if (route === "pick-ipa") {
+    // B334: dir only says where the Files picker opens; an absolute folder, nothing else
+    const dir = q.get("dir") ?? "";
+    return { route, file: null, url: null, name: name || "the IPA", dir: dir.startsWith("/") && !dir.includes("\0") ? dir.slice(0, 1024) : null,
+      title: "", message: "" };
   }
   let file = q.get("file");
   if (file != null && (!FILE.test(file) || file.includes("..") || /\.ipa$/i.test(file) === (route === "deb"))) file = null;
