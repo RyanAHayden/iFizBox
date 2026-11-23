@@ -221,7 +221,7 @@ enum SignAhead {
             return (app, record, output)
         } catch {
             try? FileManager.default.removeItem(at: output)
-            IPAFetch.damaged(error, source: url, log: log) // F400
+            IPAFetch.damaged(error, source: url, tweaks: options.tweaks != nil, log: log) // F400
             throw error
         }
     }

@@ -76,7 +76,7 @@ enum Sideload {
             SignBridge.run(c) {
                 let id = c.params["bundleId"] as? String ?? ""
                 // F400: the app removed: no IPA waits for it either
-                for r in records() where r.bundleID == id { WaitingIPA.remove(app: r.originalBundleID); IPAFetch.installed(r) }
+                for r in records() where r.bundleID == id { WaitingIPA.remove(app: r.originalBundleID) }
                 saveRecords(records().filter { $0.bundleID != id })
                 reschedule()
                 return installedJSON()
@@ -528,7 +528,7 @@ enum Sideload {
             try job?.check()
         } catch {
             try? FileManager.default.removeItem(at: output)
-            IPAFetch.damaged(error, source: url, log: log) // F400
+            IPAFetch.damaged(error, source: url, tweaks: options.tweaks != nil, log: log) // F400
             opened(.failure(error)); served?(false)
             return
         }
@@ -1127,10 +1127,7 @@ enum Sideload {
                                 opened: { if case .failure(let e) = $0 { SignBridge.queue.async { fail(e) } } },
                                 served: { ok in
                                     SignBridge.queue.async {
-                                        if ok {
-                                            done.append(r.bundleID)
-                                            IPAFetch.installed(r) // F400: iOS has it, and Re-sign's own kept IPA is this one
-                                        }
+                                        if ok { done.append(r.bundleID) }
                                         else if !failed.contains(where: { $0["bundleId"] as? String == r.bundleID }) {
                                             fail(Failed(text: "cancelled: iOS didn't fetch it"))
                                         }

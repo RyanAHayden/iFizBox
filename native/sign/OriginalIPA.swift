@@ -194,7 +194,7 @@ struct WaitingIPA: Codable, Equatable {
         return locked {
             let fm = FileManager.default
             try? fm.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-            for o in all(in: dir) where o.app == w.app || o.url == url { drop(o.url, in: dir) }
+            for o in all(in: dir) where o.app == w.app || o.url == url || now.timeIntervalSince(o.kept) >= life { drop(o.url, in: dir) }
             drop(url, in: dir)
             // the note last: a file without one is swept, never used
             guard second(src, file(url, in: dir), link: link), let j = try? JSONEncoder().encode(w),
@@ -243,6 +243,14 @@ struct WaitingIPA: Codable, Equatable {
 
     static func remove(_ url: String, in dir: URL = dir) { locked { drop(url, in: dir) } }
 
+    // Installed from `url`: the one waiting goes, unless it is another IPA (`sha256`, the installed one's, when known).
+    static func installed(_ url: String, sha256: String?, in dir: URL = dir) {
+        locked {
+            if let s = sha256?.lowercased(), let w = read(url, in: dir), w.sha256 != s { return }
+            drop(url, in: dir)
+        }
+    }
+
     // The user removed the app: the one waiting for it goes too.
     static func remove(app: String, in dir: URL = dir) {
         guard !app.isEmpty else { return }
@@ -255,11 +263,21 @@ struct WaitingIPA: Codable, Equatable {
     }
 
     // The signer's errors that say the IPA itself can't be used, so a fresh download is the only way on.
-    static func damaged(_ e: Error) -> Bool {
+    // `tweaks`: tweaks were injected, whose own Mach-Os can be the bad one, so that code says nothing of the IPA.
+    static func damaged(_ e: Error, tweaks: Bool = false) -> Bool {
         if let z = e as? ZipError { // not the signer's own writing (a full disk)
             return !["can't write", "zlib ", "deflate failed"].contains { z.description.hasPrefix($0) }
         }
-        return ["bad_ipa", "bad_macho"].contains((e as? SignError)?.code ?? "")
+        let code = (e as? SignError)?.code
+        return code == "bad_ipa" || (code == "bad_macho" && !tweaks)
+    }
+
+    // Whether `file` is a whole IPA: it opens as one and every file in it reads (CRC). For the jailbreak app, whose
+    // helper says "can't unpack" for a full disk too.
+    static func sound(_ file: URL) -> Bool {
+        guard (try? Inspect.ipa(file)) != nil, let z = try? ZipReader(url: file) else { return false }
+        do { for e in z.entries { try z.read(e) { _ in } } } catch { return !damaged(error) }
+        return true
     }
 
     // At launch: what expired or lost its half goes, and this app's own update once it is the one running (its install

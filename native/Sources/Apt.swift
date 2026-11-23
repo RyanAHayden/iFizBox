@@ -598,7 +598,7 @@ enum IPAInstall {
                     }
                     let why = errText.split(separator: "\n").last { $0.hasPrefix("ifizbox-helper: ") }
                         .map { String($0.dropFirst(16)) } ?? "ifizbox-helper exited with \(code)"
-                    if code == 64 { WaitingIPA.remove(url.absoluteString) } // F400: not an IPA, or damaged
+                    if code == 64, !WaitingIPA.sound(URL(fileURLWithPath: path)) { WaitingIPA.remove(url.absoluteString) } // F400: damaged
                     let kind = code == 64 ? "bad_ipa" : code == 69 ? "no_adhoc" : code == 77 ? "helper" : "install"
                     done(nil, "\(kind): \(why)")
                 } catch let e as BridgeError { done(nil, e.text) }

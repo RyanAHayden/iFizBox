@@ -154,7 +154,7 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
   if (o.download && custom) {
     const run = customize ?? (async (opts) => (await import("../signing-sheet.js")).customInstall(opts));
     rows.push({ label: "Custom Install", subtitle: "Bundle ID, name, icon, extensions",
-      onClick: () => run({ url: o.download, name, onInstalled: () => onInstall() }) });
+      onClick: () => run({ url: o.download, name, ...listedOf({ url: o.download, version: own.version, size: own.size }), onInstalled: () => onInstall() }) });
   }
   if (o.download) rows.push(downloadRow(o.download, opener));
   return { rows: tapOnly(rows), options: o };
@@ -858,7 +858,7 @@ export async function appPageCustom(pkg, source, opts, { queue = appQueue, add =
     job = appJob(pkg, { installed: rec ? rec.version || null : null, version, source: source ? displayName(source) : null });
   }
   if (!job) return custom(opts);
-  return custom({ url: job.url, name: opts?.name || job.name || "", queue: (options) => add({ ...job, options }, { queue }) });
+  return custom({ url: job.url, name: opts?.name || job.name || "", ...listedOf(job), queue: (options) => add({ ...job, options }, { queue }) });
 }
 
 // The website's Install group (F93: it signs in the browser; F92: only Install and Download IPA).

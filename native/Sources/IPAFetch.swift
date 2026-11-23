@@ -83,18 +83,16 @@ enum IPAFetch {
     }
 
     // The install of `r` went through: nothing to keep for a retry.
-    static func installed(_ r: SignedRecord) { forget(r.url) }
-
-    // The signer failed with `e`: an IPA that is itself damaged isn't kept, so the next try downloads it again.
-    static func damaged(_ e: Error, source: String, log: ((String) -> Void)? = nil) {
-        guard WaitingIPA.damaged(e), Apt.httpURL(source) != nil else { return }
-        forget(source)
-        log?("The IPA is damaged: the next try downloads it again")
+    static func installed(_ r: SignedRecord) {
+        if let u = Apt.httpURL(r.url) { WaitingIPA.installed(u.absoluteString, sha256: r.sha256) }
     }
 
-    private static func forget(_ source: String) {
-        guard let u = Apt.httpURL(source) else { return } // My IPAs' and iFizBox's own sources keep none
+    // The signer failed with `e`: an IPA that is itself damaged isn't kept, so the next try downloads it again.
+    static func damaged(_ e: Error, source: String, tweaks: Bool = false, log: ((String) -> Void)? = nil) {
+        // My IPAs' and iFizBox's own sources keep none
+        guard WaitingIPA.damaged(e, tweaks: tweaks), let u = Apt.httpURL(source) else { return }
         WaitingIPA.remove(u.absoluteString)
+        log?("The IPA is damaged: the next try downloads it again")
     }
 
     // At launch, before any install (once: a second web view registers its bridge again).

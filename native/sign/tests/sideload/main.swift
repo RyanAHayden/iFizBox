@@ -719,6 +719,16 @@ test("a downloaded IPA waits for the retry (F400)") {
         check(!W.damaged(SignError(c, "x")), "\(c) isn't the IPA's fault")
     }
     check(!W.damaged(ZipError("can't write /x")), "nor a full disk")
+    check(!W.damaged(SignError("bad_macho", "x"), tweaks: true), "a tweak may be the bad Mach-O")
+    check(W.sound(ipa), "a whole IPA")
+    check(!W.sound(junk), "half of one")
+    let crcBad = spool.appendingPathComponent("crc.ipa")
+    var raw = try Data(contentsOf: ipa)
+    let z = try ZipReader(url: ipa)
+    let e0 = z.entries.max { $0.compressedSize < $1.compressedSize }!
+    raw[Int(e0.localOffset) + 30 + e0.name.utf8.count + Int(e0.compressedSize) / 2] ^= 0xFF
+    try raw.write(to: crcBad)
+    check(!W.sound(crcBad), "a file in it with other bytes")
 
     // the server's answer
     check(!w.changed(status: 200, headers: ["etag": "W/\"abc\"", "last-modified": "other"]), "the same ETag")
@@ -760,7 +770,9 @@ test("a downloaded IPA waits for the retry (F400)") {
     W.remove(sha256: w.sha256.uppercased(), in: dir)
     check(names().isEmpty, "known malware")
     _ = put()
-    W.remove(u, in: dir)
+    W.installed(u, sha256: String(repeating: "0", count: 64), in: dir)
+    check(names().count == 2, "another IPA of that URL was installed")
+    W.installed(u, sha256: w.sha256, in: dir)
     check(names().isEmpty, "installed")
 
     // the call's `listed`
