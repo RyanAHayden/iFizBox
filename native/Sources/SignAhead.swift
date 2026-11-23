@@ -251,7 +251,7 @@ enum SignAhead {
                     Apt.reply(c, nil, job.cancelled ? SignBridge.text(SignJob.cancelledError) : (e as? Sideload.Failed)?.text ?? SignBridge.text(e))
                 case .success(let (app, rec)):
                     if let s = spare { try? FileManager.default.removeItem(at: s) } // B337: nothing opens it again
-                    var j: [String: Any] =["bundleId": app.bundleID, "originalBundleId": app.originalBundleID, "name": app.name,
+                    var j: [String: Any] = ["bundleId": app.bundleID, "originalBundleId": app.originalBundleID, "name": app.name,
                                             "version": app.version, "removed": app.removed, "fixedArm64e": app.fixedArm64e]
                     if let x = rec.expires { j["expires"] = ISO8601DateFormatter().string(from: x) }
                     if servers.local { j["installed"] = true } // B111: installd has it, no iOS prompt to wait for

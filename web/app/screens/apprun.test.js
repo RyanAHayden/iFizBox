@@ -512,7 +512,7 @@ test("B337: Use the Signing Server installs the failed rows again from their sig
       return { token: `t-${job.id}`, bundleId: job.id };
     },
     openPrepared: async (r, o) => {
-      calls.install.push({ id: r.id, token: r.token, server: Boolean(o.server) });
+      calls.install.push({ id: r.id, token: r.token, server: Boolean(o.server), progress: r.progress });
       if (!o.server) {
         const fallback = serverFallback(Object.assign(new Error("refused: this iPhone refused the connection"), { code: "refused" }));
         throw Object.assign(new Error("refused"), { fallback });
@@ -535,10 +535,11 @@ test("B337: Use the Signing Server installs the failed rows again from their sig
   assert.ok(reached > 0);
   assert.equal(page.finished.also?.label, USE_SERVER);
   page.finished.also.action();
-  assert.ok(row.progress >= reached, "the row's progress isn't reset");
   await settle();
   assert.deepEqual(calls.sign, ["a"], "no new download or signing");
-  assert.deepEqual(calls.install, [{ id: "a", token: "t-a", server: false }, { id: "a", token: "t-a", server: true }]);
+  assert.deepEqual(calls.install.map(({ progress, ...c }) => c),
+    [{ id: "a", token: "t-a", server: false }, { id: "a", token: "t-a", server: true }]);
+  assert.ok(calls.install[1].progress >= reached, "the row's progress isn't reset when its install runs again");
   const after = page.lines.map((x) => x.text);
   assert.deepEqual(after.slice(0, before.length), before, "the Log keeps its earlier lines");
   assert.ok(after.slice(before.length).includes(serverStep("Alpha")));

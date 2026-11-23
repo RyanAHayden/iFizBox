@@ -29,3 +29,12 @@ went back to "waiting", so it downloaded and signed again, its bar dropped to 0,
   folder), and `linkItem` failing just falls back to the old behaviour (the web side then signs again on `gone`).
 - The prepare's own `life` timer can still forget the re-kept IPA up to 30 minutes after signing (not after the
   failure); the row then signs again through the `gone` path.
+
+## Spec review
+- Flagged the SignAhead.swift change as outside the file list. Kept: the brief asks that the fallback keep the
+  download and install "from the IPA already downloaded/prepared", and without it the shell answers `gone` on the
+  phone. Also kept: the `gone` path signs again (otherwise the row would just fail).
+- Fixed: a space dropped after `=` in SignAhead.swift (it broke the native build in the first gate run), and the
+  progress check now reads the row's progress when the second install starts, not before it.
+- Noted: the re-kept IPA stays for `life` after any non-cancel This iPhone failure, even if Use the Signing Server is
+  never tapped; `forget` drops it and the original then, as for any IPA that was never opened.
