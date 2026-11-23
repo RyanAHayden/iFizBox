@@ -214,3 +214,10 @@ _Said_: one trip to Shortcuts
 _On screen_: (none)
 _In code_: LocalVPN.takeTrip, tripReady, endTrip, switchOld, {"trip":1}
 _Avoid_: flip, hop
+
+**Waiting IPA**:
+An IPA fully downloaded for an install that hasn't gone through, kept unsigned on the iPhone for up to a week so a retry signs it again instead of downloading it
+_Said_: the cached local IPA
+_On screen_: Using the IPA already downloaded
+_In code_: WaitingIPA, IPAFetch, listedOf
+_Avoid_: cached IPA, pending IPA
