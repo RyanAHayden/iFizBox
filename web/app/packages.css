@@ -326,6 +326,12 @@ html[data-sheet="card"] {
 html[data-sheet="card"] .sheet { overflow: hidden; } /* the rounded corners clip the bar */
 .sheet { position: fixed; inset: var(--sheet-top) 0 0; z-index: 25; display: flex; flex-direction: column; will-change: transform; }
 .navbar.sheet-bar { height: calc(44px + var(--sheet-bar-top)); }
+/* A sheet's bar has no status-bar strip (style.css's .navbar::before, black in iOS 6): its own art runs up under the
+   status bar, so nothing black rides up with the sheet or stays above its bar. The layer covers the --sheet-bar-top
+   room and the bar's top half (22 pt) and carries the gloss's top half stretched over itself, highlight at the very
+   top (the look-only rule below), the same layer the app's iOS 7 and iOS 13 nav bars use (ios6.css). In a card it
+   is just the bar's own top half. :root lifts it over the app-era rule in ios6.css. */
+:root .sheet > .navbar.sheet-bar::before { height: calc(var(--sheet-bar-top) + 22px); }
 html.native .navbar.sheet-bar { display: block; } /* keeps a sheet's bar under html.native, which nothing sets (style.css) */
 .sheet-bar-row {
   position: absolute; left: 0; right: 0; top: var(--sheet-bar-top); height: 44px;
@@ -340,6 +346,14 @@ html.native .navbar.sheet-bar { display: block; } /* keeps a sheet's bar under h
 :root { --sheet-radius: 0px; }
 html[data-sheet="card"] { --sheet-radius: 10px; }
 .sheet { background: var(--plain); border-radius: var(--sheet-radius) var(--sheet-radius) 0 0; }
+/* the bar's four layers (base line, highlight, gloss, status-bar fill): only the highlight, at the top, and the gloss,
+   twice the layer's height from the top so its top half fills it and meets the bar's own gloss at the half */
+:root .sheet > .navbar.sheet-bar::before {
+  background: inherit;
+  background-repeat: no-repeat;
+  background-position: 0 0, top, top, 0 0;
+  background-size: 0 0, 100% 1px, 100% 200%, 0 0;
+}
 .depiction-frame { border: 0; background: #fff; }
 /* ==== } look-only ==== */
 
