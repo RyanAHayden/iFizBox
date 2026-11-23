@@ -4,8 +4,9 @@
 
 On a user's own phone (0.24.x Lite, Install Switch added) an install on This iPhone failed with
 `connect_failed: InternalError("connect: device socket io failed") (16)`, and the fix rows offered Open LocalDevVPN.
-The cause is the order in the Install Switch: its start turned cellular data off before Set VPN, so iOS never started
-the built-in VPN. The Shortcut now starts the VPN first and turns cellular data off once the VPN is up. A failed
+On Wi-Fi it didn't reproduce on the 15. The cause found is the order in the Install Switch on cellular: its start
+turned cellular data off before Set VPN, and iOS starts no VPN without a network, so the built-in VPN never came up
+(reproduced with Airplane Mode; the user's phone being on cellular is inferred, not confirmed). The Shortcut now starts the VPN first and turns cellular data off once the VPN is up. A failed
 install through the built-in VPN no longer offers Open LocalDevVPN.
 
 ## What was found
@@ -65,8 +66,19 @@ With the fixed build (0.24.1 4634 plus this branch, rebuilt and installed with `
 ## What failed / was tried
 
 - The MBA (the signing host for `tools/shortcuts/sign.sh`) was offline the whole time at first: ssh timed out, and
-  Tailscale showed it offline.
-  SIGNING: TBD
+  Tailscale showed it offline. A poll loop found it back about 25 minutes later; `tools/shortcuts/sign.sh mba
+  install-switch` then signed `web/app/shortcuts/Install Switch.shortcut` (AEA1 header checked), and the app was
+  rebuilt so it bundles the new file (compared byte for byte in the IPA).
+- New Shortcut on the 15: the old Install Switch was deleted in Shortcuts first (Replace leaves a duplicate name,
+  T75), then added through the app's own share sheet (`vpn.openShortcuts`, Shortcuts, Add Shortcut). The editor
+  showed the `dataOff` Get Value and the "If Data Off has any value / Turn Cellular Data Off" branch as written, and
+  the start branch with Set VPN before its Cellular Data Off. `vpn.checkShortcut` passed. A real install from My
+  IPAs (B375 Four) then succeeded with it: start ran (its Set VPN ended with error 2 again, `up()` connected the
+  VPN), install done in 2.6 s, VPN off, end ran, Tailscale selected and connected after. `{"dataOff":1}` run by URL
+  finished without an error (no SIM, so no data change to see); `{"end":1,"cellular":1}` put data back on.
+- The suspects in the brief: Set VPN and `LocalVPN.up()` do overlap (Set VPN's error 2 while iOS enables our
+  configuration), but it isn't harmful: `up()` always connects the tunnel itself and every run went through. A stale
+  "previous VPN" didn't show: the end deletes it before Set VPN (T75) and the next start overwrites it.
 - An Airplane Mode toggle tap missed once (Settings was still on the VPN page), which gave an extra Wi-Fi pass.
 - Web Inspector evals hang while another app is in front.
 
@@ -80,4 +92,5 @@ With the fixed build (0.24.1 4634 plus this branch, rebuilt and installed with `
   real failure on the phone needs no network.
 - `IDevice.Session`'s fallback to 10.7.0.1 when the built-in VPN fails (it still gives "device socket io failed" when
   nothing else is on) was not changed, as it is outside this task's files. It is filed as B378.
-  SIGNING: TBD
+- Whether Cellular Data Off from the new `dataOff` branch really turns data off: the 15 has no SIM, so the run only
+  showed it ends without an error.

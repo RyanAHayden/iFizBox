@@ -343,7 +343,7 @@ enum LocalVPN {
                 vpnOn = connectedNow()
                 if !vpnOn { Thread.sleep(forTimeInterval: 0.2) }
             }
-            if cellular && runShortcut("switch", input: switchInput("dataOff")).ok {
+            if cellular && vpnOn && runShortcut("switch", input: switchInput("dataOff")).ok {
                 let t1 = Date()
                 while Date().timeIntervalSince(t1) < dataOffLimit && !wentOff {
                     wentOff = !Path.now().cellular
