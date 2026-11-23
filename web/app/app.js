@@ -14,7 +14,7 @@ import { load, loaded, mod, missing, loadAll, NotLoaded } from "./lazy.js";
 import { grouped, placeholder } from "./nav/ui.js";
 import { createStacks, swipeCommits } from "./nav/stack.js";
 import { animate, setProgress, clear, DURATION, EASE_OUT } from "./nav/transition.js";
-import { attachEdgeSwipe } from "./nav/swipe.js";
+import { attachEdgeSwipe, attachPageSwipe, pageSwipeBlocked } from "./nav/swipe.js";
 import { keepRow, ghostFor } from "./nav/selection.js";
 import { createTabbar, tapTab, scrollToTop, isSliding } from "./nav/tabbar.js";
 import { scrollerOf } from "./nav/searchbar.js";
@@ -26,6 +26,8 @@ import { pageOpened, pageShown } from "./nav/pagestate.js";
 import { createHomeTop, homeRootOf } from "./nav/hometop.js";
 import * as home from "./screens/home.js";
 import * as settingsScreen from "./screens/settings.js";
+import { pendingStep } from "./screens/installroute.js"; // F373: settings.js loads it at startup already
+import { popupOpen } from "./nav/popups.js"; // F373
 import { sourceFilter } from "./core/sources.js";
 import { getBackend } from "./backend.js";
 import { appSchemeFor, openOutside } from "./core/applinks.js";
@@ -363,8 +365,8 @@ function showAgain(entry) {
   pageShown(mounted({ tab: entry.tab, path: entry.path }), entry.page.body).catch(() => {});
 }
 
-let gesture = null; // the edge swipe in progress: { pair, top, below, width }
-attachEdgeSwipe(edgeEl, {
+let gesture = null; // the edge or page swipe in progress: { pair, top, below, width }
+const backSwipe = {
   canStart: () => !webBack && !running && !gesture && stacks.stack(stacks.activeTab()).length > 1,
   begin() {
     const all = stacks.stack(stacks.activeTab());
@@ -396,6 +398,19 @@ attachEdgeSwipe(edgeEl, {
       goBack();
     }, { duration, easing: EASE_OUT, withSelect: true });
   },
+};
+attachEdgeSwipe(edgeEl, backSwipe);
+// F373: the same pop from a rightward drag anywhere on the page, as iOS 26 (nav/swipe.js attachPageSwipe). Off on the
+// web with the edge strip (webBack, in canStart). While the pairing page has a step running it steps aside: the edge
+// strip still asks "Stop Setting Up?" (screens/installroute.js guardSwipe), a drag mid-page just does nothing.
+attachPageSwipe(screensEl, {
+  ...backSwipe,
+  begin() {
+    // The row the drag started on lets go of its blue, as UIKit cancels a cell's highlight when the pop begins.
+    if (pressed) { pressed.classList.remove("is-pressed"); pressed = null; lastPress = null; }
+    return backSwipe.begin();
+  },
+  blocked: (target) => !!pageSwipeBlocked(target, screensEl) || popupOpen() || !!pendingStep(),
 });
 
 // Tab taps go through selectTab so each tab keeps its place; the href is there for no-JS fallbacks and a11y.

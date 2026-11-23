@@ -57,7 +57,7 @@ a, img { -webkit-user-drag: none; }
 .page { visibility: hidden; } /* later pages paint over earlier ones: the top is always the last child */
 .page-body {
   position: absolute; inset: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch; touch-action: pan-y; /* horizontal moves are the edge swipe's */
+  -webkit-overflow-scrolling: touch; touch-action: pan-y; /* horizontal moves are the swipes' (edge and page swipe back, rows) */
   /* 20px under the last thing on every page, so a closing note never sits against the tab bar */
   padding: var(--nav-h) env(safe-area-inset-right) calc(var(--tab-h) + 20px) env(safe-area-inset-left);
 }
