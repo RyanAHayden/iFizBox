@@ -5,6 +5,12 @@ iOS 6 is the base style. An era is another iOS look (iOS 7, iOS 13, iOS 26) over
 `ios6.css`. This page says what makes an era clean, how the look is split from the layout so it can be, and what is
 clean today.
 
+Eras run only in the native apps (the jailbreak app and the Lite sideload app), which expose their bridge as
+`window.ifizboxNative`. The website is iOS 6 only: `theme-boot.js` ignores a stored era without that bridge,
+`core/settings.js` gives the website no Style rows (its `style` setting is always iOS 6), and `era-css.js` links
+`ios7.css`, `ios13.css` and `ios26.css` only when the bridge exists. The concept frame (`tools/concept`) runs the apps'
+fake bridge, so eras show there; its Site mode shows iOS 6, and `check.mjs` skips the era themes in it.
+
 ## Definition of clean
 
 An era is clean when all of these hold:
@@ -248,7 +254,7 @@ iOS 13 and iOS 26 need three, each off in iOS 6:
   (4px, inside the pill), `--tabbar-float-inset` (21px, from the sides), `--tabbar-float-gap` (10px, pill to circle)
   and `--tabbar-float-bottom` (safe bottom − 13px, at least 12px). The pill's and the circle's paint (round corners,
   glass, their own ground on `.tab[data-tab="search"]`) is the era's look. The app draws its own UITabBar (this one
-  is hidden there), so the hook moves the website's bar only;
+  is hidden there), so the hook moves the page's bar only;
 - **card sheets**: `<html data-sheet="card">`, set by the era's JS when it is chosen. A modal sheet (`nav/sheet.js`)
   stops below the status bar as a card with rounded top corners, and the page behind it (the nav bar, the screens
   and the tab bar) scales back about the screen's centre and dims onto the black ground. It comes back when the
@@ -271,12 +277,12 @@ web view draws iOS 26's own form controls. Under it the page hands those control
 markup gets `ios26.css`'s look-alikes.
 
 - **When it is on** (`native-controls.js` `drawsIos26Controls()`; `theme-boot.js` runs the same rule before first
-  paint): in the app, the shell's `app.info` `ios` is 26 or later; on an iPhone or iPad (an iPad asking for the
-  desktop page counts) whose user agent has Safari's `Version/`, that version is 26 or later; otherwise, on an
-  iPhone or iPad, CSS anchor positioning is supported (first in WebKit 26). A web view's user agent freezes the OS
+  paint): only in the app, where the shell's `app.info` `ios` decides: 26 or later. Until the app answers, on an
+  iPhone or iPad, CSS anchor positioning (first in WebKit 26) stands in. A web view's user agent freezes the OS
   version (the iPhone 15 Pro on iOS 27 says `iPhone OS 18_7`), so the app's first paint uses the feature test and
-  `app.info` corrects it. Desktop browsers never get it. A change after first paint (Theme > Style, the app's
-  answer) redraws the switches on screen in the other kind (`nav/switch.js` `redrawSwitches`).
+  `app.info` corrects it. The website never gets it: the site is iOS 6, so no `data-style="ios26"` and no
+  `data-controls`. A change after first paint (the app's answer) redraws the switches on screen in the other kind
+  (`nav/switch.js` `redrawSwitches`).
 - **What it swaps** (look in `ios26.css`, `appearance: auto` with the page's paint reverted; sizes unchanged):
 
   | Control | Under the hook | Without it |

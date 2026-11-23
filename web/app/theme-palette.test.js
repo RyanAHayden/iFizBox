@@ -26,11 +26,12 @@ test("paletteFor: classic in light; Gunmetal in dark unless another is chosen (F
 });
 
 // theme-boot.js in a sandbox: what it puts on <html> before first paint for a stored Appearance and dark theme.
-function boot({ appearance = null, lightTheme = null, darkTheme = null, systemDark = false, hash = "", style = null, withStyle = false } = {}) {
+function boot({ appearance = null, lightTheme = null, darkTheme = null, systemDark = false, hash = "", style = null, withStyle = false, native = true } = {}) {
   const attrs = {};
   const meta = { attrs: { content: "#4f698b" }, setAttribute(k, v) { this.attrs[k] = v; } };
   const store = { "ifizbox.appearance": appearance, "ifizbox.lightTheme": lightTheme, "ifizbox.darkTheme": darkTheme, "ifizbox.style": style };
   const ctx = {
+    ...(native ? { ifizboxNative: {} } : {}), // C69: the eras are the apps' (the shell's bridge); the website is iOS 6
     location: { hash },
     localStorage: { getItem: (k) => store[k] ?? null },
     matchMedia: () => ({ matches: systemDark }),
@@ -131,7 +132,7 @@ test("F201: iOS 7's White and OLED Black, the same in themeState and theme-boot.
   const previews = [[null, ""], ["light", "#/home/settings/theme/lightTheme"], ["dark", "#/home/settings/theme/darkTheme"]];
   for (const style of [null, "ios6", "ios7", "ios99"]) for (const appearance of [null, "auto", "light", "dark"])
     for (const systemDark of [false, true]) for (const [preview, hash] of previews) {
-      const store = createSettings({ storage: mem({ "ifizbox.style": style, "ifizbox.appearance": appearance, "ifizbox.darkTheme": "nord", "ifizbox.lightTheme": "sepia" }) });
+      const store = createSettings({ storage: mem({ "ifizbox.style": style, "ifizbox.appearance": appearance, "ifizbox.darkTheme": "nord", "ifizbox.lightTheme": "sepia" }), mode: "jailbreak" }); // C69: the eras are the apps'
       const got = themeState({ style: store.get("style"), appearance: store.get("appearance"), lightTheme: "sepia", darkTheme: "nord", preview }, systemDark);
       const what = JSON.stringify({ style, appearance, systemDark, preview });
       if (style === "ios7") {
@@ -144,10 +145,27 @@ test("F201: iOS 7's White and OLED Black, the same in themeState and theme-boot.
   assert.equal(themeState({ style: "bogus", appearance: "light" }, false).style, "ios6");
 });
 
+// C69: the stylesheets in the order the apps load them: index.html's links, with era-css.js (which writes the three
+// era links in the apps, none on the website) at its place in the head.
+function pageStyles() {
+  const eras = [...read("era-css.js").matchAll(/"(ios\d+\.css)"/g)].map((m) => m[1]);
+  return [...read("index.html").matchAll(/<link rel="stylesheet" href="([^"]+)"|<script src="(era-css\.js)"/g)]
+    .flatMap((m) => (m[2] ? eras : [m[1]]));
+}
+
+test("C69: the website is iOS 6: a stored era is ignored before first paint, and index.html links no era stylesheet", () => {
+  for (const style of ["ios7", "ios13", "ios26"]) {
+    assert.deepEqual(boot({ style, appearance: "dark", native: false, withStyle: true }),
+      { theme: "dark", palette: "gunmetal", color: "#5f656f", style: "ios6" }, style);
+  }
+  assert.doesNotMatch(read("index.html"), /href="ios(7|13|26)\.css"/);
+  assert.match(read("era-css.js"), /if \(!window\.ifizboxNative\) return;/);
+});
+
 // F201: ios7.css is linked after palettes.css (its tone blocks outrank the palette blocks they tie with) and before
 // wide.css, and every rule in it is scoped to html[data-style="ios7"], so iOS 6 never sees it.
 test("F201: ios7.css is linked after palettes.css and only styles html[data-style=ios7]", () => {
-  const links = [...read("index.html").matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
+  const links = pageStyles();
   assert.ok(links.indexOf("ios7.css") > links.indexOf("palettes.css"));
   const css = read("ios7.css").replace(/\/\*[\s\S]*?\*\//g, "");
   const sels = [...css.matchAll(/([^{}]+)\{/g)].map((m) => m[1].trim());
@@ -160,7 +178,7 @@ test("F201: ios7.css is linked after palettes.css and only styles html[data-styl
 test("F202: iOS 13's White and OLED Black and its card sheets, the same in themeState and theme-boot.js", () => {
   const previews = [[null, ""], ["light", "#/home/settings/theme/lightTheme"], ["dark", "#/home/settings/theme/darkTheme"]];
   for (const appearance of [null, "auto", "light", "dark"]) for (const systemDark of [false, true]) for (const [preview, hash] of previews) {
-    const store = createSettings({ storage: mem({ "ifizbox.style": "ios13", "ifizbox.appearance": appearance }) });
+    const store = createSettings({ storage: mem({ "ifizbox.style": "ios13", "ifizbox.appearance": appearance }), mode: "jailbreak" }); // C69: the eras are the apps'
     const got = themeState({ style: store.get("style"), appearance: store.get("appearance"), lightTheme: "sepia", darkTheme: "nord", preview }, systemDark);
     const tone = appearance === "dark" || (appearance !== "light" && systemDark) ? "dark" : "light";
     const what = JSON.stringify({ appearance, systemDark, preview });
@@ -176,7 +194,7 @@ test("F202: iOS 13's White and OLED Black and its card sheets, the same in theme
 // F202: ios13.css is linked after palettes.css and ios7.css, before wide.css, and every rule in it is scoped to
 // html[data-style="ios13"], so iOS 6 and iOS 7 never see it; F370: its tab glyphs are its own (icons/rowicons.js).
 test("F202: ios13.css is linked after palettes.css and only styles html[data-style=ios13]", () => {
-  const links = [...read("index.html").matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
+  const links = pageStyles();
   assert.ok(links.indexOf("ios13.css") > links.indexOf("ios7.css"));
   assert.ok(links.indexOf("ios13.css") > links.indexOf("palettes.css"));
   assert.ok(links.indexOf("ios13.css") < links.indexOf("wide.css"));
@@ -195,7 +213,7 @@ test("F202: ios13.css is linked after palettes.css and only styles html[data-sty
 test("F203: iOS 26's White and OLED Black, card sheets and floating tab bar, the same in themeState and theme-boot.js", () => {
   const previews = [[null, ""], ["light", "#/home/settings/theme/lightTheme"], ["dark", "#/home/settings/theme/darkTheme"]];
   for (const appearance of [null, "auto", "light", "dark"]) for (const systemDark of [false, true]) for (const [preview, hash] of previews) {
-    const store = createSettings({ storage: mem({ "ifizbox.style": "ios26", "ifizbox.appearance": appearance }) });
+    const store = createSettings({ storage: mem({ "ifizbox.style": "ios26", "ifizbox.appearance": appearance }), mode: "jailbreak" }); // C69: the eras are the apps'
     const got = themeState({ style: store.get("style"), appearance: store.get("appearance"), lightTheme: "sepia", darkTheme: "nord", preview }, systemDark);
     const tone = appearance === "dark" || (appearance !== "light" && systemDark) ? "dark" : "light";
     const what = JSON.stringify({ appearance, systemDark, preview });
@@ -212,7 +230,7 @@ test("F203: iOS 26's White and OLED Black, card sheets and floating tab bar, the
 // and its glass holds the frame budget: nothing animates, backdrop-filter only on the tab pill, the Search circle and
 // the undo bar (where the page scrolls under them), the anchored menu (a still page under it) and only through the one --i26-glass-blur token per tone, the fallback's switch.
 test("F203: ios26.css is linked after ios13.css, only styles html[data-style=ios26] and blurs only the tab bar and undo bar", () => {
-  const links = [...read("index.html").matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
+  const links = pageStyles();
   assert.ok(links.indexOf("ios26.css") > links.indexOf("ios13.css"));
   assert.ok(links.indexOf("ios26.css") < links.indexOf("wide.css"));
   const css = read("ios26.css").replace(/\/\*[\s\S]*?\*\//g, "");

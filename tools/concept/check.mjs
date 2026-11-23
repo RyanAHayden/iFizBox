@@ -295,6 +295,8 @@ for (const mode of MODES) {
   await ev(`document.getElementById("mode-${mode}").click()`);
   for (const device of DEVICES) {
     for (const theme of THEMES) {
+      // C69: the website is iOS 6; an era theme is the apps' (jailbreak and sideload modes, the fake bridge) only
+      if (mode === "site" && theme.split(":").length === 3 && !theme.startsWith("ios6:")) { console.log(`ok   ${mode}: ${theme} skipped (the website has no eras)`); continue; }
       errors = [];
       stray.length = 0;
       await set("device", device);

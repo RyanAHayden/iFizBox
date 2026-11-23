@@ -10,15 +10,11 @@ import { cssRules, layoutIn } from "./ios6-css.test.js";
 
 const read = (f) => readFileSync(new URL(f, import.meta.url), "utf8");
 
-// The user agents the rule meets: the 15 Pro's app web view (iOS 27, OS frozen at 18_7, no Version/), Safari 26 and
-// 18 on an iPhone, the iPhone 7's Safari 15 and its app web view, an iPad asking for the desktop page, desktop Chrome.
+// The user agents the rule meets: the 15 Pro's app web view (iOS 27, OS frozen at 18_7, no Version/), the iPhone 7's
+// app web view, desktop Chrome (the concept frame's fake bridge). C69: no Safari cases, the website has no eras.
 const UA = {
   appWebView27: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
-  safari26: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1",
-  safari18: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1",
-  safari15: "Mozilla/5.0 (iPhone; CPU iPhone OS 15_8 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.6.6 Mobile/15E148 Safari/604.1",
   appWebView15: "Mozilla/5.0 (iPhone; CPU iPhone OS 15_8 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
-  ipadDesktop26: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
   chrome: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
 };
 const has26 = (q) => q === FEATURE_26; // a WebKit 26+ CSS.supports
@@ -31,11 +27,6 @@ const CASES = [
   ["the app on iOS 26.0, app.info answered", { userAgent: UA.appWebView27, supports: none, nativeIos: "26.0" }, true],
   ["the iPhone 7's app (iOS 15), app.info answered", { userAgent: UA.appWebView15, supports: none, nativeIos: "15.8.8" }, false],
   ["the iPhone 7's app before app.info", { userAgent: UA.appWebView15, supports: none }, false],
-  ["Safari 26 on an iPhone", { userAgent: UA.safari26, supports: has26 }, true],
-  ["Safari 18 on an iPhone", { userAgent: UA.safari18, supports: none }, false],
-  ["Safari 15 on the iPhone 7", { userAgent: UA.safari15, supports: none }, false],
-  ["Safari 26 on an iPad asking for the desktop page", { userAgent: UA.ipadDesktop26, supports: has26, touch: 5 }, true],
-  ["Safari 26 on a Mac (no touch)", { userAgent: UA.ipadDesktop26, supports: has26, touch: 0 }, false],
   ["desktop Chrome, which has anchor positioning", { userAgent: UA.chrome, supports: () => true }, false],
 ];
 
@@ -49,14 +40,15 @@ test("F345a: the hook is on only under the iOS 26 style and only where WebKit dr
 });
 
 // theme-boot.js before first paint must give the same answer (it can't import native-controls.js).
-function boot({ style, userAgent, supports, touch = 0 }) {
+function boot({ style, userAgent, supports }) {
   const attrs = {};
   const store = { "ifizbox.style": style };
   const ctx = {
+    ifizboxNative: {}, // C69: an era is the apps' only
     location: { hash: "" },
     localStorage: { getItem: (k) => store[k] ?? null },
     matchMedia: () => ({ matches: false }),
-    navigator: { userAgent, maxTouchPoints: touch },
+    navigator: { userAgent },
     CSS: { supports },
     document: { documentElement: { setAttribute: (k, v) => { attrs[k] = v; } }, querySelectorAll: () => [] },
   };
@@ -78,7 +70,7 @@ test("F345a: applyControls puts the hook on <html> and takes it off with the sty
   const doc = fakeDocument();
   const root = doc.documentElement;
   root.removeAttribute = (k) => { delete root.attrs[k]; };
-  const env = { userAgent: UA.safari26, supports: has26 };
+  const env = { userAgent: UA.appWebView27, supports: has26 };
   root.setAttribute("data-style", "ios26");
   assert.equal(applyControls(doc, env), true);
   assert.equal(root.getAttribute("data-controls"), "native");

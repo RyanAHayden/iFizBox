@@ -110,7 +110,7 @@ def tree_from_git(repo, ref, sub="web/app"):
 
 def is_module(path):
     return (path.endswith(".js") and not path.startswith(("vendor/", "node_modules/"))
-            and not re.search(r"\.test(-helper)?\.js$|test-helper\.js$", path) and path != "theme-boot.js")
+            and not re.search(r"\.test(-helper)?\.js$|test-helper\.js$", path) and path not in ("theme-boot.js", "era-css.js"))
 
 
 def split_tree(tree):
@@ -137,6 +137,8 @@ def frame_html(html):
     html = re.sub(r'\s*<link rel="(?:manifest|icon|apple-touch-icon|apple-touch-startup-image)"[^>]*>', "", html)
     html = re.sub(r'<link rel="stylesheet" href="([^"]+)">', r'<style data-concept-for="\1"></style>', html)
     html = html.replace('<script src="theme-boot.js"></script>', "<!--concept-boot-->")
+    # C69: era-css.js writes the era stylesheets in the apps (a fake bridge here too); the frame has the slots always
+    html = html.replace('<script src="era-css.js"></script>', "".join(f'<style data-concept-for="{f}"></style>' for f in ("ios7.css", "ios13.css", "ios26.css")))
     html = re.sub(r'\s*<script type="module" src="app.js"></script>', "", html)
     html = html.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n  <!--concept-head-->', 1)
     html = html.replace("</body>", "<!--concept-body-->\n</body>", 1)
