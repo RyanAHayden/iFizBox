@@ -110,19 +110,26 @@ const namedFor = (gh, name) => {
   return r.length > 2 && n.length > 2 && (r.includes(n) || n.includes(r));
 };
 
+// Is the repo the source's JSON lives in this app's own? When it is named for the app, when the source's website
+// names that repo (Kernarium's source for Andarium), or when the source lists this one app; not for a source repo
+// carrying many apps' IPAs.
+const homeIsApps = (home, app) =>
+  namedFor(home, app?.name) || sameRepo(githubRepoOf(app?.sourceWebsite), home) || app?.sourceApps === 1;
+
 // The repo an app's own fields name: a code link first, then its website, then the IPA's release. A release in the
-// repo the source's JSON lives in counts only when that repo is named for the app (a one-app source in its own repo,
-// not a source repo carrying many apps' IPAs); so does the source's repo itself.
+// repo the source's JSON lives in counts only when that repo is the app's (homeIsApps); so does the source's repo
+// itself.
 export function appGithub(app) {
   const x = app?.extra ?? {};
   const urls = [...CODE_KEYS, ...SITE_KEYS].map((k) => x[k] ?? app?.[k]).filter(isHttp);
   const own = githubOf(urls);
   if (own) return own;
   const home = sourceRepo(app);
+  const mine = Boolean(home) && homeIsApps(home, app);
   const downloads = (app?.versions ?? []).map((v) => v.downloadURL).filter(isHttp);
-  const fromRelease = githubOf(downloads, { not: home && !namedFor(home, app?.name) ? home : null });
+  const fromRelease = githubOf(downloads, { not: home && !mine ? home : null });
   if (fromRelease) return fromRelease;
-  return home && namedFor(home, app?.name) ? home : null;
+  return mine ? home : null;
 }
 
 export function appLinks(app) {

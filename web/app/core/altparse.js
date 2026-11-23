@@ -225,6 +225,10 @@ export function parseAltSource(input) {
     apps.push(app);
   }
   for (const app of apps) if (app.merged) { sortByDate(app.versions); delete app.merged; }
+  // B336: what core/previews.js appGithub needs to tell a source's own repo from one carrying other people's IPAs:
+  // the source's website and how many apps it lists. appStanza carries both onto the ipa next to sourceUrl.
+  const website = httpUrl(json.website);
+  for (const app of apps) { app.sourceWebsite = website; app.sourceApps = apps.length; }
   const news = (Array.isArray(json.news) ? json.news : []).map(parseNews).filter(Boolean)
     .sort((a, b) => (b.date ?? 0) - (a.date ?? 0));
   return {
