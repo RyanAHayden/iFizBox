@@ -119,6 +119,29 @@ static void swizzle(Class c, SEL sel, IMP imp, IMP *orig) {
 
 // ---- keychain: the query without kSecAttrAccessGroup, or (isolate) a password query in the app's own group ----
 
+// B339: the real SecItem* functions, from Security itself. Every keychain call of this fix goes through these, never
+// through its own symbol pointers: another group fix in the same app (SideDrop's sidedrop-groupfix.dylib, in an IPA it
+// signed that iFizBox signs again) points every image's SecItem* pointers but its own at its fixes, this dylib's
+// included, while this one points that one's at these fixes. Called through the pointers, each fix would call the
+// other's and the first keychain call would recurse until the stack ran out. This way the other fix's calls end here
+// and this fix's reach the keychain, so this one always runs last (its pinned group is what the keychain sees).
+static OSStatus (*realAdd)(CFDictionaryRef, CFTypeRef *) = SecItemAdd;
+static OSStatus (*realCopyMatching)(CFDictionaryRef, CFTypeRef *) = SecItemCopyMatching;
+static OSStatus (*realUpdate)(CFDictionaryRef, CFDictionaryRef) = SecItemUpdate;
+static OSStatus (*realDelete)(CFDictionaryRef) = SecItemDelete;
+
+// Sets the real* pointers from Security's exports, before any image is rebound; each keeps its link-time value
+// (the symbol pointer as dyld bound it) when Security can't be found.
+static void findRealSecItem(void) {
+    void *sec = dlopen("/System/Library/Frameworks/Security.framework/Security", RTLD_NOW | RTLD_NOLOAD);
+    if (!sec) return;
+    void *p;
+    if ((p = dlsym(sec, "SecItemAdd"))) realAdd = p;
+    if ((p = dlsym(sec, "SecItemCopyMatching"))) realCopyMatching = p;
+    if ((p = dlsym(sec, "SecItemUpdate"))) realUpdate = p;
+    if ((p = dlsym(sec, "SecItemDelete"))) realDelete = p;
+}
+
 static BOOL isPassword(CFDictionaryRef q) {
     CFTypeRef c = CFDictionaryGetValue(q, kSecClass);
     return c && (CFEqual(c, kSecClassGenericPassword) || CFEqual(c, kSecClassInternetPassword));
@@ -138,13 +161,13 @@ static CFDictionaryRef fixed(CFDictionaryRef q, BOOL own) {
 
 static OSStatus fixAdd(CFDictionaryRef a, CFTypeRef *r) {
     CFDictionaryRef s = fixed(a, YES);
-    OSStatus st = SecItemAdd(s ? s : a, r);
+    OSStatus st = realAdd(s ? s : a, r);
     if (s) CFRelease(s);
     return st;
 }
 static OSStatus fixCopyMatching(CFDictionaryRef q, CFTypeRef *r) {
     CFDictionaryRef s = fixed(q, YES);
-    OSStatus st = SecItemCopyMatching(s ? s : q, r);
+    OSStatus st = realCopyMatching(s ? s : q, r);
     if (s) CFRelease(s);
     return st;
 }
@@ -156,14 +179,14 @@ static OSStatus fixUpdate(CFDictionaryRef q, CFDictionaryRef a) {
         CFDictionaryRemoveValue(m, kSecAttrAccessGroup);
         t = m;
     }
-    OSStatus st = SecItemUpdate(s ? s : q, t ? t : a);
+    OSStatus st = realUpdate(s ? s : q, t ? t : a);
     if (s) CFRelease(s);
     if (t) CFRelease(t);
     return st;
 }
 static OSStatus fixDelete(CFDictionaryRef q) {
     CFDictionaryRef s = fixed(q, YES);
-    OSStatus st = SecItemDelete(s ? s : q);
+    OSStatus st = realDelete(s ? s : q);
     if (s) CFRelease(s);
     return st;
 }
@@ -183,7 +206,7 @@ static BOOL copySharedPasswords(void) {
                                 (__bridge id)kSecAttrSynchronizable: (__bridge id)kSecAttrSynchronizableAny };
         // how many there are outside the app's group (attributes only: no item asks for Face ID for that)
         CFTypeRef all = NULL;
-        OSStatus st = SecItemCopyMatching((__bridge CFDictionaryRef)base, &all);
+        OSStatus st = realCopyMatching((__bridge CFDictionaryRef)base, &all);
         if (st == errSecItemNotFound) continue;
         if (st != errSecSuccess) { ok = NO; continue; }
         NSUInteger outside = 0;
@@ -197,7 +220,7 @@ static BOOL copySharedPasswords(void) {
         q[(__bridge id)kSecUseAuthenticationUI] = (__bridge id)kSecUseAuthenticationUISkip;
 #pragma clang diagnostic pop
         CFTypeRef out = NULL;
-        st = SecItemCopyMatching((__bridge CFDictionaryRef)q, &out);
+        st = realCopyMatching((__bridge CFDictionaryRef)q, &out);
         if (st != errSecSuccess) { ok = NO; continue; }
         NSUInteger copied = 0;
         // in the order a read that names no group finds them, so the app keeps the one it read until now
@@ -211,7 +234,7 @@ static BOOL copySharedPasswords(void) {
             add[(__bridge id)kSecClass] = (__bridge id)cls;
             if (add[(__bridge id)kSecAttrAccessControl]) [add removeObjectForKey:(__bridge id)kSecAttrAccessible];
             add[(__bridge id)kSecAttrAccessGroup] = (__bridge id)isolate;
-            OSStatus as = SecItemAdd((__bridge CFDictionaryRef)add, NULL);
+            OSStatus as = realAdd((__bridge CFDictionaryRef)add, NULL);
             if (as == errSecSuccess || as == errSecDuplicateItem) copied++;
             else ok = NO;
         }
@@ -246,7 +269,8 @@ static const struct { const char *name; void *to; } hooks[] = {
 };
 
 // Points an image's symbol pointers (__got, __la_symbol_ptr) for SecItem* at the fixes, as fishhook (BSD) does:
-// the app's executable and its own frameworks, never the shared cache or this dylib (its calls reach the real ones).
+// the app's executable and its own frameworks, never the shared cache or this dylib (its calls use the real* pointers).
+// Another group fix's image is rebound too, so its calls end in these fixes (B339: findRealSecItem).
 static void rebindSection(const struct section_64 *sect, intptr_t slide, const struct nlist_64 *symtab,
                           const char *strtab, const uint32_t *indirect) {
     const uint32_t *idx = indirect + sect->reserved1;
@@ -298,6 +322,7 @@ static void rebindImage(const struct mach_header *mh, intptr_t slide) {
 
 __attribute__((constructor)) static void groupfixInit(void) {
     @autoreleasepool {
+        findRealSecItem();
         Dl_info self;
         if (!dladdr((void *)groupfixInit, &self) || !self.dli_fname) return;
         NSString *dir = [[NSString stringWithUTF8String:self.dli_fname] stringByDeletingLastPathComponent];
