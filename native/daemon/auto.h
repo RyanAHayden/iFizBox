@@ -39,11 +39,11 @@ struct auto_settings {
  * text NULL: all defaults. */
 void auto_settings_parse(const char *text, struct auto_settings *s);
 
-/* 1 if text has the line "<key>=<id>" (marked=, hold=). */
+/* 1 if text has the line "<key>=<id>" (marked=, hold=), the id in any case. */
 int auto_listed(const char *text, const char *key, const char *id);
 
 /* F282: Ignore This Version (the app's ifizbox.ignoredVersions, {id: version}), as "ignore=<id>=<version>" settings
- * lines. auto_ignored: 1 if settings ignores id at version, the versions equal by dpkg's order (epoch 0 = none,
+ * lines. auto_ignored: 1 if settings ignores id (in any case) at version, the versions equal by dpkg's order (epoch 0 = none,
  * "01" = "1", no revision = "-0"), as core/appupdates.js splitIgnoredVersions compares them. auto_drop_ignored takes
  * those upgrades out of list (n and kept both), so they neither count for N5 nor install for N7; returns how many. */
 int auto_same_version(const char *a, const char *b);

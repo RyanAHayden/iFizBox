@@ -28,7 +28,7 @@
 // failure's name; everything else goes on. Retry puts a failed row back (and what was skipped for it); a skipped
 // row's retry retries its cause first. Cancel stops the downloads at once and lets dpkg finish the package it is on.
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { parseRelations, satisfies } from "./apt.js";
+import { IdMap, parseRelations, satisfies } from "./apt.js";
 import { MODES } from "./queue.js";
 import { PACKAGE } from "../brand.js";
 
@@ -41,7 +41,7 @@ const relations = (st) => [...parseRelations(st?.preDepends), ...parseRelations(
 
 // apt's plan (core/queue.js parseSimulation) and the queued jobs -> the rows, in the dpkg lane's order.
 export function runRows(plan, jobs = [], info = {}) {
-  const queued = new Map(jobs.map((j, i) => [j.id, { job: j, i }]));
+  const queued = new IdMap(jobs.map((j, i) => [j.id, { job: j, i }]));
   const all = [];
   for (const mode of MODES) {
     for (const e of plan?.[`${mode}s`] ?? []) {
@@ -60,7 +60,7 @@ export function runRows(plan, jobs = [], info = {}) {
       });
     }
   }
-  const byId = new Map(all.map((r) => [r.id, r]));
+  const byId = new IdMap(all.map((r) => [r.id, r]));
   for (const r of all) {
     for (const g of r.needs) for (const alt of g) {
       const d = byId.get(alt.name);
@@ -115,7 +115,7 @@ export function neededBy(plan, jobs = [], info = {}) {
 // a name that isn't a row (installed already, or provided by something) always counts as there.
 // -> Map(id -> the dead row at the root of it)
 export function deadRows(rows, installed = {}) {
-  const byId = new Map(rows.map((r) => [r.id, r]));
+  const byId = new IdMap(rows.map((r) => [r.id, r]));
   const dead = new Map(); // id -> root cause id
   for (const r of rows) if (DEAD.has(r.state) && r.state !== "skipped") dead.set(r.id, r.id);
   const lost = (alt) => {

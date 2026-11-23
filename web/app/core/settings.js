@@ -743,31 +743,34 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
   }
   const blocked = {
     list: () => Object.keys(readBlocked()).sort(),
-    has: (pkg) => Object.hasOwn(readBlocked(), pkg),
-    name: (pkg) => readBlocked()[pkg] ?? pkg,
+    // B411: package names ignore case, as in holds: a block stays under the spelling it was made with.
+    has: (pkg) => Object.keys(readBlocked()).some((p) => sameId(p, pkg)),
+    name: (pkg) => Object.entries(readBlocked()).find(([p]) => sameId(p, pkg))?.[1] ?? pkg,
     // [{ id, name }] sorted by name, for Settings > Blocked.
     entries: () => Object.entries(readBlocked()).map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }) || (a.id < b.id ? -1 : 1)),
-    heldByBlock: (pkg) => readBlockHolds().includes(pkg),
+    heldByBlock: (pkg) => readBlockHolds().some((p) => sameId(p, pkg)),
     // `installed`: whether dpkg has it, so a jailbreak block holds it too. Resolves to { held } once done: true when
     // this block put a dpkg hold on it, false otherwise (not installed, not jailbreak, already held, dpkg refused).
     async set(pkg, on, { name = null, installed = false } = {}) {
       const id = String(pkg ?? "").trim();
       if (!id) return { held: false };
       const all = readBlocked();
-      const was = Object.hasOwn(all, id);
-      if (on) all[id] = typeof name === "string" && name.trim() ? name.trim() : all[id] ?? id;
-      else delete all[id];
+      const same = Object.keys(all).filter((p) => sameId(p, id));
+      const was = same.length > 0;
+      const key = same[0] ?? id;
+      if (on) all[key] = typeof name === "string" && name.trim() ? name.trim() : all[key] ?? id;
+      else for (const p of same) delete all[p];
       if (on || was) store.set(BLOCKED_KEY, JSON.stringify(all));
       if (on !== was) notify("blockedPackages", Object.keys(all).sort());
       if (on) {
-        if (!dpkg || !installed || holds.has(id) || readBlockHolds().includes(id)) return { held: false };
+        if (!dpkg || !installed || holds.has(id) || blocked.heldByBlock(id)) return { held: false };
         const ok = await holds.set(id, true);
         if (ok) writeBlockHolds([...readBlockHolds(), id]);
         return { held: ok };
       }
-      if (readBlockHolds().includes(id)) {
-        writeBlockHolds(readBlockHolds().filter((p) => p !== id));
+      if (blocked.heldByBlock(id)) {
+        writeBlockHolds(readBlockHolds().filter((p) => !sameId(p, id)));
         if (holds.has(id)) await holds.set(id, false);
       }
       return { held: false };

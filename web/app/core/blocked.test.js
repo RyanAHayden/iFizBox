@@ -140,3 +140,24 @@ test("jailbreak: a refused hold still blocks, and says it is not held", async ()
   assert.equal(s.blocked.has("tweak"), true);
   assert.equal(s.blocked.heldByBlock("tweak"), false);
 });
+
+test("jailbreak: a blocked Oreo and dpkg's hold on oreo are one package", async () => {
+  const f = fakeHelper();
+  const dpkg = async (words) => f.helper(words.map((w) => w.toLowerCase())); // dpkg knows every name in lower case
+  const storage = memStorage();
+  const s = createSettings({ storage, mode: "jailbreak", helper: dpkg });
+  assert.deepEqual(await s.blocked.set("Oreo", true, { name: "Oreo Theme", installed: true }), { held: true });
+  assert.deepEqual([...f.dpkg], ["oreo"]);
+  await s.holds.sync();
+  assert.deepEqual(s.holds.list(), ["oreo"]);
+  assert.equal(s.blocked.has("oreo"), true);
+  assert.equal(s.blocked.name("OREO"), "Oreo Theme");
+  assert.equal(s.blocked.heldByBlock("oreo"), true);
+  await s.blocked.set("oreo", true, { installed: true }); // the same block, not a second one
+  assert.deepEqual(s.blocked.entries(), [{ id: "Oreo", name: "Oreo Theme" }]);
+  await s.blocked.set("oreo", false);
+  assert.deepEqual(s.blocked.list(), []);
+  assert.equal(s.blocked.heldByBlock("Oreo"), false);
+  assert.deepEqual([...f.dpkg], []);
+  assert.deepEqual(s.holds.list(), []);
+});

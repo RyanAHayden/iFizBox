@@ -178,6 +178,10 @@ class Decisions(Base):
         self.assertEqual(self.pick("autoInstall=all\n", held="com.ex.held\n"), ["com.ex.tweak", "libfoo"])
         self.assertEqual(self.pick("autoInstall=all\nhold=libfoo\n"), ["com.ex.tweak", "com.ex.held"])
         self.assertEqual(self.pick("autoInstall=marked\nmarked=libfoo\nhold=libfoo\n"), [])
+        # Names ignore case: apt says libfoo for a source's LibFoo; still whole ids only.
+        self.assertEqual(self.pick("autoInstall=marked\nmarked=LibFoo\nmarked=LIBF\n"), ["libfoo"])
+        self.assertEqual(self.pick("autoInstall=all\nhold=LibFoo\n", held="Com.Ex.Held\n"), ["com.ex.tweak"])
+        self.assertEqual(self.pick("autoInstall=all\nignore=LibFoo=2:3.2-1\n"), ["com.ex.tweak", "com.ex.held"])
         # F282: Ignore This Version: only that version; another one installs.
         self.assertEqual(self.pick("autoInstall=all\nignore=libfoo=2:3.2-1\nignore=com.ex.held=1.9\n"),
                          ["com.ex.tweak", "com.ex.held"])
