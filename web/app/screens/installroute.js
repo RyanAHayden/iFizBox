@@ -179,6 +179,9 @@ export function howGroups() {
 // footer into what went wrong.
 // F392: `direct`: Add opens Shortcuts itself (core SHORTCUT_LINKS has our iCloud link); Share Shortcut File is then the
 // backup, the share sheet. Without the link Add is the share sheet, so the row isn't there.
+// B397: the test's row says what it is doing (vpn.testSwitch's {step} events; `testing` is the last one).
+const TEST_STEPS = { opening: "Opening Shortcuts…", connecting: "Connecting…", back: "Putting Things Back…" };
+export const testStep = (s) => TEST_STEPS[s] ?? "Testing…";
 export const SHARE_SHORTCUT = "Share Shortcut File";
 export function shortcutGroups(st, { add = () => {}, test = () => {}, testing = false, reading = false, checking = null, failed = {},
   direct = Boolean(SHORTCUT_LINKS.switch) } = {}) {
@@ -197,7 +200,7 @@ export function shortcutGroups(st, { add = () => {}, test = () => {}, testing = 
   if (direct && !reading && checking !== k && (!sc[k] || switchOld(st))) groups.push({ rows: [{ label: SHARE_SHORTCUT, icon: rowIcon("share"), onClick: () => add(k, "share"), chevron: true }],
     footer: `If ${sc[k] ? "Update" : "Add"} doesn't open Shortcuts, share the file and pick Shortcuts.` });
   if (sc[k]) {
-    groups.push({ rows: [{ label: "Test Install Switch", icon: rowIcon("testConnection"), onClick: test, ...(testing ? { detail: "Testing…", spin: true } : {}) }],
+    groups.push({ rows: [{ label: "Test Install Switch", icon: rowIcon("testConnection"), onClick: test, ...(testing ? { subtitle: testStep(testing), spin: true } : {}) }],
       footer: `${sc.trip ? "Runs it once" : "Runs it once each way"}: ${BUILTIN_VPN} on, then your VPN back.` });
   }
   return groups;
@@ -325,10 +328,11 @@ async function drawShortcuts(box, { native, alert, whenBack = backInApp }) {
       add,
       test: async () => {
         if (shortcutsTesting || shortcutRunning) return;
-        shortcutsTesting = true; repaint();
+        shortcutsTesting = "opening"; repaint();
+        const step = (e) => { if (shortcutsTesting && e?.step && e.step !== shortcutsTesting) { shortcutsTesting = e.step; repaint(); } };
         let r = null;
         // F386: two runs through Shortcuts (25 s each at most) and up to 10 s for the VPN between
-        try { r = await within(call(native, "vpn.testSwitch"), SWITCH_TEST_MS); } catch (e) { r = { ok: false, start: { ok: false, error: e?.message } }; }
+        try { r = await within(call(native, "vpn.testSwitch", {}, step), SWITCH_TEST_MS); } catch (e) { r = { ok: false, start: { ok: false, error: e?.message } }; }
         shortcutsTesting = false;
         try { st = await call(native, "vpn.status"); shortcutsShown?.set(st); } catch { /* keeps the last */ }
         repaint();
@@ -424,9 +428,12 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
         if (testing) return;
         testing = true;
         paint();
+        // B397: with another VPN on, the test goes to Shortcuts and back, which draws the page again: the end is drawn by
+        // the latest drawing (this one's paint does nothing then, and the row went on spinning under the answer)
+        const ended = () => { testing = false; if (mine()) { view = lastStatus; paint(); } else redraw(); };
         // F372: the built-in VPN's test (on, one connect with the pairing, off); not paired yet: Pairing first
         if (!(view ?? lastStatus)?.paired) { testing = false; paint(); return goTo("pair"); }
-        try { await vpnTest(native, alert, store, { ended: () => { testing = false; view = lastStatus; paint(); } }); } finally { if (testing) { testing = false; paint(); } }
+        try { await vpnTest(native, alert, store, { ended }); } finally { if (testing) ended(); }
       },
     });
     const shown = subGroups(sections, sub);

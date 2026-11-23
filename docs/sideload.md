@@ -328,7 +328,13 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   (self-update included) the next launch runs the end, unless an end already opened Shortcuts. If things aren't back 25 seconds after the queue (or 10 seconds
   after the waits ran out, whichever comes first), the app runs the separate `{"end":1}` run described below as a retry,
   once the app is in front. The rules for when a start or an end is needed are unchanged.
-  `vpn.testSwitch` does one trip when ready.
+  `vpn.testSwitch` does one trip when ready. It emits `{step}` events (`opening`, `connecting`, `back`), which its row
+  on `installation/shortcuts` shows as the row's subtitle: Opening Shortcuts…, Connecting…, Putting Things Back…. In a test the built-in VPN
+  goes off at once, with no 3 second wait, and putting things back is waited for 12 seconds at most before the end run
+  retries. When the Install Switch doesn't run, the test fails without connecting the built-in VPN, so your VPN stays on.
+  Coming back to the front for 5 seconds without Open counts as failed too. The answer's `vpnBack` says another VPN was
+  on or selected before and is again: the success alert says "then your VPN came back" only then, otherwise "then went
+  off again" (on cellular, "then data came back on").
   Shortcuts opens are capped per queue (`SwitchOpens`, native/sign/SwitchOpens.swift, tested on Linux). A queue takes
   one trip and then its end, or an older Install Switch's start, dataOff and end, each once; after a failed run,
   nothing but the end. A failed start or trip rests the queue's starts for 5 minutes, except an older Install Switch's
@@ -392,7 +398,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   Install Switch only then. With an idle VPN selected but not connected and no Install Switch, the alert is "Your VPN
   May Stay Off" (`vpnIdle`), worded with "if" because iOS doesn't say whether the VPN connects on demand. Bridge calls: `vpn.status` (also `idevice.status`'s `vpn`; its `shortcuts` is
   `{off, on, switch, trip, idle}`; `otherVPNSelected` is there too), `vpn.test`, `vpn.testSwitch` (one trip when ready; otherwise runs start, waits for the VPN,
-  runs dataOff on cellular, then end; answers `{ok, start, end, cellular, wentOff, vpnOn}`), `vpn.checkShortcut` (`{which}`: at most two runs, see above), `vpn.openShortcuts` (takes the optional `link` above, which it opens as a universal link), `vpn.leftOff` (`{vpn, cellular}`, see above).
+  runs dataOff on cellular, then end; emits `{step}` events and answers `{ok, start, end, cellular, wentOff, vpnOn, vpnBack}`), `vpn.checkShortcut` (`{which}`: at most two runs, see above), `vpn.openShortcuts` (takes the optional `link` above, which it opens as a universal link), `vpn.leftOff` (`{vpn, cellular}`, see above).
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`.
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and

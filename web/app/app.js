@@ -494,6 +494,7 @@ document.addEventListener("click", (e) => {
 document.addEventListener("touchstart", () => {}, { passive: true });
 
 initScroller(document.getElementById("screens"));
+import("./nav/respin.js").then((m) => m.respinOnReturn(), () => {}); // B397: loaded on its own, it only matters on a return
 // The other tabs' init runs once their screens load (initLoadedTabs: after the first page, below).
 for (const tab of TABS) if (STATIC_SCREENS[tab]?.init) STATIC_SCREENS[tab].init(ctx);
 // N4: the install queue (jailbreak build: the backend has one): Confirm opens when a package is queued. F313: queue.js

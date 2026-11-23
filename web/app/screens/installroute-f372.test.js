@@ -113,7 +113,7 @@ test("Install Switch's page: one Add row (no Cellular Shortcuts rows); Test once
   const on = shortcutGroups({ shortcuts: { switch: true } });
   assert.deepEqual(on.map((g) => g.rows[0].detail ?? null), ["Added", null]);
   assert.equal(on[1].rows[0].label, "Test Install Switch");
-  assert.equal(shortcutGroups({ shortcuts: { switch: true } }, { testing: true })[1].rows[0].detail, "Testing…");
+  assert.equal(shortcutGroups({ shortcuts: { switch: true } }, { testing: true })[1].rows[0].subtitle, "Testing…");
 });
 
 test("the tests' answers in words", () => {
@@ -122,7 +122,11 @@ test("the tests' answers in words", () => {
   assert.equal(vpnTestResult(null, new Error("refused: this iPhone no longer has the pairing")).again, true);
   // F386: the Install Switch's test
   assert.equal(switchTestResult({ ok: true, start: { ok: true }, end: { ok: true }, vpnOn: true, cellular: false }).title, "Install Switch Works");
-  assert.match(switchTestResult({ ok: true, start: { ok: true }, end: { ok: true }, vpnOn: true, cellular: true, wentOff: true }).message, /Cellular Data off/);
+  assert.match(switchTestResult({ ok: true, start: { ok: true }, end: { ok: true }, vpnOn: true, cellular: true, wentOff: true }).message, /Cellular Data off, then your VPN came back/);
+  assert.equal(switchTestResult({ ok: false, busy: true, start: { ok: false } }).title, "Not Tested");
+  const none = (r) => switchTestResult({ ok: true, start: { ok: true }, end: { ok: true }, vpnOn: true, vpnBack: false, ...r }).message;
+  assert.equal(none({ cellular: false }), `${BUILTIN_VPN} came on, then went off again.`, "B397: no VPN to bring back, none claimed");
+  assert.match(none({ cellular: true, wentOff: true }), /Cellular Data off, then data came back on/);
   assert.match(switchTestResult({ ok: true, start: { ok: true }, end: { ok: true }, vpnOn: false }).message, new RegExp(`${BUILTIN_VPN} didn't connect`));
   assert.match(switchTestResult({ ok: true, start: { ok: true }, end: { ok: true }, vpnOn: true, cellular: true, wentOff: false }).message, /cellular stayed in use/);
   const nope = switchTestResult({ ok: false, start: { ok: false, error: "Could not find the shortcut" }, end: { ok: true } });
