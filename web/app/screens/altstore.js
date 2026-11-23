@@ -41,7 +41,7 @@ import { altVersionList } from "../core/catalog.js"; // B232: Install Which Vers
 import { ignoreVersionLabel, withVersionButton, versionToStore, IGNORE_VERSION } from "../core/appupdates.js"; // F281
 import { queueApp } from "./queue.js";
 import { descriptionGroup } from "./description.js";
-import { infoGroup } from "./sourcepage.js"; // F384: one source page
+import { infoGroup, sourceHeader } from "./sourcepage.js"; // F384: one source page
 import { storeHeader, headerLine, storeTabs, whatsNewGroup } from "./storepage.js";
 import { appRows, moreInfoShown, detailRows, descGroup, changeButton, tileCells, footerGroup, detailsFooter, MORE_INFO_LABEL,
   PREVIEW_HEADER } from "./details.js"; // F350
@@ -207,31 +207,28 @@ export async function renderAltSource(body, route, key, ctx = null) {
   const page = el("div", "alt-source");
   if (meta.tintColor) page.style.setProperty("--alt-tint", meta.tintColor);
 
-  // Header: the source's banner (headerURL) on its tint, with its icon, name and subtitle.
-  const head = el("div", "alt-header");
-  const banner = img(meta.headerURL, "alt-banner");
-  if (banner) head.append(banner);
-  const id = el("div", "alt-id");
-  const icon = img(meta.iconURL || (source && githubAvatarUrl(source)), "alt-icon"); // F44: GitHub avatar fallback
-  if (icon) id.append(icon);
-  const names = el("div", "alt-names");
-  names.append(el("span", "alt-name", meta.name || (source ? displayName(source) : key)));
-  if (meta.subtitle) names.append(el("span", "alt-subtitle", meta.subtitle));
-  id.append(names);
-  head.append(id);
-  page.append(head);
+  // Header: the source's banner (headerURL) on its tint, with its icon, name and subtitle (screens/sourcepage.js, the
+  // same card an APT repo's page draws).
+  page.append(sourceHeader({ name: meta.name || (source ? displayName(source) : key), subtitle: meta.subtitle || "",
+    banner: img(meta.headerURL, "alt-banner"),
+    iconEl: img(meta.iconURL || (source && githubAvatarUrl(source)), "alt-icon") })); // F44: GitHub avatar fallback
   body.replaceChildren(page);
   // F384: what's in it first. Up to 5 apps right on the page (featured ones first), so a one-app source is never
-  // an empty page with a lone All Apps row; All Apps only when there are more than fit.
+  // an empty page with a lone All Apps row; All Apps only when there are more than fit. Only apps the source's list
+  // shows (the ones that run on this iPhone), so the rows, the All Apps count and the footer agree; the featured
+  // rows alone if the list can't be read.
   const appRow = (r) => ({ label: r.name, subtitle: r.short, detail: r.version, href: deeper(route, `package:${r.id}`),
     icon: { cls: "alt-app-icon", src: r.icon ? mediaUrl(r.icon) : "" } });
+  const all = (await catalog.list(key, ALL).catch(() => null)) || null;
+  const runs = all ? new Set(all.map((r) => r.id)) : null;
   const seen = new Set();
-  const all = (await catalog.list(key, ALL).catch(() => [])) || [];
-  const listed = [...meta.featured, ...all].filter((r) => r && !seen.has(r.id) && seen.add(r.id));
+  const listed = [...meta.featured.filter((r) => r && (!runs || runs.has(r.id))), ...(all ?? [])]
+    .filter((r) => r && !seen.has(r.id) && seen.add(r.id));
   const shown = listed.slice(0, 5).map(appRow);
-  if (listed.length > shown.length) shown.push({ label: "All Apps", detail: String(meta.count), href: deeper(route, `section:${ALL}`) });
-  body.append(grouped([{ header: meta.count === 1 ? "App" : "Apps", rows: shown,
-    footer: meta.count ? null : "No app on this source runs on this iPhone's iOS version." }]));
+  const total = all ? all.length : meta.count;
+  if (total > shown.length) shown.push({ label: "All Apps", detail: String(total), href: deeper(route, `section:${ALL}`) });
+  body.append(grouped([{ header: total === 1 ? "App" : "Apps", rows: shown,
+    footer: total ? null : "No app on this source runs on this iPhone's iOS version." }]));
 
   if (meta.description) body.append(descriptionGroup(meta.description)); // F165: own group, long ones fold behind More
 
