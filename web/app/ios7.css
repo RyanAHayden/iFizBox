@@ -561,3 +561,18 @@ html[data-style="ios7"] .progress-seg-item:active:not(.selected) { background: r
 html[data-style="ios7"] .progress-seg-item.selected { color: #fff; }
 html[data-style="ios7"] .qr-bar, html[data-style="ios7"] .qr-fill, html[data-style="ios7"] .progress-fill { border-radius: 0; }
 html[data-style="ios7"] .progress-finish { border-radius: 3px; font-size: 21px; font-weight: 600; }
+
+/* B345: the review buttons (reviews.css: Write a Review, More Reviews, Report as Malicious) as iOS 7's App Store
+   drew Write a Review: a tinted outline on the page, filled with the tint while held, like the price button. The
+   small text buttons (Report, Remove, your Delete Review) take the tint and fade while held, like the bar buttons. */
+html[data-style="ios7"][data-theme] .review-button {
+  font-size: 15px; font-weight: 400; color: var(--i7-tint); text-shadow: none;
+  border: 1px solid var(--i7-tint); border-radius: 4px; background: none; box-shadow: none;
+}
+html[data-style="ios7"][data-theme] .review-button:is(:active, .is-pressed):not(:disabled) {
+  color: var(--i7-tint-text); background: var(--i7-tint); box-shadow: none;
+}
+html[data-style="ios7"][data-theme] .review-button:disabled { color: var(--i7-get-dim-text); border-color: var(--i7-get-dim); }
+html[data-style="ios7"][data-theme] :is(.review-report, .review-tap-remove) { color: var(--i7-tint); }
+html[data-style="ios7"][data-theme] .review-delete-own { color: var(--i7-red); }
+html[data-style="ios7"] :is(.review-report, .review-tap-remove, .review-delete-own):is(:active, .is-pressed) { opacity: .3; }

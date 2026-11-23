@@ -1,0 +1,39 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- B345: the review buttons with the app's own stylesheets (index.html's list), one era/tone per load:
+     harness.html?style=ios7&theme=dark&pressed=1. Served from the worktree root (shots.sh). -->
+<script>
+  const q = new URLSearchParams(location.search), r = document.documentElement;
+  const style = q.get("style") || "ios6", theme = q.get("theme") || "light";
+  r.dataset.style = style; r.dataset.theme = theme;
+  r.dataset.palette = style === "ios6" ? (theme === "dark" ? "gunmetal" : "classic") : (theme === "dark" ? "oled" : "white");
+</script>
+<link rel="stylesheet" href="../../web/app/style.css">
+<link rel="stylesheet" href="../../web/app/ios6.css">
+<link rel="stylesheet" href="../../web/app/sources.css">
+<link rel="stylesheet" href="../../web/app/packages.css">
+<link rel="stylesheet" href="../../web/app/reviews.css">
+<link rel="stylesheet" href="../../web/app/palettes.css">
+<link rel="stylesheet" href="../../web/app/ios7.css">
+<link rel="stylesheet" href="../../web/app/ios13.css">
+<link rel="stylesheet" href="../../web/app/ios26.css">
+<style>body { margin: 0; } .page-body { position: static; height: auto; padding: 4px 0 12px; overflow: visible; }</style>
+<div class="page-body grouped">
+  <div class="review-actions">
+    <button type="button" class="review-button">Write a Review</button>
+    <button type="button" class="review-button review-malicious">Report as Malicious</button>
+  </div>
+  <button type="button" class="review-button review-more">More Reviews…</button>
+  <div class="table grouped" style="margin: 10px 10px 0">
+    <div class="review-tap"><span class="review-tap-label">Your Rating</span><span class="review-tap-status"></span>
+      <button type="button" class="review-tap-remove">Remove</button></div>
+    <div class="cell" style="display:flex;flex-direction:column;padding:6px 12px">
+      <span>A review written here</span><button type="button" class="review-report">Report</button></div>
+    <div class="cell" style="display:flex;flex-direction:column;padding:6px 12px">
+      <span>Your own review</span><button type="button" class="review-delete-own">Delete Review</button></div>
+  </div>
+</div>
+<script>
+  if (q.get("pressed")) for (const b of document.querySelectorAll("button")) b.classList.add("is-pressed");
+</script>
