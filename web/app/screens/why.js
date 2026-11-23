@@ -31,7 +31,7 @@ export const WHY_POINTS = [
   },
   {
     id: "tweaks", title: "Tweaks in Sideloaded Apps",
-    lines: ["Add tweaks from APT repos to any app you sign, no jailbreak.", "Paid ones too, bought with your Chariz or Havoc account.",
+    lines: ["Add tweaks from APT repos to any app you sign, no jailbreak.", "Paid ones too, bought with your Havoc account.",
       "ElleKit comes bundled for tweaks that need it.", "Or add your own .deb, .dylib or .framework.",
       "The tweaks stay with the app when it's re-signed."],
     shot: "tweaks", size: [600, 456], alt: "Sign Options with three tweaks under Inject Tweaks",
