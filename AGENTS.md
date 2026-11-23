@@ -93,6 +93,19 @@ UI concepts (a screen proposed before it's built) go through the concept skill, 
 - A task that changes something users see adds `release-notes/<ID>.md`: one plain sentence on what a user notices or
   must do, no task IDs, file/API names or internal terms (`release-notes/README.md`).
 
+## Usage
+
+Every turn pays for the session's whole context again (user 2026-11-23), so:
+
+- Queue small: one outcome a task. Several screens or behaviours, or more than about 6 code files, are several tasks
+  (`--after` where files overlap). An approved concept is queued as its parts, each naming the page and its part.
+- A task you were given that is bigger than that: do the first part, file the rest (`plan add <your ID>`) before you start.
+- Queue a simple B or F (wording, one style rule, a removal, a small fix with a known cause and files) with
+  `--model sonnet`. Unknown causes, signing, native code and concurrency stay on the default.
+- Read by line range: grep for the name, then the part you need. Never print a whole source file over 400 lines, a
+  whole diff, or a full test log (tail or grep it). Don't reread what you already read.
+- Put independent commands in one turn, and wait in one command with a deadline, not by polling turn after turn.
+
 ## The main checkout
 
 agent-runner merges every task into `~/repos/iFizBox` (the main checkout). Don't leave uncommitted work there:
