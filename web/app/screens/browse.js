@@ -404,6 +404,8 @@ function iconSrc(item) {
   return mediaUrl(item.icon);
 }
 
+const flaggedRow = (item) => Boolean((item.exact || item.misfit) && isIncompatible(item.compat));
+
 function bindRow(row, item, route) {
   const r = row._;
   row._item = item;
@@ -414,8 +416,9 @@ function bindRow(row, item, route) {
   if (r.from) r.from.textContent = fromLine(item); // F348
   // Works on my phone (F17): the worker's code for this row, drawn as a mark (F35); rows never judged get none.
   setMark(r.compat, item.compat);
-  // Search's exact match that can't work (F35): its name in red, the reason in place of the description.
-  const flagged = Boolean(item.exact && isIncompatible(item.compat));
+  // Search's exact match that can't work (F35), or the author page's misfit (B363): its name in red, the reason in
+  // place of the description.
+  const flagged = flaggedRow(item);
   r.name.classList.toggle("incompatible", flagged);
   r.desc.textContent = flagged && item.why ? item.why : item.short;
   markQueued(row);
@@ -443,7 +446,7 @@ function markQueued(row) {
   if (job) row.dataset.queued = job.mode; else delete row.dataset.queued;
   if (job) row._.desc.textContent = queuedFor(job.mode);
   else if (row._.desc.textContent.startsWith("Queued for ")) {
-    const flagged = Boolean(item.exact && isIncompatible(item.compat));
+    const flagged = flaggedRow(item);
     row._.desc.textContent = flagged && item.why ? item.why : item.short;
   }
 }
