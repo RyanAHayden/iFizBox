@@ -1,5 +1,5 @@
 // F374: Installed Apps, the jailbreak app's list of the apps on this iPhone (App Store and other user apps), each with
-// Decrypt and Add Tweaks. The words and rules here; the page is screens/userapps.js, the list ifizbox-helper's
+// Decrypt and Inject Tweaks. The words and rules here; the page is screens/userapps.js, the list ifizbox-helper's
 // user-apps (backend-native.js userApps), the decrypt and the tweaked copy the shell's (native/Sources/InstalledApps.swift).
 //
 //   parseUserApps(text)                  helper lines -> [{ bundleId, name, version, build, path, encrypted, store }]
@@ -22,7 +22,7 @@ export function rememberNames(apps) { for (const a of apps ?? []) if (a?.bundleI
 export const userAppTitle = (bundleId) => names.get(bundleId) || bundleId;
 
 // Install IPAs' row to the page (jailbreak app only).
-export const listRow = (href) => ({ label: PAGE_TITLE, subtitle: "Decrypt the apps on this iPhone and add tweaks", href });
+export const listRow = (href) => ({ label: PAGE_TITLE, subtitle: "Decrypt the apps on this iPhone and inject tweaks", href });
 
 // ifizbox-helper user-apps: "<id>\t<name>\t<version>\t<build>\t<path>\t<encrypted 1|0|>\t<store 1|0>" per line.
 // A line with a bad bundle ID or too few fields is left out; encrypted is true, false or null (couldn't be read).
@@ -75,7 +75,7 @@ export function userAppSections(apps, { query = "", ipas = [] } = {}) {
 
 export const LIST_FOOTER = "Decrypt makes an IPA of an App Store app in My IPAs, which tweaks can go into.";
 export const EMPTY_TEXT = "No apps found.";
-export const DECRYPT_FOOTER = "The app isn't changed or run. The decrypted IPA goes to My IPAs, ready for tweaks, to install or to share.";
+export const DECRYPT_FOOTER = "The app on this iPhone isn't changed. The decrypted IPA goes to My IPAs, ready for tweaks, to install or to share.";
 export const NOT_ENCRYPTED_FOOTER = "This app isn't encrypted. Decrypt still packs it into an IPA in My IPAs, ready for tweaks.";
 export const TWEAKS_FOOTER = "The tweaks go into a copy of the decrypted IPA in My IPAs. The app on this iPhone stays as it is until you install the copy.";
 export const decryptLabel = (decrypted) => (decrypted ? "Decrypt Again" : "Decrypt");

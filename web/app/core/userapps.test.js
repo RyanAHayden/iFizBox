@@ -67,7 +67,7 @@ test("routes: userapp:<bundle id> tokens, a bad ID is no page; the list's row; n
   assert.equal(userAppTitle("com.unknown.app"), "com.unknown.app");
   rememberNames([{ bundleId: "com.x.tube", name: "Tube" }]);
   assert.equal(userAppTitle("com.x.tube"), "Tube");
-  assert.deepEqual(listRow("#/x"), { label: "Installed Apps", subtitle: "Decrypt the apps on this iPhone and add tweaks", href: "#/x" });
+  assert.deepEqual(listRow("#/x"), { label: "Installed Apps", subtitle: "Decrypt the apps on this iPhone and inject tweaks", href: "#/x" });
   assert.equal(decryptLabel(null), "Decrypt");
   assert.equal(decryptLabel({ file: "A.ipa" }), "Decrypt Again");
 });

@@ -55,7 +55,7 @@ test("an app's page: details, Decrypt (Again, with the copy's row, once there is
   assert.deepEqual(g.details.rows.map((x) => [x.label, x.detail]),
     [["Version", "2.1 (210)"], ["Bundle ID", "com.x.tube"], ["From", "App Store"], ["Encrypted", "Yes"]]);
   assert.deepEqual(g.decrypt.rows.map((x) => x.label), ["Decrypt"]);
-  assert.match(g.decrypt.footer, /isn't changed or run/);
+  assert.match(g.decrypt.footer, /The app on this iPhone isn't changed/);
   const again = appGroups(TUBE, { ipas: [{ file: "Tube 2.1 (decrypted).ipa", bundleId: "com.x.tube" }] });
   assert.deepEqual(again.decrypt.rows.map((x) => x.label), ["Decrypt Again", "Tube 2.1 (decrypted).ipa"]);
   assert.match(decodeURIComponent(again.decrypt.rows[1].href), /ipa:Tube 2\.1 \(decrypted\)\.ipa$/);

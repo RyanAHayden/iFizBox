@@ -109,3 +109,17 @@ _Said_: swipe back, back swipe, edge swipe
 _On screen_: (a gesture: no wording)
 _In code_: nav/swipe.js attachEdgeSwipe, attachPageSwipe, pageSwipeBlocked
 _Avoid_: back gesture, pop gesture
+
+**Installed Apps**:
+The jailbreak app's page of the apps on this iPhone (App Store and other apps), each with Decrypt and Inject Tweaks
+_Said_: installed apps
+_On screen_: Installed Apps
+_In code_: core/userapps.js, screens/userapps.js, renderUserApps, ifizbox-helper user-apps, USERAPPS
+_Avoid_: user apps list, app list
+
+**Decrypt**:
+Making an IPA of an App Store app on this iPhone with its encryption taken off, kept in My IPAs
+_Said_: decrypt
+_On screen_: Decrypt, Decrypt Again
+_In code_: decrypt-app, library.decrypt, decryptApp, native/helper/decrypt.c
+_Avoid_: dump, crack

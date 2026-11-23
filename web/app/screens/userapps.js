@@ -3,12 +3,12 @@
 //   #/installed/myipas/userapps                     the apps (ifizbox-helper user-apps, core/userapps.js): App Store,
 //                                                   then Other Apps, A-Z, each with its Home Screen icon (apps.icon)
 //                                                   and a line: version, Encrypted / Decrypted copy in My IPAs
-//   #/installed/myipas/userapps/userapp:<id>        an app's page: Details, Decrypt, Add Tweaks
+//   #/installed/myipas/userapps/userapp:<id>        an app's page: Details, Decrypt, Inject Tweaks
 //
 // Decrypt runs on the black progress page (nav/progress.js): ifizbox-helper decrypt-app's lines as they come, then the
 // shell zips the IPA into My IPAs (native/Sources/InstalledApps.swift); Complete opens the new IPA's page. A file
 // FairPlay wouldn't decrypt is a yellow line, and an extension still encrypted is left out of the IPA; only the main
-// executable failing ends in an error. Add Tweaks is the sign options' Inject Tweaks group (screens/tweaks.js
+// executable failing ends in an error. Tweaks go in with the sign options' Inject Tweaks group (screens/tweaks.js
 // tweaksGroup, kept per app, bundled ElleKit when a tweak needs CydiaSubstrate) and a row that builds a copy of the
 // decrypted IPA with them in (library.addTweaks): it lands in My IPAs, where its page has Install (the helper, ldid
 // signs it) and Share. Nothing replaces the app on this iPhone unless that copy is installed from its page.
@@ -131,10 +131,9 @@ export async function renderUserApp(body, route, bundleId) {
   const decryptRows = g.decrypt.rows.map((r) => (r.key === "decrypt" ? { ...r, onClick: () => decryptApp(app, { body, route }) } : r));
   body.append(grouped([g.details, { ...g.decrypt, rows: decryptRows }]));
 
-  // Add Tweaks: Inject Tweaks (kept for this app), then the row that builds the copy, then the copy if there is one
+  // Inject Tweaks (the sign options' group, kept for this app), then the row that builds the copy, then the copy
   const { tweaksGroup } = await import("./tweaks.js");
   const tg = tweaksGroup({ bundleId, onChange: () => { tg.save(); } });
-  tg.el.querySelector(".group-header").textContent = "Add Tweaks";
   body.append(tg.el);
   const build = [{ label: "Build IPA with Tweaks", chevron: false, onClick: () => buildWithTweaks(app, tg, { body, route }) }];
   if (g.tweaked) build.push({ label: g.tweaked.file, subtitle: "IPA with tweaks in My IPAs", href: ipaHref(g.tweaked.file) });
@@ -178,7 +177,7 @@ export async function decryptApp(app, { body = null, route = null, backend = get
   return r;
 }
 
-// ---- Add Tweaks -------------------------------------------------------------------------------------------------
+// ---- Build IPA with Tweaks --------------------------------------------------------------------------------------
 
 // The decrypted copy (decrypting first when there is none, after asking), then library.addTweaks with the prepared
 // tweaks; the new IPA's page opens. -> its file name, or null.
