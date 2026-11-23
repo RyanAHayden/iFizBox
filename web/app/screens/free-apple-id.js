@@ -27,6 +27,7 @@ import { parseProfile } from "../core/signing.js";
 import { storedUdid } from "./signing.js";
 import { MERGED_PAGE } from "../core/signingpage.js";
 import { loadStyle } from "../nav/motion.js";
+import { easeOut, TOP_MS } from "../nav/tabbar.js";
 
 export const FREE_KEY = "ifizbox.freeid";
 const ANISETTE_KEY = "ifizbox.freeid.anisette";
@@ -130,6 +131,116 @@ function button(label, onClick, cls = "", footer = null) {
   return grouped([{ rows: [{ label, onClick, cls: cls || "free-button" }], footer }]); // ui.js takes one class per row
 }
 
+// B369: Sign In's and Verify's buttons as one row, Cancel left and the action right: a one-row grouped table split in
+// two halves by a line, like Home's Settings | Theme pair (freeid.css .free-split). The footer stays under the pair.
+//   signInButtons({ busy, wait, onSignIn, onCancel }) / codeButtons({ onVerify, onCancel })
+//                                        pure: { rows: [{ label, cls, onClick }] (left to right), footer }
+//   splitButtons({ rows, footer })       the group
+export function signInButtons({ busy = false, wait = null, onSignIn = () => {}, onCancel = () => {} } = {}) {
+  return { rows: [{ label: "Cancel", cls: "free-button", onClick: onCancel },
+    { label: busy ? "Signing In…" : "Sign In", cls: "free-primary", onClick: onSignIn }],
+  footer: wait ? freeWaitFooter(wait) : FREE_PASSWORD_FOOTER };
+}
+export function codeButtons({ onVerify = () => {}, onCancel = () => {} } = {}) {
+  return { rows: [{ label: "Cancel", cls: "free-button", onClick: onCancel }, { label: "Verify", cls: "free-primary", onClick: onVerify }],
+    footer: null };
+}
+export function splitButtons({ rows, footer = null }) {
+  const g = el("div", "group");
+  const ul = el("ul", "table grouped free-split");
+  for (const r of rows) {
+    const li = el("li", `cell ${r.cls}`);
+    const b = el("button", "cell-inner");
+    b.type = "button";
+    b.addEventListener("click", r.onClick);
+    const text = el("span", "cell-text");
+    text.append(el("span", "cell-label", r.label));
+    b.append(text);
+    li.append(b);
+    ul.append(li);
+  }
+  g.append(ul);
+  if (footer) g.append(el("p", "group-footer", footer));
+  return g;
+}
+
+// B369: tapping Use a Free Apple ID brings the Sign In group to the top of the page, under the nav bar (the page's
+// .page-body runs under the fixed #navbar), so both fields and the buttons are in view. TOP_GAP leaves the header room.
+//   scrollTarget({ groupTop, scrollerTop, scrollTop, navBottom, max })   pure: the scrollTop that puts it there
+export const TOP_GAP = 8;
+export function scrollTarget({ groupTop, scrollerTop, scrollTop, navBottom = scrollerTop, max = Infinity, gap = TOP_GAP }) {
+  const cover = Math.max(0, navBottom - scrollerTop);
+  return Math.round(Math.max(0, Math.min(max, scrollTop + groupTop - scrollerTop - cover - gap)));
+}
+const KEYBOARD_MS = 1200; // how long after the tap a keyboard opening may still move the page
+
+function targetFor(group, scroller, win, max = scroller.scrollHeight - scroller.clientHeight) {
+  const nav = win.document?.getElementById?.("navbar");
+  return scrollTarget({ groupTop: group.getBoundingClientRect().top, scrollerTop: scroller.getBoundingClientRect().top,
+    scrollTop: scroller.scrollTop, navBottom: nav ? nav.getBoundingClientRect().bottom : scroller.getBoundingClientRect().top,
+    max });
+}
+// The block sits near the end of the Signing page, so the page may end before the group reaches the top: while Sign In
+// is open an empty .free-room at the very end of the scroller gives the missing height (where the keyboard opens on a
+// phone); render() takes it away. The Signing page's own redraw replaces the scroller's children, room included.
+function makeRoom(group, scroller, win) {
+  scroller.querySelector(":scope > .free-room")?.remove();
+  const short = targetFor(group, scroller, win, Infinity) - (scroller.scrollHeight - scroller.clientHeight);
+  if (short <= 0) return;
+  const room = el("div", "free-room");
+  room.style.height = `${Math.ceil(short)}px`;
+  room.setAttribute("aria-hidden", "true");
+  scroller.append(room);
+}
+function dropRoom(box) {
+  box.closest?.(".page-body, [data-scroller]")?.querySelector(":scope > .free-room")?.remove();
+}
+
+// A smooth slide of our own (nav/tabbar.js B57: scrollTo's smooth jumped on iOS 15 WebKit), TOP_MS with its ease-out;
+// a touch on the page ends it; an instant jump when the viewer asked for less motion.
+function slideTo(scroller, to, win) {
+  const from = scroller.scrollTop;
+  const raf = win.requestAnimationFrame;
+  const reduce = win.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  if (Math.abs(to - from) < 1) return;
+  if (reduce || !raf) { scroller.scrollTop = to; return; }
+  let t0 = null, done = false;
+  const stop = () => { done = true; scroller.removeEventListener("touchstart", stop); };
+  scroller.addEventListener("touchstart", stop, { passive: true });
+  const frame = (now) => {
+    if (done) return;
+    t0 ??= now;
+    const p = Math.min(1, Math.max(0, (now - t0) / TOP_MS));
+    scroller.scrollTop = Math.round(from + (to - from) * easeOut(p));
+    if (p >= 1) stop(); else raf.call(win, frame);
+  };
+  raf.call(win, frame);
+}
+
+function bringToTop(box, win = globalThis) {
+  const group = box.querySelector?.(".group");
+  const scroller = group?.closest?.(".page-body, [data-scroller]");
+  if (!scroller) return;
+  makeRoom(group, scroller, win);
+  slideTo(scroller, targetFor(group, scroller, win), win);
+  // The keyboard opening on the field's focus can scroll the page to the field on its own: put the group back once
+  // the visible area has settled (visualViewport resize), within KEYBOARD_MS of the tap.
+  const vv = win.visualViewport;
+  if (!vv?.addEventListener) return;
+  let timer = 0;
+  const settle = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (!group.isConnected) return;
+      const to = targetFor(group, scroller, win);
+      if (Math.abs(to - scroller.scrollTop) > 2) slideTo(scroller, to, win);
+    }, 120);
+  };
+  vv.addEventListener("resize", settle);
+  vv.addEventListener("scroll", settle);
+  setTimeout(() => { vv.removeEventListener("resize", settle); vv.removeEventListener("scroll", settle); }, KEYBOARD_MS);
+}
+
 // F317: the route's hints in the iOS 6 hint style (AGENTS.md, Hints): each under the group it explains, one or two
 // short sentences, never joined. Entry: under Use a Free Apple ID. Sign-in: the spare-ID advice under the Apple ID
 // fields, the password note under Sign In (or, while Apple makes us wait, the wait in its place: the fix). Ready: the
@@ -173,10 +284,16 @@ function render(box, ctx) {
   const { store } = ctx;
   const saved = loadFreeIdentity(store);
   const parts = [];
+  if (!(flow.open && (flow.view === "signin" || flow.view === "code"))) dropRoom(box); // B369: bringToTop's room
   if (!flow.open) {
     const has = saved ? "Set Up" : null;
     parts.push(grouped([{ header: "Free Apple ID",
-      rows: [{ label: "Use a Free Apple ID", detail: has, onClick: () => { flow.open = true; if (saved && !flow.session) flow.view = "ready"; ctx.redraw(); }, chevron: true }],
+      rows: [{ label: "Use a Free Apple ID", detail: has, onClick: () => {
+        flow.open = true;
+        if (saved && !flow.session) flow.view = "ready";
+        ctx.redraw();
+        if (flow.view === "signin") bringToTop(box); // B369: after the redraw, the Sign In group at the top
+      }, chevron: true }],
       footer: FREE_ENTRY_FOOTER }]));
   } else if (flow.view === "signin") parts.push(...signInView(ctx));
   else if (flow.view === "code") parts.push(...codeView(ctx));
@@ -200,10 +317,10 @@ function signInView(ctx) {
   const wait = waitingUntil(ctx.store);
   const fields = table("Sign In With a Free Apple ID", email.li, pw.li);
   fields.append(el("p", "group-footer", FREE_FIELDS_FOOTER));
-  const out = [fields,
-    button(flow.busy ? "Signing In…" : "Sign In", go, "free-primary", wait ? freeWaitFooter(wait) : FREE_PASSWORD_FOOTER),
-    button("Cancel", () => { flow.open = false; ctx.redraw(); })];
-  queueMicrotask(() => (flow.email ? pw.input : email.input).focus?.());
+  const out = [fields, splitButtons(signInButtons({ busy: flow.busy, wait, onSignIn: go,
+    onCancel: () => { flow.open = false; ctx.redraw(); } }))];
+  // B369: no scroll of the focus's own: the page puts the group at the top (bringToTop)
+  queueMicrotask(() => (flow.email ? pw.input : email.input).focus?.({ preventScroll: true }));
   return out;
 }
 
@@ -289,8 +406,8 @@ function codeView(ctx) {
   // F317: the hint under the field it explains, not a footer-only group after Verify
   const fields = table("Two-Factor Authentication", code.li);
   fields.append(el("p", "group-footer", flow.sms ? `Enter the code Apple texted to ${flow.sms.number}.` : "Enter the code shown on your other Apple devices."));
-  return [fields, button("Verify", go, "free-primary"),
-    button("Cancel", () => { flow.view = "signin"; flow.session = null; ctx.redraw(); })];
+  return [fields, splitButtons(codeButtons({ onVerify: go,
+    onCancel: () => { flow.view = "signin"; flow.session = null; ctx.redraw(); } }))];
 }
 
 // ---- setup ----

@@ -13,6 +13,9 @@
 :is(.free-button, .free-primary, .free-danger) .cell-inner { justify-content: center; }
 :is(.free-button, .free-primary, .free-danger) .cell-text { flex: none; }
 @media (prefers-reduced-motion: reduce) { .free-step.is-running .free-mark { animation-duration: 3s; } }
+/* B369: Cancel | Sign In (and Cancel | Verify) as one grouped table split in two halves, like Home's Settings | Theme. */
+.table.grouped.free-split { display: flex; }
+.free-split > .cell { flex: 1 1 0; min-width: 0; }
 
 /* ==== look-only { ==== the checklist's marks, fields and buttons */
 :root {
@@ -46,6 +49,11 @@
 :is(.free-button, .free-primary, .free-danger) .cell-text { text-align: center; }
 .free-primary .cell-label { color: var(--detail); }
 .free-danger .cell-label { color: #b5322c; }
+/* the split's line: the grouped divider turned upright (iOS 6: its shadow, then its highlight); the later eras' hairline */
+html .table.grouped.free-split > .cell + .cell { border-top: 0; border-left: 1px solid var(--divider); background: none; }
+html .table.grouped.free-split > .cell + .cell > .cell-inner { box-shadow: inset 1px 0 0 var(--divider-hi); }
+html:is([data-style="ios7"], [data-style="ios13"], [data-style="ios26"]) .table.grouped.free-split > .cell + .cell { border-left-width: .5px; }
+html:is([data-style="ios7"], [data-style="ios13"], [data-style="ios26"]) .table.grouped.free-split > .cell + .cell > .cell-inner { box-shadow: none; }
 /* ==== } look-only ==== */
 
 /* F254i: Developer Mode and Trust (free-apple-id.js devModeView). The step cards are the Signing walkthrough's

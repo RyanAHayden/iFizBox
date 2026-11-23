@@ -1,0 +1,17 @@
+record: ok ios26
+manage: [ 355, 22 ]
+rows: 3
+tap 1 at [ 41, 22 ] {"button":"Select…","menus":["All Apps | Expiring Soon (0) | Not Signed Here (3) | With Updates (0)"],"picked":0}
+tap 2 {"button":"Select…","menus":["All Apps | Expiring Soon (0) | Not Signed Here (3) | With Updates (0)"],"picked":0}
+tap 3 {"button":"Select…","menus":["All Apps | Expiring Soon (0) | Not Signed Here (3) | With Updates (0)"],"picked":0}
+tap 4 {"button":"Select…","menus":["All Apps | Expiring Soon (0) | Not Signed Here (3) | With Updates (0)"],"picked":0}
+tap 5 {"button":"Select…","menus":["All Apps | Expiring Soon (0) | Not Signed Here (3) | With Updates (0)"],"picked":0}
+tap 6 {"button":"Select…","menus":["All Apps | Expiring Soon (0) | Not Signed Here (3) | With Updates (0)"],"picked":0}
+tap 7 {"button":"Select…","menus":["All Apps | Expiring Soon (0) | Not Signed Here (3) | With Updates (0)"],"picked":0}
+tap 8 {"button":"Select…","menus":["All Apps | Expiring Soon (0) | Not Signed Here (3) | With Updates (0)"],"picked":0}
+tap 9 {"button":"Select…","menus":["All Apps | Expiring Soon (0) | Not Signed Here (3) | With Updates (0)"],"picked":0}
+tap 10 {"button":"Select…","menus":["All Apps | Expiring Soon (0) | Not Signed Here (3) | With Updates (0)"],"picked":0}
+tap 11 {"button":"Select…","menus":["All Apps | Expiring Soon (0) | Not Signed Here (3) | With Updates (0)"],"picked":0}
+tap 12 {"button":"Select…","menus":["All Apps | Expiring Soon (0) | Not Signed Here (3) | With Updates (0)"],"picked":0}
+end {"button":"Select…","menus":["All Apps | Expiring Soon (0) | Not Signed Here (3) | With Updates (0)"],"picked":0}
+after a slow tap {"button":"Deselect","menus":[],"picked":3}

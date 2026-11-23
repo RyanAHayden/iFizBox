@@ -2155,7 +2155,8 @@ export function openHtmlDepiction(url, title, { backend = getBackend(), open = o
   };
   Promise.resolve().then(() => backend.fetch(url)).then(async (res) => {
     const html = await res.text();
-    const view = depictionView({ html, headers: res.headers, mixed, origin: globalThis.location?.origin });
+    const headers = backend.kind === "http" ? proxiedFraming(res.headers) : res.headers;
+    const view = depictionView({ html, headers, mixed, origin: globalThis.location?.origin });
     if (!box.isConnected) return;
     if (view === "refused") outside(`${hostOf(url)} doesn't let its depiction open inside ${NAME}.`);
     else frame(view === "live", html);
@@ -2168,7 +2169,8 @@ const hostOf = (url) => { try { return new URL(url).host; } catch { return url; 
 
 // B365: how a fetched HTML depiction shows.
 //   "refused": the host forbids framing (X-Frame-Options, or a CSP frame-ancestors that leaves us out; the app sees
-//              the headers, the site's proxy doesn't pass them on), so Open in Safari instead of a white frame;
+//              the headers, the site reads them from the proxy's X-Upstream-* ones, proxiedFraming), so Open in
+//              Safari instead of a white frame;
 //   "static":  the page's own HTML in srcdoc with scripts off: an http page on the https site (mixed content), or a
 //              page whose scripts can't run in the sandbox's opaque origin anyway (module or crossorigin scripts need
 //              CORS, which a host rarely grants origin null: Havoc's Next.js depictions), and that has text to show;
@@ -2190,6 +2192,18 @@ export function framingRefused(headers, origin = "") {
   if (ancestors.length) return ancestors.some((d) => !d.slice(1).some((s) => sourceMatches(s, origin)));
   const xfo = String(header(headers, "x-frame-options") ?? "").trim().toLowerCase();
   return xfo !== "" && xfo !== "allowall";
+}
+
+// F383: the site's proxy (/api/fetch, worker/src/index.js upstreamFraming) hands the page's framing headers on under
+// names of its own, X-Upstream-Frame-Options and X-Upstream-Frame-Ancestors (one comma-separated source list per
+// policy); its own Content-Security-Policy is the proxy's, never the page's. Turned back into the page's headers here.
+export function proxiedFraming(headers) {
+  const out = {};
+  const xfo = header(headers, "x-upstream-frame-options");
+  if (xfo) out["x-frame-options"] = xfo;
+  const lists = header(headers, "x-upstream-frame-ancestors");
+  if (lists) out["content-security-policy"] = String(lists).split(",").map((l) => `frame-ancestors ${l.trim()}`).join(", ");
+  return out;
 }
 
 function sourceMatches(src, origin) {
