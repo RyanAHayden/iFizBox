@@ -53,6 +53,17 @@ test("sideload build: App Tweaks follows Section Visibility, Block and the newes
   assert.deepEqual(c.sections(ALL, { hidden: true }).sections, [{ name: APP_TWEAKS, count: 1, hidden: true }]);
   assert.deepEqual(c.list(ALL, APP_TWEAKS), []);
   assert.deepEqual(c.search("lite", { section: APP_TWEAKS }), []);
+  // A tweak whose own section is hidden (from its source's page) leaves the count and the list alike.
+  c.setHidden(["Tweaks"]);
+  assert.deepEqual(names(c), [], "no App Tweaks row counting tweaks its list would leave out");
+  assert.deepEqual(c.list(ALL, APP_TWEAKS), []);
+  // A Tweak Source loaded after the section was built shows at once.
+  c.setHidden([]);
+  c.setBlocked([]);
+  c.load("deb:https://repo.z/:./", "Package: com.z.new\nName: NewLite\nArchitecture: iphoneos-arm64\nSection: Tweaks\nVersion: 1\nDepends: mobilesubstrate\n",
+    "https://repo.z/", "iphoneos-arm64", { tweaks: true });
+  assert.deepEqual(c.list(ALL, APP_TWEAKS).map((r) => r.id), ["com.x.ig", "com.z.new", "com.x.yt"]);
+  assert.deepEqual(c.sections(ALL).sections, [{ name: APP_TWEAKS, count: 3 }]);
   // Back to a jailbroken device: Tweak Sources are reloaded as plain sources there, so no App Tweaks.
   c.setHidden([]);
   c.setDevice({ ios: "17.0", jailbreak: "rootless" });

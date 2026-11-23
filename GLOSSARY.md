@@ -109,3 +109,10 @@ _Said_: swipe back, back swipe, edge swipe
 _On screen_: (a gesture: no wording)
 _In code_: nav/swipe.js attachEdgeSwipe, attachPageSwipe, pageSwipeBlocked
 _Avoid_: back gesture, pop gesture
+
+**App Tweaks**:
+The section under All Sources in the sideload build that lists every tweak from your Tweak Sources that can be added to an app
+_Said_: App Tweaks
+_On screen_: App Tweaks
+_In code_: APP_TWEAKS, tweakRows
+_Avoid_: injectable section, tweak apps

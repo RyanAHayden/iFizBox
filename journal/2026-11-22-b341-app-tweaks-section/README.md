@@ -45,8 +45,16 @@ User report: All Sections has no Tweaks or App Tweaks section.
   machine) and an added `http://127.0.0.1` source was turned into https, so App Tweaks had nothing; fixed in the
   test shell only (the URL rewrite), not in the app.
 
+  - sideload mode, Search > Filter (`search.json`, `sl-search-filter.png`): the Section group reads All Sections |
+    All Tweaks | All Themes | All Apps | All Utilities | App Tweaks | Apps (Utilities).
+
+## Spec review
+
+A fresh subagent saw the diff and the brief. Fixed: App Tweaks' count no longer includes tweaks whose own
+section is hidden (from a Tweak Source's page), since its list leaves them out. Checked and not a bug: a Tweak
+Source loaded after App Tweaks was built does show up, because every load drops the All Sources merge, which is
+what the cache follows; a test now covers it. Added the Search filter shot it asked for.
+
 ## Not verified
 
-- Search's filter sheet was not shot in Chromium: it draws its Section rows from the same `catalog.sections(ALL)`
-  that the Sections page shot shows, and the search side is covered by the unit test.
 - Not tried on a phone: a web-only change, checkable in Chromium (AGENTS.md: phone only when Chromium can't check).

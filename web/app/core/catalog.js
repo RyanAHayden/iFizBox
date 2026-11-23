@@ -613,9 +613,9 @@ export function createCatalog() {
     return tweakMerged;
   }
   // What App Tweaks lists: those rows outside hidden sections, blocked ids and hidden authors (and misfits).
-  function tweakRows({ withHidden = false } = {}) {
+  function tweakRows() {
     if (!tweakEntries().size) return [];
-    return tweakSorted.filter((r) => !(fitFilter && isIncompatible(r.compat)) && (withHidden ? !byHiddenAuthor(r) && !isBlocked(r) : !isHidden(r)));
+    return tweakSorted.filter((r) => !(fitFilter && isIncompatible(r.compat)) && !isHidden(r));
   }
   // An entry of `key`, or (All Sources, sideload build) of the App Tweaks merge: a tweak opened from that section.
   const entryOf = (id, key) => entries(key).get(id) ?? (key === ALL ? tweakEntries().get(id) : undefined);
@@ -660,7 +660,7 @@ export function createCatalog() {
       .map(([name, count]) => (withHidden ? { name, count, hidden: hidden.has(name) } : { name, count }))
       .sort((a, b) => collator.compare(a.name, b.name));
     // B341: the sideload build's App Tweaks, under All Sources (each Tweak Source keeps its own sections).
-    const tweaks = key === ALL ? tweakRows({ withHidden: true }).length : 0;
+    const tweaks = key === ALL ? tweakRows().length : 0;
     if (tweaks && (withHidden || !hidden.has(APP_TWEAKS))) {
       list.push(withHidden ? { name: APP_TWEAKS, count: tweaks, hidden: hidden.has(APP_TWEAKS) } : { name: APP_TWEAKS, count: tweaks });
       list.sort((a, b) => collator.compare(a.name, b.name));
