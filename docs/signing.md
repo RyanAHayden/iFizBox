@@ -685,6 +685,8 @@ go unmapped). The app's signer writes them to the log (`Profile.keychainLine`, `
 job returns them as `signLog` (`core/websign.js keychainLogLine`, `core/groupfix.js groupFixLogLine`), which the
 page writes to the browser console.
 
+Every launch of an app signed with the group fix adds a line to its own `Library/ifizbox-groupfix.log` (and the system log): the time, bundle ID, version, whether the app ran before and how many preferences it has, its keychain groups by name, how many passwords, internet passwords and keys it can see in each group (counts only, never item names or values), what the group fix copied in and whether it pinned the app's keychain. The file keeps its last 200 lines and lives in the app's container, not in its preferences, so an app that clears its own settings leaves it in place. A log that starts anew means a new container (the app was deleted and installed again, or it is another bundle ID); a long log beside lost settings means the app cleared them itself.
+
 What iOS doesn't let a re-sign keep:
 
 - **Another team, or another App ID**: installd refuses the update (`MismatchedApplicationIdentifierEntitlement`),
