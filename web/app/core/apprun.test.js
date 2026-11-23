@@ -48,7 +48,7 @@ test("signs ahead (2 at a time), installs one at a time in order, iFizBox last",
   ph.signed("c");
   await flush();
   assert.equal(rows[1].state, "signed");
-  assert.equal(rowStatus(rows[1]), "Signed");
+  assert.equal(rowStatus(rows[1]), "Signed: Waiting to Install");
   // b waits for a's install, even though it is signed
   assert.equal(ph.events.filter((e) => e.startsWith("install")).length, 1);
   ph.installed("a");

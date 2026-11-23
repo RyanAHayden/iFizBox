@@ -685,7 +685,7 @@ html[data-style="ios26"][data-theme] {
   --progress-seg: var(--i26-seg-track); --progress-seg-selected: var(--i26-seg-pill); --progress-seg-edge: var(--i26-seg-track);
   --progress-seg-divider: inset 1px 0 0 var(--i26-seg-divider); --progress-seg-shadow: none; --progress-seg-emboss: none;
   --progress-seg-text: var(--i26-seg-text);
-  --qr-bar: var(--i26-run-track) padding-box; --qr-fill: var(--i26-tint);
+  --qr-bar: var(--i26-run-track) padding-box; --qr-fill: var(--i26-tint); --qr-stripe: rgba(0,0,0,.5);
   --progress-track: var(--i26-run-track) content-box; --progress-track-edge: transparent; --progress-fill: var(--i26-tint);
   --progress-finish: var(--i26-tint); --progress-finish-pressed: linear-gradient(rgba(0,0,0,.2), rgba(0,0,0,.2)), var(--i26-tint);
   --progress-finish-ring: none; --progress-finish-emboss: none; --progress-finish-pressed-emboss: none; --progress-finish-text: #fff;
@@ -729,6 +729,7 @@ html[data-style="ios26"] .qr-row[data-state="cancelled"] .qr-status { color: var
 html[data-style="ios26"] .qr-summary { font-weight: 600; color: var(--i26-label); }
 /* UIProgressView: a 4pt capsule */
 html[data-style="ios26"] .qr-bar { border: solid transparent; border-width: 2.5px 0; border-radius: 2px / 4.5px; }
+html[data-style="ios26"] .qr-native .qr-wait { border-radius: 2px; }
 html[data-style="ios26"] .qr-fill, html[data-style="ios26"] .progress-fill { border-radius: 2px; }
 /* the stop: the App Store's stop glyph, a small rounded square in a thin ring, painted in the tint through a mask */
 html[data-style="ios26"] .qr-stop {

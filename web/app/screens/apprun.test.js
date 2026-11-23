@@ -78,7 +78,12 @@ test("a queue of 3 with one stopped at iOS's prompt installs the other two, in o
   assert.deepEqual(s.l.calls.install, ["a"]);
   const rows = rowsOf(s.page);
   assert.equal(statusOf(rows[0]), "Tap Install on the iOS prompt");
-  assert.equal(statusOf(rows[1]), "Signed");
+  assert.equal(statusOf(rows[1]), "Signed: Waiting to Install");
+  // F391: waiting its turn, its bar shows, full with stripes; Alpha's (with iOS) doesn't wait
+  const barOfRow = (li) => li.children[0].children[2];
+  assert.equal(barOfRow(rows[1]).hidden, false);
+  assert.ok(barOfRow(rows[1]).classList.contains("is-waiting"));
+  assert.ok(!barOfRow(rows[0]).classList.contains("is-waiting"));
   await s.l.release("a");
   assert.deepEqual(s.l.calls.install, ["a", "b"]);
   // Beta's round stop button: only Beta is cancelled, Gamma goes to iOS

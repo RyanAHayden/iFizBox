@@ -561,7 +561,7 @@ html[data-style="ios13"][data-theme] {
   --progress-seg: #1c1c1e; --progress-seg-selected: #636366; --progress-seg-edge: #1c1c1e;
   --progress-seg-divider: inset 1px 0 0 #3a3a3c; --progress-seg-shadow: none; --progress-seg-emboss: none;
   --progress-seg-text: #fff;
-  --qr-bar: #3a3a3c padding-box; --qr-fill: var(--i13-console-tint);
+  --qr-bar: #3a3a3c padding-box; --qr-fill: var(--i13-console-tint); --qr-stripe: rgba(0,0,0,.5);
   --progress-track: #3a3a3c content-box; --progress-track-edge: transparent;
   --progress-fill: var(--i13-console-tint);
   --progress-finish: #2c2c2e; --progress-finish-pressed: #3a3a3c; --progress-finish-ring: none;

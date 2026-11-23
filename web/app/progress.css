@@ -180,8 +180,20 @@
 @keyframes qr-sweep { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
 /* B324: WebKit's own <progress> in the bar's place under the native controls hook (nav/progress.js rowBar; ios26.css
    hands it to WebKit) */
-.qr-progress { display: block; width: 100%; margin-top: 3px; }
-.qr-progress[hidden] { display: none; }
+.qr-native { position: relative; margin-top: 3px; }
+.qr-native[hidden] { display: none; }
+.qr-progress { display: block; width: 100%; }
+/* F391: a signed app waiting its turn: the bar full, stripes moving along it (one 12px stripe pair on the diagonal is
+   16.97px across). Only transform and opacity move. Over WebKit's <progress>, the 4px bar it draws. */
+.qr-wait { position: absolute; inset: 0; overflow: hidden; opacity: 0; transition: opacity .3s; pointer-events: none; }
+.qr-native .qr-wait { inset: calc(50% - 2px) 0 auto; height: 4px; }
+.qr-wait::before { content: ""; position: absolute; inset: 0 -17px; }
+.is-waiting > .qr-wait { opacity: 1; }
+.is-waiting > .qr-wait::before { animation: qr-stripes .7s linear infinite; }
+.qr-progress { transition: opacity .3s; }
+.is-waiting > .qr-progress { opacity: 0; }
+@keyframes qr-stripes { to { transform: translateX(16.97px); } }
+@media (prefers-reduced-motion: reduce) { .is-waiting > .qr-wait::before { animation: none; } }
 /* the row's stop: a grey disc with a white x, until dpkg takes the package */
 .qr-stop { flex: none; width: 44px; height: 44px; margin-right: 4px; cursor: pointer; touch-action: manipulation; }
 .qr-stop[hidden] { display: none; }
@@ -200,6 +212,8 @@
 .qr-row[data-state="skipped"] .qr-status, .qr-row[data-state="cancelled"] .qr-status { color: #ffd60a; }
 .qr-bar { border-radius: 4.5px; background: var(--qr-bar); }
 .qr-fill { border-radius: 4.5px; background: var(--qr-fill); }
+.qr-wait { border-radius: inherit; background: var(--qr-fill); }
+.qr-wait::before { background: repeating-linear-gradient(-45deg, var(--qr-stripe, rgba(255,255,255,.5)) 0 6px, transparent 6px 12px); }
 .qr-stop {
   border: 0;
   background: no-repeat center / 22px 22px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='12' fill='%23636363'/%3E%3Cpath d='M8.8 8.8l8.4 8.4M17.2 8.8l-8.4 8.4' stroke='%23fff' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E");

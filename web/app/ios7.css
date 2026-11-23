@@ -573,6 +573,10 @@ html[data-style="ios7"] .progress-seg-item:last-child { border-radius: 0 4px 4px
 html[data-style="ios7"] .progress-seg-item:active:not(.selected) { background: rgba(10,132,255,.25); }
 html[data-style="ios7"] .progress-seg-item.selected { color: #fff; }
 html[data-style="ios7"] .qr-bar, html[data-style="ios7"] .qr-fill, html[data-style="ios7"] .progress-fill { border-radius: 0; }
+/* F391: on the 2px bar the waiting stripes are dashes */
+html[data-style="ios7"] .qr-wait::before {
+  background: repeating-linear-gradient(90deg, #b7b7b7 0 8.485px, transparent 8.485px 16.97px) center / 100% 2px no-repeat;
+}
 html[data-style="ios7"] .progress-finish { border-radius: 3px; font-size: 21px; font-weight: 600; }
 
 /* B345: the review buttons (reviews.css: Write a Review, More Reviews, Report as Malicious) as iOS 7's App Store
