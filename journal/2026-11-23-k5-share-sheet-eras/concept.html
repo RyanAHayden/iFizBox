@@ -1,0 +1,235 @@
+<title>Share Sheet per Era</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+:root {
+  --bg: #f4f4f6; --fg: #1c1c1e; --muted: #6b6b72; --card: #fff; --line: #dcdce0; --accent: #0a6cff; --pick: #e8f5ec; --pickfg: #13703a;
+  --code: #eeeef2;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111113; --fg: #f2f2f4; --muted: #9a9aa2; --card: #1c1c1f; --line: #333338; --accent: #4c9aff; --pick: #13301f; --pickfg: #7fdc9f; --code: #26262a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #111113; --fg: #f2f2f4; --muted: #9a9aa2; --card: #1c1c1f; --line: #333338; --accent: #4c9aff; --pick: #13301f; --pickfg: #7fdc9f; --code: #26262a; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 15px/1.45 -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; }
+.wrap { max-width: 860px; margin: 0 auto; padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1 { font-size: 24px; margin: 0 0 4px; }
+h2 { font-size: 19px; margin: 0 0 6px; }
+h3 { font-size: 14px; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+p { margin: 6px 0; }
+.lead { color: var(--muted); }
+code { background: var(--code); border-radius: 4px; padding: 0 4px; font-size: 13px; overflow-wrap: anywhere; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin: 16px 0; min-width: 0; }
+.card.rec { border: 2px solid var(--pickfg); }
+.tag { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 2px 10px; background: var(--pick); color: var(--pickfg); margin-left: 6px; vertical-align: middle; }
+ul { margin: 6px 0; padding-left: 20px; }
+.tl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 560px) { .tl { grid-template-columns: 1fr; } }
+.tl div { min-width: 0; }
+.plus { color: var(--pickfg); } .minus { color: #c0392b; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .minus { color: #ff7a6b; } }
+:root[data-theme="dark"] .minus { color: #ff7a6b; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 13px; min-width: 520px; }
+th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+th { color: var(--muted); font-weight: 600; }
+
+/* ---- sketches: the bottom of a phone screen, ~ 1/2 scale. Fixed colours on purpose: they draw iOS, not this page. */
+.phones { display: flex; gap: 12px; overflow-x: auto; padding: 6px 2px 10px; }
+.ph { flex: 0 0 196px; }
+.ph .cap { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+.scr { position: relative; height: 330px; border-radius: 22px; overflow: hidden; background: #c9ccd2;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.18); font-family: -apple-system, "Helvetica Neue", Helvetica, sans-serif; }
+.scr::before { content: ""; position: absolute; inset: 0; background:
+  repeating-linear-gradient(#e9eaee 0 22px, #d7d9de 22px 23px); }
+.scr .dim { position: absolute; inset: 0; background: rgba(0,0,0,.4); }
+.sh { position: absolute; left: 0; right: 0; bottom: 0; }
+.ic { width: 30px; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center;
+  color: #fff; font: 700 15px/1 -apple-system, Helvetica, sans-serif; flex: none; }
+.i1 { background: #2a8f8c; } .i2 { background: linear-gradient(135deg,#21c3ff,#a51fff); } .i3 { background: #6c6cf0; } .i4 { background: #f08a24; }
+.lbl { font-size: 8px; text-align: center; margin-top: 3px; line-height: 1.15; }
+.it { width: 52px; display: flex; flex-direction: column; align-items: center; }
+/* iOS 6 */
+.s6 { background: linear-gradient(rgba(150,150,150,.75), rgba(0,0,0,.78) 22px); border-top: 1px solid rgba(255,255,255,.4); padding: 14px 6px 10px; }
+.s6 .grid { display: grid; grid-template-columns: repeat(3,1fr); row-gap: 10px; justify-items: center; }
+.s6 .lbl { color: #fafafa; font-weight: 700; text-shadow: 0 1px 0 #000; }
+.s6 .ic { box-shadow: 0 1px 1px rgba(0,0,0,.5); }
+.s6 .sys { background: radial-gradient(circle, rgba(0,0,0,.5) .6px, transparent .9px) 0 0/3px 3px, linear-gradient(#5e5e5e,#262626); box-shadow: 0 0 0 2px #d6d6d7, 0 1px 2px rgba(0,0,0,.5); }
+.s6 .cancel { margin: 10px 10px 0; height: 22px; border-radius: 6px; background: linear-gradient(#5d5d5d,#1d1e1e 50%,#0a0b0c 72%,#29292b);
+  box-shadow: 0 0 0 1.5px rgba(13,13,13,.6), inset 0 0 0 .5px rgba(255,255,255,.2); color: #fff; font: 700 10px/22px Helvetica, sans-serif; text-align: center; }
+/* iOS 7 */
+.s7 { background: rgba(247,247,248,.97); padding: 8px 0 4px; }
+.s7 .row { display: flex; gap: 2px; padding: 4px 6px; overflow: hidden; }
+.s7 .ic { border-radius: 7px; }
+.s7 .lbl { color: #333; font-size: 7.5px; }
+.s7 .hr { height: 1px; background: #d0d0d4; margin: 4px 8px; }
+.s7 .act { background: #fff; border: .5px solid #c8c8cc; color: #6d6d72; }
+.s7 .cancel { margin: 6px 4px 0; height: 22px; border-radius: 2px; background: #ebebeb; color: #007aff; font: 600 10px/22px -apple-system, sans-serif; text-align: center; }
+/* iOS 13 */
+.s13 { background: #f2f2f7; border-radius: 10px 10px 0 0; padding: 6px 0 8px; }
+.s13 .head { display: flex; align-items: center; gap: 6px; padding: 0 8px 6px; border-bottom: .5px solid #c6c6c8; }
+.s13 .head b { font-size: 8.5px; color: #000; flex: 1; } .s13 .head small { display: block; font-size: 7px; color: #8a8a8e; font-weight: 400; }
+.x { width: 13px; height: 13px; border-radius: 50%; background: #e3e3e8; color: #8a8a8e; font: 700 7px/13px sans-serif; text-align: center; flex: none; }
+.s13 .row { display: flex; gap: 2px; padding: 8px 6px 4px; }
+.s13 .lbl { color: #000; font-size: 7.5px; }
+.list { margin: 4px 8px 0; border-radius: 6px; overflow: hidden; }
+.list div { display: flex; justify-content: space-between; align-items: center; font-size: 8.5px; padding: 0 8px; height: 22px; }
+.s13 .list div { background: #fff; color: #000; } .s13 .list div + div { box-shadow: inset 0 .5px 0 #c6c6c8; }
+.gl { width: 10px; height: 10px; border: 1.2px solid currentColor; border-radius: 2px; opacity: .8; }
+/* iOS 26 */
+.s26 { left: 5px; right: 5px; bottom: 5px; background: rgba(250,250,252,.72); backdrop-filter: blur(6px);
+  border-radius: 20px; box-shadow: 0 0 0 .5px rgba(255,255,255,.9) inset, 0 6px 18px rgba(0,0,0,.18); padding: 8px 0 8px; }
+.s26 .head { display: flex; align-items: center; gap: 6px; padding: 0 8px 4px; }
+.s26 .head b { font-size: 8.5px; color: #000; flex: 1; } .s26 .head small { display: block; font-size: 7px; color: #6e6e73; font-weight: 400; }
+.s26 .x { background: rgba(255,255,255,.8); box-shadow: 0 0 0 .5px rgba(0,0,0,.08); color: #333; }
+.s26 .row { display: flex; gap: 2px; padding: 6px 6px 4px; }
+.s26 .ic { border-radius: 8px; }
+.s26 .lbl { color: #000; font-size: 7.5px; }
+.s26 .list { border-radius: 12px; }
+.s26 .list div { background: rgba(255,255,255,.7); color: #000; } .s26 .list div + div { box-shadow: inset 0 .5px 0 rgba(0,0,0,.1); }
+/* option C: the action sheet */
+.sC { padding: 0 5px 5px; }
+.sC .btns { border-radius: 7px; overflow: hidden; }
+.sC .btns div { background: rgba(255,255,255,.96); height: 24px; display: flex; align-items: center; gap: 6px; padding: 0 8px; color: #007aff; font-size: 9px; }
+.sC .btns div + div { box-shadow: inset 0 .5px 0 #c6c6c8; }
+.sC .btns .ic { width: 15px; height: 15px; border-radius: 4px; font-size: 8px; }
+.sC .cancel { margin-top: 5px; height: 24px; border-radius: 7px; background: #fff; color: #007aff; font: 600 9px/24px -apple-system, sans-serif; text-align: center; }
+/* option A: iOS 6 grid repainted */
+.sA { background: rgba(247,247,248,.97); padding: 14px 6px 10px; }
+.sA .grid { display: grid; grid-template-columns: repeat(3,1fr); row-gap: 10px; justify-items: center; }
+.sA .lbl { color: #333; }
+.sA .act { background: #fff; border: .5px solid #c8c8cc; color: #6d6d72; }
+.sA .cancel { margin: 10px 4px 0; height: 22px; border-radius: 2px; background: #ebebeb; color: #007aff; font: 600 10px/22px -apple-system, sans-serif; text-align: center; }
+.note { font-size: 13px; color: var(--muted); }
+</style>
+
+<div class="wrap">
+<h1>Share Sheet per Era</h1>
+<p class="lead">K5: today the Share button opens iOS 6's black metal sheet in every era (iOS 7, 13 and 26 included). Three ways to give each era its own sheet. The sketches are hand-drawn at about half size. The build goes through the concept tool (the real <code>web/app</code>, live), so you can check it before it lands.</p>
+
+<div class="card">
+<h3>Today, in every era</h3>
+<div class="phones">
+  <div class="ph"><div class="cap">iOS 6 (and 7, 13, 26)</div><div class="scr"><div class="dim"></div><div class="sh s6">
+    <div class="grid">
+      <div class="it"><span class="ic sys">⧉</span><span class="lbl">Copy Link</span></div>
+      <div class="it"><span class="ic sys">▦</span><span class="lbl">Add on Another Device</span></div>
+      <div class="it"><span class="ic i1">A</span><span class="lbl">AltStore</span></div>
+      <div class="it"><span class="ic i2">S</span><span class="lbl">SideStore</span></div>
+      <div class="it"><span class="ic i3">F</span><span class="lbl">Feather</span></div>
+      <div class="it"><span class="ic i4">S</span><span class="lbl">StikStore</span></div>
+    </div><div class="cancel">Cancel</div></div></div></div>
+</div>
+<p class="note">The items are two kinds already: <b>actions</b> (Copy Link, Add on Another Device: <code>glyph:</code>) and <b>apps</b> (<code>letter</code>/<code>image</code>). iOS 7 and later show them apart: apps in a row, actions under them.</p>
+</div>
+
+<div class="card rec">
+<h2>B. One sheet, two layouts, chosen by a hook <span class="tag">Recommended</span></h2>
+<p>The era sets one hook, <code>--share-layout: grid | rows</code>, and <code>sharesheet.js</code> reads it when the sheet opens, the way <code>switch.js</code> reads <code>--sw-travel</code>. <b>grid</b> builds today's iOS 6 sheet unchanged. <b>rows</b> builds a header (title + ✕), a scrolling row of apps, an actions group and Cancel. Hooks in <code>style.css</code> lay out and hide each part. Each era's CSS only sets values.</p>
+<div class="phones">
+  <div class="ph"><div class="cap">iOS 6 · grid (unchanged)</div><div class="scr"><div class="dim"></div><div class="sh s6">
+    <div class="grid">
+      <div class="it"><span class="ic sys">⧉</span><span class="lbl">Copy Link</span></div>
+      <div class="it"><span class="ic sys">▦</span><span class="lbl">Add on Another Device</span></div>
+      <div class="it"><span class="ic i1">A</span><span class="lbl">AltStore</span></div>
+      <div class="it"><span class="ic i2">S</span><span class="lbl">SideStore</span></div>
+      <div class="it"><span class="ic i3">F</span><span class="lbl">Feather</span></div>
+      <div class="it"><span class="ic i4">S</span><span class="lbl">StikStore</span></div>
+    </div><div class="cancel">Cancel</div></div></div></div>
+  <div class="ph"><div class="cap">iOS 7 · rows</div><div class="scr"><div class="dim"></div><div class="sh s7">
+    <div class="row">
+      <div class="it"><span class="ic i1">A</span><span class="lbl">AltStore</span></div>
+      <div class="it"><span class="ic i2">S</span><span class="lbl">SideStore</span></div>
+      <div class="it"><span class="ic i3">F</span><span class="lbl">Feather</span></div>
+      <div class="it"><span class="ic i4">S</span><span class="lbl">StikStore</span></div>
+    </div>
+    <div class="hr"></div>
+    <div class="row">
+      <div class="it"><span class="ic act">⧉</span><span class="lbl">Copy Link</span></div>
+      <div class="it"><span class="ic act">▦</span><span class="lbl">Add on Another Device</span></div>
+    </div>
+    <div class="cancel">Cancel</div></div></div></div>
+  <div class="ph"><div class="cap">iOS 13 · rows (card)</div><div class="scr"><div class="dim"></div><div class="sh s13">
+    <div class="head"><span class="ic i1" style="width:18px;height:18px;font-size:9px;border-radius:4px">A</span><b>AltStore<small>Source</small></b><span class="x">✕</span></div>
+    <div class="row">
+      <div class="it"><span class="ic i1">A</span><span class="lbl">AltStore</span></div>
+      <div class="it"><span class="ic i2">S</span><span class="lbl">SideStore</span></div>
+      <div class="it"><span class="ic i3">F</span><span class="lbl">Feather</span></div>
+      <div class="it"><span class="ic i4">S</span><span class="lbl">StikStore</span></div>
+    </div>
+    <div class="list"><div>Copy Link<span class="gl"></span></div><div>Add on Another Device<span class="gl"></span></div></div>
+  </div></div></div>
+  <div class="ph"><div class="cap">iOS 26 · rows (glass)</div><div class="scr"><div class="dim" style="background:rgba(0,0,0,.18)"></div><div class="sh s26">
+    <div class="head"><span class="ic i1" style="width:18px;height:18px;font-size:9px;border-radius:5px">A</span><b>AltStore<small>Source</small></b><span class="x">✕</span></div>
+    <div class="row">
+      <div class="it"><span class="ic i1">A</span><span class="lbl">AltStore</span></div>
+      <div class="it"><span class="ic i2">S</span><span class="lbl">SideStore</span></div>
+      <div class="it"><span class="ic i3">F</span><span class="lbl">Feather</span></div>
+      <div class="it"><span class="ic i4">S</span><span class="lbl">StikStore</span></div>
+    </div>
+    <div class="list"><div>Copy Link<span class="gl"></span></div><div>Add on Another Device<span class="gl"></span></div></div>
+  </div></div></div>
+</div>
+<h3>How the tokens split</h3>
+<div class="scroll"><table>
+<tr><th>Where</th><th>What</th><th>iOS 6</th><th>iOS 7</th><th>iOS 13</th><th>iOS 26</th></tr>
+<tr><td><code>style.css</code> hooks</td><td><code>--share-layout</code></td><td>grid</td><td>rows</td><td>rows</td><td>rows</td></tr>
+<tr><td></td><td><code>--share-inset</code>, <code>--share-radius</code></td><td>0, 0</td><td>0, 0</td><td>0, 10px top</td><td>8px, 38px</td></tr>
+<tr><td></td><td><code>--share-head</code> (header shown)</td><td>none</td><td>none</td><td>flex</td><td>flex</td></tr>
+<tr><td></td><td><code>--share-icon-size</code>, <code>--share-app-w</code></td><td>57px, (grid)</td><td>60px, 76px</td><td>60px, 76px</td><td>60px, 76px</td></tr>
+<tr><td></td><td><code>--share-action-dir</code></td><td>(grid)</td><td>column: icon over label</td><td>row: label, glyph right</td><td>row</td></tr>
+<tr><td></td><td><code>--share-cancel</code> (shown)</td><td>block</td><td>block</td><td>none (✕, tap the dim)</td><td>none</td></tr>
+<tr><td><code>ios6.css</code> look tokens</td><td>sheet, dim, icon rim/metal, labels, Cancel, plus new head/row/list tokens</td><td colspan="4">every era sets its own values in <code>ios7/13/26.css</code>, light and dark (its <code>--dk-*</code> block)</td></tr>
+<tr><td>glyph art</td><td><code>--share-glyph-copy</code>, <code>--share-glyph-qr</code></td><td>white on metal</td><td>grey line art</td><td>dark line art</td><td>dark line art</td></tr>
+</table></div>
+<div class="tl">
+<div><h3>Files</h3><ul>
+<li><code>nav/sharesheet.js</code>: reads the hook, adds a <code>rows</code> builder (header, apps row, actions, ✕). Same <code>showShareSheet</code> API, no caller changes.</li>
+<li><code>style.css</code>: the share hooks (the grid's "no hook yet" in <code>docs/eras.md</code> goes away).</li>
+<li><code>ios6.css</code>: tokens for the new parts. iOS 6 pixels stay the same (3x shot diff).</li>
+<li><code>ios7.css</code>, <code>ios13.css</code>, <code>ios26.css</code>: hook and token values only.</li>
+<li><code>docs/eras.md</code> hook list, plus a <code>sharesheet.test.js</code> case for each layout.</li>
+</ul></div>
+<div><h3>Trade-off</h3><ul>
+<li class="plus">+ Each era looks like its own iOS, in the app's usual shape: hooks plus values, zero layout rules in an era (the test still holds).</li>
+<li class="plus">+ The iOS 6 path is the code that runs today.</li>
+<li class="minus">− The biggest of the three: a second builder in JS (~80 lines) and about 12 hooks.</li>
+<li class="minus">− iOS 26 glass blurs over a moving page: it uses <code>--i26-glass-blur</code> so the solid fallback still works.</li>
+</ul></div>
+</div>
+</div>
+
+<div class="card">
+<h2>A. Repaint the iOS 6 grid</h2>
+<p>Keep today's markup and layout: three to a row, Cancel at the bottom. Each era only sets the existing <code>--share-*</code> look tokens: a white sheet, flat rounded icons, line-art glyphs and a white Cancel.</p>
+<div class="phones"><div class="ph"><div class="cap">iOS 7 / 13 / 26 (iOS 7 shown)</div><div class="scr"><div class="dim"></div><div class="sh sA">
+  <div class="grid">
+    <div class="it"><span class="ic act">⧉</span><span class="lbl">Copy Link</span></div>
+    <div class="it"><span class="ic act">▦</span><span class="lbl">Add on Another Device</span></div>
+    <div class="it"><span class="ic i1">A</span><span class="lbl">AltStore</span></div>
+    <div class="it"><span class="ic i2">S</span><span class="lbl">SideStore</span></div>
+    <div class="it"><span class="ic i3">F</span><span class="lbl">Feather</span></div>
+    <div class="it"><span class="ic i4">S</span><span class="lbl">StikStore</span></div>
+  </div><div class="cancel">Cancel</div></div></div></div></div>
+<div class="tl">
+<div><h3>Files</h3><ul><li><code>ios7.css</code>, <code>ios13.css</code>, <code>ios26.css</code>: token values only.</li><li><code>ios6.css</code>: move the last literal radii into tokens.</li><li>No JS.</li></ul></div>
+<div><h3>Trade-off</h3><ul><li class="plus">+ Smallest: CSS only, an afternoon's work.</li><li class="minus">− No iOS after 6 drew a 3×3 grid. It reads as iOS 6 in a new colour, not as iOS 7, 13 or 26: no apps row, no action list, no card or glass shape.</li></ul></div>
+</div>
+</div>
+
+<div class="card">
+<h2>C. iOS 7 and later use the action sheet</h2>
+<p>Under an era, <code>showShareSheet</code> passes the items to the existing action sheet (<code>packages.css</code> <code>.action-*</code>, which every era already styles), with a small icon in front of each label.</p>
+<div class="phones"><div class="ph"><div class="cap">iOS 13 shown</div><div class="scr"><div class="dim"></div><div class="sh sC">
+  <div class="btns"><div><span class="ic act" style="background:#fff;border:.5px solid #c8c8cc;color:#6d6d72">⧉</span>Copy Link</div><div><span class="ic act" style="background:#fff;border:.5px solid #c8c8cc;color:#6d6d72">▦</span>Add on Another Device</div><div><span class="ic i1">A</span>AltStore</div><div><span class="ic i2">S</span>SideStore</div><div><span class="ic i3">F</span>Feather</div><div><span class="ic i4">S</span>StikStore</div></div>
+  <div class="cancel">Cancel</div></div></div></div></div>
+<div class="tl">
+<div><h3>Files</h3><ul><li><code>nav/sharesheet.js</code>: hand off to the action sheet when the era hook says so.</li><li>The action sheet's JS and <code>packages.css</code>: an icon slot in a button (a new hook).</li><li><code>ios7/13/26.css</code>: the icon's look.</li></ul></div>
+<div><h3>Trade-off</h3><ul><li class="plus">+ Reuses a sheet already finished in every era. Small JS.</li><li class="minus">− It's a menu, not a share sheet: no iOS showed sharing this way. A long app list gets tall, and it changes a shared component other tasks also touch.</li></ul></div>
+</div>
+</div>
+
+<div class="card rec">
+<h2>Recommendation: B</h2>
+<p>It's the only option where each era looks like its own iOS share sheet. It also matches how the action sheet and alert were split: layout in <code>style.css</code> hooks, and each era file only sets values. The iOS 6 grid stays the code that runs today, so iOS 6 has nothing to regress. The one new idea, JS reading a layout hook, is already used by <code>switch.js</code> and <code>sheet.js</code>. Planned build order: hooks and the <code>rows</code> builder with iOS 7 first, then iOS 13's card, then iOS 26's glass. Each step gets a live concept and era shots.</p>
+</div>
+</div>
