@@ -48,7 +48,6 @@ import { guideRows, JAILBREAK_INFO_URL, isLite } from "./guide-index.js";
 const guides = lazyNs("guides");
 import * as why from "./why.js"; // F303: Why <NAME> (#/home/why)
 import { NAME } from "../brand.js";
-import { notForLite } from "../core/canister.js"; // B389
 import { rowIcon, PAGE_ICONS } from "../icons/rowicons.js";
 import { nativeBridge } from "../native.js";
 import { routeFailure, ROUTE_KEY } from "../core/installroute.js"; // B316
@@ -66,8 +65,9 @@ export const CURATED_SOURCES = [
   { name: "ElleKit", uri: "https://ellekit.space/", blurb: "the tweak injection library" },
   { name: "palera1n", uri: "https://repo.palera.in/", blurb: "palera1n's own packages" },
 ].map((s) => ({ ...s, key: sourceKey({ uri: s.uri, dist: "./" }) }));
-// B389: the sideload build leaves out the repos it doesn't recommend (core/canister.js notForLite).
-export const curatedSources = (mode) => (mode === "sideload" ? CURATED_SOURCES.filter((s) => !notForLite(s.uri)) : CURATED_SOURCES);
+// B389: the sideload build leaves out the repos it doesn't recommend (core/canister.js liteRepos,
+// loaded only there: it isn't part of startup).
+export const curatedSources = async (mode) => (mode === "sideload" ? (await import("../core/canister.js")).liteRepos(CURATED_SOURCES) : CURATED_SOURCES);
 
 // B172: Home's link to Search (Find Extensions for Applications) pushes it onto Home's stack (it slides in, Back
 // returns to Home), as every other page opens; a plain #/search would switch tabs without a slide.
@@ -1058,9 +1058,10 @@ function renderSources(body, ctx) {
     } catch {
       // no store: every source shows as addable
     }
+    const curated = await curatedSources(settings.mode);
     box.replaceChildren(grouped([{
       header: "Package Sources",
-      rows: curatedSources(settings.mode).map((s) => ({
+      rows: curated.map((s) => ({
         label: s.name,
         subtitle: s.blurb || s.uri,
         checked: have.has(s.key),

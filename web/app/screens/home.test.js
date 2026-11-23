@@ -31,10 +31,10 @@ test("Home pages: titles below the root, and curated sources are flat repos with
   }
 });
 
-test("B389: Recommended Sources leaves Chariz out in the sideload build only", () => {
-  const names = (mode) => curatedSources(mode).map((s) => s.name);
-  assert.deepEqual(names("sideload"), CURATED_SOURCES.map((s) => s.name).filter((n) => n !== "Chariz"));
-  for (const mode of ["jailbreak", "site"]) assert.ok(names(mode).includes("Chariz"), mode);
+test("B389: Recommended Sources leaves Chariz out in the sideload build only", async () => {
+  const names = async (mode) => (await curatedSources(mode)).map((s) => s.name);
+  assert.deepEqual(await names("sideload"), CURATED_SOURCES.map((s) => s.name).filter((n) => n !== "Chariz"));
+  for (const mode of ["jailbreak", "site"]) assert.ok((await names(mode)).includes("Chariz"), mode);
 });
 
 test("F37: Home's hint shows while Not Jailbroken and taps through to Settings > Device", () => {

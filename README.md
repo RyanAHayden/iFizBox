@@ -6,9 +6,9 @@
 Browse APT repos and AltStore sources, install tweaks on a jailbroken iPhone, and install apps signed with your own
 certificate, on the website or in the sideloaded app.</p>
 
-<p align="center"><b>Tweaks without a jailbreak:</b> pick a tweak from an APT repo (Havoc, BigBoss) and
+<p align="center"><b>Tweaks without a jailbreak:</b> pick a tweak from an APT repo (Havoc, Chariz, BigBoss) and
 iFizBox injects it into an app you sign on the phone, with ElleKit bundled for tweaks that need it. Paid tweaks
-too, bought with your repo account (Havoc). Your own
+too, bought with your repo account (Chariz, Havoc). Your own
 <code>.deb</code>, <code>.dylib</code> or <code>.framework</code> works too, and the tweaks stay with the app when it's
 re-signed. More on <a href="https://ifizbox.com/#/home/why">Why iFizBox</a>.</p>
 
