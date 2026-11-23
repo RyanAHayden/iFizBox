@@ -96,9 +96,9 @@ function cssAlert({ title = "", message = "", input = null, buttons = ["OK"], ca
           const v = typeof input.paste === "function" ? input.paste(text) : String(text ?? "").trim();
           if (!v) return;
           field.value = v;
-          // B335: `pasteSubmits` (Sources' Add) taps a button once something usable was pasted: true taps the last
-          // one (as Return does), a number taps that one.
-          const submit = input.pasteSubmits === true ? buttons.length - 1 : input.pasteSubmits;
+          // B335: `pasteSubmits` (Sources' Add: the Add Source button's index) taps that button once something
+          // usable was pasted, so the alert answers as if it were tapped.
+          const submit = input.pasteSubmits;
           if (Number.isInteger(submit) && submit >= 0 && submit < buttons.length) close(submit);
           else field.focus({ preventScroll: true });
         });

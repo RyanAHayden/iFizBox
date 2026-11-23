@@ -1,8 +1,8 @@
 # B335: Sources' Add: Paste adds the source at once
 
 ## What I did
-- `web/app/nav/alert.js`: new opt-in `input.pasteSubmits` (true = the last button, as Return does; a number = that
-  button). When Paste gives something usable (the `paste` function's result is non-empty) the field takes it and
+- `web/app/nav/alert.js`: new opt-in `input.pasteSubmits` (the index of the button to tap; Sources gives Add
+  Source's). When Paste gives something usable (the `paste` function's result is non-empty) the field takes it and
   the alert closes with that button, so the caller sees `{ index: <Add>, value: <url> }`. Nothing usable: unchanged
   (field left alone, alert stays).
 - `web/app/screens/manage.js`: `addSource` takes a 4th argument `{ pasteSubmits, alert }`. The alert itself is
