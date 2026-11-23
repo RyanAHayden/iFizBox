@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "0.21.0",
+          "date": "2026-11-23T02:04:00Z",
+          "localizedDescription": "A real iOS 26 tab bar, era icon sets, and era app icons with dark modes\niOS 26 style on iOS 26+: the tab bar is iOS's own, with its press-drag lens and shrink on scroll\niOS 13 and iOS 26 styles get their own icon sets for rows, tabs and Home\nTheme > App Icon has iOS 7, iOS 13 and iOS 26 icons that turn dark with the Home Screen\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.21.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.21.0/iFizBox.ipa",
+          "size": 39566631,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.20.1",
           "date": "2026-11-22T04:36:03Z",
           "localizedDescription": "Real Liquid Glass bars on iOS 26+, and Open Tailscale without the \"Could not sign device\" sheet\niOS 26 style in the app on iOS 26+: the tab bar, Search circle and bar buttons are iOS's own Liquid Glass\nOpen Tailscale opens the app directly instead of Tailscale's \"Could not sign device\" sheet\niOS 26 style in the app on iOS 26+: the floating tab bar, the Search circle and the nav bar's buttons are drawn by iOS as real Liquid Glass, with its refraction, over the page.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.20.1",
@@ -250,14 +258,6 @@
           "localizedDescription": "Apple Developer Account: add an App Store Connect API key and iFizBox makes each app's App ID and Ad Hoc profile itself, with Push.\nSettings > Installation & Signing is one page in the app; Remove Certificate sits beside Replace Certificate.\nA hint shows how to see the install queue while apps wait in it.\nClearer wording on how signed apps get their own notifications.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.11.0",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.11.0/iFizBox.ipa",
           "size": 15615508,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.10.0",
-          "date": "2026-11-19T23:52:46Z",
-          "localizedDescription": "Install apps right on your iPhone: pair once, then This iPhone installs over LocalDevVPN or Tailscale.\nFree Apple ID route: sign in with a free account and keep apps going with LiveContainer.\nOne-command computer setup for the free route (curl \u2026 | sh), no Docker and no GUI.\nPull to refresh on Sources, Changes and Home, and one search bar everywhere.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.10.0",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.10.0/iFizBox.ipa",
-          "size": 15526896,
           "minOSVersion": "15.0"
         }
       ]
