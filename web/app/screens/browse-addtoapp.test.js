@@ -60,7 +60,7 @@ test("worksInGroup's onCheck hears the check (Comet: a library), so the page can
 
 test("wiring: the package page hands every check to the nav bar button, the one after Buy too", () => {
   const browse = readFileSync(new URL("./browse.js", import.meta.url), "utf8");
-  assert.ok(browse.includes("worksInGroup(st, { onCheck: (info) => addToAppFollowsCheck(body, info) })"));
+  assert.ok(browse.includes("worksInGroup(st, { onCheck: (info) => addToAppFollowsCheck(body, info)"));
   const tweaks = readFileSync(new URL("./tweaks.js", import.meta.url), "utf8");
   assert.ok(tweaks.includes("await checked();"), "Sign In / Buy re-check goes through onCheck");
 });

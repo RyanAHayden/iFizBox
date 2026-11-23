@@ -214,6 +214,8 @@ export function tweaksGroup({ bundleId = "", store = tweakStore, alert = showAle
 //   await addToApp(stanza, { … })           the package page's Add to App…: checks the .deb (HUD), then an action sheet
 //                                           of the apps its filter names; the rest listed as not targeted. The picked
 //                                           app is queued as a re-sign with it (B342), or keeps it when not signed here
+//                                           F401: `app` (the app whose Add Tweaks page the tweak was opened from): no
+//                                           picker, kept for that app, then `put(app, stanza, data)` queues it
 //   await signedRecordFor(bundleId)         the signing.installed record Add to App re-signs from, or null
 //   worksInGroup(stanza)                    the package page's group: "Works In" and Add to App…, filled once checked
 
@@ -223,7 +225,7 @@ const INFO_V = 2; // B185: libraries and plain reasons
 const debKey = (st) => `${st?.package ?? ""}@${st?.version ?? ""}`;
 // F304: a GitHub release's tweak may be a bare .dylib (core/github.js X-GitHub-Asset): kept and injected as it is.
 export const isDylibTweak = (st) => String(st?.["x-github-asset"] ?? "").trim().toLowerCase() === "dylib";
-const debName = (st) => `${st.package}_${st.version ?? "0"}.${isDylibTweak(st) ? "dylib" : "deb"}`;
+export const debName = (st) => `${st.package}_${st.version ?? "0"}.${isDylibTweak(st) ? "dylib" : "deb"}`;
 const debs = new Map(); // debKey -> Uint8Array, this session only (a few at most)
 const indexed = new Map(); // F344: debKey -> the Tweak Index's verdict (entryInfo) among the sources loaded so far
 
@@ -524,6 +526,12 @@ export async function signableApps({ library = null, records = null } = {}) {
   return [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// F401: those, and the app an Add Tweaks page is for, which may not be one of them yet.
+export async function appsWith(app, apps = signableApps) {
+  const list = await apps();
+  return list.some((a) => a.bundleId === app.bundleId) ? list : [...list, { bundleId: app.bundleId, name: app.name || app.bundleId }];
+}
+
 const knownNames = (apps) => Object.fromEntries(apps.map((a) => [a.bundleId, a.name]));
 
 // Which of `apps` take the tweak: { made: [app], not: [app] }.
@@ -535,7 +543,7 @@ export function splitApps(info, apps) {
 
 export async function addToApp(st, opts = {}) {
   const { alert = showAlert, pick = pickApp, hud = null, apps = signableApps, fetchDeb, storage, store = tweakStore, paid = null,
-    sheet = showActionSheet, records = signedRecords, job = null, queue = null } = opts;
+    sheet = showActionSheet, records = signedRecords, job = null, queue = null, app: only = null, put = async () => false } = opts;
   const name = st.name || st.package;
   const hide = hud ? hud("Checking Tweak") : (await import("../nav/hud.js")).showHUD("Checking Tweak");
   let info, list, data;
@@ -550,6 +558,7 @@ export async function addToApp(st, opts = {}) {
     return null;
   }
   hide();
+  if (only) list = await appsWith(only, async () => list); // F401
   if (!info.ok) {
     await alert({ title: info.library ? "Not a Tweak for Apps" : "Can't Take This Tweak", message: info.why || "It can't go into an app.", buttons: ["OK"] });
     return null;
@@ -560,13 +569,26 @@ export async function addToApp(st, opts = {}) {
   const made = split.made.filter((a) => !locked.includes(a));
   const not = split.not;
   const works = worksInText(info, knownNames(list));
+  if (only) { // F401
+    if (locked.some((a) => a.bundleId === only.bundleId)) { await lockedAlert(only.name, { alert }); return null; }
+    if (!made.some((a) => a.bundleId === only.bundleId)) {
+      await alert({ title: "Can't Add This Tweak", message: `${name} works in ${works ?? "other apps"}, not in ${only.name}.`, buttons: ["OK"] });
+      return null;
+    }
+  }
   if (!made.length && !locked.length) {
     await alert({ title: "No App for This Tweak", message: `${name} works in ${works ?? "apps you don't have"}. `
       + "Add that app's IPA to Install IPAs (or sign it here) first.", buttons: ["OK"] });
     return null;
   }
-  const app = await pick({ name, made, locked, not, works });
+  const app = only ? made.find((a) => a.bundleId === only.bundleId) : await pick({ name, made, locked, not, works });
   if (!app || !made.includes(app)) return null;
+  if (only) {
+    await oneAtATime(app.bundleId, () => addDebTo(app.bundleId, st, data, { store }));
+    if (await put(app, st, data)) return app;
+    await alert({ title: "Tweak Added", message: `${name} goes in when ${app.name} is installed or re-signed.`, buttons: ["OK"] });
+    return app;
+  }
   // B342: the app is re-signed from its record with the tweak in, through the queue (as Installed's Re-sign): its kept
   // tweaks (under the ID it was signed from, as keptTweakParams reads them) now differ from the record's, so they go
   const rec = await signedRecordFor(app.bundleId, records);
@@ -592,6 +614,15 @@ export async function signedRecordFor(bundleId, records = signedRecords) {
   return recs.find((r) => r.bundleId === bundleId) ?? recs.find((r) => r.originalBundleId === bundleId) ?? null;
 }
 const signedRecords = async () => (hasNativeCall() ? (await nativeBridge()?.call?.("signing.installed", {}))?.apps ?? [] : []);
+
+// F401: changes to one app's kept tweaks one after another (two ADDs side by side each read the list, then write it).
+const keeping = new Map(); // bundle ID -> the last change's promise
+function oneAtATime(bundleId, f) {
+  const p = (keeping.get(bundleId) ?? Promise.resolve()).then(f, f);
+  keeping.set(bundleId, p);
+  p.catch(() => {}).then(() => { if (keeping.get(bundleId) === p) keeping.delete(bundleId); });
+  return p;
+}
 
 const needsHookLib = (st) => /(mobilesubstrate|cydia-substrate|ellekit)/i.test(`${st?.depends ?? ""} ${st?.["pre-depends"] ?? ""}`);
 
@@ -837,6 +868,7 @@ export function pickApp({ name, made, locked = [], not = [] }, { sheet = null, a
 
 // The kept tweaks' bundle ID for a queue job: the app's own (a source's bundleIdentifier, a My IPAs entry's).
 function keptIdOf(job) {
+  if (typeof job?.tweaksOf === "string" && job.tweaksOf) return job.tweaksOf === BUNDLE_ID ? null : job.tweaksOf; // F401
   const id = typeof job?.bundleId === "string" && job.bundleId ? job.bundleId : job?.id;
   return typeof id === "string" && id && !id.startsWith("library:") && id !== BUNDLE_ID ? id : null;
 }
@@ -855,11 +887,12 @@ export async function keptTweakParams(params, job, { log = () => {}, store = twe
     id = rec.originalBundleId || rec.bundleId;
     items = await savedTweaks(id, { store });
     const had = Array.isArray(rec.tweaks) ? rec.tweaks : [];
+    if (!items.length && had.length && job?.noTweaks) return { ...params, tweaks: {} }; // F401: the last one was removed
     if (!items.length || (items.length === had.length && items.every((x) => had.includes(x.name)))) return params;
   }
   if (!id) return params;
   items ??= await savedTweaks(id, { store });
-  if (!items.length) return params;
+  if (!items.length) return job?.noTweaks && params.library ? { ...params, tweaks: {} } : params; // F401
   const prepared = await preparedItems(items, { ellekit });
   const enc = toBase64 ?? (await import("../core/signing.js")).toBase64;
   const t = tweakParams(prepared, enc);
@@ -1036,13 +1069,14 @@ async function dropItem(bundleId, test, store) {
 }
 
 // One tweak's ADD / ADDED. ADD: added at once (a spinner while its .deb is read and checked), kept for the app if the
-// check passes; a paid tweak not bought offers Sign In / Buy, then ADD again (F308). ADDED: Remove. `cls` the button's
-// look (Add Tweaks' sheet: tw-add / on; the Add Tweaks page: the price button, added / adding). A button drawn again
+// check passes; a paid tweak not bought offers Sign In / Buy, then ADD again (F308). ADDED: Remove.
+// F401: `queue` ({ add(stanza), remove(row) }): also queues the app with the tweak, or takes it out of the queue.
+// `cls` the button's look (Add Tweaks' sheet: tw-add / on; the Add Tweaks page: the price button, added / adding). A button drawn again
 // while its tweak is still being added (a recycled list row) shows the spinner and waits for that add.
 const addingTweaks = new Set(); // `${bundleId}\n${package}` while ADD reads and checks its .deb
 const defaultPkg = async (r) => (await (await import("../catalog.js")).catalog.package(r.id, r.key))?.stanza;
 export function addTweakButton(r, { bundleId, on = false, cls = "tw-add", onCls = "on", busyCls = "", store = tweakStore, storage, fetchDeb,
-  paid = null, sheet = showActionSheet, alert = showAlert, pkg = defaultPkg, onChange = () => {}, onRemove = () => {} } = {}) {
+  paid = null, sheet = showActionSheet, alert = showAlert, pkg = defaultPkg, onChange = () => {}, onRemove = () => {}, queue = null } = {}) {
   const busyKey = `${bundleId}\n${r.id}`;
   const btn = el("button", `${cls}${on ? ` ${onCls}` : ""}`, on ? "ADDED" : "ADD");
   btn.type = "button";
@@ -1061,7 +1095,8 @@ export function addTweakButton(r, { bundleId, on = false, cls = "tw-add", onCls 
     if (btn.classList.contains(onCls)) { // added: Remove
       const i = await sheet({ title: r.name || r.id, buttons: ["Remove"], destructive: 0 });
       if (i !== 0) return;
-      await dropItem(bundleId, (x) => (r.file ? x.name === r.file : debOf(x.name)?.package === r.id), store); // r.file: from Files
+      await oneAtATime(bundleId, () => dropItem(bundleId, (x) => (r.file ? x.name === r.file : debOf(x.name)?.package === r.id), store)); // r.file: from Files
+      await Promise.resolve().then(() => queue?.remove(r)).catch(() => {}); // F401
       onChange();
       onRemove();
       return;
@@ -1069,7 +1104,7 @@ export function addTweakButton(r, { bundleId, on = false, cls = "tw-add", onCls 
     // green at once, a spinner while the .deb is read and checked
     busy(true);
     addingTweaks.add(busyKey);
-    let again = false, paidSt = null, added = false;
+    let again = false, paidSt = null, added = false, addedData = null;
     try {
       const st = await pkg(r);
       if (!st) throw new Error("This tweak isn't on its source any more.");
@@ -1077,8 +1112,9 @@ export function addTweakButton(r, { bundleId, on = false, cls = "tw-add", onCls 
       const info = await tweakInfo(st, { fetchDeb, storage, paid });
       if (!info.ok) throw new Error(info.why || "It can't go into an app.");
       const data = await tweakDeb(st, { fetchDeb, paid });
-      await addDebTo(bundleId, st, data, { store });
+      await oneAtATime(bundleId, () => addDebTo(bundleId, st, data, { store }));
       added = true;
+      addedData = data;
     } catch (e) {
       addingTweaks.delete(busyKey);
       busy(false);
@@ -1093,6 +1129,7 @@ export function addTweakButton(r, { bundleId, on = false, cls = "tw-add", onCls 
       btn.replaceChildren(globalThis.document.createTextNode("ADDED"));
       btn.setAttribute("aria-label", `Remove ${r.name || r.id}`);
       onChange();
+      await Promise.resolve().then(() => queue?.add(paidSt, addedData)).catch(() => {}); // F401: kept all the same
     }
     if (again) btn.click();
   });
