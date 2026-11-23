@@ -339,7 +339,7 @@ export async function addShortcut(native, k, { whenBack = backInApp, checking = 
   return { opened: true, ok: Boolean(r?.ok), error: r?.ok ? null : (r?.error || "it didn't run"), status: r?.status ?? null };
 }
 
-export const SWITCH_TEST_MS = 150000 // F394: its one trip, then an older Install Switch's runs;
+export const SWITCH_TEST_MS = 150000; // F394: its one trip, then an older Install Switch's runs
 let shortcutsTesting = false;
 const shortcutsFailed = {}; // B359: the last check run's error per Shortcut, for its footer
 

@@ -264,7 +264,7 @@ enum LocalVPN {
             end()
             throw error
         }
-        lock.lock(); lastFailure = nil; let switching = switchedOn, dataOff = start && !tripOn && switchedOn && onCellular; lock.unlock()
+        lock.lock(); lastFailure = nil; let switching = switchedOn, dataOff = start && switchedOn && onCellular && !(trip && tripSeen && tripError == nil); lock.unlock()
         if dataOff { // B375: this VPN is up, so cellular data can go off now; the end turns it back on
             step("running the Shortcut \(shortcutNames["switch"]!) (Cellular Data Off)")
             savePending(cellular: true, vpn: before)
@@ -515,13 +515,13 @@ enum LocalVPN {
             if let e = ranOut, Date().timeIntervalSince(e) > 10 { break } // a VPN needs a moment to have its address
         }
         lock.lock()
-        let done = back || ranOut != nil // the Shortcut's own end ran: nothing is left to run again
+        let done = back // not back: endSwitch runs the end (the trip keeps the remembered VPN for it)
         tripOn = false; tripGo = nil; tripBack = done
         if done { switchedOn = false } else { switchEndDue = switchedOn }
         tailing = false
         lock.unlock()
         if done { clearPending() }
-        log("Install Switch: after the trip, \(back ? "everything is back" : done ? "its end ran" : "its end didn't run")")
+        log("Install Switch: after the trip, \(back ? "everything is back" : "not everything is")")
     }
 
     /// Connect VPN (blocking): our VPN for the trip's queue. Outside one nothing would turn it off again.
@@ -554,14 +554,14 @@ enum LocalVPN {
     }
 
     /// A Wait for Install turn ended. The last one with the queue still going (a 15 min install): the Shortcut puts
-    /// everything back now, so a reconnect starts a new trip.
+    /// everything back now, and endSwitch looks again once the queue is over.
     static func tripWaited() {
         lock.lock()
         tripWaits += 1
         let out = tripWaits == waitTurns && tripOn && busy
-        if out { tripOn = false; switchedOn = false }
+        if out { tripOn = false }
         lock.unlock()
-        if out { clearPending(); log("Install Switch: the trip's waits ran out before the install") }
+        if out { log("Install Switch: the trip's waits ran out before the install") }
     }
 
     /// The Install Switch's check run: with our actions when this build has them (that proves the one trip, and iOS

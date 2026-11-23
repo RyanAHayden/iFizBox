@@ -138,7 +138,7 @@ class App(unittest.TestCase):
             self.assertEqual(modes[-1], 2, g)
         sets = [a["WFWorkflowActionParameters"] for a in acts if a["WFWorkflowActionIdentifier"].endswith("vpn.set")]
         self.assertEqual([s["WFVPNOperation"] for s in sets], ["Connect", "Connect", "Connect"])
-        last_set = len(ids) - 1 - ids[::-1].index("vpn.set")  # the end forgets before Set VPN's error 2 ends the run
+        last_set = [i for i, x in enumerate(ids) if x == "vpn.set"][1]  # the end forgets before Set VPN's error 2 ends the run
         self.assertEqual(ids[last_set - 1], "deletestoredcontent")
         flt = next(a for a in acts if ids[acts.index(a)] == "filter.vpns")["WFWorkflowActionParameters"]
         tpl = flt["WFContentItemFilter"]["Value"]["WFActionParameterFilterTemplates"][0]
@@ -199,7 +199,7 @@ class App(unittest.TestCase):
         steps = [i for i in ids[first:last] if i not in ("conditional",)]
         self.assertEqual(steps, ["vpn.get", "setstoredcontent", "deletestoredcontent", me + "ConnectVPNIntent", "cellulardata.set",
                                  me + "OpenForInstallIntent", "repeat.count", me + "WaitForInstallIntent", "repeat.count",
-                                 "cellulardata.set", "delay", "getstoredcontent", "deletestoredcontent", "vpn.set"])
+                                 "cellulardata.set", "delay", "getstoredcontent", "vpn.set"])
         data = [p["OnValue"] for i, p in list(zip(ids, params))[first:last] if i == "cellulardata.set"]
         self.assertEqual(data, [False, True])
         loop = next(p for i, p in zip(ids, params) if i == "repeat.count")

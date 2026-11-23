@@ -1020,7 +1020,7 @@
 				<integer>2</integer>
 			</dict>
 		</dict>
-		<!--   data on (a VPN starts only with a network: 3 s to get one), then the remembered VPN, forgotten first as in the end -->
+		<!--   data on (a VPN starts only with a network: 3 s to get one), then the remembered VPN (kept, so the app's end can try again; the next start replaces it) -->
 		<dict>
 			<key>WFWorkflowActionIdentifier</key>
 			<string>is.workflow.actions.conditional</string>
@@ -1123,15 +1123,6 @@
 						<string>WFTextTokenAttachment</string>
 					</dict>
 				</dict>
-			</dict>
-		</dict>
-		<dict>
-			<key>WFWorkflowActionIdentifier</key>
-			<string>is.workflow.actions.deletestoredcontent</string>
-			<key>WFWorkflowActionParameters</key>
-			<dict>
-				<key>WFStoredContentKey</key>
-				<string>previous VPN</string>
 			</dict>
 		</dict>
 		<dict>
