@@ -42,6 +42,8 @@
 //       it forgets core/installed.js's record, as the Installed section's row does); "jailbreak": "Remove" (apt's
 //       queued remove); none given: neither
 //   MARK_NOT_INSTALLED, destructiveOf(buttons) -> that button's index for showActionSheet's `destructive` (red), or -1
+// F379: a Custom Install saves its IPA in My IPAs (customInstallSave), and a Re-sign signs that saved IPA
+//   (savedResignJob, withSavedIpa; the queue keeps a resign job's `library` and options)
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { modeOf } from "./queue.js";
 import { compareVersions } from "./apt.js";
@@ -79,6 +81,11 @@ export function createAppQueue() {
         // F221: a marked app's re-sign carries its installed version's IPA url (markedResignJob): that is downloaded
         const job = { op: "resign", id, name: name || null, version: version || installed || null, installed: installed || version || null,
           mode: "resign", url: url || null, size: url ? Number(size) || null : null, icon, key, source, sourceName, deps: [], options: null };
+        // F379: a re-sign from the app's saved IPA in My IPAs (savedResignJob) keeps its file and Sign Options
+        if (!url && typeof library === "string" && library) {
+          job.library = library;
+          job.options = options && typeof options === "object" ? options : null;
+        }
         jobs.set(id, job);
         emit1(job);
         return job;
@@ -278,4 +285,39 @@ export function customParams(job, now = Date.now()) {
   delete edits.url;
   const fresh = o.token && Number.isFinite(o.at) && now - o.at < TOKEN_LIFE;
   return fresh ? { token: o.token, ...edits } : { url: job.url, ...edits };
+}
+
+// ---- F379: a custom install's saved IPA (core/myipas.js saveInstalledIpa) ------------------------------------------
+//
+//   customInstallSave(job) -> saveInstalledIpa's first argument for a Custom Install job (it has options and a url),
+//                        with the edits it was signed with; null for anything else (a source's plain Install, a My IPAs
+//                        file, iFizBox itself, a Remove)
+//   savedResignJob(job, entries, { match }) -> a Re-sign with no url of its own, signed from the app's saved IPA when
+//                        My IPAs has that app at the installed version (`match`: core/myipas.js savedIpa; its file and
+//                        Sign Options, as libraryJob's); else the job
+//   await withSavedIpa(job, { call }) -> savedResignJob over library.list (the job as it is when the list fails);
+//                        core/myipas.js is loaded only then, so it stays out of the app's startup modules
+export function customInstallSave(job) {
+  if (!job || job.op === "remove" || job.library || job.id === SELF_ID || !job.url || !job.options) return null;
+  const edits = { ...(job.options.edits ?? {}) };
+  delete edits.token;
+  delete edits.url;
+  const id = typeof job.id === "string" && !job.id.startsWith("library:") ? job.id : null;
+  return { url: job.url, bundleId: id, version: job.version || null, edits };
+}
+
+export function savedResignJob(job, entries, { match } = {}) {
+  if (job?.mode !== "resign" || job.url || job.library || typeof match !== "function") return job;
+  const entry = match(entries, { bundleId: job.id, version: job.installed || job.version });
+  const lj = entry ? libraryJob(entry, { installed: true }) : null;
+  if (!lj) return job;
+  return { ...job, library: entry.file, options: lj.options, size: lj.size ?? job.size ?? null };
+}
+
+export async function withSavedIpa(job, { call } = {}) {
+  if (job?.mode !== "resign" || job.url || job.library || typeof call !== "function") return job;
+  try {
+    const { savedIpa } = await import("./myipas.js");
+    return savedResignJob(job, (await call("library.list", {}))?.ipas, { match: savedIpa });
+  } catch { return job; }
 }

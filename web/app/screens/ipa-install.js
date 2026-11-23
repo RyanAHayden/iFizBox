@@ -6,6 +6,7 @@
 //     (initIpaLinks, app.js)
 // F88: a successful install is remembered (core/installed.js) for the Installed tab's Apps page and Changes: the
 // AltStore row's with its source (installRows' onInstall), a URL's or link's by bundle id (rememberIpa).
+// F379: a URL's or link's IPA is saved in My IPAs as well (saveIpaCopy).
 // All open the same progress page as the install queue's (F151: nav/progress.js): the shell's and helper's lines as
 // they come, installd's pmstatus progress on the bar, then Close (installd puts the app on the home screen itself, so
 // no uicache; Close iFizBox only for iFizBox's own IPA, which has to quit) (B61: Restart
@@ -31,6 +32,7 @@ import { NAME } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
 import { showHUD } from "../nav/hud.js";
 import { nativeBridge } from "../native.js";
+import { saveInstalledIpa } from "../core/myipas.js"; // F379
 import { APPSYNC_ID, APPSYNC_NAME, APPSYNC_SOURCE, APPSYNC_PAGE, appSyncInstalled, sameSource, appSyncFailure,
   afterAppSyncNote, TRY_AGAIN, OPEN_SOURCE } from "../core/appsync.js";
 
@@ -225,7 +227,7 @@ export async function runIpaConsole({ url, name = "", onInstalled = () => {}, na
   run.end({ code: r.ok ? 0 : -1, cancelled: Boolean(r.cancelled), text: r.log });
   if (r.declined) page.close(); // B113: Cancel on This Download Is Not Secure: back where Install was tapped
   if (r.cancelled) return r;
-  if (r.ok) { try { onInstalled(r); } catch { /* the record is a nicety */ } }
+  if (r.ok) { try { onInstalled(native ? r : { ...r, url }); } catch { /* the record is a nicety */ } } // F379: the url, for rememberIpa's saved IPA
 
   const fin = ipaFinish({ ok: r.ok, name: title, bundleId: r.bundleId });
   if (fin.note) page.line("step", fin.note);
@@ -297,15 +299,25 @@ export function stopIpaInstall(native = undefined, { bridge = nativeBridge() } =
 // jailbreak backend's installedApps) fills it in. An app already remembered (from its source's page, with its
 // source) keeps that record; one from My IPAs (a `library:` key, no source) gives way to the URL install's, so the
 // app's page no longer says My IPAs. Resolves the record, or null (no bundle id, already remembered, no store).
+// F379: the IPA is saved in My IPAs too (saveIpaCopy), whether or not the record changes; not awaited.
 const myIpasRecord = (x) => typeof x?.key === "string" && x.key.startsWith("library:") && !x.source;
-export async function rememberIpa(r, name, { store = apps } = {}) {
+export async function rememberIpa(r, name, { store = apps, save = saveIpaCopy } = {}) {
   const id = r?.bundleId;
   if (!id) return null;
+  try { Promise.resolve(save(r)).catch(() => {}); } catch { /* the saved IPA is a nicety */ }
   try {
     const s = await store();
     if ((await s.all()).some((x) => x?.id === id && !myIpasRecord(x))) return null;
     return await recordInstall(s, { id, name: String(name ?? "").replace(/\.ipa$/i, "") || id, version: "" });
   } catch { return null; }
+}
+
+// F379: an IPA installed from a URL or a link (runIpaConsole hands rememberIpa the url) is saved in My IPAs
+// (core/myipas.js saveInstalledIpa: library.add, unless that bundle ID and version is saved already), so Add Tweaks and
+// a later install use that copy. The jailbreak app signs nothing: no Sign Options go with it. -> its answer, or null.
+export function saveIpaCopy(r, { bridge = nativeBridge(), save = saveInstalledIpa } = {}) {
+  if (!r?.ok || !r.url || typeof bridge?.call !== "function") return Promise.resolve(null);
+  return save({ url: r.url, bundleId: r.bundleId || null, version: r.version || null }, { call: (m, p) => bridge.call(m, p) });
 }
 
 // Settings > Install IPA's row: a URL typed or pasted. Asks again (with what was typed) when it isn't an http(s) link.

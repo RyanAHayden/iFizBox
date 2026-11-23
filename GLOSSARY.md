@@ -158,3 +158,10 @@ _Said_: full-row swipe, swipe to delete like Mail
 _On screen_: (a row dragged off its left edge, red behind it)
 _In code_: nav/rowswipe.js attachRowSwipe full, fullSwipeEra; screens/installed.js attachDeleteSwipe
 _Avoid_: swipe-to-delete button
+
+**Saved IPA**:
+The copy of an IPA that a custom install (Custom Install, a URL or a link) keeps in My IPAs with the options it was signed with, so a re-sign uses it instead of downloading again
+_Said_: saves the IPA into My IPAs automatically
+_On screen_: My IPAs
+_In code_: saveInstalledIpa, savedIpa, savedResignJob, saveIpaCopy, saveCustomIpa
+_Avoid_: cached IPA, autosave copy

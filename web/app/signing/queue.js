@@ -28,6 +28,7 @@ import { askInsecure, bridge, keepIpaHash, refusing, storageOf } from "./common.
 import { getServer, defaultServer } from "./identity.js";
 import { serverFallback } from "../core/installroute.js"; // F366
 import { chooseRoute, holdApp } from "./route.js";
+import { withSavedIpa } from "../core/appqueue.js"; // F379
 export { hereLabel, shownName, finishHere } from "./common.js";
 
 export const ASK_WAIT = 600; // seconds the queue waits for Install on iOS's prompt before the row fails
@@ -66,6 +67,7 @@ const rowError = (e, name) => {
 };
 
 export async function prepareOnDevice(job, { tag, signal = null, progress = () => {}, log = () => {}, native, alert = showAlert } = {}) {
+  job = await withSavedIpa(job, { call: (m, p) => bridge(native).call(m, p) }); // F379: a Re-sign signs the saved IPA
   let params = prepareParams(job);
   // F302a: the app's kept tweaks go with a plain install, an update and a tweak update (screens/tweaks.js), a line each
   try { params = await (await import("../screens/tweaks.js")).keptTweakParams(params, job, { log }); } catch (e) {
