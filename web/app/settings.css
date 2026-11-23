@@ -231,7 +231,11 @@ html[data-theme="dark"] [data-check="fail"] .check-mark { color: var(--dk-bad); 
 /* F372: USE / ACTIVE at the right of Install Apps With's rows (Version's CHANGE, details.js changeButton). ACTIVE
    sits over USE, wider, and is revealed from the right like Sources' Delete (clip-path), USE fading under it. */
 .install-main .has-use { position: relative; }
-.install-main .has-use .cell-text { padding-right: 80px; }
+.install-main .has-use .cell-text { padding-right: var(--route-use-gap, 80px); }
+/* An era whose subtitle doesn't fit beside the button (iOS 26's SF) wraps it to a second line instead of "...", with
+   room above and below for it (ios26.css sets these; the fallbacks are every other era's look). */
+.install-main .has-use > .cell-inner { padding-block: var(--route-row-pad-y, 0px); }
+.install-main .has-use .cell-subtitle { white-space: var(--route-sub-wrap, nowrap); overflow-wrap: break-word; }
 .install-main .route-use { position: absolute; right: 28px; top: 50%; margin-top: -12px; display: inline-flex; justify-content: flex-end; min-width: 70px; }
 .install-main .route-active {
   position: absolute; right: 0; top: 0; min-width: 70px; pointer-events: none;
