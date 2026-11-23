@@ -50,6 +50,7 @@ import { forgetInstalled } from "../core/installed.js"; // B358
 import { MARK_NOT_INSTALLED } from "../core/appqueue.js"; // B358
 import { signedIndex } from "../core/signing.js"; // B358
 import { NAME } from "../brand.js"; // B358
+import { IdSet } from "../core/apt.js"; // B411
 
 export const title = "Changes";
 
@@ -131,7 +132,7 @@ const setCount = (n, ran, ctx = state.ctx) => {
 export function badgeAfterRun(ids = [], { ctx = state.ctx, counted = lastCounted } = {}) {
   afterRunUntil = Date.now() + AFTER_RUN_MS;
   if (!counted || !ctx) return null;
-  const done = new Set(ids);
+  const done = new IdSet(ids); // apt says oreo for a source's Oreo
   const { upgrades, resign } = counted;
   const left = { ...upgrades, available: (upgrades?.available ?? []).filter((r) => !done.has(r?.id)) };
   const n = badgeCount(left, resign);

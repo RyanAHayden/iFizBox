@@ -25,6 +25,8 @@ test("badgeAfterRun: the new count goes out at once, before any recount, less wh
   assert.deepEqual(calls, [["changes", 1]], "synchronously, through the after-run setter");
   assert.equal(badgeAfterRun(["a", "b", "c", "dep"], { ctx, counted }), 0);
   assert.deepEqual(calls.at(-1), ["changes", 0], "everything upgraded: 0 goes out too");
+  // apt says oreo for a source's Oreo
+  assert.equal(badgeAfterRun(["oreo"], { ctx, counted: { ...counted, upgrades: { available: [row("Oreo"), row("b")] } } }), 1);
   // a re-sign still waiting stays counted
   assert.equal(badgeAfterRun(["a", "b", "c"], { ctx, counted: { ...counted, resign: [{ id: "x" }] } }), 1);
   // no count yet: nothing to take from

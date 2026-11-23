@@ -38,6 +38,19 @@ static int has_line(const char *text, const char *a, const char *b, const char *
     return 0;
 }
 
+/* 1 if text has a line that is prefix, then the package name id. Names ignore case: apt and dpkg say oreo for a
+ * package its source (so the app's settings) calls Oreo. */
+static int has_id(const char *text, const char *prefix, const char *id) {
+    size_t lp = strlen(prefix), li = strlen(id);
+    for (const char *p = text; p && *p; ) {
+        size_t n;
+        const char *next = line(p, &n);
+        if (n == lp + li && !memcmp(p, prefix, lp) && !strncasecmp(p + lp, id, li)) return 1;
+        p = next;
+    }
+    return 0;
+}
+
 /* The value of "key=" in text (the last one wins, as a later write would), into val; 0 if missing. */
 static int value(const char *text, const char *key, char *val, size_t size) {
     size_t kl = strlen(key);
@@ -78,7 +91,9 @@ void auto_settings_parse(const char *text, struct auto_settings *s) {
 }
 
 int auto_listed(const char *text, const char *key, const char *id) {
-    return id[0] && has_line(text, key, "=", id);
+    char prefix[32];
+    int n = snprintf(prefix, sizeof prefix, "%s=", key);
+    return id[0] && n > 0 && (size_t)n < sizeof prefix && has_id(text, prefix, id);
 }
 
 long auto_interval(const struct auto_settings *s) {
@@ -101,7 +116,7 @@ int auto_pick(const struct upd_list *list, const struct auto_settings *s, const 
     for (int i = 0; i < list->kept; i++) {
         const struct upd_item *it = &list->items[i];
         int go = s->install == AUTO_INSTALL_ALL || (s->install == AUTO_INSTALL_MARKED && auto_listed(settings, "marked", it->id));
-        if (go && (auto_listed(settings, "hold", it->id) || has_line(held, it->id, "", ""))) go = 0;
+        if (go && (auto_listed(settings, "hold", it->id) || has_id(held, "", it->id))) go = 0;
         if (go && auto_ignored(settings, it->id, it->to)) go = 0; /* F282: Ignore This Version */
         if (go) {
             char key[2 * UPD_FIELD + 2];
@@ -448,7 +463,7 @@ int auto_ignored(const char *settings, const char *id, const char *version) {
     for (const char *p = settings; p && *p; ) {
         size_t n;
         const char *next = line(p, &n);
-        if (n > 7 + li + 1 && !memcmp(p, "ignore=", 7) && !memcmp(p + 7, id, li) && p[7 + li] == '=')
+        if (n > 7 + li + 1 && !memcmp(p, "ignore=", 7) && !strncasecmp(p + 7, id, li) && p[7 + li] == '=')
             if (same_version_n(p + 8 + li, n - 8 - li, version, strlen(version))) return 1;
         p = next;
     }

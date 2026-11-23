@@ -80,6 +80,19 @@ test("deadRows: a failure takes its reverse dependencies (transitively), nothing
   assert.deepEqual([...dead.entries()].sort(), [["child", "lib"], ["tweak", "lib"]]);
 });
 
+test("Depends names match ignoring case: order, needed by, skipped", () => {
+  const plan = parseSimulation("Inst user (1 R [a])\nInst oreo (1 R [a])");
+  const jobs = [{ op: "install", id: "User" }];
+  const info = { user: { depends: "Oreo" } };
+  const rows = runRows(plan, jobs, info);
+  assert.deepEqual(rows.map((r) => r.id), ["oreo", "user"]);
+  assert.deepEqual(rows.map((r) => r.added), [true, false]);
+  assert.deepEqual(neededBy(plan, jobs, info), { oreo: ["user"] });
+  rows[0].state = "failed";
+  assert.deepEqual([...deadRows(rows).entries()], [["user", "oreo"]]);
+  assert.equal(deadRows(rows, { Oreo: "1" }).size, 0);
+});
+
 test("deadRows: an installed version that satisfies the relation stands in for a failed upgrade", () => {
   const rows = runRows(parseSimulation("Inst up [1.0] (1.1 R [a])\nInst a (1 R [a])\nInst b (1 R [a])"),
     [{ op: "install", id: "up" }, { op: "install", id: "a" }, { op: "install", id: "b" }],
