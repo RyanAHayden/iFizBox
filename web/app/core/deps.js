@@ -14,6 +14,7 @@
 //               "version"     sources have it, but not a version that satisfies the dependency
 //               "conflict"    it conflicts with (or breaks) an installed package
 //               "conflicted"  an installed package conflicts with (or breaks) it
+//               "lists"       (explainApt only) apt can't read one of its own list files, or dpkg's status; id null
 //     id        the package the sentence is about (the dependency, or the installed package); tapping opens it
 //     action    { kind: "open", id } | { kind: "remove", id } | { kind: "add-source", name, url } |
 //               { kind: "settings" }, with `label` ("Add Chariz", "Remove Y", "Open X", "Set iOS Version")
@@ -260,6 +261,22 @@ function sentenceFor(f, via, { subject, names, homes, ios }) {
 
 // ---- apt's own output (N4's Confirm sheet) -------------------------------------------------------------------
 
+// "E: Problem with MergeList <file>": apt can't parse one of its own files, and then refuses every command. A list
+// file is named after the URL it came from (repo.twickd.com_._en, apt.procurs.us_dists_1800_main_..._Packages),
+// so its first part is the source's host; Refresh downloads it again. dpkg's status file is another matter:
+// Refresh doesn't rewrite it.
+function unreadableList(path) {
+  const file = path.split("/").pop();
+  if (file === "status" && /\/dpkg\//.test(path)) {
+    return { kind: "lists", id: null, blocking: true, via: [],
+      sentence: `apt can't read dpkg's status file (${path}), the list of what is installed, so it won't run. Refreshing sources won't fix it: it needs repairing in a terminal.` };
+  }
+  let host = file.split("_")[0];
+  try { host = decodeURIComponent(host); } catch { /* keep it as written */ }
+  return { kind: "lists", id: null, blocking: true, via: [],
+    sentence: `apt can't read the list it downloaded from ${host || "a source"} (${file}), so it won't run. Refresh your sources to download it again.` };
+}
+
 // apt-get's report, line by line:
 //    foo : Depends: bar (>= 2) but it is not installable
 //          PreDepends: firmware (>= 16.0) but 15.4 is installed
@@ -272,8 +289,12 @@ export function explainApt(output, { device = null, index = depIndex(), homes = 
   const names = (id) => nameOf(index.installed.get(id)?.find((o) => o.real)?.stanza ?? index.available.get(id)?.find((o) => o.real)?.stanza, id);
   const ios = iosOf(device, index);
   let pkg = null;
+  let unreadable = false; // "The package lists or status file could not be parsed or opened."
   for (const raw of String(output ?? "").split(/\r?\n/)) {
-    let m = raw.match(/^E: Unable to locate package (\S+)/);
+    if (/^E: The package lists or status file could not be parsed/.test(raw)) { unreadable = true; continue; }
+    let m = raw.match(/^E: Problem with MergeList (\S+)/);
+    if (m) { problems.push(unreadableList(m[1])); continue; }
+    m = raw.match(/^E: Unable to locate package (\S+)/);
     if (m) {
       const home = homes?.[m[1]];
       problems.push({ kind: "missing", id: m[1], blocking: true, via: [],
@@ -315,6 +336,10 @@ export function explainApt(output, { device = null, index = depIndex(), homes = 
     if (!f && have) f = { kind: "version", r, have: [have], installed: null, id: r.name };
     if (!f) f = { kind: (index.available.get(r.name) || index.installed.get(r.name)) ? "version" : "missing", r, have: [], id: r.name };
     problems.push(sentenceFor(f, [], { subject, names, homes, ios }));
+  }
+  if (unreadable && !problems.some((p) => p.kind === "lists")) {
+    problems.push({ kind: "lists", id: null, blocking: true, via: [],
+      sentence: "apt can't read its package lists, so it won't run. Refresh your sources to download them again." });
   }
   const out = [];
   for (const p of problems) if (!out.some((q) => q.sentence === p.sentence)) out.push(p);
