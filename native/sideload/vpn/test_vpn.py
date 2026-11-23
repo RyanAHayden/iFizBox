@@ -112,7 +112,7 @@ class App(unittest.TestCase):
         is off after the last; the plist reads JSON flags with "has any value" only (B359: "contains" loses its text)."""
         import plistlib
         src = read("App", "LocalVPN.swift")
-        self.assertIn('runShortcut("switch", input: switchInput("start", cellular: cell))', src)
+        self.assertIn('runShortcut("switch", input: switchInput("start"))', src)
         self.assertIn("if stop { down(); endSwitch() }", src)
         self.assertIn("UIApplication.didBecomeActiveNotification", src)  # an end found in the background runs later
         self.assertIn('b.on("vpn.testSwitch")', src)
@@ -125,7 +125,7 @@ class App(unittest.TestCase):
             self.assertIn(want, ids)
         self.assertEqual(ids[-1], "nothing")
         keys = [a["WFWorkflowActionParameters"].get("WFDictionaryKey") for a in acts if ids[acts.index(a)] == "getvalueforkey"]
-        self.assertEqual(keys, ["start", "end", "cellular"])
+        self.assertEqual(keys, ["start", "end", "cellular", "dataOff"])
         groups = {}
         for a in acts:
             p = a["WFWorkflowActionParameters"]
@@ -144,6 +144,27 @@ class App(unittest.TestCase):
         tpl = flt["WFContentItemFilter"]["Value"]["WFActionParameterFilterTemplates"][0]
         self.assertEqual((tpl["Property"], tpl["Values"]["String"]), ("Server Address", "10.7.0.1"))
         self.assertIn('static let peer = "10.7.0.1"', src)  # the address Find VPNs looks for
+
+    def test_install_switch_vpn_before_data_off(self):
+        """B375: iOS starts no VPN without a network ("No network available"), so Cellular Data goes off only after
+        the built-in VPN is up: the start's Set VPN comes before its Cellular Data Off, and the app turns data off
+        with a separate {"dataOff":1} run once up() has the VPN connected (never "cellular" with the start)."""
+        import plistlib
+        src = read("App", "LocalVPN.swift")
+        begin = src[src.index("static func begin("):src.index("static func waitOffCellular(")]
+        self.assertNotIn('switchInput("start", cellular', src)
+        self.assertLess(begin.index("try up(step)"), begin.index('switchInput("dataOff")'))
+        self.assertIn("if !Path.online() { throw", src)  # no network: say so at once, not after startLimit
+        repo = os.path.dirname(NATIVE)
+        with open(os.path.join(repo, "tools", "shortcuts", "install-switch.plist"), "rb") as f:
+            acts = plistlib.load(f)["WFWorkflowActions"]
+        ids = [a["WFWorkflowActionIdentifier"].removeprefix("is.workflow.actions.") for a in acts]
+        offs = [i for i, a in enumerate(acts) if ids[i] == "cellulardata.set" and a["WFWorkflowActionParameters"]["OnValue"] is False]
+        first_set = ids.index("vpn.set")
+        self.assertEqual(len(offs), 2, "the start's (old app builds) and dataOff's")
+        self.assertTrue(all(i > first_set for i in offs), "no Cellular Data Off before the start's Set VPN")
+        cond = acts[offs[1] - 1]["WFWorkflowActionParameters"]
+        self.assertEqual(cond["WFInput"]["Variable"]["Value"]["OutputName"], "Data Off")
 
 
 if __name__ == "__main__":

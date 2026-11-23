@@ -272,7 +272,8 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   down, not paired: `serverFallback`) offers Use the Signing Server besides the fix: in the install's alert and its
   log, and on the IPA queue run's Log (each failed app's fix, then Use the Signing Server) and at its bottom. It
   runs the same install, or the same failed apps, again through the default Signing Server for that install or run
-  only; Install Apps With stays This iPhone.
+  only; Install Apps With stays This iPhone. The queue's fix row for a failed app reads `idevice.status` first, so a
+  failure through the built-in VPN offers Check Again and Use the Signing Server, not Open LocalDevVPN.
 - **This iPhone with the built-in VPN** (`native/sideload/vpn/`): the sideload IPA carries its own packet tunnel,
   `PlugIns/iFizBoxVPN.appex` (`com.ryha.ifizbox.vpn`), the loopback idea of StosVPN and LocalDevVPN: the phone is
   10.7.0.0 on the tunnel, only 10.7.0.1 is routed into it (no default route), and every packet is written back with
@@ -295,9 +296,18 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   with the input `{"check":1}` (it does nothing) and shows Done only if it ran. Once added, the page
   `installation/shortcuts` (Install Switch) shows an Added row and Test Install Switch (`vpn.testSwitch`).
   The first connect of a queue of installs runs it through `shortcuts://x-callback-url/run-shortcut` (Shortcuts
-  comes back to `ifizbox://vpn-shortcut`) with the input `{"start":1}`, plus `"cellular":1` on cellular: it stores
-  the VPN connected now (Get Current VPN, as "previous VPN"), turns cellular data off, and connects the built-in VPN
-  (found with Find VPNs by its server address, 10.7.0.1) with Set VPN, which iOS runs without a prompt. The app then connects its tunnel as before, and a start that didn't run is not fatal. After
+  comes back to `ifizbox://vpn-shortcut`) with the input `{"start":1}`: it stores the VPN connected now (Get Current
+  VPN, as "previous VPN") and connects the built-in VPN (found with Find VPNs by its server address, 10.7.0.1) with
+  Set VPN, which iOS runs without a prompt. The app then connects its tunnel as before. A start that didn't run, or
+  whose Set VPN ended with NEVPNErrorDomain error 2, is not fatal: on the iPhone 15 Pro (iOS 27) Set VPN often ends
+  with error 2 while iOS is still enabling the configuration, and the app's own connect covers it. On cellular, once
+  the built-in VPN is connected, the app runs the Install Switch again with `{"dataOff":1}`: Cellular Data Off. The
+  order matters: iOS starts no VPN without a network (nesessionmanager logs "No network available", and the VPN goes
+  connecting to disconnected at once), but a VPN that is already connected keeps working when the network goes away
+  (checked on the iPhone 15 Pro with Airplane Mode), so cellular data goes off only after the VPN is up, the order
+  SideStore's docs give. The Shortcut still accepts `{"start":1,"cellular":1}` from older app builds: it turns data
+  off after Set VPN, not before. With no network at all, the built-in VPN's start fails at once, saying it can't
+  start without Wi-Fi or cellular data, instead of waiting 10 s. After
   the last connect, once the VPN goes off (the 3 second linger, so a queue shares one start and one end), it runs
   with `{"end":1}`, plus `"cellular":1` on cellular: cellular data goes back on, then the stored VPN (Tailscale, say)
   connects and is forgotten. Shortcuts opens only from the front, so an end due while the app is in the background
@@ -307,8 +317,8 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   the connect, on once connected), but Set Up no longer offers them. An install that starts on cellular without the
   Install Switch asks first (Use Server or Set Up), and Home's status slot and Installation & Signing's status cell
   say Add the Install Switch. Bridge calls: `vpn.status` (also `idevice.status`'s `vpn`; its `shortcuts` is
-  `{off, on, switch}`), `vpn.test`, `vpn.testSwitch` (runs start then end; answers `{ok, start, end, cellular,
-  wentOff, vpnOn}`), `vpn.checkShortcut`, `vpn.openShortcuts`.
+  `{off, on, switch}`), `vpn.test`, `vpn.testSwitch` (runs start, waits for the VPN, runs dataOff on cellular, then
+  end; answers `{ok, start, end, cellular, wentOff, vpnOn}`), `vpn.checkShortcut`, `vpn.openShortcuts`.
 - **This iPhone over Tailscale** (`native/sideload/tailscale/`, its README): for Tailscale users, who can't run
   LocalDevVPN at the same time. The sideload app embeds tsnet (tailscale.com, BSD-3-Clause, a Go c-archive built on
   Linux with a pinned Go; not in the jailbreak executable) and joins the tailnet as its own device ("iFizBox on

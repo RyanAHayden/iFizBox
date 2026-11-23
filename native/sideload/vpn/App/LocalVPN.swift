@@ -9,11 +9,12 @@
 // (journal/2026-11-21-r72-cellular-this-iphone). They run through Shortcuts' x-callback-url, which comes back to the
 // app (ifizbox://vpn-shortcut, App.swift's Incoming hands it here).
 // F386: with the Install Switch added instead (one Shortcut, tools/shortcuts/install-switch.plist), the first connect
-// of a queue runs it once with {"start":1[,"cellular":1]}: it remembers the VPN that is on (Tailscale), turns Cellular
-// Data off on cellular and connects this VPN with Shortcuts' Set VPN, which iOS does without a prompt (R76). Once the
-// VPN has gone off after the last connect (`linger`), it runs once more with {"end":1[,"cellular":1]}: Cellular Data
-// back on and the remembered VPN connected again. One hop to Shortcuts each way per queue, not per app. An end that
-// finds the app in the background waits until it is in front again.
+// of a queue runs it once with {"start":1}: it remembers the VPN that is on (Tailscale) and connects this VPN with
+// Shortcuts' Set VPN, which iOS does without a prompt (R76). B375: on cellular it runs once more with {"dataOff":1}
+// once up() has this VPN connected: iOS starts no VPN without a network, and a VPN that is up stays up when data goes
+// off. Once the VPN has gone off after the last connect (`linger`), it runs with {"end":1[,"cellular":1]}: Cellular
+// Data back on and the remembered VPN connected again. One hop to Shortcuts each way per queue (two at the start on
+// cellular), not per app. An end that finds the app in the background waits until it is in front again.
 //   vpn.status          {available, bundled, entitled, tested, on, cellular, wifi, shortcuts: {off, on, switch}}; also in
 //                       idevice.status as `vpn`
 //   vpn.test            the VPN on, one connect to iOS with the pairing (idevice.verify), the VPN off: {ok, ms, kind};
@@ -101,6 +102,15 @@ enum LocalVPN {
             let wifi = p.usesInterfaceType(.wifi)
             return (p.usesInterfaceType(.cellular) && !wifi, wifi)
         }
+
+        /// B375: some network is up (Wi-Fi, cellular data, wired), so iOS can start a VPN. True before the first
+        /// path update arrives (not known yet: up() tries as before).
+        static func online() -> Bool {
+            start()
+            plock.lock(); let p = path; plock.unlock()
+            guard let p = p else { return true }
+            return p.status == .satisfied
+        }
     }
 
     // ---- The tunnel
@@ -169,6 +179,9 @@ enum LocalVPN {
     static func up(_ step: (String) -> Void = { _ in }) throws {
         let m = try manager()
         if m.connection.status == .connected { return }
+        // B375: iOS starts no VPN without a network: it goes connecting then disconnected ("No network available")
+        // faster than the loop below can see, which then waited out startLimit
+        if !Path.online() { throw IDevice.Failure(code: "vpn_failed", text: "\(name) can't start without a network: iOS starts a VPN only with Wi-Fi or cellular data on") }
         step("turning on \(name)")
         let t0 = Date()
         do { try m.connection.startVPNTunnel() } catch {
@@ -209,23 +222,30 @@ enum LocalVPN {
         lock.lock(); holds += 1; stopGen += 1
         let start = switchAdded() && !switchedOn // F386: the first connect of a queue runs the Install Switch's start
         if start { switchedOn = true; switchCellular = cellular && Path.now().cellular }
-        let cell = switchCellular
         lock.unlock()
         if start {
             step("running the Shortcut \(shortcutNames["switch"]!)")
-            let r = runShortcut("switch", input: switchInput("start", cellular: cell))
-            // not fatal: up() below connects this VPN itself, as without the Shortcut
+            // B375: never with "cellular": iOS starts no VPN without a network ("No network available"), so Cellular
+            // Data goes off only once up() below has this VPN connected (dataOff), as SideStore's docs order it
+            let r = runShortcut("switch", input: switchInput("start"))
+            // not fatal: up() below connects this VPN itself, as without the Shortcut (its Set VPN can end with
+            // NEVPNErrorDomain error 2 while iOS is still enabling our configuration: seen on the 15 Pro)
             log(r.ok ? "Install Switch: start ran" : "Install Switch: start didn't run: \(r.error ?? "?")")
-            if r.ok && cell { waitOffCellular() }
             // Shortcuts never opened (the app in the background): nothing changed, so no end is due either
-            if !r.ok && notOpened(r.error) { lock.lock(); switchedOn = false; lock.unlock() }
+            if !r.ok && notOpened(r.error) { lock.lock(); switchedOn = false; switchCellular = false; lock.unlock() }
         }
         do { try up(step) } catch {
             lock.lock(); lastFailure = Date(); lock.unlock()
             end()
             throw error
         }
-        lock.lock(); lastFailure = nil; let switching = switchedOn; lock.unlock()
+        lock.lock(); lastFailure = nil; let switching = switchedOn, dataOff = start && switchedOn && switchCellular; lock.unlock()
+        if dataOff { // B375: this VPN is up, so cellular data can go off now; the end turns it back on
+            step("running the Shortcut \(shortcutNames["switch"]!) (Cellular Data Off)")
+            let r = runShortcut("switch", input: switchInput("dataOff"))
+            log(r.ok ? "Install Switch: data off ran" : "Install Switch: data off didn't run: \(r.error ?? "?"); connecting anyway")
+            if r.ok { waitOffCellular() }
+        }
         // F386: the Install Switch turns data back on at its end; the two Cellular Shortcuts only without it
         guard !switching, cellular, Path.now().cellular, shortcutsAdded() else { return false }
         step("running the Shortcut \(shortcutNames["off"]!)")
@@ -315,14 +335,20 @@ enum LocalVPN {
     /// `vpnOn`: this VPN was connected after the start, so Set VPN found it. A run that passed marks it added.
     static func testSwitch() -> [String: Any] {
         let cellular = Path.now().cellular
-        let start = runShortcut("switch", input: switchInput("start", cellular: cellular))
+        let start = runShortcut("switch", input: switchInput("start")) // B375: data off only once the VPN is up
         var wentOff = false, vpnOn = false
         if start.ok {
             let t0 = Date()
-            while Date().timeIntervalSince(t0) < startLimit && !(vpnOn && (!cellular || wentOff)) {
-                vpnOn = vpnOn || connectedNow()
-                wentOff = wentOff || (cellular && !Path.now().cellular)
-                Thread.sleep(forTimeInterval: 0.2)
+            while Date().timeIntervalSince(t0) < startLimit && !vpnOn {
+                vpnOn = connectedNow()
+                if !vpnOn { Thread.sleep(forTimeInterval: 0.2) }
+            }
+            if cellular && vpnOn && runShortcut("switch", input: switchInput("dataOff")).ok {
+                let t1 = Date()
+                while Date().timeIntervalSince(t1) < dataOffLimit && !wentOff {
+                    wentOff = !Path.now().cellular
+                    if !wentOff { Thread.sleep(forTimeInterval: 0.2) }
+                }
             }
         }
         let end = switchEnded(runShortcut("switch", input: switchInput("end", cellular: cellular)))
