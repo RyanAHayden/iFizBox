@@ -145,6 +145,29 @@ E: Unable to locate package com.nowhere.thing`;
   assert.equal(p[2].action.kind, "remove");
 });
 
+test("apt that can't read its own lists says which source's file and to Refresh, not 'apt refused'", () => {
+  // The iPhone 7's output when a source answered its Translation URL with a web page.
+  const out = `E: Encountered a section with no Package: header
+E: Problem with MergeList /var/jb/var/lib/apt/lists/repo.twickd.com_._en
+E: The package lists or status file could not be parsed or opened.`;
+  const p = explainApt(out, { index: index(SOURCES) });
+  assert.deepEqual(p.map((x) => x.sentence), [
+    "apt can't read the list it downloaded from repo.twickd.com (repo.twickd.com_._en), so it won't run. Refresh your sources to download it again.",
+  ]);
+  assert.equal(p[0].kind, "lists");
+  assert.equal(p[0].blocking, true);
+  // A host with a port: apt writes ':' as %3a in the file name.
+  assert.match(explainApt("E: Problem with MergeList /var/lib/apt/lists/repo.example.com%3a8080_dists_stable_main_binary-iphoneos-arm64_Packages", {})[0].sentence,
+    /from repo\.example\.com:8080 \(/);
+  // dpkg's status file: Refresh doesn't fix that one.
+  const s = explainApt("E: Problem with MergeList /var/jb/var/lib/dpkg/status\nE: The package lists or status file could not be parsed or opened.", {});
+  assert.equal(s.length, 1);
+  assert.match(s[0].sentence, /^apt can't read dpkg's status file \(\/var\/jb\/var\/lib\/dpkg\/status\).*won't fix it/);
+  // Only the summary line: still a sentence.
+  assert.deepEqual(explainApt("E: The package lists or status file could not be parsed or opened.", {}).map((x) => x.sentence),
+    ["apt can't read its package lists, so it won't run. Refresh your sources to download them again."]);
+});
+
 test("the catalog's deps op: every source (older versions too) and dpkg's status, against the device", async () => {
   const { createCatalog, runCatalog } = await import("./catalog.js");
   const c = createCatalog();
