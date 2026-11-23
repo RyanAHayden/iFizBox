@@ -7,7 +7,9 @@
                                    when "cellular", then Set VPN: connect the built-in VPN (Find VPNs, server 10.7.0.1)
        {"end":1[,"cellular":1]}    Cellular Data On when "cellular", then Set VPN: connect the remembered VPN, forgotten
        {"check":1}                 nothing: the app's check run after Add
-     tools/shortcuts/sign.sh signs it. Set VPN keys: R76's journal and F386's notes. -->
+     The VPN to bring back isn't chosen at Add (no import question): the start's Store Content keeps whichever VPN
+     was on, a VPN object (R76: text can't become a VPN), so the user picks nothing.
+     tools/shortcuts/sign.sh signs it. Set VPN keys: journal/2026-11-23-f386-install-switch. -->
 <plist version="1.0">
 <dict>
 	<key>WFWorkflowActions</key>
