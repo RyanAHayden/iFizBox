@@ -56,3 +56,10 @@ The 15 Pro keeps Test Alpha 1.1.0 installed.
 - The iPhone 7 download was plain http through the tunnel, not https from GitHub.
 - The iPhone 7 success path (install ok, then the waiting file removed) was not run.
 - The iPhone 7 check was run once, as asked.
+- Step 7 shows a successful This iPhone install removing the Waiting IPA it had just downloaded, not one left by
+  an earlier failed install (step 5 had already replaced the 1.1.0 copy). The F400 journal's wording "the waiting
+  file goes" is covered only in that form.
+- Why afcclient can't open the kept .ipa (link count 2) is open: it may be file protection, not checked.
+- `phone-r85.mjs` is the script from step 3 on; steps 1, 2 and 2b ran from the F400 `phone.mjs` (run1 log), which
+  also reads the fixture copy `kept.ipa` (the same GitHub file, SHA-256 689eff7b...) from its scratch dir.
+- "Show me the id": no id was asked for in the task beyond R85 itself; none is shown.
