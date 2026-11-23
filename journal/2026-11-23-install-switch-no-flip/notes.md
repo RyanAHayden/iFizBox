@@ -47,13 +47,13 @@ Tests, in order:
 
 | # | Test | How | Expect (hypothesis) |
 |---|------|-----|--------------------|
-| A1 | Fires for a local notification from the app in front | `willPresent` returning banner, list, none in turn; automation filter on title | Unclear. iOS does not deliver a notification-trigger automation for a banner the app itself suppresses in some cases; this is the main unknown |
+| A1 | Fires for a local notification from the app in front | `willPresent` returning banner, list, none in turn; automation filter on title | Unknown, and the main one: nothing here says whether a notification the app suppresses or posts while in front still triggers the automation |
 | A2 | Latency | timestamps in the syslog from post to the first action | under 2 s if it fires |
 | A3 | Shortcuts stays closed; banner or Dynamic Island shown | screenshots right after | no Shortcuts UI; a "Running" banner may show for run-without-asking |
 | A4 | Runs Set VPN and Set Cellular Data with no prompt | the switch inside the automation | R76 showed Set VPN silent by hand; automations may ask for Cellular Data |
 | A5 | Notification removed at once | `removeDeliveredNotifications` after the post | likely yes; the automation should have fired already |
 | A6 | A Focus blocks it | Do Not Disturb on | expect yes for a Focus that silences the app, test it |
-| A7 | A signed `.shortcut` can carry the trigger | read a Shortcut exported with an automation; try `WFWorkflowTypes`/trigger keys | Expect no: automations are personal automations stored apart from the Shortcut file, so the user makes the automation by hand. Count the taps when measured: Automation tab, +, Notification, choose app, filter, Run Immediately, choose Shortcut, Done is about 8 |
+| A7 | A signed `.shortcut` can carry the trigger | read a Shortcut exported with an automation; try `WFWorkflowTypes`/trigger keys | Open. The brief says iOS 27 lists triggers among the actions, which would let a Shortcut carry it; before iOS 27, automations lived apart from the Shortcut file. Read an iOS 27 export first. If it cannot, the user makes the automation by hand. Count the taps when measured: Automation tab, +, Notification, choose app, filter, Run Immediately, choose Shortcut, Done is about 8 |
 
 Failure handling: if iFizBox is killed after the start, the end never fires. The automation approach has no hook for
 "app died". Mitigation: the end is also posted by the next app launch (the app remembers an open switch in its
@@ -100,6 +100,13 @@ option that runs the restore in the same Shortcut.
 | B | loop sees the failure, runs the tail | the loop's intent errors, Shortcut ends, data may stay off | loop deadline, tail runs |
 | C | as today | as today | as today |
 | D | tail runs if tested by If | Shortcut errors, data may stay off | tail runs |
+
+"Always restore" (the brief's rule) is not met by any option as described: when iFizBox is killed mid-install, A
+restores only at the next launch, and B and D can leave data off because a Shortcut has no try/catch. Only a restore
+that does not depend on the app or on one Shortcut run surviving would meet it (for example a second automation or a
+scheduled restore); R78b/R78c must test that. Also: from F372 only the Settings checkmark behaviour (an On Demand
+VPN does not reconnect by itself) was used, via F388. The stand-ins: Tailscale on stands for "another VPN up",
+Airplane Mode for "data off", in every phone test above.
 
 ## Recommendation per iOS version (provisional, from reading only)
 
