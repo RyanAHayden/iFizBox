@@ -1,5 +1,5 @@
 // F367/F369: the iOS 26 style's glass bars. In the app on iOS 26 and later, under the native controls hook
-// (<html data-controls="native">, native-controls.js) with the floating tab bar (data-tabbar="float"), the shell
+// (<html data-style="ios26">) with the floating tab bar (data-tabbar="float"), the shell
 // draws the tab bar as a real UITabBar (one tab per page tab, Search as its search tab, our glyphs from
 // icons/rowicons.js, the badges; iOS draws the glass, the press-and-drag lens and the shrink on scroll) and the nav
 // bar's buttons as UIKit glass buttons at the rects of the page's own (bridge call ui.glass,
@@ -34,7 +34,7 @@ let queued = false;
 // The hook's precondition: the app, the native controls (iOS 26+ under ios26) and the floating tab bar.
 export function glassWanted(doc = globalThis.document, native = nativeBridge()) {
   const root = doc?.documentElement;
-  return hasNativeCall(native) && root?.getAttribute?.("data-controls") === "native" && root.getAttribute("data-tabbar") === "float";
+  return hasNativeCall(native) && root?.getAttribute?.("data-style") === "ios26" && root.getAttribute("data-tabbar") === "float";
 }
 
 const round = (n) => Math.round(n * 2) / 2;
@@ -432,7 +432,7 @@ export function watchGlass(doc = globalThis.document, win = globalThis, native =
     });
     obs.observe(doc.body, { childList: true, subtree: true, characterData: true, attributes: true,
       attributeFilter: ["class", "hidden", "style", "role", "aria-modal", "disabled", "aria-label"] });
-    obs.observe(doc.documentElement, { attributes: true, attributeFilter: ["class", "data-controls", "data-tabbar", "data-style", "data-theme", "data-palette"] });
+    obs.observe(doc.documentElement, { attributes: true, attributeFilter: ["class", "data-tabbar", "data-style", "data-theme", "data-palette"] });
   }
   doc.addEventListener?.("ifizbox:slide", (e) => slideGlass(e.detail, doc, native, win));
   // B387: a swipe back ended, so WebKit has built its held scrollers' scroll views anew: one update even when nothing

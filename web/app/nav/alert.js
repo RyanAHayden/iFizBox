@@ -15,7 +15,7 @@
 // user gesture, such as opening an itms-services link.
 // A one-button (OK) alert: title, message. `alert` swaps in another showAlert (tests pass a fake).
 //
-// F345b: in the app under the native controls hook (<html data-controls="native">, native-controls.js) the alert is
+// F345b: in the app under the iOS 26 style (<html data-style="ios26">) the alert is
 // the shell's own UIAlertController (bridge call ui.alert, native/Sources/NativeAlerts.swift): same options, same
 // {index, value} answer. A countdown alert stays the CSS one (UIAlertAction titles can't count down), so does one
 // with `onTap` (the bridge's answer comes after the tap, outside the user gesture its window.open or link needs), `input.paste`
@@ -53,7 +53,7 @@ export function showAlert(opts = {}) {
 // The native alert only in the app (the bridge takes calls), under the native controls hook, and never for a countdown
 // or an `onTap` (it must run inside the tap itself).
 export function wantsNativeAlert({ countdown = null, onTap = null } = {}, native = nativeBridge(), doc = globalThis.document) {
-  return hasNativeCall(native) && !countdown && !onTap && doc?.documentElement?.getAttribute?.("data-controls") === "native";
+  return hasNativeCall(native) && !countdown && !onTap && doc?.documentElement?.getAttribute?.("data-style") === "ios26";
 }
 
 // {index: "red" | "green"} as the shell takes it: string keys, known colours, indexes inside the buttons.

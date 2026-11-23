@@ -76,7 +76,7 @@ export function openOn(page, seg, count, { logTab = 1 } = {}) {
 // F391: `waiting` (signed, waiting its turn) covers either with .qr-wait, the full bar with moving stripes (progress.css).
 // -> { bar, set(fraction, sweep, waiting) }
 export function rowBar(doc = globalThis.document) {
-  if (doc?.documentElement?.getAttribute?.("data-controls") === "native") {
+  if (doc?.documentElement?.getAttribute?.("data-style") === "ios26") {
     const bar = el("div", "qr-native");
     const progress = Object.assign(el("progress", "qr-progress"), { max: 1 });
     bar.append(progress, el("div", "qr-wait")); // a <progress> draws no children: the stripes lie over it
@@ -137,7 +137,7 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
   const statusText = el("div", "progress-status", "Preparing");
   // F345a: under the native controls hook (native-controls.js) the bar is WebKit's own <progress>, iOS 26's
   // UIProgressView; otherwise the drawn track and fill.
-  const native = globalThis.document?.documentElement?.getAttribute?.("data-controls") === "native";
+  const native = globalThis.document?.documentElement?.getAttribute?.("data-style") === "ios26";
   const track = native ? Object.assign(el("progress", "progress-bar"), { max: 100, value: 0 }) : el("div", "progress-track");
   const fill = el("div", "progress-fill");
   if (!native) track.append(fill);

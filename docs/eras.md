@@ -272,30 +272,34 @@ In iOS 6 a sheet is clipped (`clip-path: inset(var(--sheet-bar-top) 0 0 0)`, pac
 
 ### Native controls
 
-iOS 26 adds a fourth hook: `<html data-controls="native">`, set only under `data-style="ios26"` and only where the
-web view draws iOS 26's own form controls. Under it the page hands those controls to WebKit; without it the same
-markup gets `ios26.css`'s look-alikes.
+The iOS 26 style has its own form controls. Wherever `<html data-style="ios26">` is on, the web view draws iOS 26's
+own controls, and the page hands them to WebKit (`native-controls.js` `nativeControls(doc)` is that check, and
+`initNativeControls` takes the app's answer). The native-control rules in `ios26.css` are scoped
+`html[data-style="ios26"][data-tabbar="float"]`. Where a control is not drawn natively, the same markup gets
+`ios26.css`'s look-alikes: the concept frame shows those, and so do transitions and the countdown and `onTap` alerts.
 
-- **When it is on** (`native-controls.js` `drawsIos26Controls()`; `theme-boot.js` runs the same rule before first
-  paint): only in the app, where the shell's `app.info` `ios` decides: 26 or later. Until the app answers, on an
-  iPhone or iPad, CSS anchor positioning (first in WebKit 26) stands in. A web view's user agent freezes the OS
-  version (the iPhone 15 Pro on iOS 27 says `iPhone OS 18_7`), so the app's first paint uses the feature test and
-  `app.info` corrects it. The website never gets it: the site is iOS 6, so no `data-style="ios26"` and no
-  `data-controls`. A change after first paint (the app's answer) redraws the switches on screen in the other kind
-  (`nav/switch.js` `redrawSwitches`).
+- **When it is on**: only with the iOS 26 style, which is offered only on a phone running iOS 26 or later, in both
+  apps (`core/settings.js` `ios26Here()`; `theme-boot.js` runs the same rule before first paint). The shell's
+  `app.info` `ios` decides once it answers. Until then, on an iPhone or iPad, CSS anchor positioning (first in
+  WebKit 26) stands in. A web view's user agent freezes the OS version (the iPhone 15 Pro on iOS 27 says
+  `iPhone OS 18_7`), so the app's first paint uses the feature test and `app.info` corrects it. A change after first
+  paint (the app's answer) redraws the switches on screen in the other kind (`nav/switch.js` `redrawSwitches`).
+  Below iOS 26, Theme > Style lists iOS 6, 7 and 13 only (`settings.optionsOf("style")`). A stored `ios26` stays
+  stored and draws iOS 6, and it returns on an iOS 26 phone. The website is iOS 6 only, so it never gets the style.
+  The jailbreak app keeps its iOS 15 and later support, and iOS 6, 7 and 13 stay in both apps.
 - **What it swaps** (look in `ios26.css`, `appearance: auto` with the page's paint reverted; sizes unchanged):
 
-  | Control | Under the hook | Without it |
+  | Control | Under the hook | Look-alike (concept frame, transitions, countdown and `onTap` alerts) |
   |---|---|---|
   | Search bar field (`nav/searchbar.js`) | WebKit's capsule and magnifier, 17pt, no focus ring; `packages.css` drops the drawn magnifier's room | the CSS capsule, magnifier and clear |
   | Text fields in cells | plain borderless inputs | the same, styled by the era |
-  | Switches (`nav/switch.js` `createSwitch`) | `<input type=checkbox switch>`, WebKit's switch, in `--sw-w` x `--sw-h` (71 x 31, WebKit's own box) | the button art, in the same box |
+  | Switches (`nav/switch.js` `createSwitch`) | `<input type=checkbox switch>`, WebKit's switch, in `--sw-w` x `--sw-h` (71 x 31, WebKit's own box) | the look-alike switch art, in the same box; in the concept frame a plain checkbox, as Chromium has no `switch` attribute |
   | Fixed-choice menus | a real `<select>`: iOS 26's pull-down button and its glass menu | (none built yet) |
   | The run page's bar (`nav/progress.js`) | `<progress class="progress-bar">` | the drawn track and fill |
-  | Alerts (`nav/alert.js` `showAlert`), in the app only | the shell's `UIAlertController` (bridge call `ui.alert`, `native/Sources/NativeAlerts.swift`): the cancel button is the cancel action, red buttons are destructive, the green one is the preferred action, at most one text field; `input.paste` is dropped (the field has Paste in its own menu), but with `input.pasteSubmits` (Sources' Add) the field's own Paste puts the trimmed text in the field and answers for that button, as the CSS alert's Paste does; `input.paste` then turns the text into the value, and text it can't use opens the alert again with it in the field. A countdown alert and one with `onTap` keep the CSS alert | the CSS alert (`.alert`, "Overlays" below); so does the site, and a shell without `ui.alert` |
-  | Action sheets and menus opened from a button or a row (`showActionSheet` in `nav/actionsheet.js`, `showMenu` in `nav/menu.js`), in the app only | The shell's `UIMenu` out of that button (bridge call `ui.menu`, with `sheet: true` for a sheet; `native/Sources/NativeMenus.swift`), with the items' icons; a sheet with no source is the shell's `UIAlertController` sheet (`ui.actionSheet`) | The CSS sheet or anchored menu (`.action-menu`, "Overlays" below); so does the site, and a shell without `ui.menu` |
+  | Alerts (`nav/alert.js` `showAlert`), in the app only | the shell's `UIAlertController` (bridge call `ui.alert`, `native/Sources/NativeAlerts.swift`): the cancel button is the cancel action, red buttons are destructive, the green one is the preferred action, at most one text field; `input.paste` is dropped (the field has Paste in its own menu), but with `input.pasteSubmits` (Sources' Add) the field's own Paste puts the trimmed text in the field and answers for that button, as the CSS alert's Paste does; `input.paste` then turns the text into the value, and text it can't use opens the alert again with it in the field. A countdown alert and one with `onTap` keep the CSS alert | the CSS alert (`.alert`, "Overlays" below), which also shows in the concept frame; so does the site, and a shell without `ui.alert` |
+  | Action sheets and menus opened from a button or a row (`showActionSheet` in `nav/actionsheet.js`, `showMenu` in `nav/menu.js`), in the app only | The shell's `UIMenu` out of that button (bridge call `ui.menu`, with `sheet: true` for a sheet; `native/Sources/NativeMenus.swift`), with the items' icons; a sheet with no source is the shell's `UIAlertController` sheet (`ui.actionSheet`) | The CSS bottom sheet (`.action-sheet`, "Overlays" below), or for a menu the iOS 6 menu callout (`.menu`), which also shows in the concept frame; so does the site, and a shell without `ui.menu` |
 
-  | The scope bar pinned under the search bar (`nav/ui.js` `segments` inside `nav/searchbar.js` `pinned`), in the app only | the shell's `UISegmentedControl` (bridge call `ui.segments`, `native/Sources/NativeSegments.swift`) laid over the CSS bar's rect, which turns see-through while it shows; hidden while a slide runs or one of the page's own popups or pages covers the bar, closed when its page leaves; a tap calls the page's `onPick`. A scope bar inside a scroller keeps the CSS bar | the CSS bar; so does the site, and a shell without `ui.segments` |
+  | The scope bar pinned under the search bar (`nav/ui.js` `segments` inside `nav/searchbar.js` `pinned`), in the app only | the shell's `UISegmentedControl` (bridge call `ui.segments`, `native/Sources/NativeSegments.swift`) laid over the CSS bar's rect, which turns see-through while it shows; hidden while a slide runs or one of the page's own popups or pages covers the bar, closed when its page leaves; a tap calls the page's `onPick`. A scope bar inside a scroller keeps the CSS bar | the CSS bar, which also shows in the concept frame and transitions; so does the site, and a shell without `ui.segments` |
 
   `appearance` (and `-webkit-appearance`) is look: it is in the test's `LOOK` list.
 
@@ -309,7 +313,7 @@ against these classes. The classes and states are the hooks: keep them when an o
 | Overlay | JS | Classes and states | Look today |
 |---|---|---|---|
 | Alert | `alert.js` | `.alert-scrim`, `.alert`, `.alert-title`, `.alert-message`, `.alert-field`, `.alert-field-row`, `.alert-paste`, `.alert-buttons` (`.stacked`), `.alert-button` (`.cancel`, `.green`, `.red`) | `sources.css`, literal |
-| Action sheet | `actionsheet.js` | `.action-scrim`, `.action-dim`, `.action-sheet`, `.action-title`, `.action-list`, `.action-button` (`.destructive`, `.cancel`); iOS 26's anchored menu (a sheet opened from a button): `.action-menu-scrim`, `.action-menu`, `.action-menu-room` | `packages.css`, tokens: `--action-*`; dark `--dk-action-sheet`, `--dk-action-btn`, `--dk-action-cancel`; the menu: `ios26.css`, `--i26-menu`, `--i26-menu-pressed`, `--i26-menu-dim` |
+| Action sheet | `actionsheet.js` | `.action-scrim`, `.action-dim`, `.action-sheet`, `.action-title`, `.action-list`, `.action-button` (`.destructive`, `.cancel`) | `packages.css`, tokens: `--action-*`; dark `--dk-action-sheet`, `--dk-action-btn`, `--dk-action-cancel` |
 | Share sheet | `sharesheet.js` | `.share-scrim`, `.share-dim`, `.share-sheet`, `.share-pages`, `.share-grid`, `.share-item`, `.share-icon` (`.system`, `.app`, `.has-image`), `.share-glyph` (`.glyph-copy`, `.glyph-qr`), `.share-letter`, `.share-image`, `.share-label`, `.share-dots` (`span.on`), `.share-cancel`; the nav bar's `.share-button`. Under `--share-layout: action` it is the action sheet: `.action-button.has-icon`, its `.action-icon` (with `.share-icon`) and `.action-label` | `ios6.css`, tokens: `--share-*`, the glyphs `--share-glyph-copy`, `--share-glyph-qr`; an app's own colour comes in `--share-tint` |
 | HUD | `hud.js` | `.hud-scrim`, `.hud`, `.hud-spinner`, `.hud-label`, `.hud-check` | `ios6.css`, tokens: `--hud`, `--hud-text`, `--hud-emboss`, `--spinner-large`, `--hud-check` (the checkmark's art) |
 | Spinners | `spinner.js` | `.hud-spinner`, `.reload-spinner`, `.pull-spinner`, `.badge.spinning`, `.source-row.is-loading`, `.loading-spinner`, `.bar-button.is-reloading` | tokens `--spinner-white`, `--spinner-gray`, `--spinner-large` in `ios6.css` and again in `ios7.css`, `ios13.css` and `ios26.css`, each era's own; the hook `--spinner-turns` (`style.css`: `hud-spin`, 30 degrees a turn, or `hud-spin-8`, 45) |

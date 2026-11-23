@@ -232,7 +232,7 @@ function settingsGroups(list, page) {
     for (const d of s.settings) {
       if (d.kind === "choice") {
         const v = settings.get(d.key);
-        for (const o of d.options) rows.push({ label: o.label, checked: o.value === v, onClick: () => settings.set(d.key, o.value) });
+        for (const o of settings.optionsOf(d.key)) rows.push({ label: o.label, checked: o.value === v, onClick: () => settings.set(d.key, o.value) });
       } else if (d.kind === "segmented") {
         segs.push(d); // F199: Theme's Mode; drawn under the group's header below
       } else if (d.kind === "toggle") {

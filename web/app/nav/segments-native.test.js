@@ -1,4 +1,4 @@
-// F345d: the pinned scope bar under the native controls hook goes to the shell's UISegmentedControl (ui.segments):
+// F345d: the pinned scope bar under the iOS 26 style goes to the shell's UISegmentedControl (ui.segments):
 // open with the shown items, selection and rect; updates; hidden while a popup, a slide or another page covers it;
 // closed when its page leaves or the hook goes off; picks call onPick; an old shell keeps the CSS bar. Plus the
 // Swift handler's shape. SPDX-License-Identifier: GPL-3.0-or-later
@@ -55,7 +55,7 @@ function page(native, { pick = () => {} } = {}) {
 function reset() {
   doc.body.children.forEach((c) => { c.parentNode = null; });
   doc.body.children.length = 0;
-  doc.documentElement.setAttribute("data-controls", "native");
+  doc.documentElement.setAttribute("data-style", "ios26");
   delete doc.getAnimations;
   syncSegments(doc, fakeShell().native, win); // closes the last test's bars, which left with the page
 }
@@ -162,11 +162,11 @@ test("closed when its page leaves or the hook goes off; reopened when it comes b
   const { seg } = page(native);
   syncSegments(doc, native, win);
   assert.equal(calls.at(-1).op, "open");
-  doc.documentElement.setAttribute("data-controls", "css");
+  doc.documentElement.setAttribute("data-style", "ios6");
   syncSegments(doc, native, win);
   assert.equal(calls.at(-1).op, "close");
   assert.equal(seg.style.opacity, "");
-  doc.documentElement.setAttribute("data-controls", "native");
+  doc.documentElement.setAttribute("data-style", "ios26");
   syncSegments(doc, native, win);
   assert.equal(calls.at(-1).op, "open");
 });
@@ -183,7 +183,7 @@ test("only a pinned bar: none inside the scroller, none without the hook or on t
   assert.equal(calls.filter((c) => c.op === "open").length, 0);
 
   reset();
-  doc.documentElement.setAttribute("data-controls", "css");
+  doc.documentElement.setAttribute("data-style", "ios6");
   page(native);
   syncSegments(doc, native, win);
   assert.equal(calls.filter((c) => c.op === "open").length, 0);

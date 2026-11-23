@@ -11,7 +11,7 @@ const HOOKS = ["--action-sheet-pad: 8px 8px", "--action-sheet-pad-bottom: 8px", 
 
 for (const [era, file, scope, line] of [
   ["ios13", "ios13.css", "", "--i13-alert-line"],
-  ["ios26", "ios26.css", " .action-sheet:not(.action-menu)", "--i26-alert-line"],
+  ["ios26", "ios26.css", " .action-scrim .action-sheet", "--i26-alert-line"],
 ]) {
   test(`B376: ${era}'s bottom action sheet is one 13pt group with hairlines, Cancel apart`, () => {
     const src = css(file);

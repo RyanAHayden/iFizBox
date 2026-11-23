@@ -63,8 +63,6 @@ html[data-style="ios26"][data-theme="light"] {
   --i26-glass-rim: rgba(255,255,255,.85);
   --i26-glass-shadow: 0 8px 28px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.9), inset 0 -1px 2px rgba(0,0,0,.05);
   --i26-capsule: rgba(255,255,255,.78); --i26-capsule-pressed: rgba(228,228,234,.9);
-  /* the anchored menu (nav/actionsheet.js, .action-menu): a thicker glass than the pill, its pressed row, the dim */
-  --i26-menu: rgba(255,255,255,.8); --i26-menu-pressed: rgba(0,0,0,.08); --i26-menu-dim: rgba(0,0,0,.1);
   --i26-capsule-shadow: 0 2px 12px rgba(0,0,0,.08), inset 0 0 0 .5px rgba(0,0,0,.06);
   --i26-back-shadow: 0 2px 12px rgba(0,0,0,.08), 0 0 0 .5px rgba(0,0,0,.06); /* outside: its border is the chevron's slot */
   --i26-tab-chosen: rgba(0,0,0,.07);
@@ -171,7 +169,6 @@ html[data-style="ios26"][data-theme="dark"] {
   --i26-glass-rim: rgba(255,255,255,.14);
   --i26-glass-shadow: 0 8px 28px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.12);
   --i26-capsule: #1c1c1e; --i26-capsule-pressed: #2c2c2e;
-  --i26-menu: rgba(36,36,40,.82); --i26-menu-pressed: rgba(255,255,255,.12); --i26-menu-dim: rgba(0,0,0,.3);
   --i26-capsule-shadow: inset 0 0 0 .5px rgba(255,255,255,.1);
   --i26-back-shadow: 0 0 0 .5px rgba(255,255,255,.1);
   --i26-tab-chosen: rgba(255,255,255,.12);
@@ -358,41 +355,42 @@ html[data-style="ios26"][data-theme] .switch.is-held .sw-knob {
   background: linear-gradient(var(--i26-knob-held), var(--i26-knob-held)) padding-box, var(--i26-ring);
 }
 
-/* ---- F345a: native controls (html[data-controls="native"], native-controls.js; docs/eras.md "Native controls") ----
+/* ---- F345a: native controls (html[data-style="ios26"], native-controls.js; docs/eras.md "Native controls"; [data-tabbar="float"] always comes with
+   the style and keeps these rules above the look-alikes' specificity) ----
    Where WebKit draws iOS 26's own controls, the page leaves them to it: appearance auto, and ios6.css's and
    packages.css's paint on them reverted to the browser's (a border or background of the page's own would make
    WebKit draw a plain box instead). Sizes stay style.css's and packages.css's, so nothing moves between this and the
    look-alikes above. */
 /* The switch: an <input type=checkbox switch> (nav/switch.js), WebKit's wide-knob switch in the 71 x 31 box. */
-html[data-style="ios26"][data-controls="native"] .switch.is-native {
+html[data-style="ios26"][data-tabbar="float"] .switch.is-native {
   appearance: auto; -webkit-appearance: auto; border: revert; background: revert; accent-color: auto;
 }
 /* The search field: WebKit's grey capsule and magnifier on the <input type=search>; the label behind it paints
    nothing. 17pt, UIKit's body size (16pt or more also keeps Safari from zooming on focus), and no focus ring: the
    caret shows the focus, as UISearchBar's. */
-html[data-style="ios26"][data-controls="native"] .search-field,
-html[data-style="ios26"][data-controls="native"][data-theme] .search-field {
+html[data-style="ios26"][data-tabbar="float"] .search-field,
+html[data-style="ios26"][data-tabbar="float"][data-theme] .search-field {
   background: none; border: 0; box-shadow: none;
 }
-html[data-style="ios26"][data-controls="native"] .search-field input,
-html[data-style="ios26"][data-controls="native"][data-theme] .search-field input {
+html[data-style="ios26"][data-tabbar="float"] .search-field input,
+html[data-style="ios26"][data-tabbar="float"][data-theme] .search-field input {
   appearance: auto; -webkit-appearance: auto; border: revert; background: revert; color: revert;
   font-size: 17px; outline: none;
 }
-html[data-style="ios26"][data-controls="native"] .search-field input::-webkit-search-decoration { -webkit-appearance: revert; }
+html[data-style="ios26"][data-tabbar="float"] .search-field input::-webkit-search-decoration { -webkit-appearance: revert; }
 /* WebKit on iOS draws no clear button, focused or not (the 15 Pro, iOS 27): packages.css's drawn one stays, moved
    inside the capsule's right end there. */
 /* Text fields in cells (Signing's rows, Add Source, Settings): plain borderless inputs, as UIKit's cell fields;
    WebKit's caret and keyboard, its own colour for the text. */
-html[data-style="ios26"][data-controls="native"] .cell-inner input:not([type="checkbox"]):not([type="search"]) {
+html[data-style="ios26"][data-tabbar="float"] .cell-inner input:not([type="checkbox"]):not([type="search"]) {
   appearance: auto; -webkit-appearance: auto; border: 0; background: none; font-size: 17px; outline: none;
 }
 /* Fixed-choice menus are real <select>s: the capsule is iOS 26's pull-down button, a tap opens the glass UIMenu. */
-html[data-style="ios26"][data-controls="native"] select {
+html[data-style="ios26"][data-tabbar="float"] select {
   appearance: auto; -webkit-appearance: auto; border: revert; background: revert; font-size: 17px;
 }
 /* The run page's bar (nav/progress.js): WebKit's <progress>, iOS 26's UIProgressView. */
-html[data-style="ios26"][data-controls="native"] progress { appearance: auto; -webkit-appearance: auto; }
+html[data-style="ios26"][data-tabbar="float"] progress { appearance: auto; -webkit-appearance: auto; }
 
 /* Signature pills (packages.css .sig-pill, whose fills the tokens above make flat): semibold white text, no tracking. */
 html[data-style="ios26"] .sig-pill,
@@ -502,42 +500,21 @@ html[data-style="ios26"] .action-button { font-size: 20px; font-weight: 400; bor
 html[data-style="ios26"] .action-button.cancel { font-weight: 600; }
 html[data-style="ios26"][data-theme="dark"] .action-button.destructive:not(:active):not(.is-pressed) { background: var(--action-destructive); }
 /* B376: the bottom sheet (no source button) uses iOS 13's grouped geometry, as ios13.css does: one 13pt block split by
-   .5pt hairlines, 8pt from the sides and bottom, and Cancel in its own box 8pt under it. These rules are scoped to the
-   sheet and leave out the anchored menu, which keeps its own padding and rows. */
+   .5pt hairlines, 8pt from the sides and bottom, and Cancel in its own box 8pt under it.  */
 html[data-style="ios26"][data-theme="light"] { --i26-action-cell: var(--action-btn); }
 html[data-style="ios26"][data-theme="dark"] { --i26-action-cell: var(--dk-action-btn); }
-html[data-style="ios26"] .action-sheet:not(.action-menu) {
+html[data-style="ios26"] .action-scrim .action-sheet {
   --action-sheet-pad: 8px 8px; --action-sheet-pad-bottom: 8px;
   --action-gap: 8px; --action-list-gap: 0px; --action-list-bleed: 0px;
   --action-title-margin: 0 0 -8px; --action-title-pad: 14px 16px; /* -8: the sheet's 8pt gap closed under the title */
   --action-cancel-gap: 0px;
 }
-html[data-style="ios26"] .action-sheet:not(.action-menu) .action-list { border-radius: 13px; }
-html[data-style="ios26"] .action-sheet:not(.action-menu) .action-list > .action-button { border-width: 0; border-radius: 0; }
-html[data-style="ios26"] .action-sheet:not(.action-menu) .action-list > .action-button + .action-button,
-html[data-style="ios26"] .action-sheet:not(.action-menu) .action-title + .action-list > .action-button:first-child { box-shadow: inset 0 .5px 0 var(--i26-alert-line); }
-html[data-style="ios26"] .action-sheet:not(.action-menu) .action-title { background: var(--i26-action-cell); border-radius: 13px 13px 0 0; }
-html[data-style="ios26"] .action-sheet:not(.action-menu) .action-title + .action-list { border-top-left-radius: 0; border-top-right-radius: 0; }
-/* The anchored menu (a sheet opened from a button, nav/actionsheet.js .action-menu): iOS 26's UIMenu, a rounded glass
-   list over a light dim; rows of label-coloured 17pt text, red for destructive, no separators, a grey pressed row.
-   The sheet's tokens are re-pointed inside it, so packages.css's look rules (dark ones too) paint the rows. */
-html[data-style="ios26"] .action-menu {
-  --action-btn: none; --dk-action-btn: none; --action-destructive: none; --action-btn-edge: transparent;
-  --action-btn-shadow: none; --action-btn-emboss: none; --action-btn-text: var(--i26-label);
-  --action-btn-pressed: var(--i26-menu-pressed); --action-btn-pressed-text: var(--i26-label);
-  --action-btn-pressed-emboss: none; --action-destructive-text: var(--i26-red); --action-destructive-emboss: none;
-  --action-destructive-pressed: var(--i26-menu-pressed);
-  --action-sheet: var(--i26-menu); --dk-action-sheet: var(--i26-menu);
-  border: 1px solid var(--i26-glass-rim); border-radius: 24px; box-shadow: var(--i26-glass-shadow);
-  -webkit-backdrop-filter: var(--i26-glass-blur); backdrop-filter: var(--i26-glass-blur);
-}
-html[data-style="ios26"] .action-menu-scrim .action-dim { background: var(--i26-menu-dim); }
-html[data-style="ios26"] .action-menu .action-button {
-  font-size: 17px; font-weight: 400; line-height: 44px; text-align: left; border-width: 0; border-radius: 0;
-}
-html[data-style="ios26"] .action-menu .action-button.destructive:active { background: var(--i26-menu-pressed); }
-html[data-style="ios26"] .action-menu .action-title { font-size: 13px; line-height: 17px; text-align: left; }
-
+html[data-style="ios26"] .action-scrim .action-sheet .action-list { border-radius: 13px; }
+html[data-style="ios26"] .action-scrim .action-sheet .action-list > .action-button { border-width: 0; border-radius: 0; }
+html[data-style="ios26"] .action-scrim .action-sheet .action-list > .action-button + .action-button,
+html[data-style="ios26"] .action-scrim .action-sheet .action-title + .action-list > .action-button:first-child { box-shadow: inset 0 .5px 0 var(--i26-alert-line); }
+html[data-style="ios26"] .action-scrim .action-sheet .action-title { background: var(--i26-action-cell); border-radius: 13px 13px 0 0; }
+html[data-style="ios26"] .action-scrim .action-sheet .action-title + .action-list { border-top-left-radius: 0; border-top-right-radius: 0; }
 /* The price button (myipas.css .price-btn: My IPAs' SIGN / INSTALL / OPEN, the confirm tap's INSTALL .go, and
    More Sources' and Find More's ADD / ADDED, sources.css .rec-add, which wears .price-btn too): the iOS 13 App
    Store's GET, a grey capsule with bold tinted text and no outline, darker while held; the confirm tap's INSTALL
@@ -745,7 +722,7 @@ html[data-style="ios26"] .qr-stop:active { opacity: .3; }
 /* the finish button: the prominent capsule */
 html[data-style="ios26"] .progress-finish { border-radius: 22px; font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
 /* the native <progress>es take the tint */
-html[data-style="ios26"][data-controls="native"] progress { accent-color: var(--i26-tint); }
+html[data-style="ios26"][data-tabbar="float"] progress { accent-color: var(--i26-tint); }
 /* F370: iOS 26's icons. The tab bar's glyphs are filled, the chosen tab the same glyph in the tint: tabGlyphTokens("ios26")
    and tabGlyphTokens("ios26", "tabsSelected") from icons/rowicons.js (rowicons.test.js fails if they drift). */
 html[data-style="ios26"] .tab[data-tab="home"] { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28' stroke='%23000' stroke-width='2.2' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M3.5 13.5 14 4l10.5 9.5z'/%3E%3Cpath d='M6.5 11v14h5.5v-7h4v7h5.5V11z'/%3E%3C/svg%3E"); }

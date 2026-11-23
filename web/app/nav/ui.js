@@ -166,7 +166,7 @@ export function segments(values, labels, current, onPick) {
   return seg;
 }
 
-// F345d: in the app under the native controls hook (<html data-controls="native">), a scope bar pinned under the
+// F345d: in the app under the iOS 26 style (<html data-style="ios26">), a scope bar pinned under the
 // search bar (nav/searchbar.js pinned: inside .search-root, not in its .search-results scroller) is drawn by the
 // shell as a real UISegmentedControl laid over this element's rect (bridge call ui.segments,
 // native/Sources/NativeSegments.swift). The CSS bar stays in the page underneath, see-through while the native one
@@ -191,7 +191,7 @@ const POPUP = '[aria-modal="true"], [role="dialog"], [role="alertdialog"]'; // n
 
 // What the native bar should show now, or null when it should be closed: { items, selected, rect, hidden }.
 export function segmentsSnapshot(seg, doc = globalThis.document, win = globalThis) {
-  if (doc?.documentElement?.getAttribute?.("data-controls") !== "native") return null;
+  if (doc?.documentElement?.getAttribute?.("data-style") !== "ios26") return null;
   if (!seg.isConnected || !seg.closest?.(".search-root") || seg.closest(".search-results")) return null;
   const shown = seg.buttons.map((b, i) => [b, i]).filter(([b]) => !b.hidden);
   const items = shown.map(([b]) => b.textContent);
@@ -321,7 +321,7 @@ function watchSegments(doc = globalThis.document, win = globalThis) {
     const inScroller = (n) => (n.nodeType === 1 ? n : n.parentElement)?.closest?.("[data-scroller]");
     const obs = new Observer((records) => { if (records.some((r) => !inScroller(r.target))) scheduleSegmentsSync(); });
     obs.observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "hidden", "style", "role", "aria-modal"] });
-    obs.observe(doc.documentElement, { attributes: true, attributeFilter: ["data-controls"] });
+    obs.observe(doc.documentElement, { attributes: true, attributeFilter: ["data-style"] });
     segmentsWatch = obs;
   }
   win.addEventListener?.("resize", scheduleSegmentsSync);

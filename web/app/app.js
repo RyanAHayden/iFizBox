@@ -646,7 +646,7 @@ addEventListener("pageshow", (e) => { if (e.persisted) homeTop.opened(); });
 // ifizbox://install (F89) is no longer sent by the website since F92/F95: only for links already out there.
 if (nativeBridge()) import("./incoming.js").then((m) => m.startIncoming()).catch(() => {});
 
-// F345a: <html data-controls="native"> follows the style and the app's app.info (theme-boot.js set it for first paint)
+// F345a, C70: the app's app.info decides whether this phone offers the iOS 26 style (theme-boot.js guessed for first paint)
 import("./native-controls.js").then((m) => m.initNativeControls()).catch(() => {});
 
 // The Home Screen icon's long-press Upgrade All (native Shortcut.perform): Changes, every upgrade queued, Confirm.
