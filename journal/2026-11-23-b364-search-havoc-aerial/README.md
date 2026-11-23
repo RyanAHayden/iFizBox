@@ -64,6 +64,23 @@ Source, Paid, hidden App Tweaks). `node --test web/app`: 3290 pass.
 - The default GitHub Tweak Sources answered HTTP 403 in the sideload runs (GitHub API rate limit here), as in B341;
   Havoc itself loaded.
 
+## Spec review
+
+A fresh subagent read the diff and the brief. Nothing to fix. Here is what it raised:
+- The fixture is already in the repo (from B268).
+- Griddy and Novus in the test are trimmed copies of real Havoc stanzas. `havoc-paid-check.mjs` covers all 213 paid
+  packages against the live index; it is a journal tool and not part of the gate, because the live index changes.
+- The `appsAndTweaks()` cache depends on `rowsOf(ALL)` and `tweakSorted`. Both are replaced with new arrays when
+  rebuilt, never changed in place.
+- The `sections-b341.test.js` line had to change for this fix.
+- `capture.mjs` is B129's driver, copied unchanged (its `helper.run` ssh path is unused here). The step files'
+  shot names map to the PNGs like this:
+  - `app-aerial` → `jailbreak-app.png`
+  - `lite-aerial` → `sideload-before.png` / `sideload-after.png` (before and after the fix)
+  - `search` → `site-jailbroken.png`
+
+Filed B366 (low): the Sources page shows Havoc's count as 1,801 (rootless stanzas) while it lists 377 packages.
+
 ## Not verified
 
 - Not tried on a phone: the fix is pure `web/app/core` search logic, checked in Chromium with both fake-bridge builds
