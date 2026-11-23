@@ -29,6 +29,8 @@ html[data-theme="dark"] .pkg-row[data-queued="remove"] .pkg-desc { color: var(--
 .confirm-mods .cell-detail { white-space: pre-line; }
 /* B92: a name with no break in it (an IPA's file name) wraps instead of running off the row's edge */
 .confirm-mods .cell-detail { overflow-wrap: anywhere; }
+/* B404: Cannot Comply's Remove <name> from Queue, its whole name on more lines if it must */
+.confirm-unqueue .cell-label { white-space: normal; overflow-wrap: anywhere; }
 .confirm-raw, .console-log {
   margin: 0; padding: 10px 12px; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere;
   -webkit-user-select: text; user-select: text;
@@ -41,6 +43,9 @@ html[data-theme="dark"] .pkg-row[data-queued="remove"] .pkg-desc { color: var(--
 html[data-theme="dark"] .confirm-issues .group-header { color: var(--dk-issue-head); }
 .confirm-problem .table { background: #ffcccc; }
 html[data-theme="dark"] .confirm-problem .table { background: var(--dk-issue-table); }
+.confirm-unqueue .cell-label { text-align: center; color: #c0392b; }
+html[data-theme="dark"] .confirm-unqueue .cell-label { color: var(--dk-remove); }
+html[data-style="ios6"] .confirm-unqueue .cell-inner.is-pressed .cell-label { color: #fff; }
 .confirm-raw, .console-log { font: 11px/15px ui-monospace, Menlo, monospace; }
 .console { background: #000; }
 .console .navbar.sheet-bar { background: var(--console-bar); }

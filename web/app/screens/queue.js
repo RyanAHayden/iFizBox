@@ -6,7 +6,9 @@
 //      Upgrade, Downgrade, Remove, one row each with the names), the queue itself (tap one to clear it), and
 //      Continue Queuing. When apt refuses, the sheet is "Cannot Comply": F18's plain-language explanation of each
 //      problem with its action (core/deps.js explainApt through the catalog) above apt's own output, which always
-//      shows; never a silent failure (Zebra #2052). Cancel clears the queue; Confirm runs it.
+//      shows; never a silent failure (Zebra #2052). Cancel clears the queue; Confirm runs it. B404: until apt agrees (while
+//      it is asked, and on Cannot Comply) the left button is Close, which leaves the queue as it is; Cannot Comply has a
+//      "Remove <name> from Queue" row per package that caused it (core/queuerefusal.js).
 //   3. The console ("Running", then "Complete"; F151: nav/progress.js): apt's and dpkg's lines streamed over the
 //      bridge as they come, the status fd's steps in bold white, dpkg's own output in monospace, errors in red, a
 //      progress bar, then the finish button (core/progress.js chooseFinish): Restart SpringBoard when a changed
@@ -41,6 +43,7 @@ import { MODES, MODE_LABEL, changeCount, runTitle, createRepeatFilter, CONFFILE_
   CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine, debUrlOf, debLinkOf, mergePlans, runStatusText } from "../core/queue.js";
 import { appQueue } from "../app-queue.js";
 import { appPlan, runOrder, sizeText, SELF_ID, customParams, listedOf, APP_MODES, APP_MODE_LABEL } from "../core/appqueue.js";
+import { helperRefusal, refusalIds } from "../core/queuerefusal.js";
 import { NAME } from "../brand.js";
 import { storedRoute } from "../core/installroute.js"; // B137
 import { rowIcon } from "../icons/rowicons.js";
@@ -127,16 +130,19 @@ export function confirmCancel() {
 }
 
 // F234: `footer` under the sheet (a cancelled run's "Stopped. N installed and cleared from the queue.").
-function openConfirm({ footer = null } = {}) {
+export function openConfirm({ footer = null } = {}) {
   if (confirm || running) { confirm?.refresh(); return; }
   if (!installQueue.size && !jbAppJobs().length) return;
   const cancel = confirmCancel();
+  const closer = barButton("Close"); // B404: until apt agrees, the left button leaves the queue alone
   const ok = barButton("Confirm", "done");
   ok.hidden = true;
-  const m = modal({ title: "Confirm", left: cancel, right: ok, cls: "confirm-sheet" });
+  const m = modal({ title: "Confirm", left: closer, right: ok, cls: "confirm-sheet" });
   let generation = 0;
   let ready = null; // { jobs, plan, ids } once apt agreed
-  const close = () => { confirm = null; updateChrome(); return m.close(); };
+  // B404: the generation moves on, so an answer still coming can't queue anything or draw once the sheet is closed
+  const close = () => { generation++; confirm = null; updateChrome(); return m.close(); };
+  closer.addEventListener("click", () => close());
   cancel.addEventListener("click", () => { installQueue.clearAll(); if (!appRunning && !appPreparing) appQueue.clearAll(); close(); });
   ok.addEventListener("click", () => {
     if (!ready) return;
@@ -158,9 +164,11 @@ function openConfirm({ footer = null } = {}) {
       m.scroll.replaceChildren(continueGroup(close), statistics(plan), modifications(plan, appNames(apps)));
       if (footer) m.scroll.append(el("p", "group-footer confirm-stopped", footer));
       ready = { jobs: [], plan: null, ids: [], apps };
+      m.left.replaceChildren(cancel);
       ok.hidden = false;
       return;
     }
+    m.left.replaceChildren(closer);
     m.scroll.replaceChildren(loading("Checking with apt"));
     const jobs = await withDebUrls(installQueue.list());
     if (gen !== generation) return;
@@ -169,19 +177,21 @@ function openConfirm({ footer = null } = {}) {
     if (gen !== generation) return; // the queue changed while apt was asked; a newer answer is coming
     // F131: apt would pull in a package it can't download (its Filename is a full URL): queue it, so the shell
     // fetches it; the add redraws this sheet.
-    if (r?.ok && (await queueLinkedDeps(r.plan, jobs)) && gen !== generation) return;
+    if (r?.ok) await queueLinkedDeps(r.plan, jobs, () => gen === generation);
+    if (gen !== generation) return;
     const names = await namesFor([...jobs.map((j) => j.id), ...(r ? planIds(r.plan) : [])]);
     if (gen !== generation) return;
     m.scroll.replaceChildren();
     if (err) {
       m.setTitle("Cannot Comply");
-      m.scroll.append(grouped([{ header: "Couldn't Ask apt", rows: [{ label: err.message || String(err) }],
-        footer: `Nothing was changed. ${NAME} runs apt through its helper (ifizbox-helper); reinstalling ${NAME} puts it back.` }]));
+      m.scroll.append(refusedGroups(err, jobs, names));
     } else if (!r.ok || r.plan.essential.length) {
       m.setTitle("Cannot Comply");
-      await drawIssues(m.scroll, r, names, () => close());
+      await drawIssues(m.scroll, r, names, () => close(), () => gen === generation);
       if (gen !== generation) return;
+      m.scroll.append(unqueueGroup(refusalIds(r, jobs), jobs, names));
     } else if (!changeCount(r.plan) && !apps.length) {
+      m.left.replaceChildren(cancel);
       m.scroll.append(grouped([{ header: "Modifications", rows: [{ label: "Nothing to change" }],
         footer: "apt says everything queued is already as asked." }]));
     } else {
@@ -193,6 +203,7 @@ function openConfirm({ footer = null } = {}) {
       markNeededBy(modsGroup, r.plan, jobs, names, catalog); // F234: "needed by X" under what apt added
       const changes = changeCount(r.plan) > 0;
       ready = { jobs: changes ? jobs : [], plan: r.plan, ids: changes ? planIds(r.plan) : [], apps };
+      m.left.replaceChildren(cancel);
       ok.hidden = false;
     }
     // Cydia on the 4S (ref/4s/screens/queue-81.png, queue-83.png): Continue Queuing, Statistics, Modifications and no
@@ -264,14 +275,15 @@ async function withDebUrls(jobs) {
 }
 
 // F131: packages apt-get -s would install or upgrade that aren't queued but whose Filename is a full URL go into the
-// queue for that version. True when one was added.
-async function queueLinkedDeps(plan, jobs) {
+// queue for that version, while live(). True when one was added.
+async function queueLinkedDeps(plan, jobs, live) {
   const queued = new Set(jobs.map((j) => j.id));
   let added = false;
   for (const e of [...plan.installs, ...plan.upgrades, ...plan.downgrades]) {
     if (queued.has(e.id)) continue;
     let url = null;
     try { url = debUrlOf(await catalog.history(e.id), e.to); } catch { url = null; }
+    if (!live()) return added; // B404: closed, or a newer answer is coming
     if (!url) continue;
     installQueue.add({ op: "install", id: e.id, version: e.to, installed: e.from });
     queued.add(e.id);
@@ -336,12 +348,33 @@ function continueGroup(close) {
   return g;
 }
 
+// B404: Cannot Comply when ifizbox-helper couldn't ask apt: which package and why in plain words, wrapped whole.
+function refusedGroups(err, jobs, names) {
+  const why = helperRefusal(err.message || String(err), jobs, names);
+  const frag = grouped([{ header: "Couldn't Ask apt", rows: why.sentences.map(() => ({ label: "" })),
+    footer: why.missing ? `Reinstalling ${NAME} puts it back.` : null }]);
+  const g = frag.querySelector(".group");
+  g.classList.add("confirm-problem", "confirm-issues");
+  [...g.querySelectorAll(".cell")].forEach((li, i) => li.replaceChildren(el("div", "pkg-description", why.sentences[i])));
+  if (!why.missing) frag.append(unqueueGroup(why.ids, jobs, names));
+  return frag;
+}
+
+// B404: Cannot Comply's way out: a red row per queued package that caused it (every queued one when the cause names
+// none) takes just that one out of the queue; the queue's own change asks apt again with the rest.
+function unqueueGroup(ids, jobs, names) {
+  const list = ids.length ? ids : jobs.map((j) => j.id);
+  return grouped([{ rows: list.map((id) => ({ label: `Remove ${names[id] || id} from Queue`, cls: "confirm-unqueue",
+    onClick: () => installQueue.clear(id) })) }]);
+}
+
 // Cannot Comply: F18's sentences (and actions) first, then what Cydia would also call an issue: essentials.
-async function drawIssues(box, r, names, close) {
+async function drawIssues(box, r, names, close, live = () => true) {
   const frag = document.createDocumentFragment();
   let problems = [];
   if (!r.ok) {
     try { problems = (await catalog.aptProblems(r.output)) ?? []; } catch { problems = []; }
+    if (!live()) return;
   }
   const sentences = [
     ...(r.issues ?? []).map((sentence) => ({ sentence })), // F131: a link that couldn't be downloaded
