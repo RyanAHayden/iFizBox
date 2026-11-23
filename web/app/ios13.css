@@ -397,6 +397,24 @@ html[data-style="ios13"][data-theme="dark"] .search-cancel { background: none; }
 html[data-style="ios13"] .action-button { font-size: 20px; font-weight: 400; border-radius: 13px; }
 html[data-style="ios13"] .action-button.cancel { font-weight: 600; }
 html[data-style="ios13"][data-theme="dark"] .action-button.destructive:not(:active):not(.is-pressed) { background: var(--action-destructive); }
+/* B376: UIAlertController's action sheet geometry. The choices form one block with 13pt corners, split by .5pt
+   hairlines, 8pt from the screen's sides and bottom, and Cancel sits in its own 13pt box 8pt under the block. The
+   title goes inside the block, in its first cell. As in ios7.css, each button after the first (or after the title)
+   draws its own .5pt line across its top, because a .5pt flex gap lands on half pixels and Chromium drops some. */
+html[data-style="ios13"][data-theme="light"] { --i13-action-cell: var(--action-btn); }
+html[data-style="ios13"][data-theme="dark"] { --i13-action-cell: var(--dk-action-btn); }
+html[data-style="ios13"] {
+  --action-sheet-pad: 8px 8px; --action-sheet-pad-bottom: 8px;
+  --action-gap: 8px; --action-list-gap: 0px; --action-list-bleed: 0px;
+  --action-title-margin: 0 0 -8px; --action-title-pad: 14px 16px; /* -8: the sheet's 8pt gap closed under the title */
+  --action-cancel-gap: 0px;
+}
+html[data-style="ios13"] .action-list { border-radius: 13px; }
+html[data-style="ios13"] .action-list > .action-button { border-width: 0; border-radius: 0; }
+html[data-style="ios13"] .action-list > .action-button + .action-button,
+html[data-style="ios13"] .action-title + .action-list > .action-button:first-child { box-shadow: inset 0 .5px 0 var(--i13-alert-line); }
+html[data-style="ios13"] .action-title { background: var(--i13-action-cell); border-radius: 13px 13px 0 0; }
+html[data-style="ios13"] .action-title + .action-list { border-top-left-radius: 0; border-top-right-radius: 0; }
 
 /* The price button (myipas.css .price-btn: My IPAs' SIGN / INSTALL / OPEN, the confirm tap's INSTALL .go, and
    More Sources' and Find More's ADD / ADDED, sources.css .rec-add, which wears .price-btn too): the iOS 13 App

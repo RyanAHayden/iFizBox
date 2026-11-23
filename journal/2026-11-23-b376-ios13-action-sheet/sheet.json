@@ -1,0 +1,128 @@
+[
+ {
+  "wait": 1000
+ },
+ {
+  "eval": "localStorage.setItem(\"ifizbox.firstVisit\",\"later\"); \"ok\""
+ },
+ {
+  "nav": "#/sources",
+  "ms": 8000
+ },
+ {
+  "eval": "localStorage.setItem(\"ifizbox.style\",\"ios13\"); localStorage.setItem(\"ifizbox.appearance\",\"light\"); \"ok\""
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+  "ms": 5000
+ },
+ {
+  "eval": "setInterval(()=>document.querySelectorAll(\".banner\").forEach(b=>b.remove()),200); \"ok\""
+ },
+ {
+  "wait": 3000
+ },
+ {
+  "eval": "import('./nav/actionsheet.js').then(m=>{m.showActionSheet({title:'iFizBox 0.24.1',buttons:['Reinstall','Downgrade','Remove'],destructive:2});return 'ok'})"
+ },
+ {
+  "wait": 1500
+ },
+ {
+  "shot": "modify-ios13-light"
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+  "ms": 5000
+ },
+ {
+  "eval": "setInterval(()=>document.querySelectorAll(\".banner\").forEach(b=>b.remove()),200); \"ok\""
+ },
+ {
+  "tap": ".store-head-share",
+  "ms": 1500
+ },
+ {
+  "shot": "share-ios13-light"
+ },
+ {
+  "eval": "localStorage.setItem(\"ifizbox.style\",\"ios13\"); localStorage.setItem(\"ifizbox.appearance\",\"dark\"); \"ok\""
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+  "ms": 5000
+ },
+ {
+  "eval": "setInterval(()=>document.querySelectorAll(\".banner\").forEach(b=>b.remove()),200); \"ok\""
+ },
+ {
+  "wait": 3000
+ },
+ {
+  "eval": "import('./nav/actionsheet.js').then(m=>{m.showActionSheet({title:'iFizBox 0.24.1',buttons:['Reinstall','Downgrade','Remove'],destructive:2});return 'ok'})"
+ },
+ {
+  "wait": 1500
+ },
+ {
+  "shot": "modify-ios13-dark"
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+  "ms": 5000
+ },
+ {
+  "eval": "setInterval(()=>document.querySelectorAll(\".banner\").forEach(b=>b.remove()),200); \"ok\""
+ },
+ {
+  "tap": ".store-head-share",
+  "ms": 1500
+ },
+ {
+  "shot": "share-ios13-dark"
+ },
+ {
+  "eval": "localStorage.setItem(\"ifizbox.style\",\"ios26\"); localStorage.setItem(\"ifizbox.appearance\",\"light\"); \"ok\""
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+  "ms": 5000
+ },
+ {
+  "eval": "setInterval(()=>document.querySelectorAll(\".banner\").forEach(b=>b.remove()),200); \"ok\""
+ },
+ {
+  "wait": 3000
+ },
+ {
+  "eval": "import('./nav/actionsheet.js').then(m=>{m.showActionSheet({title:'iFizBox 0.24.1',buttons:['Reinstall','Downgrade','Remove'],destructive:2});return 'ok'})"
+ },
+ {
+  "wait": 1500
+ },
+ {
+  "shot": "modify-ios26-light"
+ },
+ {
+  "eval": "localStorage.setItem(\"ifizbox.style\",\"ios26\"); localStorage.setItem(\"ifizbox.appearance\",\"dark\"); \"ok\""
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+  "ms": 5000
+ },
+ {
+  "eval": "setInterval(()=>document.querySelectorAll(\".banner\").forEach(b=>b.remove()),200); \"ok\""
+ },
+ {
+  "wait": 3000
+ },
+ {
+  "eval": "import('./nav/actionsheet.js').then(m=>{m.showActionSheet({title:'iFizBox 0.24.1',buttons:['Reinstall','Downgrade','Remove'],destructive:2});return 'ok'})"
+ },
+ {
+  "wait": 1500
+ },
+ {
+  "shot": "modify-ios26-dark"
+ }
+]
