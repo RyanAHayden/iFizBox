@@ -204,7 +204,9 @@ export function tweaksGroup({ bundleId = "", store = tweakStore, alert = showAle
 //   await addDebTo(bundleId, stanza, data)  puts the .deb in that app's kept tweaks (the next sign injects it)
 //   await signableApps()                    [{ bundleId, name, from }] My IPAs and the apps signed here
 //   await addToApp(stanza, { … })           the package page's Add to App…: checks the .deb (HUD), then an action sheet
-//                                           of the apps its filter names; the rest listed as not targeted
+//                                           of the apps its filter names; the rest listed as not targeted. The picked
+//                                           app is queued as a re-sign with it (B342), or keeps it when not signed here
+//   await signedRecordFor(bundleId)         the signing.installed record Add to App re-signs from, or null
 //   worksInGroup(stanza)                    the package page's group: "Works In" and Add to App…, filled once checked
 
 export const INFO_KEY = "ifizbox.tweakInfo";
@@ -524,7 +526,7 @@ export function splitApps(info, apps) {
 
 export async function addToApp(st, opts = {}) {
   const { alert = showAlert, pick = pickApp, hud = null, apps = signableApps, fetchDeb, storage, store = tweakStore, paid = null,
-    sheet = showActionSheet } = opts;
+    sheet = showActionSheet, records = signedRecords, job = null, queue = null } = opts;
   const name = st.name || st.package;
   const hide = hud ? hud("Checking Tweak") : (await import("../nav/hud.js")).showHUD("Checking Tweak");
   let info, list, data;
@@ -556,11 +558,31 @@ export async function addToApp(st, opts = {}) {
   }
   const app = await pick({ name, made, locked, not, works });
   if (!app || !made.includes(app)) return null;
-  await addDebTo(app.bundleId, st, data, { store });
-  await alert({ title: "Tweak Added", message: `${name} goes into ${app.name} the next time it's signed. `
-    + `Its Sign Options list it under Inject Tweaks${needsHookLib(st) ? `, with ${ELLEKIT.name}` : ""}.`, buttons: ["OK"] });
+  // B342: the app is re-signed from its record with the tweak in, through the queue (as Installed's Re-sign): its kept
+  // tweaks (under the ID it was signed from, as keptTweakParams reads them) now differ from the record's, so they go
+  const rec = await signedRecordFor(app.bundleId, records);
+  await addDebTo(rec?.originalBundleId || app.bundleId, st, data, { store });
+  const j = rec ? await (job ?? (async (r) => (await import("../core/appqueue.js")).resignJob(r)))(rec) : null;
+  if (j) {
+    await (queue ?? (async (x) => (await import("./queue.js")).queueApp(x)))(j);
+    return app;
+  }
+  await alert({ title: "Tweak Added", message: `${app.name} wasn't signed on this phone, so it can't be re-signed with ${name} now. `
+    + `${name} is kept in its Sign Options under Inject Tweaks${needsHookLib(st) ? `, with ${ELLEKIT.name}` : ""}, and goes in when you sign it.`,
+  buttons: ["OK"] });
   return app;
 }
+
+// B342: the signing.installed record Add to App re-signs from, by the app's bundle ID or the one it was signed from
+// (kept tweaks are under that one); null when this phone didn't sign it (or isn't the sideload app).
+export async function signedRecordFor(bundleId, records = signedRecords) {
+  if (!bundleId) return null;
+  const list = await Promise.resolve().then(records).catch(() => []);
+  const recs = (Array.isArray(list) ? list : []).filter((r) => r?.bundleId);
+  // the picked app's own record first: a copy signed from it shares its originalBundleId
+  return recs.find((r) => r.bundleId === bundleId) ?? recs.find((r) => r.originalBundleId === bundleId) ?? null;
+}
+const signedRecords = async () => (hasNativeCall() ? (await nativeBridge()?.call?.("signing.installed", {}))?.apps ?? [] : []);
 
 const needsHookLib = (st) => /(mobilesubstrate|cydia-substrate|ellekit)/i.test(`${st?.depends ?? ""} ${st?.["pre-depends"] ?? ""}`);
 
@@ -1147,7 +1169,7 @@ export function addTweaksGroup({ bundleId, name = "", open = null, rows = source
     const [kept, made] = await Promise.all([savedTweaks(bundleId, { store }), madeForRows(bundleId, { rows, storage })]);
     detail.textContent = kept.length ? `${kept.length} Added` : made.length ? `${made.length} for This App` : "";
     // F352: no footer naming the tweaks; the row's detail says how many
-    foot.textContent = kept.length ? "They go in the next time it's signed." : made.length ? ""
+    foot.textContent = kept.length ? "They go in when it's installed or re-signed." : made.length ? ""
       : "Tweaks from your Tweak Sources or Files go into the app when it's signed.";
     foot.hidden = !foot.textContent;
     return { kept, made };
@@ -1301,7 +1323,7 @@ export function openAddTweaks({ bundleId, name = "", rows = sourceTweakRows, sto
       files.append(el("span", "cell-label", "From Files…"));
       filesLi.append(files, input);
       groups.push(group(listed.length || others.length ? "More Tweaks" : "Tweaks", [browseLi, searchLi, filesLi],
-        `Only tweaks that work in ${name || "this app"} without a jailbreak are listed. ${ELLEKIT.name} goes in for the ones that need it. They go into ${name || "the app"} the next time it's signed. ${searchAllFooter(name)}`));
+        `Only tweaks that work in ${name || "this app"} without a jailbreak are listed. ${ELLEKIT.name} goes in for the ones that need it. They go into ${name || "the app"} when it's installed or re-signed. ${searchAllFooter(name)}`));
       body.replaceChildren(...groups);
     }
     lister({ rows, storage }).then((l) => {
