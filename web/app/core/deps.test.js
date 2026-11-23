@@ -156,6 +156,7 @@ E: The package lists or status file could not be parsed or opened.`;
   ]);
   assert.equal(p[0].kind, "lists");
   assert.equal(p[0].blocking, true);
+  assert.deepEqual(p[0].action, { kind: "refresh", label: "Refresh Sources" }); // F378: Cannot Comply's row
   // A host with a port: apt writes ':' as %3a in the file name.
   assert.match(explainApt("E: Problem with MergeList /var/lib/apt/lists/repo.example.com%3a8080_dists_stable_main_binary-iphoneos-arm64_Packages", {})[0].sentence,
     /from repo\.example\.com:8080 \(/);
@@ -163,9 +164,12 @@ E: The package lists or status file could not be parsed or opened.`;
   const s = explainApt("E: Problem with MergeList /var/jb/var/lib/dpkg/status\nE: The package lists or status file could not be parsed or opened.", {});
   assert.equal(s.length, 1);
   assert.match(s[0].sentence, /^apt can't read dpkg's status file \(\/var\/jb\/var\/lib\/dpkg\/status\).*won't fix it/);
-  // Only the summary line: still a sentence.
-  assert.deepEqual(explainApt("E: The package lists or status file could not be parsed or opened.", {}).map((x) => x.sentence),
+  assert.equal(s[0].action, undefined); // Refresh doesn't rewrite dpkg's status: no Refresh row
+  // Only the summary line: still a sentence, with the Refresh row.
+  const only = explainApt("E: The package lists or status file could not be parsed or opened.", {});
+  assert.deepEqual(only.map((x) => x.sentence),
     ["apt can't read its package lists, so it won't run. Refresh your sources to download them again."]);
+  assert.equal(only[0].action?.kind, "refresh");
 });
 
 test("the catalog's deps op: every source (older versions too) and dpkg's status, against the device", async () => {

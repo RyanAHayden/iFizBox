@@ -17,7 +17,8 @@
 //               "lists"       (explainApt only) apt can't read one of its own list files, or dpkg's status; id null
 //     id        the package the sentence is about (the dependency, or the installed package); tapping opens it
 //     action    { kind: "open", id } | { kind: "remove", id } | { kind: "add-source", name, url } |
-//               { kind: "settings" }, with `label` ("Add Chariz", "Remove Y", "Open X", "Set iOS Version")
+//               { kind: "settings" } | { kind: "refresh" }, with `label` ("Add Chariz", "Remove Y", "Open X",
+//               "Set iOS Version", "Refresh Sources")
 //     via       the chain of packages that pulled the dependency in, outermost first ([] for a direct one)
 //   targets: each dependency name the page lists -> the package id that opens for it (a virtual name like
 //            mobilesubstrate opens its provider, ElleKit), for tappable Depends (Zebra #1414)
@@ -265,6 +266,7 @@ function sentenceFor(f, via, { subject, names, homes, ios }) {
 // file is named after the URL it came from (repo.twickd.com_._en, apt.procurs.us_dists_1800_main_..._Packages),
 // so its first part is the source's host; Refresh downloads it again. dpkg's status file is another matter:
 // Refresh doesn't rewrite it.
+const REFRESH = Object.freeze({ kind: "refresh", label: "Refresh Sources" });
 function unreadableList(path) {
   const file = path.split("/").pop();
   if (file === "status" && /\/dpkg\//.test(path)) {
@@ -274,7 +276,8 @@ function unreadableList(path) {
   let host = file.split("_")[0];
   try { host = decodeURIComponent(host); } catch { /* keep it as written */ }
   return { kind: "lists", id: null, blocking: true, via: [],
-    sentence: `apt can't read the list it downloaded from ${host || "a source"} (${file}), so it won't run. Refresh your sources to download it again.` };
+    sentence: `apt can't read the list it downloaded from ${host || "a source"} (${file}), so it won't run. Refresh your sources to download it again.`,
+    action: REFRESH };
 }
 
 // apt-get's report, line by line:
@@ -339,7 +342,8 @@ export function explainApt(output, { device = null, index = depIndex(), homes = 
   }
   if (unreadable && !problems.some((p) => p.kind === "lists")) {
     problems.push({ kind: "lists", id: null, blocking: true, via: [],
-      sentence: "apt can't read its package lists, so it won't run. Refresh your sources to download them again." });
+      sentence: "apt can't read its package lists, so it won't run. Refresh your sources to download them again.",
+      action: REFRESH });
   }
   const out = [];
   for (const p of problems) if (!out.some((q) => q.sentence === p.sentence)) out.push(p);
