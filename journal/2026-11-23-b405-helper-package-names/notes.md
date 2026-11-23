@@ -12,7 +12,9 @@ Read-only survey on the iPhone 7: 14322 stanzas, 4554 names (21 sources' lists p
 
 dpkg: `--validate-pkgname` takes capitals, `_`, a trailing + and a one-letter name, and refuses `/`, `:` and a leading `-`. Test .debs with `dpkg --no-act`: capitals, `_` and + are accepted, and dpkg lower-cases the Package. `beta1` and `1.0-` are refused ("version number does not start with digit", "revision number is empty"). `iphoneos-arm` is refused as an architecture, which the package page already says (Rootful only).
 
-apt-get -s: chaoge.ChargeLimiter works in any case. Oreo and OreoDark (iphoneos-arm) report "Unable to locate", while oreo and oreodark are found, which is why names go to apt in lower case. libdb18.1++ works.
+apt-get -s: chaoge.ChargeLimiter works in any case. Oreo and OreoDark (iphoneos-arm) report "Unable to locate", while oreo and oreodark are found, which is why names go to apt in lower case. libdb18.1++ works. `apt-get -s install ./x.deb` of com.example.b405_us gave `Inst com.example.b405_us`, so underscores are accepted. Simulate of oreo on the 7: `Conf com.spark.snowboard`, `Conf oreo:iphoneos-arm (1.4 Packix)`.
+
+Spec review: fixed the daemon's full-URL match (case), the fake helper's other verbs, the removal wording, `_` in payment/featured/canister. `seed_archive` needs nothing: the phone's dpkg-deb prints Package lower-cased. Lower-casing covers every package verb on purpose: they share helper_name_ok.
 
 Test .debs were removed from the phone. Underscore names are stored as `%5f` in apt's archive names.
 

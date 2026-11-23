@@ -42,6 +42,7 @@ prefix=${IFIZBOX_PREFIX:?}
 lists=$prefix/var/lib/apt/lists
 status=$prefix/var/lib/dpkg/status
 st() { { printf '%s\n' "$1" >&3; } 2>/dev/null || true; }
+lower() { printf '%s' "$1" | tr A-Z a-z; }
 refuse() { echo "ifizbox-helper: $1" >&2; exit 64; }
 verb=${1:-}
 VERBS="update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, simulate, apply, apply-ask, respring, install-ipa, selfupdate, rollbacks, rollback, install-paid, userspace-reboot, simulate-deb, install-deb, app-versions, update-source"
@@ -237,11 +238,12 @@ print(v)' "$1")
     if [ "$verb" = rollback ]; then
       { one_line "$2" && printf '%s' "$2" | grep -Eqx '[0-9]([A-Za-z0-9.+~:-]{0,253}[A-Za-z0-9.+~:])?'; } || refuse "bad version (a digit, then [A-Za-z0-9.+~:-], not ending in -)"
     fi
-    store=$prefix/var/cache/ifizbox/rollback/$1
+    id=$(lower "$1")
+    store=$prefix/var/cache/ifizbox/rollback/$id
     found=
-    for f in "$store/$1"_*_*.deb; do
+    for f in "$store/$id"_*_*.deb; do
       [ -f "$f" ] && [ ! -L "$f" ] || continue
-      rest=${f##*/}; rest=${rest#"$1"_}; arch=${rest##*_}; ver=${rest%_*}
+      rest=${f##*/}; rest=${rest#"$id"_}; arch=${rest##*_}; ver=${rest%_*}
       printf '%s' "$ver" | grep -Eqx '[0-9][A-Za-z0-9.+~%-]*' && printf '%s' "${arch%.deb}" | grep -Eqx '[a-z0-9-]+' || continue
       case $ver in *_*) continue ;; esac
       ver=$(printf '%s' "$ver" | sed 's/%3[aA]/:/g')
@@ -250,7 +252,7 @@ print(v)' "$1")
     done
     [ "$verb" = rollbacks ] && exit 0
     [ -n "$found" ] || refuse "no stored .deb of that version (Roll Back keeps only what automatic updates replaced)"
-    { grep -qxF "Package: $1" "$found" && grep -qxF "Version: $2" "$found" &&
+    { grep -qixF "Package: $1" "$found" && grep -qxF "Version: $2" "$found" &&
       [ "$(grep -c '^Package:' "$found")" = 1 ] && [ "$(grep -c '^Version:' "$found")" = 1 ]; } ||
       refuse "the stored .deb's control isn't that package and version"
     [ -n "${FAKE_SLOW:-}" ] && sleep "$FAKE_SLOW"
@@ -286,7 +288,7 @@ print(v)' "$1")
     { one_line "$3" && printf '%s' "$3" | grep -Eqx '[0-9]([A-Za-z0-9.+~:-]{0,253}[A-Za-z0-9.+~:])?'; } || refuse "bad version (a digit, then [A-Za-z0-9.+~:-], not ending in -)"
     { [ -f "$1" ] && [ ! -L "$1" ] && [ -s "$1" ]; } || refuse "can't open the .deb (missing, or a link)"
     deb=$(sed '1{/^!<arch>$/d}' "$1")
-    { printf '%s\n' "$deb" | grep -qxF "Package: $2" && printf '%s\n' "$deb" | grep -qxF "Version: $3" &&
+    { printf '%s\n' "$deb" | grep -qixF "Package: $2" && printf '%s\n' "$deb" | grep -qxF "Version: $3" &&
       [ "$(printf '%s\n' "$deb" | grep -c '^Package:')" = 1 ] && [ "$(printf '%s\n' "$deb" | grep -c '^Version:')" = 1 ]; } ||
       refuse "the downloaded .deb isn't that package and version"
     echo "Reading package lists..."
@@ -368,7 +370,6 @@ print(v)' "$1")
   *) refuse "unknown verb ($VERBS)" ;;
 esac
 # N4: the versions of package $2 in file(s) $1..., one per line (status: installed ones only).
-lower() { printf '%s' "$1" | tr A-Z a-z; }
 versions_in() {
   p=$1; shift
   awk -v p="$p" 'BEGIN { RS = "" } {
@@ -537,8 +538,8 @@ for p in "$@"; do
   # B5: grep -x matches a line, so "ab\n--force-yes" would pass; the real helper refuses it, so refuse it first.
   one_line "$p" && printf '%s' "$p" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._+-]+' || refuse "bad package name (allowed: [A-Za-z0-9][A-Za-z0-9._+-]+)"
   case $verb in
-    install) cat "$status" "$lists"/*_Packages 2>/dev/null | grep -qx "Package: $p" || refuse "unknown package: $p" ;;
-    remove|hold|unhold) grep -qx "Package: $p" "$status" 2>/dev/null || refuse "unknown package: $p" ;;
+    install) cat "$status" "$lists"/*_Packages 2>/dev/null | grep -qix "Package: $p" || refuse "unknown package: $p" ;;
+    remove|hold|unhold) grep -qix "Package: $p" "$status" 2>/dev/null || refuse "unknown package: $p" ;;
   esac
 done
 if [ "${FAKE_FAIL:-}" = "$verb" ]; then

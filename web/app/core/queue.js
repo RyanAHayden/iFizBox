@@ -87,7 +87,7 @@ export function jobIssues(jobs, label = (j) => j.name || j.id) {
   for (const j of jobs) {
     const key = lowerId(j.id);
     if (!/^[A-Za-z0-9][A-Za-z0-9._+-]{1,254}$/.test(j.id) || (j.op !== "remove" && j.id.endsWith("-"))) {
-      out.push(`${label(j)} can't be installed: its source gives it a name dpkg doesn't take (${j.id}). Only the source can fix that.`);
+      out.push(`${label(j)} can't be ${j.op === "remove" ? "removed" : "installed"}: its source gives it a name dpkg doesn't take (${j.id}). Only the source can fix that.`);
     } else if (j.op !== "remove" && j.version && !/^[0-9](?:[A-Za-z0-9.+~:-]{0,253}[A-Za-z0-9.+~:])?$/.test(j.version)) {
       out.push(`${label(j)} can't be installed: its source gives it a version dpkg doesn't take (${j.version}). Only the source can fix that.`);
     } else if (seen.has(key)) {

@@ -608,7 +608,7 @@ struct stanza { char pkg[UPD_FIELD], ver[UPD_FIELD]; int url; };
 static void stanza_end(struct stanza *st, const char *const *ids, const char *const *vers, int n, unsigned char *hit, int *hits) {
     if (st->url && st->pkg[0] && st->ver[0])
         for (int i = 0; i < n; i++)
-            if (!hit[i] && !strcmp(ids[i], st->pkg) && !strcmp(vers[i], st->ver)) { hit[i] = 1; (*hits)++; }
+            if (!hit[i] && !strcasecmp(ids[i], st->pkg) && !strcmp(vers[i], st->ver)) { hit[i] = 1; (*hits)++; }
     st->pkg[0] = st->ver[0] = 0;
     st->url = 0;
 }
