@@ -108,9 +108,8 @@ The pages under it:
   once, whether or not the iPhone is paired, and the row shows the grey spinner until `idevice.status` answers.
 - **This iPhone** (also `installation/iphone` on its own): **Set Up** and **How It Works**, as above. Set Up's rows are drawn
   from the first frame: each says Checking… until `idevice.status` answers, and a failed or late answer says Not Responding,
-  red. A profile without Network Extensions shows a Set Up group "Network Extensions: Missing" with the footer "…signing
-  profile has no Network Extensions, so it can't connect to this iPhone. Sign it with a profile that has them, or install
-  apps through the Signing Server." No Developer Mode row: an install it stops explains it in its alert. Groups that come,
+  red. A profile without Network Extensions shows a Set Up group "Network Extensions: Missing" with the footer "This
+  profile has no Network Extensions, so it can't connect. Sign with one that has them, or use the Signing Server." No Developer Mode row: an install it stops explains it in its alert. Groups that come,
   go or change size slide (FLIP, transform and opacity only: nav/slide.js's watcher). `idevice.status` is read at once and
   each row fills as it answers; the last answer of this app run shows at once, its rows spinning while they're read again;
   a read past its deadline (`TIMEOUTS`) says Not Responding, red. An answer swaps only the rows that changed

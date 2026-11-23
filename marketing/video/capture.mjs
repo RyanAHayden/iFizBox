@@ -149,7 +149,7 @@ const native = {
     const id = /\/(\w+)\.ipa/.exec(url)?.[1] ?? "x";
     return { token: "t-" + id, bundleId: "com.example." + id, name: id, version: "1.0" };
   },
-  async "idevice.status"() { await sleep(Number(process.env.ROUTE_MS || 3000)); return { paired: "rp", localDevVPN: true }; },
+  async "idevice.status"() { await sleep(Number(process.env.ROUTE_MS || 3000)); return { paired: "rp", vpn: { available: true, tested: true } }; },
   async "signing.open"({ token }, emit) {
     for (const f of [0, 0.5, 1]) { emit?.([{ phase: "copying", progress: f }]); await sleep(1000); }
     for (const f of [0.4, 1]) { emit?.([{ phase: "installing", progress: f }]); await sleep(1000); }

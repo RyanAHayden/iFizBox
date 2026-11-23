@@ -41,7 +41,23 @@ enum KeptRoute {
         if st != errSecSuccess { NSLog("kept route: keychain refused (\(st))") }
     }
 
+    /// Leftovers of the old tailnet node (its keys, its Connect With, its Keychain copies) go once: an update keeps them
+    /// on the phone otherwise. The route item above stays.
+    static func removeLeftovers() {
+        let fm = FileManager.default
+        if let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            try? fm.removeItem(at: base.appendingPathComponent("tailscale", isDirectory: true))
+        }
+        for k in ["ifizbox.installConnect", "ifizbox.tailscale.node"] { UserDefaults.standard.removeObject(forKey: k) }
+        for a in ["state", "node", "connect", "_machinekey"] {
+            var q = query()
+            q[kSecAttrAccount as String] = a
+            SecItemDelete(q as CFDictionary)
+        }
+    }
+
     static func register(_ b: Bridge) {
+        removeLeftovers()
         b.on("route.keep") { c in
             let v = c.params["value"] as? String ?? ""
             guard ["iphone", "server"].contains(v) else { return Apt.reply(c, nil, "bad_params: value is iphone or server") }
