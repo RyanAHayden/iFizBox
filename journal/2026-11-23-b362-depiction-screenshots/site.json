@@ -1,0 +1,15 @@
+[
+ {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"},
+ {"nav": "#/sources", "ms": 5000},
+ {"clicktext": "Edit", "ms": 1500},
+ {"clicktext": "Add", "ms": 1500},
+ {"eval": "(()=>{const i=[...document.querySelectorAll('input')].filter(x=>x.offsetParent!==null).at(-1); if(!i) return 'no input'; i.value='https://havoc.app/'; i.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"},
+ {"clicktext": "Add Source", "ms": 25000},
+ {"shot": "site-added"},
+ {"eval": "location.hash + ' | ' + document.querySelector('.page.is-top')?.innerText.slice(0,300)"},
+ {"eval": "JSON.stringify(Object.keys(localStorage))"},
+ {"nav": "#/search", "ms": 3000},
+ {"eval": "(()=>{const i=[...document.querySelectorAll('input')].filter(x=>x.offsetParent!==null).at(-1); if(!i) return 'no input'; i.value='Aerial'; i.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"},
+ {"wait": 4000},
+ {"eval": "[...document.querySelectorAll('.page.is-top a')].map(a=>a.getAttribute('href')).filter(h=>/aerial/i.test(h)).join(' ')"}
+]

@@ -1,0 +1,12 @@
+[
+ {
+  "nav": "#/search/package%3Ajp.uzra.aerial",
+  "ms": 20000
+ },
+ {
+  "shot": "html-only-aerial"
+ },
+ {
+  "eval": "JSON.stringify({prev:!!document.querySelector(\".package-previews .shots-group\"), imgs:[...document.querySelectorAll(\".package-previews img\")].map(i=>[i.src.slice(-40),i.naturalWidth])})"
+ }
+]

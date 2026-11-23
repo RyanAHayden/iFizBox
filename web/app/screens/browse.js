@@ -1301,7 +1301,8 @@ async function renderPackage(body, route, key, id, ctx) {
   const previewKey = `pkg:${pkg.key ?? "installed"}:${pid}`;
   const drawPreviews = (json) => previews.replaceChildren(previewSlot(previewKey, {
     shots: [...aptShots(st), ...(json ? sileoShots(json) : [])],
-    html: sileo ? null : html,
+    // B362: a Sileo depiction without screenshots (or one that didn't load) still has the HTML depiction's pictures.
+    html,
     gh: packageGithub(st, json),
   }));
   if (!sileo) drawPreviews(null);

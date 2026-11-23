@@ -140,6 +140,57 @@ test("a Zebra/Cydia HTML depiction: screenshot images when marked, else every re
   assert.deepEqual(htmlShots("", "https://repo.dev/"), []);
 });
 
+// B362: Havoc's Aerial (jp.uzra.aerial), trimmed from https://havoc.app/package/aerial/depiction.json and
+// https://havoc.app/depiction/aerial: every picture on media.havoc.app is extensionless (image/jpeg by its header).
+const AERIAL_JSON = { class: "DepictionTabView", minVersion: "0.4", headerImage: "https://media.havoc.app/6913433dd707490685941f1d",
+  tabs: [{ class: "DepictionStackView", tabname: "Details", views: [
+    { class: "DepictionSubheaderView", title: "Stage Manager, redesigned for iOS", useBoldText: true },
+    { class: "DepictionScreenshotsView", itemCornerRadius: 6, itemSize: "{160, 346}", screenshots: [
+      { accessibilityText: "Screenshot", url: "https://media.havoc.app/69458937a008e49d802748fa" },
+      { accessibilityText: "Screenshot", url: "https://media.havoc.app/692ea4c6fb6d48411c82a1ae" },
+      { accessibilityText: "Screenshot", url: "https://media.havoc.app/69458a05a008e49d80274e2c" },
+      { accessibilityText: "Screenshot", url: "https://media.havoc.app/6914b893e17cb71877e10747" }] },
+    { class: "DepictionHeaderView", title: "Description" }] }] };
+const havocImg = (id, alt, extra = "") => `<img src="https://media.havoc.app/${id}?w=3840&amp;q=75" srcSet="https://media.havoc.app/${id}?w=640&amp;q=75 640w, `
+  + `https://media.havoc.app/${id}?w=750&amp;q=75 750w, https://media.havoc.app/${id}?w=3840&amp;q=75 3840w" sizes="100vw" alt="${alt}" ${extra}decoding="async" class="css-1ch1qe"/>`;
+const AERIAL_HTML = `<!DOCTYPE html><html><head><title>Aerial - Havoc</title></head><body><div class="css-1n9im4r">
+  <img alt="Aerial" src="https://media.havoc.app/6913433dd707490685941f1d" class="chakra-image css-ss89hg"/>
+  ${havocImg("691618f1e17cb71877e8edca", "Icon", 'loading="lazy" ')}
+  <div class="swiper"><div class="swiper-wrapper">
+  <div class="swiper-slide">${havocImg("69458937a008e49d802748fa", "Screenshot 1", 'loading="eager" fetchPriority="high" ')}</div>
+  <div class="swiper-slide">${havocImg("692ea4c6fb6d48411c82a1ae", "Screenshot 2", 'loading="eager" fetchPriority="high" ')}</div>
+  <div class="swiper-slide">${havocImg("69458a05a008e49d80274e2c", "Screenshot 3", 'loading="eager" fetchPriority="high" ')}</div>
+  <div class="swiper-slide">${havocImg("6914b893e17cb71877e10747", "Screenshot 4", 'loading="eager" fetchPriority="high" ')}</div>
+  </div></div></div></body></html>`;
+const AERIAL_IDS = ["69458937a008e49d802748fa", "692ea4c6fb6d48411c82a1ae", "69458a05a008e49d80274e2c", "6914b893e17cb71877e10747"];
+
+test("Aerial's Sileo depiction: its four extensionless screenshots, sized by itemSize", () => {
+  const shots = sileoShots(AERIAL_JSON);
+  assert.deepEqual(urls(shots), AERIAL_IDS.map((id) => `https://media.havoc.app/${id}`));
+  assert.ok(shots.every((s) => s.width === 160 && s.height === 346 && s.from === "sileo"));
+});
+
+test("Aerial's HTML depiction: the extensionless, srcset-sized screenshots count, the icon and banner don't", () => {
+  assert.deepEqual(urls(htmlShots(AERIAL_HTML, "https://havoc.app/depiction/aerial")), AERIAL_IDS.map((id) => `https://media.havoc.app/${id}?w=3840&q=75`));
+  // Without "screenshot" in any alt, every resized or srcset picture but the icon.
+  const unmarked = AERIAL_HTML.replace(/Screenshot \d/g, "");
+  assert.deepEqual(urls(htmlShots(unmarked, "https://havoc.app/depiction/aerial")).map((u) => u.split("?")[0].split("/").pop()), AERIAL_IDS);
+});
+
+test("isScreenshotUrl: extensionless pictures an image CDN resizes or a srcset offers; avatars and Next.js-wrapped icons are not", () => {
+  assert.equal(isScreenshotUrl("https://media.havoc.app/69458937a008e49d802748fa?w=3840&q=75"), true);
+  assert.equal(isScreenshotUrl("https://media.havoc.app/69458937a008e49d802748fa"), false); // nothing says it's a picture
+  assert.equal(isScreenshotUrl("https://media.havoc.app/69458937a008e49d802748fa", { responsive: true }), true);
+  assert.equal(isScreenshotUrl("https://cdn.x.dev/abc?w=64"), false); // an icon's width
+  assert.equal(isScreenshotUrl("https://x.dev/page.html?w=800"), false);
+  assert.equal(isScreenshotUrl("https://x.dev/_next/image?url=%2Fshots%2F1.png&w=1080&q=75"), true);
+  assert.equal(isScreenshotUrl("https://x.dev/_next/image?url=%2Fimg%2Flogo.png&w=1080&q=75"), false);
+  assert.equal(isScreenshotUrl("https://x.dev/_next/image?url=https%3A%2F%2Fmedia.x.dev%2Fabc123&w=1080&q=75"), true);
+  // Chariz's author picture beside the screenshots.
+  assert.equal(isScreenshotUrl("https://img.chariz.cloud/user/profile-image/CllU8ou4xzBfcI6UBohYburhSR6g.jpg?s=32"), false);
+  assert.equal(isScreenshotUrl("https://cdn.chariz.cloud/asset/deck/bNQKC/assets/1srg6wf1qvMrPV68MSpmZp4XygQrhcU.jpg"), true);
+});
+
 test("dedupeShots: http/https, host case, blob vs raw and ?raw=true are one picture; sizes are kept", () => {
   const out = dedupeShots([
     { url: "http://X.dev/a.png", width: null, height: null, from: "apt" },
