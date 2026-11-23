@@ -37,7 +37,13 @@ nav/sheet.test.js: 34 pass.
 mode, `data-shell="app"` as App.swift sets it), eras ios6/ios7/ios13/ios26 × light/dark, opens "Add Tweaks" over
 Sources, pauses every animation at 140 ms of 350 (mid-slide), shoots, finishes them, shoots again: 32 shots per
 run, before (HEAD's packages.css) and after. Kept here: `before-app-ios6-light-mid.png` (black band above the
-sheet bar), `after-app-ios6-light-mid.png`, `after-site-ios6-dark-settled.png`, `after-app-ios13-light-mid.png`.
+sheet bar), `after-app-ios6-light-mid.png`, `after-app-ios6-light-settled.png`, `after-site-ios6-dark-settled.png`,
+`after-app-ios7-dark-mid.png`, `after-app-ios13-light-mid.png`, `after-site-ios26-light-mid.png`,
+`after-app-ios26-dark-settled.png` (the other 25 per run stay out of the repo for size).
+Visible change in iOS 6: under the status bar the sheet now shows the top of the bar's gloss stretched, not the
+bar's flat status-bar fill (`#4f698b` light) and not black; that is the brief's "gradient runs up under the status
+bar". Every iOS 6 bar background (`--nav-bar`, `--dk-nav-bar` in ios6.css and all six in palettes.css,
+`--console-bar`) has the four layers the repositioning assumes.
 Probe after: the `::before` is `84px` (62 + 22) with the bar's gradients in full-screen eras, `22px` in card eras;
 before: `62px`, `rgb(0,0,0)` in iOS 6.
 
