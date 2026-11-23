@@ -18,6 +18,12 @@ once more for an installed app. Costs one sign; avoids installing a copy that ma
 that isn't installed, or whose App ID can't be found, the copy is used as before. `installedAppID` reads the record
 first, so it only asks installd for an installed app with no record, and only when a fitting copy exists.
 
+Spec review: the signer asked for the installed App ID again after a copy was dropped (installd twice for an
+installed app with no record). Fixed: the answer `signIfNeeded` found is handed to the signer. Kept on purpose: a
+copy hit for an installed app with no record now asks installd once (up to 25 s), since that's the only way to tell
+whether the copy fits. Not new here: for an install on another device, the App ID check reads this phone's records,
+the same way B340's signer path does.
+
 ## Not verified
 
 - On a phone: the install of a kept copy, the record's `appID`, and the re-sign of an old copy. No device check in

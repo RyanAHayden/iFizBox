@@ -137,12 +137,14 @@ enum MyIPAs {
                              job: SignJob? = nil, keep: Bool? = nil, log: ((String) -> Void)? = nil) throws -> IPALibrary.Signed {
         let identity = try KeychainIdentity(id)
         if let p = DeviceCheck.problem(PhoneID.check(profile)) { throw p } // F236: before iOS's "integrity" alert
+        var asked: (bundleID: String, appID: String)? // the installed App ID found below, so the signer doesn't ask again
         if let s = library.signed(file, certificate: identity.certificate, keep: keep) {
             // A copy signed under another App ID than the installed app's (or one from before copies kept it) would be
             // refused by iOS (installd error 15): signed again below, where the signer keeps the installed one.
             guard let have = Sideload.installedAppID(s.bundleID, log: log), have != s.appID else { return s }
             log?("The signed copy of \(file) has App ID \(s.appID ?? "(not kept)"), the installed app \(have): signing again")
             library.dropSigned(file)
+            asked = (s.bundleID, have)
         }
         if let p = profile.problem(with: identity.certificate) { throw p }
         if let why = try library.details(file).error { throw SignError("bad_ipa", why) }
@@ -150,7 +152,11 @@ enum MyIPAs {
         let signer = IPASigner(profile: profile, identity: identity)
         if let job = job { signer.stop = { job.cancelled } }
         if let log = log { let nslog = signer.log; signer.log = { nslog($0); log($0) } } // B327: Keychain:/Group fix: lines in the run's log
-        signer.installedAppID = { Sideload.installedAppID($0, log: log) } // B340: an update keeps its App ID, as SignAhead.sign (B280)
+        let known = asked
+        signer.installedAppID = { bid in // B340: an update keeps its App ID, as SignAhead.sign (B280)
+            if let k = known, k.bundleID == bid { return k.appID }
+            return Sideload.installedAppID(bid, log: log)
+        }
         return try library.sign(file, signer: signer, certificate: identity.certificate,
                                 expires: profile.signatureExpiry(certificate: identity.certificate), work: SignBridge.work,
                                 progress: { emit($0, $1) }, keep: keep)

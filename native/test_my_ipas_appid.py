@@ -22,7 +22,8 @@ def body(src, start):
 class MyIPAsAppID(unittest.TestCase):
     def test_sign_asks_for_the_installed_app_id(self):
         sign = body(read("MyIPAs.swift"), "static func signIfNeeded(")
-        ask = sign.index("signer.installedAppID = { Sideload.installedAppID($0, log: log) }")
+        ask = sign.index("signer.installedAppID = { bid in")
+        self.assertIn("return Sideload.installedAppID(bid, log: log)", sign[ask:])
         self.assertGreater(ask, sign.index("let signer = IPASigner("))
         self.assertLess(ask, sign.index("try library.sign(file, signer: signer"))
 
@@ -70,6 +71,9 @@ class SignedCopyKeepsAppID(unittest.TestCase):
         self.assertLess(kept, ask)
         self.assertLess(ask, drop)
         self.assertLess(drop, sign.index("let signer = IPASigner("))
+        # the answer found here is the signer's too: installd isn't asked twice
+        self.assertIn("asked = (s.bundleID, have)", sign)
+        self.assertIn("if let k = known, k.bundleID == bid { return k.appID }", sign)
 
 
 if __name__ == "__main__":
