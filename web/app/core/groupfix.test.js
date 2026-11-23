@@ -127,4 +127,6 @@ test("the committed fix dylib: an arm64 dylib under @rpath, built from the curre
   const built = readFileSync(new URL(`../${GROUPFIX.file}.source-sha256`, import.meta.url), "utf8").trim();
   assert.equal(built, createHash("sha256").update(src).digest("hex"), "groupfix.m changed: run native/groupfix/build.sh and commit the dylib");
   assert.ok(src.includes(`@"${GROUPFIX.config.split("/").pop()}"`), "the dylib reads the config the signers write");
+  // B390: each launch's line for a report of lost sign-ins, kept out of the app's own preferences
+  assert.ok(new TextDecoder("latin1").decode(bin).includes("Library/ifizbox-groupfix.log"), "the dylib logs each launch");
 });

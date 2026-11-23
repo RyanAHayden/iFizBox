@@ -20,6 +20,8 @@
 // group an earlier sign chose), keychain: bool, legacy: the profile group older signs mapped to, copied in once,
 // isolate: the app's own keychain group (the first of its keychain-access-groups) }.
 // The same folder and suite on every re-sign, under any profile, so the data survives.
+// B390: every launch adds a line to Library/ifizbox-groupfix.log in the app's container (and the system log): the
+// keychain groups it has and saw items in (counts only, never names or values), what was copied, whether it pinned.
 // Built by native/groupfix/build.sh into web/app/vendor/groupfix/.
 // SPDX-License-Identifier: GPL-3.0-or-later
 #import <Foundation/Foundation.h>
@@ -30,6 +32,7 @@
 #include <mach-o/dyld.h>
 #include <mach-o/loader.h>
 #include <mach-o/nlist.h>
+#include <os/log.h>
 #include <string.h>
 
 static NSSet<NSString *> *groups;
@@ -191,9 +194,19 @@ static OSStatus fixDelete(CFDictionaryRef q) {
     return st;
 }
 
+// "TEAM.a 12, TEAM.b 3", for the log.
+static NSString *countList(NSCountedSet *n) {
+    NSMutableArray *out = [NSMutableArray array];
+    for (NSString *g in n) [out addObject:[NSString stringWithFormat:@"%@ %lu", g, (unsigned long)[n countForObject:g]]];
+    return [[out sortedArrayUsingSelector:@selector(compare:)] componentsJoinedByString:@", "];
+}
+
 // B327: copies every password the app can see outside its own group (TEAM.<App ID>, app groups) into its own group,
 // never over one it has there. YES when every item was read (none locked away, as before the first unlock).
+// The log's words for it: per class, the read's status, or how many were outside and how many of them are in the own group now.
+static NSMutableString *copyLog;
 static BOOL copySharedPasswords(void) {
+    copyLog = [NSMutableString string];
     static const CFStringRef *keep[] = { &kSecClass, &kSecAttrService, &kSecAttrAccount, &kSecAttrGeneric, &kSecAttrLabel,
         &kSecAttrDescription, &kSecAttrComment, &kSecAttrCreator, &kSecAttrType, &kSecAttrIsInvisible, &kSecAttrIsNegative,
         &kSecAttrAccessible, &kSecAttrAccessControl, &kSecAttrSynchronizable, &kSecAttrServer, &kSecAttrProtocol,
@@ -207,8 +220,9 @@ static BOOL copySharedPasswords(void) {
         // how many there are outside the app's group (attributes only: no item asks for Face ID for that)
         CFTypeRef all = NULL;
         OSStatus st = realCopyMatching((__bridge CFDictionaryRef)base, &all);
+        NSString *what = k ? @"internet" : @"generic";
         if (st == errSecItemNotFound) continue;
-        if (st != errSecSuccess) { ok = NO; continue; }
+        if (st != errSecSuccess) { ok = NO; [copyLog appendFormat:@" %@ read %d", what, (int)st]; continue; }
         NSUInteger outside = 0;
         for (NSDictionary *a in (__bridge_transfer NSArray *)all) {
             if ([a isKindOfClass:[NSDictionary class]] && ![a[(__bridge id)kSecAttrAccessGroup] isEqual:(__bridge id)isolate]) outside++;
@@ -221,8 +235,10 @@ static BOOL copySharedPasswords(void) {
 #pragma clang diagnostic pop
         CFTypeRef out = NULL;
         st = realCopyMatching((__bridge CFDictionaryRef)q, &out);
-        if (st != errSecSuccess) { ok = NO; continue; }
+        if (st != errSecSuccess) { ok = NO; [copyLog appendFormat:@" %@ data %d", what, (int)st]; continue; }
         NSUInteger copied = 0;
+        NSCountedSet *added = [NSCountedSet set], *had = [NSCountedSet set]; // by the group they came from, for the log
+        OSStatus bad = errSecSuccess;
         // in the order a read that names no group finds them, so the app keeps the one it read until now
         for (NSDictionary *item in (__bridge_transfer NSArray *)out) {
             if (![item isKindOfClass:[NSDictionary class]] || [item[(__bridge id)kSecAttrAccessGroup] isEqual:(__bridge id)isolate]) continue;
@@ -236,10 +252,15 @@ static BOOL copySharedPasswords(void) {
             add[(__bridge id)kSecAttrAccessGroup] = (__bridge id)isolate;
             OSStatus as = realAdd((__bridge CFDictionaryRef)add, NULL);
             if (as == errSecSuccess || as == errSecDuplicateItem) copied++;
-            else ok = NO;
+            else { ok = NO; bad = as; }
+            id from = item[(__bridge id)kSecAttrAccessGroup] ?: @"?";
+            if (as == errSecSuccess) [added addObject:from];
+            else if (as == errSecDuplicateItem) [had addObject:from];
         }
         // an item behind Face ID or a passcode (skipped above) would be out of reach once pinned: stay as before
         if (copied < outside) ok = NO;
+        [copyLog appendFormat:@" %@ %lu outside, added from [%@], already in the own group and left alone [%@]%@", what, (unsigned long)outside,
+                              countList(added), countList(had), bad ? [NSString stringWithFormat:@", add error %d", (int)bad] : @""];
     }
     return ok;
 }
@@ -259,6 +280,54 @@ static BOOL appRanBefore(void) {
         if ([fm fileExistsAtPath:[home stringByAppendingPathComponent:d]]) return YES;
     }
     return NO;
+}
+
+// ---- B390: what a report of a lost sign-in needs to tell which part lost it ----
+
+// An entitlement of this process, as the system sees it (SecTask has no header on iOS: looked up).
+static id entitlement(NSString *key) {
+    CFTypeRef (*create)(CFAllocatorRef) = (CFTypeRef (*)(CFAllocatorRef))dlsym(RTLD_DEFAULT, "SecTaskCreateFromSelf");
+    CFTypeRef (*get)(CFTypeRef, CFStringRef, CFErrorRef *) =
+        (CFTypeRef (*)(CFTypeRef, CFStringRef, CFErrorRef *))dlsym(RTLD_DEFAULT, "SecTaskCopyValueForEntitlement");
+    CFTypeRef task = create && get ? create(NULL) : NULL;
+    if (!task) return nil;
+    id v = CFBridgingRelease(get(task, (__bridge CFStringRef)key, NULL));
+    CFRelease(task);
+    return v;
+}
+
+// How many items of a class there are in each group ("TEAM.a 12, TEAM.b 3"), or why none could be read.
+static NSString *itemCounts(CFStringRef cls) {
+    CFTypeRef all = NULL;
+    OSStatus st = realCopyMatching((__bridge CFDictionaryRef)@{
+        (__bridge id)kSecClass: (__bridge id)cls, (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitAll,
+        (__bridge id)kSecReturnAttributes: @YES, (__bridge id)kSecAttrSynchronizable: (__bridge id)kSecAttrSynchronizableAny }, &all);
+    if (st == errSecItemNotFound) return @"none";
+    if (st != errSecSuccess) return [NSString stringWithFormat:@"error %d", (int)st];
+    NSCountedSet *n = [NSCountedSet set];
+    for (NSDictionary *a in (__bridge_transfer NSArray *)all) {
+        if ([a isKindOfClass:[NSDictionary class]]) [n addObject:a[(__bridge id)kSecAttrAccessGroup] ?: @"?"];
+    }
+    return countList(n);
+}
+
+// Adds the launch's line to Library/ifizbox-groupfix.log (its last 200 lines kept), not in the app's preferences, which the app may
+// clear: a log that starts anew points to a new container (the app was deleted or is another bundle ID, or it cleared
+// its Library); a long one means the container was kept. Readable before the first unlock; it holds no secrets.
+static void logLaunch(NSString *line) {
+    os_log(OS_LOG_DEFAULT, "group fix: %{public}s", line.UTF8String);
+    NSString *path = [NSHomeDirectory() stringByAppendingPathComponent:@"Library/ifizbox-groupfix.log"];
+    NSString *old = nil;
+    if ([[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        old = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:NULL];
+        if (!old) return; // unreadable now: never over what's there
+    }
+    NSMutableArray *lines = [[old componentsSeparatedByString:@"\n"] mutableCopy] ?: [NSMutableArray array];
+    [lines removeObject:@""];
+    [lines addObject:line];
+    if (lines.count > 200) [lines removeObjectsInRange:NSMakeRange(0, lines.count - 200)];
+    NSData *d = [[[lines componentsJoinedByString:@"\n"] stringByAppendingString:@"\n"] dataUsingEncoding:NSUTF8StringEncoding];
+    [d writeToFile:path options:NSDataWritingAtomic | NSDataWritingFileProtectionNone error:NULL];
 }
 
 static const struct { const char *name; void *to; } hooks[] = {
@@ -333,9 +402,14 @@ __attribute__((constructor)) static void groupfixInit(void) {
         target = [t isKindOfClass:[NSString class]] && t.length ? t : nil;
         // The legacy copy's test (its preferences weren't empty), read before anything below writes one.
         CFArrayRef keys = CFPreferencesCopyKeyList(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
-        BOOL ranBefore = keys && CFArrayGetCount(keys) > 0;
+        NSUInteger keyCount = keys ? (NSUInteger)CFArrayGetCount(keys) : 0;
+        BOOL ranBefore = keyCount > 0;
         if (keys) CFRelease(keys);
         BOOL ownBefore = appRanBefore(); // isolate's test, before ownFolder makes Library/AppGroups
+        NSUInteger prefs = keyCount;
+        NSString *saw = [NSString stringWithFormat:@"passwords %@; internet %@; keys %@", itemCounts(kSecClassGenericPassword),
+                                                   itemCounts(kSecClassInternetPassword), itemCounts(kSecClassKey)];
+        NSString *isolation = @"none";
         NSString *l = c[@"legacy"];
         if (!target && [l isKindOfClass:[NSString class]] && l.length) {
             // A fresh install (no preferences yet) is marked at once, so it never copies the shared group in later.
@@ -357,17 +431,27 @@ __attribute__((constructor)) static void groupfixInit(void) {
             // unlock), calls stay as before and the next launch tries again.
             CFStringRef mark = CFSTR("ifizbox.groupfix.isolated");
             CFPropertyListRef done = CFPreferencesCopyValue(mark, kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
-            if (done) { CFRelease(done); pinned = YES; }
+            if (done) { CFRelease(done); pinned = YES; isolation = @"marked earlier"; }
             else if (!ownBefore || copySharedPasswords()) {
                 CFPreferencesSetValue(mark, kCFBooleanTrue, kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
                 CFPreferencesSynchronize(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
                 pinned = YES;
             }
+            if (copyLog) isolation = [@"copied in" stringByAppendingString:copyLog.length ? copyLog : @" nothing"];
+            else if (!ownBefore) isolation = @"fresh install, nothing copied";
         }
         if (groups.count) {
             swizzle([NSFileManager class], @selector(containerURLForSecurityApplicationGroupIdentifier:), (IMP)fixContainer, (IMP *)&origContainer);
             swizzle([NSUserDefaults class], @selector(initWithSuiteName:), (IMP)fixSuite, (IMP *)&origSuite);
         }
+        NSDictionary *info = [NSBundle mainBundle].infoDictionary;
+        NSISO8601DateFormatter *iso8601 = [NSISO8601DateFormatter new];
+        NSArray *kc = entitlement(@"keychain-access-groups");
+        logLaunch([NSString stringWithFormat:@"%@ %@ %@ (%@) container %@; ran before %@, %lu preferences; application-identifier %@, keychain groups %@; saw %@; isolate %@: %@; pinned %@; app groups %lu",
+            [iso8601 stringFromDate:[NSDate date]], info[@"CFBundleIdentifier"], info[@"CFBundleShortVersionString"], info[@"CFBundleVersion"],
+            NSHomeDirectory().lastPathComponent, ownBefore ? @"yes" : @"no", (unsigned long)prefs, entitlement(@"application-identifier"),
+            [kc isKindOfClass:[NSArray class]] ? [kc componentsJoinedByString:@", "] : @"none", saw,
+            isolate ? (__bridge NSString *)isolate : @"off", isolation, pinned ? @"yes" : @"no", (unsigned long)groups.count]);
         if (keychainStrip || pinned) _dyld_register_func_for_add_image(rebindImage);
     }
 }
