@@ -31,7 +31,7 @@ tools/ui-15.sh T99 install build/iFizBox.ipa   # signs it for this phone, then i
 tools/ui-15.sh T99 launch                      # the brand's bundle ID
 tools/ui-15.sh T99 tap 355 2400                # Sources tab
 tools/ui-15.sh T99 shot sources                # ref/15/screens/sources.png
-tools/ui-15.sh unlock T99
+tools/ui-15.sh unlock T99                # closes every app, locks the screen, frees the lock
 ```
 
 ## Remote control for a person

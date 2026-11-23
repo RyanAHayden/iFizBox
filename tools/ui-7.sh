@@ -8,7 +8,8 @@
 #   tools/ui-7.sh ME home           Home button
 #   tools/ui-7.sh ME lock-button    side button (locks or wakes the screen)
 #   tools/ui-7.sh ME shot NAME      screenshot -> ref/7/screens/NAME.png (nothing kept on the phone)
-#   tools/ui-7.sh unlock ME         release it; always do this when done, even after a failure
+#   tools/ui-7.sh unlock ME         close every app, lock the screen and release it; always do this when done, even
+#                                   after a failure
 # ME is your task ID. A lock unused for 30 minutes is stale and can be taken over.
 # Taps, swipes and buttons come from phonectl on the phone (tools/phonectl/, installed setuid in /var/jb/usr/local/bin).
 set -eu
@@ -18,6 +19,24 @@ stale=30
 pc=/var/jb/usr/local/bin/phonectl
 
 holder() { cat "$lock/owner" 2>/dev/null || echo '?'; }
+# Leave the phone as the next agent and the user expect it: app switcher empty, Home Screen, screen off.
+# Wakes it (two Home presses a second apart: the second opens the lock screen), then swipes the switcher's front
+# card up until the screen is the Home Screen again (or stops changing).
+# IFIZBOX_UI_TIDY=0 skips it (tests).
+tidy() {
+  [ "${IFIZBOX_UI_TIDY:-1}" = 1 ] || return 0
+  s() { ssh -o ConnectTimeout=5 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 "$host" "$@"; }
+  s "$pc home; sleep 1; $pc home; sleep 1" 2>/dev/null || { echo "couldn't tidy the iPhone 7 (unreachable?)" >&2; return 0; }
+  t=${XDG_RUNTIME_DIR:-/tmp}/ifizbox-7-tidy; same() { python3 "$(dirname "$0")/ui-same.py" "$t-$1.png" "$t-$2.png"; }
+  s "$pc shot -" > "$t-home.png"; s "$pc home; $pc home; sleep 1"; i=0
+  while [ $i -lt 40 ]; do  # ponytail: 40 cards at most, more than the switcher ever holds here
+    s "$pc shot -" > "$t-now.png"
+    { same home now || { [ $i -gt 0 ] && same prev now; }; } && break
+    s "$pc swipe 375 700 375 30 0.2; sleep 0.7"; mv "$t-now.png" "$t-prev.png"; i=$((i + 1))
+  done
+  rm -f "$t"-*.png
+  s "$pc home; sleep 1; $pc lock" || true
+}
 case $1 in
   lock)
     if ! mkdir "$lock" 2>/dev/null; then
@@ -32,7 +51,9 @@ case $1 in
     if [ -n "${AGENT_SLOT:-}" ]; then echo "$AGENT_SLOT" > "$lock/slot"; else rm -f "$lock/slot"; fi
     exit 0 ;;
   unlock)
-    [ "$(holder)" = "$2" ] && rm -rf "$lock"; exit 0 ;;
+    [ "$(holder)" = "$2" ] || exit 0
+    (tidy) || echo "tidy failed; the lock is freed anyway" >&2  # a subshell: set -e can't skip the rm
+    rm -rf "$lock"; exit 0 ;;
 esac
 
 me=$1; cmd=$2; shift 2

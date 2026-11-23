@@ -6,7 +6,8 @@
 #   tools/ui-4s.sh ME open URL       uiopen, e.g. cydia://sources
 #   tools/ui-4s.sh ME home           home button
 #   tools/ui-4s.sh ME shot NAME      screenshot -> ref/4s/screens/NAME.png (stays in the Camera Roll: no rm on the 4S)
-#   tools/ui-4s.sh unlock ME         release it; always do this when done, even after a failure
+#   tools/ui-4s.sh unlock ME         quit every app, lock the screen and release it; always do this when done, even
+#                                    after a failure (the multitasking bar keeps its icons: iOS 6 has no way to clear it)
 # ME is your task ID. A lock unused for 30 minutes is stale and can be taken over.
 set -eu
 lock=${XDG_RUNTIME_DIR:-/tmp}/ifizbox-4s-ui.lock  # outside the repo: shared by every worktree on this machine
@@ -14,6 +15,16 @@ host=${IFIZBOX_4S_HOST:-4s}
 stale=30
 
 holder() { cat "$lock/owner" 2>/dev/null || echo '?'; }
+# Leave the phone as the next agent and the user expect it: no app running, Home Screen, screen off.
+# IFIZBOX_UI_TIDY=0 skips it (tests).
+tidy() {
+  [ "${IFIZBOX_UI_TIDY:-1}" = 1 ] || return 0
+  ssh -o ConnectTimeout=5 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 "$host" 'launchctl list | while read pid st job; do  # no awk on the 4S
+      case $job in  # never Cydia: killing it mid-install breaks dpkg, and this phone is hard to re-jailbreak
+        UIKitApplication:com.saurik.Cydia*) ;; UIKitApplication:*) [ "$pid" = - ] || kill "$pid";; esac; done
+    activator send libactivator.system.homebutton; sleep 1; activator send libactivator.system.sleepbutton' \
+    >/dev/null 2>&1 || echo "couldn't tidy the 4S (unreachable?)" >&2
+}
 case $1 in
   lock)
     if ! mkdir "$lock" 2>/dev/null; then
@@ -28,7 +39,9 @@ case $1 in
     if [ -n "${AGENT_SLOT:-}" ]; then echo "$AGENT_SLOT" > "$lock/slot"; else rm -f "$lock/slot"; fi
     exit 0 ;;
   unlock)
-    [ "$(holder)" = "$2" ] && rm -rf "$lock"; exit 0 ;;
+    [ "$(holder)" = "$2" ] || exit 0
+    (tidy) || echo "tidy failed; the lock is freed anyway" >&2  # a subshell: set -e can't skip the rm
+    rm -rf "$lock"; exit 0 ;;
 esac
 
 me=$1; cmd=$2; shift 2

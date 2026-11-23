@@ -16,6 +16,7 @@ class UiRelease(unittest.TestCase):
         self.run_dir = Path(self.tmp.name)
         self.env = {**os.environ, "XDG_RUNTIME_DIR": self.tmp.name}
         self.env.pop("AGENT_SLOT", None)  # the gate itself runs in a runner slot
+        self.env["IFIZBOX_UI_TIDY"] = "0"  # never touch the real phones from the gate
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -85,6 +86,18 @@ class UiRelease(unittest.TestCase):
                                    text=True, timeout=30)
                 self.assertEqual(r.returncode, 0, r.stderr)
                 self.assertFalse(lock.exists())
+
+    def test_unlock_frees_the_lock_when_tidy_fails(self):
+        # tidy (close apps, lock the screen) can't reach the phone: the lock is given back all the same
+        for phone in ("7", "4s"):
+            with self.subTest(phone=phone):
+                ui = ROOT / "tools" / f"ui-{phone}.sh"
+                d = self.hold(phone, "T1")
+                env = {**self.env, "IFIZBOX_UI_TIDY": "1", f"IFIZBOX_{phone.upper()}_HOST": "unreachable.invalid"}
+                r = subprocess.run(["sh", str(ui), "unlock", "T1"], env=env, capture_output=True, text=True,
+                                   timeout=60)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertFalse(d.exists())
 
     def test_main_is_left_alone(self):
         d = self.hold("15", "main")

@@ -17,7 +17,8 @@
 #   tools/ui-15.sh ME reboot          restart the phone, wait for it, bring WDA back and unlock it (about a minute)
 #   tools/ui-15.sh ME shot NAME       screenshot -> ref/15/screens/NAME.png
 #   tools/ui-15.sh ME source          the frontmost app's accessibility tree (XML)
-#   tools/ui-15.sh unlock ME          release it; always do this when done, even after a failure
+#   tools/ui-15.sh unlock ME          close every app, lock the screen and release it; always do this when done, even
+#                                     after a failure (IFIZBOX_UI_TIDY=0: just release it)
 # ME is your task ID. A lock unused for 30 minutes is stale and can be taken over. Setup: docs/iphone15.md.
 # Take it only for what Chromium (tools/readme_shots.py, fake bridge) and node --test can't check (AGENTS.md), and
 # keep `trap 'tools/ui-15.sh unlock ME' EXIT` beside it in a script. When a session ends or is dropped, the runner
@@ -45,7 +46,9 @@ case $1 in
     if [ -n "${AGENT_SLOT:-}" ]; then echo "$AGENT_SLOT" > "$lock/slot"; else rm -f "$lock/slot"; fi
     exit 0 ;;
   unlock)
-    [ "$(holder)" = "$2" ] && rm -rf "$lock"; exit 0 ;;
+    [ "$(holder)" = "$2" ] || exit 0
+    [ "${IFIZBOX_UI_TIDY:-1}" = 1 ] && { timeout 180 sh "$0" "$2" tidy || echo "couldn't tidy the iPhone 15" >&2; }
+    rm -rf "$lock"; exit 0 ;;
 esac
 
 me=$1; cmd=$2; shift 2
@@ -159,6 +162,23 @@ case $cmd in
     dir=$here/ref/15/screens; mkdir -p "$dir"
     gi screenshot --output="$dir/$1.png" >/dev/null || { up; gi screenshot --output="$dir/$1.png" >/dev/null; }
     echo "$dir/$1.png" ;;
+  tidy)  # unlock runs it: app switcher empty, Home Screen, screen off. Only when WebDriverAgent is still up.
+    curl -sf -m 3 "$wda/status" >/dev/null 2>&1 || exit 0
+    snap() { gi screenshot --output="$run/tidy-$1.png" >/dev/null; }
+    same() { python3 "$here/tools/ui-same.py" "$run/tidy-$1.png" "$run/tidy-$2.png"; }
+    # the screen can be off while WDA says unlocked, and then /wda/unlock does nothing: the side button wakes it
+    snap now; python3 "$here/tools/ui-same.py" "$run/tidy-now.png" &&
+      { post /wda/performIoHidEvent '{"page":12,"usage":48,"duration":0.05}'; sleep 1; }
+    curl -sf -m 30 -X POST "$wda/wda/unlock" >/dev/null; curl -sf -m 30 -X POST "$wda/wda/homescreen" >/dev/null
+    sleep 1; snap home; i=0
+    # up from the very bottom edge: the app switcher (a W3C pointer swipe from there doesn't trigger it)
+    post /wda/dragfromtoforduration '{"fromX":196,"fromY":851,"toX":196,"toY":450,"duration":0.1}'; sleep 1.5
+    while [ $i -lt 40 ]; do  # ponytail: 40 cards at most; stops at the Home Screen or when nothing changes
+      snap now; { same home now || { [ $i -gt 0 ] && same prev now; }; } && break
+      sh "$here/tools/ui-15.sh" "$me" swipe 589 1400 589 150 0.2; sleep 0.8; mv "$run/tidy-now.png" "$run/tidy-prev.png"; i=$((i + 1))
+    done
+    curl -sf -m 30 -X POST "$wda/wda/homescreen" >/dev/null; sleep 1
+    post /wda/performIoHidEvent '{"page":12,"usage":48,"duration":0.05}' ;;
   source) up; curl -s -m 60 "$wda/source" | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' ;;
   *) echo "unknown command: $cmd" >&2; exit 2 ;;
 esac
