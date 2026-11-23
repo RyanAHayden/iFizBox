@@ -26,6 +26,9 @@
 /* ---- Geometry hooks (style.css "Era hooks"): the same in both tones ---- */
 html[data-style="ios26"] {
   --bar-btn-h: 38px; --bar-btn-min-w: 38px; --bar-btn-pad: 0 14px; /* the glass capsule */
+  /* B386: Wish List keeps the 12pt the shell's glass leaves each side of a title (NativeGlass.swift GlassFace); a
+     User | Recent title is narrower, so "Wish List (1)" fits beside it too */
+  --wish-btn-pad: 0 12px; --nav-seg2-w: 120px;
   --bar-back-h: 38px; --bar-back-pad: 0 14px 0 4px; /* the chevron in the border's 13px slot, the label after it */
   --tab-item-h: 100%; --tab-item-margin: 0; --tab-item-pad-top: 6px; --tab-icon-size: 26px; --tab-label-gap: 2px;
   --group-margin: 20px 16px 0; --group-gap: 35px; --group-first-head: 0px; /* inset grouped: 16pt from the sides */
@@ -486,6 +489,7 @@ html[data-style="ios26"][data-theme] .scope-segment.selected, html[data-style="i
   border-radius: 8px; box-shadow: inset 0 0 0 1px var(--i26-seg-track), var(--i26-seg-pill-shadow);
 }
 html[data-style="ios26"] .nav-segments .scope-segments { box-shadow: none; }
+html[data-style="ios26"] .bar-button.wish-button { letter-spacing: 0; } /* B386: as wide as the glass title it sizes */
 
 /* Search bar: the field is a grey capsule; Cancel is tinted text. */
 html[data-style="ios26"] .search-field { border-radius: 18px; }
