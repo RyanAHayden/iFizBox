@@ -30,7 +30,10 @@ import { compareVersions } from "./apt.js"; // F302a
 import { LIBRARY_WHY } from "./tweakfields.js"; // C32
 
 export { UnpackError };
-export const TWEAK_ACCEPT = ".dylib,.deb,.zip,.framework";
+// The file picker's accept: iOS turns each extension into a file type and greys out what matches none; it knows
+// no type for .dylib (nor .deb), so application/octet-stream (any data) keeps them pickable there, as the IPA
+// picker does. prepareTweaks checks the name after picking.
+export const TWEAK_ACCEPT = ".dylib,.deb,.zip,.framework,application/octet-stream";
 export const TWEAK_LIMIT = 64 << 20; // all of an app's tweaks, unpacked
 export const SUBSTRATE = "@rpath/CydiaSubstrate.framework/CydiaSubstrate";
 export const RPATH = "@executable_path/Frameworks";
