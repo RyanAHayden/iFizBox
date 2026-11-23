@@ -33,10 +33,10 @@ test("sideload build: All Sources gets an App Tweaks section of the Tweak Source
   // A tweak opened from App Tweaks (package/<id> under All Sources) has its page, its versions and its deps.
   assert.equal(c.package("com.x.yt", ALL).stanza.injectable, true);
   assert.equal(c.history("com.x.ig", ALL).versions.length, 1);
-  // Search: the App Tweaks choice (and All Tweaks) search them; no filter keeps them out, as before.
+  // Search: the App Tweaks choice (and All Tweaks) search them; B364: so does no filter.
   assert.deepEqual(c.search("lite", { section: APP_TWEAKS }).map((r) => r.id), ["com.x.ig", "com.x.yt"]);
   assert.deepEqual(c.search("lite", { section: "group:Tweaks" }).map((r) => r.id), ["com.x.ig", "com.x.yt"]);
-  assert.deepEqual(c.search("lite"), []);
+  assert.deepEqual(c.search("lite").map((r) => r.id).sort(), ["com.x.ig", "com.x.yt"]);
   assert.equal(sectionGroup(APP_TWEAKS), "Tweaks");
 });
 

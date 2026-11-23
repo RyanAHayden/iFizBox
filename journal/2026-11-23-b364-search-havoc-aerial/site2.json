@@ -1,0 +1,17 @@
+[
+ {"wait": 3000},
+ {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.device','iphoneos-arm64'); localStorage.setItem('ifizbox.arch','iphoneos-arm64'); location.reload(); 'ok'"},
+ {"wait": 4000}, {"nav": "#/sources", "ms": 6000},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,800)"},
+ {"clicktext": "Edit", "ms": 2000},
+ {"clicktext": "Add", "ms": 2000},
+ {"eval": "(()=>{const i=[...document.querySelectorAll('input')].filter(x=>x.offsetParent!==null).at(-1); if(!i) return 'no input'; i.value='https://havoc.app/'; i.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"},
+ {"clicktext": "Add Source", "ms": 30000},
+ {"shot": "added"},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,600)"},
+ {"nav": "#/search", "ms": 4000},
+ {"eval": "(()=>{const i=document.querySelector('.page.is-top input'); i.value='aerial'; i.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"},
+ {"wait": 8000},
+ {"shot": "search"},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,1500)"}
+]

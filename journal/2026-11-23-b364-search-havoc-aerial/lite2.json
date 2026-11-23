@@ -1,0 +1,15 @@
+[
+ {"wait": 3000},
+ {"nav": "#/sources", "ms": 8000},
+ {"clicktext": "Add", "ms": 2000},
+ {"eval": "(()=>{const i=[...document.querySelectorAll('input')].filter(x=>x.offsetParent!==null).at(-1); if(!i) return 'no input'; i.value='https://havoc.app/'; i.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"},
+ {"clicktext": "Add Source", "ms": 40000},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,900)"},
+ {"nav": "#/sources", "ms": 8000},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,900)"},
+ {"nav": "#/search", "ms": 4000},
+ {"eval": "(()=>{const i=document.querySelector('.page.is-top input'); i.value='aerial'; i.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"},
+ {"wait": 10000},
+ {"shot": "lite-aerial"},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,1500)"}
+]
