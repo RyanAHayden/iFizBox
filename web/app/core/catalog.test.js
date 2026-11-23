@@ -176,6 +176,39 @@ test("author lists every package by Author or Maintainer name, any case", () => 
   assert.deepEqual(c.author(""), []);
 });
 
+test("B363: the author page keeps what can't work, marked, and spacing or case never hides a name", () => {
+  const bigboss = packages(
+    { Package: "com.bb.old", Name: "Old Rootful", Version: "1", Architecture: "iphoneos-arm", Section: "Tweaks",
+      Author: "Someone <s@example.com>", Maintainer: "BigBoss <bigboss@thebigboss.org>" },
+    { Package: "com.bb.case", Name: "Case Variant", Version: "1", Architecture: "iphoneos-arm", Section: "Tweaks",
+      Maintainer: "Bigboss <bigboss@thebigboss.org>" },
+    { Package: "com.bb.spaced", Name: "Spaced", Version: "1", Architecture: "all", Section: "Themes",
+      Maintainer: "Big  Boss <bigboss@thebigboss.org>" },
+    { Package: "com.bb.new", Name: "Any Arch", Version: "1", Architecture: "all", Section: "Tweaks",
+      Maintainer: "BigBoss <bigboss@thebigboss.org>" },
+  );
+  const c = createCatalog();
+  c.setDevice({ ios: "16.5", jailbreak: "rootless" });
+  c.load("bb", bigboss, "http://apt.thebigboss.org/repofiles/cydia/", "iphoneos-arm");
+  assert.deepEqual(ids(c.list()), ["com.bb.new", "com.bb.spaced"], "the fit filter is on: lists drop the rootful ones");
+  const rows = c.author("BigBoss");
+  assert.deepEqual(ids(rows), ["com.bb.new", "com.bb.case", "com.bb.old"]);
+  assert.deepEqual(rows.map((r) => Boolean(r.misfit)), [false, true, true]);
+  assert.ok(rows[1].why, "a misfit says why, for its subtitle");
+  assert.equal(rows[0].why, undefined);
+  assert.deepEqual(ids(c.author("big boss")), ["com.bb.spaced"]);
+  assert.deepEqual(ids(c.author("  Big   Boss ")), ["com.bb.spaced"]);
+  // Filter off: the same rows, none marked.
+  c.setDevice({ ios: "16.5", jailbreak: "rootless" }, { filter: false });
+  assert.deepEqual(c.author("BigBoss").map((r) => [r.id, Boolean(r.misfit)]), [["com.bb.new", false], ["com.bb.case", false], ["com.bb.old", false]]);
+  // Sideload build: BigBoss as a Tweak Source. Its tweaks aren't in All Sources' apps, but their maintainer's page finds them.
+  const lite = createCatalog();
+  lite.setDevice({ ios: "27.0", jailbreak: "none" });
+  lite.load("bb", bigboss, "http://apt.thebigboss.org/repofiles/cydia/", "iphoneos-arm", { tweaks: true });
+  assert.equal(lite.list(ALL).length, 0);
+  assert.ok(lite.author("BigBoss").length > 0, "the Tweak Source's packages are listed");
+});
+
 test("reloading a source replaces it; removing drops it from All Sources", () => {
   const c = loaded();
   c.load("B", packages({ Package: "com.b.new", Name: "New", Version: "1", Architecture: "all" }), "https://b.example/");

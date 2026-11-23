@@ -16,7 +16,8 @@
 //                                             (author() too); package() and upgrades() still see them
 //   c.list(key | "*", section | "*")       -> [row], sorted by name ("*": All Sources / All Packages)
 //   c.search(query)                        -> [row], best matches first (any non-blank query)
-//   c.author(name)                         -> [row]: every package whose Author or Maintainer is `name`
+//   c.author(name)                         -> [row]: every package whose Author or Maintainer is `name`; what
+//                                             can't work on the device is kept, marked { misfit: true, why }
 //   c.package(id, key | "*")               -> { stanza, key, others: [{ key, version }] } or null; a package
 //                                             no source carries but dpkg has installed comes from its status
 //                                             stanza: { stanza, key: null, row, others: [], installedOnly: true }
@@ -829,11 +830,24 @@ export function createCatalog() {
     });
   }
 
+  // F104: a hidden author's own page still lists their packages (hidden sections and blocked ids stay out).
+  // B363: names compare lower-cased with runs of spaces as one. What can't work on the device stays in, marked
+  // `misfit` with `why` for the row's subtitle (BigBoss's packages are mostly rootful: the page was empty on a
+  // rootless phone). The sideload build looks in the Tweak Sources too (appsAndTweaks), not only All Sources' apps.
   function author(name) {
-    const n = String(name ?? "").trim().toLowerCase();
+    const same = (s) => s.replace(/\s+/g, " ");
+    const n = same(String(name ?? "").trim().toLowerCase());
     if (!n) return [];
-    // F104: a hidden author's own page still lists their packages (hidden sections and misfits stay out).
-    return fitOf(ALL).filter((r) => !hidden.has(r.section) && !isBlocked(r) && (r._a === n || r._m === n)).map(slim);
+    const pool = appsOnly ? appsAndTweaks() : rowsOf(ALL);
+    return pool.filter((r) => !hidden.has(r.section) && !isBlocked(r) && (same(r._a) === n || same(r._m) === n)).map((r) => {
+      const out = slim(r);
+      if (misfit(r)) {
+        out.misfit = true;
+        const e = entryOf(r.id, ALL);
+        if (e) out.why = needText(compat(judged(e.stanza), device));
+      }
+      return out;
+    });
   }
 
   function pkg(id, key = ALL) {
