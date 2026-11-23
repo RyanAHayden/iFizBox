@@ -1,9 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseToken, token, pageOf, nav, withBase, escapeHtml, installedAppSection } from "./browse.js";
+import { parseToken, token, pageOf, nav, withBase, escapeHtml, installedAppSection, relationsOf, relationRows } from "./browse.js";
 import { sizeText as formatSize } from "../core/appqueue.js";
 import { withLetterHeaders } from "../nav/vlist.js";
 import { parse, format } from "../router.js";
+import { grouped } from "../nav/ui.js";
+import { withDocument } from "../fakes.test-helper.js";
 
 const KEY = "deb:https://repo.example/:./";
 
@@ -33,6 +35,9 @@ test("titles: source name, All Packages, section, author", () => {
   assert.equal(nav({ tab: "search", path: ["package:x", "info:x"] }).title, "More Information");
   assert.equal(nav({ tab: "search", path: ["package:x", "pkgsettings:x"] }).title, "Settings");
   assert.equal(nav({ tab: "search", path: ["package:x", "files:x"] }).title, "Files");
+  assert.equal(nav({ tab: "search", path: ["package:x", "depends:x"] }).title, "Depends");
+  assert.equal(nav({ tab: "search", path: ["package:x", "conflicts:x"] }).title, "Conflicts");
+  assert.deepEqual(pageOf({ tab: "sources", path: [KEY, "package:x@deb:b:./", "depends:x@deb:b:./"] }), { key: "deb:b:./", page: "depends", value: "x" });
 });
 
 test("sizes, letter headers and proxied depiction HTML", () => {
@@ -356,4 +361,50 @@ test("F383: on the site, a depiction host that refuses framing (Chariz) shows Op
   assert.match(chariz.text, /Open in Safari/);
   const plain = await sheet({});
   assert.equal(plain.frame?.src, URL_, "no framing headers: the live page");
+});
+
+const STANZA = { "pre-depends": "firmware (>= 15.0)", depends: "com.x.lib (>= 1.2), com.x.gone | com.x.alt (<< 2), virtual-thing", conflicts: "com.x.old, com.x.alt" };
+const PKG = (id, name, key, extra = {}) => ({ stanza: { package: id }, key, row: { id, name, short: "words", section: "Tweaks", icon: null, key }, others: [], ...extra });
+
+test("F402: Depends has Pre-Depends and Depends, Conflicts its own field, both empty when there are none", () => {
+  assert.deepEqual(relationsOf(STANZA, "depends").map((g) => g.map((r) => r.name)), [["firmware"], ["com.x.lib"], ["com.x.gone", "com.x.alt"], ["virtual-thing"]]);
+  assert.deepEqual(relationsOf(STANZA, "conflicts").map((g) => g[0].name), ["com.x.old", "com.x.alt"]);
+  assert.deepEqual(relationsOf({}, "depends"), []);
+  assert.deepEqual(relationsOf({}, "conflicts"), []);
+});
+
+test("F402: a found package's row links with its name and icon, the rest are plain text; alternatives, other sources, installed", async () => {
+  const route = { tab: "sources", path: [KEY, "package:com.x", "depends:com.x"] };
+  const asked = [];
+  const find = async (id, key) => {
+    asked.push([id, key]);
+    if (id === "com.x.lib" && key === KEY) return PKG(id, "X Library", KEY);
+    if (id === "com.x.alt" && key === "*") return PKG(id, "Alt", "deb:other:./");
+    if (id === "com.x.old") return PKG(id, "Old", null, { installedOnly: true });
+    return null;
+  };
+  const rows = await relationRows(relationsOf(STANZA, "depends"), route, KEY, find);
+  assert.deepEqual(rows.map((r) => r.label), ["firmware (>= 15.0)", "X Library", "Alt", "virtual-thing"]);
+  assert.equal(rows[1].subtitle, "com.x.lib (>= 1.2)");
+  assert.equal(rows[2].subtitle, "com.x.gone | com.x.alt (<< 2)");
+  const last = (r) => parse(r.href).path.at(-1);
+  assert.equal(last(rows[1]), "package:com.x.lib");
+  assert.equal(last(rows[2]), "package:com.x.alt@deb:other:./", "another source's: its own page, not this source's");
+  assert.equal(rows[0].href, undefined);
+  assert.equal(rows[3].icon, undefined);
+  assert.ok(rows[1].icon.color.includes("url("));
+  const [old, alt] = await relationRows(relationsOf(STANZA, "conflicts"), route, KEY, find);
+  assert.equal(old.label, "Old");
+  assert.equal(last(old), "package:com.x.old", "installed, in no source");
+  assert.equal(alt.label, "Alt");
+  // Search: All Sources is the page's own key, and asked once
+  asked.length = 0;
+  const [s] = await relationRows([[{ name: "com.x.alt" }]], { tab: "search", path: ["package:com.x", "conflicts:com.x"] }, "*", find);
+  assert.equal(last(s), "package:com.x.alt");
+  assert.deepEqual(asked, [["com.x.alt", "*"]]);
+  // drawn: a link with the icon; plain text without
+  withDocument(() => {
+    const g = grouped([{ rows }]).firstElementChild;
+    assert.deepEqual([...g.querySelector("ul").children].map((li) => li.querySelector(".cell-inner").tagName), ["DIV", "A", "A", "DIV"]);
+  });
 });

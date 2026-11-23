@@ -131,7 +131,7 @@ export const ROW_ICONS = {
   pkgSettings: [C.dark, "gear"], pkgAuthor: [C.dark, "envelope"], pkgMore: [C.purple, "laptop"],
   pkgVersion: [C.grey, "badge"], pkgBundle: [C.indigo, "badge"], pkgFiles: [C.orange, "folder"],
   pkgSection: [C.brown, "apps"], pkgBlock: [C.red, "minusCircle"], pkgTweaks: [C.green, "bolt"], pkgWish: [C.pink, "plus"],
-  pkgSize: [C.teal, "download"], pkgDepends: [C.purple, "link"], pkgLink: [C.blue, "globe"],
+  pkgSize: [C.teal, "download"], pkgDepends: [C.purple, "link"], pkgConflicts: [C.red, "bolt"], pkgLink: [C.blue, "globe"],
   help: [C.blue, "question"], server: [C.teal, "globe"], checkServer: [C.green, "pulse"], runYourOwn: [C.orange, "cloud"],
   shareCert: [C.green, "personPlus"], // Share Your Certificate (SideDrop)
   sources: [C.blue, "list"], transfer: [C.green, "transfer"], hidden: [C.grey, "eyeSlash"], recommended: [C.gold, "star"],

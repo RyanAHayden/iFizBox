@@ -25,6 +25,11 @@ test("F350: a package that isn't installed: no options, the Version group withou
   assert.equal(p.info.find((r) => r.key === "depends").detail, "mobilesubstrate, preferenceloader");
   assert.equal(p.price, "Free");
   assert.equal(p.payment, false);
+  // F402: Conflicts next to Depends, each only with something to list
+  const both = packageRows({ depends: ["a"], conflicts: ["b", "c"] }).info;
+  assert.deepEqual(labels(both).slice(-2), ["Depends", "Conflicts"]);
+  assert.equal(both.at(-1).detail, "b, c");
+  assert.deepEqual(labels(packageRows({}).info).filter((l) => l === "Depends" || l === "Conflicts"), []);
 });
 
 test("F350: an installed package: Change Package Settings, Installed Package with its version and Filesystem Content", () => {
