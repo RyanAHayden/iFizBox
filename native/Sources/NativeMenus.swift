@@ -152,7 +152,8 @@ enum NativeMenus {
                 button.session = nil
                 button.showsMenuAsPrimaryAction = false
                 button.menu = nil
-                if glass == nil { // once its menu has folded back into it
+                if glass == nil { // taps reach the row under it now; it goes once its menu has folded back into it
+                    button.isUserInteractionEnabled = false
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { button.removeFromSuperview() }
                 }
             }
