@@ -197,8 +197,8 @@ export function nav(route, sourceName = () => null) {
     case "pkgsettings": return { title: "Settings" };
     case "files": return { title: "Files", style: "plain" };
     case "package": return { title: DETAILS_TITLE,
-      right: { label: "Install", onClick: (e) => packageActions(route, e.currentTarget),
-        onHold: () => installVersionHold(route).catch(() => {}) } }; // F346: a hold picks the version
+      right: { label: "Install", onClick: (e) => installTap(route, e.currentTarget).catch(() => {}),
+        onHold: (b) => installHold(route, b).catch(() => {}) } }; // B330: tap queues, hold opens the options
     case "versions": return { title: "Versions" };
     case "addtweaks": return { title: "Add Tweaks", style: "plain" }; // F352
     default: return { title: "Not Found" };
@@ -1649,6 +1649,49 @@ export async function installVersionHold(route, { pages = packagePages, mode = d
     return row?.onClick();
   };
   return installWhichVersion(app, pkg, source, { installed, ask, mode, jailbreakInstall });
+}
+
+// ---- B330: Install taps straight into the queue; the options wait for a hold ------------------------------------
+// A package that isn't installed (the button says Install, not Modify): a tap queues its version and the Confirm
+// sheet opens (screens/queue.js, on the queue's add), and a hold opens the options sheet a tap used to
+// (packageActions: Other Versions, Wish List...). Modify keeps its tap (the Modify sheet) and its hold (Install Which
+// Version?, F346), as its options already cover the rest. An app's Install already installs on a tap and keeps its
+// hold; Add to App, a paid package (its Purchase steps) and the website (no install queue) keep the options on a tap.
+
+// Whether the page's button is Install for an apt package: no Modify, no app, no Add to App.
+export function installNoModify(page, { mode = detectMode() } = {}) {
+  const st = page?.pkg?.stanza;
+  if (!st || st.kind === "ipa" || isSideloadTweak(st, mode)) return false;
+  return !installedOf(page.history);
+}
+
+// The tap. -> "queued" (Confirm opens) or "options" (packageActions ran), or null for a page gone.
+// `queue`: the install queue's add (undefined: the backend's; null: none, as on the website).
+export async function installTap(route, button, { pages = packagePages, mode = detectMode(), queue = undefined,
+  paidState = (box) => paidStateOf(box), options = packageActions } = {}) {
+  const page = pages.get(format(route));
+  if (!page || !page.body.isConnected) return null;
+  if (installNoModify(page, { mode })) {
+    const { id, pkg } = page;
+    const q = queue === undefined ? queueOf({ installed: null, name: pkg.row?.name }) : queue;
+    if (q && !(isPaid(pkg.stanza) && await paidState(page.payBox))) {
+      if (!page.body.isConnected) return null;
+      await q({ op: "install", id, version: pkg.stanza.version });
+      return "queued";
+    }
+  }
+  await options(route, button);
+  return "options";
+}
+
+// The hold. -> "options" where the button is Install (packageActions ran), else what F346's hold returns.
+export async function installHold(route, button, { pages = packagePages, mode = detectMode(), options = packageActions,
+  versions = installVersionHold } = {}) {
+  const page = pages.get(format(route));
+  if (!page || !page.body.isConnected) return null;
+  if (!installNoModify(page, { mode })) return versions(route);
+  await options(route, button);
+  return "options";
 }
 
 async function packageActions(route, button) {
