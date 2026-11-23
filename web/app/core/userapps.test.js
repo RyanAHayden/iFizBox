@@ -29,6 +29,39 @@ test("parseUserApps: the helper's lines, A-Z by name, encrypted true/false/null,
   assert.deepEqual(parseUserApps(null), []);
 });
 
+// A thin 64-bit (or 32-bit) Mach-O header with one LC_ENCRYPTION_INFO(_64), as ifizbox-helper user-apps reads off an
+// app's executable (native/helper/test_decrypt.py has the same fixtures for the C side).
+function machoHeader(cryptid, { is64 = true } = {}) {
+  const b = new Uint8Array(0x2000);
+  const dv = new DataView(b.buffer);
+  const h = is64 ? 32 : 28, cmd = is64 ? 24 : 20;
+  dv.setUint32(0, is64 ? 0xfeedfacf : 0xfeedface, true);
+  dv.setUint32(4, is64 ? 0x0100000c : 12, true);
+  dv.setUint32(16, 1, true);
+  dv.setUint32(20, cmd, true);
+  dv.setUint32(h, is64 ? 0x2c : 0x21, true);
+  dv.setUint32(h + 4, cmd, true);
+  dv.setUint32(h + 8, 0x1000, true);
+  dv.setUint32(h + 12, 0x200, true);
+  dv.setUint32(h + 16, cryptid, true);
+  return b;
+}
+
+test("the encrypted flag on fixture Mach-O headers: the page's flag and the web's own reading agree", async () => {
+  const { machoEncrypted } = await import("./tweaks.js");
+  for (const [bytes, flag] of [[machoHeader(1), "1"], [machoHeader(0), "0"], [machoHeader(7, { is64: false }), "1"],
+    [machoHeader(0, { is64: false }), "0"]]) {
+    const enc = machoEncrypted(bytes);
+    assert.equal(enc, flag === "1");
+    // the helper's line for the same executable -> the row and the page say the same
+    const [app] = parseUserApps(`com.x.tube\tTube\t1\t1\t/x/Tube.app\t${flag}\t1`);
+    assert.equal(app.encrypted, enc);
+    assert.equal(userAppLine(app, []), enc ? "1 · Encrypted" : "1 · Not encrypted");
+  }
+  assert.equal(machoEncrypted(new TextEncoder().encode("not a binary")), null);
+  assert.equal(parseUserApps("com.x.tube\tTube\t1\t1\t/x/Tube.app\t\t1")[0].encrypted, null); // unreadable: unknown
+});
+
 test("copiesOf: the decrypted IPA and the one with tweaks, by bundle ID and file name", () => {
   const ipas = [
     { file: "Tube 2.1 (decrypted).ipa", bundleId: "com.x.tube" },

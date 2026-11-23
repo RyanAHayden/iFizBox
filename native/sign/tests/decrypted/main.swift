@@ -70,6 +70,9 @@ test("left out: SC_Info anywhere, every file of an extension still encrypted") {
     check(!DecryptedIPA.leftOut("PlugIns", left: left), "PlugIns itself")
     check(!DecryptedIPA.leftOut("Frameworks/K.framework/K", left: left), "a framework stays (it is said, not left out)")
     check(DecryptedIPA.leftOutExtensions(left + ["PlugIns/A.appex/Other"]) == ["PlugIns/A.appex"], "\(DecryptedIPA.leftOutExtensions(left))")
+    // a framework of the app still encrypted stops the run (the app couldn't run); one inside an extension doesn't
+    check(DecryptedIPA.blocking(left) == ["Frameworks/K.framework/K"], "\(DecryptedIPA.blocking(left))")
+    check(DecryptedIPA.blocking(["PlugIns/A.appex/A", "PlugIns/A.appex/Frameworks/F.framework/F"]).isEmpty, "inside an extension")
     check(DecryptedIPA.tweakedName("Tube 2.1 (decrypted).ipa") == "Tube 2.1 (tweaks)", DecryptedIPA.tweakedName("Tube 2.1 (decrypted).ipa"))
     check(DecryptedIPA.tweakedName("Tube 2.1 (decrypted) 2.ipa") == "Tube 2.1 (tweaks)", "a second copy's name")
     check(DecryptedIPA.tweakedName("Mine.ipa") == "Mine (tweaks)", "an IPA of the user's own")

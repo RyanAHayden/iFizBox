@@ -3,6 +3,7 @@
 // tests/decrypted/main.swift). The bridge around it is native/Sources/InstalledApps.swift.
 //
 //   DecryptedIPA.parse(helperOut)                  ifizbox-helper decrypt-app's "App: " and "Still encrypted " lines
+//   DecryptedIPA.blocking(left)                    of those, the ones outside an extension: Decrypt fails on them
 //   DecryptedIPA.pack(app:decrypted:left:to:say:)  Payload/<App>.app zipped: the decrypted files in place of the
 //                                                  originals; SC_Info/ and extensions still encrypted left out
 //   DecryptedIPA.withTweaks(src, tweaks, to:)      the copy: entries copied raw, the main executable with the weak
@@ -39,6 +40,12 @@ enum DecryptedIPA {
             if parts.count > x, Array(parts[0...x]) == Array(lp[0...x]) { return true }
         }
         return false
+    }
+
+    // The files still encrypted that aren't inside an extension (a framework, the app's own): the app couldn't run
+    // from such an IPA, so Decrypt fails on them instead of packing it.
+    static func blocking(_ left: [String]) -> [String] {
+        left.filter { !$0.split(separator: "/").contains { $0.hasSuffix(".appex") } }
     }
 
     // The extensions left out, for the progress page ("PlugIns/A.appex").

@@ -75,6 +75,9 @@ enum InstalledApps {
                     throw SignError("decrypt", why)
                 }
                 let d = try DecryptedIPA.parse(r["stdout"] as? String ?? "")
+                if let f = DecryptedIPA.blocking(d.left).first {
+                    throw SignError("decrypt", "\(f) stayed encrypted (FairPlay refused it), so the app couldn't run from this IPA.")
+                }
                 let plist = NSDictionary(contentsOf: d.app.appendingPathComponent("Info.plist")) as? [String: Any] ?? [:]
                 let name = plist["CFBundleDisplayName"] as? String ?? plist["CFBundleName"] as? String ?? d.app.deletingPathExtension().lastPathComponent
                 let version = plist["CFBundleShortVersionString"] as? String ?? plist["CFBundleVersion"] as? String ?? ""
