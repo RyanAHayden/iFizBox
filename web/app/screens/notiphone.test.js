@@ -5,6 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NAME, DOMAIN } from "../brand.js";
+import { REPO_URL, DISCORD_URL } from "../core/appoffer.js";
 import { DISMISS_KEY } from "../core/platform.js";
 import { fakeDocument as fakeDom } from "../fakes.test-helper.js";
 
@@ -35,6 +36,28 @@ test("the page names the device, and scans and copies https://<DOMAIN>", async (
   assert.equal(btn.textContent, "Copied");
   const headers = all(page).filter((x) => x._cls?.has("group-header")).map((x) => x.textContent);
   assert.deepEqual(headers, ["Scan With Your iPhone", "On Your iPhone"]);
+});
+
+test("GitHub | Discord sit between the hero and the code, open in a new tab and leave the page up", async () => {
+  const parent = document.createElement("div");
+  let left = false;
+  showNotIphone("mac", { parent, win: { localStorage: storage() } }).then(() => { left = true; });
+  const body = one(parent, "notiphone-body");
+  const at = body.children.findIndex((c) => c._cls.has("notiphone-links"));
+  assert.ok(body.children[at - 1]._cls.has("notiphone-hero"));
+  assert.equal(one(body.children[at + 1], "group-header").textContent, "Scan With Your iPhone");
+  const links = all(body.children[at]).filter((x) => x._cls?.has("home-tile"));
+  assert.deepEqual(links.map((a) => [a.href, a.target, a.rel]), [
+    [REPO_URL, "_blank", "noopener"],
+    [DISCORD_URL, "_blank", "noopener"],
+  ]);
+  assert.deepEqual(links.map((a) => one(a, "cell-label").textContent), ["GitHub", "Discord"]);
+  assert.ok(one(links[0], "glyph-github"));
+  assert.ok(one(links[1], "glyph-discord"));
+  for (const a of links) await a.click();
+  await Promise.resolve();
+  assert.equal(left, false);
+  assert.ok(one(parent, "notiphone"));
 });
 
 test("Look Around Anyway removes the page, remembers it and opens the normal site", async () => {

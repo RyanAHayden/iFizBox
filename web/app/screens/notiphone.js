@@ -4,6 +4,7 @@
 // light and dark palettes with no colours of its own; notiphone.css only lays it out.
 //
 //   app icon, "Open <NAME> on Your iPhone" and why it can't install here (this Mac / this PC / Android phones)
+//   GitHub | Discord        Home's pair of tiles, in a new tab
 //   Scan With Your iPhone   a QR code of https://<DOMAIN> (core/qr.js), then the address with Copy Link
 //   On Your iPhone          Safari > Share > Add to Home Screen > open it
 //   Why <NAME>?             gone for this visit, onto the Why page (screens/why.js, F303)
@@ -16,6 +17,7 @@ import { el } from "../nav/ui.js";
 import { copyText } from "../nav/menu.js";
 import { qrSvg } from "../core/qr.js";
 import { notIphoneText, dismissNotIphone } from "../core/platform.js";
+import { REPO_URL, DISCORD_URL } from "../core/appoffer.js";
 import { format } from "../router.js";
 import { NAME, DOMAIN } from "../brand.js";
 import { WHY_ROUTE } from "./why.js";
@@ -38,6 +40,28 @@ function group(header, ...children) {
   if (header) g.append(el("h2", "group-header", header));
   g.append(...children);
   return g;
+}
+
+// Home's GitHub | Discord pair (screens/home.js tile(); this page draws before the app starts, so Home isn't imported).
+// The `home` class brings home.css's tile tokens, per era and theme. Both open in a new tab; the page stays up.
+function communityPair() {
+  const tile = (label, href, glyph) => {
+    const li = el("li", "cell");
+    const a = el("a", "cell-inner chevron home-tile");
+    a.href = href;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.append(el("span", "cell-icon home-glyph glyph-" + glyph), el("span", "cell-label", label));
+    li.append(a);
+    return li;
+  };
+  const ul = el("ul", "table home-pair");
+  ul.append(tile("GitHub", REPO_URL, "github"), tile("Discord", DISCORD_URL, "discord"));
+  const row = el("div", "home-row pair");
+  row.append(ul);
+  const home = el("div", "home notiphone-links");
+  home.append(row);
+  return home;
 }
 
 // kind: "mac" | "pc" | "android". opts: { win (window-like: localStorage), copy (text -> Promise), parent }.
@@ -113,6 +137,7 @@ export function showNotIphone(kind, { win = globalThis, copy = copyText, parent 
 
   body.append(
     hero,
+    communityPair(),
     group("Scan With Your iPhone", table(qr, addr)),
     group("On Your iPhone", table(...steps)),
     group(null, table(whyApp, anyway, what)),

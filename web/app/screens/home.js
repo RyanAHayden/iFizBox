@@ -39,7 +39,7 @@ const featuredRefs = () => load("extras").then((m) => m.featuredRefs()); // F313
 import { browseList, browseListsFor, FRESH_DAYS, collection } from "../core/catalog.js";
 import { dayOf, dayTitle } from "../core/changes.js";
 import { isAltKey } from "../core/altstore.js";
-import { homeOffer, debUrl, debAlert, REPO_URL, APP_IPA_URL, APP_NAME, ownBuilds, APP_APT_REPO } from "../core/appoffer.js";
+import { homeOffer, debUrl, debAlert, REPO_URL, DISCORD_URL, APP_IPA_URL, APP_NAME, ownBuilds, APP_APT_REPO } from "../core/appoffer.js";
 import { fetchRelease, debFor } from "../core/selfupdate.js";
 const refreshInBackground = (ctx) => load("sources").then((m) => m.refreshInBackground(ctx)); // F313: Sources loads after Home
 import { markiFizBoxInstalled, browsingLocked, askToBrowse } from "../websign-gate.js";
@@ -52,8 +52,6 @@ import { rowIcon, PAGE_ICONS } from "../icons/rowicons.js";
 import { nativeBridge } from "../native.js";
 import { routeFailure, ROUTE_KEY } from "../core/installroute.js"; // B316
 import { cellularWarning, CELLULAR } from "../core/installroute.js"; // F372
-
-const DISCORD_URL = "https://discord.gg/3XASvpjbgp"; // Home's pair: GitHub | Discord (Cydia: Facebook | Twitter)
 
 export const title = "Home";
 
