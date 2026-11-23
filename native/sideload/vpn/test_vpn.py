@@ -182,6 +182,19 @@ class App(unittest.TestCase):
         web = read("web", "app", "screens", "installroute.js", base=os.path.dirname(NATIVE))
         self.assertIn("It opens Shortcuts only when needed: on cellular", web)
 
+    def test_start_logs_the_up_tunnels(self):
+        """T77: a queue's start logs the list it decided from, every family, so a carrier's ipsec tunnel shows."""
+        src = read("App", "LocalVPN.swift")
+        begin = src[src.index("static func begin("):src.index("static func waitOffCellular(")]
+        self.assertIn("before = otherVPNAddresses(tunnels)", begin)  # the decision and the log read one list
+        self.assertIn("let deciding = !switchedOn && holds == 1", begin)
+        self.assertLess(begin.index("let deciding"), begin.index("if start { switchedOn = true"))
+        self.assertIn("up tunnels: \\(tunnelList(tunnels))", begin)
+        listed = src[src.index("static func tunnelAddresses()"):src.index("static func switchInput(")]
+        self.assertIn('["utun", "ipsec", "ppp"]', listed)
+        for family in ["AF_INET:", "AF_INET6:", "AF_LINK:"]:
+            self.assertIn("case " + family, listed)
+
     def test_install_switch_one_trip(self):
         """F394: the trip connects the built-in VPN with the app's own action before Cellular Data Off, opens the app,
         waits in a bounded loop of waits shorter than Shortcuts' 30 s, and puts data then the VPN back; nothing in it
