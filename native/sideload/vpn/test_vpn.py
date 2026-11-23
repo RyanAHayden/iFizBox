@@ -138,6 +138,8 @@ class App(unittest.TestCase):
             self.assertEqual(modes[-1], 2, g)
         sets = [a["WFWorkflowActionParameters"] for a in acts if a["WFWorkflowActionIdentifier"].endswith("vpn.set")]
         self.assertEqual([s["WFVPNOperation"] for s in sets], ["Connect", "Connect"])
+        last_set = len(ids) - 1 - ids[::-1].index("vpn.set")  # the end forgets before Set VPN's error 2 ends the run
+        self.assertEqual(ids[last_set - 1], "deletestoredcontent")
         flt = next(a for a in acts if ids[acts.index(a)] == "filter.vpns")["WFWorkflowActionParameters"]
         tpl = flt["WFContentItemFilter"]["Value"]["WFActionParameterFilterTemplates"][0]
         self.assertEqual((tpl["Property"], tpl["Values"]["String"]), ("Server Address", "10.7.0.1"))
