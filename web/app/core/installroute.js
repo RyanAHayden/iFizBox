@@ -42,9 +42,10 @@ export const shortcutsAdded = (st) => switchAdded(st) || Boolean(st?.vpn?.shortc
 // own copy; this link is the fallback it opens in Safari. Shortcuts names an imported Shortcut after its file.
 export const shortcutFileURL = (k) => `https://${DOMAIN}/shortcuts/${encodeURIComponent(SHORTCUT_NAMES[k])}.shortcut`;
 // F392: our Shortcut's iCloud link (Shortcuts > Share > Copy iCloud Link, made once by hand by the Apple ID that owns
-// it): the only link Shortcuts' own Add Shortcut opens from (shortcuts://import-shortcut refuses any other). null:
-// Add shares the file instead.
-export const SHORTCUT_LINKS = { switch: null };
+// it): opened as it is, Shortcuts shows its Add Shortcut (shortcuts://import-shortcut can't read it). null:
+// Add shares the file instead. It holds the Shortcut as it was when the link was made: a re-signed one (a changed
+// tools/shortcuts plist) needs a new link.
+export const SHORTCUT_LINKS = { switch: "https://www.icloud.com/shortcuts/733163d13cc04d469e36a6c85c66f32e" };
 // B359: a group footer for a Shortcut whose check run (vpn.checkShortcut) didn't pass: it isn't marked added.
 export const shortcutDidntRun = (k, err) => `"${SHORTCUT_NAMES[k]}" didn't run: ${err || "Shortcuts didn't say why"}. ${/could not find/i.test(err ?? "") ? "If Shortcuts has two of it, delete both, then tap Add." : "Tap Add to try again."}`; // F394: Replace can leave two (iOS 27), and neither runs by name
 // ... and for an Add whose share sheet never opened (nothing was imported, so nothing ran either).
