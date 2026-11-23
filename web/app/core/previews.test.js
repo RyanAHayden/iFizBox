@@ -280,3 +280,61 @@ test("F181: sileoWhatsNew: the Changelog tab's first header and its text, up to 
   assert.equal(sileoWhatsNew(tab([{ class: "DepictionMarkdownView", markdown: "hi" }], "Screenshots")), null);
   assert.equal(sileoWhatsNew({ class: "DepictionStackView", views: [] }), null);
 });
+
+// ---- B328: an HTML depiction's description ----
+import { readFileSync } from "node:fs";
+import { depictionDescription, betterDescription, loadDepictionDescription } from "./previews.js";
+const depictionFixture = (name) => readFileSync(new URL(`./fixtures/depictions/${name}`, import.meta.url), "utf8");
+
+test("B328: a BigBoss depiction (Springy, saved page): fieldset#description as plain text, chrome left out", () => {
+  const text = depictionDescription(depictionFixture("bigboss-springy.html"), "http://moreinfo.thebigboss.org/moreinfo/depiction.php?file=springyDp");
+  assert.equal(text, [
+    "Compatible with iOS 7, 8 and 9", "", "The ultimate way to customize your respring screen.", "", "Features:", "",
+    "• Use an animation or custom image during resprings", "• Customize the tint of the Apple Logo",
+    "• Customize the background color of the respring screen", "• Configure the FPS and loop count of the animation",
+    "• Invert the colors of the respring screen", "", "Not Compatible with RespringProgress", "",
+    "Configure options from Settings", "", "See larger Screenshots below..",
+  ].join("\n"));
+  assert.doesNotMatch(text, /[<>]|Description|View All Screenshots|Developer Website|Terms|moveChildren|gfycat/);
+  // the one-line Description: field gives way to it; a longer field stays
+  assert.equal(betterDescription("Respring animations & customization", text), text);
+  assert.equal(betterDescription("x".repeat(text.length + 5), text), "x".repeat(text.length + 5));
+  assert.equal(betterDescription("Short", ""), "Short");
+});
+
+test("B328: another repo's depiction: the article's text, links kept as text (URL), no scripts, nav, header, footer or aside", () => {
+  const text = depictionDescription(depictionFixture("repo-tweak.html"), "https://repo.example.dev/depictions/glowdock.html");
+  assert.equal(text, [
+    "Glow Dock", "", "Adds a soft glow behind your dock that follows the wallpaper’s colours & fades as you scroll.", "",
+    "Options:", "", "• Glow strength and blur radius", "• Match the wallpaper or pick a colour", "",
+    "Source code on GitHub (https://github.com/example/glowdock). Report bugs at https://example.dev/issues.",
+  ].join("\n"));
+  assert.doesNotMatch(text, /Donate|Other Tweak|Privacy|injected|Share|dataLayer/);
+  // a page with no text to speak of gives nothing; relative links resolve against the page
+  assert.equal(depictionDescription("<html><body><img src=a.png><nav>Home</nav></body></html>", "https://r.dev/"), "");
+  assert.equal(depictionDescription("", "https://r.dev/"), "");
+  assert.equal(depictionDescription('<div class="description">Read the <a href="/guide">setup guide</a> before installing it.</div>', "https://r.dev/d/x.html"),
+    "Read the setup guide (https://r.dev/guide) before installing it.");
+});
+
+test("B328: loadDepictionDescription shares loadPreviews' page fetch and is cached per URL for a day", async () => {
+  clearPreviewMemory();
+  const url = "https://repo.dev/dep.html";
+  let asked = 0;
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const text = async (u) => { asked++; await gate; return u === url ? '<div id="description"><p>A long enough description to count.</p></div><img class="screenshot" src="s.png">' : Promise.reject(new Error("404")); };
+  const store = memStore();
+  const both = Promise.all([loadPreviews("k", { html: url }, { text, store }), loadDepictionDescription(url, { text, store, now: 1000 })]);
+  release();
+  const [shots, desc] = await both;
+  assert.deepEqual(urls(shots), ["https://repo.dev/s.png"]);
+  assert.equal(desc, "A long enough description to count.");
+  assert.equal(asked, 1, "one fetch for both");
+  clearPreviewMemory();
+  assert.equal(await loadDepictionDescription(url, { text, store, now: 2000 }), desc, "from the cache");
+  assert.equal(asked, 1);
+  assert.equal(await loadDepictionDescription(url, { text, store, now: 1000 + PREVIEW_TTL + 1 }), desc);
+  assert.equal(asked, 2, "refetched after a day");
+  assert.equal(await loadDepictionDescription("https://repo.dev/gone.html", { text, store }), "", "a failed fetch is no error");
+});
