@@ -39,7 +39,13 @@ After the spec review: `Library/Caches/com.apple.dyld` and `Library/Saved Applic
 also count as "ran before" (an app whose every file was rewritten at launch). `retest.sh` ran A to C again with the
 final dylib: "ran before no" when fresh; after the old-way sign, own `...039` replaced by the shared `...110`
 (1 taken over, 15 left alone). A first try at the retest printed old "INSTALL REFUSED" lines from the rig's log: the
-lock had not been obtained. D and E ran with the dylib before this change, which only touches the "ran before" test.
+lock had not been obtained.
+
+After merging main (B393 changed `groupfix.m`: its bring-in runs after this fix's checks) the dylib was rebuilt and
+`retest.sh` (rewritten: the old-way step writes a new shared item) ran A to E with it, the committed one. A: "ran
+before no", nothing copied. C: own `...6110` replaced by the shared `...3284` (4 taken over, 14 left alone), kept at
+the next launch. D: own `...3320` kept beside the newer shared one (0 taken over). E: "ran before no"; with the mark
+cleared, "group fix before yes", 0 taken over.
 
 ## Decision
 
@@ -56,6 +62,7 @@ that item anyway, so taking the newer one is what the app already sees.
 - The folder-birth sign on its own: an app whose only files were all rewritten before the fix loads.
 - A fresh launch by a Home Screen tap (go-ios launched every one).
 - The real RyukGram (its IPA is gone) and a real login.
+- B393's bring-in together with a takeover in one launch (the probe has no such data).
 - Internet passwords.
 - Items behind Face ID or passcode, or locked before first unlock. So the retry through `ifizbox.groupfix.takeover`
   was not run.
