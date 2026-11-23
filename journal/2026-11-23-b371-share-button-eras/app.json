@@ -1,0 +1,88 @@
+[
+{
+"wait": 1000
+},
+{
+"eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"
+},
+{
+"nav": "#/sources",
+"ms": 8000
+},
+{
+"eval": "localStorage.setItem('ifizbox.style','ios6'); 'ok'"
+},
+{
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+"ms": 6000
+},
+{
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
+},
+{
+"wait": 500
+},
+{
+"shot": "ios6-app"
+},
+{
+"eval": "(()=>{const b=document.querySelector('.page.is-top .store-head-share'); if(!b) return 'none'; const s=getComputedStyle(b), a=getComputedStyle(b,'::before'); return {bg:s.backgroundImage.slice(0,80), border:s.borderImageSource.slice(0,60), bw:s.borderWidth, glyph:a.backgroundImage.slice(0,40), mask:a.maskImage.slice(0,40), color:a.backgroundColor}})()"
+},
+{
+"eval": "localStorage.setItem('ifizbox.style','ios7'); 'ok'"
+},
+{
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+"ms": 6000
+},
+{
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
+},
+{
+"wait": 500
+},
+{
+"shot": "ios7-app"
+},
+{
+"eval": "(()=>{const b=document.querySelector('.page.is-top .store-head-share'); if(!b) return 'none'; const s=getComputedStyle(b), a=getComputedStyle(b,'::before'); return {bg:s.backgroundImage.slice(0,80), border:s.borderImageSource.slice(0,60), bw:s.borderWidth, glyph:a.backgroundImage.slice(0,40), mask:a.maskImage.slice(0,40), color:a.backgroundColor}})()"
+},
+{
+"eval": "localStorage.setItem('ifizbox.style','ios13'); 'ok'"
+},
+{
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+"ms": 6000
+},
+{
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
+},
+{
+"wait": 500
+},
+{
+"shot": "ios13-app"
+},
+{
+"eval": "(()=>{const b=document.querySelector('.page.is-top .store-head-share'); if(!b) return 'none'; const s=getComputedStyle(b), a=getComputedStyle(b,'::before'); return {bg:s.backgroundImage.slice(0,80), border:s.borderImageSource.slice(0,60), bw:s.borderWidth, glyph:a.backgroundImage.slice(0,40), mask:a.maskImage.slice(0,40), color:a.backgroundColor}})()"
+},
+{
+"eval": "localStorage.setItem('ifizbox.style','ios26'); 'ok'"
+},
+{
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+"ms": 6000
+},
+{
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
+},
+{
+"wait": 500
+},
+{
+"shot": "ios26-app"
+},
+{
+"eval": "(()=>{const b=document.querySelector('.page.is-top .store-head-share'); if(!b) return 'none'; const s=getComputedStyle(b), a=getComputedStyle(b,'::before'); return {bg:s.backgroundImage.slice(0,80), border:s.borderImageSource.slice(0,60), bw:s.borderWidth, glyph:a.backgroundImage.slice(0,40), mask:a.maskImage.slice(0,40), color:a.backgroundColor}})()"
+}
+]

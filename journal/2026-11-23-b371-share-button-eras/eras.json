@@ -1,0 +1,128 @@
+[
+{
+"wait": 1000
+},
+{
+"eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"
+},
+{
+"nav": "#/sources",
+"ms": 8000
+},
+{
+"eval": "localStorage.setItem('ifizbox.style','ios6'); 'ok'"
+},
+{
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json",
+"ms": 5000
+},
+{
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
+},
+{
+"wait": 500
+},
+{
+"shot": "ios6-source"
+},
+{
+"eval": "[...document.querySelectorAll('.page.is-top a')].map(a=>a.getAttribute('href')).slice(0,8)"
+},
+{
+"tap": ".page.is-top a[href*='app']",
+"ms": 3000
+},
+{
+"eval": "location.hash"
+},
+{
+"shot": "ios6-app"
+},
+{
+"eval": "localStorage.setItem('ifizbox.style','ios7'); 'ok'"
+},
+{
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json",
+"ms": 5000
+},
+{
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
+},
+{
+"wait": 500
+},
+{
+"shot": "ios7-source"
+},
+{
+"eval": "[...document.querySelectorAll('.page.is-top a')].map(a=>a.getAttribute('href')).slice(0,8)"
+},
+{
+"tap": ".page.is-top a[href*='app']",
+"ms": 3000
+},
+{
+"eval": "location.hash"
+},
+{
+"shot": "ios7-app"
+},
+{
+"eval": "localStorage.setItem('ifizbox.style','ios13'); 'ok'"
+},
+{
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json",
+"ms": 5000
+},
+{
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
+},
+{
+"wait": 500
+},
+{
+"shot": "ios13-source"
+},
+{
+"eval": "[...document.querySelectorAll('.page.is-top a')].map(a=>a.getAttribute('href')).slice(0,8)"
+},
+{
+"tap": ".page.is-top a[href*='app']",
+"ms": 3000
+},
+{
+"eval": "location.hash"
+},
+{
+"shot": "ios13-app"
+},
+{
+"eval": "localStorage.setItem('ifizbox.style','ios26'); 'ok'"
+},
+{
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json",
+"ms": 5000
+},
+{
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
+},
+{
+"wait": 500
+},
+{
+"shot": "ios26-source"
+},
+{
+"eval": "[...document.querySelectorAll('.page.is-top a')].map(a=>a.getAttribute('href')).slice(0,8)"
+},
+{
+"tap": ".page.is-top a[href*='app']",
+"ms": 3000
+},
+{
+"eval": "location.hash"
+},
+{
+"shot": "ios26-app"
+}
+]
