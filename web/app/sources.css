@@ -143,6 +143,14 @@
 .source-row.armed .del-confirm { clip-path: inset(0 round 6px); pointer-events: auto; }
 .source-row.removing { transition: opacity .2s ease-out; }
 .source-row { touch-action: pan-y; }
+/* B356: Sources' and Install IPAs' full-row Delete swipe under iOS 7, 13 and 26 (nav/rowswipe.js): the row's content
+   slides over packages.css's .row-swipe strip, which it hides at rest. */
+.source-row.swiping > .cell-inner { position: relative; z-index: 1; will-change: transform; }
+.source-row.swiping > .row-swipe { display: block; }
+/* ==== look-only { ==== the full-row swipe: the content keeps its table's ground over the red strip */
+.table.grouped .source-row.swiping > .cell-inner { background-color: var(--table); }
+.table.plain .source-row.swiping > .cell-inner { background-color: var(--plain); }
+/* ==== } look-only ==== */
 /* ==== look-only { ==== the minus, the faded chevron, Delete and a row going away */
 .del-toggle { border: 0; background: none; }
 .del-toggle::before { /* UIRemoveControlMinus: 2pt white rim, glossy top half, flat red bottom, soft shadow */

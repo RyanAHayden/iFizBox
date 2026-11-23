@@ -1767,7 +1767,7 @@ export function bulkHud(factory, { verb, name, i, n }) {
 
 // ---- F125: the Wish List page --------------------------------------------------------------------------------
 
-const wishView = { body: null, route: null, list: null, seq: 0, editing: false };
+const wishView = { body: null, route: null, list: null, seq: 0, editing: false, swipe: null };
 
 // The wished packages the sources carry, as a plain package list; installed ones drop off the list for good (as
 // browse.js renderWishlist, F102).
@@ -1796,10 +1796,12 @@ function drawWish(rows) {
   body.classList.replace("grouped", "plain");
   if (!rows.length) { body.replaceChildren(note(WISH_EMPTY)); return; }
   body.replaceChildren();
+  wishView.swipe = null;
   const list = browse.packageList(body, wishView.route, rows, { letters: false, decorate: decorateWish });
   list.el.classList.add("wish-list");
   list.el.classList.toggle("editing", wishView.editing);
   attachWishGestures(list.el);
+  wishView.swipe = attachWishSwipe(list.el); // B356
   wishView.list = list;
   body.append(list.el);
 }
@@ -1816,8 +1818,22 @@ function decorateWish(row, item) {
     row.append(toggle, confirm);
     row._wishToggle = toggle;
   }
+  wishView.swipe?.reset(row); // B356: a recycled row drops a swipe that was on its last package
   row.classList.remove("armed", "removing");
   row._wishToggle.setAttribute("aria-label", "Remove " + item.name);
+}
+
+// B356: under iOS 7, 13 and 26 (fullSwipeEra) a wished package leaves the list with a full-row swipe, as the apps
+// list's Delete (attachDeleteSwipe), red behind it. iOS 6 keeps the swipe that shows the red Delete (attachWishGestures).
+function attachWishSwipe(el) {
+  return attachRowSwipe(el, {
+    rowSelector: ".wish-row",
+    canStart: (row) => fullSwipeEra() && !wishView.editing && !!row._item?.id && !el.querySelector(".wish-row.armed"),
+    prepare: (row) => ({ id: row._item.id }),
+    kindOf: () => "remove",
+    full: () => true,
+    commit: (row, a) => { removeWish(row, a.id); return true; },
+  });
 }
 
 function armWish(row, on) {
@@ -1842,7 +1858,8 @@ function attachWishGestures(el) {
   el.addEventListener("pointerdown", (e) => {
     const row = e.target.closest(".wish-row");
     swiped = false;
-    start = row && !wishView.editing && !e.target.closest(".del-confirm") ? { row, x: e.clientX, y: e.clientY } : null;
+    start = row && !wishView.editing && !e.target.closest(".del-confirm") && !fullSwipeEra()
+      ? { row, x: e.clientX, y: e.clientY } : null; // B356: iOS 7 and later swipe the row off instead (attachWishSwipe)
   });
   el.addEventListener("pointermove", (e) => {
     if (!start) return;
