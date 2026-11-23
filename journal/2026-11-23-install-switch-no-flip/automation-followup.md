@@ -7,7 +7,7 @@ and a stand-in body (Toggle appearance), not the real Install Switch actions.
 
 | # | Question | Answer | One line |
 |---|---|---|---|
-| 1 | The trigger can be carried in a signed .shortcut | No (not shown) | The export key was not found; a guessed key was ignored on import. |
+| 1 | The trigger can be carried in a signed .shortcut | Not determined | No export could be made, so no plist was read; a guessed key was ignored on import. |
 | 2 | One automation covers start and end, by a title filter | Yes | "Title contains" with one word fired for both messages and not for another title. |
 | 3 | Restore after a failure, a kill or a timeout | Partly | A later end still ran after a failed run, and a scheduled end ran with the app killed. But triggers were dropped for a while after an erroring run. |
 | 4 | Focus, locked, notification removed at once | Partly | Do Not Disturb did not block; the locked phone ran both runs; a notification removed within about 0.1 s did not run. Other Focus modes not tried. |
@@ -21,7 +21,9 @@ Not determined. Learned:
 - The trigger is a separate row linked to the Shortcut. It holds the trigger identifier (Notification), the app
   (bundle ID, name and team), and a title filter (operator "contains", property Title, one value).
 - Saved from the editor, the automation appears in Automation as "When I get a notification from iFizBox", enabled.
-  The editor flow is about seven taps.
+  The editor flow is about seven taps (Library, Automation, +, Edit, search and pick the trigger, App, the search
+  field and the app). It offered no Run Immediately or Ask Before Running choice: the automation ran without
+  asking, and no first-run Allow prompt appeared for the stand-in actions.
 - Export from the phone was not possible. Save to Files asks for iCloud sign-in and left a loading sheet that
   cleared only after a reboot. Copy iCloud Link needs iCloud too. The share row has no iFizBox entry.
 - A made .shortcut was tried: the same action plus a guessed top-level key holding the trigger. It was signed,
@@ -52,8 +54,9 @@ Partly.
 - **Erroring body drops triggers.** With the failing action in the body, 6 of 15 posts ran over about 9 minutes
   (run history: 12:48:37, 12:48:56, 12:49:11, 12:49:40, 12:50:54, 12:56:06); all runs that did happen ended in an
   error. In an eight-post loop, the first post ran (and errored) and the other seven, 8 to 80 s later, did not. The
-  automation stayed enabled throughout. A post 74 s after a failed run ran; one 78 s after did not. The window was
-  not measured. Without the failing action, 8 of 8 ran.
+  automation stayed enabled throughout. There is no simple window: posts 15 to 29 s after an
+  erroring run ran, a post 74 s after one ran, but a post 40 s after one and others up to 80 s after did not. The
+  rule behind the drops is not known (a count of failures, or a backoff). Without the failing action, 8 of 8 ran.
 - The failing run also showed a banner: "Show Notification: No URL Specified".
 
 Consequences: the body must not be able to error; the end cannot rely on one notification alone; the app should
@@ -63,8 +66,9 @@ also restore at the next launch.
 
 - **Do Not Disturb** (Silence all notifications, moon in the status bar): the start toggled the appearance and
   the end toggled it back. Not blocked.
-- **Locked screen:** a start posted with a 12 s delay, then the lock button pressed. The screen was black 4 s
-  later. After unlock at 25 s, the appearance had changed. So it ran while locked, for both start and end.
+- **Locked screen:** a start posted with a 12 s delay, then the lock button pressed. After unlock at 25 s, the
+  appearance had changed (light to dark). Then an end posted the same way, with the screen black 4 s after the lock
+  (checked by a screenshot): after unlock the appearance was back (dark to light). So both ran while locked.
 - **Notification removed at once:** removed 0.1 s after its delivery time: neither start nor end ran (two tries).
   Removed 1.5 s after delivery: ran. Removed 4 s after: ran. So the system reads the notification within about
   0.1 to 1.5 s. Do not remove a start or end notification in its first 2 s.
@@ -102,6 +106,10 @@ How it was done, for the next person:
 
 ## Not verified
 
+- **A timeout with the app still alive and posting the end itself.** The timeout was covered only by an end
+  scheduled ahead (tested with the app killed, which is the harder case). The app's own end post while alive is
+  the same call as the end posts in the 8 of 8 run. Why: not run as its own case.
+- **The first lock test's screen state.** Only the second lock test had a screenshot of the black screen.
 - **Cellular data.** The phone has no SIM service, so no cellular effect was seen.
 - **The real Install Switch body** (Connect VPN, Set Cellular Data, Set VPN) in an automation with a failing step.
   The stand-in was Toggle appearance. Why: the real actions were not put in the automation.
