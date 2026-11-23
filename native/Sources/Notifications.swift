@@ -59,7 +59,8 @@ final class Notifications: NSObject, UNUserNotificationCenterDelegate {
             if tries > 0 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { open(route, tries: tries - 1) } }
             return
         }
-        web.callAsyncJavaScript("location.hash = route", arguments: ["route": route], in: nil, in: .page,
+        // B399: an update alert (Changes) refreshes the sources too (app.js), or Changes can lack what it told of.
+        web.callAsyncJavaScript("location.hash = route; if (route === '#/changes') dispatchEvent(new Event('ifizbox:update-alert'))", arguments: ["route": route], in: nil, in: .page,
                                 completionHandler: nil)
     }
 

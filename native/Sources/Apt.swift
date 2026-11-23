@@ -284,6 +284,10 @@ enum Apt {
 
     static let session: URLSession = {
         let cfg = URLSessionConfiguration.default
+        // B399: no HTTP cache. By default a host's max-age (GitHub Pages: 10 minutes) kept a Refresh on the old copy,
+        // relaunch included.
+        cfg.urlCache = nil
+        cfg.requestCachePolicy = .reloadIgnoringLocalCacheData
         cfg.timeoutIntervalForRequest = 30
         cfg.timeoutIntervalForResource = 120
         cfg.httpAdditionalHeaders = ["User-Agent": "\(Brand.name)/\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "")"]
