@@ -476,3 +476,33 @@ test("a bar button's look-alike fades out under its glass button, and shows agai
   assert.equal(back.dataset.glassShown, undefined);
   assert.equal(fade.cancelled, true, "a fade still running stops: the look-alike shows at once");
 });
+
+test("B387: the end of a swipe back sends one update even when nothing changed, so the shell follows the new scroller", async () => {
+  reset();
+  const { native, calls } = fakeShell();
+  app(native);
+  syncGlass(doc, native, win);
+  await tick();
+  const on = {};
+  const had = doc.addEventListener;
+  doc.addEventListener = (t, f) => { on[t] = f; };
+  const raf = globalThis.requestAnimationFrame;
+  const frames = [];
+  globalThis.requestAnimationFrame = (f) => frames.push(f);
+  try {
+    const { watchGlass } = await import("./glass.js");
+    watchGlass(doc, { ...win, MutationObserver: undefined, addEventListener() {} }, native);
+    const before = calls.length;
+    syncGlass(doc, native, win);
+    assert.equal(calls.length, before, "unchanged: nothing sent");
+    on["ifizbox:scrollfree"]();
+    syncGlass(doc, native, win);
+    assert.equal(calls.length, before + 1);
+    syncGlass(doc, native, win);
+    assert.equal(calls.length, before + 1, "once");
+  } finally {
+    globalThis.requestAnimationFrame = raf;
+    doc.addEventListener = had;
+  }
+  assert.match(readFileSync(join(HERE, "../app.js"), "utf8"), /unlock\(\);[^\n]*\n\s*document\.dispatchEvent\(new CustomEvent\("ifizbox:scrollfree"\)\)/);
+});

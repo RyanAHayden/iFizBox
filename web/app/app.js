@@ -14,7 +14,7 @@ import { load, loaded, mod, missing, loadAll, NotLoaded } from "./lazy.js";
 import { grouped, placeholder } from "./nav/ui.js";
 import { createStacks, swipeCommits } from "./nav/stack.js";
 import { animate, setProgress, clear, DURATION, EASE, EASE_OUT } from "./nav/transition.js";
-import { attachEdgeSwipe, attachPageSwipe, attachTabSwipe, pageSwipeBlocked, tabSwipeTakesBack } from "./nav/swipe.js";
+import { attachEdgeSwipe, attachPageSwipe, attachTabSwipe, lockScroll, pageSwipeBlocked, tabSwipeTakesBack } from "./nav/swipe.js";
 import { keepRow, ghostFor } from "./nav/selection.js";
 import { createTabbar, tapTab, scrollToTop, isSliding } from "./nav/tabbar.js";
 import { scrollerOf } from "./nav/searchbar.js";
@@ -367,13 +367,14 @@ function showAgain(entry) {
   pageShown(mounted({ tab: entry.tab, path: entry.path }), entry.page.body).catch(() => {});
 }
 
-let gesture = null; // the edge or page swipe in progress: { pair, top, below, width }
+let gesture = null; // the edge or page swipe in progress: { pair, top, below, width, unlock }
 const backSwipe = {
   canStart: () => !webBack && !running && !gesture && stacks.stack(stacks.activeTab()).length > 1,
   begin() {
     const all = stacks.stack(stacks.activeTab());
     const [top, below] = [all.at(-1), all.at(-2)];
-    gesture = { pair: pairOf(top, below, true), top, below, width: screensEl.clientWidth };
+    gesture = { pair: pairOf(top, below, true), top, below, width: screensEl.clientWidth, unlock: null };
+    gesture.unlock = lockScroll([top.page.el, below.page.el]); // B387: after the layout read above
     setMoving(gesture.pair, true, false);
     setProgress(gesture.pair, 1); // B346: .is-moving shows the page below's nav item; pinned at rest until the finger moves
     if (shownBySwipe !== below) { shownBySwipe = below; showAgain(below); } // B148: right as it is revealed
@@ -383,7 +384,7 @@ const backSwipe = {
     if (gesture) setProgress(gesture.pair, 1 - Math.min(1, dx / gesture.width));
   },
   end(dx, vx) {
-    const { top, below, width, pair } = gesture;
+    const { top, below, width, pair, unlock } = gesture;
     gesture = null;
     const p = 1 - Math.min(1, dx / width);
     const commit = swipeCommits(dx, vx, width);
@@ -393,6 +394,8 @@ const backSwipe = {
     const speed = Math.abs(vx) * DURATION / width; // full slides per DURATION at the finger's speed
     const duration = Math.max(120, Math.min(DURATION, rest * DURATION / Math.max(1, speed)));
     slide(top, below, p, commit ? 0 : 1, () => {
+      unlock(); // once at rest: no layout during the slide
+      document.dispatchEvent(new CustomEvent("ifizbox:scrollfree")); // the shell's tab bar follows the page's scroller again (nav/glass.js)
       if (!commit) { shownBySwipe = null; return; } // B148: a later Back to it refreshes again
       swipedBack = true;
       unselect(below); // faded out with the swipe

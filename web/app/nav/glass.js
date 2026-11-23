@@ -435,6 +435,9 @@ export function watchGlass(doc = globalThis.document, win = globalThis, native =
     obs.observe(doc.documentElement, { attributes: true, attributeFilter: ["class", "data-controls", "data-tabbar", "data-style", "data-theme", "data-palette"] });
   }
   doc.addEventListener?.("ifizbox:slide", (e) => slideGlass(e.detail, doc, native, win));
+  // B387: a swipe back ended, so WebKit has built its held scrollers' scroll views anew: one update even when nothing
+  // changed (a cancelled swipe), as the shell finds the scroller the tab bar follows again on each update.
+  doc.addEventListener?.("ifizbox:scrollfree", () => { st.sent = null; scheduleGlassSync(); });
   win.addEventListener?.("resize", scheduleGlassSync);
   win.visualViewport?.addEventListener?.("resize", scheduleGlassSync);
   win.matchMedia?.("(prefers-color-scheme: dark)")?.addEventListener?.("change", scheduleGlassSync);

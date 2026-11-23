@@ -61,6 +61,8 @@ a, img { -webkit-user-drag: none; }
   /* 20px under the last thing on every page, so a closing note never sits against the tab bar */
   padding: var(--nav-h) env(safe-area-inset-right) calc(var(--tab-h) + 20px) env(safe-area-inset-left);
 }
+/* A swipe back under way (nav/swipe.js lockScroll): nothing on its two pages scrolls up or down. */
+.page.scroll-held .page-body, .page.scroll-held [data-scroller] { overflow-y: hidden !important; }
 .page-shade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
 /* Sizes change by sliding (nav/slide.js): no browser scroll anchoring under it (iOS WebKit has none), or Chromium
    would shift the scroll while the boxes slide back from the shift. */
