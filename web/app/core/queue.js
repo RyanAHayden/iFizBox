@@ -79,6 +79,37 @@ export function queueWords(jobs) {
   return jobs.map((j) => (j.op === "remove" ? `-${j.id}` : j.version ? `${j.id}=${j.version}` : j.id));
 }
 
+// The helper's own rules for a queued package (native/helper/policy.c helper_name_ok and helper_version_ok: what dpkg
+// installs), so one that can't go is said in plain words instead of the helper's exit 64. jobs -> [sentence].
+export function jobIssues(jobs, label = (j) => j.name || j.id) {
+  const out = [];
+  const seen = new Map(); // lower case, as dpkg and apt know a name
+  for (const j of jobs) {
+    const key = lowerId(j.id);
+    if (!/^[A-Za-z0-9][A-Za-z0-9._+-]{1,254}$/.test(j.id) || (j.op !== "remove" && j.id.endsWith("-"))) {
+      out.push(`${label(j)} can't be installed: its source gives it a name dpkg doesn't take (${j.id}). Only the source can fix that.`);
+    } else if (j.op !== "remove" && j.version && !/^[0-9](?:[A-Za-z0-9.+~:-]{0,253}[A-Za-z0-9.+~:])?$/.test(j.version)) {
+      out.push(`${label(j)} can't be installed: its source gives it a version dpkg doesn't take (${j.version}). Only the source can fix that.`);
+    } else if (seen.has(key)) {
+      out.push(`${label(j)} is queued twice: ${seen.get(key)} and ${j.id} are one package to apt. Clear one of them.`);
+    }
+    if (!seen.has(key)) seen.set(key, j.id);
+  }
+  return out;
+}
+
+// dpkg's and apt's spelling of a package name: they know every name in lower case.
+export const lowerId = (id) => String(id ?? "").replace(/[A-Z]+/g, (s) => s.toLowerCase());
+
+// apt answers about Oreo as oreo: give the plan's entries the queued jobs' own ids back, which the catalog knows.
+export function planForJobs(plan, jobs) {
+  const ids = new Map(jobs.map((j) => [lowerId(j.id), j.id]));
+  const own = (id) => ids.get(id) ?? id;
+  const out = { ...plan, essential: plan.essential.map(own) };
+  for (const m of MODES) out[`${m}s`] = plan[`${m}s`].map((e) => ({ ...e, id: own(e.id) }));
+  return out;
+}
+
 // Packages Cydia never lets go: removing the iOS stand-ins (firmware, gsc.*, cy+*) is an issue, not a change.
 const SYSTEM = (id) => id === "firmware" || id.startsWith("gsc.") || id.startsWith("cy+");
 
@@ -96,7 +127,7 @@ export function parseSimulation(text) {
     if (inEssential) {
       if (/^This should NOT be done/.test(line)) continue;
       if (/^\s+\S/.test(line)) {
-        for (const id of line.replace(/\(due to [^)]*\)/g, " ").trim().split(/\s+/)) if (/^[a-z0-9][a-z0-9.+:-]+$/.test(id)) out.essential.push(id.replace(/:.*$/, ""));
+        for (const id of line.replace(/\(due to [^)]*\)/g, " ").trim().split(/\s+/)) if (/^[a-z0-9][a-z0-9._+:-]*$/i.test(id)) out.essential.push(id.replace(/:.*$/, ""));
         continue;
       }
       inEssential = false;

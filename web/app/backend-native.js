@@ -54,7 +54,7 @@ import { healthFields } from "./core/health.js";
 import { DEFAULT_ARCH, compareVersions } from "./core/apt.js";
 import { withAltSources } from "./core/altstore.js";
 import { detectMode } from "./core/settings.js";
-import { queueWords, parseSimulation, mergePlans } from "./core/queue.js";
+import { queueWords, parseSimulation, mergePlans, jobIssues, lowerId, planForJobs } from "./core/queue.js";
 import { installQueue } from "./queue.js";
 import { NAME } from "./brand.js";
 import { encodeUrl } from "./core/urlencode.js";
@@ -287,8 +287,17 @@ function queueCalls(backend, q, call) {
   const joinOut = (a, b) => [a, b].filter(Boolean).join(a?.endsWith("\n") ? "" : "\n");
   const links = linkedDebs(q, call);
   const aptSimulate = async (jobs) => {
-    const r = await run(["simulate", ...queueWords(jobs)]);
-    return { ok: r.code === 0, code: r.code, plan: parseSimulation(r.stdout), output: joinOut(r.stdout, r.stderr) };
+    let r;
+    try {
+      r = await run(["simulate", ...queueWords(jobs)]);
+    } catch (e) {
+      const id = /unknown package: (\S+)/.exec(e?.message ?? "")?.[1];
+      const j = id && jobs.find((x) => x.op === "install" && lowerId(x.id) === lowerId(id));
+      if (!j) throw e;
+      return { ok: false, code: 64, plan: parseSimulation(""), output: e.message,
+        issues: [`apt doesn't know ${j.name || j.id} yet: its source isn't in apt's lists. Refresh in Changes, then try again.`] };
+    }
+    return { ok: r.code === 0, code: r.code, plan: planForJobs(parseSimulation(r.stdout), jobs), output: joinOut(r.stdout, r.stderr) };
   };
   const aptApply = (jobs, onEvent) => run([onEvent ? "apply-ask" : "apply", ...queueWords(jobs)], onEvent);
   return {
@@ -299,6 +308,8 @@ function queueCalls(backend, q, call) {
     // downloaded by the shell and asked about with simulate-deb; apt's simulate takes the rest. `issues`: sentences
     // for the Cannot Comply sheet when a link couldn't be downloaded or gave another package.
     async simulate(jobs) {
+      const bad = jobIssues(jobs);
+      if (bad.length) return { ok: false, code: 64, plan: parseSimulation(""), output: "", issues: bad };
       const linked = jobs.filter(isLinked);
       if (!linked.length) return aptSimulate(jobs);
       const rest = jobs.filter((j) => !isLinked(j));
@@ -309,7 +320,11 @@ function queueCalls(backend, q, call) {
         if (r.issue) issues.push(r.issue);
         parts.push(r);
       }
-      if (rest.length) parts.push(await aptSimulate(rest));
+      if (rest.length) {
+        const r = await aptSimulate(rest);
+        if (r.issues) issues.push(...r.issues);
+        parts.push(r);
+      }
       const failed = parts.find((p) => !p.ok);
       return { ok: !failed, code: failed?.code ?? 0, plan: mergePlans(parts.map((p) => p.plan)),
         output: parts.map((p) => p.output).filter(Boolean).join("\n"), ...(issues.length ? { issues } : {}) };
@@ -491,12 +506,12 @@ function linkedDebs(q, call) {
           : `Couldn't download ${label(j)} from ${j.debUrl}, where its source says it is: ${clean(e)}`;
         return { ok: false, code: -1, plan: empty(), output: `E: ${label(j)}: ${clean(e)} (${j.debUrl})`, issue };
       }
-      if (r.package && r.package !== j.id) {
+      if (r.package && lowerId(r.package) !== lowerId(j.id)) {
         discard(j.id);
         return { ok: false, code: -1, plan: empty(), output: r.output ?? "",
           issue: `The link ${j.debUrl} gave ${r.package}, not ${label(j)}, so ${NAME} won't install it.` };
       }
-      return { ok: Boolean(r.ok), code: r.code ?? (r.ok ? 0 : -1), plan: parseSimulation(r.stdout), output: r.output ?? "" };
+      return { ok: Boolean(r.ok), code: r.code ?? (r.ok ? 0 : -1), plan: planForJobs(parseSimulation(r.stdout), [j]), output: r.output ?? "" };
     },
     async install(j, onEvent) {
       onEvent?.({ fd: "status", line: `dlstatus:${j.id}:0:Downloading ${j.debUrl}` });

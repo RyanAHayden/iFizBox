@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
@@ -182,8 +183,14 @@ int auto_respring_pending(long since, long sb_started, long now) {
 }
 
 int auto_deb_version(const char *file, const char *id, char *ver, size_t size) {
-    size_t il = strlen(id), fl = strlen(file);
-    if (!il || fl < il + 7 || memcmp(file, id, il) || file[il] != '_' || strcmp(file + fl - 4, ".deb")) return 0;
+    size_t il = 0, fl = strlen(file);
+    if (!*id) return 0;
+    for (const char *q = id; *q; q++) { /* apt's archive names write the id's "_" as %5f */
+        if (*q == '_' && !strncasecmp(file + il, "%5f", 3)) il += 3;
+        else if (file[il] == *q) il++;
+        else return 0;
+    }
+    if (fl < il + 7 || file[il] != '_' || strcmp(file + fl - 4, ".deb")) return 0;
     const char *v = file + il + 1, *end = file + fl - 4;
     const char *us = NULL;
     for (const char *q = v; q < end; q++)
@@ -463,10 +470,10 @@ int auto_drop_ignored(struct upd_list *list, const char *settings) {
 int auto_safe_id(const char *id) {
     size_t n = strlen(id);
     if (n < 1 || n > 255) return 0;
-    if (!((id[0] >= 'a' && id[0] <= 'z') || (id[0] >= '0' && id[0] <= '9'))) return 0;
-    for (size_t i = 1; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
         char c = id[i];
-        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '+' || c == '-')) return 0;
+        int an = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+        if (!an && (!i || !strchr("._+-", c))) return 0;
     }
     return 1;
 }
