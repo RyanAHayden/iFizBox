@@ -131,6 +131,14 @@ export function matchesArch(stanza, arch = DEFAULT_ARCH) {
 
 export const filterArch = (stanzas, arch = DEFAULT_ARCH) => stanzas.filter((s) => matchesArch(s, arch));
 
+// How many packages a Packages text holds for `arch`: unique package ids, not stanzas, since a repo often lists
+// several versions of one package (the Sources tab's count, matching the source's own package list).
+export function countPackages(text, arch = DEFAULT_ARCH) {
+  const ids = new Set();
+  for (const s of parseControl(text)) if (s.package && matchesArch(s, arch)) ids.add(s.package);
+  return ids.size;
+}
+
 // Where a source's index files live. `source` is a sources.list line ("deb URI DIST [COMPONENT…]") or
 // {uri, dist, components}. A dist ending in "/" ("./", the usual Cydia repo) is a flat repo: Release and
 // Packages sit in that directory and no components are allowed. Otherwise it's a dist repo:
