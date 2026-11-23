@@ -50,6 +50,10 @@
 #ifndef IFIZBOX_PREFIX
 #define IFIZBOX_PREFIX "/var/jb"
 #endif
+/* B329: every apt-get and apt-mark run reads no Translation files, as the helper's (native/helper/policy.h
+ * HELPER_APT_NO_TRANSLATIONS): a repo's web page saved as one broke every apt command, and an update without this
+ * would fetch it again. */
+#define NO_TRANSLATIONS "Acquire::Languages=none"
 #define BUNDLE_ID @"com.ryha.ifizbox"
 #define NOTE_ID @"ifizbox-upgrades" /* one notification, replaced by the next */
 #define AUTO_NOTE_ID @"ifizbox-autoupdate" /* N7's: what installed by itself, or failed to */
@@ -237,7 +241,7 @@ static char *e_settings(void *ctx) {
 static char *e_held(void *ctx) {
     (void)ctx;
     NSMutableData *out = [NSMutableData data];
-    const char *argv[] = {IFIZBOX_PREFIX "/usr/bin/apt-mark", "showhold", NULL};
+    const char *argv[] = {IFIZBOX_PREFIX "/usr/bin/apt-mark", "-o", NO_TRANSLATIONS, "showhold", NULL};
     if (run(argv, SIMULATE_SECONDS, out) != 0) return NULL;
     [out appendBytes:"" length:1];
     return strdup(out.bytes);
@@ -311,7 +315,8 @@ static int e_busy(void *ctx) {
 
 static int e_update(void *ctx) {
     (void)ctx;
-    const char *argv[] = {IFIZBOX_PREFIX "/usr/bin/apt-get", "-q", "-o", "Acquire::AllowInsecureRepositories=true", "update", NULL};
+    const char *argv[] = {IFIZBOX_PREFIX "/usr/bin/apt-get", "-q", "-o", NO_TRANSLATIONS, "-o", "Acquire::AllowInsecureRepositories=true",
+                          "update", NULL};
     return run(argv, UPDATE_SECONDS, nil);
 }
 
@@ -321,6 +326,7 @@ static int apt(const char *const *ids, int n, int simulate, char **out) {
     int k = 0;
     argv[k++] = IFIZBOX_PREFIX "/usr/bin/apt-get";
     argv[k++] = "-q";
+    argv[k++] = "-o"; argv[k++] = NO_TRANSLATIONS;
     if (simulate) { argv[k++] = "-s"; argv[k++] = "-o"; argv[k++] = "Debug::NoLocking=1"; }
     else {
         argv[k++] = "-y";
