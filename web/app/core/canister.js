@@ -147,6 +147,8 @@ export function priceFor(json, repoUri, name = null) {
 //   repoFrom(r, { have })             -> a repo row: repoOf's fields plus count, description, https, gpg, payment
 //   mapRepos(json, { have, blocked }) -> repo rows, piracy-listed ones left out (never offered), one per source key
 //   popularRepos([json…], opts)       -> the Popular list: tiers 1 and 2 merged, empty repos out, most packages first
+//   notForLite(uri)                   -> a repo the sideload build doesn't recommend (B389: Chariz)
+//   liteRepos(rows, query)            -> rows without those, unless the query names one (its name, host or URL)
 //   canisterSafe(repo)                -> { safe, why }: tier 1 or bootstrap (shipped by a jailbreak's package manager)
 //   repoLabel(repo, { trusted })      -> { kind, label, why }: blocked | safe (our list) | canister | trusted | unknown
 //   repoMatch(json, uri)              -> the search answer's repo at that URI (the safest one when several), or null
@@ -209,6 +211,20 @@ export function popularRepos(jsons, opts = {}) {
   const seen = new Map();
   for (const j of jsons ?? []) for (const r of mapRepos(j, opts)) if (r.count && !seen.has(r.key)) seen.set(r.key, r);
   return [...seen.values()].sort((a, b) => (b.count ?? 0) - (a.count ?? 0) || a.name.localeCompare(b.name));
+}
+
+// B389 (user 2026-11-23): almost nothing on Chariz works without a jailbreak, so the sideload build never recommends it.
+// It stays in the jailbreak build, and Lite still finds it by name or URL; an added one is never touched.
+const NOT_FOR_LITE = [{ domain: "chariz.com", name: "chariz" }];
+const notForLiteEntry = (uri) => {
+  let host;
+  try { host = new URL(uri).hostname.toLowerCase(); } catch { return null; }
+  return NOT_FOR_LITE.find((e) => host === e.domain || host.endsWith(`.${e.domain}`)) ?? null;
+};
+export const notForLite = (uri) => Boolean(notForLiteEntry(uri));
+export function liteRepos(rows, query = "") {
+  const q = String(query ?? "").toLowerCase();
+  return rows.filter((r) => { const e = notForLiteEntry(r.uri); return !e || q.includes(e.name); });
 }
 
 export function canisterSafe(repo) {

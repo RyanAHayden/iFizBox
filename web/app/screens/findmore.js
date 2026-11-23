@@ -35,7 +35,7 @@ import { knownSafe } from "../core/safe-sources.js";
 import { trustOf } from "../core/trust.js";
 import { confirmUnknownSource, markTrusted, trustedNow } from "./safety.js";
 import {
-  askable, mapRepos, popularRepos, repoLabel, canisterSafe, repoMatch, trustQuery, createRepoCache, mapRepoPackages, mapResults,
+  askable, mapRepos, popularRepos, liteRepos, repoLabel, canisterSafe, repoMatch, trustQuery, createRepoCache, mapRepoPackages, mapResults,
   loadInjectable, normalRepo, POPULAR_RANKS, CANISTER_SAFE_LABEL,
 } from "../core/canister.js";
 import { canisterApi, offerTweak } from "./extras.js";
@@ -245,8 +245,9 @@ export async function addAllListed(ctx, { rows = listed.rows, backend = getBacke
 
 const haveSources = () => Promise.resolve().then(() => getBackend().sources()).catch(() => []);
 
-// `api` and `sources` are seams for the tests.
-export function renderFind(body, ctx, { api = canisterApi(), sources = haveSources } = {}) {
+// `api`, `sources` and `sideload` are seams for the tests. B389: the sideload build leaves out the repos it doesn't
+// recommend (core/canister.js liteRepos), so Add All never adds them either; a search that names one shows it.
+export function renderFind(body, ctx, { api = canisterApi(), sources = haveSources, sideload = sideloadTweaks } = {}) {
   let seq = 0;
   const box = el("div", "find-more");
   const bar = searchBar({ placeholder: "Search Repos", ariaLabel: "Search Canister's repos", delay: 350, className: "find-search",
@@ -266,6 +267,7 @@ export function renderFind(body, ctx, { api = canisterApi(), sources = haveSourc
       const have = await sources();
       rows = searching ? mapRepos(await api.repos(query), { have, blocked })
         : popularRepos(await Promise.all(POPULAR_RANKS.map((r) => api.ranking(r))), { have, blocked });
+      if (sideload()) rows = liteRepos(rows, searching ? query : "");
     } catch (e) { error = e; rows = []; }
     if (turn !== seq) return;
     const header = searching ? (rows.length ? `${rows.length} ${rows.length === 1 ? "Repo" : "Repos"}` : "Results") : "Popular on Canister";

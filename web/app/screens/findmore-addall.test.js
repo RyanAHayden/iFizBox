@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fakeDocument, fakePage } from "../nav/fakedom.test-helper.js";
 import { PIRACY_HOSTS } from "../core/piracy-list.js";
-import { mapRepos } from "../core/canister.js";
+import { mapRepos, liteRepos, notForLite } from "../core/canister.js";
 import { plainText } from "../core/plaintext.js";
 import { addAllListed, nav, renderFind } from "./findmore.js";
 
@@ -82,6 +82,39 @@ test("B272: the page's Add All works on the rows it shows", async () => {
   const { rows: _r, redraw: _d, ...rest } = opts;
   await addAllListed(null, rest);
   assert.match(log.sheets[0].title, new RegExp(`the ${shown} repos`));
+});
+
+// B389: almost nothing on Chariz works without a jailbreak, so the sideload build never recommends it.
+test("B389: Popular and Add All leave Chariz out in sideload mode and keep it in jailbreak mode; a search for it finds it", async () => {
+  const api = { ranking: async (r) => (r === 1 ? rank1 : r === 2 ? rank2 : { data: [] }), repos: async () => rank1 };
+  const draw = async (sideload, query = "") => {
+    const f = renderFind(fakePage(), null, { api, sources: async () => [], sideload: () => sideload });
+    await f.ready;
+    if (query) await f.draw(query);
+    const slugs = f.el.querySelectorAll(".find-row").map((li) => li.dataset.slug);
+    const { log, opts } = rig();
+    const { rows: _r, redraw: _d, ...rest } = opts;
+    await addAllListed(null, { ...rest, redraw: () => {} });
+    assert.equal(log.added.length, slugs.length);
+    return { slugs, added: log.added.includes("https://repo.chariz.com/") };
+  };
+  const jb = await draw(false), lite = await draw(true);
+  assert.ok(jb.slugs.includes("chariz") && jb.added, "the jailbreak build offers it");
+  assert.deepEqual(lite.slugs, jb.slugs.filter((s) => s !== "chariz"), "only Chariz goes");
+  assert.equal(lite.added, false, "Lite's Add All never adds it");
+  for (const q of ["Chariz", "repo.chariz.com", "https://repo.chariz.com/"]) {
+    const found = await draw(true, q);
+    assert.ok(found.slugs.includes("chariz") && found.added, q);
+  }
+  const broad = await draw(true, "free");
+  assert.ok(!broad.slugs.includes("chariz") && !broad.added, "a search that doesn't name it: Add All stays clear of it");
+  assert.ok((await draw(false, "free")).slugs.includes("chariz"));
+});
+
+test("B389: notForLite matches Chariz's hosts only", () => {
+  for (const u of ["https://repo.chariz.com/", "http://Repo.Chariz.com", "https://chariz.com/"]) assert.ok(notForLite(u), u);
+  for (const u of ["https://havoc.app/", "https://notchariz.com/", "https://example.com/chariz.com/", "", null]) assert.ok(!notForLite(u), String(u));
+  assert.deepEqual(liteRepos([{ uri: "https://havoc.app/" }, { uri: "https://repo.chariz.com/" }]), [{ uri: "https://havoc.app/" }]);
 });
 
 test("B272: the directory row's outside mark is drawn, never the ↗ character (iOS draws it as an emoji)", async () => {

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GUIDES, guideRows } from "./guides.js";
-import { nav, CURATED_SOURCES, deviceHint, DEVICE_HINT, showsThemes, versionLimits } from "./home.js";
+import { nav, CURATED_SOURCES, curatedSources, deviceHint, DEVICE_HINT, showsThemes, versionLimits } from "./home.js";
 
 test("B295: Home's green row is always More Sources, opening Sources > More on Home's stack", async () => {
   const { MORE_SOURCES_TILE } = await import("./home.js");
@@ -29,6 +29,12 @@ test("Home pages: titles below the root, and curated sources are flat repos with
     assert.match(s.uri, /^https:\/\/.+\/$/);
     assert.equal(s.key, `deb:${s.uri}:./`);
   }
+});
+
+test("B389: Recommended Sources leaves Chariz out in the sideload build only", () => {
+  const names = (mode) => curatedSources(mode).map((s) => s.name);
+  assert.deepEqual(names("sideload"), CURATED_SOURCES.map((s) => s.name).filter((n) => n !== "Chariz"));
+  for (const mode of ["jailbreak", "site"]) assert.ok(names(mode).includes("Chariz"), mode);
 });
 
 test("F37: Home's hint shows while Not Jailbroken and taps through to Settings > Device", () => {
