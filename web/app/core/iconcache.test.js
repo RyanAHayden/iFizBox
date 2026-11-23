@@ -4,10 +4,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { iconCache, iconType, openIconStore, ICON_MAX_AGE, ICON_MAX_BYTES } from "./iconcache.js";
-import { sourceIconUrls, loadTweakSources } from "./sources.js";
+import { sourceIconUrls, tweakSourcesFrom } from "./sources.js";
 import { fakeIndexedDB } from "../fakes.test-helper.js";
 
-const DEFAULT_SOURCES = await loadTweakSources(); // web/app/tweak-sources.json
+// BigBoss, an old dist repo (`deb <uri> stable main`) and no longer a default: the shape this lookup order is for.
+const [BIGBOSS] = tweakSourcesFrom([{ name: "BigBoss", uri: "http://apt.thebigboss.org/repofiles/cydia/", dist: "stable", components: ["main"] }]);
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 const PNG2 = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9, 9]);
@@ -42,7 +43,7 @@ test("iconType: PNG and JPEG by their signature, nothing else", () => {
 });
 
 test("lookup order: BigBoss' <base> (dists/stable/) first, then the root; the root is the fallback when <base> 404s", async () => {
-  const bigboss = DEFAULT_SOURCES.find((s) => s.name === "BigBoss");
+  const bigboss = BIGBOSS;
   const urls = sourceIconUrls(bigboss);
   assert.deepEqual(urls, ["http://apt.thebigboss.org/repofiles/cydia/dists/stable/CydiaIcon.png", "http://apt.thebigboss.org/repofiles/cydia/CydiaIcon.png"]);
   // BigBoss: the icon at <base>, the root never asked

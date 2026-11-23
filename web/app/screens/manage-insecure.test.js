@@ -84,7 +84,7 @@ test("F220: the alert's words and buttons: Cancel (the darker cancel button) / A
   assert.equal(INSECURE_ALERT.cancel, 0);
 });
 
-test("F220: the Not Secure mark goes on http sources only, built-in BigBoss included", () => {
+test("F220: the Not Secure mark goes on http sources only, BigBoss included", () => {
   assert.equal(insecureNote({ uri: "http://repo.test/" }), INSECURE_NOTE);
   assert.equal(insecureNote({ uri: "HTTP://repo.test/" }), INSECURE_NOTE);
   assert.equal(insecureNote({ uri: "https://repo.test/" }), null);
@@ -92,7 +92,4 @@ test("F220: the Not Secure mark goes on http sources only, built-in BigBoss incl
   assert.equal(insecureNote({}), null);
   assert.equal(isInsecureSource("http://a.test/"), true);
   assert.equal(httpsInput("https://a.test/"), null);
-  const bigboss = DEFAULT_SOURCES.find((s) => /bigboss/i.test(s.name));
-  assert.ok(bigboss, "BigBoss is built in");
-  assert.equal(insecureNote(bigboss), INSECURE_NOTE);
-});
+  assert.equal(insecureNote({ name: "BigBoss", uri: "http://apt.thebigboss.org/repofiles/cydia/", dist: "stable" }), INSECURE_NOTE);});

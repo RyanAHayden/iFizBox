@@ -1,6 +1,4 @@
 [
-  { "name": "Telesphoreo", "uri": "http://apt.saurik.com/", "dist": "ios/1800.00", "components": ["main"] },
-  { "name": "BigBoss", "uri": "http://apt.thebigboss.org/repofiles/cydia/", "dist": "stable", "components": ["main"] },
   { "name": "Chariz", "uri": "https://repo.chariz.com/", "dist": "./", "components": [] },
   { "name": "Havoc", "uri": "https://havoc.app/", "dist": "./", "components": [] },
   { "name": "Procursus", "uri": "https://apt.procurs.us/", "dist": "1800", "components": ["main"] },
