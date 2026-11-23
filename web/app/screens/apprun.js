@@ -391,7 +391,8 @@ export async function runAppRun(jobs, deps) {
       tick();
     },
     onLog: ({ id, kind, text }) => line(kind, text, id),
-    onStart: (pass) => { if (pass > 1) clearLog(page); }, // B153: a new pass on this page starts with a clean log
+    // B153: a new pass on this page starts with a clean log; B337: not the Signing Server Fallback's (keep)
+    onStart: (pass, o) => { if (pass > 1 && !o?.keep) clearLog(page); },
   });
   const isInstalled = deps.isInstalled ?? lanes.isInstalled;
   const handoff = followHandoff(run, rows, { isInstalled, answered,
@@ -459,9 +460,11 @@ export async function runAppRun(jobs, deps) {
       used = true;
       lanes.fallbacks.clear();
       lanes.useServer();
-      let p = null;
-      for (const r of failed) p = run.retry(r.id) ?? p;
-      for (const r of failed) line("step", serverStep(r.name), r.id); // after retry: a new pass empties the Log first
+      // B337: only the install goes again, from the IPA already signed, onto the same Log; a row with no signed IPA
+      // left (none expected: fallbacks come from the install) goes again from the start
+      let p = run.installAgain(failed.map((r) => r.id));
+      for (const r of failed) if (r.state === "failed") p = run.retry(r.id) ?? p;
+      for (const r of failed) line("step", serverStep(r.name), r.id); // after retry: a new pass may empty the Log first
       if (p) drive(p);
       return true;
     };

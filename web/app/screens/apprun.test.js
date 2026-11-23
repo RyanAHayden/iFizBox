@@ -500,3 +500,75 @@ test("B264: runAppQueueRun counts the badge as each app ends, after its record, 
   deps.onClose();
   assert.equal(sent.at(-1), false);
 });
+
+test("B337: Use the Signing Server installs the failed rows again from their signed IPA, keeping the Log and progress", () => withDom(async () => {
+  const { serverFallback, USE_SERVER, serverStep } = await import("../core/installroute.js");
+  const calls = { sign: [], install: [] };
+  const sc = {
+    prepareOnDevice: async (job, { progress }) => {
+      calls.sign.push(job.id);
+      progress("downloading", 1);
+      progress("signing", 1);
+      return { token: `t-${job.id}`, bundleId: job.id };
+    },
+    openPrepared: async (r, o) => {
+      calls.install.push({ id: r.id, token: r.token, server: Boolean(o.server) });
+      if (!o.server) {
+        const fallback = serverFallback(Object.assign(new Error("refused: this iPhone refused the connection"), { code: "refused" }));
+        throw Object.assign(new Error("refused"), { fallback });
+      }
+      return { installed: true };
+    },
+    discardPrepared() {},
+  };
+  const l = phoneLanes(sc, { native: { call: async () => null } });
+  const queue = createAppQueue();
+  queue.add(app("a", "Alpha"));
+  const page = fakePage();
+  const r = await runAppRun(queue.list(), { queue, lanes: { ...l, local: () => !l.serverRoute() }, open: () => page });
+  assert.equal(r.ok, false);
+  assert.deepEqual(calls.sign, ["a"]);
+  const before = page.lines.map((x) => x.text);
+  assert.ok(before.includes("Signed Alpha"));
+  const row = r.rows[0];
+  const reached = row.progress;
+  assert.ok(reached > 0);
+  assert.equal(page.finished.also?.label, USE_SERVER);
+  page.finished.also.action();
+  assert.ok(row.progress >= reached, "the row's progress isn't reset");
+  await settle();
+  assert.deepEqual(calls.sign, ["a"], "no new download or signing");
+  assert.deepEqual(calls.install, [{ id: "a", token: "t-a", server: false }, { id: "a", token: "t-a", server: true }]);
+  const after = page.lines.map((x) => x.text);
+  assert.deepEqual(after.slice(0, before.length), before, "the Log keeps its earlier lines");
+  assert.ok(after.slice(before.length).includes(serverStep("Alpha")));
+  assert.equal(row.state, "installed");
+  assert.equal(queue.size, 0);
+}));
+
+test("B337: a Signing Server Fallback row whose signed IPA the shell no longer keeps signs it again", () => withDom(async () => {
+  const { serverFallback } = await import("../core/installroute.js");
+  const calls = { sign: [], install: [] };
+  let n = 0;
+  const sc = {
+    prepareOnDevice: async (job) => { calls.sign.push(job.id); return { token: `t-${job.id}-${++n}`, bundleId: job.id }; },
+    openPrepared: async (r, o) => {
+      calls.install.push({ token: r.token, server: Boolean(o.server) });
+      if (!o.server) throw Object.assign(new Error("refused"), { fallback: serverFallback(Object.assign(new Error("refused"), { code: "refused" })) });
+      if (r.token === "t-a-1") throw Object.assign(new Error("the signed copy is gone"), { code: "gone" });
+      return { installed: true };
+    },
+    discardPrepared() {},
+  };
+  const l = phoneLanes(sc, { native: { call: async () => null } });
+  const queue = createAppQueue();
+  queue.add(app("a", "Alpha"));
+  const page = fakePage();
+  const r = await runAppRun(queue.list(), { queue, lanes: { ...l, local: () => !l.serverRoute() }, open: () => page });
+  page.finished.also.action();
+  await settle(20);
+  assert.deepEqual(calls.sign, ["a", "a"]);
+  assert.deepEqual(calls.install, [{ token: "t-a-1", server: false }, { token: "t-a-1", server: true }, { token: "t-a-2", server: true }]);
+  assert.ok(page.lines.some((x) => x.text === "The signed copy of Alpha is gone; signing it again"));
+  assert.equal(r.rows[0].state, "installed");
+}));

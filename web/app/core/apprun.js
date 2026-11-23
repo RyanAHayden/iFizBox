@@ -32,6 +32,8 @@
 //     .cancel()   the red Cancel: every app not finished is abandoned (in-flight ones aborted)
 //     .retry(id) / .retryAll()   failed and cancelled rows go again (a new pass when the run had ended); B91: a row
 //                 iOS didn't download (dismissed) goes back to iOS's prompt without signing again (hooks.again)
+//     .installAgain(ids) B337: failed rows that still hold their signed IPA (token) run only the install again: no
+//                 download or signing, progress kept, and the new pass keeps the Log (onStart(pass, { keep: true }))
 //     .away()     B76: iFizBox went to the background while a row was with iOS: that row is handed off to iOS
 //     .confirm(id) B76: iOS has an app whose row ended "Sent to iOS" (apps.isInstalled on the way back): Installed
 //     .unconfirm(id) B170: iOS later says it doesn't have that app: the row is "Sent to iOS" again
@@ -372,12 +374,20 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
   async function startInstall(r) {
     const f = fly(r);
     const again = Boolean(r.again);
-    set(r, { state: "asking", phase: null, fraction: 0, again: false, here: false, local: localRoute(r) });
+    const reinstall = Boolean(r.reinstall); // B337: installAgain's row
+    set(r, { state: "asking", phase: null, fraction: 0, again: false, reinstall: false, here: false, local: localRoute(r) });
     let res;
     try {
       res = await install(r, { signal: f.ctl.signal, progress: progressOf(r, f), ...(again ? { again: true } : {}) });
     } catch (e) {
       if (f.why || ended(r)) return;
+      if (reinstall && e?.code === "gone") {
+        // B337: the shell no longer keeps that signed IPA (its `life` ran out, or an older shell): signed again
+        finishRow(r, "waiting", { token: null, phase: null, fraction: 0, progress: 0 });
+        log(r, "step", `The signed copy of ${label(r)} is gone; signing it again`);
+        pump();
+        return;
+      }
       if (again && e?.code === "gone") {
         // B91: the shell no longer serves that IPA: the row signs it again from the start
         finishRow(r, "waiting", { token: null, dismissed: false, phase: null, fraction: 0, progress: 0 });
@@ -427,7 +437,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
   const retryPatch = (r) => {
     const back = r.state === "failed" && r.dismissed && Boolean(reprompt) && Boolean(r.bundleId) && !helperRow(r);
     return { state: back ? "signed" : "waiting", again: back, phase: null, fraction: back ? 1 : 0, progress: back ? 0.5 : 0, error: null,
-      token: null, unsure: false, dismissed: false, busy: false, finishing: false, fetched: false };
+      token: null, unsure: false, dismissed: false, busy: false, finishing: false, fetched: false, reinstall: false };
   };
 
   function pump() {
@@ -454,7 +464,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     }
   }
 
-  function start() {
+  function start({ keep = false } = {}) {
     if (running) return endPromise;
     running = true;
     stopping = false;
@@ -462,7 +472,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     const p = endPromise;
     pass++;
     awake(true);
-    try { onStart(pass); } catch { /* the page's bug isn't the run's */ }
+    try { onStart(pass, keep ? { keep: true } : {}); } catch { /* the page's bug isn't the run's */ }
     // a microtask later, so the caller can draw the rows first
     Promise.resolve().then(pump);
     return p;
@@ -550,6 +560,17 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       log(r, "step", `Installing ${label(r)} with its own bundle ID`);
       if (running) pump();
       return p;
+    },
+    // B337: the Signing Server Fallback's rows: a row whose install failed after its signing (its token kept) goes
+    // back to the install lane with the same signed IPA: no new download or signing, its progress kept, and the pass
+    // keeps the page's Log (onStart's `keep`) -> the run's end promise | null (no such row)
+    installAgain(ids = []) {
+      const again = rows.filter((r) => ids.includes(r.id) && r.state === "failed" && r.token && !helperRow(r));
+      if (!again.length) return null;
+      for (const r of again) set(r, { state: "signed", phase: null, fraction: 1, error: null, again: false, reinstall: true, unsure: false,
+        dismissed: false, busy: false, finishing: false, fetched: false });
+      if (running) { pump(); return endPromise; }
+      return start({ keep: true });
     },
     retryAll() {
       const again = rows.filter((r) => ["failed", "cancelled"].includes(r.state));
