@@ -34,17 +34,22 @@ test("both Share buttons are the bar button the era rules target", () => {
   assert.match(read("screens/handoff.js"), /"bar-button bar-icon share-button store-head-share"/);
 });
 
-// The app page's queue toggle (screens/altstore.js queueToggle): the same, for its plus and its X while queued.
-for (const [era, colour] of Object.entries(ERAS)) {
-  test(`${era} draws its own queue toggle glyphs, not iOS 6's`, () => {
+// The app page's queue toggle (screens/altstore.js queueToggle) and Installed mark toggle (markToggle): the same, for
+// the plus and its X while queued, and the circled check, outline and filled while marked.
+const TOGGLES = { "queue-toggle": "is-queued", "mark-toggle": "is-marked" };
+for (const [era, colour] of Object.entries(ERAS)) for (const [toggle, on] of Object.entries(TOGGLES)) {
+  test(`${era} draws its own ${toggle} glyphs, not iOS 6's`, () => {
     const css = read(`${era}.css`);
-    const sel = `html[data-style="${era}"] .bar-button.queue-toggle`;
+    const sel = `html[data-style="${era}"] .bar-button.${toggle}`;
     const body = ruleFor(css, `${sel}::before`);
-    assert.ok(body, `${era}.css has no queue toggle glyph rule`);
+    assert.ok(body, `${era}.css has no ${toggle} glyph rule`);
     for (const re of [/background-image:\s*none/, /filter:\s*none/, /(^|[;\s])mask:\s*url\(/, /-webkit-mask:\s*url\(/]) assert.match(body, re);
     assert.ok(body.includes(`background-color: var(${colour})`), `the glyph isn't painted in ${colour}`);
-    const queued = ruleFor(css, `${sel}.is-queued::before`);
-    assert.match(queued ?? "", /-webkit-mask-image:\s*url\(.*[\s;]mask-image:\s*url\(/s);
+    const onBody = ruleFor(css, `${sel}.${on}::before`);
+    assert.match(onBody ?? "", /-webkit-mask-image:\s*url\(.*[\s;]mask-image:\s*url\(/s);
+    const glyph = (b) => /url\("[^"]*"\)/.exec(b)?.[0];
+    assert.notEqual(glyph(onBody), glyph(body), "on and off draw the same glyph");
+    assert.doesNotMatch(onBody ?? "", /background-image/, "the iOS 6 glyph comes back while on");
   });
 }
 
