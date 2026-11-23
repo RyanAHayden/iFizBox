@@ -69,8 +69,10 @@ export function debRefusal(message, name) {
   const why = String(message ?? "").replace(/^(ifizbox-helper|[a-z_]+): /, "").trim();
   const file = name || "the shared file";
   const say = (sentence) => ({ missing: false, ids: [], sentences: [sentence] });
-  if (/^that shared file isn't there|^can't open the \.deb/.test(why)) return say(`${name || "The shared file"} isn't there any more. Share it again.`);
-  if (/^bad \.deb path|^path too long|^the \.deb isn't a plain file/.test(why)) return say(`${NAME} can't hand ${file} to apt: it isn't a file ${NAME} saved for installing. Share it again.`);
+  if (/^that shared file isn't there/.test(why)) return say(`${name || "The shared file"} isn't there any more. Share it again.`);
+  if (/^bad \.deb path|^path too long/.test(why)) return say(`${NAME} can't hand ${file} to apt: it isn't a file ${NAME} saved for installing. Share it again.`);
+  if (/^can't open the \.deb/.test(why)) return say(`${NAME} can't hand ${file} to apt: its copy is missing or is a link. Share it again.`);
+  if (/^the \.deb isn't a plain file/.test(why)) return say(`${NAME} can't hand ${file} to apt: it is empty, larger than 1 GiB, or not a plain file of ${NAME}'s own.`);
   return helperRefusal(why, [], {}, file);
 }
 

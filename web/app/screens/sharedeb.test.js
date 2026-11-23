@@ -41,6 +41,9 @@ refused("the wrong caller", "ifizbox-helper: the calling process isn't the insta
 refused("a path the helper won't take", "ifizbox-helper: bad .deb path (only /var/mobile/Library/Caches/com.ryha.ifizbox/deb/<name>.deb)",
   kept(/can't hand Tweak\.deb to apt.*Share it again/));
 refused("the staged file is gone", "gone: that shared file isn't there any more; share it again", kept(/^Tweak\.deb isn't there any more\. Share it again\.$/));
+refused("a file it can't take", "ifizbox-helper: the .deb isn't a plain file of the app's own (one link, not root's, at most 1 GiB)",
+  kept(/Tweak\.deb to apt: it is empty, larger than 1 GiB/));
+refused("a missing copy", "ifizbox-helper: can't open the .deb (missing, or a link)", kept(/its copy is missing or is a link\. Share it again\.$/));
 refused("any other reason", "ifizbox-helper: prefix too long", kept(/couldn't ask apt about Tweak\.deb: prefix too long$/));
 refused("a missing helper", "ifizbox-helper is not installed at /var/jb/usr/libexec/ifizbox-helper", (sentences, footer) => {
   assert.match(sentences[0], /is missing from this iPhone/);

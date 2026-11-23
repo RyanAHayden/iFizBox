@@ -66,7 +66,7 @@ const native = {
     if (MODE === "refused" && bad) return { code: 100, stdout: "The following packages have unmet dependencies:\n com.ex.violaWhite : Depends: com.ex.gone but it is not installable\n", stderr: "E: Unable to correct problems, you have held broken packages.\n" };
     return { code: 0, stdout: "Inst com.ex.new (2.0 Test [iphoneos-arm64])\n", stderr: "" };
   },
-  "share.debSimulate": () => { throw new Error(MODE === "missing" ? "ifizbox-helper is not installed at /var/jb/usr/libexec/ifizbox-helper" : "ifizbox-helper: the calling process isn't the installed app"); },
+  "share.debSimulate": () => { throw new Error(MODE === "missing" ? "ifizbox-helper is not installed at /var/jb/usr/libexec/ifizbox-helper" : MODE === "file" ? "ifizbox-helper: the .deb isn't a plain file of the app's own (one link, not root's, at most 1 GiB)" : "ifizbox-helper: the calling process isn't the installed app"); },
   "apps.isInstalled": ({ bundleIds }) => ({ installed: Object.fromEntries((bundleIds || []).map((b) => [b, false])) }),
   "app.info": () => ({ version: "0.9.8", build: "", ios: "26.0", jailbreak: "rootless", mode: "jailbreak", machine: "iPhone9,1", cf: 1856.105, markers: [] }),
 };
@@ -96,7 +96,7 @@ const press = async (x, y, ms) => {
 
 let MODE = "refused";
 await send("Page.navigate", { url: base }); await sleep(2500);
-for (const era of ["ios6", "ios7", "ios13", "ios26"]) for (const theme of ["light", "dark"]) for (const mode of ["refused", "missing"]) {
+for (const era of (process.env.ERAS ?? "ios6 ios7 ios13 ios26").split(" ")) for (const theme of ["light", "dark"]) for (const mode of ["refused", "missing", "file"]) {
   MODE = mode;
   await ev(`localStorage.setItem("ifizbox.style", "${era}"); localStorage.setItem("ifizbox.appearance", "${theme}")`);
   await send("Page.navigate", { url: base + "?r=" + (++id) }); await sleep(3000);
