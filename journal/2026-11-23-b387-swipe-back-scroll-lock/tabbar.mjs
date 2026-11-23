@@ -1,9 +1,6 @@
 #!/usr/bin/env node
-// B387 on the iPhone 15 Pro: what iOS WebKit's own pan does to the page while a swipe back is under way.
-//   tools/ui-15.sh lock B387; tools/ui-15.sh B387 launch; pymobiledevice3 webinspector cdp --port 9387
-//   node journal/2026-11-23-b387-swipe-back-scroll-lock/phone.mjs <cdp port> <mode>
-// mode: base (the installed build as it is) or lock (lockScroll's effect injected: overflow-y hidden on both pages' scrollers while
-// .page.is-moving during a touch). Samples both scrollTops, and the touch events, per frame; gestures come from WDA.
+// B387 on the iPhone 15 Pro: the native iOS 26 tab bar still shrinks after a cancelled swipe back. Run from the repo root,
+// as phone.mjs: node .../tabbar.mjs <cdp port> <base|lock>; shots go to ref/15/screens/b387-*.
 const [port, mode] = process.argv.slice(2);
 const list = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
 const p = list.find((t) => /ifizbox:/.test(t.url)) ?? list[0];
@@ -69,5 +66,9 @@ shot("rest"); await run("flick first", flick(650, 350)); shot("scrolled-before")
 await run("flick up", flick(350, 650)); shot("back-up");
 await run("diagonal, cancelled", finger("a", [[120, 300, 0], [240, 400, 400], [130, 480, 500], [130, 480, 200]]));
 shot("after-cancel"); await run("flick after", flick(650, 350)); shot("scrolled-after");
+// committed: the page below's scroller is followed too
+await ev(`window.__b.forEach((x) => { x.scrollTop = 400; })`); await go(flick(350, 450)); await sleep(800);
+await go(finger("a", [[120, 300, 0], [380, 500, 300]])); await sleep(1500);
+console.log("committed:", await ev("location.hash")); await go(flick(650, 350)); await sleep(1200); shot("committed-scrolled");
 await ev(`(() => { window.__b387.stop = true; window.__mut = null; window.__note = () => {}; for (const x of document.querySelectorAll(".b387")) x.remove(); window.__b.forEach((x) => { x.style.overflowY = ""; x.scrollTop = 0; }); })()`);
 process.exit(0);

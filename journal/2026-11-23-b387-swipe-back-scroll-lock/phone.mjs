@@ -3,7 +3,7 @@
 //   tools/ui-15.sh lock B387; tools/ui-15.sh B387 launch; pymobiledevice3 webinspector cdp --port 9387
 //   node journal/2026-11-23-b387-swipe-back-scroll-lock/phone.mjs <cdp port> <mode>
 // mode: base (the installed build as it is) or lock (lockScroll's effect injected: overflow-y hidden on both pages' scrollers while
-// .page.is-moving during a touch). Samples both scrollTops, and the touch events, per frame; gestures come from WDA.
+// .page.is-moving during a touch), or any other word for a build with lockScroll in it. Samples both scrollTops, and the touch events, per frame; gestures come from WDA.
 const [port, mode] = process.argv.slice(2);
 const list = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
 const p = list.find((t) => /ifizbox:/.test(t.url)) ?? list[0];
@@ -47,7 +47,7 @@ await ev(`(() => {
   requestAnimationFrame(f);
 })()`);
 const run = async (name, ...fs) => {
-  await ev(`window.__b.forEach((x) => { x.scrollTop = 400; })`); await sleep(400);
+  await ev(`window.__b.forEach((x) => { x.scrollTop = ${name.includes("top") ? 0 : 400}; })`); await sleep(400);
   await ev(`(() => { const s = window.__b387; s.log = []; s.frames = []; s.on = true; })()`);
   await go(...fs);
   await sleep(1500);
@@ -66,6 +66,7 @@ await run("page swipe, then down and up", L(150));
 await run("edge strip, then down and up", L(4));
 await run("page swipe, diagonal 40 degrees", finger("a", [[120, 300, 0], [240, 400, 400], [130, 480, 500], [130, 480, 200]]));
 await run("edge strip with a second finger on the page", finger("a", [[4, 400, 0], [100, 404, 300], [100, 404, 1200], [10, 404, 300], [10, 404, 200]]), { ...finger("b", [[250, 600, 0], [250, 600, 1], [250, 300, 500]]), actions: [{ type: "pointerMove", duration: 0, x: 250, y: 600 }, { type: "pause", duration: 500 }, { type: "pointerDown" }, { type: "pointerMove", duration: 500, x: 250, y: 300 }, { type: "pointerUp" }] });
+await run("at the very top, diagonal down (rubber band)", finger("a", [[120, 300, 0], [240, 400, 400], [130, 480, 500], [130, 480, 200]]));
 await run("vertical flick afterwards", finger("a", [[200, 600, 0], [205, 350, 120]]));
 await run("fling, then an edge swipe during it", finger("a", [[200, 700, 0], [205, 300, 90]]), { ...finger("b", [[4, 400, 0]]), actions: [{ type: "pointerMove", duration: 0, x: 4, y: 400 }, { type: "pause", duration: 350 }, { type: "pointerDown" }, { type: "pointerMove", duration: 250, x: 90, y: 404 }, { type: "pause", duration: 800 }, { type: "pointerMove", duration: 300, x: 8, y: 404 }, { type: "pause", duration: 200 }, { type: "pointerUp" }] });
 await ev(`(() => { window.__b387.stop = true; window.__mut = null; window.__note = () => {}; for (const x of document.querySelectorAll(".b387")) x.remove(); window.__b.forEach((x) => { x.style.overflowY = ""; x.scrollTop = 0; }); })()`);

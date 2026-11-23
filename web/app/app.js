@@ -395,6 +395,7 @@ const backSwipe = {
     const duration = Math.max(120, Math.min(DURATION, rest * DURATION / Math.max(1, speed)));
     slide(top, below, p, commit ? 0 : 1, () => {
       unlock(); // once at rest: no layout during the slide
+      document.dispatchEvent(new CustomEvent("ifizbox:scrollfree")); // the shell's tab bar follows the page's scroller again (nav/glass.js)
       if (!commit) { shownBySwipe = null; return; } // B148: a later Back to it refreshes again
       swipedBack = true;
       unselect(below); // faded out with the swipe

@@ -323,7 +323,6 @@ export function pullToRefresh(scroller, opts = {}) {
     // The browser's own rubber band after all: drop the transform at once, so script and scroll never both move the list.
     if (g.mode !== "script" && scroller.scrollTop < 0) { g.mode = "native"; nativeBounce = true; place(0); return; }
     if (g.mode === "?") {
-      if (scroller.style.overflowY === "hidden") return; // held by a swipe back (B387, nav/swipe.js lockScroll): no pull
       if (scroller.scrollTop > 0) { g.base = null; return; }
       g.base ??= y;
       const dy = y - g.base;

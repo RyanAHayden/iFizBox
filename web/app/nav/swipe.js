@@ -57,19 +57,12 @@ export function attachEdgeSwipe(root, { canStart, begin, move, end }, win = glob
 }
 
 // B387: while a swipe back is under way neither page scrolls up or down, as on iOS (the pop's pan takes the touch).
-// The touch listeners stay passive, so the scrollers themselves are held: `overflow-y: hidden`, which also stops a
-// fling at once and keeps the scroll place. pages: the two pages' elements. Returns the release (once).
-// A scroller something else holds (the pull to refresh, the A-Z index) is left to it.
+// The touch listeners stay passive, so the scrollers themselves are held: style.css `.page.scroll-held` gives them
+// `overflow-y: hidden`, which also stops a fling at once and keeps the scroll place. A class on the two pages, so it
+// covers a scroller drawn meanwhile and no other hold's inline style ends it. Returns the release.
 export function lockScroll(pages) {
-  const held = [];
-  for (const page of pages) {
-    for (const el of page.querySelectorAll(".page-body, [data-scroller]")) {
-      if (el.style.overflowY) continue;
-      el.style.overflowY = "hidden";
-      held.push(el);
-    }
-  }
-  return () => { for (const el of held.splice(0)) el.style.overflowY = ""; };
+  for (const page of pages) page.classList.add("scroll-held");
+  return () => { for (const page of pages) page.classList.remove("scroll-held"); };
 }
 
 // px/ms over the last ~80 ms of moves; 0 if the finger stopped before letting go.

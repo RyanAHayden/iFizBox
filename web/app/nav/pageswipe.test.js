@@ -3,7 +3,7 @@
 // selected) and the touch stream (passive listeners, a second finger, a lost touch).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pageSwipeDecide, pageSwipeBlocked, attachPageSwipe } from "./swipe.js";
+import { pageSwipeDecide, pageSwipeBlocked, attachPageSwipe, lockScroll } from "./swipe.js";
 
 test("decide: waits inside the slop, starts only rightward and more sideways than down", () => {
   assert.equal(pageSwipeDecide(0, 0), "wait");
@@ -217,4 +217,30 @@ test("touch: cancelled by iOS, or the app losing focus, slides back; the next sw
   s.s.drop();
   assert.equal(s.ends.length, 2);
   assert.equal(s.ends[1][1], -1);
+});
+
+test("B387: a page swipe holds both pages from its begin to its end, lifted or cancelled; a vertical drag holds nothing", () => {
+  const c = new Set();
+  const page = { classList: { add: (x) => c.add(x), remove: (x) => c.delete(x) } };
+  for (const stop of ["touchend", "touchcancel"]) {
+    const on = {};
+    let unlock;
+    attachPageSwipe({ addEventListener: (t, f) => { on[t] = f; } }, {
+      canStart: () => true, begin: () => { unlock = lockScroll([page]); return 390; }, move() {}, end: () => unlock(),
+    }, {});
+    const at = (x, y) => ({ target: {}, touches: [0], changedTouches: [{ identifier: 1, clientX: x, clientY: y }], timeStamp: 0 });
+    on.touchstart(at(100, 300));
+    on.touchmove(at(102, 340));
+    assert.equal(c.size, 0, "a scroll");
+    on.touchend(at(102, 340));
+    on.touchstart(at(100, 300));
+    on.touchmove(at(105, 300));
+    assert.equal(c.size, 0, "not decided");
+    on.touchmove(at(130, 315));
+    assert.equal(c.size, 1, "decided");
+    on.touchmove(at(130, 500));
+    assert.equal(c.size, 1, "still held while it drags down");
+    on[stop](at(130, 500));
+    assert.equal(c.size, 0, stop);
+  }
 });

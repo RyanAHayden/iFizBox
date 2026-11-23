@@ -49,30 +49,21 @@ test("a touch that never ended at all: the next touch cancels it instead of bein
 });
 
 // B387: the scrollers of both pages are held while a swipe back is under way.
-const scroller = (overflowY = "") => ({ style: { overflowY } });
-const pageOf = (...els) => ({ querySelectorAll: (sel) => { assert.equal(sel, ".page-body, [data-scroller]"); return els; } });
-
-test("lockScroll holds every scroller of both pages, and the release frees them once", () => {
-  const top = [scroller(), scroller()], below = [scroller()];
-  const unlock = lockScroll([pageOf(...top), pageOf(...below)]);
-  for (const el of [...top, ...below]) assert.equal(el.style.overflowY, "hidden");
+test("lockScroll holds both pages by a class (style.css: overflow-y hidden on their scrollers), and the release frees them", () => {
+  const page = () => { const c = new Set(); return { c, classList: { add: (x) => c.add(x), remove: (x) => c.delete(x) } }; };
+  const pages = [page(), page()];
+  const unlock = lockScroll(pages);
+  for (const p of pages) assert.deepEqual([...p.c], ["scroll-held"]);
   unlock();
-  for (const el of [...top, ...below]) assert.equal(el.style.overflowY, "");
-  top[0].style.overflowY = "hidden"; // another hold, later
-  unlock();
-  assert.equal(top[0].style.overflowY, "hidden");
-});
-
-test("lockScroll leaves a scroller something else holds to it", () => {
-  const pulled = scroller("hidden"), free = scroller();
-  lockScroll([pageOf(pulled, free)])();
-  assert.deepEqual([pulled.style.overflowY, free.style.overflowY], ["hidden", ""]);
+  for (const p of pages) assert.equal(p.c.size, 0);
+  const css = readFileSync(new URL("../style.css", import.meta.url), "utf8");
+  assert.match(css, /\.page\.scroll-held \.page-body, \.page\.scroll-held \[data-scroller\] \{ overflow-y: hidden !important; \}/);
 });
 
 test("app.js: both swipes back lock as they begin and unlock once at rest, committed or not", () => {
   const js = readFileSync(new URL("../app.js", import.meta.url), "utf8");
   const swipe = js.slice(js.indexOf("const backSwipe = {"), js.indexOf("attachEdgeSwipe(edgeEl, backSwipe)"));
   assert.match(swipe, /begin\(\) \{[^]*lockScroll\(\[top\.page\.el, below\.page\.el\]\)[^]*move\(dx\)/);
-  assert.match(swipe, /slide\(top, below, [^\n]*\{\n\s*unlock\(\);[^\n]*\n\s*if \(!commit\)/);
+  assert.match(swipe, /slide\(top, below, [^\n]*\{\n\s*unlock\(\);[^\n]*\n[^\n]*scrollfree[^\n]*\n\s*if \(!commit\)/);
   assert.match(js, /attachPageSwipe\(screensEl, \{\n\s*\.\.\.backSwipe,/);
 });
