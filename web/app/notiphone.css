@@ -13,8 +13,9 @@
 .notiphone-icon { display: block; width: 76px; height: 76px; margin: 0 auto 12px; }
 .notiphone-title { margin: 0; }
 .notiphone-why { margin: 6px 0 0; text-wrap: balance; }
-/* Home's GitHub | Discord pair (home.css), as far above the next header as a table is */
-.notiphone-links { margin-bottom: 13px; }
+/* Home's GitHub | Discord pair (home.css), as far above the next header as a table is (padding: a margin would collapse
+   into the header's) */
+.notiphone-links { padding-bottom: 13px; }
 .notiphone .group:first-of-type > .group-header { margin-top: 0; }
 
 /* The code: white cell, the code centred (core/qr.js draws its own white quiet zone) */
