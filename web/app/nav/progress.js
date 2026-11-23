@@ -72,18 +72,29 @@ export function openOn(page, seg, count, { logTab = 1 } = {}) {
 
 // B324: a row's bar on a rows page (screens/apprun.js, screens/queuerun.js). Under the native controls hook
 // (native-controls.js) it is WebKit's own <progress>, iOS 26's UIProgressView (no value: WebKit's indeterminate bar);
-// otherwise the drawn .qr-bar track and .qr-fill, which sweeps while indeterminate. -> { bar, set(fraction, sweep) }
+// otherwise the drawn .qr-bar track and .qr-fill, which sweeps while indeterminate.
+// F391: `waiting` (signed, waiting its turn) covers either with .qr-wait, the full bar with moving stripes (progress.css).
+// -> { bar, set(fraction, sweep, waiting) }
 export function rowBar(doc = globalThis.document) {
   if (doc?.documentElement?.getAttribute?.("data-controls") === "native") {
-    const bar = Object.assign(el("progress", "qr-progress"), { max: 1 });
-    return { bar, set(fraction, sweep) { if (sweep) bar.removeAttribute("value"); else bar.value = Math.max(0, Math.min(1, Number(fraction) || 0)); } };
+    const bar = el("div", "qr-native");
+    const progress = Object.assign(el("progress", "qr-progress"), { max: 1 });
+    bar.append(progress, el("div", "qr-wait")); // a <progress> draws no children: the stripes lie over it
+    return {
+      bar,
+      set(fraction, sweep, waiting = false) {
+        bar.classList.toggle("is-waiting", !!waiting);
+        if (sweep) progress.removeAttribute("value"); else progress.value = Math.max(0, Math.min(1, Number(fraction) || 0));
+      },
+    };
   }
   const bar = el("div", "qr-bar");
   const fill = el("div", "qr-fill");
-  bar.append(fill);
+  bar.append(fill, el("div", "qr-wait"));
   return {
     bar,
-    set(fraction, sweep) {
+    set(fraction, sweep, waiting = false) {
+      bar.classList.toggle("is-waiting", !!waiting);
       bar.classList.toggle("is-indeterminate", !!sweep);
       fill.style.transform = `scaleX(${Math.max(0, Math.min(1, Number(fraction) || 0))})`;
     },

@@ -621,7 +621,7 @@ export function rowStatus(row, opts = {}) {
       return p > 0 ? `Downloading ${p}%` : "Downloading";
     }
     case "signing": return p > 0 && p < 100 ? `Signing ${p}%` : "Signing";
-    case "signed": return "Signed";
+    case "signed": return "Signed: Waiting to Install"; // F391: only while it waits its turn
     case "asking":
       if (row.phase === "vpn") return VPN_WAIT;
       if (row.phase === "busy") return busyText(label(row)); // B312
