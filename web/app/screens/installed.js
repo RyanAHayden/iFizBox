@@ -591,7 +591,7 @@ function updateWishButton(view = null) {
   }
   const n = wishCount(browse.wishlist().list(), knownInstalled(view));
   const name = Object.assign(document.createElement("span"), { className: "wish-name", textContent: "Wish List" });
-  const count = n > 0 ? [Object.assign(document.createElement("span"), { className: "wish-count", textContent: `(${n})` })] : [];
+  const count = n > 0 ? [Object.assign(document.createElement("span"), { className: "wish-count", textContent: ` (${n})` })] : []; // the space is for the glass title (textContent); CSS drops it
   b.replaceChildren(name, ...count);
   b.setAttribute("aria-label", wishButtonLabel(n));
 }

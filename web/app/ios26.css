@@ -486,6 +486,10 @@ html[data-style="ios26"][data-theme] .scope-segment.selected, html[data-style="i
   border-radius: 8px; box-shadow: inset 0 0 0 1px var(--i26-seg-track), var(--i26-seg-pill-shadow);
 }
 html[data-style="ios26"] .nav-segments .scope-segments { box-shadow: none; }
+/* B386: Wish List keeps the 12pt the shell's glass leaves each side of a title (NativeGlass.swift GlassFace); a
+   User | Recent title is narrower, so "Wish List (1)" fits beside it too. */
+html[data-style="ios26"] .bar-button.wish-button { padding: 0 12px; letter-spacing: 0; }
+html[data-style="ios26"] .nav-segments:has(.scope-segment:nth-child(2):last-child) { width: 120px; }
 
 /* Search bar: the field is a grey capsule; Cancel is tinted text. */
 html[data-style="ios26"] .search-field { border-radius: 18px; }
