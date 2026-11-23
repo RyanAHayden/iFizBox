@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "0.26.0",
+          "date": "2026-11-23T20:17:19Z",
+          "localizedDescription": "Install Switch opens Shortcuts once per install queue.\nSwipe between Details, Reviews and Related.\nHold Install to queue an update straight away.\nApps waiting their turn show a moving bar.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.26.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.26.0/iFizBox.ipa",
+          "size": 39810253,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.25.0",
           "date": "2026-11-23T15:05:00Z",
           "localizedDescription": "Share opens each style's own menu\nInstall Switch opens only when it's needed\nInstalls on cellular with the Install Switch\nFewer system-only tweaks in App Tweaks\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.25.0",
@@ -250,14 +258,6 @@
           "localizedDescription": "Tweaks in sideloaded apps: add APT and GitHub tweaks to any app you sign, no jailbreak\nAdd Tweaks on every app page: tweaks made for that app, ElleKit bundled, kept through updates\nGitHub repos as sources: YTLite, BHTwitter, uYouEnhanced and more, straight from their releases\nFind More Sources from Canister's repo index; Why iFizBox page; .ipa files open in iFizBox instead of unzipping\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.17.0",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.17.0/iFizBox.ipa",
           "size": 16587049,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.16.0",
-          "date": "2026-11-20T15:37:41Z",
-          "localizedDescription": "Tweak injection unpacks zstd and bzip2 .debs, and bundles ElleKit for tweaks that need Substrate\nAll Apps row on Sources and AltStore source pages: every app, newest version\nInstallation & Signing simplified: one Install Apps With row; faster This iPhone settings\nSmoother: pages, sheets and alerts slide when they grow or shrink; fixes for cancelled installs and Paste\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.16.0",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.16.0/iFizBox.ipa",
-          "size": 16265583,
           "minOSVersion": "15.0"
         }
       ]
