@@ -26,10 +26,33 @@
 - Set Up's "Pair This iPhone" row still says Done once paired (it is): the test runs on the pairing page before that
   page says Paired, which is where the user saw Done-without-test.
 
+## iPhone 15 Pro (2026-11-23 00:03-00:06, lock B357)
+
+Built with `native/build.sh ipa` (native/build/iFizBox.ipa), installed with `tools/ui-15.sh B357 install`, driven
+through `pymobiledevice3 webinspector cdp` (port 9347; 9333 and 9334 were held by other sessions' servers) with
+`ifizboxNative.call(...)` evals, shots with ui-15.sh. The phone needs the real device because the change is in
+the native shell (NETunnelProviderManager, iOS's Allow) and Chromium has no VPN.
+
+- Before: paired (rp), Tailscale on (utun4), vpn tested=true from F372's build, which had removed our configuration.
+- `vpn.test` #1: iOS showed "iFizBox Would Like to Add VPN Configurations" (no configuration was left by the old
+  build: expected once); Allow tapped; `{ok, ms: 185}`.
+- `vpn.test` #2 with the VPN off between (`vpn.status.on` false): `{ok, ms: 153}`, no prompt, no tap.
+- Two installs in a row (`signing.resign` of the Probe test app, `route: "idevice"`): both "Connected to iOS through
+  iFizBox VPN (RemotePairing tunnel)", "iOS installed Probe 1.0", no prompt in the shots taken during each.
+- Settings > VPN after: "iFizBox VPN" still listed (with the checkmark), Not Connected; Tailscale listed without it.
+  I gave Tailscale its checkmark back and switched it on so other tasks find the phone as they expect.
+
 ## Tried and failed
 
-(filled in below as the phone check goes)
+- First install: `appid_mismatch` (the Probe on the phone was rig-installed under another App ID, as F372 also
+  hit); the VPN part had worked. Uninstalled Probe with `ios uninstall com.ryha.ifizbox.probe`, then both installs
+  went through.
 
 ## Not verified
 
-(filled in below)
+- **Pairing from scratch on the phone (the automatic test after pairing)**: the 15 is paired; forgetting the pairing
+  to redo it needs the pairing code typed in iOS Settings again and would leave the shared test phone unpaired for
+  other tasks. Covered by `installroute-b357.test.js` with the fake bridge; the native `vpn.test` it calls is the
+  one checked on the phone above.
+- **Tailscale's return after an install**: by design it no longer gets the checkmark back; a user of the Tailscale
+  route must re-select it in Settings > VPN. Not a check, a known consequence the user chose.
