@@ -46,3 +46,27 @@ test("B349: the sheet's layer outranks every other .navbar::before rule, so no s
     }
   }
 });
+
+// B379: the console (nav/progress.js, queue.css .console) keeps iOS 6's plain black strip above its 44 pt bar: the
+// status bar's room tall, painted with the strip colour, and outranking the sheet layer above.
+const queue = readFileSync(new URL("./queue.css", import.meta.url), "utf8");
+const CONSOLE = 'html:not([data-style="ios7"]):not([data-style="ios13"]):not([data-style="ios26"]) .sheet.console > .navbar.sheet-bar::before';
+
+test("B379: the console's bar has the black status-bar strip, the room's height, in the iOS 6 era", () => {
+  const all = rulesOf(queue).filter((r) => r.sel === CONSOLE);
+  assert.ok(all.some((r) => /height:\s*var\(--sheet-bar-top\);/.test(r.decl)), "height: the status bar's room, no more");
+  const look = stretchesOf(queue).flatMap(rulesOf).filter((r) => r.sel === CONSOLE);
+  assert.equal(look.length, 1, "its paint sits in a look-only stretch");
+  assert.match(look[0].decl, /background:\s*var\(--site-strip\);/, "the strip colour, as style.css's .navbar::before in ios6.css");
+  assert.match(readFileSync(new URL("./ios6.css", import.meta.url), "utf8"), /--site-strip:\s*#000;/, "black in iOS 6");
+});
+
+test("B379: the console's strip outranks the sheet layer, and only the console gets it", () => {
+  assert.ok(spec(CONSOLE) > spec(SEL), `${CONSOLE} (${spec(CONSOLE)}) must beat ${SEL} (${spec(SEL)})`);
+  for (const f of ["./queue.css", "./packages.css", "./progress.css"]) {
+    for (const r of rulesOf(strip(f))) for (const s of r.sel.split(/,(?![^(]*\))/).map((x) => x.trim())) {
+      if (!/\.sheet-bar::before$/.test(s) || s === SEL || s === CONSOLE) continue;
+      assert.fail(`${f}: ${s} also reaches a sheet's bar layer`);
+    }
+  }
+});
