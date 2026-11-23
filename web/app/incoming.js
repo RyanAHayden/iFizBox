@@ -277,7 +277,7 @@ export async function defaultInstall({ jailbreak = null, ipaInstall = null, reme
     const { ipaName } = await import("./core/ipainstall.js");
     const openIt = ipaInstall ?? screen.openIpaInstall;
     const keep = remember ?? screen.rememberIpa;
-    return ({ url, name }) => openIt({ url, name, onInstalled: (r) => keep(r, name || ipaName(url)) });
+    return ({ url, name }) => openIt({ url, name, keep: true, onInstalled: (r) => keep(r, name || ipaName(url)) }); // F380
   }
   return (await import("./signing/install.js")).signAndInstall;
 }

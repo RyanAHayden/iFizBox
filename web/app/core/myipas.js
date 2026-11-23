@@ -580,6 +580,21 @@ export function ipaCountText(counts) {
 //                                        library.list, then library.add {url} and library.options unless that app
 //                                        and version is saved already (a copy that turns out to be one is deleted
 //                                        again) -> { entry, added } or null (no url, no bridge, any failure)
+//   F380: the install's call can keep its own download in My IPAs (keepInLibrary: true on signing.prepare and
+//   ipa.install; the reply's libraryFile): saveInstalledIpa's `file`, or the file noteKeptIpa(url, file) remembered
+//   for that url, is used instead of library.add {url}, so the saved IPA costs no second download
+//   noteKeptIpa(url, file)               remembers the file the shell kept for that url (taken by the next save of it)
+//   takeKeptIpa(url)                     that file, once, or null
+const keptIpas = new Map();
+export function noteKeptIpa(url, file) {
+  if (typeof url === "string" && url && typeof file === "string" && file) keptIpas.set(url, file);
+}
+export function takeKeptIpa(url) {
+  const f = keptIpas.get(url) ?? null;
+  keptIpas.delete(url);
+  return f;
+}
+
 export function savedIpa(entries, { bundleId = null, version = null } = {}) {
   const id = typeof bundleId === "string" ? bundleId.trim() : "";
   const v = version == null ? "" : String(version).trim();
@@ -600,17 +615,22 @@ export function savedIpaOptions(file, edits = null) {
   return Object.keys(out).length ? { file, ...out } : null;
 }
 
-export async function saveInstalledIpa({ url = null, bundleId = null, version = null, edits = null } = {}, { call } = {}) {
+export async function saveInstalledIpa({ url = null, bundleId = null, version = null, edits = null, file: kept = null } = {}, { call } = {}) {
   if (typeof url !== "string" || !/^https?:\/\//i.test(url) || typeof call !== "function") return null;
+  kept = (typeof kept === "string" && kept) || takeKeptIpa(url); // F380: the install's own download, already in My IPAs
   try {
-    const had = savedIpa((await call("library.list", {}))?.ipas, { bundleId, version });
+    const ipas = (await call("library.list", {}))?.ipas;
+    const mine = kept && Array.isArray(ipas) ? ipas.find((e) => e?.file === kept) ?? null : null;
+    const had = savedIpa(mine ? ipas.filter((e) => e !== mine) : ipas, { bundleId, version });
     if (had) {
+      if (mine) { try { await call("library.delete", { file: kept }); } catch { /* an extra copy is no harm */ } }
       // no second copy, but the Sign Options this install used become the saved IPA's, so a Re-sign signs it the same way
       const o = savedIpaOptions(had.file, edits);
       if (!o) return { entry: had, added: false };
       try { return { entry: (await call("library.options", o)) ?? had, added: false }; } catch { return { entry: had, added: false }; }
     }
-    const r = await call("library.add", { url });
+    // F380: the kept file when the shell put it there (no download), else library.add downloads the IPA again
+    const r = mine ? { file: kept, ipas } : await call("library.add", { url });
     const file = r?.file;
     if (!file) return null;
     const list = Array.isArray(r.ipas) ? r.ipas : [];

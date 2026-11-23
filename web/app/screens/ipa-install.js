@@ -153,7 +153,8 @@ export async function markIpaNeeds(group, url, { needs = ipaNeeds } = {}) {
 // F189: openIpaInstall's way in: AppSync Unified first (ensureAppSync), its fallback alert when that fails (Try Again
 // goes round again), then the IPA's console; installd still refusing the app (no_adhoc) gets the same short alert.
 // `deps` stand in for ensureAppSync, the alert and the console in tests.
-export async function installWithAppSync({ url, name = "", onInstalled = () => {}, native = undefined },
+// F380: `keep` (onInstalled saves the IPA in My IPAs) goes on to runIpaConsole and runIpaInstall.
+export async function installWithAppSync({ url, name = "", onInstalled = () => {}, native = undefined, keep = false },
   { ensure = ensureAppSync, fallback = appSyncFallback, run = runIpaConsole, needs = ipaNeeds, alert = showAlert } = {}) {
   if (running || preparing) return false;
   const title = name || ipaName(url);
@@ -175,7 +176,7 @@ export async function installWithAppSync({ url, name = "", onInstalled = () => {
       if (await fallback(got.step)) continue;
       return false;
     }
-    const r = await run({ url, name: title, onInstalled, native });
+    const r = await run({ url, name: title, onInstalled, native, ...(keep ? { keep: true } : {}) });
     if (r?.error?.code !== "no_adhoc") return r;
     if (!(await fallback(got.installed || got.present ? "refused" : "absent"))) return r;
     await r.close?.(); // Try Again: this run's console makes way for the next
@@ -192,7 +193,7 @@ export function openIpaInstall(opts) {
 
 // The console part of openIpaInstall. installd's no_adhoc refusal gets no alert here: installWithAppSync's short
 // fallback says it.
-export async function runIpaConsole({ url, name = "", onInstalled = () => {}, native = undefined },
+export async function runIpaConsole({ url, name = "", onInstalled = () => {}, native = undefined, keep = false },
   { open = openProgress, install = runIpaInstall, logs = runLogs, alert = showAlert } = {}) {
   if (running) return false;
   running = true;
@@ -217,7 +218,8 @@ export async function runIpaConsole({ url, name = "", onInstalled = () => {}, na
 
   let r;
   try {
-    r = await install({ url, name: title }, view, { ...(native ? { native } : {}), signal: ctl.signal });
+    // F380: keep only through the real bridge: share.js's stand-in installs a staged file, no download to keep
+    r = await install({ url, name: title, ...(keep && !native ? { keep: true } : {}) }, view, { ...(native ? { native } : {}), signal: ctl.signal });
   } catch (e) {
     run.line(`E: ${e?.message || String(e)}`);
     run.end({ code: -1 });
@@ -317,7 +319,8 @@ export async function rememberIpa(r, name, { store = apps, save = saveIpaCopy } 
 // a later install use that copy. The jailbreak app signs nothing: no Sign Options go with it. -> its answer, or null.
 export function saveIpaCopy(r, { bridge = nativeBridge(), save = saveInstalledIpa } = {}) {
   if (!r?.ok || !r.url || typeof bridge?.call !== "function") return Promise.resolve(null);
-  return save({ url: r.url, bundleId: r.bundleId || null, version: r.version || null }, { call: (m, p) => bridge.call(m, p) });
+  return save({ url: r.url, bundleId: r.bundleId || null, version: r.version || null,
+    ...(r.libraryFile ? { file: r.libraryFile } : {}) }, { call: (m, p) => bridge.call(m, p) }); // F380: the kept download
 }
 
 // Settings > Install IPA's row: a URL typed or pasted. Asks again (with what was typed) when it isn't an http(s) link.
@@ -331,7 +334,7 @@ async function askIpaUrl(value = "") {
     });
     if (index !== 1) return false;
     const url = ipaUrl(typed);
-    if (url) return openIpaInstall({ url, onInstalled: (r) => rememberIpa(r, ipaName(url)) });
+    if (url) return openIpaInstall({ url, keep: true, onInstalled: (r) => rememberIpa(r, ipaName(url)) });
     await showAlert({ title: "Not a Link", message: `"${String(typed ?? "").trim()}" isn't an http or https link to an IPA.`, buttons: ["OK"] });
     value = typed;
   }
@@ -354,7 +357,7 @@ export function initIpaLinks(root = document) {
     e.stopPropagation();
     const url = a.href;
     showActionSheet({ title: ipaName(url), buttons: ["Install IPA", "Open Link"] }).then((i) => {
-      if (i === 0) openIpaInstall({ url, onInstalled: (r) => rememberIpa(r, ipaName(url)) });
+      if (i === 0) openIpaInstall({ url, keep: true, onInstalled: (r) => rememberIpa(r, ipaName(url)) });
       else if (i === 1) window.open(url, "_blank", "noopener");
     });
   }, true);
