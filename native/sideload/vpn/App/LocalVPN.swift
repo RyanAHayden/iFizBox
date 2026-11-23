@@ -247,7 +247,7 @@ enum LocalVPN {
         let skipped = !start && !switchedOn && holds == 1 && switchAdded() // said once per queue
         lock.unlock()
         // T77: what the start decided from, for a phone where a carrier's ipsec tunnel may count as another VPN
-        if deciding || start { log("Install Switch: start \(start), cellular \(onCellular), another VPN \(other); up tunnels: \(tunnelList(tunnels))") }
+        if deciding || start { log("Install Switch: start \(start), added \(switchAdded()), cellular \(onCellular), another VPN \(other); up tunnels: \(tunnelList(tunnels))") }
         if skipped { log("Install Switch: not needed (not on cellular, no other VPN up)") }
         if start { savePending(cellular: false, vpn: before) }
         // F394: one trip for the whole queue, when the added Install Switch can; else the runs below, as before
