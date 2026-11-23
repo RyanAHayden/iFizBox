@@ -261,6 +261,8 @@ function slide(top, below, p0, p1, cleanup, { withSelect = false, ...opts } = {}
   const pair = pairOf(top, below, withSelect);
   setMoving(pair, true);
   setProgress(pair, p0);
+  // B382: the shell's glass buttons go along (nav/glass.js slideGlass, loaded only in the app)
+  document.dispatchEvent(new CustomEvent("ifizbox:slide", { detail: { item: (p1 ? top : below).page.item, ms: opts.duration ?? DURATION * Math.abs(p1 - p0) } }));
   running = animate(pair, p0, p1, {
     ...opts,
     onEnd() {

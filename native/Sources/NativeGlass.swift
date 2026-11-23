@@ -8,12 +8,13 @@
 //     each switch; a tab tap goes to the page's router ({tap: "tab:<id>"}).
 //   - the nav bar's buttons as UIButtons with UIButton.Configuration.glass() (.prominentGlass() for Done), titles and
 //     actions from each page, at the rects of the page's own buttons.
-// The page hides its own tab bar and buttons while these show (<html data-glass="native">, ios26.css) and shows them
-// again whenever the glass bars hide (a push sliding, a sheet, a popup over them).
+// The page hides its own tab bar and buttons while these show (<html data-glass="native">, ios26.css), through page
+// slides too, and shows them again whenever the glass bars hide (a sheet, a popup over them).
 //
 //   ui.glass {op: "open", key, ...bars}  stream: {ready: true} once the bars are in place, then {tap: id} on each tap
 //     of a tab ("tab:<id>") or a button ("button:<id>"). Settles (null) only when closed.
-//   ui.glass {op: "update", key, ...bars} -> null
+//   ui.glass {op: "update", key, slide?, ...bars} -> null. slide: ms of the page slide that starts now; the buttons
+//     cross-fade to the new ones over it instead of changing at once (B382)
 //   ui.glass {op: "close", key} -> null (also settles the open call)
 //
 // bars (every field optional on update; a missing one keeps what is there):
@@ -200,7 +201,7 @@ private final class GlassBars: UIView {
         if p.keys.contains("tabbar") || p["icons"] != nil || p["colors"] != nil {
             tabs.apply(lastTabbar, images: images, colors: colors)
         }
-        if let list = p["buttons"] as? [[String: Any]] { layoutButtons(list) }
+        if let list = p["buttons"] as? [[String: Any]] { layoutButtons(list, slide: (NativeGlass.number(p["slide"]) ?? 0) / 1000) }
         else if p["icons"] != nil { for b in buttons.values { (b as? GlassButton)?.refreshIcon(images) } }
         if let hidden = p["buttonsHidden"] as? Bool { for b in buttons.values { b.isHidden = hidden } }
     }
@@ -212,22 +213,48 @@ private final class GlassBars: UIView {
         return buttons.values.first { !$0.isHidden && $0.frame.contains(p) } as? GlassButton
     }
 
-    private func layoutButtons(_ list: [[String: Any]]) {
+    // Without a slide everything changes at once. With one, a button that stays keeps its glass: the capsule goes to its
+    // new rect while the old and new title or glyph cross-fade in it; a button that comes, goes or changes its kind of
+    // glass fades. The curve is the page slide's (web/app/nav/transition.js EASE).
+    private func layoutButtons(_ list: [[String: Any]], slide: TimeInterval) {
         var keep = Set<String>()
+        var motions: [() -> Void] = [], ends: [() -> Void] = []
+        let fade = slide > 0 && !UIAccessibility.isReduceMotionEnabled
+        func drop(_ v: UIButton) {
+            v.isUserInteractionEnabled = false
+            guard fade, !v.isHidden else { return v.removeFromSuperview() }
+            motions.append { v.alpha = 0 }
+            ends.append { v.removeFromSuperview() }
+        }
         for b in list {
             guard let id = b["id"] as? String, let rect = NativeMenus.rect(b["rect"]) else { continue }
             keep.insert(id)
-            let button = (buttons[id] as? GlassButton) ?? {
+            var button = buttons[id] as? GlassButton
+            if let old = button, !old.sameGlass(as: b) { drop(old); button = nil }
+            if let button {
+                let change = button.change(to: b, rect: rect, images: images, fade: fade)
+                if fade { motions.append(change.move); ends.append(change.end) } else { UIView.performWithoutAnimation { change.move(); change.end() } }
+            } else {
                 let v = GlassButton()
                 v.addAction(UIAction { [weak self] _ in self?.call.emit([["tap": "button:" + id]]) }, for: .primaryActionTriggered)
-                addSubview(v)
+                UIView.performWithoutAnimation {
+                    addSubview(v)
+                    let change = v.change(to: b, rect: rect, images: images, fade: false)
+                    change.move()
+                    change.end()
+                    v.layoutIfNeeded()
+                }
                 buttons[id] = v
-                return v
-            }()
-            button.frame = rect
-            button.update(b, images: images)
+                if fade { v.alpha = 0; motions.append { v.alpha = 1 } }
+            }
         }
-        for (id, v) in buttons where !keep.contains(id) { v.removeFromSuperview(); buttons[id] = nil }
+        for (id, v) in buttons where !keep.contains(id) { drop(v); buttons[id] = nil }
+        guard !motions.isEmpty else { return }
+        let curve = UICubicTimingParameters(controlPoint1: CGPoint(x: 0.36, y: 0.66), controlPoint2: CGPoint(x: 0.04, y: 1))
+        let a = UIViewPropertyAnimator(duration: slide, timingParameters: curve)
+        a.addAnimations { for m in motions { m() } }
+        a.addCompletion { _ in for e in ends { e() } }
+        a.startAnimation()
     }
 }
 
@@ -424,48 +451,130 @@ private final class NativeTabs: NSObject, UITabBarControllerDelegate {
     }
 }
 
-// One nav bar button: a glass capsule (prominent for Done), the page's title or glyph in it.
+// One nav bar button: a glass capsule (prominent for Done) whose configuration never changes; the page's title or glyph
+// is a face of our own over it, so a new title cross-fades with the slide or changes at once. (A configuration given a
+// new title makes UIKit draw the glass again and dissolve the old title into the new one, B382.)
 @available(iOS 26.0, *)
 private final class GlassButton: NativeMenus.MenuButton {
     private var info: [String: Any] = [:]
+    private var face: GlassFace?
+    private let faces: UIView = { // clips a face wider than the capsule while its size changes
+        let v = UIView()
+        v.isUserInteractionEnabled = false
+        v.clipsToBounds = true
+        return v
+    }()
 
-    func update(_ b: [String: Any], images: [String: UIImage]) {
+    private static func glass(_ b: [String: Any]) -> [String] {
+        (b["kind"] as? String) == "done" ? ["done", b["tint"] as? String ?? ""] : ["plain"]
+    }
+
+    func sameGlass(as b: [String: Any]) -> Bool { Self.glass(info) == Self.glass(b) }
+
+    // Takes on the button `b` at `rect`: `move` is what changes over a slide (inside its animation), `end` what is done
+    // after it. With nothing to fade both run at once.
+    func change(to b: [String: Any], rect: CGRect, images: [String: UIImage], fade: Bool) -> (move: () -> Void, end: () -> Void) {
+        if configuration == nil {
+            var c: UIButton.Configuration = b["kind"] as? String == "done" ? .prominentGlass() : .glass()
+            if b["kind"] as? String == "done" { c.baseBackgroundColor = NativeGlass.color(b["tint"]) ?? .systemBlue }
+            configuration = c
+            addSubview(faces)
+        }
+        let same = face != nil && (info as NSDictionary).isEqual(to: b) && !(face?.waitsForIcon ?? false)
+        let kept = same && frame == rect
+        if kept { return ({}, {}) }
         info = b
-        let kind = b["kind"] as? String ?? "plain"
-        var c: UIButton.Configuration = kind == "done" ? .prominentGlass() : .glass()
-        let fg = NativeGlass.color(b["color"]) ?? .label
-        if kind == "done" { c.baseBackgroundColor = NativeGlass.color(b["tint"]) ?? .systemBlue }
-        c.baseForegroundColor = fg
-        let font = UIFont.systemFont(ofSize: NativeGlass.number(b["size"]) ?? 15, weight: NativeGlass.weight(b["weight"]))
         let title = b["title"] as? String ?? ""
-        let glyph = icon(b["icon"] as? [String: Any], images)
-        c.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12)
-        c.titleLineBreakMode = .byTruncatingTail
-        if let glyph {
-            c.image = glyph
-            c.contentInsets = .zero
-        } else if kind == "back" {
-            c.image = NativeGlass.chevron
-            // as tight as the CSS back button (4pt, the 13pt chevron slot, the label, 14pt), so the label fits its rect
-            c.imagePadding = 3
-            c.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 6, bottom: 0, trailing: 8)
-        }
-        if glyph == nil, !title.isEmpty {
-            c.attributedTitle = AttributedString(title, attributes: AttributeContainer([.font: font]))
-        }
-        configuration = c
-        contentHorizontalAlignment = kind == "back" ? .leading : .center
         accessibilityLabel = title.isEmpty ? (b["label"] as? String) : title
-        isEnabled = !(b["disabled"] as? Bool ?? false)
+        let enabled = !(b["disabled"] as? Bool ?? false)
+        if isEnabled != enabled { isEnabled = enabled }
+        let old = same ? nil : face
+        if !same {
+            let new = GlassFace(b, size: rect.size, images: images)
+            // where the old one starts, so the two keep step as the capsule's size changes
+            UIView.performWithoutAnimation {
+                faces.addSubview(new)
+                new.place(in: fade ? faces.bounds : CGRect(origin: .zero, size: rect.size))
+                new.alpha = fade ? 0 : 1
+            }
+            face = new
+        }
+        let now = face
+        return ({ [weak self] in
+            guard let self else { return }
+            frame = rect
+            faces.frame = bounds
+            faces.layer.cornerRadius = bounds.height / 2
+            old?.alpha = 0
+            old?.place(in: faces.bounds)
+            now?.alpha = 1
+            now?.place(in: faces.bounds)
+            layoutIfNeeded()
+        }, { old?.removeFromSuperview() })
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        bringSubviewToFront(faces) // UIKit puts the configuration's views in later
     }
 
     func refreshIcon(_ images: [String: UIImage]) {
-        guard info["icon"] != nil else { return }
-        update(info, images: images)
+        guard info["icon"] is [String: Any], face?.waitsForIcon == true else { return }
+        UIView.performWithoutAnimation {
+            let c = change(to: info, rect: frame, images: images, fade: false)
+            c.move()
+            c.end()
+        }
+    }
+}
+
+// What a nav bar button shows: the back chevron and the title, the title, or a glyph. Laid out once for the capsule's
+// size at rest; a back button's stays at the leading edge, any other in the middle.
+@available(iOS 26.0, *)
+private final class GlassFace: UIView {
+    private let leading: Bool
+    let waitsForIcon: Bool // its glyph's picture hasn't come from the page yet
+
+    init(_ b: [String: Any], size: CGSize, images: [String: UIImage]) {
+        let kind = b["kind"] as? String ?? "plain"
+        leading = kind == "back"
+        let icon = b["icon"] as? [String: Any]
+        let glyph = (icon?["key"] as? String).flatMap { images[$0] }
+        waitsForIcon = icon != nil && glyph == nil
+        super.init(frame: CGRect(origin: .zero, size: size))
+        let disabled = b["disabled"] as? Bool ?? false
+        let color = disabled ? UIColor.tertiaryLabel : NativeGlass.color(b["color"]) ?? .label
+        if let glyph {
+            let template = icon?["template"] as? Bool ?? true
+            add(glyph.withRenderingMode(template ? .alwaysTemplate : .alwaysOriginal), color, x: (size.width - glyph.size.width) / 2)
+            return
+        }
+        var left: CGFloat = 12, right: CGFloat = 12
+        if leading {
+            // as tight as the CSS back button (4pt, the 13pt chevron slot, the label, 14pt), so the label fits its rect
+            add(NativeGlass.chevron, color, x: 6)
+            (left, right) = (6 + NativeGlass.chevron.size.width + 3, 8)
+        }
+        let label = UILabel()
+        label.text = b["title"] as? String ?? ""
+        label.font = .systemFont(ofSize: NativeGlass.number(b["size"]) ?? 15, weight: NativeGlass.weight(b["weight"]))
+        label.textColor = color
+        label.lineBreakMode = .byTruncatingTail
+        label.textAlignment = leading ? .natural : .center
+        label.frame = CGRect(x: left, y: 0, width: max(0, size.width - left - right), height: size.height)
+        addSubview(label)
     }
 
-    private func icon(_ i: [String: Any]?, _ images: [String: UIImage]) -> UIImage? {
-        guard let i, let key = i["key"] as? String, let img = images[key] else { return nil }
-        return (i["template"] as? Bool ?? true) ? img.withRenderingMode(.alwaysTemplate) : img.withRenderingMode(.alwaysOriginal)
+    required init?(coder: NSCoder) { fatalError("not from a nib") }
+
+    private func add(_ image: UIImage, _ color: UIColor, x: CGFloat) {
+        let v = UIImageView(image: image)
+        v.tintColor = color
+        v.frame.origin = CGPoint(x: x, y: (bounds.height - image.size.height) / 2)
+        addSubview(v)
+    }
+
+    func place(in box: CGRect) {
+        center = CGPoint(x: leading ? bounds.width / 2 : box.midX, y: box.midY)
     }
 }
