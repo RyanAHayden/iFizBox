@@ -27,6 +27,10 @@ signs left its passwords reachable in `TEAM.com.ryha.sideload`, where another ap
 - `docs/developer-account.md`: the shared group paragraph now says what isolate does.
 - Nothing in iFizBox's `native/groupfix/groupfix.m` needed changing: it already names SideDrop's fix in its B339 comment.
 
+- Spec review (on the SideDrop diff): nothing missing or wrong. It flagged the B339 port as extra; kept, because
+  iFizBox's isolate code calls the keychain through B339's `real*` pointers, so a SideDrop copy without them would be
+  a new mix that no phone ever ran. The `SIGNER_VERSION` bump is SideDrop's own rule for a `group_fix_plan` change.
+
 ## Tried and failed
 
 - none
