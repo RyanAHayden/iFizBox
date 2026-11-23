@@ -1712,6 +1712,34 @@
 				<key>GroupingIdentifier</key>
 				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A3C</string>
 				<key>WFControlFlowMode</key>
+				<integer>1</integer>
+			</dict>
+		</dict>
+		<!--       none: one more Wait tells the app there was nothing more to put back (LocalVPN.endTrip) -->
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>com.ryha.ifizbox.WaitForInstallIntent</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>AppIntentDescriptor</key>
+				<dict>
+					<key>AppIntentIdentifier</key>
+					<string>WaitForInstallIntent</string>
+					<key>BundleIdentifier</key>
+					<string>com.ryha.ifizbox</string>
+					<key>Name</key>
+					<string>iFizBox</string>
+				</dict>
+			</dict>
+		</dict>
+		<dict>
+			<key>WFWorkflowActionIdentifier</key>
+			<string>is.workflow.actions.conditional</string>
+			<key>WFWorkflowActionParameters</key>
+			<dict>
+				<key>GroupingIdentifier</key>
+				<string>3A9E1C40-6B2D-4F18-9C7A-0D5E8B1F2A3C</string>
+				<key>WFControlFlowMode</key>
 				<integer>2</integer>
 			</dict>
 		</dict>

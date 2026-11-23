@@ -215,7 +215,7 @@ class App(unittest.TestCase):
         self.assertEqual(steps, ["deletestoredcontent", "vpn.get", "setstoredcontent", "deletestoredcontent", "filter.vpns", "setstoredcontent", me + "ConnectVPNIntent", "cellulardata.set",
                                  me + "OpenForInstallIntent", "repeat.count", me + "WaitForInstallIntent", "repeat.count",
                                  "cellulardata.set", "delay", "getstoredcontent", "vpn.set",
-                                 "getstoredcontent", "vpn.set"])
+                                 "getstoredcontent", "vpn.set", me + "WaitForInstallIntent"])
         data = [p["OnValue"] for i, p in list(zip(ids, params))[first:last] if i == "cellulardata.set"]
         self.assertEqual(data, [False, True])
         loop = next(p for i, p in zip(ids, params) if i == "repeat.count")

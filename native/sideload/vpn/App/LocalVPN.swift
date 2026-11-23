@@ -470,7 +470,7 @@ enum LocalVPN {
     static let waitTurns = 45 // the Shortcut's Repeat: after them it puts things back, whatever the queue does
     static let callbackGrace: TimeInterval = 3 // after Shortcuts' callback, for our own actions to say it runs
     static let putBackLimit: TimeInterval = 25 // from the queue's end until the Shortcut put things back
-    static let nothingLimit: TimeInterval = 9 // ... until a selected VPN that still isn't counts as one that was off
+    static let nothingLimit: TimeInterval = 9 // ... with an Install Switch that can't put an idle VPN back, until the app stops waiting for it
     private static var busy = false // guarded by lock: from a begin until the VPN goes off after the last connection
     private static var tripOn = false // guarded by lock: a one-trip run goes on in the background
     private static var tripOpen = false // guarded by lock: its Open ran
@@ -561,7 +561,7 @@ enum LocalVPN {
     /// put back is left to endSwitch (switchEndDue).
     private static func endTrip(_ gen: Int) {
         lock.lock()
-        let waits = tripWaits
+        let waits = tripWaits, canIdle = UserDefaults.standard.bool(forKey: idleKey)
         if stopGen == gen { busy = false }
         guard tripOn else { lock.unlock(); return }
         guard stopGen == gen else { tailing = false; lock.unlock(); return } // another connect began: the trip goes on
@@ -572,11 +572,10 @@ enum LocalVPN {
         while !back && Date().timeIntervalSince(t0) < putBackLimit {
             Thread.sleep(forTimeInterval: 0.3)
             back = !switchEndNeeded(dataOff: dataOff, vpnBefore: !before.isEmpty || selected, dataBack: Path.now().cellular, vpnBack: otherVPNBack(before, selected: selected))
-            lock.lock(); let over = tripWaits >= waitTurns, past = tripWaits > waits; lock.unlock()
-            // F389: the Shortcut went on after the queue, data and addresses are back, and no VPN took the place in
-            // Settings: the selected one had no On Demand (off, not idle), so it found nothing to put back
-            if selected && past && UserDefaults.standard.bool(forKey: idleKey) && Date().timeIntervalSince(t0) > nothingLimit
-                && !switchEndNeeded(dataOff: dataOff, vpnBefore: !before.isEmpty, dataBack: Path.now().cellular, vpnBack: otherVPNBack(before, selected: false)) {
+            lock.lock(); let over = tripWaits >= waitTurns, past = tripWaits > waits, told = canIdle && tripWaits > waitTurns; lock.unlock()
+            // F389: data and addresses are back, and no VPN took the place in Settings: the selected one had no On Demand
+            // (off, not idle), which the Shortcut says with one more Wait. An older one never puts it back
+            if !back && selected && (told || !canIdle && past && Date().timeIntervalSince(t0) > nothingLimit) && !switchEndNeeded(dataOff: dataOff, vpnBefore: !before.isEmpty, dataBack: Path.now().cellular, vpnBack: otherVPNBack(before, selected: false)) {
                 nothing = true; back = true
             }
             if over && ranOut == nil { ranOut = Date() }
