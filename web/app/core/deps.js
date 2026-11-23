@@ -15,7 +15,7 @@
 //               "conflict"    it conflicts with (or breaks) an installed package
 //               "conflicted"  an installed package conflicts with (or breaks) it
 //               "lists"       (explainApt only) apt can't read one of its own list files, or dpkg's status; id null
-//     id       the package the sentence is about (the dependency, or the installed package); tapping opens it
+//     id        the package the sentence is about (the dependency, or the installed package); tapping opens it
 //     action    { kind: "open", id } | { kind: "remove", id } | { kind: "add-source", name, url } |
 //               { kind: "settings" }, with `label` ("Add Chariz", "Remove Y", "Open X", "Set iOS Version")
 //     via       the chain of packages that pulled the dependency in, outermost first ([] for a direct one)
