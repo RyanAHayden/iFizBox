@@ -1377,7 +1377,7 @@ export function upgradeNewsSlot(st, inst, sileoJson = Promise.resolve(null)) {
   draw(NO_RELEASE_NOTES);
   slot.ready = Promise.resolve(sileoJson).catch(() => null).then((json) => {
     const text = json ? sileoWhatsNew(json)?.text?.trim() : null;
-    if (text) slideChange(slot, () => draw(text));
+    if (text) { if (slot.isConnected) slideChange(slot, () => draw(text)); else draw(text); } // a page left: no slide
     return text || null;
   });
   return slot;
