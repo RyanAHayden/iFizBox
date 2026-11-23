@@ -668,9 +668,12 @@ An app keeps its data in three places, and a re-sign must leave each where the a
   its original names no groups: the dylib names that group on every generic and internet password call (add, read,
   update, delete), so no other app's call reaches the app's passwords and the app never sees theirs. The first launch
   with it copies every password the app could see outside its own group into its own (`copySharedPasswords`, never
-  over one it has), only for an app that had run before (marked `ifizbox.groupfix.isolated` in its preferences; a
-  fresh install copies nothing). Until every item could be read (before the first unlock after a restart) calls stay
-  as before and the next launch tries again. Keys and certificates keep the plain stripping.
+  over one it has, in the order a read naming no group finds them, so it keeps the one it read until now), only for
+  an app that had run before (anything of its own in its preferences, Documents, Application Support or
+  Library/AppGroups; a fresh install copies nothing) and marks `ifizbox.groupfix.isolated` in its preferences. Until
+  every item could be copied (locked before the first unlock after a restart, or behind Face ID or a passcode) calls
+  stay as before and the next launch tries again. Keys and certificates keep the plain stripping. Extensions don't
+  get the dylib; they have the app's keychain groups, so they still find its items.
 
 Every sign logs what it gave the app, so a report of an app that lost its sign-in or settings can be read from
 Console Logs (the run's log): `Keychain: TEAM.<its ID>, TEAM.<App ID> (application-identifier TEAM.<App ID>)`, the

@@ -178,17 +178,29 @@ static BOOL copySharedPasswords(void) {
     BOOL ok = YES;
     for (int k = 0; k < 2; k++) {
         CFStringRef cls = k ? kSecClassInternetPassword : kSecClassGenericPassword;
-        NSDictionary *q = @{ (__bridge id)kSecClass: (__bridge id)cls, (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitAll,
-                             (__bridge id)kSecReturnAttributes: @YES, (__bridge id)kSecReturnData: @YES,
-                             (__bridge id)kSecAttrSynchronizable: (__bridge id)kSecAttrSynchronizableAny,
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-                             (__bridge id)kSecUseAuthenticationUI: (__bridge id)kSecUseAuthenticationUISkip };
-#pragma clang diagnostic pop
-        CFTypeRef out = NULL;
-        OSStatus st = SecItemCopyMatching((__bridge CFDictionaryRef)q, &out);
+        NSDictionary *base = @{ (__bridge id)kSecClass: (__bridge id)cls, (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitAll,
+                                (__bridge id)kSecReturnAttributes: @YES,
+                                (__bridge id)kSecAttrSynchronizable: (__bridge id)kSecAttrSynchronizableAny };
+        // how many there are outside the app's group (attributes only: no item asks for Face ID for that)
+        CFTypeRef all = NULL;
+        OSStatus st = SecItemCopyMatching((__bridge CFDictionaryRef)base, &all);
         if (st == errSecItemNotFound) continue;
         if (st != errSecSuccess) { ok = NO; continue; }
+        NSUInteger outside = 0;
+        for (NSDictionary *a in (__bridge_transfer NSArray *)all) {
+            if ([a isKindOfClass:[NSDictionary class]] && ![a[(__bridge id)kSecAttrAccessGroup] isEqual:(__bridge id)isolate]) outside++;
+        }
+        NSMutableDictionary *q = [base mutableCopy];
+        q[(__bridge id)kSecReturnData] = @YES;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        q[(__bridge id)kSecUseAuthenticationUI] = (__bridge id)kSecUseAuthenticationUISkip;
+#pragma clang diagnostic pop
+        CFTypeRef out = NULL;
+        st = SecItemCopyMatching((__bridge CFDictionaryRef)q, &out);
+        if (st != errSecSuccess) { ok = NO; continue; }
+        NSUInteger copied = 0;
+        // in the order a read that names no group finds them, so the app keeps the one it read until now
         for (NSDictionary *item in (__bridge_transfer NSArray *)out) {
             if (![item isKindOfClass:[NSDictionary class]] || [item[(__bridge id)kSecAttrAccessGroup] isEqual:(__bridge id)isolate]) continue;
             NSMutableDictionary *add = [NSMutableDictionary dictionary];
@@ -200,10 +212,30 @@ static BOOL copySharedPasswords(void) {
             if (add[(__bridge id)kSecAttrAccessControl]) [add removeObjectForKey:(__bridge id)kSecAttrAccessible];
             add[(__bridge id)kSecAttrAccessGroup] = (__bridge id)isolate;
             OSStatus as = SecItemAdd((__bridge CFDictionaryRef)add, NULL);
-            if (as != errSecSuccess && as != errSecDuplicateItem) ok = NO;
+            if (as == errSecSuccess || as == errSecDuplicateItem) copied++;
+            else ok = NO;
         }
+        // an item behind Face ID or a passcode (skipped above) would be out of reach once pinned: stay as before
+        if (copied < outside) ok = NO;
     }
     return ok;
+}
+
+// Whether the app ran before: anything of its own in its preferences (not this fix's marks), Documents, Application
+// Support or the group fix's folders. A fresh install's container has none of these.
+static BOOL appRanBefore(void) {
+    CFArrayRef keys = CFPreferencesCopyKeyList(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+    BOOL ran = NO;
+    for (NSString *k in (__bridge NSArray *)keys) if (![k hasPrefix:@"ifizbox.groupfix."]) { ran = YES; break; }
+    if (keys) CFRelease(keys);
+    if (ran) return YES;
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *home = NSHomeDirectory();
+    if ([fm contentsOfDirectoryAtPath:[home stringByAppendingPathComponent:@"Documents"] error:NULL].count) return YES;
+    for (NSString *d in @[ @"Library/Application Support", @"Library/AppGroups" ]) {
+        if ([fm fileExistsAtPath:[home stringByAppendingPathComponent:d]]) return YES;
+    }
+    return NO;
 }
 
 static const struct { const char *name; void *to; } hooks[] = {
@@ -274,10 +306,11 @@ __attribute__((constructor)) static void groupfixInit(void) {
         groups = [NSSet setWithArray:g];
         NSString *t = c[@"target"];
         target = [t isKindOfClass:[NSString class]] && t.length ? t : nil;
-        // Whether the app ran before (its preferences weren't empty), read before anything below writes one.
+        // The legacy copy's test (its preferences weren't empty), read before anything below writes one.
         CFArrayRef keys = CFPreferencesCopyKeyList(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
         BOOL ranBefore = keys && CFArrayGetCount(keys) > 0;
         if (keys) CFRelease(keys);
+        BOOL ownBefore = appRanBefore(); // isolate's test, before ownFolder makes Library/AppGroups
         NSString *l = c[@"legacy"];
         if (!target && [l isKindOfClass:[NSString class]] && l.length) {
             // A fresh install (no preferences yet) is marked at once, so it never copies the shared group in later.
@@ -300,7 +333,7 @@ __attribute__((constructor)) static void groupfixInit(void) {
             CFStringRef mark = CFSTR("ifizbox.groupfix.isolated");
             CFPropertyListRef done = CFPreferencesCopyValue(mark, kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
             if (done) { CFRelease(done); pinned = YES; }
-            else if (!ranBefore || copySharedPasswords()) {
+            else if (!ownBefore || copySharedPasswords()) {
                 CFPreferencesSetValue(mark, kCFBooleanTrue, kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
                 CFPreferencesSynchronize(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
                 pinned = YES;

@@ -95,6 +95,15 @@ the group fix with `isolate: TEAM.<its ID>` (also apps whose original names no g
   fresh install copies nothing. If an item couldn't be read (before the first unlock), calls stay as before and the
   next launch tries again;
 - keys and certificates keep the old stripping.
+Spec review fixes: "ran before" also looks at Documents, Application Support and Library/AppGroups and ignores the
+fix's own `ifizbox.groupfix.*` marks (an app keeping nothing in its preferences was taken for fresh and pinned
+without its items; a B227 fresh install with only the fresh mark was taken for one that ran); an item behind Face
+ID or a passcode, which the copy skips, now keeps the app unpinned (it would be out of reach once pinned). Kept from
+the review's "not asked": every app with its own keychain group gets the dylib (the victims are apps whose original
+names no groups too) and the stamp bump (the only way installed apps get it).
+Re-run on the 15 Pro with the reviewed dylib: a7 (old SideDrop way; its passwords were ones it found in the
+shared group) re-signed by our native signer, w4 (old SideDrop way) wiped the shared group, a7 kept everything
+(passwords in its own group); a8 fresh with the fix: NEW everywhere. Probes uninstalled after.
 SignerStamp and WEB_SIGNER_VERSION go to 2, so every installed app shows under Needs Re-sign and gets it.
 Log line: `Group fix: ...; passwords kept in TEAM.<its ID>, the shared groups' copied in once if the app ran before`.
 
