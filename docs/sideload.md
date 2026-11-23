@@ -310,10 +310,16 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   SideStore's docs give. The Shortcut still accepts `{"start":1,"cellular":1}` from older app builds: it turns data
   off after Set VPN, not before. With no network at all, the built-in VPN's start fails at once, saying it can't
   start without Wi-Fi or cellular data, instead of waiting 10 s. After
-  the last connect, once the VPN goes off (the 3 second linger, so a queue shares one start and one end), when the start ran, it runs
-  with `{"end":1}`, plus `"cellular":1` on cellular: cellular data goes back on, then the stored VPN (Tailscale, say)
-  connects and is forgotten. Shortcuts opens only from the front, so an end due while the app is in the background
-  runs when the app is next active. The Shortcut reads its input as a dictionary and tests its flags with "has any
+  the last connect, once the VPN goes off and the queue is over (the 3 second linger has passed, so a queue shares one
+  start and one end), the end runs only when the start ran and there is something to put back: cellular data that the
+  run turned off and that isn't on again, or another VPN that was up before the start and isn't up again (its
+  address isn't back). It runs
+  with `{"end":1}`, plus `"cellular":1` only when Cellular Data Off ran: cellular data goes back on, then the stored VPN
+  (Tailscale, say) connects and is forgotten. Shortcuts opens only from the front, so an end due while the app is in
+  the background waits until the app is next in front; with nothing to put back, the end doesn't open Shortcuts at all. The
+  automatic check that Installation & Signing's pages run after a failure is skipped while a connect would run the
+  Install Switch (it is added, and cellular or another VPN is up), so returning to a page can't open Shortcuts; a
+  tapped Check Connection still runs it. The Shortcut reads its input as a dictionary and tests its flags with "has any
   value". Without the Install Switch the built-in VPN connects by itself and the user's VPN stays off after. Phones
   that added the two older Shortcuts, "Cellular Data Off" and "Cellular Data On", still run them (data off before
   the connect, on once connected), but Set Up no longer offers them. An install that starts on cellular without the

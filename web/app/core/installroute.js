@@ -51,6 +51,9 @@ export function setupFooter(st) {
   if (shortcutsAdded(st)) return "Set up. Apps install straight onto this iPhone, on Wi-Fi, cellular or offline.";
   return "Set up for Wi-Fi and offline. Add the Install Switch to install on cellular and get your VPN back after.";
 }
+// B381: a connect now would run the Install Switch (LocalVPN.switchNeeded: on cellular, or with another VPN up), so
+// iOS would flip to Shortcuts. The checks nobody tapped (autoCheck) stay away then.
+export const switchWouldRun = (st) => builtinVPN(st) && Boolean(st.vpn.shortcuts?.switch) && Boolean(st.vpn.cellular || st.otherVPN || (!st.vpn.on && st.tunnels?.length)); // otherVPN is false when another VPN routes 10.7.0.1
 // User 2026-11-22: This iPhone in use, the phone on cellular (no Wi-Fi), and the Install Switch not added: iOS
 // refuses the connection, so Home, Installation & Signing's status and an install that starts say so, with a button
 // to the Install Switch's page.
