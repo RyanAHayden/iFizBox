@@ -22,7 +22,7 @@
 //                             F131: a Filename that is a full URL, fetched by the shell instead of apt
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { compareVersions, parseRelations } from "./apt.js";
+import { compareVersions, parseRelations, lowerId } from "./apt.js";
 import { NAME } from "../brand.js";
 
 export const MODES = ["install", "reinstall", "upgrade", "downgrade", "remove"];
@@ -98,8 +98,7 @@ export function jobIssues(jobs, label = (j) => j.name || j.id) {
   return out;
 }
 
-// dpkg's and apt's spelling of a package name: they know every name in lower case.
-export const lowerId = (id) => String(id ?? "").replace(/[A-Z]+/g, (s) => s.toLowerCase());
+export { lowerId };
 
 // apt answers about Oreo as oreo: give the plan's entries the queued jobs' own ids back, which the catalog knows.
 export function planForJobs(plan, jobs) {

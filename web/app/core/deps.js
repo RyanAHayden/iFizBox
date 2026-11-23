@@ -26,6 +26,7 @@
 // Dependencies of dependencies are followed (a few levels down), so a missing library two steps away still gets
 // its sentence: "Needs Foo, which needs libbar, which none of your sources has".
 import { parseRelations, satisfies, compareVersions } from "./apt.js";
+import { IdMap, IdSet, sameId } from "./apt.js"; // B407: package names compare ignoring case
 
 // Where well-known libraries live when none of the user's sources has them: rootless (iphoneos-arm64) builds,
 // checked against each repo's Packages file on 2026-11-17. Every repo here is also in core/recommended.js (recommended.test.js).
@@ -62,11 +63,11 @@ export function depIndex({ available = [], installed = [] } = {}) {
     if (!id) return;
     add(map, id, { id, version: stanza.version ?? "", stanza, key, real: true });
     for (const g of parseRelations(stanza.provides)) for (const p of g) {
-      if (p.name !== id) add(map, p.name, { id, version: p.op === "=" ? p.version : null, stanza, key, real: false });
+      if (!sameId(p.name, id)) add(map, p.name, { id, version: p.op === "=" ? p.version : null, stanza, key, real: false });
     }
   };
-  const avail = new Map();
-  const inst = new Map();
+  const avail = new IdMap();
+  const inst = new IdMap();
   for (const a of available) fill(avail, a.stanza ?? a, a.key ?? null);
   for (const st of installed) fill(inst, st, null);
   return { available: avail, installed: inst };
@@ -112,7 +113,7 @@ export function explain(stanza, { device = null, index = depIndex(), homes = KNO
   const self = stanza?.package;
   const names = (id) => nameOf(index.installed.get(id)?.find((o) => o.real)?.stanza ?? index.available.get(id)?.find((o) => o.real)?.stanza, id);
   const ios = iosOf(device, index);
-  const seen = new Set(self ? [self] : []);
+  const seen = new IdSet(self ? [self] : []);
   const push = (p) => { if (!problems.some((q) => q.sentence === p.sentence)) problems.push(p); };
 
   const walk = (st, via) => {
@@ -143,7 +144,7 @@ export function explain(stanza, { device = null, index = depIndex(), homes = KNO
         continue;
       }
       for (const o of index.installed.get(r.name) ?? []) {
-        if (o.id === self || !offerOk(o, r)) continue;
+        if (sameId(o.id, self) || !offerOk(o, r)) continue;
         const n = names(o.id);
         push({ kind: "conflict", id: o.id, blocking: true, via: [],
           sentence: `${subject ? `${subject} conflicts` : "Conflicts"} with ${n}, which is installed (remove ${n} first).`,
@@ -157,9 +158,9 @@ export function explain(stanza, { device = null, index = depIndex(), homes = KNO
     const installedOffers = new Map();
     for (const list of index.installed.values()) for (const o of list) if (o.real) installedOffers.set(o.id, o.stanza);
     for (const [id, ist] of installedOffers) {
-      if (id === self) continue;
+      if (sameId(id, self)) continue;
       for (const g of [...parseRelations(ist.conflicts), ...parseRelations(ist.breaks)]) for (const r of g) {
-        const hit = mine.find((m) => m.name === r.name && (!r.op || (m.version != null && satisfies(m.version, r.op, r.version))));
+        const hit = mine.find((m) => sameId(m.name, r.name) && (!r.op || (m.version != null && satisfies(m.version, r.op, r.version))));
         if (!hit) continue;
         const n = names(id);
         push({ kind: "conflicted", id, blocking: true, via: [],

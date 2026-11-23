@@ -10,6 +10,8 @@
 //   wishRows(ids, rows, installed)        // the page's rows: the catalog's, by name, installed and unknown left out
 //   wishCount(ids, installed)             // F125: Installed's Wish List row count: the wished ids not installed
 
+import { IdSet } from "./apt.js"; // B407: installed ids match ignoring case
+
 export const WISHLIST_KEY = "ifizbox.wishlist";
 export const WISH_ADD = "Add to Wish List";
 export const WISH_REMOVE = "Remove from Wish List";
@@ -45,7 +47,7 @@ export function createWishlist({ storage = globalThis.localStorage } = {}) {
       else if (!on && has) write(list.filter((p) => p !== id));
     },
     prune(installed) {
-      const inst = new Set(installed);
+      const inst = new IdSet(installed);
       const list = read();
       const gone = list.filter((p) => inst.has(p));
       if (gone.length) write(list.filter((p) => !inst.has(p)));
@@ -58,14 +60,14 @@ export function createWishlist({ storage = globalThis.localStorage } = {}) {
 // `rows`: the catalog's rows for the wished ids (null or missing for one no source carries now), `installed`: ids
 // on the device. Sorted by name, as the other plain package lists.
 export function wishRows(ids, rows, installed = []) {
-  const inst = new Set(installed);
-  const want = new Set(ids);
+  const inst = new IdSet(installed);
+  const want = new IdSet(ids);
   return rows.filter((r) => r && want.has(r.id) && !inst.has(r.id))
     .sort((a, b) => String(a.name ?? a.id).localeCompare(String(b.name ?? b.id), undefined, { sensitivity: "base" }));
 }
 
 // F125: the number on Installed's Wish List row: wished packages not on the device (the page prunes those when it draws).
 export function wishCount(ids, installed = []) {
-  const inst = new Set(installed);
+  const inst = new IdSet(installed);
   return new Set(ids.filter((id) => !inst.has(id))).size;
 }

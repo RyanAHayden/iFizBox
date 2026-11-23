@@ -26,7 +26,7 @@
 // A row only shows once the feature it controls exists (user 2026-11-17). FEATURES lists the ones that do; the task
 // that builds a feature adds its name here, and its row appears. Each def names its `feature`.
 
-import { ARCHES, DEFAULT_ARCH } from "./apt.js";
+import { ARCHES, DEFAULT_ARCH, sameId } from "./apt.js";
 import { IOS_VERSIONS, JAILBREAK_ARCH } from "./compat.js";
 import { NAME } from "../brand.js";
 import { OLD_WAY_ALERT } from "./keepid.js";
@@ -560,12 +560,13 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
   };
   const holds = {
     list: () => [...new Set([...readHolds(), ...readAppHolds()])].sort(),
-    has: (pkg) => readHolds().includes(pkg) || readAppHolds().includes(pkg),
+    // B407: dpkg's holds ignore case (apt-mark showhold says oreo for Oreo); apps' bundle IDs stay exact.
+    has: (pkg) => readHolds().some((p) => sameId(p, pkg)) || readAppHolds().includes(pkg),
     // Resolves to true once the hold is in place (at once without a helper), false when dpkg refused it; the list
     // then shows dpkg's holds again (or the old list if showhold failed too).
     async set(pkg, on, { dpkg: viaDpkg = true } = {}) {
       const app = readAppHolds();
-      if (!viaDpkg || (!on && app.includes(pkg) && !readHolds().includes(pkg))) {
+      if (!viaDpkg || (!on && app.includes(pkg) && !readHolds().some((p) => sameId(p, pkg)))) {
         const next = new Set(app);
         if (on) next.add(pkg); else next.delete(pkg);
         if (next.size) store.set(APP_HOLDS_KEY, JSON.stringify([...next].sort())); else store.remove(APP_HOLDS_KEY);
@@ -573,9 +574,9 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
         return true;
       }
       const before = readHolds().sort();
-      const list = new Set(before);
-      if (on) list.add(pkg); else list.delete(pkg);
-      writeHolds([...list].sort());
+      const list = before.filter((p) => !sameId(p, pkg));
+      if (on) list.push(before.find((p) => sameId(p, pkg)) ?? pkg);
+      writeHolds(list.sort());
       if (!dpkg) return true;
       try {
         await run([on ? "hold" : "unhold", pkg]);

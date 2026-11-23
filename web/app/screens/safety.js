@@ -29,6 +29,7 @@ import { MALICIOUS_REASONS, OTHER_REASON, REPORT_TEXT_MAX, reportBody, reportsAp
   WHY_LISTED, reportedAlert, INSTALL_ANYWAY } from "../core/malicious.js";
 import { reviewsBase } from "../core/reviews.js";
 import { nativeBridge } from "../native.js";
+import { IdMap } from "../core/apt.js";
 
 const local = () => { try { return globalThis.localStorage ?? null; } catch { return null; } };
 const session = () => { try { return globalThis.sessionStorage ?? null; } catch { return null; } };
@@ -243,7 +244,7 @@ export async function patchUpgrades(upgrades, { mode = detectMode(), ios = curre
 // The jailbreak build's installed packages (dpkg's status through the catalog) as id -> version.
 export async function installedPackages() {
   const { catalog } = await import("../catalog.js");
-  return new Map(((await catalog.installed().catch(() => null)) ?? []).map((r) => [r.id, r.version ?? ""]));
+  return new IdMap(((await catalog.installed().catch(() => null)) ?? []).map((r) => [r.id, r.version ?? ""]));
 }
 
 export async function catalogKeyOf(id) {

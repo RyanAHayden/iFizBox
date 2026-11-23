@@ -83,6 +83,7 @@ import { compat, compatCode, isIncompatible, normalizeDevice, needText } from ".
 import { parseSource, appStanza, isAltKey, runsOn, installOptions, signableApp } from "./altstore.js";
 import { depIndex, explain, explainApt } from "./deps.js";
 import { withIpaInfo } from "./ipainfo.js";
+import { IdMap, IdSet, sameId } from "./apt.js"; // B407: package names compare ignoring case
 import { needsRestart } from "./queue.js";
 import { packageKind } from "./progress.js";
 import { injectableFromFields, hintMatcher } from "./tweakfields.js"; // F302; C32: not tweaks.js, which pulls unpack.js in
@@ -456,7 +457,7 @@ export function createCatalog() {
   let hidden = new Set();    // Section Visibility (Cydia's CydiaSections Hidden): section names left out of lists
   const shown = new Map();   // key -> sorted rows outside hidden sections (cache)
   let hiddenAuthors = new Set(); // F104: lower-cased author/maintainer names whose packages are left out of lists
-  let blocked = new Set();   // F226: package ids blocked on the device, left out like hidden sections' packages
+  let blocked = new IdSet(); // F226: package ids blocked on the device, left out like hidden sections' packages
   let device = null;         // F17: the device rows are judged for (core/compat.js), or null before one is set
   let fitFilter = false;     // and whether rows that can't work on it are left out
   const fitting = new Map(); // key -> sorted rows that can work on the device (cache)
@@ -466,6 +467,9 @@ export function createCatalog() {
   const tweakKeys = new Set();
   const counts = (key) => !appsOnly || isAltKey(key) || tweakKeys.has(key);
   const inAll = (key) => !appsOnly || isAltKey(key);
+  // B407: a map over several sources' packages. apt takes Oreo and oreo as one package, so ids compare ignoring case;
+  // without a jailbreak the ids are apps' bundle IDs, kept apart as spelled.
+  const mergeMap = () => (appsOnly ? new Map() : new IdMap());
   const ipaInfo = new Map(); // F160: downloadURL -> what the IPA itself says (core/ipainfo.js), from the UI
   const judged = (st) => (st?.kind === "ipa" && st.downloadURL && ipaInfo.has(st.downloadURL) ? withIpaInfo(st, ipaInfo.get(st.downloadURL)) : st);
   // F382: Source Filters. `filterStore` is the stored choices (null until the UI sent them: nothing filtered), each
@@ -546,11 +550,12 @@ export function createCatalog() {
   function listMerges() {
     const all = entries(ALL);
     if (listCacheOf[0] === all && listCacheOf[1] === filterGen) return;
-    newestCopy = new Map();
-    listMerged = new Map();
+    newestCopy = mergeMap();
+    listMerged = mergeMap();
     for (const [k, { byId }] of sources) {
       if (!counts(k)) continue;
-      for (const [id, e] of byId) {
+      for (const e of byId.values()) {
+        const id = e.row.id;
         if (filteredOut(e.row) || systemTweak(e.row) || !listed(e.row)) continue;
         const v = newestCopy.get(id);
         if (v == null || compareVersions(v, e.stanza.version) < 0) newestCopy.set(id, e.stanza.version);
@@ -570,7 +575,7 @@ export function createCatalog() {
   // F302: `opts.tweaks`: a Tweak Source of the sideload build: only what core/tweaks.js injectableFromFields keeps,
   // iphoneos-arm64 and iphoneos-arm alike, each stanza marked `injectable`.
   function load(key, text, root, arch = DEFAULT_ARCH, opts = {}) {
-    const byId = new Map();
+    const byId = new IdMap();
     const tweaks = Boolean(opts?.tweaks);
     if (tweaks) tweakKeys.add(key); else tweakKeys.delete(key);
     for (const st of parseControl(text)) {
@@ -689,7 +694,7 @@ export function createCatalog() {
   // F226: Block. These ids drop out of every list, Search, Sections' counts, the author page and Changes;
   // package() still opens one, so its page can unblock it, and upgrades() still sees it (Changes files it as ignored).
   function setBlocked(ids) {
-    blocked = new Set((Array.isArray(ids) ? ids : []).filter((n) => typeof n === "string" && n));
+    blocked = new IdSet((Array.isArray(ids) ? ids : []).filter((n) => typeof n === "string" && n));
     shown.clear();
     return blocked.size;
   }
@@ -703,10 +708,11 @@ export function createCatalog() {
   function entries(key) {
     if (key !== ALL) return (counts(key) && sources.get(key)?.byId) || new Map();
     if (merged) return merged;
-    merged = new Map();
+    merged = mergeMap();
     for (const [k, { byId }] of sources) {
       if (!inAll(k)) continue;
-      for (const [id, e] of byId) {
+      for (const e of byId.values()) {
+        const id = e.row.id;
         const cur = merged.get(id);
         if (!cur || compareVersions(cur.stanza.version, e.stanza.version) < 0) merged.set(id, e);
       }
@@ -721,8 +727,8 @@ export function createCatalog() {
     if (!appsOnly || !tweakKeys.size) return new Map();
     const all = entries(ALL);
     if (tweakOf === all && tweakGen === filterGen) return tweakMerged;
-    tweakMerged = new Map();
-    const kept = new Map(); // F382: the same merge over the rows the Source Filters keep, for the section's list
+    tweakMerged = new IdMap();
+    const kept = new IdMap(); // F382: the same merge over the rows the Source Filters keep, for the section's list
     for (const k of tweakKeys) {
       for (const [id, e] of sources.get(k)?.byId ?? []) {
         const cur = tweakMerged.get(id);
@@ -809,10 +815,10 @@ export function createCatalog() {
   function sourceCounts() {
     const all = entries(ALL);
     if (spreadOf === all) return spread;
-    spread = new Map();
+    spread = mergeMap();
     for (const [k, { byId }] of sources) {
       if (!counts(k)) continue;
-      for (const id of byId.keys()) spread.set(id, (spread.get(id) ?? 0) + 1);
+      for (const { row } of byId.values()) spread.set(row.id, (spread.get(row.id) ?? 0) + 1);
     }
     spreadOf = all;
     return spread;
@@ -919,7 +925,7 @@ export function createCatalog() {
 
   // B391: what a source's featured banners may show (screens/extras.js): a hidden tweak's banner stays away too.
   function shows(id, key) {
-    return tweakKeys.has(key) ? visibleOf(key).some((r) => r.id === id) : Boolean(pkg(id, key));
+    return tweakKeys.has(key) ? visibleOf(key).some((r) => sameId(r.id, id)) : Boolean(pkg(id, key));
   }
 
   // Version History (F29): every version of `id` on offer. APT: each version any source carries (the candidate
@@ -1040,7 +1046,7 @@ export function createCatalog() {
         if (o && o !== e) stanzas.push(o.stanza, ...(o.older ?? []));
       }
       const kind = packageKind(stanzas); // F151: what the console's finish button does for it
-      out[id] = { name: e?.row.name ?? (st ? installedPkgs?.find((r) => r.id === id)?.name : null) ?? null, restart: needsRestart(stanzas), kind };
+      out[id] = { name: e?.row.name ?? (st ? installedPkgs?.find((r) => r.id === st.package)?.name : null) ?? null, restart: needsRestart(stanzas), kind };
     }
     return out;
   }
@@ -1077,7 +1083,8 @@ export function createCatalog() {
   function versions() {
     const out = [];
     for (const [k, { byId }] of sources) {
-      for (const [id, e] of byId) {
+      for (const e of byId.values()) {
+        const id = e.row.id;
         const vs = e.stanza.ipa?.versions;
         if (!Array.isArray(vs) || !vs.length) { out.push([k, id, e.stanza.version ?? ""]); continue; }
         for (const v of vs) out.push([k, id, v.version ?? "", v.date ?? null]);
@@ -1088,16 +1095,16 @@ export function createCatalog() {
 
   // ---- installed packages (F7): dpkg's status file, matched against every source's candidate ----
   let installedPkgs = null; // parseStatus rows, or null before a status file came
-  let statusById = new Map(); // id -> status stanza, for the package page of packages no source carries (F27)
+  let statusById = new IdMap(); // id -> status stanza, for the package page of packages no source carries (F27)
 
   function setInstalled(text) {
     if (text == null) {
       installedPkgs = null;
-      statusById = new Map();
+      statusById = new IdMap();
       return -1;
     }
     const stanzas = installedStanzas(text);
-    statusById = new Map(stanzas.map((st) => [st.package, st]));
+    statusById = new IdMap(stanzas.map((st) => [st.package, st]));
     installedPkgs = parseStatus(text, stanzas);
     return installedPkgs.length;
   }
@@ -1107,20 +1114,21 @@ export function createCatalog() {
   function installedOnly(id) {
     const st = statusById.get(id);
     if (!st) return null;
-    const p = installedPkgs.find((r) => r.id === id);
+    const p = installedPkgs.find((r) => r.id === st.package);
     const row = { id: p.id, name: p.name, short: p.short, version: p.version, section: p.section, icon: null, key: null, author: p.author,
       compat: device ? compatCode(st, device) : null };
     return { stanza: st, key: null, row, others: [], installedOnly: true };
   }
 
   // The installed list as rows: the status file's own fields (name, version, description), with the source's
-  // icon and key where a source carries the package, so the row's icon and package page work.
+  // icon, key and spelling of the id (B407: Oreo, dpkg's is oreo) where a source carries the package, so the row's
+  // icon and package page work.
   function installed() {
     if (!installedPkgs) return null;
     const all = entries(ALL);
     return installedPkgs.map((p) => {
       const e = all.get(p.id);
-      return { id: p.id, name: p.name, short: p.short, version: p.version, section: p.section,
+      return { id: e?.row.id ?? p.id, name: p.name, short: p.short, version: p.version, section: p.section,
         icon: e?.row.icon ?? null, key: e?.row.key ?? null, author: p.author, installed: p.version, held: p.held, tier: p.tier, // F127
         purpose: e?.row.purpose ?? (statusById.has(p.id) ? purposeOf(statusById.get(p.id)) : null),
         size: installedBytes(statusById.get(p.id)),

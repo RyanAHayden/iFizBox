@@ -22,7 +22,7 @@ import { aptHeader, infoGroup } from "./sourcepage.js"; // F384: one source page
 import { catalog, ALL } from "../catalog.js";
 import { NO_SECTION, indexLetter, parseAuthor } from "../core/catalog.js";
 import { packageIcon } from "../core/sectionicons.js";
-import { description, parseRelations, compareVersions } from "../core/apt.js";
+import { description, parseRelations, compareVersions, sameId } from "../core/apt.js";
 import { displayName, releaseDepiction } from "../core/sources.js";
 import { insecureNote } from "../core/sources.js"; // F220
 import { renderSileo, mediaUrl, reviewBody } from "./depiction.js";
@@ -1175,7 +1175,7 @@ function blockGroup({ id, name, author, tile = null }) {
   };
   draw();
   if (detectMode() === "jailbreak") {
-    catalog.installed().then((list) => { installed = Boolean(list?.some((p) => p.id === id)); if (box.isConnected) draw(); }).catch(() => {});
+    catalog.installed().then((list) => { installed = Boolean(list?.some((p) => sameId(p.id, id))); if (box.isConnected) draw(); }).catch(() => {});
   }
   return box;
 }
@@ -1279,7 +1279,7 @@ async function renderPackage(body, route, key, id, ctx) {
   // F29: Version History, every version the sources offer (Downgrade's list).
   const [depReport, history, installedList] = await Promise.all([catalog.deps(id, key).catch(() => null),
     catalog.history(id, key).catch(() => null), catalog.installed().catch(() => null)]);
-  const inst = installedList?.find((r) => r.id === pid) ?? null;
+  const inst = installedList?.find((r) => sameId(r.id, pid)) ?? null;
   const author = parseAuthor(st.author);
   const maint = parseAuthor(st.maintainer);
   const section = pkg.row.section && pkg.row.section !== NO_SECTION ? pkg.row.section : null;
@@ -2103,7 +2103,7 @@ export const paidDebSection = () => ({ rows: [{ label: "Download .deb", detail: 
 async function installedGroup(id, { version = true } = {}) {
   let rows;
   try { rows = await catalog.installed(); } catch { return null; }
-  const p = rows?.find((r) => r.id === id);
+  const p = rows?.find((r) => sameId(r.id, id));
   if (!p) return null;
   // On the site a hold in the uploaded status file is dpkg's, set on the phone: shown, not switchable here.
   const dpkgHeld = p.held && catalog.statusSource() !== "native";

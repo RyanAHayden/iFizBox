@@ -13,6 +13,7 @@ import { parseControl, description, compareVersions, parseRelations } from "./ap
 import { sectionName, parseAuthor, compareNames, sectionGroup } from "./sections.js"; // C36: not catalog.js, which imports this file
 import { NAME } from "../brand.js";
 import { nativeBridge } from "../native.js";
+import { IdMap, IdSet, lowerId } from "./apt.js"; // B407: package names compare ignoring case
 
 // Where dpkg keeps it: rootful, then rootless (Dopamine, palera1n rootless).
 export const STATUS_PATHS = ["/var/lib/dpkg/status", "/var/jb/var/lib/dpkg/status"];
@@ -42,7 +43,7 @@ function installedRow(st, deps = new Set()) {
 // The status stanzas of the packages dpkg has on disk, first stanza per package, in file order.
 export function installedStanzas(text) {
   const out = [];
-  const seen = new Set();
+  const seen = new IdSet();
   for (const st of parseControl(text)) {
     if (!st.package || !st.version || seen.has(st.package)) continue;
     if (!ON_DISK.has(parseStatusField(st.status).state)) continue;
@@ -71,7 +72,7 @@ export function looksLikeStatus(text) {
 // file's hold flags: the app passes that, since there `holds` already is dpkg's list (apt-mark showhold, F22) and
 // is newer than the status file it read.
 export function findUpgrades(installed, candidateOf, holds = [], { dpkgHolds = true } = {}) {
-  const ignoredIds = new Set(holds);
+  const ignoredIds = new IdSet(holds);
   const available = [];
   const ignored = [];
   for (const pkg of installed) {
@@ -533,8 +534,8 @@ export function roleRank(st) {
 }
 
 export function dependedOn(stanzas) {
-  const ids = new Set(stanzas.map((st) => st.package));
-  const providers = new Map(); // virtual name -> installed ids that provide it
+  const ids = new IdMap(stanzas.map((st) => [st.package, st.package]));
+  const providers = new IdMap(); // virtual name -> installed ids that provide it
   for (const st of stanzas) {
     for (const [p] of parseRelations(st.provides)) {
       if (!providers.has(p.name)) providers.set(p.name, []);
@@ -545,7 +546,7 @@ export function dependedOn(stanzas) {
   for (const st of stanzas) {
     for (const group of [...parseRelations(st["pre-depends"]), ...parseRelations(st.depends)]) {
       for (const alt of group) {
-        for (const id of [...(ids.has(alt.name) ? [alt.name] : []), ...(providers.get(alt.name) ?? [])]) {
+        for (const id of [...(ids.has(alt.name) ? [ids.get(alt.name)] : []), ...(providers.get(alt.name) ?? [])]) {
           if (id !== st.package) out.add(id);
         }
       }
@@ -567,17 +568,18 @@ export function packageTier(st, deps = new Set()) {
 
 export function markedRows(rows, auto) {
   if (!(auto instanceof Set)) return rows;
+  const marked = new IdSet(auto);
   return rows.map((r) => {
     const t = tierOf(r);
-    if (t === 2 && !auto.has(r.id)) return { ...r, tier: 1 };
-    if (t === 1 && auto.has(r.id)) return { ...r, tier: 2 };
+    if (t === 2 && !marked.has(r.id)) return { ...r, tier: 1 };
+    if (t === 1 && marked.has(r.id)) return { ...r, tier: 2 };
     return r;
   });
 }
 
 // Rows without a tier (an older worker's) count as User, so nothing disappears.
 const tierOf = (r) => (Number.isFinite(r?.tier) ? r.tier : 1);
-const dateOf = (dates, r) => Number(dates?.[r.id]) || 0;
+const dateOf = (dates, r) => Number(dates?.[r.id] ?? dates?.[lowerId(r.id)]) || 0; // dpkg's info/<pkg>.list is lower case
 
 export function modeRows(rows, mode, dates = null) {
   if (mode === "recent") {
