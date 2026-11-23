@@ -36,7 +36,11 @@ export function helperRefusal(message, jobs, names = {}) {
   if (/^bad package name/.test(why)) {
     const rule = nameRule(why);
     const bad = (j) => (rule && !rule.test(j.id)) || j.id.length > 255 || (j.op !== "remove" && /[-+]$/.test(j.id));
-    return about(jobs.filter(bad), (j) => `${titled(j)} can't be handed to apt: its package ID isn't one ${NAME} can pass on.`,
+    return about(jobs.filter(bad), (j) => {
+      const id = !rule || rule.test(j.id) ? `isn't one ${NAME} can pass on`
+        : `has ${rule.test(j.id.toLowerCase()) ? "capital letters" : "characters"} ${NAME} can't pass on`;
+      return `${titled(j)} can't be handed to apt: its package ID ${id}.`;
+    },
       `A queued package can't be handed to apt: its package ID isn't one ${NAME} can pass on.`);
   }
   if (/^bad version/.test(why)) {

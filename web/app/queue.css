@@ -31,6 +31,7 @@ html[data-theme="dark"] .pkg-row[data-queued="remove"] .pkg-desc { color: var(--
 .confirm-mods .cell-detail { overflow-wrap: anywhere; }
 /* B404: Cannot Comply's Remove <name> from Queue, its whole name on more lines if it must */
 .confirm-unqueue .cell-label { white-space: normal; overflow-wrap: anywhere; }
+.confirm-unqueue .cell-inner { padding-top: 10px; padding-bottom: 10px; }
 .confirm-raw, .console-log {
   margin: 0; padding: 10px 12px; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere;
   -webkit-user-select: text; user-select: text;

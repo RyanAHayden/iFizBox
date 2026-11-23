@@ -228,7 +228,7 @@ test("helperRefusal: which package and why, by the helper's own rule", () => {
   const jobs = [inst("com.b.violaWhite", { name: "Viola White" }), inst("com.x.ok", { version: "v2" }), { op: "remove", id: "com.x.rm" }];
   const bad = helperRefusal(helperError("bad package name (allowed: [a-z0-9][a-z0-9.+-]+)").message, jobs);
   assert.deepEqual(bad.ids, ["com.b.violaWhite"]);
-  assert.match(bad.sentences[0], /^Viola White \(com\.b\.violaWhite\) can't be handed to apt/);
+  assert.match(bad.sentences[0], /^Viola White \(com\.b\.violaWhite\) can't be handed to apt: its package ID has capital letters /);
   assert.deepEqual(helperRefusal(helperError("bad version (a digit, then [A-Za-z0-9.+~:-])").message, jobs).ids, ["com.x.ok"]);
   const rm = helperRefusal(helperError("unknown package: com.x.rm").message, jobs);
   assert.deepEqual([rm.ids, rm.sentences], [["com.x.rm"], ["com.x.rm isn't installed, so it can't be removed."]]);
