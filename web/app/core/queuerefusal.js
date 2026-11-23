@@ -4,6 +4,8 @@
 //   helperRefusal(message, jobs, names)  -> { sentences: [string], ids: [queued id], missing }
 //       `message`: the BackendError's ("ifizbox-helper simulate failed (64): ifizbox-helper: unknown package: com.a",
 //       native/helper/policy.c's and main.c's words). `missing`: there is no helper (Apt.swift), so reinstalling helps.
+//       `what`: the words for what apt was asked about, when the helper's reason has no sentence of its own.
+//   debRefusal(message, name)            -> the same, for a shared .deb (B409, share.debSimulate's error)
 //   refusalIds(r, jobs)                  -> [queued id]: the queued packages apt's refusal names (r: simulate's answer)
 //
 // Both give [] when the cause names no queued package. apt prints names in lowercase, so ids match without regard to
@@ -20,7 +22,7 @@ function nameRule(why) {
   try { return new RegExp(`^(?:${why.match(/allowed: (.+)\)\s*$/)[1]})$`); } catch { return null; }
 }
 
-export function helperRefusal(message, jobs, names = {}) {
+export function helperRefusal(message, jobs, names = {}, what = "these packages") {
   const why = String(message ?? "").replace(/^ifizbox-helper \S+ failed \(-?\d+\): /, "").replace(/^ifizbox-helper: /, "").trim();
   const label = (j) => names[j.id] || j.name || j.id;
   const titled = (j) => (label(j) === j.id ? j.id : `${label(j)} (${j.id})`);
@@ -58,7 +60,18 @@ export function helperRefusal(message, jobs, names = {}) {
   }
   if (/calling process|parent/.test(why)) return about([], null, `iOS didn't let ${NAME} run apt: the app that is running isn't the installed ${NAME}. Close and open ${NAME}, then try again.`);
   if (/can't start ifizbox-helper/.test(why)) return about([], null, `iOS didn't let ${NAME} run apt (${why.replace(/^.*?: /, "")}). Is the jailbreak on?`);
-  return about([], null, `${NAME} couldn't ask apt about these packages: ${why || "it gave no reason"}`);
+  return about([], null, `${NAME} couldn't ask apt about ${what}: ${why || "it gave no reason"}`);
+}
+
+// Its own reasons are policy.c's local_deb_plan and paid.c's, and ShareBridge.swift's "gone"; `name` is what the user
+// knows the file as.
+export function debRefusal(message, name) {
+  const why = String(message ?? "").replace(/^(ifizbox-helper|[a-z_]+): /, "").trim();
+  const file = name || "the shared file";
+  const say = (sentence) => ({ missing: false, ids: [], sentences: [sentence] });
+  if (/^that shared file isn't there|^can't open the \.deb/.test(why)) return say(`${name || "The shared file"} isn't there any more. Share it again.`);
+  if (/^bad \.deb path|^path too long|^the \.deb isn't a plain file/.test(why)) return say(`${NAME} can't hand ${file} to apt: it isn't a file ${NAME} saved for installing. Share it again.`);
+  return helperRefusal(why, [], {}, file);
 }
 
 export function refusalIds(r, jobs) {

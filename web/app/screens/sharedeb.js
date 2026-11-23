@@ -7,9 +7,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped, el, barButton } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
-import { modal, runPaidInstall } from "./queue.js";
+import { modal, refusedBlock, runPaidInstall } from "./queue.js";
 import { catalog } from "../catalog.js";
 import { MODES, MODE_LABEL, parseSimulation, changeCount } from "../core/queue.js";
+import { debRefusal } from "../core/queuerefusal.js";
 import { NAME } from "../brand.js";
 import { nativeBridge } from "../native.js";
 
@@ -35,8 +36,7 @@ export async function openDebConfirm({ file, name = "" }, { native = nativeBridg
   const plan = r ? parseSimulation(r.stdout) : null;
   if (err) {
     m.setTitle("Cannot Comply");
-    m.scroll.append(grouped([{ header: "Couldn't Ask apt", rows: [{ label: err.message || String(err) }],
-      footer: "Nothing was changed." }]));
+    m.scroll.append(refusedBlock(debRefusal(err.message || String(err), name), "Nothing was changed."));
   } else if (!r.ok || plan.essential.length) {
     m.setTitle("Cannot Comply");
     let problems = [];
