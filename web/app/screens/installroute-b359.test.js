@@ -12,7 +12,7 @@ globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), se
 globalThis.document ??= fakeDocument();
 
 const { SHORTCUT_NAMES, shortcutFileURL, shortcutDidntRun } = await import("../core/installroute.js");
-const { shortcutGroups, addShortcut, backInApp } = await import("./installroute.js");
+const { shortcutGroups, addShortcut, addSwitch, backInApp } = await import("./installroute.js");
 const { DOMAIN } = await import("../brand.js");
 
 const here = new URL(".", import.meta.url);
@@ -20,7 +20,7 @@ const here = new URL(".", import.meta.url);
 // vpn.openShortcuts answers `opened`; vpn.checkShortcut answers `check` (and the status it leaves).
 function phone({ opened = true, check = { ok: true } } = {}) {
   const calls = [];
-  const added = { off: false, on: false };
+  const added = { off: false, on: false, switch: false };
   const native = { call: (m, p) => {
     calls.push([m, p]);
     if (m === "vpn.openShortcuts") return Promise.resolve({ opened, via: "share" });
@@ -35,14 +35,14 @@ test("Add: not Added on open, only once the check run passed", async () => {
   const { native, calls } = phone();
   let back;
   const states = [];
-  const p = addShortcut(native, "off", { whenBack: () => new Promise((r) => { back = r; }), checking: (on) => states.push(on) });
+  const p = addShortcut(native, "switch", { whenBack: () => new Promise((r) => { back = r; }), checking: (on) => states.push(on) });
   await new Promise((r) => setTimeout(r, 0));
   assert.deepEqual(calls.map((c) => c[0]), ["vpn.openShortcuts"], "nothing runs or is marked until the user is back");
-  assert.deepEqual(calls[0][1], { which: "off", url: shortcutFileURL("off") });
+  assert.deepEqual(calls[0][1], { which: "switch", url: shortcutFileURL("switch") });
   back(true);
   const r = await p;
   assert.deepEqual(calls.map((c) => c[0]), ["vpn.openShortcuts", "vpn.checkShortcut"]);
-  assert.deepEqual(calls[1][1], { which: "off" });
+  assert.deepEqual(calls[1][1], { which: "switch" });
   assert.deepEqual(states, [true, false]);
   assert.equal(r.ok, true);
   assert.equal(shortcutGroups(r.status)[0].rows[0].detail, "Added");
@@ -50,22 +50,39 @@ test("Add: not Added on open, only once the check run passed", async () => {
 
 test("Add: a check run that fails leaves the row Add, and its footer says it didn't run", async () => {
   const { native } = phone({ check: { ok: false, error: "Shortcuts didn't come back in 25 s" } });
-  const r = await addShortcut(native, "on", { whenBack: async () => true });
+  const r = await addShortcut(native, "switch", { whenBack: async () => true });
   assert.equal(r.ok, false);
-  const gs = shortcutGroups(r.status, { failed: { on: r.error } });
-  assert.equal(gs[1].rows[0].detail, "Add");
-  assert.equal(gs[1].warn, true);
-  assert.equal(gs[1].footer, `"${SHORTCUT_NAMES.on}" didn't run: Shortcuts didn't come back in 25 s. Tap Add to try again.`);
-  assert.equal(gs[1].footer, shortcutDidntRun("on", r.error));
-  assert.notEqual(gs[0].warn, true, "the other Shortcut's footer is its own hint");
+  const gs = shortcutGroups(r.status, { failed: { switch: r.error } });
+  assert.equal(gs[0].rows[0].detail, "Add");
+  assert.equal(gs[0].warn, true);
+  assert.equal(gs[0].footer, `"${SHORTCUT_NAMES.switch}" didn't run: Shortcuts didn't come back in 25 s. Tap Add to try again.`);
+  assert.equal(gs[0].footer, shortcutDidntRun("switch", r.error));
+});
+
+test("F386: Set Up's Add says a failed check run in an alert; a pass says nothing", async () => {
+  const shown = [];
+  const alert = async (a) => { shown.push(a); return { index: 0 }; };
+  const bad = phone({ check: { ok: false, error: "Could not find the shortcut" } });
+  const r = await addSwitch(bad.native, alert, { whenBack: async () => true });
+  assert.equal(r.ok, false);
+  assert.deepEqual(shown.map((a) => [a.title, a.message]), [["Shortcut Not Added", shortcutDidntRun("switch", "Could not find the shortcut")]]);
+  shown.length = 0;
+  const good = phone();
+  const ok = await addSwitch(good.native, alert, { whenBack: async () => true });
+  assert.equal(ok.ok, true);
+  assert.equal(ok.status.shortcuts.switch, true);
+  assert.deepEqual(shown, []);
+  const closed = phone({ opened: false });
+  await addSwitch(closed.native, alert, { whenBack: async () => true });
+  assert.deepEqual(shown, [], "a closed share sheet: nothing to say");
 });
 
 test("Add: a share sheet that never opened says so, not that the Shortcut didn't run", async () => {
   const native = { call: (m) => m === "vpn.openShortcuts" ? Promise.reject(new Error("no window to show the share sheet in")) : Promise.resolve({}) };
-  const r = await addShortcut(native, "off", { whenBack: async () => true });
+  const r = await addShortcut(native, "switch", { whenBack: async () => true });
   assert.deepEqual(r, { opened: false, ok: false, error: "no window to show the share sheet in" });
-  const gs = shortcutGroups({ shortcuts: { off: false, on: false } }, { failed: { off: { open: r.error } } });
-  assert.equal(gs[0].footer, `"${SHORTCUT_NAMES.off}" couldn't be shared to Shortcuts: no window to show the share sheet in. Tap Add to try again.`);
+  const gs = shortcutGroups({ shortcuts: { switch: false } }, { failed: { switch: { open: r.error } } });
+  assert.equal(gs[0].footer, `"${SHORTCUT_NAMES.switch}" couldn't be shared to Shortcuts: no window to show the share sheet in. Tap Add to try again.`);
   assert.equal(gs[0].warn, true);
 });
 
@@ -80,10 +97,10 @@ test("Add: a closed share sheet, or the user still away, runs nothing and marks 
 });
 
 test("the row spins while its check runs; Added rows have no footer warning", () => {
-  const gs = shortcutGroups({ shortcuts: { off: false, on: false } }, { checking: "off", failed: { off: "old" } });
+  const gs = shortcutGroups({ shortcuts: { switch: false } }, { checking: "switch", failed: { switch: "old" } });
   assert.equal(gs[0].rows[0].detail, "Checking…");
   assert.notEqual(gs[0].warn, true);
-  const done = shortcutGroups({ shortcuts: { off: true, on: false } }, { failed: { off: "old" } });
+  const done = shortcutGroups({ shortcuts: { switch: true } }, { failed: { switch: "old" } });
   assert.equal(done[0].rows[0].detail, "Added");
   assert.notEqual(done[0].warn, true);
 });
@@ -101,14 +118,14 @@ test("backInApp: hidden then visible is back; no leave at all resolves after lea
 });
 
 test("the signed Shortcuts are on the site under their names, and the app runs them by those names", () => {
-  for (const k of ["off", "on"]) {
+  for (const k of ["off", "on", "switch"]) {
     const f = new URL(`../shortcuts/${SHORTCUT_NAMES[k]}.shortcut`, here);
     assert.ok(existsSync(f), `${f.pathname} (tools/shortcuts/sign.sh)`);
     assert.equal(readFileSync(f).subarray(0, 4).toString(), "AEA1", "signed (Apple Encrypted Archive)");
     assert.equal(shortcutFileURL(k), `https://${DOMAIN}/shortcuts/${SHORTCUT_NAMES[k].replaceAll(" ", "%20")}.shortcut`);
   }
   const swift = readFileSync(new URL("../../../native/sideload/vpn/App/LocalVPN.swift", here), "utf8");
-  assert.match(swift, /shortcutNames = \["off": "Cellular Data Off", "on": "Cellular Data On"\]/);
+  assert.match(swift, /shortcutNames = \["off": "Cellular Data Off", "on": "Cellular Data On", "switch": "Install Switch"\]/);
   assert.match(swift, /b\.on\("vpn\.checkShortcut"\)/);
   assert.doesNotMatch(swift, /create-shortcut/, "Add never opens an empty new Shortcut");
 });

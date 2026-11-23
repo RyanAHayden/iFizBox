@@ -179,3 +179,10 @@ _Said_: filters
 _On screen_: Filters
 _In code_: core/sourcefilters.js, settings.sourceFilters, catalog.setFilters
 _Avoid_: source rules, package filters
+
+**Install Switch**:
+The one Shortcut the user adds on This iPhone's Set Up: before a queue of installs it turns cellular data off and connects the built-in VPN, after it turns data back on and reconnects the VPN that was on before
+_Said_: one iFizBox Shortcut
+_On screen_: Install Switch
+_In code_: SHORTCUT_NAMES.switch, switchAdded, LocalVPN.endSwitch, vpn.testSwitch, install-switch.plist
+_Avoid_: VPN Shortcut, switch shortcut
