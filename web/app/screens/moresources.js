@@ -17,7 +17,8 @@
 //
 // The rows' data and adds are manage.js's (recRows, loadPreview, addRecommended, recHref); a row opens the source
 // (added) or its preview (#/sources/manage/recommended/<key>).
-import { el, grouped, note, barButton } from "../nav/ui.js";
+import { el, grouped, plain, note, barButton } from "../nav/ui.js";
+import { searchBar, pinned } from "../nav/searchbar.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { format } from "../router.js";
@@ -30,7 +31,7 @@ import {
   JAILBREAKS, jailbreakName, saveJailbreak, markRecommendedSeen, recommendedGroups, shortWhy,
 } from "../core/recommended.js";
 import { recRows, appSourceRows, loadPreview, addRecommended, recHref, currentJailbreak, sourcesChanged } from "./manage.js";
-import { findMoreOn, findHref } from "./findmore.js";
+import { findMoreOn, findHref, addAllListed } from "./findmore.js";
 
 export const MORE = "more";
 export const APPS = "apps";
@@ -52,10 +53,10 @@ export function page(route) {
 }
 export const isMore = (route) => page(route) != null;
 
-export function nav(route) {
+export function nav(route, ctx) {
   switch (page(route)) {
     case "root": return { title: "More Sources" };
-    case "apps": return { title: "App Sources" };
+    case "apps": return { title: "App Sources", right: { label: "Add All", onClick: () => addAllApps(ctx) } }; // B344
     default: return { title: "Not Found" };
   }
 }
@@ -138,11 +139,14 @@ function recGroups(rows, ctx, redraw, { jb = null } = {}) {
 const recCell = (r) => ({ label: r.label, subtitle: shortWhy(r.rec), icon: { text: r.label[0]?.toUpperCase() ?? "?" },
   href: recHref(r), chevron: false, cls: "rec-more-row" });
 
-function decorate(li, r, ctx, redraw) {
+// `find`: App Sources' rows, which wear Find More's ADD (findmore.js .find-add, centred on the row).
+function decorate(li, r, ctx, redraw, { find = false } = {}) {
   if (!li) return;
   li.dataset.key = r.key;
   setIcon(li, r.key, r.icons);
-  li.append(addButton(r, ctx, redraw));
+  const b = addButton(r, ctx, redraw);
+  if (find) b.classList.add("find-add");
+  li.append(b);
   // An AltStore source not read yet gets its icon from its JSON (read once per visit; tweak repos wait for Refresh).
   if (!r.rec.jailbreak && !r.record.iconURL) {
     loadPreview(r).then((p) => {
@@ -216,26 +220,66 @@ async function pickJailbreak(redraw) {
 
 // ---- Find App Sources --------------------------------------------------------------------------------------------
 
+// Find More's row (findmore.js repoCell): the source's name and one line saying what it carries.
+const appCell = (r) => ({ label: r.label, subtitle: shortWhy(r.rec), icon: { text: r.label[0]?.toUpperCase() ?? "?" },
+  href: recHref(r), chevron: false });
+
+// B344: the same page as Find Tweak Sources (findmore.js renderFind): a search bar pinned under the nav bar, one plain
+// list with a section per group, Find More's rows (icon, name, one line, ADD / ADDED) and Add All in the nav bar
+// (findmore.js addAllListed over the rows shown). The search filters the directory here; nothing is asked.
 export function renderApps(body, ctx) {
-  const box = el("div", "more-sources more-apps");
-  body.replaceChildren(box);
-  return drawApps(box, ctx);
+  const box = el("div", "find-more more-apps");
+  let query = "";
+  const bar = searchBar({ placeholder: "Search Sources", ariaLabel: "Search app sources", delay: 150, className: "find-search",
+    onQuery: (q) => { query = q; drawApps(box, ctx, { query }); } });
+  body.replaceChildren();
+  pinned(body, bar).append(box);
+  return drawApps(box, ctx, { query });
+}
+
+// What App Sources' Add All works on: the rows the page shows now and how to draw them again.
+let appsListed = { rows: [], redraw: () => {} };
+
+export function addAllApps(ctx, opts = {}) {
+  return addAllListed(ctx, { rows: appsListed.rows, redraw: appsListed.redraw, noun: "source", input: (r) => r.input,
+    nameOf: (r) => r.label, title: "App Sources", ...opts });
+}
+
+// A row matches when the query is in its name, its reason or its URL (case ignored).
+export function matchesQuery(r, q) {
+  const words = String(q ?? "").trim().toLowerCase();
+  if (!words) return true;
+  return [r.label, r.rec?.why, r.rec?.url].some((t) => String(t ?? "").toLowerCase().includes(words));
 }
 
 // B272: every source in the directory (manage.js appSourceRows: Recommended's app sources and the checked extras of
 // core/appsources.js), added ones kept with ADDED, so the page is never empty. Each source not added yet is read for
 // its icon (decorate: loadPreview); only when none of them answers does a note say so, under the footer, where it
 // pushes nothing down. `rows` and `preview` are seams for the tests. Resolves once that check has ended.
-export async function drawApps(box, ctx, { rows: load = appSourceRows, preview = loadPreview } = {}) {
-  const rows = await load();
-  const redraw = () => drawApps(box, ctx);
-  box.replaceChildren(recGroups(rows, ctx, redraw),
-    el("p", "group-footer rec-foot", "App sources from their developers and from mod makers. Tap one to see its apps "
-      + "before adding. Piracy sources are never listed."));
+export async function drawApps(box, ctx, { rows: load = appSourceRows, preview = loadPreview, query = "" } = {}) {
+  const turn = (box.drawTurn = (box.drawTurn ?? 0) + 1); // a newer draw (the next search letter) wins
+  const all = await load();
+  if (turn !== box.drawTurn) return;
+  const rows = all.filter((r) => matchesQuery(r, query));
+  const redraw = () => drawApps(box, ctx, { rows: load, preview, query });
+  appsListed = { rows, redraw };
+  const groups = recommendedGroups(rows);
+  const ul = plain(groups.map((g) => ({ header: g.header, rows: g.rows.map(appCell) })));
+  ul.classList.add("rec-list", "find-list");
+  const cells = [...ul.querySelectorAll(".cell")];
+  groups.flatMap((g) => g.rows).forEach((r, i) => {
+    cells[i]?.classList.add("source-row", "rec-row", "find-row");
+    decorate(cells[i], r, ctx, redraw, { find: true });
+  });
+  const parts = [ul];
+  if (!rows.length) parts.push(note("No app sources found."));
+  parts.push(el("p", "group-footer find-credit", "App sources from their developers and from mod makers. Tap one to see "
+    + "its apps before adding. Piracy sources are never listed."));
+  box.replaceChildren(...parts);
   const fresh = rows.filter((r) => !r.added);
   if (!fresh.length) return;
   const read = await Promise.allSettled(fresh.map((r) => preview(r)));
-  if (read.every((x) => x.status === "rejected" || !x.value) && box.isConnected !== false) {
+  if (turn === box.drawTurn && read.every((x) => x.status === "rejected" || !x.value) && box.isConnected !== false) {
     const why = read.find((x) => x.status === "rejected")?.reason?.message;
     box.append(note(`None of these sources answered${why ? `: ${why}` : ""}. Check the connection and open this page again.`));
   }

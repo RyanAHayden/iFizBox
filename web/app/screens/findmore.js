@@ -203,16 +203,19 @@ let listed = { rows: [], redraw: () => {} };
 // Add All in the nav bar: every listed repo not added yet, after one action sheet, then each in turn under a HUD that
 // counts them, as Import adds its picks. No Unknown Source question per repo: the sheet is the one confirm, and an
 // Unknown repo comes in as Unknown, as an imported one does. Failures are named in one alert at the end.
-// `rows`, `backend`, `sheet`, `alert`, `hud` and `changed` are seams for the tests. Resolves how many were added.
+// `rows`, `backend`, `sheet`, `alert`, `hud` and `changed` are seams for the tests. B344: App Sources (moresources.js)
+// runs the same Add All over its own rows: `noun` names them, `input` and `nameOf` read one, `title` is the page's.
+// Resolves how many were added.
 export async function addAllListed(ctx, { rows = listed.rows, backend = getBackend(), sheet = showActionSheet, alert = showAlert,
-  hud = liveHUD, changed = null, redraw = listed.redraw } = {}) {
-  const todo = rows.filter((r) => !r.added && !blocked(r.uri));
+  hud = liveHUD, changed = null, redraw = listed.redraw, noun = "repo", input = inputOf, nameOf = (r) => r.name,
+  title = "Find More" } = {}) {
+  const todo = rows.filter((r) => !r.added && !blocked(r.uri ?? r.rec?.url ?? ""));
   if (!todo.length) {
-    await alert({ title: "Find More", message: rows.length ? "Every repo listed here is in your sources." : "No repos are listed.",
+    await alert({ title, message: rows.length ? `Every ${noun} listed here is in your sources.` : `No ${noun}s are listed.`,
       buttons: ["OK"] });
     return 0;
   }
-  const what = todo.length === 1 ? "the 1 repo" : `the ${todo.length} repos`;
+  const what = todo.length === 1 ? `the 1 ${noun}` : `the ${todo.length} ${noun}s`;
   const i = await sheet({ title: `Add ${what} listed here that aren't in your sources yet?`, buttons: ["Add All"] });
   if (i !== 0) return 0;
   const failed = [];
@@ -221,10 +224,10 @@ export async function addAllListed(ctx, { rows = listed.rows, backend = getBacke
     for (const [n, r] of todo.entries()) {
       h.set(`Adding ${n + 1} of ${todo.length}`);
       try {
-        await backend.addSource(inputOf(r));
+        await backend.addSource(input(r));
         r.added = true;
         remember(r);
-      } catch (e) { failed.push(`${r.name}: ${e.message}`); }
+      } catch (e) { failed.push(`${nameOf(r)}: ${e.message}`); }
     }
   } finally {
     h.hide();

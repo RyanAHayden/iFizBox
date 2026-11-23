@@ -106,3 +106,89 @@ test("B272: emoji and arrows in a repo's name and description are dropped; plain
   assert.equal(r.name, "NSCake");
   assert.equal(r.description, "Cakes for you");
 });
+
+// B344: App Sources (Find More for apps, screens/moresources.js) is the same page: Find More's plain list and rows,
+// a search bar, and the same Add All in the nav bar over the rows it shows.
+async function appSources() {
+  const { memStorage, fakeIndexedDB } = await import("../fakes.test-helper.js");
+  globalThis.localStorage ??= memStorage({ "ifizbox.device": "none" });
+  globalThis.indexedDB ??= fakeIndexedDB();
+  globalThis.CSS ??= { escape: (s) => String(s) };
+  const more = await import("./moresources.js");
+  const { RECOMMENDED_SOURCES } = await import("../core/recommended.js");
+  const { recommendedRows } = await import("../core/sourcelist.js");
+  const { findAppSources } = await import("../core/appsources.js");
+  const rows = recommendedRows(findAppSources(RECOMMENDED_SOURCES), [], { jailbroken: false });
+  rows[0].added = true;
+  return { more, rows };
+}
+
+test("B344: App Sources has Find More's Add All top right and draws Find More's list, rows and ADD", async () => {
+  const { more, rows } = await appSources();
+  const bar = more.nav({ tab: "sources", path: ["more", "apps"] }, null);
+  assert.equal(bar.right.label, "Add All");
+  assert.equal(typeof bar.right.onClick, "function");
+  const box = fakePage();
+  await more.drawApps(box, null, { rows: async () => rows, preview: async () => null });
+  const list = box.querySelector("ul.table.plain.find-list");
+  assert.ok(list, "one plain list, as Find More's");
+  assert.deepEqual(list.querySelectorAll(".section-header").map((h) => h.textContent), ["From the Developer", "Modded Apps"]);
+  const cells = list.querySelectorAll(".find-row");
+  assert.equal(cells.length, rows.length);
+  assert.ok(cells.every((li) => li.classList.contains("source-row") && li.querySelector(".price-btn.find-add")));
+  assert.ok(box.querySelector(".find-credit"), "the footer under the list");
+});
+
+test("B344: App Sources' Add All asks once, adds each shown source not added yet, counting, and names failures", async () => {
+  const { more, rows } = await appSources();
+  const box = fakePage();
+  await more.drawApps(box, null, { rows: async () => rows, preview: async () => null });
+  const todo = rows.filter((r) => !r.added);
+  const failing = typeof todo[1].input === "string" ? todo[1].input : todo[1].input.uri;
+  const { log, opts } = rig({ fail: [failing] });
+  const { rows: _r, redraw: _d, ...rest } = opts;
+  assert.equal(await more.addAllApps(null, rest), todo.length - 1);
+  assert.equal(log.sheets.length, 1);
+  assert.match(log.sheets[0].title, new RegExp(`the ${todo.length} sources listed here`));
+  assert.deepEqual(log.sheets[0].buttons, ["Add All"]);
+  assert.equal(log.added.length, todo.length - 1);
+  assert.equal(log.hud.at(-1), `Adding ${todo.length} of ${todo.length}`);
+  assert.equal(log.changed, 1);
+  assert.equal(log.alerts[0].title, "Some Sources Failed");
+  assert.match(log.alerts[0].message, new RegExp(`${todo[1].label}: No Release file`));
+  const none = rig();
+  assert.equal(await more.addAllApps(null, { ...none.opts, rows: [rows[0]] }), 0);
+  assert.equal(none.log.sheets.length, 0);
+  assert.match(none.log.alerts[0].message, /Every source listed here is in your sources/);
+});
+
+test("B344: App Sources' search keeps the rows that match, and Add All works on those", async () => {
+  const { more, rows } = await appSources();
+  const pick = rows.find((r) => !r.added);
+  const box = fakePage();
+  await more.drawApps(box, null, { rows: async () => rows, preview: async () => null, query: pick.label.toUpperCase() });
+  const shown = box.querySelectorAll(".find-row .cell-label").map((n) => n.textContent);
+  assert.ok(shown.includes(pick.label) && shown.length < rows.length, shown.join(", "));
+  const { log, opts } = rig({ pick: -1 });
+  const { rows: _r, redraw: _d, ...rest } = opts;
+  await more.addAllApps(null, rest);
+  const n = rows.filter((r) => !r.added && shown.includes(r.label)).length;
+  assert.match(log.sheets[0].title, new RegExp(n === 1 ? "the 1 source " : `the ${n} sources`));
+  await more.drawApps(box, null, { rows: async () => rows, preview: async () => null, query: "zzzz-nothing" });
+  assert.match(box.textContent, /No app sources found/);
+});
+
+test("B344: a slow earlier search draw never replaces a later one, nor adds its failure note to it", async () => {
+  const { more, rows } = await appSources();
+  const pick = rows.find((r) => !r.added);
+  const box = fakePage();
+  let release;
+  const slow = new Promise((r) => { release = r; });
+  const first = more.drawApps(box, null, { rows: () => slow.then(() => rows), preview: async () => { throw new Error("offline"); } });
+  await more.drawApps(box, null, { rows: async () => rows, preview: async () => ({ apps: [] }), query: pick.label });
+  const later = box.querySelectorAll(".find-row .cell-label").map((n) => n.textContent);
+  release();
+  await first;
+  assert.deepEqual(box.querySelectorAll(".find-row .cell-label").map((n) => n.textContent), later);
+  assert.doesNotMatch(box.textContent, /None of these sources answered/);
+});
