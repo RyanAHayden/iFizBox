@@ -75,9 +75,19 @@ test("an IPA install adds a My IPAs entry with its Sign Options, and a following
 test("skipped when that bundle ID and version is saved already: no download", async () => {
   const shell = fakeShell([{ file: "Delta.ipa", name: "Delta", bundleId: "com.x.delta", version: "1.5" }]);
   const r = await saveInstalledIpa(customInstallSave(customJob()), { call: shell.call });
-  assert.deepEqual(r, { entry: shell.lib[0], added: false });
+  assert.equal(r.added, false);
+  assert.equal(r.entry.file, "Delta.ipa");
   assert.deepEqual(shell.fetches, []);
   assert.equal(shell.lib.length, 1);
+  assert.deepEqual(shell.lib[0].options, EDITS); // the install's Sign Options become the saved IPA's
+  // and a Re-sign of that app signs the saved IPA, as it was installed, with no download
+  shell.calls.length = 0;
+  await prepareOnDevice(createAppQueue().add(resignJob({ bundleId: "com.me.delta", name: "My Delta", version: "1.5" })),
+    { tag: "com.me.delta#2", native: shell.native });
+  const prep = shell.calls.find((c) => c.method === "signing.prepare");
+  assert.equal(prep.params.library, "Delta.ipa");
+  assert.equal(prep.params.bundleId, "com.me.delta");
+  assert.deepEqual(shell.fetches, []);
   // another version is saved as its own entry
   const other = fakeShell([{ file: "Delta.ipa", name: "Delta", bundleId: "com.x.delta", version: "1.4" }]);
   assert.equal((await saveInstalledIpa(customInstallSave(customJob()), { call: other.call })).added, true);

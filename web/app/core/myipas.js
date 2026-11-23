@@ -604,7 +604,12 @@ export async function saveInstalledIpa({ url = null, bundleId = null, version = 
   if (typeof url !== "string" || !/^https?:\/\//i.test(url) || typeof call !== "function") return null;
   try {
     const had = savedIpa((await call("library.list", {}))?.ipas, { bundleId, version });
-    if (had) return { entry: had, added: false };
+    if (had) {
+      // no second copy, but the Sign Options this install used become the saved IPA's, so a Re-sign signs it the same way
+      const o = savedIpaOptions(had.file, edits);
+      if (!o) return { entry: had, added: false };
+      try { return { entry: (await call("library.options", o)) ?? had, added: false }; } catch { return { entry: had, added: false }; }
+    }
     const r = await call("library.add", { url });
     const file = r?.file;
     if (!file) return null;

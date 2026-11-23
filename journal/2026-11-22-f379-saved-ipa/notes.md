@@ -34,6 +34,14 @@
   (no second "Not Secure" alert in the background).
 - The website path (`runAppQueue` → `resignApp` → `signing.resign`) is unchanged: the website has no shell library.
 
+## Spec review
+
+- Fixed: when the app and version were saved already, the install's Sign Options were dropped; now they are written to
+  the saved IPA (`library.options`), so a Re-sign signs it the way it was installed (tested).
+- Not changed: "url only when not `native`" in `runIpaConsole`: `native` is only share.js's stand-in (a staged file,
+  no url), so there is nothing to save there.
+- Filed F380: keep the install's own download in the library instead of downloading again for the save.
+
 ## Not verified
 
 - On a phone (iPhone 15 Pro / iPhone 7): not run. The change is page JS over existing bridge calls
