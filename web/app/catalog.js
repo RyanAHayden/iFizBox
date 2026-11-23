@@ -324,8 +324,13 @@ async function watchTweakIndex(tweakSources) {
       return m;
     }));
   } catch { verdictsHooked = null; return; }
-  if (tweakSources.length) mod.loadTweakIndex(tweakSources).catch(() => 0);
+  if (!tweakSources.length) return;
+  // Lists drawn before the answer keep the tweak until they are drawn again: wait a little for it (it comes on
+  // anyway, through onTweakVerdicts, if it is slower).
+  const asked = mod.loadTweakIndex(tweakSources).catch(() => 0);
+  await Promise.race([asked, new Promise((r) => setTimeout(r, INDEX_WAIT_MS)?.unref?.())]);
 }
+const INDEX_WAIT_MS = 1500;
 
 // ---- Installed (F7): dpkg's status file, parsed in the worker beside the catalog. In the app the native
 // backend reads it (N3: `ifizboxNative.dpkgStatus()` resolves to the text of /var/lib/dpkg/status, or

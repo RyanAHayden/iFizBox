@@ -17,7 +17,11 @@ Section and Depends checks in `tweakfields.js` (`injectableFromFields`), which A
   `onTweakVerdicts(f)`. `loadTweakIndex` fires it with each index answer, and `tweakInfo` fires it after a device check.
 - `web/app/catalog.js` (the UI's handle, not in the task's file list, but needed to carry verdicts to the worker): in
   sideload mode, after loading Tweak Sources it hooks `onTweakVerdicts`, sends `catalogVerdicts()`, and asks the index
-  for the Tweak Sources (not awaited). Pending verdicts go to the worker with the next question, like `setIpaInfo`.
+  for the Tweak Sources, waiting at most 1.5 s for the answer so the first lists and Search already leave the
+  tweaks out (a slower answer still comes in through `onTweakVerdicts`). Pending verdicts go to the worker with the
+  next question, like `setIpaInfo`.
+- Review fix: a verdict that says the tweak works (this device's own check winning over the index's refusal) is sent
+  as `false`, so the tweak comes back; before, only drops were ever sent.
 - Test: `web/app/core/catalog-systemtweaks.test.js`. Fixture: a Tweak Source with Aerial (`systemOnly`), AnyFont
   (`anyApp`) and Aerial Fresh (unchecked), plus an index answer. Aerial is gone from App Tweaks, Search, the section
   count and the source list, and the others stay. A verdict for another version is ignored. One case runs the full
@@ -36,6 +40,7 @@ Section and Depends checks in `tweakfields.js` (`injectableFromFields`), which A
 ## Not verified
 - The live Worker index answering for a real source such as Havoc. The shots use a faked answer, and the 127.0.0.1
   repo is not reachable from the Worker.
-- An open App Tweaks page does not redraw by itself when the index answer lands after it is drawn. The catalog change
-  listeners fire, but the next visit or Search is correct.
+- An index answer slower than 1.5 s that lands while App Tweaks is already open: that page keeps the tweak until it
+  is drawn again (no list redraws on a catalog change today, hidden sections included). The 1.5 s wait itself was
+  not timed in Chromium (the fake answer is instant).
 - Not tried on the iPhone 15. This is a web-only change, and the Chromium check covers it under the phone rule.

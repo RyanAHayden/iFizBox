@@ -95,8 +95,12 @@ test("B377: the index's answer reaches the catalog (screens/tweaks.js onTweakVer
     const fetch = async () => ({ ok: true, json: async () => ({ enabled: true, tweaks: ANSWER }) });
     assert.equal(await loadTweakIndex([{ key: KEY, uri: KEY, dist: "./" }], { fetch, base: "https://ifizbox.example/api/tweaks" }), 2);
   } finally { off(); }
-  assert.deepEqual(got, [{ "jp.uzra.aerial@1.2.0": true }]);
+  assert.deepEqual(got, [{ "jp.uzra.aerial@1.2.0": true, "com.b377.anyfont@1.1": false }]);
   assert.equal(catalogVerdicts({ storage: { getItem: () => null, setItem() {} } })["jp.uzra.aerial@1.2.0"], true);
+  // a check on this device that found Aerial works after all (its cached verdict wins over the index's) brings it back
+  const dev = { getItem: () => JSON.stringify({ "jp.uzra.aerial@1.2.0": { v: 2, ok: true, why: null, bundles: [], anyApp: true } }), setItem() {} };
+  assert.equal(catalogVerdicts({ storage: dev })["jp.uzra.aerial@1.2.0"], false);
+  assert.equal(catalogVerdicts({ storage: dev })["com.b377.aerialfresh@0.9"], undefined, "unchecked: no verdict");
   assert.deepEqual(ids(c.list(ALL, APP_TWEAKS)), ["com.b377.aerialfresh", "com.b377.anyfont"]);
   assert.deepEqual(ids(c.search("aerial")), ["com.b377.aerialfresh"]);
   assert.equal(tweakCount(c), 2);

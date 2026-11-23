@@ -251,7 +251,8 @@ export function onTweakVerdicts(f) { verdictListeners.add(f); return () => verdi
 function verdictsFor(keys, storage) {
   const dev = infoStore(storage);
   const out = {};
-  for (const k of keys) if (dropsFromCatalog(dev.get(k) ?? indexed.get(k))) out[k] = true;
+  // a check on this device that says the tweak works (after the index refused it) brings it back: false
+  for (const k of keys) { const info = dev.get(k) ?? indexed.get(k); if (info) out[k] = dropsFromCatalog(info); }
   return out;
 }
 export function catalogVerdicts({ storage } = {}) {
