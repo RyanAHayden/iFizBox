@@ -1,0 +1,66 @@
+[
+ {
+  "eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"
+ },
+ {
+  "nav": "#/sources",
+  "ms": 5000
+ },
+ {
+  "clicktext": "Edit",
+  "ms": 1500
+ },
+ {
+  "clicktext": "Add",
+  "ms": 1500
+ },
+ {
+  "eval": "(()=>{const i=[...document.querySelectorAll('input')].filter(x=>x.offsetParent!==null).at(-1); if(!i) return 'no input'; i.value='https://havoc.app/'; i.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"
+ },
+ {
+  "clicktext": "Add Source",
+  "ms": 25000
+ },
+ {
+  "shot": "site-added"
+ },
+ {
+  "eval": "location.hash + ' | ' + document.querySelector('.page.is-top')?.innerText.slice(0,300)"
+ },
+ {
+  "eval": "JSON.stringify(Object.keys(localStorage))"
+ },
+ {
+  "nav": "#/search",
+  "ms": 3000
+ },
+ {
+  "eval": "(()=>{const i=[...document.querySelectorAll('input')].filter(x=>x.offsetParent!==null).at(-1); if(!i) return 'no input'; i.value='Aerial'; i.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"
+ },
+ {
+  "wait": 4000
+ },
+ {
+  "eval": "[...document.querySelectorAll('.page.is-top a')].map(a=>a.getAttribute('href')).filter(h=>/aerial/i.test(h)).join(' ')"
+ },
+ {
+  "go": "#/search/package%3Ajp.uzra.aerial",
+  "ms": 14000
+ },
+ {
+  "shot": "sl-jp.uzra.aerial"
+ },
+ {
+  "eval": "JSON.stringify({prev:!!document.querySelector(\".package-previews .shots-group\"), pending:!!document.querySelector(\".package-previews .shots-pending\"), imgs:[...document.querySelectorAll(\".package-previews img\")].map(i=>i.src.slice(0,90)), err:[...document.querySelectorAll(\".package-previews\")].length})"
+ },
+ {
+  "go": "#/search/package%3Acom.polytweaks.aerial2",
+  "ms": 14000
+ },
+ {
+  "shot": "sl-com.polytweaks.aerial2"
+ },
+ {
+  "eval": "JSON.stringify({prev:!!document.querySelector(\".package-previews .shots-group\"), pending:!!document.querySelector(\".package-previews .shots-pending\"), imgs:[...document.querySelectorAll(\".package-previews img\")].map(i=>i.src.slice(0,90)), err:[...document.querySelectorAll(\".package-previews\")].length})"
+ }
+]

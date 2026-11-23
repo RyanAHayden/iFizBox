@@ -253,12 +253,27 @@ const NOT_A_SHOT = /(badge|shield|icon|logo|avatar|favicon|sponsor|donate|paypal
 const NOT_A_ALT = /(badge|shield|\bicons?\b|\blogo\b|avatar|sponsor|donate)/i;
 const PICTURE = /\.(png|jpe?g|webp|gif|heic|avif)([?#]|$)/i;
 
-export function isScreenshotUrl(url, { alt = "", width = null, height = null } = {}) {
+// B362: an image CDN's resizing query (Havoc's media.havoc.app/<id>?w=3840&q=75, imgix, Next.js): `w`/`width` and the
+// like: a width or height asked for (not `q`, `format` alone: search pages and README widgets have those). Under 120
+// (or a `s`/`size` under 120, Gravatar-style) is an icon's.
+const RESIZE_KEYS = ["w", "width", "h", "height"];
+const resized = (u) => RESIZE_KEYS.some((k) => num(u.searchParams.get(k)) !== null);
+const tooSmall = (u) => [...RESIZE_KEYS, "s", "size"].some((k) => { const v = num(u.searchParams.get(k)); return v !== null && v < 120; });
+
+// `responsive`: the <img> had a srcset with width descriptors ("640w"), which only pictures get (B362: Havoc's and
+// other Next.js depiction pages serve every screenshot that way, extensionless).
+export function isScreenshotUrl(url, { alt = "", width = null, height = null, responsive = false } = {}) {
   let u;
   try { u = new URL(url); } catch { return false; }
   if (BADGE_HOST.test(u.hostname)) return false;
   const path = decodeURIComponentSafe(u.pathname);
+  // Next.js's image optimiser wraps the real picture: judge that one (its name says logo or icon too).
+  if (/\/_next\/image$/.test(path) && u.searchParams.get("url")) {
+    const inner = resolve(u.searchParams.get("url"), u.href);
+    return Boolean(inner) && !tooSmall(u) && isScreenshotUrl(inner, { alt, width, height, responsive: true });
+  }
   if (/\/altdirect\//i.test(path)) return false; // AltDirect's "Add to AltStore" / "Download" buttons
+  if (/\/profile[-_]?(image|picture|pic|photo)s?\//i.test(path) || tooSmall(u)) return false; // an author's avatar (Chariz: ?s=32)
   if (/\.svg([?#]|$)/i.test(path) || /\/workflows\/[^/]+\/badge/i.test(path) || /\/actions\/workflows\//i.test(path)) return false;
   const file = path.split("/").pop() || "";
   if (NOT_A_SHOT.test(file) || NOT_A_ALT.test(str(alt))) return false;
@@ -267,9 +282,11 @@ export function isScreenshotUrl(url, { alt = "", width = null, height = null } =
   if (u.hostname === "avatars.githubusercontent.com" || u.hostname === "gravatar.com" || u.hostname.endsWith(".gravatar.com")) return false;
   const w = num(width), h = num(height);
   if ((w && w < 120) || (h && h < 120)) return false;
-  // A picture's own extension, or a host that serves pictures without one (GitHub's uploads, Imgur).
+  // A picture's own extension, or a host that serves pictures without one (GitHub's uploads, Imgur), or (B362) an
+  // extensionless picture an image CDN resizes or a srcset offers in widths.
   return PICTURE.test(path) || /^\/user-attachments\/assets\//.test(path) || /\/assets\/[0-9a-f-]{20,}$/i.test(path)
-    || /(^|\.)imgur\.com$/.test(u.hostname) || /(^|\.)(user-images|private-user-images)\.githubusercontent\.com$/.test(u.hostname);
+    || /(^|\.)imgur\.com$/.test(u.hostname) || /(^|\.)(user-images|private-user-images)\.githubusercontent\.com$/.test(u.hostname)
+    || (!/\.[a-z0-9]{1,5}$/i.test(path) && (responsive || resized(u)));
 }
 
 function decodeURIComponentSafe(s) {
@@ -295,6 +312,7 @@ function htmlImgs(html) {
       at: m.index,
       src: src || srcset.split(",").map((s) => s.trim().split(/\s+/)[0]).filter(Boolean).pop() || "",
       alt: attr(tag, "alt"), cls: attr(tag, "class") + " " + attr(tag, "id"),
+      responsive: /\s\d+w\s*(,|$)/.test(srcset),
       width: parseInt(attr(tag, "width"), 10) || null, height: parseInt(attr(tag, "height"), 10) || null,
     });
   }
@@ -394,6 +412,7 @@ export function dedupeShots(list) {
 // ---- Loading (fetched text, cached per app) --------------------------------------------------------------------
 
 const PREVIEW_CACHE_PREFIX = "ifizbox.previews.";
+const PREVIEW_CACHE_VERSION = 2;
 export const PREVIEW_TTL = 24 * 3600 * 1000;
 const memory = new Map();
 
@@ -404,14 +423,15 @@ function cached(store, key, now) {
     const raw = store?.getItem(PREVIEW_CACHE_PREFIX + key);
     if (!raw) return null;
     const v = JSON.parse(raw);
-    if (!v || !Array.isArray(v.shots) || now - v.at >= PREVIEW_TTL) return null;
+    // B362: entries from before v2 may hold an empty list from when extensionless pictures didn't count.
+    if (!v || v.v !== PREVIEW_CACHE_VERSION || !Array.isArray(v.shots) || now - v.at >= PREVIEW_TTL) return null;
     memory.set(key, v);
     return v.shots;
   } catch { return null; }
 }
 
 function keep(store, key, shots, now) {
-  const v = { at: now, shots };
+  const v = { v: PREVIEW_CACHE_VERSION, at: now, shots };
   memory.set(key, v);
   try { store?.setItem(PREVIEW_CACHE_PREFIX + key, JSON.stringify(v)); } catch { /* full or private: memory only */ }
 }

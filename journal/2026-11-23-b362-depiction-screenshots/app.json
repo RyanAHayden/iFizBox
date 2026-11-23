@@ -1,0 +1,12 @@
+[
+ {"nav": "#/sources", "ms": 8000},
+ {"eval": "[...document.querySelectorAll('.page.is-top a')].map(a=>a.getAttribute('href')).slice(0,12).join(' ')"},
+ {"go": "#/search", "ms": 2000},
+ {"eval": "(()=>{const i=[...document.querySelectorAll('input')].filter(x=>x.offsetParent!==null).at(-1); if(!i) return 'no input'; i.value='Aerial'; i.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"},
+ {"wait": 5000},
+ {"eval": "[...document.querySelectorAll('.page.is-top a')].map(a=>a.getAttribute('href')).filter(h=>/aerial/i.test(h)).join(' ')"},
+ {"eval": "(()=>{const a=[...document.querySelectorAll('.page.is-top a')].find(a=>/jp\\.uzra\\.aerial/.test(a.getAttribute('href'))); if(!a) return 'none'; location.hash=a.getAttribute('href'); return a.getAttribute('href')})()"},
+ {"wait": 12000},
+ {"shot": "app-aerial"},
+ {"eval": "(()=>{const p=document.querySelector('.page.is-top'); return JSON.stringify({slot: p.querySelector('.package-previews')?.outerHTML.slice(0,1500), imgs:[...p.querySelectorAll('img.alt-shot')].map(i=>[i.src,i.complete,i.naturalWidth])})})()"}
+]
