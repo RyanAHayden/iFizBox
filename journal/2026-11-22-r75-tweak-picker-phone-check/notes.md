@@ -2,7 +2,15 @@
 
 Result: **pass on both phones.** With `TWEAK_ACCEPT = ".dylib,.deb,.zip,.framework,application/octet-stream"`
 the iOS document picker shows `.dylib` and `.deb` as pickable, and picking a `.txt` gives
-"Can't Add This Tweak — R75Test.txt: add a .dylib, a .deb or a zipped .framework." No change to file.
+"Can't Add This Tweak — R75Test.txt: add a .dylib, a .deb or a zipped .framework." Nothing in the product
+needs changing; nothing to queue.
+
+The value used on both phones is main's `TWEAK_ACCEPT` byte for byte: on the 7 main's whole file was copied over
+(md5 `516174a3…` = `git show main:web/app/core/tweaks.js`), and on the 15 the value Web Inspector read back after
+setting it is the same string as main's line 36.
+
+The row is called "Add Tweak…" in the jailbreak app and "Add Tweak from Files…" in Lite: it's the same row
+(`screens/tweaks.js` adds "from Files" when Lite also shows "Add Tweak from a Source…").
 
 Why a phone: the greyed-out state is drawn by iOS's own document picker (UIDocumentPickerViewController from
 WKWebView's file input), which Chromium doesn't have.
