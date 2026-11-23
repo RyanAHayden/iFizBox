@@ -141,9 +141,12 @@ test("openProgress: the page is a dark cover from open to close, not while hidde
     root.setAttribute("data-sheet", "card");
     const card = openProgress();
     card.sheet.animate = anim;
-    card.hide(); // the page behind stays sunk on the black ground
     page.hide();
+    card.hide(); // B408: the page behind comes forward off the black ground
+    assert.equal(darkCovered(), false);
+    card.show();
     assert.equal(darkCovered(), true);
+    card.hide();
     card.close();
     assert.equal(darkCovered(), false);
     page.show();
@@ -158,6 +161,57 @@ test("openProgress: the page is a dark cover from open to close, not while hidde
     third.hide();
     third.close();
     assert.equal(darkCovered(), false);
+  });
+});
+
+// B408: in a card style (iOS 13, 26) the app behind the run page goes back on open and show, and forward on hide.
+test("openProgress: hide brings the page behind a card forward, show pushes it back, close while hidden leaves it", async () => {
+  const { withDocument } = await import("../fakes.test-helper.js");
+  const { openProgress } = await import("./progress.js");
+  const { showSheet } = await import("./sheet.js");
+  const gcs = globalThis.getComputedStyle;
+  await withDocument(async (doc) => {
+    const root = globalThis.document.documentElement;
+    root.setAttribute("data-sheet", "card");
+    const moves = []; // the tab bar's
+    const ends = [];
+    const tabbar = { animate: (frames) => {
+      moves.push(frames);
+      return { finished: new Promise((r) => ends.push(r)), cancel() {} };
+    } };
+    const byId = doc.getElementById;
+    doc.getElementById = (id) => (id === "tabbar" ? tabbar : null);
+    const settle = async () => { ends.splice(0).forEach((r) => r()); await Promise.resolve(); await Promise.resolve(); };
+    const last = () => moves.at(-1)[1].opacity;
+    try {
+      const page = openProgress();
+      page.sheet.animate = () => ({ finished: new Promise(() => {}), cancel() {} });
+      assert.deepEqual([moves.length, last()], [1, 0.75]);
+      page.hide();
+      assert.deepEqual([moves.length, last()], [2, 1]);
+      const close = showSheet({ title: "Confirm" }); // a card over the app meanwhile, its own push back
+      assert.deepEqual([moves.length, last()], [3, 0.75]);
+      page.show();
+      page.hide();
+      assert.equal(moves.length, 3, "the other card keeps it back");
+      close();
+      assert.deepEqual([moves.length, last()], [4, 1]);
+      await settle();
+      page.show();
+      assert.deepEqual([moves.length, moves[4][0].transform, last()], [5, "none", 0.75]);
+      page.hide();
+      const mid = { transform: "matrix(0.95, 0, 0, 0.95, 0, 0)", opacity: 0.9 };
+      globalThis.getComputedStyle = () => ({ ...mid, getPropertyValue: () => "" });
+      page.show(); // mid-way: back from where it is, to where it was
+      assert.deepEqual([moves.length, moves[6][0], moves[6][1]], [7, mid, moves[4][1]]);
+      page.hide();
+      page.close();
+      assert.deepEqual([moves.length, last()], [8, 1], "closing a hidden page moves nothing");
+    } finally {
+      doc.getElementById = byId;
+      globalThis.getComputedStyle = gcs;
+      root.removeAttribute("data-sheet");
+    }
   });
 });
 

@@ -9,7 +9,8 @@
 //   close.sheet / .h1 / .left / .right / .content   its nodes (.content is the .sheet-body the body goes in)
 //   close.setTitle(t)            the title and the dialog's label
 //   close.closed()               true once close() ran
-//   close.cover(on)              B401: a black sheet slid away without closing (nav/progress.js hide) and back
+//   close.away(on)               the sheet slid away without closing (nav/progress.js hide), and back: while away it
+//                                neither covers the status bar (B401) nor keeps the page behind back (B408)
 //
 // Options beyond title/body/onClose:
 //   left                         a node (or array) at the left of the bar (empty by default)
@@ -29,7 +30,8 @@ import { coverDark } from "./statusbar.js";
 
 const PAGE = ["navbar", "screens", "tabbar"];  // index.html's page, under every sheet
 let behind = null;                            // the page's open card animations, while a card sheet is up
-let cards = 0;                                // card sheets up
+let cards = 0;                                // card sheets up (not the hidden ones)
+const coming = new WeakMap();                 // el -> where a page still on its way forward came from
 
 const cardSheets =(doc = globalThis.document) => doc?.documentElement?.getAttribute?.("data-sheet") === "card";
 
@@ -45,21 +47,33 @@ function pushBack(doc) {
   for (const id of PAGE) {
     const el = doc.getElementById?.(id);
     if (!el?.animate) continue;
+    const run = (from, to) => anims.push({ el, to, a: el.animate([from, to], { duration: SHEET_IN, easing: EASE, fill: "forwards" }) });
+    // B408: still on its way forward (hidden and shown at once): back from there, its rect is mid-scale
+    const last = coming.get(el);
+    if (last) { run(whereNow(el, last), last); continue; }
     const r = el.getBoundingClientRect?.() ?? { left: 0, top: 0, width: 0, height: 0 };
     const tx = (cx - (r.left + r.width / 2)) * (1 - s), ty = (cy - (r.top + r.height / 2)) * (1 - s) + dy;
     const to = { transform: `translate(${+tx.toFixed(2)}px, ${+ty.toFixed(2)}px) scale(${s})`, opacity: op };
-    anims.push({ el, to, a: el.animate([{ transform: "none", opacity: 1 }, to], { duration: SHEET_IN, easing: EASE, fill: "forwards" }) });
+    run({ transform: "none", opacity: 1 }, to);
   }
   return anims;
+}
+
+function whereNow(el, dflt) {
+  const cs = globalThis.getComputedStyle?.(el);
+  return cs?.transform ? { transform: cs.transform, opacity: Number(cs.opacity) } : dflt;
 }
 
 // Back from wherever the page is now (a sheet closed mid push-back must not jump to the end first).
 function bringForward(anims) {
   for (const { el, to, a } of anims) {
-    const cs = globalThis.getComputedStyle?.(el);
-    const now = cs?.transform ? { transform: cs.transform, opacity: Number(cs.opacity) } : to;
-    const back = el.animate([now, { transform: "none", opacity: 1 }], { duration: DURATION, easing: EASE, fill: "forwards" });
-    const end = () => { a.cancel?.(); back.cancel?.(); };
+    const back = el.animate([whereNow(el, to), { transform: "none", opacity: 1 }], { duration: DURATION, easing: EASE, fill: "forwards" });
+    const at = { ...to };
+    coming.set(el, at);
+    const end = () => {
+      if (coming.get(el) === at) coming.delete(el);
+      a.cancel?.(); back.cancel?.();
+    };
     if (back?.finished) back.finished.then(end, end); else end();
   }
 }
@@ -101,7 +115,14 @@ export function showSheet({ title = "", body = null, onClose = () => {}, left = 
 
   sheet.animate?.([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: SHEET_IN, easing: EASE });
   const card = cardSheets(doc);
-  if (card && cards++ === 0) behind = pushBack(doc);
+  let sunk = false; // the page behind is back for this card
+  const sink = (on) => {
+    if (!card || on === sunk) return;
+    sunk = on;
+    if (on) { if (cards++ === 0) behind = pushBack(doc); }
+    else if (--cards === 0 && behind) { bringForward(behind); behind = null; }
+  };
+  sink(true);
   // B401: light status-bar text over the black page (.console), and over the black ground a card's page sinks onto
   const cover = card || cls.split(" ").includes("console") ? coverDark() : () => {};
 
@@ -111,7 +132,7 @@ export function showSheet({ title = "", body = null, onClose = () => {}, left = 
     if (gone) return gone;
     doc.removeEventListener?.("keydown", onKey);
     cover(false); // as it starts down: its top edge leaves the status bar first
-    if (card && --cards === 0 && behind) { bringForward(behind); behind = null; }
+    sink(false);
     gone = new Promise((resolve) => {
       const end = () => {
         sheet.remove();
@@ -131,6 +152,6 @@ export function showSheet({ title = "", body = null, onClose = () => {}, left = 
     sheet, h1, left: l, right: r, content,
     setTitle(t) { h1.textContent = t; sheet.setAttribute("aria-label", t); },
     closed: () => gone !== null,
-    cover(on) { if (!gone && !card) cover(on); }, // a card's page stays sunk on the black ground until close()
+    away(on) { if (!gone) { cover(!on); sink(!on); } },
   });
 }
