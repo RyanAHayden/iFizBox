@@ -14,7 +14,7 @@ import { fakeDocument, tick } from "./fakedom.test-helper.js";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const doc = fakeDocument();
 globalThis.document = doc;
-const { syncGlass, glassSnapshot, glassWanted, resetGlass, GLASS_KEY } = await import("./glass.js");
+const { syncGlass, slideGlass, glassSnapshot, glassWanted, resetGlass, GLASS_KEY } = await import("./glass.js");
 
 function fakeShell({ refuse = null } = {}) {
   const calls = [];
@@ -75,7 +75,15 @@ function app(native) {
   doc.body.append(el("div", "navbar", box(0, 0, 393, 103), [stack]), bar);
   let cover = null;
   doc.elementFromPoint = (x, y) => cover ?? (y > 700 ? (x > 320 ? search : home) : (x < 100 ? back : install));
-  return { bar, home, sources, search, back, install, item, setCover: (n) => { cover = n; } };
+  // The page under it as a slide starts: its nav item a quarter screen left, its Back and Edit moved with it.
+  const below = () => {
+    const b = Object.assign(el("button", "bar-button back", box(5 - 196.5, 63, 90, 38)), { _text: "Sources" });
+    const e = Object.assign(el("button", "bar-button", box(310 - 196.5, 63, 70, 38)), { _text: "Edit" });
+    const it = el("div", "nav-item is-moving", box(-196.5, 59, 393, 44), [el("div", "nav-left", box(-196.5, 59, 100, 44), [b]), el("div", "nav-right", box(100, 59, 80, 44), [e])]);
+    stack.append(it);
+    return { item: it, back: b, edit: e };
+  };
+  return { bar, home, sources, search, back, install, item, below, setCover: (n) => { cover = n; } };
 }
 
 function reset() {
@@ -191,23 +199,21 @@ test("the tab glyphs: our own outline drawings for the UITabBar, the filled ones
   }
 });
 
-test("a push hides the buttons (the CSS ones show at once) but not the tab bar; back at rest they return", async () => {
+test("a slide keeps the glass up: both pages' look-alikes see-through, nothing hidden or sent", async () => {
   reset();
   const { native, calls } = fakeShell();
-  const { item, back, install, bar } = app(native);
+  const { item, back, install, bar, below } = app(native);
   syncGlass(doc, native, win);
+  const under = below();
   item.classList.add("is-moving");
   syncGlass(doc, native, win);
-  assert.equal(calls.at(-1).buttonsHidden, true);
-  assert.equal(calls.at(-1).tabbar.hidden, false);
-  assert.equal(back.dataset.glassShown, undefined, "the look-alike shows while the glass can't follow the slide");
-  assert.equal(install.dataset.glassShown, undefined);
-  assert.equal(bar.dataset.glassShown, "", "the tab bar stays glass");
-  item.classList.remove("is-moving");
+  assert.equal(calls.length, 1, "the edge swipe under the finger: the glass stays as it is");
+  for (const n of [back, install, under.back, under.edit, bar]) assert.equal(n.dataset.glassShown, "", "see-through at once");
+  item.classList.remove("is-moving"); // a cancelled swipe
+  under.item.remove();
   syncGlass(doc, native, win);
-  assert.equal(calls.at(-1).buttonsHidden, false);
-  await tick();
-  assert.equal(back.dataset.glassShown, "", "see-through again once the shell answered");
+  assert.equal(calls.length, 1);
+  assert.equal(back.dataset.glassShown, "");
 });
 
 test("a popup, or a sheet over the tab bar, hides the glass there", async () => {
@@ -343,48 +349,81 @@ test("another error (no window): the CSS bars, and the glass opens again a secon
   assert.ok(calls.filter((c) => c === "open").length >= 2, `reopened: ${calls}`);
 });
 
-// B346: the back transition's flicker. The shell keeps one glass view per place in the bar (l0, r0, ...), so the page
-// that comes on top after a slide shows in the same views (no new glass drawn in); while the buttons hide, the
-// snapshot keeps what the shell last showed, so a swipe moving the look-alikes sends nothing each frame.
-test("a slide keeps the glass views: ids by place, nothing sent while it moves, the new page's titles at rest", () => {
+// B346, B382: the back transition's flicker. The shell keeps one glass view per place in the bar (l0, r0, ...) and
+// fades to the coming page's buttons as the slide starts; after the slide nothing is left to send.
+test("a back slide: the coming page's buttons go out once as it starts, with its time, at their place at rest", async () => {
   reset();
   const { native, calls, tap } = fakeShell();
-  const { item, back, install } = app(native);
+  const { item, back, install, below } = app(native);
   syncGlass(doc, native, win);
-  const shown = calls[0].buttons;
-  assert.deepEqual(shown.map((b) => b.id), ["l0", "r0"]);
+  assert.deepEqual(calls[0].buttons.map((b) => b.id), ["l0", "r0"]);
+  assert.equal(calls[0].slide, undefined);
+  const under = below();
   item.classList.add("is-moving");
-  item.style.transform = "translate3d(40px,0,0)";
   syncGlass(doc, native, win);
-  assert.equal(calls.at(-1).buttonsHidden, true);
-  assert.deepEqual(calls.at(-1).buttons, shown, "hidden, the views stay as they were");
-  const sent = calls.length;
-  for (const x of [80, 120, 200]) {
-    item.style.transform = `translate3d(${x}px,0,0)`;
-    back.getBoundingClientRect = () => box(5 + x, 63, 80, 38);
-    syncGlass(doc, native, win);
-  }
-  assert.equal(calls.length, sent, "nothing sent while the slide moves the look-alikes");
-  // the page below comes on top: its own Back and button, in the same places
-  back._text = "Sources";
-  install._text = "Edit";
-  back.getBoundingClientRect = () => box(5, 63, 90, 38);
-  item.classList.remove("is-moving");
-  item.style.transform = "";
-  syncGlass(doc, native, win);
-  const up = calls.at(-1);
+  slideGlass({ item: under.item, ms: 350, easing: "cubic-bezier(.2,.8,.4,1)" }, doc, native, win);
+  assert.equal(calls.length, 2);
+  const up = calls[1];
+  assert.equal(up.slide, 350);
+  assert.deepEqual(up.curve, [0.2, 0.8, 0.4, 1], "the page slide's own curve");
   assert.equal(up.buttonsHidden, false);
-  assert.deepEqual(up.buttons.map((b) => [b.id, b.title]), [["l0", "Sources"], ["r0", "Edit"]], "the same views, new titles");
+  assert.deepEqual(up.buttons.map((b) => [b.id, b.title, b.rect.x]), [["l0", "Sources", 5], ["r0", "Edit", 310]]);
+  // the slide moves both, and the page changes a label meanwhile: nothing sent until it ends
+  under.back.getBoundingClientRect = () => box(-40, 63, 90, 38);
+  under.edit._text = "Done";
+  syncGlass(doc, native, win);
+  assert.equal(calls.length, 2);
   const clicked = [];
-  back.addEventListener("click", () => clicked.push("back"));
+  back.addEventListener("click", () => clicked.push("old"));
+  under.back.addEventListener("click", () => clicked.push("new"));
   tap("button:l0");
-  assert.deepEqual(clicked, ["back"]);
+  assert.deepEqual(clicked, [], "no taps while it slides");
+  // at rest
+  under.edit._text = "Edit";
+  under.back.getBoundingClientRect = () => box(5, 63, 90, 38);
+  under.edit.getBoundingClientRect = () => box(310, 63, 70, 38);
+  item.classList.remove("is-moving");
+  item.classList.remove("is-top");
+  under.item.classList.remove("is-moving");
+  under.item.classList.add("is-top");
+  doc.elementFromPoint = (x, y) => (y > 700 ? doc.body.querySelector("a.tab") : x < 100 ? under.back : under.edit);
+  syncGlass(doc, native, win);
+  await tick();
+  assert.equal(calls.length, 2, "nothing changes after the slide");
+  assert.equal(under.back.dataset.glassShown, "");
+  for (const n of [back, install]) assert.equal(n.dataset.glassShown, undefined, "the page that left keeps no mark");
+  tap("button:l0");
+  assert.deepEqual(clicked, ["new"]);
 });
 
-test("a nav item starting to slide hides the glass buttons at once, not a frame later", async () => {
+test("a popup closing into a slide: the glass comes with it, the coming page's; under a sheet it stays away", async () => {
+  for (const sheet of [false, true]) {
+    reset();
+    const { native, calls } = fakeShell();
+    const { item, back, below, setCover } = app(native);
+    syncGlass(doc, native, win);
+    if (sheet) setCover(doc.createElement("div"));
+    const alert = doc.createElement("div");
+    alert.setAttribute("role", "alertdialog");
+    if (!sheet) doc.body.append(alert);
+    syncGlass(doc, native, win);
+    await tick();
+    assert.equal(calls.at(-1).buttonsHidden, true);
+    alert.remove();
+    const under = below();
+    item.classList.add("is-moving");
+    slideGlass({ item: under.item, ms: 350 }, doc, native, win);
+    await tick();
+    assert.equal(calls.at(-1).buttonsHidden, sheet);
+    assert.equal(back.dataset.glassShown, sheet ? undefined : "");
+    if (!sheet) assert.deepEqual(calls.at(-1).buttons.map((b) => b.title), ["Sources", "Edit"]);
+  }
+});
+
+test("a nav item starting to slide covers the coming look-alikes at once, not a frame later; app.js tells each slide", async () => {
   reset();
   const { native, calls } = fakeShell();
-  const { item } = app(native);
+  const { item, below } = app(native);
   const { watchGlass } = await import("./glass.js");
   let observed = null;
   class Observer { constructor(cb) { observed = cb; } observe() {} }
@@ -393,12 +432,14 @@ test("a nav item starting to slide hides the glass buttons at once, not a frame 
   globalThis.getComputedStyle = win.getComputedStyle; // the observer's sync runs with the real globals
   try {
     syncGlass(doc, native, win);
-    const sent = calls.length;
     watchGlass(doc, { ...win, MutationObserver: Observer, addEventListener() {} }, native);
+    const under = below();
     item.classList.add("is-moving");
     observed([{ type: "attributes", attributeName: "class", target: item }]);
-    assert.equal(calls.length, sent + 1, "sent in the observer's own turn");
-    assert.equal(calls.at(-1).buttonsHidden, true);
+    assert.equal(under.back.dataset.glassShown, "", "in the observer's own turn");
+    const js = readFileSync(join(HERE, "../app.js"), "utf8");
+    assert.match(js, /new CustomEvent\("ifizbox:slide", \{ detail: \{ item: \(p1 \? top : below\)\.page\.item, ms:/);
+    assert.match(readFileSync(join(HERE, "glass.js"), "utf8"), /addEventListener\?\.\("ifizbox:slide"/);
   } finally {
     globalThis.requestAnimationFrame = raf;
     delete globalThis.getComputedStyle;
@@ -406,10 +447,18 @@ test("a nav item starting to slide hides the glass buttons at once, not a frame 
   }
 });
 
+test("the shell: a bar button's glass configuration is set once; titles are its own faces", () => {
+  const swift = readFileSync(join(HERE, "../../../native/Sources/NativeGlass.swift"), "utf8");
+  assert.equal(swift.match(/\bconfiguration = c\b/g)?.length, 1);
+  assert.match(swift, /if configuration == nil \{/);
+  assert.doesNotMatch(swift, /attributedTitle/, "a title given to the configuration makes UIKit draw the glass again");
+  assert.match(swift, /\[0\.36, 0\.66, 0\.04, 1\]/, "transition.js EASE");
+});
+
 test("a bar button's look-alike fades out under its glass button, and shows again at once when the glass hides", async () => {
   reset();
   const { native } = fakeShell();
-  const { item, back, bar } = app(native);
+  const { back, bar, setCover } = app(native);
   const fades = new Map();
   for (const n of [back, bar]) n.animate = (frames, timing) => {
     const a = { frames, timing, cancelled: false, cancel() { this.cancelled = true; } };
@@ -422,7 +471,7 @@ test("a bar button's look-alike fades out under its glass button, and shows agai
   assert.deepEqual(fade?.frames, [{ opacity: 1 }, { opacity: 0 }], "the look-alike fades out under the glass");
   assert.ok(fade.timing.duration > 0 && fade.timing.duration <= 200);
   assert.equal(fades.has(bar), false, "the tab bar's look-alike goes at once: the UITabBar is not over its rects");
-  item.classList.add("is-moving");
+  setCover(doc.createElement("div"));
   syncGlass(doc, native, win);
   assert.equal(back.dataset.glassShown, undefined);
   assert.equal(fade.cancelled, true, "a fade still running stops: the look-alike shows at once");
