@@ -8,6 +8,8 @@
 //     profile was made again and which every app signed with it shared);
 //   - maps -[NSUserDefaults initWithSuiteName:] for them to a suite of the app's own (ifizbox.appgroup.<group>, kept
 //     in its own Library/Preferences);
+//   - B393: the first time for a group, brings in what an app that ran without this fix kept for it: the folder a
+//     tweak's own app group shim (zxPluginsInject) gives for it, and Library/Preferences/<group>.plist;
 //   - strips kSecAttrAccessGroup from SecItemAdd/CopyMatching/Update/Delete, so keychain items land in the app's
 //     default group (its application-identifier, the same on every re-sign with the same team and App ID);
 //   - B327 (isolate): keeps the app's passwords (generic and internet) in its own keychain group. Every app signed
@@ -49,21 +51,76 @@ static NSString *legacy;
 static CFStringRef isolate;
 static BOOL pinned;
 
+// B393: the app ran before this launch (appRanBefore, as isolate's test).
+static BOOL ranBeforeLaunch;
+
 static NSURL *(*origContainer)(id, SEL, NSString *);
 static id (*origSuite)(id, SEL, NSString *);
 
-// Copies what `from` holds into `to`, never over what's there; Library/Caches stays behind.
-static void copyMissing(NSURL *from, NSURL *to, NSString *rel) {
+// Copies what `from` holds into `to`, never over what's there; Library/Caches stays behind, and so do the original
+// groups' own folders at the top (B393: a shim's, in the profile group). NO when something couldn't be read (locked).
+static BOOL copyMissing(NSURL *from, NSURL *to, NSString *rel) {
     NSFileManager *fm = [NSFileManager defaultManager];
-    for (NSURL *item in [fm contentsOfDirectoryAtURL:from includingPropertiesForKeys:@[ NSURLIsDirectoryKey ] options:0 error:NULL]) {
+    BOOL ok = YES;
+    NSError *e = nil;
+    NSArray *items = [fm contentsOfDirectoryAtURL:from includingPropertiesForKeys:@[ NSURLIsDirectoryKey ] options:0 error:&e];
+    if (!items) return e.code != NSFileReadNoPermissionError;
+    for (NSURL *item in items) {
         NSString *name = item.lastPathComponent, *path = rel.length ? [rel stringByAppendingPathComponent:name] : name;
-        if ([path isEqualToString:@"Library/Caches"]) continue;
+        if ([path isEqualToString:@"Library/Caches"] || [groups containsObject:path]) continue;
         NSURL *dest = [to URLByAppendingPathComponent:name];
         NSNumber *dir = nil;
         [item getResourceValue:&dir forKey:NSURLIsDirectoryKey error:NULL];
-        if (dir.boolValue && [fm fileExistsAtPath:dest.path]) copyMissing(item, dest, path);
-        else if (![fm fileExistsAtPath:dest.path]) [fm copyItemAtURL:item toURL:dest error:NULL];
+        if (dir.boolValue && [fm fileExistsAtPath:dest.path]) ok = copyMissing(item, dest, path) && ok;
+        else if (![fm fileExistsAtPath:dest.path] && ![fm copyItemAtURL:item toURL:dest error:&e]) {
+            ok = ok && e.code != NSFileReadNoPermissionError && e.code != NSFileWriteNoPermissionError;
+        }
     }
+    return ok;
+}
+
+// B393: what the app kept for a group without this fix, for the log ("group folder 3, suite 12").
+static NSMutableArray<NSString *> *broughtIn;
+
+// Brings that into the group's own folder `u` and suite, never over what's there: the folder the container call gives
+// without this fix (nil without a shim; another group fix gives `u` itself) and the suite the system then kept in
+// the app's Library/Preferences/<group>.plist (read as a file: a shim may send its domain elsewhere).
+// `emptySuite`: the own suite held nothing, so a setting the app removed under this fix doesn't come back.
+// NO when something couldn't be read.
+static BOOL bringIn(NSString *group, NSURL *u, BOOL emptySuite) {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    BOOL ok = YES;
+    NSUInteger files = 0, keys = 0;
+    NSURL *from = origContainer(fm, @selector(containerURLForSecurityApplicationGroupIdentifier:), group);
+    NSString *a = from.path.stringByResolvingSymlinksInPath, *b = u.path.stringByResolvingSymlinksInPath;
+    // never itself, a folder it is in (the copy would have no end) or one in it
+    if (a && ![[b stringByAppendingString:@"/"] hasPrefix:[a stringByAppendingString:@"/"]] &&
+        ![[a stringByAppendingString:@"/"] hasPrefix:[b stringByAppendingString:@"/"]]) {
+        NSDirectoryEnumerator *en = [fm enumeratorAtPath:a];
+        while ([en nextObject]) if ([en.fileAttributes.fileType isEqual:NSFileTypeRegular]) files++;
+        ok = copyMissing(from, u, @"");
+    }
+    NSString *plist = [NSHomeDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"Library/Preferences/%@.plist", group]];
+    if (emptySuite && [fm fileExistsAtPath:plist]) {
+        NSError *e = nil;
+        NSData *d = [NSData dataWithContentsOfFile:plist options:0 error:&e];
+        if (!d && e.code == NSFileReadNoPermissionError) ok = NO;
+        NSDictionary *old = d ? [NSPropertyListSerialization propertyListWithData:d options:0 format:NULL error:NULL] : nil;
+        if ([old isKindOfClass:[NSDictionary class]] && old.count) {
+            keys = old.count;
+            CFStringRef n = (__bridge CFStringRef)[@"ifizbox.appgroup." stringByAppendingString:group];
+            NSDictionary *have = CFBridgingRelease(CFPreferencesCopyMultiple(NULL, n, kCFPreferencesCurrentUser, kCFPreferencesAnyHost));
+            NSMutableDictionary *add = [old mutableCopy];
+            [add removeObjectsForKeys:have.allKeys ?: @[]];
+            CFPreferencesSetMultiple((__bridge CFDictionaryRef)add, NULL, n, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+            if (!CFPreferencesSynchronize(n, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)) ok = NO;
+        }
+    }
+    if (files || keys) {
+        [broughtIn addObject:[NSString stringWithFormat:@"%@ folder %lu, suite %lu%@", group, (unsigned long)files, (unsigned long)keys,
+                                                        ok ? @"" : @" (not all readable, tried again at the next launch)"]];
+    }
+    return ok;
 }
 
 // Library/AppGroups/<group>/ in the app's own container, made with the Library folders a group container has.
@@ -72,10 +129,29 @@ static NSURL *ownFolder(NSString *group) {
         URLByAppendingPathComponent:[@"Library/AppGroups" stringByAppendingPathComponent:group] isDirectory:YES];
     NSFileManager *fm = [NSFileManager defaultManager];
     BOOL fresh = ![fm fileExistsAtPath:u.path];
+    // Beside the folder while its copy isn't done (a launch cut short, or before the first unlock): tried again.
+    NSString *pending = [u.URLByDeletingLastPathComponent.path stringByAppendingPathComponent:[NSString stringWithFormat:@".%@.copying", group]];
+    BOOL bring = NO;
+    if (broughtIn) { // at launch only
+        bring = fresh ? ranBeforeLaunch : [fm fileExistsAtPath:pending];
+        if (bring && fresh) {
+            [fm createDirectoryAtPath:pending.stringByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:NULL];
+            [fm createFileAtPath:pending contents:[NSData data] attributes:@{ NSFileProtectionKey: NSFileProtectionNone }];
+        }
+    }
+    BOOL emptySuite = NO;
+    if (bring) {
+        // as before this group's first copy, which may have been cut short after its suite
+        CFArrayRef keys = CFPreferencesCopyKeyList((__bridge CFStringRef)[@"ifizbox.appgroup." stringByAppendingString:group],
+                                                   kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+        emptySuite = !keys || !CFArrayGetCount(keys) || !fresh;
+        if (keys) CFRelease(keys);
+    }
     for (NSString *sub in @[ @"Library/Preferences", @"Library/Caches" ]) {
         [fm createDirectoryAtURL:[u URLByAppendingPathComponent:sub isDirectory:YES] withIntermediateDirectories:YES
                       attributes:nil error:NULL];
     }
+    if (bring && bringIn(group, u, emptySuite)) [fm removeItemAtPath:pending error:NULL];
     if (fresh && legacy) {
         NSURL *old = origContainer([NSFileManager defaultManager], @selector(containerURLForSecurityApplicationGroupIdentifier:), legacy);
         if (old) copyMissing(old, u, @"");
@@ -443,6 +519,18 @@ __attribute__((constructor)) static void groupfixInit(void) {
         if (groups.count) {
             swizzle([NSFileManager class], @selector(containerURLForSecurityApplicationGroupIdentifier:), (IMP)fixContainer, (IMP *)&origContainer);
             swizzle([NSUserDefaults class], @selector(initWithSuiteName:), (IMP)fixSuite, (IMP *)&origSuite);
+            // B393: at the first launch with a group, whether the app asks for it or not: its folder is there from then
+            // on, so a fresh install never brings in what an earlier one left.
+            if (!target && origContainer) {
+                ranBeforeLaunch = ownBefore;
+                broughtIn = [NSMutableArray array];
+                for (NSString *group in groups) if ([group isKindOfClass:[NSString class]]) ownFolder(group);
+                if (broughtIn.count) {
+                    logLaunch([NSString stringWithFormat:@"%@ brought in from before the group fix: %@",
+                        [[NSISO8601DateFormatter new] stringFromDate:[NSDate date]], [broughtIn componentsJoinedByString:@"; "]]);
+                }
+                broughtIn = nil;
+            }
         }
         NSDictionary *info = [NSBundle mainBundle].infoDictionary;
         NSISO8601DateFormatter *iso8601 = [NSISO8601DateFormatter new];
