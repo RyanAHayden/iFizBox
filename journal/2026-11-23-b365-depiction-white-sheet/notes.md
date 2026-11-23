@@ -47,4 +47,15 @@ bridge rule); the test checks that too.
   time a 15 task runs: open Aerial (Havoc) > Depiction.
 - The full app route (Package page > Depiction row with real sources): checked through `openHtmlDepiction` called
   directly with a fake backend in the real sheet, not by tapping through the app.
-- The site path for refusing hosts: still white there until F383.
+- The site path for refusing hosts: still white there until F383 (it needs the Worker's `/api/fetch`, outside this
+  task's files; the site is no worse than before).
+- No runtime "did it go blank" check for live pages: a sandboxed cross-origin frame can't be inspected, so a timeout
+  has nothing to measure. The static view is chosen up front instead, from the HTML.
+
+## Spec review
+
+Fixed: every `frame-ancestors` policy has to let us in (not just the first), `corsScripts` no longer matches
+`module`/`crossorigin` inside another attribute's value, and the test now draws the sheet on the fake DOM (refused,
+failed, static, live; no `allow-same-origin`) instead of reading the source. Kept as designed: refused before static
+(the host's choice is respected rather than worked around with srcdoc), and the fetch before a live load (the views
+need the HTML and the headers).

@@ -2172,8 +2172,9 @@ const header = (headers, name) => (typeof headers?.get === "function" ? headers.
 // `origin` (https://ifizbox.com on the site, ifizbox://app in the app; never the depiction's own origin).
 export function framingRefused(headers, origin = "") {
   const csp = String(header(headers, "content-security-policy") ?? "");
-  const ancestors = csp.split(/[,;]/).map((d) => d.trim().split(/\s+/)).find((d) => d[0]?.toLowerCase() === "frame-ancestors");
-  if (ancestors) return !ancestors.slice(1).some((s) => sourceMatches(s, origin));
+  // Several policies (comma-joined headers) each have to let us in.
+  const ancestors = csp.split(/[,;]/).map((d) => d.trim().split(/\s+/)).filter((d) => d[0]?.toLowerCase() === "frame-ancestors");
+  if (ancestors.length) return ancestors.some((d) => !d.slice(1).some((s) => sourceMatches(s, origin)));
   const xfo = String(header(headers, "x-frame-options") ?? "").trim().toLowerCase();
   return xfo !== "" && xfo !== "allowall";
 }
@@ -2194,7 +2195,8 @@ function sourceMatches(src, origin) {
 }
 
 // Scripts with a src that load in CORS mode: type="module", or a crossorigin attribute.
-export const corsScripts = (html) => /<script\b(?=[^>]*\bsrc\s*=)(?=[^>]*(\btype\s*=\s*["']?module\b|\bcrossorigin\b))[^>]*>/i.test(String(html));
+export const corsScripts = (html) =>
+  /<script\b(?=[^>]*\ssrc\s*=)(?=[^>]*\s(type\s*=\s*["']?module["'\s>]|crossorigin(?=[\s=>/])))[^>]*>/i.test(String(html));
 
 // The page's text with its head, scripts, styles and tags taken out: an app shell with nothing in it has none.
 export function visibleText(html) {

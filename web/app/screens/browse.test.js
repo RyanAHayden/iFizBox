@@ -280,10 +280,38 @@ test("B365: an HTML depiction never opens as a white sheet: live, its own HTML w
   assert.equal(corsScripts('<script type="module">import "./a.js"</script>'), false, "inline: no src");
   assert.equal(visibleText(`<head><title>T</title></head><body><script>var a = "hidden";</script><style>p{}</style>${text}</body>`),
     "Aerial: Stage Manager, redesigned for iOS. Works on iOS 15 to 26.");
-  // the sheet itself: a refusing host and a failed fetch both end on the Open in Safari row, never a bare frame
-  assert.equal(typeof openHtmlDepiction, "function");
-  const src = (await import("node:fs")).readFileSync(new URL("./browse.js", import.meta.url), "utf8");
-  const body = src.slice(src.indexOf("export function openHtmlDepiction"), src.indexOf("const openOutside"));
-  assert.ok(!/allow-same-origin/.test(body.replace(/Never add allow-same-origin/, "")), "the bridge rule: no allow-same-origin");
-  assert.match(body, /\.catch\(\(e\) => \{ if \(box\.isConnected\) outside\(/, "a failed fetch offers Open in Safari");
+  assert.equal(corsScripts('<script src="/a.js" data-x="crossorigin-ish"></script>'), false, "a word inside another value");
+  assert.equal(framingRefused(h({ "Content-Security-Policy": "frame-ancestors *, frame-ancestors 'self'" }), SITE), true,
+    "every policy has to let us in");
+
+  // The sheet, drawn on the fake DOM: each view, and the bridge rule (never allow-same-origin).
+  const { fakeDocument } = await import("../nav/fakedom.test-helper.js");
+  const URL_ = "https://havoc.app/depiction/aerial";
+  const open = async (fetch) => {
+    const saved = globalThis.document;
+    const doc = fakeDocument();
+    globalThis.document = doc;
+    const opened = [];
+    try {
+      openHtmlDepiction(URL_, "Aerial", { backend: { kind: "native", fetch }, open: (u) => opened.push(u) });
+      assert.match(doc.body.textContent, /Loading Depiction/);
+      for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
+      return { doc, frame: doc.querySelector("iframe"), text: doc.body.textContent, opened };
+    } finally { globalThis.document = saved; }
+  };
+  const refused = await open(async () => new Response(text, { headers: { "X-Frame-Options": "deny" } }));
+  assert.equal(refused.frame, null, "no white frame");
+  assert.match(refused.text, /havoc\.app doesn't let its depiction open inside .+\./);
+  assert.match(refused.text, /Open in Safari/);
+  const failed = await open(async () => { throw new Error("the repo answered HTTP 404"); });
+  assert.equal(failed.frame, null);
+  assert.match(failed.text, /the repo answered HTTP 404/);
+  assert.match(failed.text, /Open in Safari/);
+  const stat = await open(async () => new Response(next));
+  assert.ok(stat.frame.srcdoc.includes(text) && stat.frame.srcdoc.includes(`<base href="${URL_}"`), "Havoc's own HTML");
+  assert.equal(stat.frame.getAttribute("sandbox"), "allow-popups allow-popups-to-escape-sandbox", "scripts off");
+  const live = await open(async () => new Response(text));
+  assert.equal(live.frame.src, URL_);
+  assert.match(live.frame.getAttribute("sandbox"), /allow-scripts/);
+  for (const f of [stat.frame, live.frame]) assert.doesNotMatch(f.getAttribute("sandbox"), /allow-same-origin/);
 });
