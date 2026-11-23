@@ -39,6 +39,7 @@ import { catalog } from "../catalog.js";
 import { installQueue, runLogs } from "../queue.js";
 import { MODES, MODE_LABEL, changeCount, runTitle, createRepeatFilter, CONFFILE_TITLE,
   CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine, debUrlOf, debLinkOf, mergePlans, runStatusText } from "../core/queue.js";
+import { withLowerIds } from "../core/idmap.js";
 import { appQueue } from "../app-queue.js";
 import { appPlan, runOrder, sizeText, SELF_ID, customParams, listedOf, APP_MODES, APP_MODE_LABEL } from "../core/appqueue.js";
 import { NAME } from "../brand.js";
@@ -295,7 +296,7 @@ async function namesFor(ids) {
     const info = await catalog.queueInfo([...new Set(ids)]);
     for (const [id, v] of Object.entries(info ?? {})) if (v?.name) out[id] = v.name;
   } catch { /* names fall back to ids */ }
-  return out;
+  return withLowerIds(out); // B407: apt's status lines name a package in lower case
 }
 
 // Cydia's Statistics group: the download size, when apt says one.

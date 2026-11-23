@@ -53,6 +53,8 @@ import { ipaInstallAvailable } from "../ipa-install.js";
 import { IPA_FOOTER } from "../core/ipainstall.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall } from "../core/installed.js";
+import { sameId } from "../core/idmap.js";
+import { lowerId } from "../core/queue.js";
 import { rememberedApps } from "../app-updates.js";
 import { ignoreVersionLabel, versionToStore, IGNORE_VERSION } from "../core/appupdates.js"; // F281
 import { openInGroup, setSourceShare, shareHeadButton } from "./handoff.js";
@@ -1175,7 +1177,7 @@ function blockGroup({ id, name, author, tile = null }) {
   };
   draw();
   if (detectMode() === "jailbreak") {
-    catalog.installed().then((list) => { installed = Boolean(list?.some((p) => p.id === id)); if (box.isConnected) draw(); }).catch(() => {});
+    catalog.installed().then((list) => { installed = Boolean(list?.some((p) => sameId(p.id, id))); if (box.isConnected) draw(); }).catch(() => {});
   }
   return box;
 }
@@ -2103,8 +2105,9 @@ export const paidDebSection = () => ({ rows: [{ label: "Download .deb", detail: 
 async function installedGroup(id, { version = true } = {}) {
   let rows;
   try { rows = await catalog.installed(); } catch { return null; }
-  const p = rows?.find((r) => r.id === id);
+  const p = rows?.find((r) => sameId(r.id, id));
   if (!p) return null;
+  const heldId = lowerId(id); // B407: apt-mark showhold's spelling
   // On the site a hold in the uploaded status file is dpkg's, set on the phone: shown, not switchable here.
   const dpkgHeld = p.held && catalog.statusSource() !== "native";
   const mark = autoMarkShown(settings); // F70: Update Automatically, for Only Packages I Mark
@@ -2113,7 +2116,7 @@ async function installedGroup(id, { version = true } = {}) {
   if (!dpkgHeld) {
     // grouped() draws plain rows; the switch goes into its cell afterwards, as on the Settings tab.
     const cell = frag.querySelectorAll(".cell-inner")[at];
-    cell.append(createSwitch({ label: "Ignore Upgrades", checked: settings.holds.has(id), onToggle: (on) => { settings.holds.set(id, on); } }));
+    cell.append(createSwitch({ label: "Ignore Upgrades", checked: settings.holds.has(heldId), onToggle: (on) => { settings.holds.set(heldId, on); } }));
     cell.classList.add("has-switch");
   }
   if (mark) {
