@@ -14,7 +14,7 @@ globalThis.document ??= fakeDocument();
 
 const core = await import("../core/installroute.js");
 const { decideRoute, installStatus, builtinVPN, iphoneSetUp, setupFooter, cellularWarning, shortcutsAdded, vpnOn, verifyVPN, verifyFailure,
-  vpnTestResult, shortcutsTestResult, routeFailureOf, HOW_STEPS, SHORTCUT_NAMES, ALERTS, CELLULAR, BUILTIN_VPN, setupState } = core;
+  vpnTestResult, switchTestResult, routeFailureOf, HOW_STEPS, SHORTCUT_NAMES, ALERTS, CELLULAR, BUILTIN_VPN, setupState } = core;
 const screens = await import("./installroute.js");
 const { installationGroups, subGroups, localGroups, shortcutGroups, howGroups, SUB_TITLES } = screens;
 const { cellularTile, slotVPN, routeTile, slotOrRoute } = await import("./home.js");
@@ -50,25 +50,28 @@ test("set up = paired and tested once; the footer says the next step", () => {
   assert.equal(iphoneSetUp({ paired: "rp" }), true, "an older shell: paired is set up");
   assert.equal(setupFooter(ST({}, { paired: null })), "Pair this iPhone once to install straight onto it.");
   assert.equal(setupFooter(ST()), "Test the connection to finish setting up.");
-  assert.equal(setupFooter(ST({ tested: true })), "Set up for Wi-Fi and offline. Add the Cellular Shortcuts to install on cellular too.");
+  assert.equal(setupFooter(ST({ tested: true })), "Set up for Wi-Fi and offline. Add the Install Switch to install on cellular and get your VPN back after.");
   assert.equal(setupFooter(ST({ tested: true, shortcuts: { off: true, on: true } })), "Set up. Apps install straight onto this iPhone, on Wi-Fi, cellular or offline.");
+  assert.equal(setupFooter(ST({ tested: true, shortcuts: { switch: true } })), "Set up. Apps install straight onto this iPhone, on Wi-Fi, cellular or offline.");
 });
 
-test("This iPhone's page: Set Up (Pair, Test, Cellular Shortcuts) with its footer, then How It Works; no Tailscale rows", () => {
+test("This iPhone's page: Set Up (Pair, Test, Install Switch) with its footer, then How It Works; no Tailscale rows", () => {
   const all = installationGroups("iphone", ST());
   const page = subGroups(all, "iphone");
   assert.deepEqual(page.map((g) => g.header), ["Set Up", undefined]);
-  assert.deepEqual(page[0].rows.map((r) => [r.label, r.detail]), [["Pair This iPhone", "Done"], ["Test Connection", "Test"], ["Cellular Shortcuts", "Add"]]);
+  assert.deepEqual(page[0].rows.map((r) => [r.label, r.detail]), [["Pair This iPhone", "Done"], ["Test Connection", "Test"], ["Install Switch", "Add"]]);
   assert.match(page[0].rows[0].href, /settings\/installation\/pair$/);
-  assert.match(page[0].rows[2].href, /settings\/installation\/shortcuts$/);
-  assert.equal(page[0].rows[2].subtitle, "Optional, for installs on cellular");
+  assert.equal(page[0].rows[2].href, undefined, "Add runs on Set Up itself (F386)");
+  assert.equal(typeof page[0].rows[2].onClick, "function");
+  assert.equal(page[0].rows[2].subtitle, "Optional: cellular, and your VPN back after");
   assert.equal(page[0].footer, "Test the connection to finish setting up.");
   assert.equal(page[1].rows[0].label, "How It Works");
   assert.match(page[1].rows[0].href, /settings\/installation\/how$/);
   assert.ok(!JSON.stringify(all).includes("Tailscale\""), "no Tailscale group");
   assert.ok(!JSON.stringify(all).includes("Connect With"));
-  const tested = localGroups(ST({ tested: true, shortcuts: { off: true, on: true } }));
+  const tested = localGroups(ST({ tested: true, shortcuts: { switch: true } }));
   assert.deepEqual(tested[0].rows.map((r) => r.detail), ["Done", "Connected", "Done"]);
+  assert.match(tested[0].rows[2].href, /settings\/installation\/shortcuts$/, "added: its page, for the test");
   assert.equal(localGroups(ST(), { testing: true })[0].rows[1].detail, "Testing…");
   assert.equal(localGroups(ST(), { testing: true })[0].rows[1].spin, true);
   assert.equal(localGroups(ST(), { reading: true })[0].rows[0].detail, "Checking…");
@@ -96,38 +99,41 @@ test("How It Works: one install's steps, a row each, and offline", () => {
   assert.deepEqual(offline.rows, [{ label: "Offline", detail: "Works" }]);
 });
 
-test("Cellular Shortcuts: each Shortcut its own group with Add; Test Shortcuts once both are added", () => {
+test("Install Switch's page: one Add row (no Cellular Shortcuts rows); Test once it is added", () => {
   const added = [];
   const gs = shortcutGroups({ shortcuts: { off: false, on: false } }, { add: (k) => added.push(k) });
-  assert.deepEqual(gs.map((g) => g.header), ["Turn Off", "Turn On"]);
-  assert.deepEqual(gs.map((g) => g.rows[0].label), [SHORTCUT_NAMES.off, SHORTCUT_NAMES.on]);
-  assert.deepEqual(SHORTCUT_NAMES, { off: "Cellular Data Off", on: "Cellular Data On" });
+  assert.equal(gs.length, 1);
+  assert.deepEqual(gs[0].rows.map((r) => [r.label, r.detail]), [[SHORTCUT_NAMES.switch, "Add"]]);
+  assert.deepEqual(SHORTCUT_NAMES, { off: "Cellular Data Off", on: "Cellular Data On", switch: "Install Switch" });
   gs[0].rows[0].onClick();
-  gs[1].rows[0].onClick();
-  assert.deepEqual(added, ["off", "on"]);
+  assert.deepEqual(added, ["switch"]);
   assert.match(gs[0].footer, /Add Shortcut/);
-  const both = shortcutGroups({ shortcuts: { off: true, on: true } });
-  assert.deepEqual(both.map((g) => g.rows[0].detail ?? null), ["Added", "Added", null]);
-  assert.equal(both[2].rows[0].label, "Test Shortcuts");
-  assert.equal(shortcutGroups({ shortcuts: { off: true, on: true } }, { testing: true })[2].rows[0].detail, "Testing…");
+  assert.equal(shortcutGroups({ shortcuts: { off: true, on: true } }).length, 1, "the old two don't count as added here");
+  const on = shortcutGroups({ shortcuts: { switch: true } });
+  assert.deepEqual(on.map((g) => g.rows[0].detail ?? null), ["Added", null]);
+  assert.equal(on[1].rows[0].label, "Test Install Switch");
+  assert.equal(shortcutGroups({ shortcuts: { switch: true } }, { testing: true })[1].rows[0].detail, "Testing…");
 });
 
 test("the tests' answers in words", () => {
   assert.deepEqual(vpnTestResult({ ok: true, ms: 38 }), { title: "Connected", message: `${BUILTIN_VPN} reached this iPhone in 38 ms, then turned off again.` });
   assert.equal(vpnTestResult(null, new Error("vpn_failed: iOS didn't save the VPN configuration (permission denied). Allow it when iOS asks")).title, `${BUILTIN_VPN} Didn't Start`);
   assert.equal(vpnTestResult(null, new Error("refused: this iPhone no longer has the pairing")).again, true);
-  assert.equal(shortcutsTestResult({ ok: true, cellular: true, wentOff: true }).message, "Cellular Data went off and came back on.");
-  assert.equal(shortcutsTestResult({ ok: true, cellular: false }).title, "Shortcuts Work");
-  const bad = shortcutsTestResult({ ok: false, off: { ok: true }, on: { ok: false, error: "Shortcut not found" } });
-  assert.equal(bad.title, "Shortcut Didn't Run");
-  assert.match(bad.message, /"Cellular Data On": Shortcut not found/);
+  // F386: the Install Switch's test
+  assert.equal(switchTestResult({ ok: true, start: { ok: true }, end: { ok: true }, vpnOn: true, cellular: false }).title, "Install Switch Works");
+  assert.match(switchTestResult({ ok: true, start: { ok: true }, end: { ok: true }, vpnOn: true, cellular: true, wentOff: true }).message, /Cellular Data off/);
+  assert.match(switchTestResult({ ok: true, start: { ok: true }, end: { ok: true }, vpnOn: false }).message, new RegExp(`${BUILTIN_VPN} didn't connect`));
+  assert.match(switchTestResult({ ok: true, start: { ok: true }, end: { ok: true }, vpnOn: true, cellular: true, wentOff: false }).message, /cellular stayed in use/);
+  const nope = switchTestResult({ ok: false, start: { ok: false, error: "Could not find the shortcut" }, end: { ok: true } });
+  assert.equal(nope.title, "Shortcut Didn't Run");
+  assert.match(nope.message, /"Install Switch": Could not find the shortcut/);
 });
 
 test("a failed connect through the built-in VPN never says to turn on LocalDevVPN or Tailscale", () => {
   const st = ST({ tested: true, cellular: true });
   const why = verifyFailure(new Error("connect_failed: no answer"), st);
   assert.equal(why.title, "Couldn't Connect");
-  assert.match(why.message, /Cellular Shortcuts/);
+  assert.match(why.message, /Install Switch/);
   const refused = routeFailureOf(new Error("route_refused: every port"), st);
   assert.equal(refused.fix, "shortcuts");
   assert.equal(refused.button, CELLULAR.button);
@@ -159,6 +165,7 @@ test("cellular + no Shortcuts -> the warning; Wi-Fi, or the Shortcuts added -> n
   assert.equal(cellularWarning("iphone", ST({ cellular: true, shortcuts: { off: true, on: false } })), true, "one of two");
   assert.equal(cellularWarning("server", ST({ cellular: true })), false, "the Signing Server");
   assert.equal(shortcutsAdded(ST({ shortcuts: { off: true, on: true } })), true);
+  assert.equal(cellularWarning("iphone", ST({ cellular: true, shortcuts: { switch: true } })), false, "the Install Switch (F386)");
   // Installation & Signing's status cell, with the fix as its action
   const s = installStatus("iphone", ST({ cellular: true }));
   assert.deepEqual([s.state, s.title, s.action, s.tone], ["cellular", CELLULAR.title, "shortcuts", "warn"]);

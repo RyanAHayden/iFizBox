@@ -31,8 +31,9 @@ import { tailscaleRoute } from "../core/installroute.js";
 import { leaveQuestion, LEAVE } from "../core/installroute.js";
 import { tailscaleVPNOn, installStatus, CHECKING, CHECKING_SERVER, STATUS_ACTIONS } from "../core/installroute.js";
 import { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, NO_ANSWER_FAILURE } from "../core/installroute.js"; // B316
-import { builtinVPN, shortcutsAdded, setupFooter, iphoneSetUp, HOW_STEPS, SHORTCUT_NAMES, vpnTestResult, shortcutsTestResult } from "../core/installroute.js"; // F372
+import { builtinVPN, shortcutsAdded, setupFooter, iphoneSetUp, HOW_STEPS, SHORTCUT_NAMES, vpnTestResult } from "../core/installroute.js"; // F372
 import { shortcutFileURL, shortcutDidntRun, shortcutDidntOpen } from "../core/installroute.js"; // B359
+import { switchAdded, switchTestResult, BUILTIN_VPN } from "../core/installroute.js"; // F386
 import { loadStyle } from "../nav/motion.js";
 import { NAME, DOMAIN } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
@@ -46,7 +47,7 @@ export const PAGE = "installation";
 // groups); `iphone` still opens This iPhone's groups alone. The Pairing row opens the setup (`pair`).
 // F372: This iPhone's own pages (How It Works, Cellular Shortcuts) and the Signing Server's page, each pushed with the
 // slide from Installation & Signing's rows.
-export const SUB_TITLES = { pair: "Pairing", iphone: "This iPhone", with: "Install Apps With", how: "How It Works", shortcuts: "Cellular Shortcuts", server: "Signing Server" };
+export const SUB_TITLES = { pair: "Pairing", iphone: "This iPhone", with: "Install Apps With", how: "How It Works", shortcuts: "Install Switch", server: "Signing Server" };
 const VPN = VPNS[0];
 
 const route = (sub) => format(settingsRoute(sub ? [PAGE, sub] : [PAGE]));
@@ -143,7 +144,8 @@ let signInVisit = null; // B143: the pair page's visit that started it (leaving 
 // that part is read again, `late: {device, tailscale}` that part didn't answer in time: its rows say Not Responding.
 export function installationGroups(choice, st, { pick = () => {}, openVPN = () => {}, connect = () => {}, signIn = () => {}, test = () => {}, signOut = () => {}, busy = null,
   reading = false, connectPick = null, picking = false, connectBusy = null, hint = null, server = () => [],
-  tsReading = reading, refreshing = {}, late = {}, testing = false, failure = null, fix = () => {}, pairChecking = false } = {}) {
+  tsReading = reading, refreshing = {}, late = {}, testing = false, failure = null, fix = () => {}, pairChecking = false,
+  addSwitch = () => {}, switchChecking = false } = {}) {
   const groups = [{
     header: "Install Apps With",
     rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", icon: rowIcon(ROUTE_ROW[o.value].icon), checked: o.value === choice, onClick: () => pick(o.value),
@@ -154,7 +156,7 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
   }];
   if (choice !== "iphone") return [...groups, ...(server() ?? [])];
   // F372: the built-in VPN is the way in: This iPhone's page is Set Up and How It Works (no Tailscale, no LocalDevVPN)
-  if (builtinVPN(st ?? hint)) return [...groups, ...localGroups(st ?? hint, { reading: reading && !hint, refreshing: Boolean(refreshing.device), test, testing, failure, fix, late: Boolean(late.device) })];
+  if (builtinVPN(st ?? hint)) return [...groups, ...localGroups(st ?? hint, { reading: reading && !hint, refreshing: Boolean(refreshing.device), test, testing, failure, fix, late: Boolean(late.device), addSwitch, switchChecking })];
   {
     const ts = st?.tailscale ?? null;
     // B167: while idevice.status (tailscale.status with it) hasn't answered, Tailscale's state is unknown, not signed
@@ -209,12 +211,16 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
 }
 
 // ---- F372: This iPhone with the built-in VPN (core BUILTIN_VPN; native/sideload/vpn)
-// The page (installation/iphone): Set Up (Pair This iPhone, Test Connection, Cellular Shortcuts) with a footer that
+// The page (installation/iphone): Set Up (Pair This iPhone, Test Connection, Install Switch) with a footer that
 // says the next step (core setupFooter), then How It Works. `st` is idevice.status (its `vpn`), `reading` while the
 // first answer is out, `refreshing` while it's read again (the rows keep the last answer, Pairing spins), `late`
 // when it didn't answer. A failed check or install (B316's `failure`) is said in the footer, red, with its fix row.
-export function localGroups(st, { reading = false, refreshing = false, test = () => {}, testing = false, failure = null, fix = () => {}, late = false } = {}) {
-  const paired = Boolean(st?.paired), tested = Boolean(st?.vpn?.tested), both = shortcutsAdded(st);
+// F386: Install Switch's row is its Add (`addSwitch`: the share sheet, then a check run while `switchChecking`); once
+// added it opens the Install Switch's page (installation/shortcuts) for its test.
+export function localGroups(st, { reading = false, refreshing = false, test = () => {}, testing = false, failure = null, fix = () => {}, late = false,
+  addSwitch = () => {}, switchChecking = false } = {}) {
+  const paired = Boolean(st?.paired), tested = Boolean(st?.vpn?.tested);
+  const switchRow = { label: SHORTCUT_NAMES.switch, subtitle: "Optional: cellular, and your VPN back after", icon: rowIcon("cellular") };
   const pairRow = late ? { label: "Pair This iPhone", icon: rowIcon("pairPhone"), detail: NOT_RESPONDING, href: route("pair") }
     : reading ? { label: "Pair This iPhone", icon: rowIcon("pairPhone"), detail: "Checking…", href: route("pair"), spin: true }
     : { label: "Pair This iPhone", icon: rowIcon("pairPhone"), detail: paired ? "Done" : "Start", href: route("pair"), ...(refreshing ? { spin: true } : {}) };
@@ -222,7 +228,9 @@ export function localGroups(st, { reading = false, refreshing = false, test = ()
     pairRow,
     { label: "Test Connection", icon: rowIcon("testConnection"), onClick: test,
       detail: testing ? "Testing…" : failure ? FAILING : tested ? "Connected" : "Test", ...(testing ? { spin: true } : {}) },
-    { label: "Cellular Shortcuts", subtitle: "Optional, for installs on cellular", icon: rowIcon("cellular"), detail: both ? "Done" : "Add", href: route("shortcuts") },
+    switchChecking ? { ...switchRow, detail: "Checking…", spin: true }
+      : switchAdded(st) ? { ...switchRow, detail: "Done", href: route("shortcuts") }
+      : { ...switchRow, detail: "Add", chevron: true, onClick: addSwitch },
     ...(failure && !testing ? [{ label: failure.button, cls: "sign-import", onClick: fix }] : []),
   ];
   const footer = failure ? { footer: `${failure.title}. ${failure.short}`, warn: true } : { footer: reading || late ? "" : setupFooter(st) };
@@ -242,25 +250,24 @@ export function howGroups() {
   ];
 }
 
-// Cellular Shortcuts (installation/shortcuts): each Shortcut in its own group with its Add row, then Test Shortcuts
-// once both are. `st` is vpn.status (or idevice.status's vpn). B359: Add shares our signed Shortcut (Shortcuts'
+// Install Switch (installation/shortcuts; F386, it replaced the two Cellular Shortcuts' rows): its Add row, then Test
+// once it is added. `st` is vpn.status (or idevice.status's vpn). B359: Add shares our signed Shortcut (Shortcuts'
 // Add Shortcut sheet); back in the app it runs once (`checking`, the Shortcut being run) and only a run that passed
-// marks it Added. `failed` ({off, on}: the run's error, or {open: error} when the share sheet didn't open) turns that
-// group's footer into what went wrong.
+// marks it Added. `failed` ({switch}: the run's error, or {open: error} when the share sheet didn't open) turns the
+// footer into what went wrong.
 export function shortcutGroups(st, { add = () => {}, test = () => {}, testing = false, reading = false, checking = null, failed = {} } = {}) {
   const sc = st?.shortcuts ?? {};
-  const row = (k) => reading || checking === k ? { label: SHORTCUT_NAMES[k], icon: rowIcon("cellular"), detail: "Checking…", spin: true }
+  const k = "switch";
+  const row = reading || checking === k ? { label: SHORTCUT_NAMES[k], icon: rowIcon("cellular"), detail: "Checking…", spin: true }
     : sc[k] ? { label: SHORTCUT_NAMES[k], icon: rowIcon("cellular"), detail: "Added" }
     : { label: SHORTCUT_NAMES[k], icon: rowIcon("cellular"), detail: "Add", chevron: true, onClick: () => add(k) };
-  const why = (k, f) => f?.open ? shortcutDidntOpen(k, f.open) : shortcutDidntRun(k, f);
-  const footer = (k, text) => !sc[k] && failed[k] && checking !== k ? { footer: why(k, failed[k]), warn: true } : { footer: text };
-  const groups = [
-    { header: "Turn Off", rows: [row("off")], ...footer("off", "Tap Shortcuts, then Add Shortcut, and come back. It turns data off for the moment an install connects.") },
-    { header: "Turn On", rows: [row("on")], ...footer("on", "The same for the one that turns data back on once the install has connected.") },
-  ];
-  if (sc.off && sc.on) {
-    groups.push({ rows: [{ label: "Test Shortcuts", icon: rowIcon("testConnection"), onClick: test, ...(testing ? { detail: "Testing…", spin: true } : {}) }],
-      footer: "Turns Cellular Data off and on again once." });
+  const f = failed[k];
+  const groups = [{ rows: [row], ...(!sc[k] && f && checking !== k
+    ? { footer: f.open ? shortcutDidntOpen(k, f.open) : shortcutDidntRun(k, f), warn: true }
+    : { footer: `${sc[k] ? "" : "Tap Shortcuts, then Add Shortcut, and come back. "}Around installs it turns cellular data off and on, and brings your VPN back.` }) }];
+  if (sc[k]) {
+    groups.push({ rows: [{ label: "Test Install Switch", icon: rowIcon("testConnection"), onClick: test, ...(testing ? { detail: "Testing…", spin: true } : {}) }],
+      footer: `Runs it once each way: ${BUILTIN_VPN} on, then your VPN back.` });
   }
   return groups;
 }
@@ -328,8 +335,22 @@ export async function addShortcut(native, k, { whenBack = backInApp, checking = 
   return { opened: true, ok: Boolean(r?.ok), error: r?.ok ? null : (r?.error || "it didn't run"), status: r?.status ?? null };
 }
 
+export const SWITCH_TEST_MS = 75000;
 let shortcutsTesting = false;
 const shortcutsFailed = {}; // B359: the last check run's error per Shortcut, for its footer
+
+// F386: Add on Set Up's Install Switch row: addShortcut, then the outcome in an alert when it didn't pass (Set Up's
+// footer says the next step, so the reason goes in the alert). `checking(on)` while the check run is out. Answers
+// addShortcut's {opened, ok, error, status}.
+export async function addSwitch(native, alert, { whenBack = backInApp, checking = () => {} } = {}) {
+  const r = await addShortcut(native, "switch", { whenBack, checking });
+  if (r.opened || r.error) shortcutsFailed.switch = r.ok ? null : r.opened ? r.error : { open: r.error };
+  if (!r.ok && r.error) {
+    const message = r.opened ? shortcutDidntRun("switch", r.error) : shortcutDidntOpen("switch", r.error);
+    await alert({ title: "Shortcut Not Added", message, buttons: ["OK"] });
+  }
+  return r;
+}
 async function drawShortcuts(box, { native, alert, whenBack = backInApp }) {
   let st = lastStatus?.vpn ?? null;
   let reading = !st, checking = null;
@@ -348,11 +369,12 @@ async function drawShortcuts(box, { native, alert, whenBack = backInApp }) {
         if (shortcutsTesting) return;
         shortcutsTesting = true; paint();
         let r = null;
-        try { r = await within(call(native, "vpn.testShortcuts"), 60000); } catch (e) { r = { ok: false, off: { ok: false, error: e?.message } }; }
+        // F386: two runs through Shortcuts (25 s each at most) and up to 10 s for the VPN between
+        try { r = await within(call(native, "vpn.testSwitch"), SWITCH_TEST_MS); } catch (e) { r = { ok: false, start: { ok: false, error: e?.message } }; }
         shortcutsTesting = false;
         try { st = await call(native, "vpn.status"); } catch { /* keeps the last */ }
         paint();
-        const why = shortcutsTestResult(r);
+        const why = switchTestResult(r);
         await alert({ title: why.title, message: why.message, buttons: ["OK"] });
       },
     });
@@ -399,6 +421,7 @@ let connectBusy = null; // F300: the Connect With pick whose tailscale.setConnec
 const painting = new WeakMap(); // page element → its latest paintInstallation (an older one stops painting)
 let testing = false; // F301: Test Connection runs (its row spins; a second tap waits for it)
 let pairChecking = false; // B320: Install Apps With's check of the kept pairing runs (the Pairing row spins)
+let switchChecking = false; // F386: Set Up's Install Switch Add is out (its row spins; a second tap waits)
 
 async function paintInstallation(el, { store, native, alert, redraw, server = () => [], sub = null }) {
   const choice = sub === "iphone" ? "iphone" : store.get(ROUTE_KEY);
@@ -416,7 +439,17 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
     const devWait = !got.device && !late.device, tsWait = !got.tailscale && !late.tailscale;
     const sections = installationGroups(choice, view, {
       reading: devWait && !cached, tsReading: tsWait && !view?.tailscale,
-      refreshing: { device: devWait && cached, tailscale: tsWait && Boolean(view?.tailscale) }, late, testing, pairChecking,
+      refreshing: { device: devWait && cached, tailscale: tsWait && Boolean(view?.tailscale) }, late, testing, pairChecking, switchChecking,
+      addSwitch: async () => {
+        if (switchChecking) return;
+        // coming back from Shortcuts repaints the page with a new paintInstallation; this one's paint() then stops,
+        // so the spinner and the answer go to whichever painter the page has now (redraw)
+        const repaint = () => (mine() ? paint() : redraw());
+        const r = await addSwitch(native, alert, { checking: (on) => { switchChecking = on; repaint(); } });
+        if (r.status && lastStatus) lastStatus = { ...lastStatus, vpn: { ...(lastStatus.vpn ?? {}), ...r.status } };
+        if (r.status && view) view = { ...view, vpn: { ...(view.vpn ?? {}), ...r.status } };
+        repaint();
+      },
       connectPick, connectBusy, hint: lastStatus, server, picking: devWait && picked === choice,
       failure: choice === "iphone" ? routeFailure() : null, // B316
       fix: () => {

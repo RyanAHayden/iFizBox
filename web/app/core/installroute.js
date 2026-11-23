@@ -27,9 +27,14 @@ export const ROUTE_OPTIONS = [
 // LocalDevVPN rules below still apply.
 export const BUILTIN_VPN = `${NAME} VPN`;
 export const builtinVPN = (st) => Boolean(st?.vpn?.available);
-// The two Shortcuts for installs on cellular, named as the user names them in Shortcuts.
-export const SHORTCUT_NAMES = { off: "Cellular Data Off", on: "Cellular Data On" };
-export const shortcutsAdded = (st) => Boolean(st?.vpn?.shortcuts?.off && st?.vpn?.shortcuts?.on);
+// Our Shortcuts, named as the user names them in Shortcuts. F386: `switch`, the Install Switch, is the one This
+// iPhone's Set Up adds: before a queue of installs it turns Cellular Data off (on cellular) and connects the built-in
+// VPN, after it turns data back on and connects the VPN that was on before (Tailscale). `off`/`on`, the two Cellular
+// Shortcuts it replaces, still work on phones that added them before.
+export const SHORTCUT_NAMES = { off: "Cellular Data Off", on: "Cellular Data On", switch: "Install Switch" };
+export const switchAdded = (st) => Boolean(st?.vpn?.shortcuts?.switch);
+// Installs on cellular are covered: the Install Switch, or both Cellular Shortcuts.
+export const shortcutsAdded = (st) => switchAdded(st) || Boolean(st?.vpn?.shortcuts?.off && st?.vpn?.shortcuts?.on);
 // B359: our signed Shortcut on the site (web/app/shortcuts/, signed by tools/shortcuts/sign.sh). The app shares its
 // own copy; this link is the fallback it opens in Safari. Shortcuts names an imported Shortcut after its file.
 export const shortcutFileURL = (k) => `https://${DOMAIN}/shortcuts/${encodeURIComponent(SHORTCUT_NAMES[k])}.shortcut`;
@@ -44,15 +49,15 @@ export function setupFooter(st) {
   if (!st?.paired) return "Pair this iPhone once to install straight onto it.";
   if (builtinVPN(st) && !st.vpn.tested) return "Test the connection to finish setting up.";
   if (shortcutsAdded(st)) return "Set up. Apps install straight onto this iPhone, on Wi-Fi, cellular or offline.";
-  return "Set up for Wi-Fi and offline. Add the Cellular Shortcuts to install on cellular too.";
+  return "Set up for Wi-Fi and offline. Add the Install Switch to install on cellular and get your VPN back after.";
 }
-// User 2026-11-22: This iPhone in use, the phone on cellular (no Wi-Fi), and the Cellular Shortcuts not added: iOS
+// User 2026-11-22: This iPhone in use, the phone on cellular (no Wi-Fi), and the Install Switch not added: iOS
 // refuses the connection, so Home, Installation & Signing's status and an install that starts say so, with a button
-// to the Cellular Shortcuts page.
+// to the Install Switch's page.
 export const cellularWarning = (choice, st) => choice === "iphone" && builtinVPN(st) && Boolean(st.vpn.cellular) && !shortcutsAdded(st);
 export const CELLULAR = {
-  title: "Add the Cellular Shortcuts",
-  message: `On cellular, iOS refuses installs straight onto this iPhone while cellular data is on. Add the two Cellular Shortcuts, and ${NAME} turns it off for the moment each install connects.`,
+  title: "Add the Install Switch",
+  message: `On cellular, iOS refuses installs straight onto this iPhone while cellular data is on. Add the Install Switch Shortcut, and ${NAME} turns data off while installs connect.`,
   short: "On cellular, installs need them.",
   button: "Set Up",
 };
@@ -61,7 +66,7 @@ export const HOW_STEPS = [
   { label: "1. Download", subtitle: "The app downloads over Wi-Fi or cellular." },
   { label: "2. Sign", subtitle: "Signed on this iPhone with your certificate." },
   { label: `3. ${BUILTIN_VPN} On`, subtitle: "iOS runs one VPN at a time, so Tailscale pauses." },
-  { label: "4. Cellular Data Off", subtitle: "On cellular only: a Shortcut turns it off for a moment." },
+  { label: "4. Cellular Data Off", subtitle: "On cellular only: the Install Switch turns it off." },
   { label: "5. Install", subtitle: "Copied straight to iOS. No internet needed." },
   { label: "6. All Back On", subtitle: "Data back on, VPN off, Tailscale reconnects." },
 ];
@@ -73,15 +78,16 @@ export function vpnTestResult(r, err = null) {
   const why = verifyFailure(err, { paired: true, vpn: { available: true } });
   return { title: why.title, message: why.message, again: why.again };
 }
-// vpn.testShortcuts' answer as the alert's words: both ran, or which one didn't.
-export function shortcutsTestResult(r) {
-  if (r?.ok) {
-    const seen = r.cellular ? (r.wentOff ? "Cellular Data went off and came back on." : "Both ran, but cellular stayed in use: check that the first one sets Cellular Data to Off.") : "Both ran. On Wi-Fi nothing changes; on cellular they turn Cellular Data off and on.";
-    return { title: "Shortcuts Work", message: seen };
+// F386: vpn.testSwitch's answer as the alert's words: the start and the end ran, and what the start did.
+export function switchTestResult(r) {
+  const name = SHORTCUT_NAMES.switch;
+  if (!r?.start?.ok || !r?.end?.ok) {
+    const err = (!r?.start?.ok ? r?.start?.error : r?.end?.error) || "it didn't run";
+    return { title: "Shortcut Didn't Run", message: `"${name}": ${err}. Check that it's in Shortcuts with exactly that name.` };
   }
-  const which = !r?.off?.ok ? SHORTCUT_NAMES.off : SHORTCUT_NAMES.on;
-  const err = (!r?.off?.ok ? r?.off?.error : r?.on?.error) || "it didn't run";
-  return { title: "Shortcut Didn't Run", message: `"${which}": ${err}. Check that it's in Shortcuts with exactly that name.` };
+  if (!r.vpnOn) return { title: "Shortcut Ran", message: `It ran, but ${BUILTIN_VPN} didn't connect. Installs still work: ${NAME} connects it itself, and Tailscale may stay off after.` };
+  if (r.cellular && !r.wentOff) return { title: "Shortcut Ran", message: "It ran, but cellular stayed in use. Check that Cellular Data can be turned off in Settings." };
+  return { title: "Install Switch Works", message: `${BUILTIN_VPN} came on${r.cellular ? " with Cellular Data off" : ""}, then your VPN came back.` };
 }
 
 // This iPhone's page says what it gives in one sentence under its title. Installs through installation_proxy never
@@ -159,7 +165,7 @@ export const setUpWithTailscale = (ts) => ts?.connect === "tailscale" || Boolean
 export const STATUS_ACTIONS = {
   check: "Check Connection", checkServer: "Check Server", openVPN: `Open ${VPNS[0]}`, pair: "Start Pairing",
   signIn: "Sign In to Tailscale", openTailscale: "Open Tailscale", useTailscale: "Use Tailscale",
-  certificate: "Import Certificate", shortcuts: "Add Cellular Shortcuts",
+  certificate: "Import Certificate", shortcuts: "Add Install Switch",
 };
 export const CHECKING = { state: "checking", title: "Checking…", subtitle: "Pairing and the VPN.", action: "check", tone: "wait", local: false };
 // B250: `certificate` is whether signing.status has an identity (signing/device.js statusReady): false says Import Your
@@ -518,8 +524,8 @@ export const TAILSCALE_VPN_OFF = {
 export function routeRefused(vpn = VPNS[0]) {
   if (vpn === BUILTIN_VPN) { // F372: on cellular iOS refuses every port while data is on (R72); the Shortcuts are the fix
     return { title: "iPhone Refused", again: false, fix: "shortcuts", button: CELLULAR.button,
-      message: `This iPhone refused every connection through ${BUILTIN_VPN}, so it isn't the pairing. On cellular, add the Cellular Shortcuts, or join Wi-Fi.`,
-      short: "Every connection was refused. On cellular, add the Shortcuts." };
+      message: `This iPhone refused every connection through ${BUILTIN_VPN}, so it isn't the pairing. On cellular, add the Install Switch, or join Wi-Fi.`,
+      short: "Every connection was refused. On cellular, add the Install Switch." };
   }
   if (vpn === VPNS[1]) {
     return { title: "Tailscale Refused", again: false, fix: "openTailscale", button: "Open Tailscale",
@@ -602,7 +608,7 @@ export function verifyFailure(err, st = null) {
     return { title: "Pair Again", message: `This iPhone answered${through}, then closed the connection: it no longer accepts ${NAME}'s pairing. Pair again.`, again: true };
   }
   if (code === "connect_failed" && builtinVPN(st)) { // F372: the shell had its own VPN on; nothing to turn on
-    return { title: "Couldn't Connect", message: `${BUILTIN_VPN} was on, but ${NAME} couldn't reach this iPhone through it. Try again.${st.vpn.cellular ? " On cellular, add the Cellular Shortcuts first." : ""}`, again: false };
+    return { title: "Couldn't Connect", message: `${BUILTIN_VPN} was on, but ${NAME} couldn't reach this iPhone through it. Try again.${st.vpn.cellular ? " On cellular, add the Install Switch first." : ""}`, again: false };
   }
   if (code === "connect_failed") {
     const vpn = verifyVPN(st, raw);

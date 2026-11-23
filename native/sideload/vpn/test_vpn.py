@@ -99,13 +99,49 @@ class App(unittest.TestCase):
 
     def test_cellular_shortcuts(self):
         src = read("App", "LocalVPN.swift")
-        self.assertIn('["off": "Cellular Data Off", "on": "Cellular Data On"]', src)
+        self.assertIn('["off": "Cellular Data Off", "on": "Cellular Data On", "switch": "Install Switch"]', src)
         self.assertIn('c.scheme = "shortcuts"; c.host = "x-callback-url"; c.path = "/run-shortcut"', src)
         self.assertIn('url.host == "vpn-shortcut"', src)
         self.assertIn("if LocalVPN.receive(url) { return }", read("Sources", "App.swift", base=NATIVE))
         # the web's names are the same
         web = read("web", "app", "core", "installroute.js", base=os.path.dirname(NATIVE))
-        self.assertIn('SHORTCUT_NAMES = { off: "Cellular Data Off", on: "Cellular Data On" }', web)
+        self.assertIn('SHORTCUT_NAMES = { off: "Cellular Data Off", on: "Cellular Data On", switch: "Install Switch" }', web)
+
+    def test_install_switch(self):
+        """F386: one Shortcut around a queue of installs: its start before the first connect, its end once the VPN
+        is off after the last; the plist reads JSON flags with "has any value" only (B359: "contains" loses its text)."""
+        import plistlib
+        src = read("App", "LocalVPN.swift")
+        self.assertIn('runShortcut("switch", input: switchInput("start", cellular: cell))', src)
+        self.assertIn("if stop { down(); endSwitch() }", src)
+        self.assertIn("UIApplication.didBecomeActiveNotification", src)  # an end found in the background runs later
+        self.assertIn('b.on("vpn.testSwitch")', src)
+        repo = os.path.dirname(NATIVE)
+        with open(os.path.join(repo, "tools", "shortcuts", "install-switch.plist"), "rb") as f:
+            wf = plistlib.load(f)
+        acts = wf["WFWorkflowActions"]
+        ids = [a["WFWorkflowActionIdentifier"].removeprefix("is.workflow.actions.") for a in acts]
+        for want in ["detect.dictionary", "vpn.get", "setstoredcontent", "getstoredcontent", "filter.vpns", "vpn.set", "cellulardata.set"]:
+            self.assertIn(want, ids)
+        self.assertEqual(ids[-1], "nothing")
+        keys = [a["WFWorkflowActionParameters"].get("WFDictionaryKey") for a in acts if ids[acts.index(a)] == "getvalueforkey"]
+        self.assertEqual(keys, ["start", "end", "cellular"])
+        groups = {}
+        for a in acts:
+            p = a["WFWorkflowActionParameters"]
+            if a["WFWorkflowActionIdentifier"].endswith("conditional"):
+                if p["WFControlFlowMode"] == 0:
+                    self.assertEqual(p["WFCondition"], 100, "has any value only")
+                groups.setdefault(p["GroupingIdentifier"], []).append(p["WFControlFlowMode"])
+        for g, modes in groups.items():
+            self.assertEqual(modes[0], 0, g)
+            self.assertEqual(modes[-1], 2, g)
+        sets = [a["WFWorkflowActionParameters"] for a in acts if a["WFWorkflowActionIdentifier"].endswith("vpn.set")]
+        self.assertEqual([s["WFVPNOperation"] for s in sets], ["Connect", "Connect"])
+        flt = next(a for a in acts if ids[acts.index(a)] == "filter.vpns")["WFWorkflowActionParameters"]
+        tpl = flt["WFContentItemFilter"]["Value"]["WFActionParameterFilterTemplates"][0]
+        self.assertEqual((tpl["Property"], tpl["Values"]["String"]), ("Server Address", "10.7.0.1"))
+        self.assertIn('static let peer = "10.7.0.1"', src)  # the address Find VPNs looks for
 
 
 if __name__ == "__main__":

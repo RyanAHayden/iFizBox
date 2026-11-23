@@ -8,15 +8,21 @@
 // is connected, as SideStore's Cellular Refresh: iOS refuses these connections while cellular data is in use
 // (journal/2026-11-21-r72-cellular-this-iphone). They run through Shortcuts' x-callback-url, which comes back to the
 // app (ifizbox://vpn-shortcut, App.swift's Incoming hands it here).
-//   vpn.status          {available, bundled, entitled, tested, on, cellular, wifi, shortcuts: {off, on}}; also in
+// F386: with the Install Switch added instead (one Shortcut, tools/shortcuts/install-switch.plist), the first connect
+// of a queue runs it once with {"start":1[,"cellular":1]}: it remembers the VPN that is on (Tailscale), turns Cellular
+// Data off on cellular and connects this VPN with Shortcuts' Set VPN, which iOS does without a prompt (R76). Once the
+// VPN has gone off after the last connect (`linger`), it runs once more with {"end":1[,"cellular":1]}: Cellular Data
+// back on and the remembered VPN connected again. One hop to Shortcuts each way per queue, not per app. An end that
+// finds the app in the background waits until it is in front again.
+//   vpn.status          {available, bundled, entitled, tested, on, cellular, wifi, shortcuts: {off, on, switch}}; also in
 //                       idevice.status as `vpn`
 //   vpn.test            the VPN on, one connect to iOS with the pairing (idevice.verify), the VPN off: {ok, ms, kind};
 //                       a pass marks This iPhone tested (set up)
 //   vpn.openShortcuts   {which, url}: our signed Shortcut in a share sheet, for Shortcuts' Add Shortcut ({opened, via})
 //   vpn.checkShortcut   {which}: runs it with a text input (it then does nothing) and marks it added only when it
 //                       ran: {ok, error, status}
-//   vpn.testShortcuts   runs Cellular Data Off, then Cellular Data On: {ok, off: {ok, error}, on: {ok, error},
-//                       cellular, wentOff}; a pass marks both added
+//   vpn.testSwitch      F386: runs the Install Switch's start, then its end: {ok, start: {ok, error}, end: {ok, error},
+//                       cellular, wentOff, vpnOn (this VPN was connected after the start)}; a pass marks it added
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 import Network
@@ -27,9 +33,10 @@ enum LocalVPN {
     static let peer = "10.7.0.1"
     static var name: String { "\(Brand.name) VPN" }
     static let testedKey = "ifizbox.vpn.tested"
-    static let shortcutKeys = ["off": "ifizbox.vpn.shortcut.off", "on": "ifizbox.vpn.shortcut.on"]
-    /// The Shortcuts' names, as the user names them (the page says these words).
-    static let shortcutNames = ["off": "Cellular Data Off", "on": "Cellular Data On"]
+    static let shortcutKeys = ["off": "ifizbox.vpn.shortcut.off", "on": "ifizbox.vpn.shortcut.on", "switch": "ifizbox.vpn.shortcut.switch"]
+    /// The Shortcuts' names, as the user names them (the page says these words). F386: "switch" is the Install
+    /// Switch, the one Shortcut that replaces the two Cellular Shortcuts (kept for phones that added them before).
+    static let shortcutNames = ["off": "Cellular Data Off", "on": "Cellular Data On", "switch": "Install Switch"]
     /// How long the VPN stays on after the last connection ends: the next install of a queue, or a reconnect, finds it on.
     static let linger: TimeInterval = 3
     static let startLimit: TimeInterval = 10 // from startVPNTunnel to connected
@@ -195,24 +202,44 @@ enum LocalVPN {
         if m.connection.status != .disconnected { m.connection.stopVPNTunnel(); log("off") }
     }
 
-    /// Before a connect to iOS (blocking, on IDevice.queue): the VPN on, held until end(). On cellular with both
-    /// Shortcuts added, Cellular Data Off runs too: the answer says so, and connected(dataOff:) turns it back on.
+    /// Before a connect to iOS (blocking, on IDevice.queue): the VPN on, held until end(). F386: with the Install
+    /// Switch added, the first begin of a queue runs its start (end() runs its end). Otherwise, on cellular with both
+    /// Cellular Shortcuts added, Cellular Data Off runs: the answer says so, and connected(dataOff:) turns it back on.
     static func begin(cellular: Bool = true, _ step: (String) -> Void = { _ in }) throws -> Bool {
-        lock.lock(); holds += 1; stopGen += 1; lock.unlock()
+        lock.lock(); holds += 1; stopGen += 1
+        let start = switchAdded() && !switchedOn // F386: the first connect of a queue runs the Install Switch's start
+        if start { switchedOn = true; switchCellular = cellular && Path.now().cellular }
+        let cell = switchCellular
+        lock.unlock()
+        if start {
+            step("running the Shortcut \(shortcutNames["switch"]!)")
+            let r = runShortcut("switch", input: switchInput("start", cellular: cell))
+            // not fatal: up() below connects this VPN itself, as without the Shortcut
+            log(r.ok ? "Install Switch: start ran" : "Install Switch: start didn't run: \(r.error ?? "?")")
+            if r.ok && cell { waitOffCellular() }
+            // Shortcuts never opened (the app in the background): nothing changed, so no end is due either
+            if !r.ok && notOpened(r.error) { lock.lock(); switchedOn = false; lock.unlock() }
+        }
         do { try up(step) } catch {
             lock.lock(); lastFailure = Date(); lock.unlock()
             end()
             throw error
         }
-        lock.lock(); lastFailure = nil; lock.unlock()
-        guard cellular, Path.now().cellular, shortcutsAdded() else { return false }
+        lock.lock(); lastFailure = nil; let switching = switchedOn; lock.unlock()
+        // F386: the Install Switch turns data back on at its end; the two Cellular Shortcuts only without it
+        guard !switching, cellular, Path.now().cellular, shortcutsAdded() else { return false }
         step("running the Shortcut \(shortcutNames["off"]!)")
         let r = runShortcut("off")
         guard r.ok else { log("Cellular Data Off didn't run: \(r.error ?? "?"); connecting anyway"); return false }
+        waitOffCellular()
+        return true
+    }
+
+    /// After a Shortcut set Cellular Data to Off: until the path leaves cellular, at most dataOffLimit. Blocking.
+    static func waitOffCellular() {
         let t0 = Date()
         while Path.now().cellular && Date().timeIntervalSince(t0) < dataOffLimit { Thread.sleep(forTimeInterval: 0.1) }
         log(Path.now().cellular ? "cellular still in use after Cellular Data Off" : "cellular data off")
-        return true
     }
 
     /// Once connected (or when the connect failed): Cellular Data On, when begin() turned it off. Not waited for.
@@ -234,13 +261,94 @@ enum LocalVPN {
         guard idle else { return }
         DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + linger) {
             lock.lock(); let stop = holds == 0 && stopGen == gen; lock.unlock()
-            if stop { down() }
+            if stop { down(); endSwitch() }
         }
+    }
+
+    // ---- F386: the Install Switch
+
+    private static var switchedOn = false // guarded by lock: its start ran (or was tried) and its end hasn't yet
+    private static var switchCellular = false // guarded by lock: the start turned Cellular Data off
+
+    /// runShortcut's error for a run that never reached Shortcuts (nothing in it ran).
+    static func notOpened(_ error: String?) -> Bool {
+        guard let e = error else { return false }
+        return e.hasSuffix("wasn't in front, so iOS wouldn't open Shortcuts") || e == "Shortcuts didn't open" || e == "bad Shortcut link"
+    }
+
+    static func switchAdded() -> Bool { UserDefaults.standard.bool(forKey: shortcutKeys["switch"]!) }
+
+    /// The Install Switch's input: a JSON dictionary of flags, as tools/shortcuts/install-switch.plist reads them.
+    static func switchInput(_ verb: String, cellular: Bool = false) -> String {
+        cellular ? "{\"\(verb)\":1,\"cellular\":1}" : "{\"\(verb)\":1}"
+    }
+
+    /// Once the VPN is off after a queue: the Install Switch's end (data back on, the user's VPN connected again).
+    /// Shortcuts opens only from the front, so with the app in the background it waits for the app's next
+    /// didBecomeActive (LocalVPNBridge.register). Blocking: runs on a background queue.
+    static func endSwitch() {
+        let active = DispatchQueue.main.sync { UIApplication.shared.applicationState == .active }
+        lock.lock()
+        guard switchedOn, holds == 0, active else {
+            if switchedOn && holds == 0 { log("Install Switch: end waits until \(Brand.name) is in front") }
+            lock.unlock(); return
+        }
+        switchedOn = false
+        let cell = switchCellular
+        lock.unlock()
+        let r = switchEnded(runShortcut("switch", input: switchInput("end", cellular: cell)))
+        log(r.ok ? "Install Switch: end ran" : "Install Switch: end didn't run: \(r.error ?? "?")")
+    }
+
+    /// The end's run, with Set VPN's last word forgiven: on the 15 Pro (iOS 27) Set VPN on the remembered VPN switches
+    /// back to it (Settings shows it selected and connected) and then reports NEVPNErrorDomain error 2
+    /// (configuration disabled), which ends the run. Through x-callback-url iOS shows no alert for it.
+    static func switchEnded(_ r: (ok: Bool, error: String?)) -> (ok: Bool, error: String?) {
+        if !r.ok, let e = r.error, e.contains("NEVPNErrorDomain error 2") {
+            log("Install Switch: Set VPN said \(e); the VPN switched back regardless")
+            return (true, nil)
+        }
+        return r
+    }
+
+    /// vpn.testSwitch (blocking): the start, then (whatever it did) the end, as around one install, without an install.
+    /// `vpnOn`: this VPN was connected after the start, so Set VPN found it. A run that passed marks it added.
+    static func testSwitch() -> [String: Any] {
+        let cellular = Path.now().cellular
+        let start = runShortcut("switch", input: switchInput("start", cellular: cellular))
+        var wentOff = false, vpnOn = false
+        if start.ok {
+            let t0 = Date()
+            while Date().timeIntervalSince(t0) < startLimit && !(vpnOn && (!cellular || wentOff)) {
+                vpnOn = vpnOn || connectedNow()
+                wentOff = wentOff || (cellular && !Path.now().cellular)
+                Thread.sleep(forTimeInterval: 0.2)
+            }
+        }
+        let end = switchEnded(runShortcut("switch", input: switchInput("end", cellular: cellular)))
+        UserDefaults.standard.set(start.ok && end.ok, forKey: shortcutKeys["switch"]!)
+        return ["ok": start.ok && end.ok, "cellular": cellular, "wentOff": wentOff, "vpnOn": vpnOn,
+                "start": ["ok": start.ok, "error": (start.error as Any?) ?? NSNull()],
+                "end": ["ok": end.ok, "error": (end.error as Any?) ?? NSNull()]]
+    }
+
+    /// This VPN's configuration is connected now (read only: nothing saved, so iOS asks nothing). Blocking.
+    static func connectedNow() -> Bool {
+        guard let id = providerID else { return false }
+        var status = NEVPNStatus.invalid // written before done() signals the wait
+        let _: Bool? = try? wait("reading the VPN configuration", 5) { done in
+            NETunnelProviderManager.loadAllFromPreferences { ms, err in
+                let m = ms?.first { ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == id }
+                status = m?.connection.status ?? .invalid
+                done(err, true)
+            }
+        }
+        return status == .connected
     }
 
     // ---- Cellular Shortcuts
 
-    static func shortcutsAdded() -> Bool { shortcutKeys.values.allSatisfy { UserDefaults.standard.bool(forKey: $0) } }
+    static func shortcutsAdded() -> Bool { ["off", "on"].allSatisfy { UserDefaults.standard.bool(forKey: shortcutKeys[$0]!) } }
 
     private static var waiting: [String: (Bool, String?) -> Void] = [:] // callback id -> its run; guarded by lock
 
@@ -249,7 +357,9 @@ enum LocalVPN {
     /// fails at once.
     /// B359: `check` runs it with a text input, which our Shortcuts (tools/shortcuts/) take as "do nothing": it proves
     /// the Shortcut is there under its name and runs, without turning cellular data off.
-    static func runShortcut(_ which: String, check: Bool = false) -> (ok: Bool, error: String?) {
+    /// F386: `input` is the text the Shortcut gets (the Install Switch's flags); a check run of the Install Switch
+    /// sends {"check":1}, which it takes as "do nothing".
+    static func runShortcut(_ which: String, check: Bool = false, input: String? = nil) -> (ok: Bool, error: String?) {
         guard let name = shortcutNames[which] else { return (false, "no Shortcut \(which)") }
         let id = UUID().uuidString
         let back = { (r: String) in "ifizbox://vpn-shortcut?id=\(id)&r=\(r)" }
@@ -257,7 +367,8 @@ enum LocalVPN {
         c.scheme = "shortcuts"; c.host = "x-callback-url"; c.path = "/run-shortcut"
         c.queryItems = [URLQueryItem(name: "name", value: name), URLQueryItem(name: "x-success", value: back("ok")),
                         URLQueryItem(name: "x-error", value: back("error")), URLQueryItem(name: "x-cancel", value: back("cancel"))]
-        if check { c.queryItems! += [URLQueryItem(name: "input", value: "text"), URLQueryItem(name: "text", value: "check")] }
+        let text = check ? (which == "switch" ? switchInput("check") : "check") : input
+        if let text { c.queryItems! += [URLQueryItem(name: "input", value: "text"), URLQueryItem(name: "text", value: text)] }
         // B359: the page sees itself visible again, and Shortcuts' callback for the run before arrives, a moment before
         // iOS calls the app active: wait for it a little, or the open below is refused
         let t0 = Date()
@@ -359,25 +470,13 @@ enum LocalVPNBridge {
                 Apt.reply(c, ["ok": r.ok, "error": (r.error as Any?) ?? NSNull(), "status": LocalVPN.status()], nil)
             }
         }
-        b.on("vpn.testShortcuts") { c in
+        b.on("vpn.testSwitch") { c in
             guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: the jailbreak app installs IPAs through its helper") }
-            DispatchQueue.global(qos: .userInitiated).async {
-                let cellular = LocalVPN.Path.now().cellular
-                let off = LocalVPN.runShortcut("off")
-                var wentOff = false
-                if off.ok && cellular {
-                    let t0 = Date()
-                    while LocalVPN.Path.now().cellular && Date().timeIntervalSince(t0) < LocalVPN.dataOffLimit { Thread.sleep(forTimeInterval: 0.1) }
-                    wentOff = !LocalVPN.Path.now().cellular
-                }
-                let on = off.ok ? LocalVPN.runShortcut("on") : (ok: false, error: "not run")
-                UserDefaults.standard.set(off.ok, forKey: LocalVPN.shortcutKeys["off"]!) // B359: Added only while it runs
-                if off.ok { UserDefaults.standard.set(on.ok, forKey: LocalVPN.shortcutKeys["on"]!) }
-                let r: [String: Any] = ["ok": off.ok && on.ok, "cellular": cellular, "wentOff": wentOff,
-                                        "off": ["ok": off.ok, "error": (off.error as Any?) ?? NSNull()],
-                                        "on": ["ok": on.ok, "error": (on.error as Any?) ?? NSNull()]]
-                Apt.reply(c, r, nil)
-            }
+            DispatchQueue.global(qos: .userInitiated).async { Apt.reply(c, LocalVPN.testSwitch(), nil) }
+        }
+        // F386: an Install Switch end that found the app in the background runs once it is in front again
+        NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: nil) { _ in
+            DispatchQueue.global(qos: .utility).async { LocalVPN.endSwitch() }
         }
     }
 

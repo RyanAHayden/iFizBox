@@ -72,8 +72,8 @@ rows or change footers. Top to bottom:
   Pair Again (a check the phone turned down) opens Pairing, which starts pairing at once.
   Tailscale's own VPN is never a conflict. With Signing Server chosen: Ready to Install through the server, Check Server.
   With the built-in VPN (the app's profile has Network Extensions): Ready to Install, "Straight onto this iPhone,
-  through iFizBox VPN"; on cellular with the Cellular Shortcuts not added, Add the Cellular Shortcuts with Add
-  Cellular Shortcuts (it opens their page).
+  through iFizBox VPN"; on cellular with the Install Switch not added, Add the Install Switch with Add Install
+  Switch (it opens its page).
 - **Install Apps With**: This iPhone ("Works offline - no install popup") and Signing Server ("Default - Uses
   ifizbox.com"), a row each with its icon. A tap on the row opens its page (`installation/iphone`,
   `installation/server`) with the push slide; **USE**, the App Store price button beside the row's link (never
@@ -91,12 +91,14 @@ The pages under it:
   Pair This iPhone (Start / Done, opens Pairing), Test Connection (Test / Testing… / Connected: `vpn.test` turns
   the VPN on, connects once with the pairing and turns it off; the first time, iOS asks to allow the VPN
   configuration; Pairing runs it by itself right after pairing, with a "Testing the Connection…" spinner, before it
-  says Paired, so setup asks that once), Cellular Shortcuts (Add / Done, "Optional, for installs on cellular"), with a footer that says
-  the next step (pair, test, or add the Shortcuts for cellular) or that it's set up. A failed check or install is
+  says Paired, so setup asks that once), Install Switch (Add / Checking… / Done, "Optional: cellular, and your VPN
+  back after"; Add shares the Shortcut to Shortcuts, and Done shows only once it has run), with a footer that says
+  the next step (pair, test, or add the Install Switch) or that it's set up. A failed check or install is
   said there instead, red, with its fix row. Then **How It Works** › (`installation/how`: the six steps of one install
-  and Offline). **Cellular Shortcuts** (`installation/shortcuts`): Turn Off (Cellular Data Off) and Turn On (Cellular
-  Data On), each Add opening Shortcuts on a new Shortcut with the footer saying what to put in it, then Test
-  Shortcuts (`vpn.testShortcuts` runs both) once both are added. **Signing Server** (`installation/server`): Server,
+  and Offline). **Install Switch** (`installation/shortcuts`, titled Install Switch): an Added row, and Test Install
+  Switch (`vpn.testSwitch` runs its start and end, turning cellular data off and back on and the VPN with it). Phones
+  that added the older Cellular Data Off and Cellular Data On Shortcuts still have them to run, but this page no
+  longer lists them. **Signing Server** (`installation/server`): Server,
   Check Server, Run Your Own. Without the built-in VPN (an older shell, or a profile without Network Extensions)
   This iPhone's page keeps the LocalDevVPN and Tailscale groups below.
 - **Install Apps With** (`installation/with`, the older page): This iPhone (installd over LocalDevVPN or Tailscale, docs/sideload.md) or Signing Server
