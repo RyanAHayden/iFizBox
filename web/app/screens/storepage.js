@@ -10,8 +10,8 @@
 //   headerLine({ version, size, price })   -> "Version 2.1.3 · 412 kB · Free"
 //   storeTabs({ details, reviews, related }) -> { control, panes: { details, reviews, related }, select(i), attach(body), nodes }
 //     The Details / Reviews / Related segmented control (ios6.css .store-segmented) over three panes. Details is
-//     filled by the caller at once; reviews(pane) and related(pane) run the first time their tab is chosen or a swipe
-//     begins to show it. attach(body), once `nodes` are in the page: taps slide the panes (F390, nav/tabswipe.js).
+//     filled by the caller at once; reviews(pane) and related(pane) run the first time their tab is chosen.
+// attach(body), once `nodes` are in the page: taps slide the panes (F390, nav/tabswipe.js).
 //   tileRow({ rating })                    -> { row, set(key, tile | null) }  the sideways info tiles, in TILE_ORDER
 //     (F206: starts with the Rating tile's placeholder, pendingRatingTile(), unless rating: false)
 //   worksOnTile(fit)                       -> { label, value, sub, ok }  compat()'s verdict as the Works On tile
