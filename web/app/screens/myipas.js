@@ -67,6 +67,7 @@ import { loadStyle } from "../nav/motion.js";
 import { go as navGo, back, handleOf } from "../nav/go.js";
 import { nativeBridge } from "../native.js";
 import { storedRoute, vpnList } from "../core/installroute.js"; // B294
+import { USERAPPS, PAGE_TITLE as USERAPPS_TITLE, bundleIdOfToken, userAppTitle, listRow as userAppsRow } from "../core/userapps.js"; // F374
 
 export { MYIPAS };
 
@@ -94,6 +95,11 @@ export function pageOf(route) {
   if (route.path.length === 1) return { page: "list" };
   const b = browseSeg(route.path[1]);
   if (b) return route.path.length === 2 ? b : { page: "browse" };
+  if (route.path[1] === USERAPPS) { // F374: Installed Apps and an app's page (screens/userapps.js)
+    if (route.path.length === 2) return { page: "userapps" };
+    const id = route.path.length === 3 ? bundleIdOfToken(route.path[2]) : null;
+    return id ? { page: "userapp", id } : { page: "missing" };
+  }
   const file = fileOfToken(route.path[1]);
   if (!file) return { page: "missing" };
   if (route.path.length === 2) return { page: "ipa", file };
@@ -123,6 +129,8 @@ export function nav(route) {
     case "ipa": return { title: known.get(p.file)?.name || p.file.replace(/\.ipa$/i, ""),
       right: { label: "Install", onClick: () => install(p.file) } };
     case "options": return { title: "Sign Options", right: { label: "Save", onClick: (e) => saveOptions(p.file, e.currentTarget) } };
+    case "userapps": return { title: USERAPPS_TITLE, style: "plain" }; // F374
+    case "userapp": return { title: userAppTitle(p.id) };
     default: return { title: "Not Found" };
   }
 }
@@ -157,6 +165,8 @@ export function render(body, route, ctx, nav = handleOf(body)) {
   if (p?.page === "browse") return browse.render(body, route, ctx);
   if (p?.page === "ipa") return renderIpa(body, route, p.file);
   if (p?.page === "options") return renderOptions(body, route, p.file);
+  if (p?.page === "userapps") return import("./userapps.js").then((m) => m.renderUserApps(body, route)); // F374
+  if (p?.page === "userapp") return import("./userapps.js").then((m) => m.renderUserApp(body, route, p.id));
   body.append(note("Nothing here."));
 }
 
@@ -339,11 +349,14 @@ function redraw() {
 }
 
 // The Add an IPA group: the app's Files picker and a download; the website's Choose File (kept in this browser) and a link.
-export function addGroups(isSite) {
-  return [{ header: "Add an IPA", rows: [
+export function addGroups(isSite, { jailbreak: jb = jailbreak() } = {}) {
+  const groups = [{ header: "Add an IPA", rows: [
     { label: isSite ? "Choose File" : "Choose from Files", onClick: () => (isSite ? chooseSiteFile() : pickFiles()), chevron: false },
     { label: "Download from URL", onClick: () => addFromUrl(), chevron: false },
   ] }];
+  // F374: the jailbreak app makes IPAs of the apps on the phone too (Installed Apps: Decrypt, Add Tweaks)
+  if (jb && !isSite) groups[0].rows.push(userAppsRow(format({ tab: "installed", path: [MYIPAS, USERAPPS] })));
+  return groups;
 }
 
 // Under the last group: how else IPAs get here. F212: the jailbreak app's Documents is /var/mobile/Documents, which the
@@ -1078,7 +1091,7 @@ async function renderIpa(body, route, file) {
     return;
   }
   if (jailbreak()) {
-    body.append(grouped(jailbreakIpaGroups(entry, () => confirmDelete(entry))));
+    body.append(grouped(jailbreakIpaGroups(entry, () => confirmDelete(entry), () => shareFile(entry))));
     markFileRow(body, entry.file);
     markDelete(body);
     return;
@@ -1127,7 +1140,7 @@ export function markFileRow(body, file, { menu = showMenu, copy = copyText, hold
 
 // F212: an IPA's page in the jailbreak app: its details and Delete; Install (nav bar) hands the file to ifizbox-helper
 // as it is (no Sign Options, Sign Now or Save Signed IPA: that app doesn't sign).
-export function jailbreakIpaGroups(entry, onDelete) {
+export function jailbreakIpaGroups(entry, onDelete, onShare = null) {
   const details = [
     { label: "Version", detail: entry.version || "—", chevron: false },
     { label: "Bundle ID", detail: entry.bundleId || "—", chevron: false },
@@ -1139,8 +1152,17 @@ export function jailbreakIpaGroups(entry, onDelete) {
   return [
     { header: "Details", rows: details,
       footer: entry.error ? `This file can't be read: ${entry.error}` : `In /var/mobile/Documents. Install hands it to ${NAME}'s helper, which installs it as it is.` },
+    // F374: a decrypted IPA, or one with tweaks, goes to other phones and apps from here (library.share)
+    ...(onShare && !entry.error ? [{ rows: [{ label: "Share", subtitle: "Files, AirDrop and other apps", onClick: onShare, chevron: false }] }] : []),
     { rows: [{ label: "Delete", onClick: onDelete }] },
   ];
+}
+
+// F374: the jailbreak app's Share for a library IPA: the share sheet for the file itself (library.share).
+async function shareFile(entry, { native = nativeBridge() } = {}) {
+  try { await native.call("library.share", { file: entry.file }); } catch (e) {
+    await showAlert({ title: "Couldn't Share", message: deviceError(e).message, buttons: ["OK"] });
+  }
 }
 
 function markDelete(body) {
