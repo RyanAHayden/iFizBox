@@ -96,7 +96,7 @@ The pages under it:
   said there instead, red, with its fix row. Then **How It Works** › (`installation/how`: the six steps of one install
   and Offline). **Install Switch** (`installation/shortcuts`, titled Install Switch): an Added row, a Share Shortcut File
   row only once the Install Switch has an iCloud link (`SHORTCUT_LINKS.switch`, core/installroute.js), and Test Install
-  Switch (`vpn.testSwitch` runs its start and end, turning cellular data off and back on and the VPN with it). Phones
+  Switch (`vpn.testSwitch` runs its start and end, turning cellular data off and back on and the VPN with it; its row says what it is doing, and if the Install Switch doesn't run the test fails and your VPN stays on). Phones
   that added the older Cellular Data Off and Cellular Data On Shortcuts still have them to run, but this page no
   longer lists them. **Signing Server** (`installation/server`): Server,
   Check Server, Run Your Own. Without Network Extensions in the app's profile, This iPhone's page shows the Set Up group "Network Extensions: Missing" below.

@@ -200,7 +200,7 @@ export function shortcutGroups(st, { add = () => {}, test = () => {}, testing = 
   if (direct && !reading && checking !== k && (!sc[k] || switchOld(st))) groups.push({ rows: [{ label: SHARE_SHORTCUT, icon: rowIcon("share"), onClick: () => add(k, "share"), chevron: true }],
     footer: `If ${sc[k] ? "Update" : "Add"} doesn't open Shortcuts, share the file and pick Shortcuts.` });
   if (sc[k]) {
-    groups.push({ rows: [{ label: "Test Install Switch", icon: rowIcon("testConnection"), onClick: test, ...(testing ? { detail: testStep(testing), spin: true } : {}) }],
+    groups.push({ rows: [{ label: "Test Install Switch", icon: rowIcon("testConnection"), onClick: test, ...(testing ? { subtitle: testStep(testing), spin: true } : {}) }],
       footer: `${sc.trip ? "Runs it once" : "Runs it once each way"}: ${BUILTIN_VPN} on, then your VPN back.` });
   }
   return groups;

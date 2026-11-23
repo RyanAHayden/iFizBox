@@ -57,6 +57,8 @@ a status bar as tall as the safe area. The iOS 7 and iOS 13 eras and the website
   and ease to the new one by `translateY`, new boxes fade in and gone ones fade out, in iOS 6's .3s
   `cubic-bezier(.25,.1,.25,1)`. A screen only changes its DOM, even redrawing a page whole. Opt a box out with
   `data-noslide`; virtualised lists and the install console are never slid.
+- Spinners keep turning after a trip out of the app (Shortcuts, Settings, the lock screen): iOS takes their animations
+  away while the app is behind, so `nav/respin.js` restarts each running `hud-spin` where it was when the app comes back.
 
 ## Targets
 

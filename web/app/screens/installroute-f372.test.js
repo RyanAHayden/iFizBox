@@ -113,7 +113,7 @@ test("Install Switch's page: one Add row (no Cellular Shortcuts rows); Test once
   const on = shortcutGroups({ shortcuts: { switch: true } });
   assert.deepEqual(on.map((g) => g.rows[0].detail ?? null), ["Added", null]);
   assert.equal(on[1].rows[0].label, "Test Install Switch");
-  assert.equal(shortcutGroups({ shortcuts: { switch: true } }, { testing: true })[1].rows[0].detail, "Testing…");
+  assert.equal(shortcutGroups({ shortcuts: { switch: true } }, { testing: true })[1].rows[0].subtitle, "Testing…");
 });
 
 test("the tests' answers in words", () => {

@@ -81,6 +81,7 @@ const { drawInstallation, forgetStatus } = await import("./installroute.js");
 const every = (e) => [e, ...e.children.flatMap(every)];
 const cell = (box, label) => every(box).filter((n) => n._cls.has("cell-inner")).find((n) => every(n).some((x) => x._cls.has("cell-label") && x.textContent === label));
 const detail = (box, label) => every(cell(box, label)).find((n) => n._cls.has("cell-detail"))?.textContent;
+const stepOf = (box, label) => every(cell(box, label)).find((n) => n._cls.has("cell-subtitle"))?.textContent;
 const spins = (box, label) => every(cell(box, label)).some((n) => n._cls.has("loading-spinner"));
 const flush = async () => { for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0)); };
 const pending = () => { let answer; const p = new Promise((r) => { answer = r; }); return { p, answer }; };
@@ -96,12 +97,12 @@ test("B397: Test Install Switch's row says each step, also on the page the trip 
   await drawInstallation(box, "shortcuts", o);
   const done = Promise.all(cell(box, "Test Install Switch").listeners.click.map((f) => f({})));
   await flush();
-  assert.equal(detail(box, "Test Install Switch"), "Opening Shortcuts…");
+  assert.equal(stepOf(box, "Test Install Switch"), "Opening Shortcuts…");
   emit({ step: "connecting" });
-  assert.equal(detail(box, "Test Install Switch"), "Connecting…");
+  assert.equal(stepOf(box, "Test Install Switch"), "Connecting…");
   await drawInstallation(again, "shortcuts", o); // back from Shortcuts
   emit({ step: "back" });
-  assert.equal(detail(again, "Test Install Switch"), "Putting Things Back…");
+  assert.equal(stepOf(again, "Test Install Switch"), "Putting Things Back…");
   assert.ok(spins(again, "Test Install Switch"));
   assert.deepEqual(alerts, [], "nothing is said before the answer");
   run.answer({ ok: true, start: { ok: true }, end: { ok: true }, vpnOn: true, vpnBack: true });
