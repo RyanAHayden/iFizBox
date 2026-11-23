@@ -41,6 +41,7 @@ export function showMenu(anchor, items, opts = {}) {
     if (open !== ctl) return;
     close();
     const i = res?.index;
+    if (globalThis.Event) anchor.dispatchEvent?.(new Event("menupick", { bubbles: true })); // an item's sheet opens from the row (actionsheet.js)
     if (Number.isInteger(i) && i >= 0 && i < items.length) items[i].onClick();
   }, () => {
     if (open !== ctl) return;
