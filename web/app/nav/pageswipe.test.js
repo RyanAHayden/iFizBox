@@ -179,6 +179,22 @@ test("touch: blocked or not allowed at the touch, nothing starts; a move a handl
   assert.equal(p.begun(), 0);
 });
 
+test("touch: held (the pairing page's running step) asks once the drag is a swipe, and drags nothing", () => {
+  let asked = 0;
+  const on = {};
+  const root = { addEventListener: (t, f) => { on[t] = f; } };
+  let begun = 0;
+  attachPageSwipe(root, { canStart: () => true, held: () => true, onHeld: () => asked++, begin: () => { begun++; return 390; }, move() {}, end() {} }, {});
+  const pt = (x) => ({ identifier: 1, clientX: x, clientY: 300 });
+  on.touchstart({ target: {}, touches: [0], changedTouches: [pt(200)] });
+  on.touchmove({ changedTouches: [pt(205)], timeStamp: 0 });
+  assert.equal(asked, 0, "not inside the slop");
+  on.touchmove({ changedTouches: [pt(230)], timeStamp: 0 });
+  on.touchmove({ changedTouches: [pt(300)], timeStamp: 0 });
+  assert.equal(asked, 1, "asked once");
+  assert.equal(begun, 0);
+});
+
 test("touch: a second finger (a pinch) cancels a swipe under way and starts none", () => {
   const s = setup();
   s.start(1, 200, 300);

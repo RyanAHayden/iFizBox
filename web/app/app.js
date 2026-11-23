@@ -26,7 +26,7 @@ import { pageOpened, pageShown } from "./nav/pagestate.js";
 import { createHomeTop, homeRootOf } from "./nav/hometop.js";
 import * as home from "./screens/home.js";
 import * as settingsScreen from "./screens/settings.js";
-import { pendingStep } from "./screens/installroute.js"; // F373: settings.js loads it at startup already
+import { pendingStep, askLeave, guardHooks } from "./screens/installroute.js"; // F373: settings.js loads it at startup already
 import { popupOpen } from "./nav/popups.js"; // F373
 import { sourceFilter } from "./core/sources.js";
 import { getBackend } from "./backend.js";
@@ -401,8 +401,8 @@ const backSwipe = {
 };
 attachEdgeSwipe(edgeEl, backSwipe);
 // F373: the same pop from a rightward drag anywhere on the page, as iOS 26 (nav/swipe.js attachPageSwipe). Off on the
-// web with the edge strip (webBack, in canStart). While the pairing page has a step running it steps aside: the edge
-// strip still asks "Stop Setting Up?" (screens/installroute.js guardSwipe), a drag mid-page just does nothing.
+// web with the edge strip (webBack, in canStart). While the pairing page has a step running it asks "Stop Setting
+// Up?" first and Leave goes Back, as the edge strip does (screens/installroute.js guardSwipe).
 attachPageSwipe(screensEl, {
   ...backSwipe,
   begin() {
@@ -410,7 +410,9 @@ attachPageSwipe(screensEl, {
     if (pressed) { pressed.classList.remove("is-pressed"); pressed = null; lastPress = null; }
     return backSwipe.begin();
   },
-  blocked: (target) => !!pageSwipeBlocked(target, screensEl) || popupOpen() || !!pendingStep(),
+  blocked: (target) => !!pageSwipeBlocked(target, screensEl) || popupOpen(),
+  held: () => !!pendingStep(),
+  onHeld: () => { askLeave(guardHooks.alert).then((go) => { if (go) goBack(); }); },
 });
 
 // Tab taps go through selectTab so each tab keeps its place; the href is there for no-JS fallbacks and a11y.

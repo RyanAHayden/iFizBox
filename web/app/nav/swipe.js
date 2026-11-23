@@ -118,7 +118,9 @@ export function pageSwipeBlocked(target, root, win = globalThis) {
 
 // root: the screens. canStart() at the touch (nothing else moving, a page to go back to); blocked(target) -> truthy
 // to step aside (the caller adds its own reasons to pageSwipeBlocked's). begin/move/end as attachEdgeSwipe's.
-export function attachPageSwipe(root, { canStart, blocked = () => false, begin, move, end }, win = globalThis) {
+// held() -> true when a swipe must ask first (the pairing page's running step): once the drag is a swipe, onHeld()
+// runs instead of begin, and nothing is dragged.
+export function attachPageSwipe(root, { canStart, blocked = () => false, held = () => false, onHeld = () => {}, begin, move, end }, win = globalThis) {
   let t = null; // { id, x0, y0, started, width, dx, samples, frame }
   const find = (list, id) => { for (const x of list ?? []) if (x.identifier === id) return x; return null; };
   const finish = (cancelled, ts) => {
@@ -147,6 +149,7 @@ export function attachPageSwipe(root, { canStart, blocked = () => false, begin, 
       const d = e.defaultPrevented ? "none" : pageSwipeDecide(p.clientX - t.x0, p.clientY - t.y0);
       if (d === "wait") return;
       if (d === "none" || !canStart()) { t = null; return; }
+      if (held()) { t = null; onHeld(); return; }
       t.started = true;
       t.width = begin();
       t.x0 = p.clientX; // start from here, so the screen doesn't jump by the slop

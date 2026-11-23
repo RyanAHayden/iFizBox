@@ -30,9 +30,10 @@
   the right swipe only closes it. With nothing armed, a right swipe goes back; their handler's `arm(li, false)` at
   30 px is a no-op then. nav/rowswipe.js (F193 queue swipe) is left-only and already leaves rightward drags alone
   ("none"). appicon.js's cell Delete is left-only (rowswipe's swipeDecide) and its crop stage is `touch-action: none`.
-- **installroute.js's guard**: it holds the edge strip and asks "Stop Setting Up?". For the page swipe, rather than
-  touching installroute.js (another task's file), the page swipe simply doesn't start while `pendingStep()` is set; the
-  edge strip still asks. A mid-page drag there does nothing.
+- **installroute.js's guard**: it holds the edge strip and asks "Stop Setting Up?". The page swipe does the same
+  without touching installroute.js (another task's file): `held: pendingStep`, and once the drag is a swipe
+  `onHeld` asks with installroute's own `askLeave` and Leave goes Back. Nothing is dragged while it asks. (First
+  version just stepped aside there; the spec review called that out as not "the same", so it now asks.)
 - **Web build**: unchanged. `canStart` keeps `!webBack`, so the page swipe is off on the website with the edge strip.
 
 ## Checks
@@ -48,6 +49,7 @@
   - Sources rows: a left swipe shows Delete and a right swipe puts it away, on the tab root and with the real list
     moved into a pushed page (no pop while closing); with no Delete showing a right swipe on a row pops, and no row
     is left blue;
+  - a real Details page (Installed > a package from a fake `dpkgStatus()`): a mid-page drag pops, with the slide;
   - `--site`: a mid-page drag does nothing.
 - `node tools/smoke/smoke.mjs` and `--site`: pass (edge swipe still pops).
 
@@ -58,6 +60,15 @@
 - A drag that ended short of half the width failed now and then in headless Chromium (the last 80 ms of samples lost
   their speed under load); the probe drags past half now. The app's commit rule is unchanged.
 
+## Spec review
+
+- Fixed: the pairing page's running step now asks "Stop Setting Up?" from a page swipe, as from the edge strip; the
+  probe now checks a real Details page; the probe's header describes the probe (it was smoke.mjs's).
+- Kept, though not named in the brief: taking the blue off the pressed row when the page swipe begins (without it the
+  row the drag starts on stays highlighted through the whole slide: a bug the page swipe would bring), the
+  blur/visibilitychange cancel (the edge swipe's own fix for iOS taking the touch away), GLOSSARY "Swipe Back" (the
+  run's rule) and the docs/native.md line (docs follow the current state).
+
 ## Not verified
 
 - **The 120 Hz feel and iOS WebKit's touch stream on the iPhone 7.** Chromium can't show the device's frame rate or how
@@ -66,8 +77,10 @@
   the only new work is one ancestor walk with getComputedStyle at touchstart. A .deb build and install also races
   the other slots' installs on the 7. Worth a look on the next phone pass: a gallery at its start may rubber-band
   while the page slides (iOS draws the bounce; Chromium doesn't).
-- **A real Details page** (package page): the fake bridge has no packages, so the mid-page swipe was checked on a
-  Settings page and a source page; the Details page uses the same page body.
+- **The pairing-page ask in the browser**: unit-tested (held/onHeld) only; reaching a running pairing step needs the
+  native idevice calls.
+- **Zoomable views other than `.shot-zoom`**: a pinch is caught by the second finger (it cancels a swipe under way)
+  and custom zoom areas by `touch-action: none` (the icon crop); a zoom view with neither isn't. None exists today.
 - **The real Preview galleries / featured strips / Sileo tab views**: checked with an injected overflow-x gallery with
   `.dep-shots`' touch-action and overscroll, not the real ones (they need data).
 - **installed.js, myipas.js, signed-apps.js rows** in the browser: only sources.js rows were driven; the other three

@@ -1,27 +1,17 @@
 #!/usr/bin/env node
 // F373 probe (from tools/smoke/smoke.mjs): page swipe back in headless Chromium with the fake bridge.
-// Chromium; a run takes about 10 seconds); run it by hand after touching navigation, slides or overlays.
 //
-//   node tools/smoke/smoke.mjs [web/app dir] [--site] [--shots DIR] [--keep]
+//   node journal/2026-11-22-f373-page-swipe-back/probe.mjs [web/app dir] [--site] [--shots DIR]
 //
-// It serves the directory on 127.0.0.1 (a random port), opens it as the jailbreak app (a fake `ifizboxNative`
-// whose every call answers null; --site opens it as the website instead) at 390x844 with an iPhone user agent, and:
-//   1. push: taps Home's Settings row, then a Settings row, and checks a push slide ran (.page.is-moving);
-//   2. pop: taps the nav bar's Back and checks the route came back, with a slide;
-//   3. swipe back: pushes again and drags a finger (CDP touch events) from the left edge, and checks the route came
-//      back (the edge strip is off on the website, so --site skips this one);
-//   4. sheet: opens one through the sheet scaffold (nav/sheet.js showSheet: every sheet in the app is built on it;
-//      none opens from the fake bridge's empty state without data) and closes it with its Done button;
-//   5. gallery: opens the screenshots gallery (screens/altstore.js previewSlot) above a group of rows and samples
-//      every frame: the rows below must never overlap the gallery's visible part and must move with its edge;
-//   6. skeleton: swaps a loading skeleton for content, at rest and with the page marked as mid-push: no fading
-//      copy of the skeleton, and no fade at all mid-push;
-// and through all of it records every animation that runs: `transitionrun` and `animationstart` events, and every
-// Web Animation (CSS ones included) caught by polling document.getAnimations() each frame and by wrapping
-// Element.animate. It fails if any of them animates a layout property (height, width, top/left, margins,
-// padding, ...): 120 Hz means transform and opacity only (AGENTS.md, docs/native.md). Page errors fail it too.
-// Taps are real CDP mouse events at the element's centre: the tap guard ignores el.click().
-// Exit 0 on pass, 1 on a failed check, 2 when it couldn't run (no Chromium).
+// Serves the directory on 127.0.0.1 and opens it as the jailbreak app (a fake `ifizboxNative` answering apt.sources
+// and apt.dpkgStatus, null otherwise; --site: the website) at 390x844, then drives CDP touch events:
+//   1. a rightward drag from mid-page on a pushed Settings page pops, with the slide (--site: does nothing, and stops);
+//   2. a vertical drag scrolls a pushed page and starts no swipe;
+//   3. an overflow-x gallery not at its start scrolls under a right drag, no pop; at its start the drag pops;
+//   4. Sources rows: left swipe shows Delete, right swipe puts it away (root, and the list moved into a pushed page,
+//      with no pop); with no Delete showing a right swipe on a row pops;
+//   5. a Details page (Installed > a package from the fake dpkg status): a mid-page drag pops.
+// Taps are CDP mouse events at the element's centre (the tap guard ignores el.click()). Exit 0 pass, 1 fail, 2 no Chromium.
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { readFile, writeFile, mkdtemp, mkdir, rm } from "node:fs/promises";
@@ -118,7 +108,8 @@ const RECORDER = `(() => {
 })();`;
 // F373: apt.sources answers two sources, so the Sources tab has rows with swipe actions.
 const SOURCES = [{ path: "/etc/apt/sources.list.d/ifizbox.sources", text: "Types: deb\nURIs: https://one.example.com/\nSuites: ./\nComponents:\n\nTypes: deb\nURIs: https://two.example.com/\nSuites: ./\nComponents:\n" }];
-const BRIDGE = `window.ifizboxNative = { jailbreak: "rootless", call: async (m) => (m === "apt.sources" || m?.method === "apt.sources" ? ${JSON.stringify(SOURCES)} : null) };`;
+const STATUS = "Package: com.example.probe\nStatus: install ok installed\nVersion: 1.0\nArchitecture: iphoneos-arm64\nName: Probe Tweak\nSection: Tweaks\nDescription: A package for the F373 probe\nMaintainer: Probe <probe@example.com>\n\n";
+const BRIDGE = `window.ifizboxNative = { jailbreak: "rootless", dpkgStatus: async () => ${JSON.stringify(STATUS)}, call: async (m) => (m === "apt.sources" ? ${JSON.stringify(SOURCES)} : m === "apt.dpkgStatus" ? ${JSON.stringify(STATUS)} : null) };`;
 
 await send("Page.enable");
 await send("Runtime.enable");
@@ -276,6 +267,21 @@ try {
   await drag(150, ry, 360, ry + 2, 12);
   check(await backTo(root), `with no Delete showing, a right swipe on a row pops (route ${await hash()})`);
   check(await ev("!document.querySelector('.tab-stack.is-active > .page.is-top .is-pressed')"), "no row left blue after it");
+
+  // 5. a Details page: Installed lists the fake package; its page pops from a mid-page drag
+  await tap("#tabbar a.tab", "Installed");
+  await settle();
+  const instRoot = await hash();
+  const hasPkg = await until("[...document.querySelectorAll('.tab-stack.is-active > .page.is-top a')].some(a => a.textContent.includes('Probe Tweak'))", 8000);
+  if (!hasPkg) { await shot("5-installed"); console.log("  installed page:", (await ev("document.querySelector('.tab-stack.is-active > .page.is-top')?.innerText")).slice(0, 400)); }
+  if (check(hasPkg, `Installed lists the fake package (${instRoot})`)) {
+    check(await pushFrom(instRoot, ".tab-stack.is-active > .page.is-top a"), `open its Details page (${await hash()})`);
+    await shot("5-details");
+    await resetMoves();
+    await drag(170, 500, 385, 505);
+    check(await backTo(instRoot), `mid-page swipe on the Details page pops (route ${await hash()})`);
+    check(await moved() > 0, "with the slide");
+  }
 
   check(pageErrors.length === 0, `no page errors${pageErrors.length ? ": " + pageErrors.join(" | ").slice(0, 600) : ""}`);
 } catch (e) {
