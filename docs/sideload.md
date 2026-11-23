@@ -182,8 +182,7 @@ Signing Server in palera.in's place (below).
 library. The app talks to the phone's own lockdownd as if it were a computer on USB:
 
 - **Setup, once:** a pairing file (`pairingFile.plist`) made on a computer (with jitterbugpair, iloader or
-  idevice's tools) and imported, plus the App Store app **LocalDevVPN**. That app runs a loopback VPN, so the
-  device is reachable at `10.7.0.1`. Feather keeps a lockdown heartbeat alive in the background. iOS 17.4+ uses
+  idevice's tools) and imported, plus a loopback VPN, so the device is reachable at `10.7.0.1` (Feather uses the App Store app LocalDevVPN for that; iFizBox runs its own, below). Feather keeps a lockdown heartbeat alive in the background. iOS 17.4+ uses
   the RSD/RemotePairing tunnel (`tunnel_create_rppairing`); older versions use plain TCP lockdown.
 - **Install:** AFC writes the IPA to `PublicStaging/`, then `installation_proxy_install_with_callback` asks
   installd to install it, with real progress callbacks. It can update the app itself (`suspend:` in the call).
@@ -257,47 +256,41 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   IPA from a plain HTTP server on 127.0.0.1. The server sees the app's bundle ID, name and version. A hand-trusted
   root CA on the phone doesn't work for this: iOS's installer ignores it. There's no backloop.dev mode.
 - **This iPhone** (Settings > Installation & Signing > Install Apps With; `native/sideload/idevice/`, its README): idevice
-  built from source on Linux and linked statically. The signed IPA goes to this phone's installd over LocalDevVPN
+  built from source on Linux and linked statically. The signed IPA goes to this phone's installd over the built-in VPN
   (AFC upload to PublicStaging, then installation_proxy), so nothing reaches the Signing Server, no install sheet has
   to stay up, it works offline, and iFizBox updates itself (installd closes and replaces it). Choosing This iPhone
-  opens one page that runs by itself (`installation/pair`): one sentence on what it gives, then the connection check
-  (LocalDevVPN on, `idevice.status`; when it's off, a "Turn On LocalDevVPN" alert with Open LocalDevVPN, rechecked
-  every 2 s and when the app comes back), then pairing starts on its own on iOS 27: the 6-digit code big at the
-  top, and where to type it, a short line a step with a ringed screenshot of the Settings row (Privacy & Security,
-  Developer Mode, "Pair with iFizBox"; `web/app/img/pair/`, the user's own iPhone screenshots, named in Credits).
-  Pairing keeps listening while the page is open, and ends when it's left. Paired: "Paired" with a check, Check
-  Connection (`idevice.verify`, Pair Again when the pairing is refused) and Forget Pairing. Settings shows no
-  Developer Mode row (iOS needs it for every kind of profile, iOS 27's Ad Hoc too, and an app can't open without it):
-  an install that fails because of it says so in its alert, with the steps to turn it on (core/installroute.js
-  `developerModeFailure`). Before iOS 27 a pairing
-  file made on a computer is imported. Each
-  install (`chooseRoute`, signing-client.js) asks `idevice.status`: paired and LocalDevVPN on sends
-  `route: "idevice"` with the bridge call (signing.install, signing.open, signing.resign/resignAll,
-  library.install), and Sideload.swift `installHere` installs it, its progress on the progress page's Installing
-  step (upload the first 30%, then installd's percentage). Not paired, LocalDevVPN off or another VPN on: an alert
-  says so and the install goes through the Signing Server ("Another VPN Is On" also offers Open LocalDevVPN, which
-  stops the install). The VPN apps' names come from one list (`VPNS`, core/installroute.js).
-  An install that went to This iPhone and couldn't reach it (refused, the pairing lost, Tailscale or LocalDevVPN
-  down, not paired: `serverFallback`) offers Use the Signing Server besides the fix: in the install's alert and its
-  log, and on the IPA queue run's Log (each failed app's fix, then Use the Signing Server) and at its bottom. It
-  runs the same install, or the same failed apps, again through the default Signing Server for that install or run
-  only; Install Apps With stays This iPhone. The queue's fix row for a failed app reads `idevice.status` first, so a
-  failure through the built-in VPN offers Check Again and Use the Signing Server, not Open LocalDevVPN.
+  opens its page (`installation/iphone`): Set Up (Pair This iPhone, Test Connection, Install Switch), then How It Works.
+  Set Up's rows say Checking… until `idevice.status` answers; a failed or late answer says Not Responding. Pair This
+  iPhone opens `installation/pair`, a page that runs by itself: one sentence on what it gives, then on iOS 27 pairing
+  starts on its own, the 6-digit code big at the top and where to type it, a short line a step with a ringed screenshot
+  of the Settings row (Privacy & Security, Developer Mode, "Pair with iFizBox"; `web/app/img/pair/`, the user's own iPhone
+  screenshots, named in Credits). Pairing keeps listening while the page is open, and ends when it's left. Paired:
+  "Paired" with a check, Check Connection (`idevice.verify`, Pair Again when the pairing is refused) and Forget Pairing.
+  Before iOS 27 a pairing file made on a computer is imported instead. Settings shows no Developer Mode row (iOS needs it
+  for every kind of profile, iOS 27's Ad Hoc too, and an app can't open without it): an install that fails because of it
+  says so in its alert, with the steps to turn it on (core/installroute.js `developerModeFailure`). Each install
+  (`chooseRoute`, signing-client.js) asks `idevice.status`: paired, with the app's profile carrying Network Extensions,
+  sends `route: "idevice"` with the bridge call (signing.install, signing.open, signing.resign/resignAll,
+  library.install), and Sideload.swift `installHere` installs it, its progress on the progress page's Installing step
+  (upload the first 30%, then installd's percentage). Not paired, or no Network Extensions: an alert says so ("No
+  Network Extensions" when the profile lacks them) and the install goes through the Signing Server. An install that went
+  to This iPhone and couldn't reach it (refused, the pairing lost, not paired: `serverFallback`) offers Use the Signing
+  Server besides the fix: in the install's alert and its log, and on the IPA queue run's Log (each failed app's fix, then
+  Use the Signing Server) and at its bottom. It runs the same install, or the same failed apps, again through the default
+  Signing Server for that install or run only; Install Apps With stays This iPhone. The queue's fix row for a failed app
+  reads `idevice.status` first, so a failure through the built-in VPN offers Check Again and Use the Signing Server.
 - **This iPhone with the built-in VPN** (`native/sideload/vpn/`): the sideload IPA carries its own packet tunnel,
-  `PlugIns/iFizBoxVPN.appex` (`com.ryha.ifizbox.vpn`), the loopback idea of StosVPN and LocalDevVPN: the phone is
+  `PlugIns/iFizBoxVPN.appex` (`com.ryha.ifizbox.vpn`), the loopback idea of StosVPN: the phone is
   10.7.0.0 on the tunnel, only 10.7.0.1 is routed into it (no default route), and every packet is written back with
   its source and destination swapped, so a connect to 10.7.0.1 reaches this phone's own RemotePairing and lockdownd
   as from a peer. Nothing leaves the phone and no internet is needed. It needs the Network Extensions capability on
   the App ID (iFizBox's own App IDs get it, `APP_ID_CAPS`; the app and the extension are signed with the profile's
-  `networkextension` entitlement); when the app's embedded profile lacks `packet-tunnel-provider`, This iPhone keeps
-  using LocalDevVPN or Tailscale. `IDevice.Session` turns the VPN on just before it connects to iOS (`LocalVPN.begin`,
+  `networkextension` entitlement); when the app's embedded profile lacks `packet-tunnel-provider`, This iPhone isn't offered: installs go through the Signing Server after the alert "No Network Extensions". `IDevice.Session` turns the VPN on just before it connects to iOS (`LocalVPN.begin`,
   saving the configuration the first time: iOS asks to allow it) and off 3 seconds after the last connection ends,
   so a queue of installs or a reconnect finds it on. A queue holds through an install's reconnects, however long the pauses between them (`installBegan` and `installEnded` in `IDevice.install`). The configuration is never On Demand and never removed: it
   stays in Settings > VPN, only connected during installs, so iOS's "Add VPN Configurations" Allow comes once.
   Setting up asks it: right after pairing (or importing a pairing file), the pairing page runs the same test as
-  Test Connection (`vpn.test`) before it says Paired. iOS runs one VPN at a time, so the user's own VPN pauses for
-  the install, and since ours keeps Settings > VPN's checkmark, a VPN that relies on On Demand (Tailscale) stays
-  off until the user turns it on again, unless the Install Switch below is added.
+  Test Connection (`vpn.test`) before it says Paired. iOS runs one VPN at a time, so your VPN pauses for the install, and since ours keeps Settings > VPN's checkmark, a VPN that relies on On Demand stays off until you turn it on again, unless the Install Switch below is added.
   On cellular (cellular in use, no Wi-Fi joined) iOS refuses these connections while cellular data is on
   (journal/2026-11-21-r72-cellular-this-iphone), so, as SideStore's Cellular Refresh, the user adds one Shortcut
   on Set Up, "Install Switch" (signed by `tools/shortcuts/sign.sh` from `tools/shortcuts/install-switch.plist`,
@@ -375,14 +368,13 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   SideStore's docs give. The Shortcut still accepts `{"start":1,"cellular":1}` from older app builds: it turns data
   off after Set VPN, not before. With no network at all, no Install Switch run starts, and the built-in VPN's start fails
   at once, saying it can't start without Wi-Fi or cellular data, instead of waiting 10 s; that check comes before the
-  configuration is saved. A connect that isn't already up reads the VPN configuration again first: another VPN set since (Set VPN putting
-  Tailscale back) disables ours silently, and a start on the old copy gives no error and never connects. After
+  configuration is saved. A connect that isn't already up reads the VPN configuration again first: another VPN set since (Set VPN putting your VPN back) disables ours silently, and a start on the old copy gives no error and never connects. After
   the last connect, once the VPN goes off and the queue is over (the 3 second linger has passed, so a queue shares one
   start and one end), the end runs only when the start ran and there is something to put back: cellular data that the
   run turned off and that isn't on again, or another VPN, or an idle one, that was up or selected before the start and
   isn't up again (its address isn't back). It runs
   with `{"end":1}`, plus `"cellular":1` only when Cellular Data Off ran: cellular data goes back on, then the stored VPN
-  (Tailscale, say) connects and is forgotten. Shortcuts opens only from the front, so an end due while the app is in
+  (your VPN, say) connects and is forgotten. Shortcuts opens only from the front, so an end due while the app is in
   the background waits until the app is next in front; with nothing to put back, the end doesn't open Shortcuts at all, and nor does one after Shortcuts couldn't find the Shortcut. The
   automatic check that Installation & Signing's pages run after a failure asks `idevice.verify` with `{"quiet":true}`. The page skips it while a connect would run the Install Switch (it is added, and cellular or another VPN is up or selected), and the shell answers `switch_needed` instead of opening Shortcuts, so returning to a page can't open Shortcuts; a tapped Check Connection still runs it. The Shortcut reads its input as a dictionary and tests its flags with "has any
   value". Without the Install Switch the built-in VPN connects by itself and the user's VPN stays off after. Phones
@@ -398,20 +390,6 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   May Stay Off" (`vpnIdle`), worded with "if" because iOS doesn't say whether the VPN connects on demand. Bridge calls: `vpn.status` (also `idevice.status`'s `vpn`; its `shortcuts` is
   `{off, on, switch, trip, idle}`; `otherVPNSelected` is there too), `vpn.test`, `vpn.testSwitch` (one trip when ready; otherwise runs start, waits for the VPN,
   runs dataOff on cellular, then end; answers `{ok, start, end, cellular, wentOff, vpnOn}`), `vpn.checkShortcut` (`{which}`: at most two runs, see above), `vpn.openShortcuts` (takes the optional `link` above), `vpn.leftOff` (`{vpn, cellular}`, see above).
-- **This iPhone over Tailscale** (`native/sideload/tailscale/`, its README): for Tailscale users, who can't run
-  LocalDevVPN at the same time. The sideload app embeds tsnet (tailscale.com, BSD-3-Clause, a Go c-archive built on
-  Linux with a pinned Go; not in the jailbreak executable) and joins the tailnet as its own device ("iFizBox on
-  <device>"). Settings > Installation & Signing, with This iPhone chosen, has Connect With: Automatic (Tailscale when the Tailscale VPN is
-  on and iFizBox is signed in, else LocalDevVPN), LocalDevVPN or Tailscale, and a Tailscale group: Sign In (the
-  login page opens in the app; approval is waited for), the device's name, Test Connection (RemotePairing's
-  handshake to this phone's own Tailscale address through the tailnet; on failure it names the fix: an access rule
-  to copy, device approval, or an expired key) and Sign Out. The node runs only while signing in, testing or
-  installing. An install through it hands idevice a 127.0.0.1 relay per port (49152, then the tunnel's port via
-  idevice's `tunnel_set_port_map`), each dialed through tsnet to the phone's own 100.x address; iOS resets plain
-  sockets to the phone's own addresses but answers ones that arrive through the Tailscale app's node. Tailscale
-  needs the internet; LocalDevVPN works offline. The phone must be on Wi-Fi: iOS takes RemotePairing (49152) and
-  lockdownd (62078) from the network only on Wi-Fi, and on cellular refuses every port, so an install there ends in
-  Tailscale Refused (join Wi-Fi, or use the Signing Server). Pairing is the same one-time step.
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`.
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and
@@ -441,8 +419,7 @@ rest:
 - **The command** (`cli/`, on idevice, the commit `native/sideload/idevice/pin.env` pins; the steps and their words
   are `core/`, tested with fakes): finds the iPhone over USB (waits for it to be plugged in); makes sure the computer
   is trusted, reusing usbmuxd's pairing record when the iPhone takes it, else pairing (the iPhone asks Trust and its
-  passcode) and saving the record to usbmuxd, with `EnableWifiConnections` on so the app can use it over
-  LocalDevVPN; asks for the code (three tries); reads `GET /sign/setup/<code>`; downloads the signed IPA (size and,
+  passcode) and saving the record to usbmuxd, with `EnableWifiConnections` on so the app can use it over the built-in VPN; asks for the code (three tries); reads `GET /sign/setup/<code>`; downloads the signed IPA (size and,
   when the website sent one, SHA-256 checked); installs it with installation_proxy; writes the pairing file into
   the app's container (house_arrest `VendContainer`, the path the website chose); and says what's left on the phone
   (Developer Mode, Trust the developer). It never asks for an Apple ID. `--check` only looks (found, trusted,

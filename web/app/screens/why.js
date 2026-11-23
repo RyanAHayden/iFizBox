@@ -53,8 +53,8 @@ export const WHY_POINTS = [
       "Up to 3 apps, 7 days at a time."],
   },
   {
-    id: "routes", title: "Installs Over Tailscale",
-    lines: ["Install straight on the phone over LocalDevVPN or Tailscale.", "No install link, no popup, no server.",
+    id: "routes", title: "Installs Straight on the Phone",
+    lines: [`Install straight on the phone through ${NAME}'s own VPN.`, "No install link, no popup, no server.",
       `${NAME} can update itself the same way.`],
     shot: "routes", size: [498, 322], alt: "Install Apps With: Signing Server or This iPhone",
   },

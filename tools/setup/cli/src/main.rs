@@ -305,7 +305,7 @@ impl Device for Usb {
             rec.udid = Some(dev.udid.clone());
             let mut l = LockdownClient::connect(&p).await.map_err(|e| PairError::Other(err(e)))?;
             l.start_session(&rec).await.map_err(|e| PairError::Other(format!("the new pairing didn't work: {e}")))?;
-            // Lockdown over the network (what the app does through LocalDevVPN) only answers when this is on.
+            // Lockdown over the network (what the app does through its built-in VPN) only answers when this is on.
             let _ = l.set_value("EnableWifiConnections", true.into(), Some("com.apple.mobile.wireless_lockdown")).await;
             let bytes = rec.serialize().map_err(|e| PairError::Other(err(e)))?;
             // usbmuxd keeps it, so the services below (and the next run) use it

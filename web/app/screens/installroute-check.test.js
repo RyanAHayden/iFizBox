@@ -20,7 +20,7 @@ const cellOf = (box, label) => withClass(box, "cell-inner").find((n) => withClas
 const tap = (cell) => Promise.all(cell.listeners.click.map((f) => f({})));
 const store = (route = "iphone") => { const m = { installRoute: route }; return { get: (k) => m[k], set: (k, v) => { m[k] = v; }, m }; };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-const PAIRED_ON = { paired: "rp", pairOnPhone: true, localDevVPN: true, otherVPN: false, tailscale: { connect: "auto", signedIn: false } };
+const PAIRED_ON = { paired: "rp", pairOnPhone: true, otherVPN: false, vpn: { available: true, tested: true } };
 function bridge(answers) {
   return { call: (m) => { const a = answers[m]; return typeof a === "function" ? a() : a instanceof Error ? Promise.reject(a) : Promise.resolve(a); } };
 }
@@ -30,7 +30,7 @@ test("the Pairing page: success shows a check and Successful with no alert, then
   CHECK_RESET.ms = 30;
   const alerts = [];
   const box = make("div");
-  await drawInstallation(box, "pair", { store: store(), native: bridge({ "idevice.status": PAIRED_ON, "idevice.vpnApps": { localdevvpn: true }, "idevice.verify": {} }),
+  await drawInstallation(box, "pair", { store: store(), native: bridge({ "idevice.status": PAIRED_ON, "idevice.verify": {} }),
     alert: async (a) => { alerts.push(a.title); return { index: 0 }; } });
   const cell = cellOf(box, "Check Connection");
   await tap(cell);
@@ -47,12 +47,12 @@ test("the Pairing page: failure keeps the alert and shows an x until the alert i
   const alerts = [];
   const box = make("div");
   const err = Object.assign(new Error("connect_failed: no route"), { code: "connect_failed" });
-  await drawInstallation(box, "pair", { store: store(), native: bridge({ "idevice.status": PAIRED_ON, "idevice.vpnApps": { localdevvpn: true }, "idevice.verify": err }),
+  await drawInstallation(box, "pair", { store: store(), native: bridge({ "idevice.status": PAIRED_ON, "idevice.verify": err }),
     alert: (a) => { alerts.push(a.title); return new Promise((r) => { close = () => r({ index: 0 }); }); } });
   const cell = cellOf(box, "Check Connection");
   const run = tap(cell);
   await wait(5);
-  assert.deepEqual(alerts, ["Turn On LocalDevVPN"]);
+  assert.deepEqual(alerts, ["Couldn't Connect"]);
   assert.deepEqual(look(cell), { check: "fail", label: "✕Check Connection" });
   await wait(50);
   assert.equal(look(cell).check, "fail", "kept while the alert is up");
@@ -70,7 +70,7 @@ test("the next tap clears the last answer before it checks again", async () => {
   const box = make("div");
   let n = 0;
   await drawInstallation(box, "pair", { store: store(), alert: async () => ({ index: 0 }),
-    native: bridge({ "idevice.status": PAIRED_ON, "idevice.vpnApps": { localdevvpn: true }, "idevice.verify": () => (n++ ? new Promise((r) => { answer = r; }) : Promise.resolve({})) }) });
+    native: bridge({ "idevice.status": PAIRED_ON, "idevice.verify": () => (n++ ? new Promise((r) => { answer = r; }) : Promise.resolve({})) }) });
   const cell = cellOf(box, "Check Connection");
   await tap(cell);
   assert.equal(look(cell).check, "ok");
@@ -109,8 +109,8 @@ test("F301: the main page shows the last idevice.status answer at once instead o
   const page = mainPage({ store: store(), native: bridge({ "idevice.status": () => new Promise((r) => { answer = r; }) }), links: {} });
   const done = page.refresh();
   assert.equal(page.status().state, "ready", "Ready to Install from the last answer");
-  answer({ ...PAIRED_ON, localDevVPN: false });
+  answer({ ...PAIRED_ON, paired: null });
   await done;
-  assert.equal(page.status().state, "vpnOff", "the fresh answer replaces it");
+  assert.equal(page.status().state, "pair", "the fresh answer replaces it");
   forgetStatus();
 });

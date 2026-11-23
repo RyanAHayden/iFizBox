@@ -18,14 +18,14 @@ const PAIR_HASH = format(settingsRoute(["installation", "pair"]));
 globalThis.location = { hash: PAIR_HASH };
 const flush = () => new Promise((r) => setTimeout(r, 0));
 const store = () => { const m = { installRoute: "server" }; return { get: (k) => m[k], set: (k, v) => { m[k] = v; } }; };
-const VPN_ON = { paired: null, pairOnPhone: true, localDevVPN: true, otherVPN: false, tailscale: { connect: "auto", signedIn: false } };
+const VPN_ON = { paired: null, pairOnPhone: true, otherVPN: false, vpn: { available: true, tested: true } };
 
 // A pairing that waits until idevice.pairCancel ends it, as the shell's does.
 function phone(over = {}) {
   const calls = [];
   let cancel = null;
   const answers = {
-    "idevice.status": VPN_ON, "idevice.vpnApps": { localdevvpn: true, tailscale: false },
+    "idevice.status": VPN_ON,
     "idevice.pair": () => new Promise((_, no) => { cancel = () => no(Object.assign(new Error("canceled: left"), { code: "canceled" })); }),
     "idevice.pairCancel": () => { cancel?.(); return Promise.resolve(null); },
     ...over,
@@ -144,7 +144,7 @@ test("while the page's first check runs it asks too; once paired nothing is held
   guardTap(first.ev);
   await flush();
   assert.match(asked[0].message, /stops checking/);
-  answer({ ...VPN_ON, paired: "rp", localDevVPN: true });
+  answer({ ...VPN_ON, paired: "rp" });
   await done;
   assert.equal(pendingStep(), null, "paired: nothing runs");
   const later = clickOn(".bar-button.back");

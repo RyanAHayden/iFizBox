@@ -17,7 +17,7 @@ const all = (e) => [e, ...e.children.flatMap(all)];
 const withClass = (box, c) => all(box).filter((n) => n._cls.has(c));
 const tap = (cell) => Promise.all(cell.listeners.click.map((f) => f({})));
 const store = (route) => { const m = { installRoute: route }; return { get: (k) => m[k], set: (k, v) => { m[k] = v; } }; };
-const PAIRED_ON = { paired: "rp", pairOnPhone: true, localDevVPN: true, otherVPN: false, tailscale: { connect: "auto", signedIn: false } };
+const PAIRED_ON = { paired: "rp", pairOnPhone: true, otherVPN: false, vpn: { available: true, tested: true } };
 const bridge = (answers) => ({ call: (m) => Promise.resolve(answers[m]) });
 const LINKS = { with: "#w", certificate: "#settings/signing/certificate", apps: "#a", help: "#h" };
 

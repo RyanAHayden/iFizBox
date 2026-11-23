@@ -1,4 +1,4 @@
-// B111: the This iPhone route's progress (installd over LocalDevVPN): no iOS prompt, so the run's row goes Signing ->
+// B111: the This iPhone route's progress (installd through the built-in VPN): no iOS prompt, so the run's row goes Signing ->
 // Copying to iPhone N% -> Installing N% -> Installed, the bar follows those numbers, the log says what happened (no
 // "Asked iOS"), and the row ends installed at once. iFizBox itself says it will restart. signing-client.js maps the
 // shell's events (herePhase for signing.open, hereLabel for signing.install).
@@ -124,7 +124,7 @@ test("openPrepared on This iPhone: the steps from signing.open's events, install
   const native = {
     call: async (m, p, onEvent) => {
       calls.push(m);
-      if (m === "idevice.status") return { paired: "rp", localDevVPN: true };
+      if (m === "idevice.status") return { paired: "rp", vpn: { available: true, tested: true } };
       if (m === "signing.open") {
         assert.equal(p.route, "idevice");
         onEvent({ log: "Connected to iOS (RemotePairing tunnel)" });
@@ -185,7 +185,7 @@ const installNative = (events, reply) => ({
   calls: [],
   async call(m, p, onEvent) {
     this.calls.push(m);
-    if (m === "idevice.status") return { paired: "rp", localDevVPN: true };
+    if (m === "idevice.status") return { paired: "rp", vpn: { available: true, tested: true } };
     if (m === "signing.install") { for (const e of events) onEvent(e); if (reply instanceof Promise) return reply; return reply; }
     if (m === "signing.openApp") return { opened: true };
     throw new Error(`unexpected ${m}`);

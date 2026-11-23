@@ -74,7 +74,6 @@
 // percents only move the row's bar and the bottom status.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { runOrder, sizeText, SELF_ID } from "./appqueue.js";
-import { VPN_WAIT } from "./installroute.js";
 import { NAME } from "../brand.js";
 import { isNewer } from "./selfupdate.js"; // B159: staleSelf
 import { rateText, busyText } from "./signing.js"; // B262; B312
@@ -120,7 +119,7 @@ export function appRows(jobs = []) {
   }));
 }
 
-// B111: the This iPhone route (installd over LocalDevVPN): no iOS prompt. install's progress goes "copying" (the IPA's
+// B111: the This iPhone route (installd through the built-in VPN): no iOS prompt. install's progress goes "copying" (the IPA's
 // bytes to iOS) then "installing" (installd's percent), and the row's `here` says it took that route.
 // B173: iFizBox's own IPA: once installd accepted it (its first status), the shell closes iFizBox within a couple of
 // seconds so iOS can finish (iOS 17.4+ installd waits for the running copy to go), so the row and the run say so.
@@ -215,7 +214,7 @@ export function installLaneNext(rows = []) {
   return self && rows.every((r) => r === self || ended(r)) ? self : null;
 }
 
-// F359: how many This iPhone installs (core/installroute.js "iphone": installd over LocalDevVPN or Tailscale, no iOS
+// F359: how many This iPhone installs (core/installroute.js "iphone": installd through the built-in VPN, no iOS
 // prompt) the install lane runs at once; the shell takes as many (native SignBridge.swift HereLane)
 export const HERE_PARALLEL = 3;
 
@@ -225,7 +224,7 @@ const wideRow = (r, localRoute) => !isSelf(r) && !helperRow(r) && !r.again && lo
 
 // F359: the row the install lane starts now, or null. Nothing with iOS: the next signed row (installLaneNext). Rows
 // already with iOS: one more only while every one of them is copying or installing on This iPhone (`here`: its route
-// is settled, so no LocalDevVPN alert or iOS prompt can be up), the next is a This iPhone row too, and fewer than
+// is settled, so no route alert or iOS prompt can be up), the next is a This iPhone row too, and fewer than
 // `parallel` are going. An iOS prompt row, or a row still settling its route, waits for every other to end. So rows
 // join one at a time: each as the one before it starts copying (the run asks again then).
 export function installLaneStart(rows = [], { parallel = 1, local = () => false } = {}) {
@@ -283,7 +282,6 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
         log(r, "step", `Installing ${label(r)}`);
         if (isSelf(r)) log(r, "step", SELF_CLOSING); // B173: installd accepted it: the shell closes iFizBox now
       } else if (phase === "installing") log(r, "step", `iOS is installing ${label(r)}`);
-      else if (phase === "vpn") log(r, "step", VPN_WAIT); // B110: Open LocalDevVPN: the row waits for it
       else if (phase === "busy") log(r, "step", busyText(label(r))); // B312: iOS installs it for another app first
     }
     const settled = !r.here && phase === "copying"; // F359: its This iPhone route is settled: others may join it
@@ -623,7 +621,6 @@ export function rowStatus(row, opts = {}) {
     case "signing": return p > 0 && p < 100 ? `Signing ${p}%` : "Signing";
     case "signed": return "Signed: Waiting to Install"; // F391: only while it waits its turn
     case "asking":
-      if (row.phase === "vpn") return VPN_WAIT;
       if (row.phase === "busy") return busyText(label(row)); // B312
       return promptUp(row) ? "Tap Install on the iOS prompt" : "Installing"; // B137: This iPhone has no prompt
     case "installing":
@@ -660,7 +657,6 @@ export function runStatus(rows) {
   }
   const ios = withIos[0];
   if (ios && helperRow(ios)) return `${ios.mode === "remove" ? "Removing" : "Installing"} ${label(ios)} (${pos(ios)})`;
-  if (ios?.phase === "vpn") return VPN_WAIT;
   if (ios?.phase === "busy") return busyText(label(ios)); // B312
   if (ios?.phase === "copying") return `Copying ${label(ios)} to iPhone (${pos(ios)})`; // B111: This iPhone
   if (selfClosing(ios)) return `Installing ${label(ios)}: ${SELF_CLOSING}`;
@@ -717,6 +713,6 @@ export function staleSelf(row, res) {
 }
 
 // B137: whether an "asking" row has iOS's Install prompt to tap. A row on the This iPhone route (`local`, from
-// createAppRun's local(row)) has none while its route is settled (idevice.status, the LocalDevVPN alert); it says
+// createAppRun's local(row)) has none while its route is settled (idevice.status, the route alert); it says
 // Installing. Its install going through the Signing Server after all sends phase "asking": the prompt is up then.
 export const promptUp = (row) => !row?.local || row.phase === "asking";

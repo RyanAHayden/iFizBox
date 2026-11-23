@@ -18,7 +18,7 @@ globalThis.location = { hash: format(settingsRoute(["installation", "pair"])) };
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 const VPN = (o = {}) => ({ available: true, tested: false, cellular: false, wifi: true, shortcuts: { off: false, on: false }, ...o });
-const NOT_PAIRED = (vpn) => ({ paired: null, pairOnPhone: true, localDevVPN: false, otherVPN: false, tailscale: { connect: "auto", signedIn: false }, ...(vpn ? { vpn } : {}) });
+const NOT_PAIRED = (vpn) => ({ paired: null, pairOnPhone: true, otherVPN: false, ...(vpn ? { vpn } : {}) });
 
 // idevice.pair sends the code and answers when `pair()` is called; vpn.test answers when `test()` is.
 function phone(before) {
@@ -96,15 +96,20 @@ test("built-in VPN: a failed test after pairing says why, and the page still sho
   leave();
 });
 
-test("without the built-in VPN, or already tested: pairing ends as before, no vpn.test", async () => {
-  for (const before of [{ ...NOT_PAIRED(), localDevVPN: true }, NOT_PAIRED(VPN({ tested: true }))]) {
-    const s = await setUp(before);
-    s.pair();
-    await tick(); await tick(); await tick();
-    assert.ok(!s.calls.includes("vpn.test"));
-    assert.match(s.box.textContent, /Paired/);
-    leave();
-  }
+test("already tested: pairing ends as before, no vpn.test", async () => {
+  const s = await setUp(NOT_PAIRED(VPN({ tested: true })));
+  s.pair();
+  await tick(); await tick(); await tick();
+  assert.ok(!s.calls.includes("vpn.test"));
+  assert.match(s.box.textContent, /Paired/);
+  leave();
+});
+
+test("without the built-in VPN: the page says Network Extensions are missing, and pairing never starts", async () => {
+  const s = await setUp(NOT_PAIRED());
+  assert.match(s.box.textContent, /Network Extensions/);
+  assert.ok(!s.calls.includes("idevice.pair"));
+  leave();
 });
 
 test("the shell keeps its VPN configuration: no removal after an install, so iOS asks Allow once", () => {

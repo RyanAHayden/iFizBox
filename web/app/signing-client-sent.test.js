@@ -77,7 +77,7 @@ test("B146: This iPhone route keeps installd's real answer: false still fails", 
   store.set("ifizbox.installRoute", "iphone");
   forgetRoute();
   const native = () => fakeNative({
-    "idevice.status": () => Promise.resolve({ paired: "rp", localDevVPN: true }),
+    "idevice.status": () => Promise.resolve({ paired: "rp", vpn: { available: true, tested: true } }),
     "signing.open": () => Promise.resolve({ bundleId: "com.a", installed: false }),
   });
   const n = native();

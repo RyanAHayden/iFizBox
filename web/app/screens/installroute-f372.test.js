@@ -13,7 +13,7 @@ globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), se
 globalThis.document ??= fakeDocument();
 
 const core = await import("../core/installroute.js");
-const { decideRoute, installStatus, builtinVPN, iphoneSetUp, setupFooter, cellularWarning, shortcutsAdded, vpnOn, verifyVPN, verifyFailure,
+const { decideRoute, installStatus, builtinVPN, iphoneSetUp, setupFooter, cellularWarning, shortcutsAdded, verifyFailure,
   vpnTestResult, switchTestResult, routeFailureOf, HOW_STEPS, SHORTCUT_NAMES, ALERTS, CELLULAR, BUILTIN_VPN, setupState } = core;
 const screens = await import("./installroute.js");
 const { installationGroups, subGroups, localGroups, shortcutGroups, howGroups, SUB_TITLES } = screens;
@@ -22,9 +22,9 @@ const { chooseRoute, forgetRoute, runFix } = await import("../signing/route.js")
 const { NAME } = await import("../brand.js");
 
 const VPN = (o = {}) => ({ available: true, tested: false, cellular: false, wifi: true, shortcuts: { off: false, on: false }, ...o });
-const ST = (vpn = {}, o = {}) => ({ paired: "rp", pairOnPhone: true, localDevVPN: false, otherVPN: true, tailscale: { connect: "tailscale", signedIn: false, address: "100.64.0.2" }, vpn: VPN(vpn), ...o });
+const ST = (vpn = {}, o = {}) => ({ paired: "rp", pairOnPhone: true, otherVPN: false, vpn: VPN(vpn), ...o });
 
-test("the built-in VPN is the way in when the shell can run it, whatever Tailscale or LocalDevVPN say", () => {
+test("the built-in VPN is the way in when the shell can run it, and the only way in", () => {
   assert.equal(BUILTIN_VPN, `${NAME} VPN`);
   assert.equal(builtinVPN(ST()), true);
   assert.equal(builtinVPN(ST({ available: false })), false);
@@ -32,22 +32,22 @@ test("the built-in VPN is the way in when the shell can run it, whatever Tailsca
   assert.deepEqual(decideRoute("iphone", ST()), { route: "idevice" });
   assert.deepEqual(decideRoute("iphone", ST({}, { paired: null })), { route: "server", alert: "notPaired" });
   assert.deepEqual(decideRoute("server", ST()), { route: "server" });
-  assert.equal(vpnOn(ST()), true, "pairing needs no VPN app on");
   assert.equal(setupState(ST({}, { paired: null })), "pairing");
-  assert.equal(verifyVPN(ST()), BUILTIN_VPN);
   const s = installStatus("iphone", ST());
   assert.equal(s.state, "ready");
   assert.equal(s.subtitle, `Straight onto this iPhone, through ${BUILTIN_VPN}.`);
   assert.equal(s.local, true);
-  // without it, the Tailscale rules as before
-  assert.notEqual(installStatus("iphone", ST({ available: false })).state, "ready");
+  // without it (no Network Extensions) it can't be used
+  assert.equal(installStatus("iphone", ST({ available: false })).state, "noVPN");
+  assert.deepEqual(decideRoute("iphone", ST({ available: false })), { route: "server", alert: "noVPN" });
+  assert.equal(setupState(ST({ available: false }, { paired: null })), "noVPN");
 });
 
 test("set up = paired and tested once; the footer says the next step", () => {
   assert.equal(iphoneSetUp(ST({}, { paired: null })), false);
   assert.equal(iphoneSetUp(ST()), false, "paired, not tested");
   assert.equal(iphoneSetUp(ST({ tested: true })), true);
-  assert.equal(iphoneSetUp({ paired: "rp" }), true, "an older shell: paired is set up");
+  assert.equal(iphoneSetUp({ paired: "rp" }), false, "an older shell has no VPN to set up");
   assert.equal(setupFooter(ST({}, { paired: null })), "Pair this iPhone once to install straight onto it.");
   assert.equal(setupFooter(ST()), "Test the connection to finish setting up.");
   assert.equal(setupFooter(ST({ tested: true, cellular: true })), "Set up for Wi-Fi and offline. Add the Install Switch to install on cellular and get your VPN back after.");
@@ -55,7 +55,7 @@ test("set up = paired and tested once; the footer says the next step", () => {
   assert.equal(setupFooter(ST({ tested: true, shortcuts: { switch: true } })), "Set up. Apps install straight onto this iPhone, on Wi-Fi, cellular or offline.");
 });
 
-test("This iPhone's page: Set Up (Pair, Test, Install Switch) with its footer, then How It Works; no Tailscale rows", () => {
+test("This iPhone's page: Set Up (Pair, Test, Install Switch) with its footer, then How It Works", () => {
   const all = installationGroups("iphone", ST());
   const page = subGroups(all, "iphone");
   assert.deepEqual(page.map((g) => g.header), ["Set Up", undefined]);
@@ -67,8 +67,7 @@ test("This iPhone's page: Set Up (Pair, Test, Install Switch) with its footer, t
   assert.equal(page[0].footer, "Test the connection to finish setting up.");
   assert.equal(page[1].rows[0].label, "How It Works");
   assert.match(page[1].rows[0].href, /settings\/installation\/how$/);
-  assert.ok(!JSON.stringify(all).includes("Tailscale\""), "no Tailscale group");
-  assert.ok(!JSON.stringify(all).includes("Connect With"));
+  assert.ok(!/tailscale|localdevvpn|connect with/i.test(JSON.stringify(all)));
   const tested = localGroups(ST({ tested: true, shortcuts: { switch: true } }));
   assert.deepEqual(tested[0].rows.map((r) => r.detail), ["Done", "Connected", "Done"]);
   assert.match(tested[0].rows[2].href, /settings\/installation\/shortcuts$/, "added: its page, for the test");
@@ -86,9 +85,11 @@ test("This iPhone's page: Set Up (Pair, Test, Install Switch) with its footer, t
   for (const k of ["how", "shortcuts", "server", "iphone", "pair"]) assert.ok(SUB_TITLES[k], k);
 });
 
-test("an older shell or a profile without Network Extensions keeps the Tailscale and LocalDevVPN groups", () => {
-  const gs = installationGroups("iphone", { paired: "rp", localDevVPN: true, tailscale: { connect: "auto" } });
-  assert.deepEqual(subGroups(gs, "iphone").map((g) => g.header), ["This iPhone", "Connect With", "Tailscale"]);
+test("a profile without Network Extensions says so instead of the VPN's rows", () => {
+  const gs = subGroups(installationGroups("iphone", { paired: "rp", vpn: { available: false } }), "iphone");
+  assert.deepEqual(gs[0].rows.map((r) => [r.label, r.detail]), [["Network Extensions", "Missing"]]);
+  assert.equal(gs[0].footer, core.NO_VPN.message);
+  assert.equal(gs[1].rows[0].label, "How It Works");
 });
 
 test("How It Works: one install's steps, a row each, and offline", () => {
@@ -129,7 +130,7 @@ test("the tests' answers in words", () => {
   assert.match(nope.message, /"Install Switch": Could not find the shortcut/);
 });
 
-test("a failed connect through the built-in VPN never says to turn on LocalDevVPN or Tailscale", () => {
+test("a failed connect through the built-in VPN never says to turn on another VPN app", () => {
   const st = ST({ tested: true, cellular: true });
   const why = verifyFailure(new Error("connect_failed: no answer"), st);
   assert.equal(why.title, "Couldn't Connect");
@@ -137,7 +138,7 @@ test("a failed connect through the built-in VPN never says to turn on LocalDevVP
   const refused = routeFailureOf(new Error("route_refused: every port"), st);
   assert.equal(refused.fix, "shortcuts");
   assert.equal(refused.button, CELLULAR.button);
-  assert.ok(!/LocalDevVPN|Tailscale/.test(JSON.stringify([why, refused])));
+  assert.ok(!/LocalDevVPN|Tailscale|Turn On/.test(JSON.stringify([why, refused])));
 });
 
 test("F392: the first test that passes uses This iPhone; a later one keeps the pick, unless its row was just tapped", async () => {

@@ -6,7 +6,7 @@ import { actionsFooter } from "./myipas.js";
 
 test("actionsFooter: This iPhone says the VPN, not the Signing Server's manifest", () => {
   const f = actionsFooter("iphone");
-  assert.match(f, /VPN to this iPhone \(LocalDevVPN or Tailscale\)/);
+  assert.match(f, /only iFizBox VPN to this iPhone, no Signing Server/i);
   assert.doesNotMatch(f, /manifest/);
 });
 

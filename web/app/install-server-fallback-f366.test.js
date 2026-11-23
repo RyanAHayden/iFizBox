@@ -1,4 +1,4 @@
-// F366: an install through This iPhone that can't reach the phone (refused, the pairing lost, Tailscale or LocalDevVPN
+// F366: an install through This iPhone that can't reach the phone (refused, the pairing lost, the VPN
 // down, not paired) offers Use the Signing Server besides the fix: in the single install's alert (and its log), and on
 // the IPA queue run's Log and bottom. Picking it runs the same install, or the same failed rows, again through the
 // default Signing Server for that install or run only; Install Apps With stays This iPhone.
@@ -18,14 +18,14 @@ const { fakeDocument } = await import("./fakes.test-helper.js");
 
 const settle = async (n = 12) => { for (let i = 0; i < n; i++) await new Promise((r) => setTimeout(r, 0)); };
 const refused = () => Object.assign(new Error("refused: this iPhone refused the connection"), { code: "refused" });
-const PAIRED = { paired: "rp", localDevVPN: true };
+const PAIRED = { paired: "rp", vpn: { available: true, tested: true } };
 
 test("serverFallback: only a This iPhone failure to reach the phone offers the Signing Server", () => {
   const f = serverFallback(refused(), { route: "idevice" });
   assert.ok(f, "a refusal on This iPhone offers it");
   assert.ok(f.button && f.fix, "with the fix beside it");
   assert.ok(serverFallback(Object.assign(new Error("not_paired: none"), { code: "not_paired" })));
-  assert.ok(serverFallback(Object.assign(new Error("tailscale_signed_out: x"), { code: "tailscale_signed_out" })));
+  assert.ok(serverFallback(Object.assign(new Error("route_refused: x"), { code: "route_refused" })));
   assert.equal(serverFallback(refused(), {}), null, "the Signing Server route itself: nothing to fall back to");
   assert.equal(serverFallback(Object.assign(new Error("offline: no internet"), { code: "offline" })), null);
   assert.equal(serverFallback(Object.assign(new Error("developer_mode: off"), { code: "developer_mode" })), null);

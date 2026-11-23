@@ -58,7 +58,7 @@ test("This iPhone rows overlap: each joins once the one before is copying, at mo
   await flush();
   for (const id of ["a", "b", "c", "d"]) ph.signed(id);
   await flush();
-  // a's route isn't settled yet (it may wait for LocalDevVPN): nobody joins it
+  // a's route isn't settled yet (the route alert may be up): nobody joins it
   assert.deepEqual(installs(ph), ["install:a"]);
   ph.copying("a", 0.1);
   await flush();

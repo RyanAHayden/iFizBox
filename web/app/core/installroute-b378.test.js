@@ -1,14 +1,12 @@
-// B378: an install through the built-in VPN that couldn't start it (no network), with LocalDevVPN and Tailscale both
-// off, said "connect_failed: device socket io failed": the shell fell back to 10.7.0.1 with no tunnel. It now says the
-// VPN's own error (vpn_failed), worded here, and the Signing Server is still offered.
+// B378: an install through the built-in VPN that couldn't start it (no network) says the VPN's own error (vpn_failed),
+// worded here, and the Signing Server is still offered.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { routeFailureOf, serverFallback, verifyFailure, BUILTIN_VPN } from "./installroute.js";
 
 const noNetwork = () => Object.assign(new Error(`vpn_failed: ${BUILTIN_VPN} can't start without a network: iOS starts a VPN only with Wi-Fi or cellular data on`), { code: "vpn_failed" });
-const ST = { paired: "rp", localDevVPN: false, otherVPN: false, tunnels: [],
-  vpn: { available: true, entitled: true, bundled: true, tested: true, on: false, cellular: false, wifi: false },
-  tailscale: { connect: "auto", signedIn: false, use: false } };
+const ST = { paired: "rp", otherVPN: false, tunnels: [],
+  vpn: { available: true, entitled: true, bundled: true, tested: true, on: false, cellular: false, wifi: false } };
 
 test("vpn_failed reads as the built-in VPN's own error, not a connect failure", () => {
   const why = verifyFailure(noNetwork(), ST);
@@ -16,7 +14,7 @@ test("vpn_failed reads as the built-in VPN's own error, not a connect failure", 
   assert.match(why.message, /without a network/);
   assert.match(why.message, /\.$/);
   assert.equal(why.again, false);
-  assert.doesNotMatch(`${why.title} ${why.message}`, /LocalDevVPN|socket|Pair/);
+  assert.doesNotMatch(`${why.title} ${why.message}`, /socket|Pair/);
 });
 
 test("vpn_failed is a route failure: Check Again as the fix, a short line for the status cell", () => {

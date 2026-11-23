@@ -121,7 +121,7 @@ For people with no certificate. The certificate route stays the recommended one:
 time, makes 10 App IDs a week, and its profiles last 7 days. iOS refuses apps with a free profile from a website
 (`MIInstallerErrorDomain` 111, "free provisioning profile … not allowed to be installed from this source"), so the
 website does the Apple side only: sign-in, the development certificate and the profiles. Installing is the app's job,
-through `installation_proxy` (pairing file + LocalDevVPN), which the app doesn't have yet.
+through `installation_proxy` (pairing file + a loopback VPN), which the app doesn't have yet.
 
 Where: How Signing Works (the walkthrough Install opens when there's no certificate), under the two steps, as
 **Use a Free Apple ID**. It shows only when the Worker's Apple relay is on (`GET /apple/status` answers
@@ -264,7 +264,7 @@ relies on it). What could serve a trusted manifest:
 | **A. backloop.dev** (Feather's Fully Local): `*.backloop.dev` resolves to 127.0.0.1, served with a public CA's wildcard certificate whose private key is published | a public CA | backloop's pack fetched, public DNS | **No.** A CA must revoke a certificate whose key is public, so the pack lives on borrowed time and expires (docs/sideload.md). Shipping our own such key breaks CA rules; using theirs makes installs depend on a third party re-issuing it. |
 | **B. A manifest from a server, IPA from the phone** (Feather's Semi Local): `GET <server>/sign/manifest?bundleid=&version=&title=&port=&path=` answers a manifest whose IPA URL is `http://127.0.0.1:<port>/<path>` | the server's own certificate | the Signing Server (sign.ifizbox.com by default, or the user's own), which sees the app's bundle ID, name and version on every install | **Used.** Nothing to set up on the phone; the certificate and the IPA stay there. |
 | C. A CA made on the phone: the user installs iFizBox's own root as a profile and turns on full trust; an HTTPS server on 127.0.0.1 uses a certificate it issues | the user's own trust setting | a one-time setup in Settings | **No.** iOS's installer ignores a hand-trusted root: a page on such a server opens fine in Safari while every install through it fails. |
-| D. A pairing file + LocalDevVPN (idevice, Feather's third mode) | lockdownd, no TLS | a computer once to make the pairing file, an App Store VPN app | Works without any certificate, but it needs a computer and keeps a full lockdown credential on the phone. Not built (docs/sideload.md). |
+| D. A pairing file + a loopback VPN (idevice, Feather's third mode) | lockdownd, no TLS | a pairing file (made on a computer before iOS 27, on the phone with iOS 27), and a loopback VPN | Works without any certificate or server, but keeps a full lockdown credential on the phone. **Used** for This iPhone, with iFizBox's own built-in VPN (docs/sideload.md). |
 | E. A `data:` URL or a file URL as the manifest | – | – | Not accepted: the manifest URL must be https. |
 
 So every install in the app takes its manifest from the Signing Server; with no server set (or one that isn't

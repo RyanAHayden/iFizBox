@@ -60,10 +60,8 @@ test("ipaChanged: the IPA page redraws only when its entry differs from the one 
   assert.equal(await ipaChanged({ ...shown, drawn: null }, { read: () => assert.fail("read") }), false);
 });
 
-test("the Pairing page names the VPN that's on: Tailscale when its route is the way in, LocalDevVPN otherwise", () => {
+test("the Pairing page names the VPN that's on: the built-in VPN", () => {
   const p = { pin: "123456", text: "Pairing…", error: "" };
-  const ts = setupGroups("pairing", { paired: false, localDevVPN: false, otherVPN: true, tailscale: { use: true, signedIn: true, address: "100.64.0.2" } }, p);
-  assert.deepEqual(ts[1].rows.map((r) => [r.label, r.detail]), [["Tailscale", "On"]]);
-  const ld = setupGroups("pairing", { paired: false, localDevVPN: true, otherVPN: false, tailscale: null }, p);
-  assert.deepEqual(ld[1].rows.map((r) => [r.label, r.detail]), [["LocalDevVPN", "On"]]);
+  const g = setupGroups("pairing", { paired: false, vpn: { available: true } }, p);
+  assert.deepEqual(g[1].rows.map((r) => [r.label, r.detail]), [["iFizBox VPN", "On"]]);
 });

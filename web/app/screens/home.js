@@ -962,7 +962,6 @@ export function softwareSections() {
       ["OpenSSL", "The OpenSSL Project\nzsign's cryptography, Apache-2.0", "https://www.openssl.org/", gh("openssl")],
       ["zlib", "Jean-loup Gailly and Mark Adler\nzsign's compression, zlib licence", "https://zlib.net/", "https://zlib.net/images/zlib3d-b1.png", "thanks-logo"],
       ["idevice", "Jackson Coxson\nInstalling on this iPhone, MIT", "https://github.com/jkcoxson/idevice", gh("jkcoxson")],
-      ["Tailscale", "Tailscale Inc\nInstalling over a tailnet, BSD-3-Clause", "https://github.com/tailscale/tailscale", gh("tailscale")],
     ].map(([label, subtitle, url, src, cls]) => row(label, subtitle, url, src, cls)) },
   ];
 }

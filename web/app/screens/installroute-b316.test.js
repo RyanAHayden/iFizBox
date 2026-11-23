@@ -14,8 +14,8 @@ const { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf } 
 hudHooks.show = () => () => {};
 hudHooks.delay = 0;
 
-const TS_FINE = { paired: "rp", localDevVPN: false, otherVPN: true, tailscale: { connect: "auto", signedIn: true, address: "100.64.0.2", use: true } };
-const TS_SIGNED_OUT = { ...TS_FINE, tailscale: { ...TS_FINE.tailscale, signedIn: false, use: false } };
+const FINE = { paired: "rp", otherVPN: false, vpn: { available: true, tested: true } };
+const noRoute = Object.assign(new Error("route_refused: every port refused"), { code: "route_refused" });
 const refused = Object.assign(new Error("refused: this iPhone refused RemotePairing on port 49152"), { code: "refused" });
 const iphone = { get: () => "iphone", set: () => {} };
 function phone(answers) {
@@ -24,9 +24,9 @@ function phone(answers) {
 }
 
 test("after a failure, opening the page checks by itself; a pass clears it with no alert", async () => {
-  rememberRouteFailure(routeFailureOf(refused, TS_SIGNED_OUT));
+  rememberRouteFailure(routeFailureOf(refused, FINE));
   AUTO_CHECK.last = 0;
-  const native = phone({ "idevice.status": TS_FINE, "idevice.verify": { ok: true } });
+  const native = phone({ "idevice.status": FINE, "idevice.verify": { ok: true } });
   const alerts = [];
   let redrawn = 0;
   await autoCheck(native, async (a) => { alerts.push(a); return { index: 0 }; }, () => { redrawn++; }, iphone, null, 100000);
@@ -38,13 +38,13 @@ test("after a failure, opening the page checks by itself; a pass clears it with 
 
 test("a failing automatic check keeps the failure, re-worded, with no alert; it doesn't run again at once", async () => {
   clearRouteFailure();
-  rememberRouteFailure(routeFailureOf(refused, TS_FINE));
+  rememberRouteFailure(routeFailureOf(refused, FINE));
   AUTO_CHECK.last = 0;
-  const native = phone({ "idevice.status": TS_SIGNED_OUT, "idevice.verify": refused });
+  const native = phone({ "idevice.status": FINE, "idevice.verify": noRoute });
   const alerts = [];
   await autoCheck(native, async (a) => { alerts.push(a); return { index: 0 }; }, () => {}, iphone, null, 200000);
   assert.deepEqual(alerts, []);
-  assert.equal(routeFailure().title, "Tailscale Is Signed Out", "Tailscale first: its VPN on, iFizBox signed out");
+  assert.equal(routeFailure().title, "iPhone Refused", "re-worded from Pair Again: not the pairing");
   assert.equal(autoCheck(native, async () => ({}), () => {}, iphone, null, 200000 + 1000), null, "within the gap: no second check");
 });
 
@@ -53,51 +53,43 @@ test("no failure, or the Signing Server route: nothing runs", () => {
   AUTO_CHECK.last = 0;
   const native = phone({});
   assert.equal(autoCheck(native, async () => ({}), () => {}, iphone, null, 500000), null);
-  rememberRouteFailure(routeFailureOf(refused, TS_FINE));
+  rememberRouteFailure(routeFailureOf(refused, FINE));
   assert.equal(autoCheck(native, async () => ({}), () => {}, { get: () => "server" }, null, 500000), null);
   assert.deepEqual(native.calls, []);
   clearRouteFailure();
 });
 
 test("Paired turns to a red Failing while a failure is kept (main page's row and Install Apps With's Pairing)", () => {
-  const f = routeFailureOf(refused, TS_FINE);
-  assert.equal(withDetail("iphone", TS_FINE), "Paired");
-  assert.equal(withDetail("iphone", TS_FINE, f), FAILING);
+  const f = routeFailureOf(refused, FINE);
+  assert.equal(withDetail("iphone", FINE), "Paired");
+  assert.equal(withDetail("iphone", FINE, f), FAILING);
   assert.equal(withDetail("iphone", { paired: false }, f), "Not Paired");
-  assert.equal(withDetail("server", TS_FINE, f), "");
-  const pairing = installationGroups("iphone", TS_FINE, { failure: f }).find((x) => x.header === "This iPhone").rows[0];
-  assert.equal(pairing.detail, FAILING);
-  assert.equal(installationGroups("iphone", null).find((x) => x.header === "This iPhone").rows[0].detail, "Not Paired");
+  assert.equal(withDetail("server", FINE, f), "");
+  const test = installationGroups("iphone", FINE, { failure: f }).find((x) => x.header === "Set Up").rows[1];
+  assert.equal(test.detail, FAILING);
 });
 
 test("a check that gets no answer in time is kept too (Check Again)", async () => {
   clearRouteFailure();
-  rememberRouteFailure(routeFailureOf(refused, TS_FINE));
+  rememberRouteFailure(routeFailureOf(refused, FINE));
   AUTO_CHECK.last = 0;
   TIMEOUTS.verify = 5;
   try {
-    const native = { call: (m) => (m === "idevice.status" ? Promise.resolve(TS_FINE) : new Promise(() => {})) };
+    const native = { call: (m) => (m === "idevice.status" ? Promise.resolve(FINE) : new Promise(() => {})) };
     await autoCheck(native, async () => ({}), () => {}, iphone, null, 300000);
     assert.equal(routeFailure().title, "Not Responding");
     assert.equal(routeFailure().fix, "check");
   } finally { TIMEOUTS.verify = 20000; clearRouteFailure(); }
 });
 
-test("Install Apps With: the failure in This iPhone's footer, its fix row in the group", () => {
-  const f = routeFailureOf(refused, TS_SIGNED_OUT);
-  const groups = installationGroups("iphone", TS_FINE, { failure: f });
-  const g = groups.find((x) => x.header === "This iPhone");
-  assert.equal(g.footer, "Tailscale Is Signed Out. Installs can't reach this iPhone. Sign in again.");
+test("Install Apps With: the failure in Set Up's footer, its fix row in the group", () => {
+  const f = routeFailureOf(refused, FINE);
+  const groups = installationGroups("iphone", FINE, { failure: f });
+  const g = groups.find((x) => x.header === "Set Up");
+  assert.equal(g.footer, "Pair Again. Installs are refused. Pair again.");
   assert.equal(g.warn, true);
-  assert.ok(g.rows.some((r) => r.label === "Sign In" && r.cls === "sign-import"));
-  // signed out now (the shell marked it): Tailscale's own Sign In row is the fix, and its footer says the failure
-  const out = installationGroups("iphone", TS_SIGNED_OUT, { failure: f });
-  const here = out.find((x) => x.header === "This iPhone"), tsg = out.find((x) => x.header === "Tailscale");
-  assert.ok(!here.rows.some((r) => r.label === "Sign In"), "one Sign In row, not two");
-  assert.ok(!here.warn);
-  assert.equal(tsg.footer, "Tailscale Is Signed Out. Installs can't reach this iPhone. Sign in again.");
-  assert.ok(tsg.rows.some((r) => r.label === "Sign In"));
-  const ok = installationGroups("iphone", TS_FINE).find((x) => x.header === "This iPhone");
-  assert.ok(!ok.rows.some((r) => r.label === "Sign In"));
+  assert.ok(g.rows.some((r) => r.label === "Pair Again" && r.cls === "sign-import"));
+  const ok = installationGroups("iphone", FINE).find((x) => x.header === "Set Up");
+  assert.ok(!ok.rows.some((r) => r.label === "Pair Again"));
   assert.ok(!ok.warn);
 });

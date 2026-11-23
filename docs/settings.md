@@ -63,14 +63,11 @@ value still loading shows the grey spinner in its slot and fades in (opacity onl
 rows or change footers. Top to bottom:
 
 - A status cell, always two lines under its title (`installStatus`), and one action row whose label changes:
-  Checking… (Check Connection, dimmed); Ready to Install, "Straight onto this iPhone, through LocalDevVPN" (or
-  Tailscale), with Check Connection; Another VPN Is On, red, when a VPN that isn't Tailscale's is on, with Open
-  LocalDevVPN, or Open Tailscale when the user set up Tailscale (Connect With: Tailscale, or signed in to it);
-  Pair This iPhone with Start Pairing; Sign In to Tailscale when Tailscale's VPN is on and the app isn't signed in.
-  Once that sign-in is in, the cell checks by itself in its own row (Checking…, "Checking Connection…" then "Checking
-  Pairing…" under it, the grey spinner; no HUD), and a pairing the phone dropped is redone on Pairing by itself.
-  Pair Again (a check the phone turned down) opens Pairing, which starts pairing at once.
-  Tailscale's own VPN is never a conflict. With Signing Server chosen: Ready to Install through the server, Check Server.
+  Checking… (Check Connection, dimmed); Pair This iPhone with Start Pairing; Pair Again (a check the phone turned down)
+  opens Pairing, which starts pairing at once; No Network Extensions (the app's profile lacks them, so installs go
+  through the Signing Server); Couldn't Connect and iPhone Refused, red, with their fix (Check Connection, Pairing, or the
+  Install Switch page). A pairing the phone dropped is redone on Pairing by itself. With Signing Server chosen: Ready to
+  Install through the server, Check Server.
   With the built-in VPN (the app's profile has Network Extensions): Ready to Install, "Straight onto this iPhone,
   through iFizBox VPN"; on cellular with the Install Switch not added, Add the Install Switch with Add Install
   Switch (it opens its page).
@@ -102,29 +99,24 @@ The pages under it:
   Switch (`vpn.testSwitch` runs its start and end, turning cellular data off and back on and the VPN with it). Phones
   that added the older Cellular Data Off and Cellular Data On Shortcuts still have them to run, but this page no
   longer lists them. **Signing Server** (`installation/server`): Server,
-  Check Server, Run Your Own. Without the built-in VPN (an older shell, or a profile without Network Extensions)
-  This iPhone's page keeps the LocalDevVPN and Tailscale groups below.
-- **Install Apps With** (`installation/with`, the older page): This iPhone (installd over LocalDevVPN or Tailscale, docs/sideload.md) or Signing Server
+  Check Server, Run Your Own. Without Network Extensions in the app's profile, This iPhone's page shows the Set Up group "Network Extensions: Missing" below.
+- **Install Apps With** (`installation/with`, the older page): This iPhone (installd over the built-in VPN, docs/sideload.md) or Signing Server
   (the manifest and iOS's Install prompt, the default), with a checkmark, each subtitle a short point per line,
-  wrapped. This iPhone's says LocalDevVPN or Tailscale / No server, no install popup / Updates itself: installs
+  wrapped. This iPhone's says Built-in VPN / No server, no install popup / Updates itself: installs
   through installation_proxy never show iOS's install prompt. Under the choice, the chosen route's groups slide in:
   This iPhone's (below), or the Signing Server's (Server, Check Server, Run Your Own). A tap moves the checkmark at
   once, whether or not the iPhone is paired, and the row shows the grey spinner until `idevice.status` answers.
-- **This iPhone** (also `installation/iphone` on its own): **Pairing** (Paired / Not Paired, opens
-  `installation/pair`), **LocalDevVPN** (On, Off or Another VPN) and **Open LocalDevVPN** with the "LocalDevVPN must
-  be on" footer, none of which shows when Tailscale is the way in (Connect With: Tailscale, or Automatic with the
-  app signed in to Tailscale and its VPN on); then **Connect With** (Automatic, LocalDevVPN, Tailscale: a tap moves
-  the checkmark at once and spins that row until `tailscale.setConnect` and the status read after it answer, no
-  HUD) and **Tailscale** (Sign In, or the device with Test Connection and Sign Out). No Developer Mode row: an
-  install it stops explains it in its alert. Groups that come, go or change size slide (FLIP, transform and opacity
-  only: nav/slide.js's watcher). `idevice.status` (Pairing, the VPN) and `tailscale.status` (Connect With, Tailscale) are read
-  at once and each fills its own rows as it answers; the last answer of this app run shows at once, its rows spinning
-  while they're read again; a read past its deadline (`TIMEOUTS`) says Not Responding, red. An answer swaps only the
-  rows that changed (`patchGroups`), never the whole page. Test Connection and Check Connection spin in their own
-  row (no HUD) for at most 25 and 20 seconds; Check Connection with neither LocalDevVPN nor Tailscale's route on
-  answers Turn On LocalDevVPN at once instead of waiting out `idevice.verify`.
-- **Pairing** (`installation/pair`), one page that runs by itself: a sentence on what it gives, the LocalDevVPN
-  check (Turn On LocalDevVPN alert when it's off, rechecked when the app comes back), then on iOS 27 pairing starts
+- **This iPhone** (also `installation/iphone` on its own): **Set Up** and **How It Works**, as above. Set Up's rows are drawn
+  from the first frame: each says Checking… until `idevice.status` answers, and a failed or late answer says Not Responding,
+  red. A profile without Network Extensions shows a Set Up group "Network Extensions: Missing" with the footer "…signing
+  profile has no Network Extensions, so it can't connect to this iPhone. Sign it with a profile that has them, or install
+  apps through the Signing Server." No Developer Mode row: an install it stops explains it in its alert. Groups that come,
+  go or change size slide (FLIP, transform and opacity only: nav/slide.js's watcher). `idevice.status` is read at once and
+  each row fills as it answers; the last answer of this app run shows at once, its rows spinning while they're read again;
+  a read past its deadline (`TIMEOUTS`) says Not Responding, red. An answer swaps only the rows that changed
+  (`patchGroups`), never the whole page. Test Connection and Check Connection spin in their own row (no HUD) for at most
+  25 and 20 seconds.
+- **Pairing** (`installation/pair`), one page that runs by itself: a sentence on what it gives, then on iOS 27 pairing starts
   on its own: the 6-digit code and where to type it, a line and a ringed Settings screenshot a step; before iOS 27,
   Import Pairing File; once paired, Paired with a check, Check Connection (Pair Again when the pairing is refused)
   and Forget Pairing. One pairing at a time: drawing the page again while it pairs, or coming back to it within 90

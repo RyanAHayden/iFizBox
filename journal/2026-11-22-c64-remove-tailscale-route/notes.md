@@ -1,28 +1,30 @@
-# C64: remove the Tailscale route and LocalDevVPN (not started)
+# C64: remove the Tailscale route and LocalDevVPN
+
+The user OK'd it on 2026-11-23 (built-in VPN checked on their phone), so the removal is done.
 
 ## What I did
 
-Checked the task's precondition before removing anything. Nothing in the code has changed.
-
-- The task opens with "Once the user OKs F372's built-in VPN on their phone".
-- The plan blocked it with "(after V8) remove only after the user verified the built-in VPN in the V8
-  release" (commit 73e393fb).
-- V8 was then dropped ("V10 is the release; covers it"). The runner counts a dropped task as landed, so it
-  reopened C64 (fe53889c). V10 (0.22.0, with the built-in VPN) merged at 23:36 on 2026-11-22, minutes
-  before this session started.
-- Nothing in the plan or git history says the user tried 0.22.0's built-in VPN on their own phone. The only
-  phone check so far is F372's own run on the iPhone 15 Pro (Test Connection, one install). The user's R66
-  note ("LocalDevVPN isn't used any more") is about LocalDevVPN, not about the built-in VPN working on their
-  phone.
-
-## Decision
-
-Blocked on CONFIRM, with no code removed. A branch closed with `done --blocked` still merges (agent-runner
-README, "part landed with the rest stuck"), so doing the removal now and then blocking would land it before
-the OK. That would take away Tailscale, the route the user's phone can still fall back to, before the
-built-in VPN has been checked there.
+- Native: `native/sideload/tailscale/` (tsnet c-archive, Go build, Swift) deleted; build.sh, check.sh, plist
+  (`LSApplicationQueriesSchemes` is `apple-magnifier` only), notices and tests follow. `IDevice.Session` has one route,
+  the built-in VPN; a build without Network Extensions fails with `vpn_failed`. `VPNCheck` keeps only what the VPN
+  needs. Bridge: `tailscale.*`, `idevice.openLocalDevVPN`, `idevice.vpnApps` and the `tailscale`/`localDevVPN`
+  status keys are gone. The kept Install Apps With choice moved to `route.keep` / `route.kept`
+  (`native/sideload/idevice/KeptRoute.swift`); it keeps the old Keychain service string so a kept route survives the
+  update.
+- Web: `core/installroute.js` and `screens/installroute.js` lose Connect With, the Tailscale group and sign-in, the
+  VPN row, the LocalDevVPN alerts and wait (`waitForVPN`, the "vpn" run phase). `This iPhone` always draws Set Up and
+  How It Works from the first frame (rows Checking…, Not Responding when late or failed). A profile without Network
+  Extensions says so (core `NO_VPN`): Set Up row, status cell, alert, check.
+- Credits no longer name Tailscale; Why page text, docs and glossary updated.
+- Settings RETIRED: nothing to add, the Tailscale settings lived in the shell's UserDefaults, not in web settings.
+- Tests: Tailscale/LocalDevVPN-only tests deleted, the rest rewritten; `installroute-c64.test.js` checks that no
+  state draws Tailscale or LocalDevVPN and drives the page with a delayed, late and failed `idevice.status`.
+- `shot.mjs` (Chromium, `idevice.status` delayed 4 s, no cached status): first frame already shows Set Up with
+  Checking… rows and How It Works, for the built-in VPN, no-Network-Extensions and failed-status cases; none names
+  Tailscale or LocalDevVPN.
 
 ## Not verified
 
-- Whether the user has already tried the built-in VPN on their phone and just didn't write it in the plan.
-  Nobody is around to ask during an unattended run.
+- The 15 Pro installing through the built-in VPN after this build (needs the phone; the VPN path itself is unchanged).
+- The Why page's "routes" screenshot (web/app/img/why) was not redrawn.
+- Set Up gains a footer when the first answer lands, so that group slides at that moment.

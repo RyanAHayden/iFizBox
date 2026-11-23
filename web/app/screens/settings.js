@@ -1684,8 +1684,8 @@ export function signingLayout({ mode, certificate = false, staged = false, profi
   return SIGNING_GROUPS.filter((g) => on[g]);
 }
 
-// F271: Installation & Signing's order: the "install" part (Install Apps With, then This iPhone's Pairing, Connect
-// With and Tailscale when it's chosen) above signingLayout's groups. Pure, for the tests.
+// F271: Installation & Signing's order: the "install" part (Install Apps With, then This iPhone's Set Up when it's
+// chosen) above signingLayout's groups. Pure, for the tests.
 export const mergedLayout = (layout, on = true) => (on ? ["install", ...layout] : layout);
 
 // F134: core/signing.js summary()/deviceSummary() rows, split into the Certificate group (Name, Team, Expires) and

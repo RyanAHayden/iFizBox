@@ -139,15 +139,15 @@ test("Installation & Signing: Back to the main page refreshes it in place; This 
 
 test("This iPhone: paired on the Pairing page, Back: Pairing says Paired on the row already drawn", async () => {
   let paired = false;
-  const native = { call: async (m) => (m === "idevice.status" ? { paired, localDevVPN: true } : null) };
+  const native = { call: async (m) => (m === "idevice.status" ? { paired, vpn: { available: true } } : null) };
   const store = { get: () => "iphone" };
   const page = fakePage();
-  page.append(grouped([{ rows: installationRows("iphone", { paired: false, localDevVPN: true }, { store }) }]));
-  assert.equal(detailOf(page, "Pairing"), "Not Paired");
+  page.append(grouped([{ rows: installationRows("iphone", { paired: false, vpn: { available: true } }, { store }) }]));
+  assert.equal(detailOf(page, "Pair This iPhone"), "Start");
   const cells = page.querySelectorAll(".cell").length;
   paired = true;
   await refreshInstallation(page, "iphone", { store, native, patch: (el, rows) => patchDetails(cellsOf(el), rows) });
-  assert.equal(detailOf(page, "Pairing"), "Paired");
+  assert.equal(detailOf(page, "Pair This iPhone"), "Done");
   assert.equal(page.querySelectorAll(".cell").length, cells, "no rows added or removed");
 });
 

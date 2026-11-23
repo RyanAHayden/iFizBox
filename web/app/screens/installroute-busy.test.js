@@ -25,7 +25,7 @@ const tap = (box, label) => {
 const store = (route = "server") => { const m = { installRoute: route }; return { get: (k) => m[k], set: (k, v) => { m[k] = v; }, m }; };
 const flush = () => new Promise((r) => setTimeout(r, 0));
 const later = () => { let answer; const p = new Promise((r) => { answer = r; }); return { p, answer }; };
-const PAIRED_ON = { paired: "rp", pairOnPhone: true, localDevVPN: true, otherVPN: false, tailscale: { connect: "auto", signedIn: false } };
+const PAIRED_ON = { paired: "rp", pairOnPhone: true, otherVPN: false, vpn: { available: true, tested: true } };
 
 function bridge(answers) {
   const calls = [];
@@ -63,26 +63,21 @@ test("the main page: Pairing spins Checking… while idevice.status answers; no 
   const native = bridge({ "idevice.status": () => st.p });
   const box = make("div");
   const done = drawInstallation(box, null, { store: store("iphone"), native });
-  assert.ok(spins(box, "Pairing"));
-  assert.equal(withClass(cellOf(box, "Pairing"), "cell-detail")[0].textContent, "Checking…");
-  assert.match(box.textContent, /LocalDevVPNChecking…/);
+  assert.ok(spins(box, "Pair This iPhone"));
+  assert.equal(withClass(cellOf(box, "Pair This iPhone"), "cell-detail")[0].textContent, "Checking…");
+  assert.ok(spins(box, "Test Connection") && spins(box, "Install Switch"), "every Set Up row says Checking… from the first frame");
   st.answer(PAIRED_ON);
   await done;
-  assert.ok(!spins(box, "Pairing"));
+  assert.ok(!spins(box, "Pair This iPhone"));
   assert.ok(!labels(box).includes("Developer Mode"), labels(box).join(", "));
-  assert.deepEqual(native.calls, ["idevice.status", "tailscale.status"], "Developer Mode isn't asked (F301: Tailscale's own read at once beside it)");
+  assert.deepEqual(native.calls, ["idevice.status"], "Developer Mode isn't asked");
   assert.equal(withClass(box, "loading-spinner").length, 0, "nothing spins once everything answered");
-});
-
-test("Tailscale signing in: the row spins with its step", () => {
-  const gs = installationGroups("iphone", PAIRED_ON, { busy: "Log in on the page" });
-  assert.deepEqual(gs[3].rows, [{ label: "Signing In…", detail: "Log in on the page", spin: true }]);
 });
 
 test("pairing: the code's place spins until the code comes, then the step line spins while the iPhone connects", async () => {
   hudLog();
   let send, cancel;
-  const native = bridge({ "idevice.status": { ...PAIRED_ON, paired: null }, "idevice.vpnApps": { localdevvpn: true, tailscale: false },
+  const native = bridge({ "idevice.status": { ...PAIRED_ON, paired: null },
     "idevice.pair": (p, ev) => { send = ev; return new Promise((_, no) => { cancel = () => no(Object.assign(new Error("cancelled"), { code: "canceled" })); }); },
     "idevice.pairCancel": () => { cancel(); return Promise.resolve(null); } });
   const box = make("div");
@@ -107,7 +102,7 @@ test("Check Connection spins in its own row (F301, no HUD); Forget Pairing runs 
   const log = hudLog();
   const verify = later(), forget = later(), again = later();
   let n = 0;
-  const native = bridge({ "idevice.status": () => (n++ > 1 ? again.p : Promise.resolve(PAIRED_ON)), "idevice.vpnApps": { localdevvpn: true, tailscale: false },
+  const native = bridge({ "idevice.status": () => (n++ > 1 ? again.p : Promise.resolve(PAIRED_ON)),
     "idevice.verify": () => verify.p, "idevice.forget": () => forget.p });
   const alerts = [];
   const box = make("div");
@@ -131,36 +126,9 @@ test("Check Connection spins in its own row (F301, no HUD); Forget Pairing runs 
   await flush();
   assert.deepEqual(log, ["Forgetting Pairing", "hide"]);
   assert.deepEqual(withClass(box, "loading").map((x) => x.textContent), ["Checking…"], "the old page doesn't stay up while it reads");
-  again.answer({ ...PAIRED_ON, paired: null, localDevVPN: false });
+  again.answer({ ...PAIRED_ON, paired: null });
   await flush();
   await flush();
   assert.ok(!box.textContent.includes("Checking…"));
   leave();
-});
-
-test("B167: switching Connect With to Automatic while signed in: Tailscale's row spins Checking… until the status comes, never Sign In", async () => {
-  hudLog(1000);
-  const SIGNED_IN = { ...PAIRED_ON, tailscale: { connect: "tailscale", signedIn: true, name: "ifizbox-on-iphone", address: "100.1.2.3" } };
-  const again = later();
-  let n = 0;
-  const native = bridge({ "idevice.status": () => (n++ ? again.p : Promise.resolve(SIGNED_IN)), "idevice.developerMode": { on: true }, "tailscale.setConnect": null,
-    "tailscale.status": () => again.p.then((s) => s.tailscale) });
-  const box = make("div");
-  await drawInstallation(box, null, { store: store("iphone"), native, alert: async () => ({ index: 0 }) });
-  await flush();
-  assert.ok(labels(box).includes("Sign Out"));
-  tap(box, "Automatic");
-  await flush();
-  await flush();
-  assert.ok(!labels(box).includes("Sign In"), `no Sign In flash: ${labels(box)}`);
-  // F301: the last answer stays (signed in) with the spinner on its Device row while it's read again; the pick holds
-  assert.ok(spins(box, "Device"), "Tailscale's Device row spins while it's read again");
-  assert.ok(labels(box).includes("Sign Out"));
-  assert.ok(spins(box, "Automatic"), "the pick is checked and spins");
-  assert.ok(withClass(cellOf(box, "Automatic"), "cell-check").length === 1);
-  again.answer({ ...SIGNED_IN, tailscale: { ...SIGNED_IN.tailscale, connect: "auto" } });
-  await flush();
-  await flush();
-  assert.ok(labels(box).includes("Sign Out"), "its real state comes back");
-  assert.ok(!labels(box).includes("Sign In"));
 });
