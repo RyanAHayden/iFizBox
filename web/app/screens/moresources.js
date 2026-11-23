@@ -257,7 +257,9 @@ export function matchesQuery(r, q) {
 // its icon (decorate: loadPreview); only when none of them answers does a note say so, under the footer, where it
 // pushes nothing down. `rows` and `preview` are seams for the tests. Resolves once that check has ended.
 export async function drawApps(box, ctx, { rows: load = appSourceRows, preview = loadPreview, query = "" } = {}) {
+  const turn = (box.drawTurn = (box.drawTurn ?? 0) + 1); // a newer draw (the next search letter) wins
   const all = await load();
+  if (turn !== box.drawTurn) return;
   const rows = all.filter((r) => matchesQuery(r, query));
   const redraw = () => drawApps(box, ctx, { rows: load, preview, query });
   appsListed = { rows, redraw };
@@ -277,7 +279,7 @@ export async function drawApps(box, ctx, { rows: load = appSourceRows, preview =
   const fresh = rows.filter((r) => !r.added);
   if (!fresh.length) return;
   const read = await Promise.allSettled(fresh.map((r) => preview(r)));
-  if (read.every((x) => x.status === "rejected" || !x.value) && box.isConnected !== false) {
+  if (turn === box.drawTurn && read.every((x) => x.status === "rejected" || !x.value) && box.isConnected !== false) {
     const why = read.find((x) => x.status === "rejected")?.reason?.message;
     box.append(note(`None of these sources answered${why ? `: ${why}` : ""}. Check the connection and open this page again.`));
   }

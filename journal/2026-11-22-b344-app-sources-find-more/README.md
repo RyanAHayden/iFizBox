@@ -40,6 +40,14 @@ like Find Tweak Sources' Find More page.
   count; not confirmed, nothing added).
 - `tools/check.sh` via `run done`.
 
+## Spec review
+
+A fresh subagent read only the diff and the brief. Fixed: overlapping search draws (a slow earlier draw could
+replace a later one or add its "None answered" note to it), which now carry a turn number, with a test. Kept,
+because the task needs them: the two other test files' selectors (the rows' classes changed), `matchesQuery` (the
+search), and `addAllListed`'s piracy check reading an app row's `rec.url`. Checked and fine: `remember` does nothing
+for rows without a slug, and the default `changed` is manage.js `sourcesChanged`, the same as one ADD.
+
 ## Tried and failed
 
 - The first capture's `clicktext: "Add All"` clicked More Sources' Recommended Add All on the page under the stack;

@@ -177,3 +177,18 @@ test("B344: App Sources' search keeps the rows that match, and Add All works on 
   await more.drawApps(box, null, { rows: async () => rows, preview: async () => null, query: "zzzz-nothing" });
   assert.match(box.textContent, /No app sources found/);
 });
+
+test("B344: a slow earlier search draw never replaces a later one, nor adds its failure note to it", async () => {
+  const { more, rows } = await appSources();
+  const pick = rows.find((r) => !r.added);
+  const box = fakePage();
+  let release;
+  const slow = new Promise((r) => { release = r; });
+  const first = more.drawApps(box, null, { rows: () => slow.then(() => rows), preview: async () => { throw new Error("offline"); } });
+  await more.drawApps(box, null, { rows: async () => rows, preview: async () => ({ apps: [] }), query: pick.label });
+  const later = box.querySelectorAll(".find-row .cell-label").map((n) => n.textContent);
+  release();
+  await first;
+  assert.deepEqual(box.querySelectorAll(".find-row .cell-label").map((n) => n.textContent), later);
+  assert.doesNotMatch(box.textContent, /None of these sources answered/);
+});
