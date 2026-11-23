@@ -18,6 +18,7 @@
 import { el } from "./ui.js";
 import { EASE, DURATION } from "./motion.js";
 import { navItemOf } from "./navbar.js";
+import { showActionSheet } from "./actionsheet.js";
 
 const PER_PAGE = 9;
 
@@ -44,7 +45,28 @@ function iconOf(item) {
   return box;
 }
 
+// F387: the era's share layout, style.css's --share-layout hook. "grid" (iOS 6) is the activity sheet below; "action"
+// (iOS 7, 13 and 26) hands the items to the action sheet (nav/actionsheet.js), each with its icon (iconOf, painted
+// smaller by the era's --share-* tokens) in front of its label, Cancel under them; the iOS 26 era's sheet is its
+// anchored menu, grown out of the Share button.
+export function shareLayout(doc = globalThis.document) {
+  const root = doc?.documentElement;
+  const v = root ? globalThis.getComputedStyle?.(root)?.getPropertyValue?.("--share-layout") : "";
+  return String(v ?? "").trim() === "action" ? "action" : "grid";
+}
+
+function actionShare(items, cancel) {
+  return showActionSheet({
+    buttons: items.map((item) => String(item.label ?? "")),
+    icons: items.map(iconOf),
+    cancel,
+    // inside the tap, as the grid's close() does: clipboard writes and app links need the user's gesture
+    onPick: (i) => { if (i >= 0) try { items[i]?.onSelect?.(); } catch (e) { console.error(e); } },
+  });
+}
+
 export function showShareSheet({ items = [], cancel = "Cancel", title = "Share" } = {}) {
+  if (shareLayout() === "action") return actionShare(items, cancel);
   return new Promise((resolve) => {
     const scrim = el("div", "share-scrim");
     const dim = el("div", "share-dim"); // its own layer, so the dimming fades by opacity alone
