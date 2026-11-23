@@ -122,6 +122,7 @@ html[data-style="ios7"][data-theme="light"] {
   --action-btn-edge: transparent; --action-btn-shadow: none;
   --action-btn-pressed: #dcdcdc; --action-btn-pressed-text: #007aff; --action-btn-pressed-emboss: none;
   --action-destructive: #f3f3f3; --action-destructive-text: #ff3b30; --action-destructive-emboss: none;
+  --action-destructive-pressed: #dcdcdc;
   --action-cancel: #ebebeb; --action-cancel-pressed: #d4d4d4;
   --action-cancel-text: #007aff; --action-cancel-emboss: none;
   --store-head: #f7f7f7; --store-head-edge: #c8c7cc; --store-head-emboss: none;
@@ -188,6 +189,7 @@ html[data-style="ios7"][data-theme="dark"] {
   --action-btn-text: #0a84ff; --action-btn-emboss: none; --action-btn-edge: transparent; --action-btn-shadow: none;
   --action-btn-pressed: #2c2c2e; --action-btn-pressed-text: #0a84ff; --action-btn-pressed-emboss: none;
   --action-destructive: #1c1c1e; --action-destructive-text: #ff453a; --action-destructive-emboss: none;
+  --action-destructive-pressed: #2c2c2e;
   --action-cancel-text: #0a84ff; --action-cancel-emboss: none; --action-cancel-pressed: #2c2c2e;
   --done-btn-edge: transparent; --done-btn-edge-top: transparent; --done-btn: none; --done-btn-pressed: none;
   /* the banner a step above the black page, with a hairline under it; the reload bar black under a hairline */
@@ -362,7 +364,7 @@ html[data-style="ios7"] .action-list > .action-button + .action-button,
 html[data-style="ios7"] .action-title + .action-list > .action-button:first-child { box-shadow: inset 0 .5px 0 var(--i7-action-line); }
 html[data-style="ios7"] .action-title { background: var(--i7-action-cell); border-radius: 3px 3px 0 0; } /* a button's colour */
 html[data-style="ios7"] .action-title + .action-list { border-top-left-radius: 0; border-top-right-radius: 0; }
-html[data-style="ios7"][data-theme="dark"] .action-button.destructive { background: var(--action-destructive); }
+html[data-style="ios7"][data-theme="dark"] .action-button.destructive:not(:active):not(.is-pressed) { background: var(--action-destructive); }
 
 /* The bars over the page: the banner's Upgrade is bold tinted text centred in its 30pt box (the 44pt line-height of
    the nav bar's buttons pushed it down); the banner's title semibold, its icon iOS 7's rounder corner; the reload

@@ -137,6 +137,7 @@ html[data-style="ios26"][data-theme="light"] {
   --action-btn-edge: transparent; --action-btn-shadow: none;
   --action-btn-pressed: #e5e5ea; --action-btn-pressed-text: #007aff; --action-btn-pressed-emboss: none;
   --action-destructive: rgba(255,255,255,.96); --action-destructive-text: #ff3b30; --action-destructive-emboss: none;
+  --action-destructive-pressed: #e5e5ea;
   --action-cancel: #fff; --action-cancel-pressed: #e5e5ea;
   --action-cancel-text: #007aff; --action-cancel-emboss: none;
   --store-head: #fff; --store-head-edge: #c6c6c8; --store-head-emboss: none;
@@ -222,6 +223,7 @@ html[data-style="ios26"][data-theme="dark"] {
   --action-btn-text: #0a84ff; --action-btn-emboss: none; --action-btn-edge: transparent; --action-btn-shadow: none;
   --action-btn-pressed: #2c2c2e; --action-btn-pressed-text: #0a84ff; --action-btn-pressed-emboss: none;
   --action-destructive: #1c1c1e; --action-destructive-text: #ff453a; --action-destructive-emboss: none;
+  --action-destructive-pressed: #2c2c2e;
   --action-cancel-text: #0a84ff; --action-cancel-emboss: none; --action-cancel-pressed: #3a3a3c;
   --sig-pill: #30d158; --sig-pill-soon: #ff9f0a; --sig-pill-expired: #ff453a; --sig-pill-unknown: #8e8e93;
   --sig-pill-shadow: none;
@@ -494,7 +496,7 @@ html[data-style="ios26"][data-theme="dark"] .search-cancel { background: none; b
 /* Action sheet: 13pt rounded buttons, regular weight, Cancel semibold. */
 html[data-style="ios26"] .action-button { font-size: 20px; font-weight: 400; border-radius: 13px; }
 html[data-style="ios26"] .action-button.cancel { font-weight: 600; }
-html[data-style="ios26"][data-theme="dark"] .action-button.destructive { background: var(--action-destructive); }
+html[data-style="ios26"][data-theme="dark"] .action-button.destructive:not(:active):not(.is-pressed) { background: var(--action-destructive); }
 /* The anchored menu (a sheet opened from a button, nav/actionsheet.js .action-menu): iOS 26's UIMenu, a rounded glass
    list over a light dim; rows of label-coloured 17pt text, red for destructive, no separators, a grey pressed row.
    The sheet's tokens are re-pointed inside it, so packages.css's look rules (dark ones too) paint the rows. */
@@ -503,6 +505,7 @@ html[data-style="ios26"] .action-menu {
   --action-btn-shadow: none; --action-btn-emboss: none; --action-btn-text: var(--i26-label);
   --action-btn-pressed: var(--i26-menu-pressed); --action-btn-pressed-text: var(--i26-label);
   --action-btn-pressed-emboss: none; --action-destructive-text: var(--i26-red); --action-destructive-emboss: none;
+  --action-destructive-pressed: var(--i26-menu-pressed);
   --action-sheet: var(--i26-menu); --dk-action-sheet: var(--i26-menu);
   border: 1px solid var(--i26-glass-rim); border-radius: 24px; box-shadow: var(--i26-glass-shadow);
   -webkit-backdrop-filter: var(--i26-glass-blur); backdrop-filter: var(--i26-glass-blur);

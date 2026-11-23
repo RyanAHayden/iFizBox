@@ -53,6 +53,8 @@
   --action-btn-pressed-text: #fff; --action-btn-pressed-emboss: 0 -1px 0 rgba(0,0,0,.4);
   --action-destructive: linear-gradient(#f59a9a, #e45c5c 30%, #cf1f1f 69%, #d52f2f);
   --action-destructive-text: #fff; --action-destructive-emboss: 0 -1px 0 rgba(0,0,0,.4);
+  /* UIAlertSheetDefaultDestroyButtonPressed: the red darkened, white text kept */
+  --action-destructive-pressed: linear-gradient(#cf848a, #c5696f 7%, #bc5259 23%, #b1353e 38%, #a51721 54%, #9f0510 69%, #9d010c 77%, #a20e18 85%, #ac2831 92%, #bf5a61);
   --action-cancel-text: #fff;
   --action-cancel: linear-gradient(#7e8288, #65676d 7%, #565a60 23%, #484b52 38%, #3b3f47 54%, #2e333b 69%, #2b3038 77%, #2c3139 85%, #333941 92%, #383f46);
   --action-cancel-pressed: linear-gradient(#5f6268, #3a3d43 50%, #1c2027);
@@ -509,7 +511,7 @@ body:has(.action-scrim) .scroll-indicator { z-index: 31; } /* the iOS 6 indicato
   text-shadow: var(--action-btn-emboss); border: 1px solid var(--action-btn-edge); border-radius: 10px;
   box-shadow: var(--action-btn-shadow); background: var(--action-btn); background-origin: border-box;
 }
-.action-button:active {
+.action-button:active, .action-button.is-pressed {
   color: var(--action-btn-pressed-text); text-shadow: var(--action-btn-pressed-emboss);
   background: var(--action-btn-pressed); background-origin: border-box;
 }
@@ -517,13 +519,16 @@ body:has(.action-scrim) .scroll-indicator { z-index: 31; } /* the iOS 6 indicato
   color: var(--action-destructive-text); text-shadow: var(--action-destructive-emboss);
   background: var(--action-destructive); background-origin: border-box;
 }
+.action-button.destructive:active, .action-button.destructive.is-pressed {
+  background: var(--action-destructive-pressed); background-origin: border-box;
+}
 .action-button.cancel {
   color: var(--action-cancel-text); text-shadow: var(--action-cancel-emboss);
   background: var(--action-cancel); background-origin: border-box;
 }
-.action-button.cancel:active { background: var(--action-cancel-pressed); background-origin: border-box; }
+.action-button.cancel:active, .action-button.cancel.is-pressed { background: var(--action-cancel-pressed); background-origin: border-box; }
 html[data-theme="dark"] .action-sheet { background: var(--dk-action-sheet); }
-html[data-theme="dark"] .action-button:not(.cancel):not(.destructive):not(:active) {
+html[data-theme="dark"] .action-button:not(.cancel):not(.destructive):not(:active):not(.is-pressed) {
   background: var(--dk-action-btn); background-origin: border-box;
 }
 html[data-theme="dark"] .action-button.cancel { background: var(--dk-action-cancel); background-origin: border-box; }

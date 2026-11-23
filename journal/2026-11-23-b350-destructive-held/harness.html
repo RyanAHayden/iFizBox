@@ -1,0 +1,52 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- B350: an action sheet (Reinstall, Remove in red, Cancel) and the iOS 26 anchored menu, with the app's own
+     stylesheets (index.html's order), one era/tone per load: harness.html?style=ios7&theme=dark&pressed=1.
+     pressed=1 puts .is-pressed on the red buttons, Reinstall and Cancel; Upgrade stays resting for comparison.
+     Served from the worktree root (shots.sh). -->
+<script>
+  const q = new URLSearchParams(location.search), r = document.documentElement;
+  const style = q.get("style") || "ios6", theme = q.get("theme") || "light";
+  r.dataset.style = style; r.dataset.theme = theme;
+  r.dataset.palette = style === "ios6" ? (theme === "dark" ? "gunmetal" : "classic") : (theme === "dark" ? "oled" : "white");
+</script>
+<link rel="stylesheet" href="../../web/app/style.css">
+<link rel="stylesheet" href="../../web/app/ios6.css">
+<link rel="stylesheet" href="../../web/app/sources.css">
+<link rel="stylesheet" href="../../web/app/packages.css">
+<link rel="stylesheet" href="../../web/app/account.css">
+<link rel="stylesheet" href="../../web/app/reviews.css">
+<link rel="stylesheet" href="../../web/app/palettes.css">
+<link rel="stylesheet" href="../../web/app/ios7.css">
+<link rel="stylesheet" href="../../web/app/ios13.css">
+<link rel="stylesheet" href="../../web/app/ios26.css">
+<style>
+  body { margin: 0; background: #888; }
+  .action-scrim { position: relative; height: 330px; }
+  .menu-box { position: relative; height: 150px; }
+  .action-sheet.action-menu { left: 16px; top: 8px; }
+</style>
+<div class="action-scrim">
+  <div class="action-dim" style="position:absolute;inset:0"></div>
+  <div class="action-sheet" style="position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;gap:var(--action-gap)">
+    <p class="action-title">Example Package</p>
+    <div class="action-list">
+      <button type="button" class="action-button">Upgrade</button>
+      <button type="button" class="action-button">Reinstall</button>
+      <button type="button" class="action-button destructive">Remove</button>
+    </div>
+    <button type="button" class="action-button cancel">Cancel</button>
+  </div>
+</div>
+<div class="menu-box">
+  <div class="action-sheet action-menu" style="position:absolute;display:flex;flex-direction:column">
+    <div class="action-list">
+      <button type="button" class="action-button">Share</button>
+      <button type="button" class="action-button destructive">Delete</button>
+    </div>
+  </div>
+</div>
+<script>
+  if (q.get("pressed")) for (const b of document.querySelectorAll(".destructive, .cancel, .action-button:nth-child(2)")) b.classList.add("is-pressed");
+</script>
