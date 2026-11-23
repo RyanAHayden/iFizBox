@@ -4,7 +4,8 @@
 
 - `web/app/nav/queuehint.js`: `NO_HINT_ERAS = ["ios26"]`. A tap on Installed while `<html data-style="ios26">` shows
   nothing and doesn't use up the run's one showing (switching to another era in the same run still shows it once).
-  The hold class on the tab is unchanged.
+  The hold class on the tab is unchanged. A hint already up when Theme > Style switches to iOS 26 goes at once (a
+  MutationObserver on `data-style` while it shows; found by the spec review).
 - `web/app/ios13.css`: the iOS 13 era had no callout tokens, so the hint drew iOS 6's glossy callout bar there (the
   user's report). It now draws a flat dark grey bubble, 8pt corners, 36pt tall, white 14pt regular text, no gloss,
   emboss or shadow; #2c2c2e in White, #48484a in OLED Black so it shows on black.

@@ -41,6 +41,7 @@ export function createQueueHint({ bar, store, doc = globalThis.document, win = g
   let last = { queued: false, badge: false }; // the last update, for a tap
   let open = null; // what a hold opens, from the last update
   let toast = null, timer = 0;
+  const noHintEra = () => NO_HINT_ERAS.includes(doc?.documentElement?.getAttribute?.("data-style"));
   const tab = () => bar?.querySelector?.(`a.tab[data-tab="${HINT_TAB}"]`) ?? null;
 
   if (bar) longPress(bar, `a.tab.${HOLDABLE}`, () => {
@@ -56,7 +57,7 @@ export function createQueueHint({ bar, store, doc = globalThis.document, win = g
   });
 
   function tapped() {
-    if (NO_HINT_ERAS.includes(doc?.documentElement?.getAttribute?.("data-style"))) return false;
+    if (noHintEra()) return false;
     const next = nextHint(state, { ...last, held: Boolean(store?.held?.()), tapped: true });
     state = next.state;
     if (next.show) show();
@@ -82,6 +83,12 @@ export function createQueueHint({ bar, store, doc = globalThis.document, win = g
     place(el, arrow, t);
     el.replace = () => place(el, arrow, t); // a rotation while it shows moves the tab
     win.addEventListener?.("resize", el.replace);
+    // Theme > Style switched to iOS 26 while it shows: it goes at once.
+    const MO = win.MutationObserver ?? globalThis.MutationObserver;
+    if (MO && doc.documentElement) {
+      el.eraWatch = new MO(() => { if (noHintEra()) hide(true); });
+      el.eraWatch.observe(doc.documentElement, { attributes: true, attributeFilter: ["data-style"] });
+    }
     el.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: FADE_IN_MS, easing: "ease-out" });
     toast = el;
     timer = setTimeout(() => hide(), showMs);
@@ -106,6 +113,7 @@ export function createQueueHint({ bar, store, doc = globalThis.document, win = g
     if (!el) return;
     toast = null;
     win.removeEventListener?.("resize", el.replace);
+    el.eraWatch?.disconnect();
     if (now || !el.animate) { el.remove(); return; }
     const a = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FADE_OUT_MS, easing: "ease-in", fill: "forwards" });
     a.finished.then(() => el.remove(), () => el.remove());
