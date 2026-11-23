@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width">
+<!-- F376 shot harness: the real renderApp (screens/altstore.js) with a sample app, and its installed record set to
+     ?installed=<version> (none: not installed). Serve the repo root and open journal/<this dir>/harness.html. -->
+<link rel=stylesheet href="../../web/app/style.css"><link rel=stylesheet href="../../web/app/ios6.css">
+<link rel=stylesheet href="../../web/app/packages.css"><link rel=stylesheet href="../../web/app/altstore.css">
+<link rel=stylesheet href="../../web/app/reviews.css">
+<style>html,body{margin:0;height:auto!important;overflow:visible!important} .page{visibility:visible!important;position:static!important;transform:none!important} .page-body{position:static!important;overflow:visible!important;height:auto!important}</style></head>
+<body><div class="page"><div class="page-body grouped" id=b></div></div>
+<script>addEventListener("error", (e) => document.body.append("ERR " + e.message)); addEventListener("unhandledrejection", (e) => document.body.append("REJ " + (e.reason?.stack || e.reason)));</script>
+<script type=module>
+const q = new URLSearchParams(location.search);
+const { apps, recordInstall, removeInstall } = await import("../../web/app/core/installed.js");
+const { renderApp } = await import("../../web/app/screens/altstore.js");
+const app = { bundleIdentifier: "com.example.velvet", name: "Velvet", developerName: "Sample Dev", sourceUrl: "https://example.com/apps.json",
+  sourceName: "Sample Source", localizedDescription: "Smooth, springy animations for every app.",
+  screenshotURLs: [],
+  versions: [{ version: "2.1.3", date: "2026-11-12", size: 4120000, downloadURL: "https://example.com/velvet-2.1.3.ipa", minOSVersion: "15.0",
+    localizedDescription: "Fixes a stutter when closing apps on iOS 16. New “Bouncy” preset." },
+    { version: "2.1.2", date: "2026-10-30", downloadURL: "https://example.com/velvet-2.1.2.ipa" }] };
+const store = await apps();
+const had = (await store.all()).find((r) => r.id === app.bundleIdentifier);
+if (had) await removeInstall(store, app.bundleIdentifier);
+if (q.get("installed")) await recordInstall(store, { id: app.bundleIdentifier, name: app.name, version: q.get("installed"), key: "alt:x" });
+const pkg = { key: "alt:x", row: { id: app.bundleIdentifier, section: "Utilities" }, stanza: { kind: "ipa", name: app.name, ipa: app } };
+renderApp(document.getElementById("b"), { tab: "sources", path: ["alt:x", "package:com.example.velvet"] }, pkg, null);
+setTimeout(() => { document.title = "ready"; }, 800);
+</script></body></html>
