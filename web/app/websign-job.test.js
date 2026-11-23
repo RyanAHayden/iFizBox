@@ -69,7 +69,7 @@ test("signs: unzips, reads the app, passes zsign the certificate, profile, narro
   assert.equal(seen.files.has("/w/app/Payload/Delta.app/ifizbox-identity.plist"), false);
   // B327: the keychain groups and the group fix it signed with, in the app's sign log's words
   assert.deepEqual(r.signLog, ["Keychain: TESTTEAM42.io.github.x.delta (application-identifier TESTTEAM42.io.github.x.delta)",
-    "Group fix: none (no fix dylib was loaded, the app's groups go unmapped)"]);
+    "Group fix: none (the original signature names no app groups or keychain groups)"]);
 });
 
 test("bring: only iFizBox's own IPA gets the certificate and the website's link, before zsign seals it", async () => {

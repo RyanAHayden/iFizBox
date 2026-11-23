@@ -118,8 +118,11 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
     ? groupFixPlan(fileEntitlements(FS, `${appDir}/${plist.CFBundleExecutable || ""}`), prof.entitlements, previous) : null;
   const all = withGroupFix(tweaks, plan, groupFix);
   // B327: the keychain groups and the group fix this sign used (or why none), the app's signer's words
-  const signLog = [keychainLogLine(ents), groupFixLogLine(plan && groupFix?.length ? plan : null,
-    own === IFIZBOX_ID ? `${NAME}'s own IPA` : !groupFix?.length ? "no fix dylib was loaded, the app's groups go unmapped" : undefined)];
+  // (a plan made without the dylib only to tell "nothing to fix" from "left unmapped", as the app's signer does)
+  const wanted = plan ?? (own !== IFIZBOX_ID && !groupFix?.length
+    ? groupFixPlan(fileEntitlements(FS, `${appDir}/${plist.CFBundleExecutable || ""}`), prof.entitlements, previous) : null);
+  const signLog = [keychainLogLine(ents), groupFixLogLine(plan,
+    own === IFIZBOX_ID ? `${NAME}'s own IPA` : wanted ? "no fix dylib was loaded, the app's groups go unmapped" : undefined)];
   // F288: tweaks (core/tweaks.js prepareTweaks, done on the page): their files into the app, and the weak load commands
   // into the main executable, before zsign signs it all (it signs Frameworks/' dylibs and frameworks as any other).
   const injected = all?.files?.length ? putTweaks(FS, appDir, plist, all) : [];

@@ -46,9 +46,14 @@ after making a new SideDrop invite link and at other times.
     `Group fix: none (<why>)` (`GroupFix.logLine`): the original names no groups, iFizBox's own IPA, the executable
     missing, or no fix dylib in this build (which was silent before: an app could be signed without the fix with
     nothing in the log). The lines reach Console Logs through the install's log on every route that forwards
-    `signer.log` (Install, Re-sign, updates, sign-ahead); My IPAs only NSLogs them (follow-up below).
+    `signer.log` (Install, Re-sign, updates, sign-ahead), and now My IPAs' Install too (`signIfNeeded(log:)`); My
+    IPAs' plain Sign has no run log and still only NSLogs them.
   - Website: `runSignJob` returns `signLog` with the same two lines (`core/websign.js keychainLogLine`,
-    `core/groupfix.js groupFixLogLine`).
+    `core/groupfix.js groupFixLogLine`), and `signing/browser.js` writes them to the browser console. Without the
+    dylib it still works out the plan, so "nothing to fix" and "left unmapped" read apart as in the app.
+- Spec review: fixed the website's "no dylib" wording (it said "unmapped" for apps with nothing to map), sent My
+  IPAs' sign log to the page and the website's to the console. Filed B339 (two fix dylibs in one app) and B340 (My
+  IPAs signs without installedAppID).
   - Tests: `native/sign/tests/main.swift` (B211 test: the keychain line of a real sign, the own IPA's "none" line,
     `logLine` with legacy, `keychainLine`), `web/app/core/b327-sign-log.test.js`, `web/app/websign-job.test.js`.
 - docs/signing.md: the log lines, under "Keeping an app's data across re-signs".

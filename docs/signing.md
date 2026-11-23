@@ -667,7 +667,8 @@ groups in their order (new items go to the first), and `Group fix: <groups> -> t
 stripped; <group> copied in once if the app ran before` (every part of `ifizbox-groupfix.plist`), or `Group fix:
 none (<why>)`: the original names no groups, iFizBox's own IPA, or no fix dylib in the build (the app's groups then
 go unmapped). The app's signer writes them to the log (`Profile.keychainLine`, `GroupFix.logLine`); the website's
-job returns them as `signLog` (`core/websign.js keychainLogLine`, `core/groupfix.js groupFixLogLine`).
+job returns them as `signLog` (`core/websign.js keychainLogLine`, `core/groupfix.js groupFixLogLine`), which the
+page writes to the browser console.
 
 What iOS doesn't let a re-sign keep:
 
