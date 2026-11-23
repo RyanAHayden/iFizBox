@@ -1,10 +1,12 @@
-// F344: the app side of the shared tweak index (screens/tweaks.js): verdicts read from GET /api/tweaks join the
+// F344: the app side of the shared tweak index (screens/tweaks.js): the verdicts of the index file join the
 // device's checks, Add Tweaks for an app lists only that app's tweaks then every-app ones with "Works in", paid
 // tweaks only from a source that names a seller, and the phone checks the unchecked ones (the app's name first).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadTweakIndex, cachedTweakInfo, rowInfo, appTweakRows, checkForApp, madeForRows, sellerKeys,
-  tweakInfo, checkTweakRows } from "./tweaks.js";
+  tweakInfo, checkTweakRows, onTweakVerdicts } from "./tweaks.js";
+import { packIndexFile } from "../core/tweakindexfile.js";
+import { indexSource } from "../core/tweakindex.js";
 import { memoryIpaStore } from "../core/myipas.js";
 import { DEBS } from "../core/fixtures/tweaks/index-debs.test-helper.js";
 import { fakeDocument, tick, withDocument } from "../fakes.test-helper.js";
@@ -29,25 +31,50 @@ const rows = [
   { id: "com.i.new", name: "New", version: "1", key: "repo-a" },
 ];
 
-test("loadTweakIndex reads each source's verdicts once; cachedTweakInfo and tweakInfo use them", async () => {
-  const asked = [];
-  const fetch = async (u) => { asked.push(u); return { ok: true, json: async () => ({ enabled: true, tweaks: entries }) }; };
-  assert.equal(await loadTweakIndex([SRC], { fetch, base: "https://ifizbox.example/api/tweaks" }), 4);
-  assert.equal(asked.length, 1);
-  assert.match(asked[0], /^https:\/\/ifizbox\.example\/api\/tweaks\?source=https%3A%2F%2Findex-test\.example%2F&dist=\.%2F$/);
-  await loadTweakIndex([SRC], { fetch, base: "https://ifizbox.example/api/tweaks" });
-  assert.equal(asked.length, 1, "kept for the session");
+const packed = (list, { src = SRC, at = 5 } = {}) => {
+  const { key } = indexSource(src);
+  return [{ key, refreshed: at, pending: 0 }, list.map((e) => ({ source: key, checked: at, entry: JSON.stringify(e) }))];
+};
+const fileOf = (...ps) => packIndexFile(ps.map((p) => p[0]), ps.flatMap((p) => p[1]));
+
+test("loadTweakIndex takes the file's verdicts of these sources; cachedTweakInfo and tweakInfo use them", async () => {
+  const file = fileOf(packed(entries));
+  assert.equal(await loadTweakIndex([SRC], { file: { read: async () => file } }), 3, "the free tweaks");
+  assert.equal(await loadTweakIndex([SRC], { file: { read: async () => file } }), 3);
   const s = storage();
   assert.deepEqual(cachedTweakInfo({ package: "com.i.yt", version: "1.0" }, { storage: s }).bundles, ["com.google.ios.youtube"]);
   assert.equal(cachedTweakInfo({ package: "com.i.yt", version: "0.9" }, { storage: s }), null, "another version isn't known");
+  assert.equal(cachedTweakInfo({ package: "com.i.ig", version: "3.0" }, { storage: s }), null, "a paid tweak has no verdict");
   // the index refused it: no download
   const info = await tweakInfo({ package: "com.i.sb", version: "2.0", debUrl: "https://x/sb.deb" }, { storage: s,
     fetchDeb: async () => { throw new Error("downloaded"); } });
   assert.equal(info.ok, false);
-  // a source the index doesn't know (or no index): nothing, asked again next time
-  const off = async () => ({ ok: true, json: async () => ({ enabled: false, tweaks: [] }) });
-  assert.equal(await loadTweakIndex([{ key: "b", uri: "https://other-index.example/", dist: "./" }], { fetch: off, base: "https://x/api/tweaks" }), 0);
-  assert.equal(await loadTweakIndex([{ key: "c", uri: "https://down-index.example/", dist: "./" }], { fetch: async () => { throw new Error("offline"); }, base: "https://x/api/tweaks" }), 0);
+  // a source the file doesn't have, or no file at all: nothing
+  assert.equal(await loadTweakIndex([{ key: "b", uri: "https://other-index.example/", dist: "./" }], { file: { read: async () => file } }), 0);
+  assert.equal(await loadTweakIndex([SRC], { file: { read: async () => null } }), 0);
+});
+
+test("F398: a newer file's verdicts reach what's loaded; the same package in two sources: the one that works wins", async () => {
+  const s = storage();
+  const A = { uri: "https://two-a.example/", dist: "./" }, B = { uri: "https://two-b.example/", dist: "./" };
+  const no = { package: "com.two", version: "1", ok: false, why: "It's for iOS itself", bundles: [], systemOnly: true };
+  const yes = { package: "com.two", version: "1", ok: true, bundles: ["com.b.app"] };
+  const get = () => cachedTweakInfo({ package: "com.two", version: "1" }, { storage: s });
+  const first = fileOf(packed([no], { src: A }), packed([no], { src: B }));
+  let told = null;
+  const told2 = [];
+  const off = onTweakVerdicts((m) => told2.push(m));
+  const file = { read: async () => first, onChange: (f) => { told = f; } };
+  await loadTweakIndex([A, B], { file });
+  assert.equal(get().ok, false);
+  told(fileOf(packed([no], { src: A, at: 9 }), packed([yes], { src: B, at: 9 })));
+  assert.deepEqual(get().bundles, ["com.b.app"]);
+  assert.deepEqual(told2.map((m) => m["com.two@1"]), [true, false]);
+  told(fileOf(packed([{ ...yes, package: "com.else" }], { src: A, at: 12 })));
+  assert.equal(get(), null);
+  assert.equal(told2.at(-1)["com.two@1"], false, "a verdict the newer file dropped is taken back");
+  off();
+  await loadTweakIndex([SRC], { file: { read: async () => fileOf(packed(entries)) } });
 });
 
 test("Add Tweaks for an app: its tweaks, then every-app ones; no SpringBoard, no paid guess without a seller", async () => {

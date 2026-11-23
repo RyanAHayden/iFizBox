@@ -771,7 +771,8 @@ export function httpsInput(input) {
 //   tweakSourceVerdict(answer, appIds)  -> true (a tweak works in one of these apps, or in any app), false (the Tweak
 //                                          Index has checked every tweak of the source and none does), null (not
 //                                          known yet: no index, the source still being read, a failed read)
-//   askTweakIndex(source, { get, base }) -> the index's answer for a source (GET /api/tweaks, every tweak), or null;
+//   askTweakIndex(source, { file })     -> the index's answer for a source, from the index file this device has
+//                                          (core/tweakindexfile.js createIndexFile; F398: no request names it), or null;
 //                                          never asked for a GitHub Tweak Source (one tweak, no Packages to index)
 //   shownTweakSources(list, hidden)     -> the Tweak Sources the list shows: those not in `hidden` (keys)
 // A source is hidden only on a false verdict, so a missing or unfinished index hides nothing.
@@ -791,21 +792,10 @@ export function tweakSourceVerdict(answer, appIds = []) {
   return answer.tweaks.some((e) => usableTweak(e, ids));
 }
 
-export async function askTweakIndex(source, { get = (u, o) => globalThis.fetch(u, o), base, timeout = 6000 } = {}) {
-  if (!source || isGithubSource(source)) return null;
-  const { indexQuery } = await import("./tweakindex.js"); // lazily: not in app.js's startup closure (module-graph.test.js)
-  const q = indexQuery(source);
-  if (!q || !base) return null;
-  const ac = typeof AbortController === "function" ? new AbortController() : null;
-  const timer = setTimeout(() => ac?.abort(), timeout);
-  try {
-    const r = await get(`${base}?${q}`, ac ? { signal: ac.signal } : {});
-    return r?.ok ? await r.json() : null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+export async function askTweakIndex(source, { file } = {}) {
+  if (!source || !file || isGithubSource(source)) return null;
+  const { answerFromFile } = await import("./tweakindexfile.js"); // lazily: not in app.js's startup closure (module-graph.test.js)
+  return answerFromFile(await file.read().catch(() => null), source);
 }
 
 export const shownTweakSources = (list, hidden) => (hidden?.size ? list.filter((s) => !hidden.has(s.key)) : list);

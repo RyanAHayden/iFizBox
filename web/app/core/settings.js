@@ -42,7 +42,7 @@ export const MODES = ["site", "jailbreak", "sideload"];
 // "upgrade-notifications": Upgrade Notifications, N5's daemon's "n Upgrades" in the jailbreak app (F65).
 // "auto-install", "rollback": N7's Automatic Installs rows, which F70 hands to the daemon (daemonPrefs below).
 export const FEATURES = new Set(["appearance", "sources", "holds", "compat", "device", "resign", "upgrade-notifications",
-  "auto-install", "rollback", "keep-id", "expiry-warning", "install-route", "self-alerts", "app-icon"]); // "keep-id": Keep Bundle IDs (F237); "expiry-warning": F244; "self-alerts": F285; "app-icon": F323
+  "auto-install", "rollback", "keep-id", "expiry-warning", "install-route", "self-alerts", "app-icon", "tweak-index"]); // "tweak-index": F398; "keep-id": Keep Bundle IDs (F237); "expiry-warning": F244; "self-alerts": F285; "app-icon": F323
 
 const BOTH = ["jailbreak", "sideload"];
 const ALL = ["site", ...BOTH];
@@ -218,6 +218,14 @@ export const SETTINGS = [
     footer: `Looks for new packages in every source each time ${NAME} opens.`,
   },
   {
+    // F398: fetch the newest Tweak Index file (core/tweakindexfile.js) in the background. Off: no such request at all
+    // (tweakIndexRefreshOn below). The sideload app only: the jailbreak app has no Tweak Index, and a website reads its
+    // own server's.
+    key: "tweakIndexRefresh", section: "sources", kind: "toggle", feature: "tweak-index", modes: ["sideload"], default: true,
+    label: "Update Tweak Index", options: onOff,
+    footer: "Gets the newest list of which apps tweaks work in. Off, the list already on this iPhone is used.",
+  },
+  {
     // Back from the background after this long counts as a fresh open: Home's root, and Refresh on Launch again
     // (app.js). Was a fixed 2 minutes in the app (user 2026-11-18: a setting for it).
     key: "returnHome", section: "sources", kind: "list", feature: "sources", modes: ALL, default: 2,
@@ -323,6 +331,10 @@ const PREFIX = "ifizbox.";
 // F285: selfUpdateAlerts as get() reads it, for app-updates.js, which has no settings store of its own.
 export function selfUpdateAlertsOn(storage = globalThis.localStorage) {
   try { return storage?.getItem?.(PREFIX + "selfUpdateAlerts") !== "false"; } catch { return true; }
+}
+// F398: tweakIndexRefresh as get() reads it, for screens/tweaks.js.
+export function tweakIndexRefreshOn(storage = globalThis.localStorage) {
+  try { return storage?.getItem?.(PREFIX + "tweakIndexRefresh") !== "false"; } catch { return true; }
 }
 const HOLDS_KEY = PREFIX + "holds";
 const HIDDEN_SECTIONS_KEY = PREFIX + "hiddenSections";

@@ -149,7 +149,7 @@ export const ROW_ICONS = {
 // core/settings.js's setting keys -> their row's icon. A key not here is a row with no icon (Appearance's choices).
 export const SETTING_ICONS = {
   device: "device", iosVersion: "iosVersion", worksOnMyPhone: "worksOnMyPhone", compatMarks: "compatMarks",
-  refreshOnLaunch: "refresh", returnHome: "returnHome", holds: "holds", upgradeNotifications: "notifications",
+  refreshOnLaunch: "refresh", tweakIndexRefresh: "pkgTweaks", returnHome: "returnHome", holds: "holds", upgradeNotifications: "notifications",
   autoInstall: "autoInstall", autoInstallIdle: "idle", respring: "respring", keepVersions: "keepVersions",
   showExpiry: "showExpiry", resignReminder: "resignReminder", keepBundleId: "keepBundleId",
   showExpiryWarning: "showExpiryWarning", expiryWarning: "expiryWarning", // F244

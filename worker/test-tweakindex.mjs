@@ -3,9 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import assert from "node:assert/strict";
 import { gzipSync } from "node:zlib";
-import { tweakIndex, indexPass, scheduled, isTweakIndexPath, forBundle, DEB_MAX } from "./src/tweakindex.js";
+import { tweakIndex, tweakIndexFile, indexPass, scheduled, isTweakIndexPath, forBundle, DEB_MAX } from "./src/tweakindex.js";
 import { d1 } from "./src/d1-sqlite.js";
 import { indexSource, indexQuery } from "../web/app/core/tweakindex.js";
+import { parseIndexFile, answerFromFile } from "../web/app/core/tweakindexfile.js";
 import w from "./src/index.js";
 import { DEBS, PACKAGES } from "../web/app/core/fixtures/tweaks/index-debs.test-helper.js";
 
@@ -104,5 +105,41 @@ assert.deepEqual(await scheduled({}, {}, null), { enabled: false });
 r = await w.fetch(new Request(`https://ifizbox.example/api/tweaks?${indexQuery(src)}`), { TWEAKS: env.TWEAKS }, ctx());
 assert.equal(r.status, 200);
 assert.equal((await r.json()).enabled, true);
+
+// F398: GET /api/tweaks.json: the whole index as one file, made from D1 and cached; the deployed copy otherwise
+{
+  const get = (e, cache = null, c = null) => tweakIndexFile(new Request("https://ifizbox.example/api/tweaks.json?x=1"), e, c, { cache });
+  const fileEnv = { TWEAKS: d1() };
+  packages = PACKAGES;
+  const other = indexSource({ uri: "https://repo.example/", dist: "./" }, "iphoneos-arm"); // the same packages in a second source
+  await indexPass(fileEnv, src, { budget: 10, fetcher });
+  await indexPass(fileEnv, other, { budget: 0, fetcher });
+  const store = new Map();
+  let puts = 0;
+  const cache = { match: async (q) => store.get(q.url)?.clone(), put: async (q, v) => { puts++; store.set(q.url, v); } };
+  let f = await get(fileEnv, cache);
+  assert.equal(f.status, 200);
+  assert.equal(f.headers.get("Access-Control-Allow-Origin"), "*");
+  assert.match(f.headers.get("Cache-Control"), /max-age=1800/);
+  const text = await f.text();
+  assert.ok(!text.includes("repo.example"), "no source's address is in it");
+  const file = parseIndexFile(text);
+  const answer = answerFromFile(file, { uri: ROOT, dist: "./" });
+  assert.equal(answer.pending, 0);
+  assert.deepEqual(answer.tweaks.filter((t) => t.package).map((t) => `${t.package}@${t.version}`).sort(), ["com.x.anyfont@1.1", "com.x.sbcolor@2.0", "com.x.ytplus@1.0"], "free tweaks only");
+  assert.deepEqual(answer.tweaks.filter((t) => !t.package).map((t) => [t.unverified, t.bundles]), [[true, ["com.burbn.instagram"]]], "the paid ones' guessed apps");
+  assert.equal(answerFromFile(file, { uri: ROOT, dist: "./", arch: "iphoneos-arm" }).pending, 1, "the second source, still being read");
+  await (await get(fileEnv, cache)).text();
+  assert.equal(puts, 1, "from the cache the second time");
+  // no D1, an empty one or a failing one: the deployed copy; none: 404
+  const copy = { fetch: async (q) => (new URL(q.url).pathname === "/tweak-index.json" ? new Response(text) : new Response("<html>")) };
+  for (const e of [{ ASSETS: copy }, { ASSETS: copy, TWEAKS: d1() }, { ASSETS: copy, TWEAKS: { batch: async () => { throw new Error("down"); }, prepare: () => ({}) } }]) {
+    f = await get(e, { match: async () => null, put: async () => { throw new Error("cached"); } });
+    assert.equal(await f.text(), text);
+  }
+  assert.equal((await get({ ASSETS: { fetch: async () => new Response("<!doctype html>") } })).status, 404);
+  // through the Worker's own handler
+  assert.equal((await w.fetch(new Request("https://ifizbox.example/api/tweaks.json"), { ASSETS: copy }, ctx())).status, 200);
+}
 
 console.log("worker tweak index: ok");

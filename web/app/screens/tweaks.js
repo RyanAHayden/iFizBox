@@ -25,7 +25,9 @@ import { detectMode } from "../core/settings.js"; // F302
 import { debOf, tweakTitle, withTweaksText, tweakSteps, madeFor, tweakUpdates, ipaEncrypted, ENCRYPTED_ALERT, HOW_TO_GET_ONE,
   HOW_TO_TEXT, tweakParams } from "../core/tweaks.js"; // F302a
 import { BUNDLE_ID } from "../brand.js"; // F302a
-import { INDEX_PATH, INDEX_URL, indexSource, indexQuery, entryInfo, paidEntry, paidHint, liteTweaks, worksInLine, dropsFromCatalog } from "../core/tweakindex.js"; // F344
+import { indexSource, entryInfo, paidEntry, paidHint, liteTweaks, worksInLine, dropsFromCatalog } from "../core/tweakindex.js"; // F344
+import { createIndexFile, answerFromFile, FILE_PATH, FILE_URL, FILE_NAME } from "../core/tweakindexfile.js"; // F398
+import { tweakIndexRefreshOn } from "../core/settings.js"; // F398
 import { appNameOf } from "../core/tweaks.js"; // F344
 import { loadStyle } from "../nav/motion.js";
 import { filterRows } from "../core/changes.js"; // F352: Add Tweaks' search
@@ -202,7 +204,7 @@ export function tweaksGroup({ bundleId = "", store = tweakStore, alert = showAle
 //   cachedTweakInfo(stanza)                 the cached check, or null when the .deb wasn't read yet
 //   catalogVerdicts()  onTweakVerdicts(f)   B377: { "id@version": true } for every checked tweak that can't go into an
 //                                           app (core/tweakindex.js dropsFromCatalog), and f(map) for each new batch
-//                                           (the index's answer, a check on this device): catalog.js setTweakVerdicts
+//                                           (the index's verdicts, a check on this device): catalog.js setTweakVerdicts
 //   await tweakDeb(stanza, { fetchDeb })    the .deb's bytes (the session's copy, else fetched)
 //   await addDebTo(bundleId, stanza, data)  puts the .deb in that app's kept tweaks (the next sign injects it)
 //   await signableApps()                    [{ bundleId, name, from }] My IPAs and the apps signed here
@@ -220,7 +222,7 @@ const debKey = (st) => `${st?.package ?? ""}@${st?.version ?? ""}`;
 export const isDylibTweak = (st) => String(st?.["x-github-asset"] ?? "").trim().toLowerCase() === "dylib";
 const debName = (st) => `${st.package}_${st.version ?? "0"}.${isDylibTweak(st) ? "dylib" : "deb"}`;
 const debs = new Map(); // debKey -> Uint8Array, this session only (a few at most)
-const indexed = new Map(); // F344: debKey -> the shared index's verdict (entryInfo), this session only
+const indexed = new Map(); // F344: debKey -> the Tweak Index's verdict (entryInfo) among the sources loaded so far
 
 function infoStore(storage = globalThis.localStorage) {
   let map = {};
@@ -260,7 +262,8 @@ export function catalogVerdicts({ storage } = {}) {
 }
 function tellVerdicts(keys, storage) {
   if (!verdictListeners.size) return;
-  const map = verdictsFor(keys, storage);
+  // F398: a verdict a newer index file no longer has is taken back (false)
+  const map = { ...Object.fromEntries([...keys].map((k) => [k, false])), ...verdictsFor(keys, storage) };
   if (!Object.keys(map).length) return;
   for (const f of [...verdictListeners]) { try { f(map); } catch { /* one listener's error stops no other */ } }
 }
@@ -291,7 +294,8 @@ export async function checkTweakRows(rows, { pkg = async (r) => (await (await im
     }
     if (refused.length && !stop()) onRefused([...refused]);
   }
-  const todo = (rows ?? []).filter((r) => r?.id && !cachedTweakInfo({ package: r.id, version: r.version }, { storage })).slice(0, max);
+  // F398: a paid tweak isn't asked of its seller here (the index's file has no verdict for one)
+  const todo = (rows ?? []).filter((r) => r?.id && !r.paid && !cachedTweakInfo({ package: r.id, version: r.version }, { storage })).slice(0, max);
   let i = 0;
   const worker = async () => {
     while (i < todo.length && !stop()) {
@@ -899,11 +903,16 @@ export async function madeForRows(bundleId, { rows = sourceTweakRows, storage, i
   return liteTweaks(list, bundleId, infoOf).made;
 }
 
-// ---- F344: the shared tweak index (worker/src/tweakindex.js, GET /api/tweaks) --------------------------------------
+// ---- F344: the Tweak Index ------------------------------------------------------------------------------------------
 //
-//   await loadTweakIndex(sources, { fetch })    each Tweak Source's verdicts from the index, kept for this session
-//                                               beside the device's own checks (cachedTweakInfo reads both); a source
-//                                               the index hasn't read yet gives nothing (the phone checks it). -> n
+// F398: read from one file (core/tweakindexfile.js): the copy the app came with (web/app/tweak-index.json) or a newer
+// one fetched whole, the same for everyone, so no request says which sources this device has; offline and with the
+// server gone it answers the same. Settings > General > Update Tweak Index turns the fetching off.
+//
+//   indexFile()                                 the file this page uses (createIndexFile), opened on first use
+//   await loadTweakIndex(sources, { file })     each Tweak Source's verdicts, read beside the device's own checks
+//                                               (cachedTweakInfo reads both) and read again when a newer file comes; a
+//                                               source the file doesn't have gives nothing. -> how many verdicts
 //   await loadRowsIndex(rows)                   the same for the sources these catalog rows come from
 //   await sellerKeys(rows)                      the keys of the sources (among these rows') that name a seller
 //                                               (payment_endpoint): their paid tweaks may be listed
@@ -916,50 +925,70 @@ export async function madeForRows(bundleId, { rows = sourceTweakRows, storage, i
 //                                               background, CHECK_MAX at most, the ones whose name or description
 //                                               names the app first; -> { done, stop() }
 //   worksSubtitle(li, info, known)              a list row's subtitle led by "Works in: <app>"
-const INDEX_FRESH_MS = 10 * 60 * 1000, INDEX_TIMEOUT_MS = 6000;
 export const CHECK_MAX = 24;
-const indexLoads = new Map(); // index source key -> { at, p }
+const loadedSources = new Map(); // tweakindex.js key -> { src, file, infos: Map(debKey -> info) }
 
-export function indexBase() {
+// The app asks brand.js DOMAIN; a website its own server (ifizbox.com or a self-hosted one).
+export function indexFileUrl() {
   const loc = globalThis.location;
-  // the site asks its own server (ifizbox.com or a self-hosted one); the app, ifizbox.com
-  if (!hasNativeCall() && loc && /^https?:$/.test(loc.protocol ?? "")) return new URL(INDEX_PATH, loc.href).href;
-  return INDEX_URL;
+  if (!hasNativeCall() && loc && /^https?:$/.test(loc.protocol ?? "")) return new URL(FILE_PATH, loc.href).href;
+  return FILE_URL;
 }
 
-export async function loadTweakIndex(sources, { fetch: get = (u, o) => globalThis.fetch(u, o), base = null, timeout = INDEX_TIMEOUT_MS } = {}) {
+let indexFileOne = null;
+export function indexFile() {
+  if (indexFileOne) return indexFileOne;
+  let storeOne = null;
+  indexFileOne = createIndexFile({
+    bundled: async () => (await import("../core/sources.js")).readBundled(FILE_NAME),
+    store: () => (storeOne ??= openIpaStore({ name: "ifizbox-tweakindex" }).catch(() => memoryIpaStore())),
+    url: indexFileUrl,
+    // never under node (tests make their own); the jailbreak app has no use for it
+    enabled: () => typeof globalThis.process?.versions?.node !== "string" && detectMode() !== "jailbreak" && tweakIndexRefreshOn(),
+  });
+  return indexFileOne;
+}
+
+// Two of the user's sources with the same package and version may have different files for it: the one that works
+// wins, so nothing that works somewhere is hidden (opening it reads the .deb itself).
+function mergeIndexed() {
+  indexed.clear();
+  for (const { infos } of loadedSources.values()) {
+    for (const [k, info] of infos) {
+      const had = indexed.get(k);
+      if (!had || (dropsFromCatalog(had) && !dropsFromCatalog(info))) indexed.set(k, info);
+    }
+  }
+}
+
+const watchedFiles = new WeakSet();
+export async function loadTweakIndex(sources, { file = indexFile() } = {}) {
+  if (!watchedFiles.has(file)) {
+    watchedFiles.add(file);
+    file.onChange?.((f) => { applyIndex([...loadedSources.values()].map((l) => l.src), f); });
+  }
+  const f = await file.read().catch(() => null);
+  return f ? applyIndex((sources ?? []).map((s) => indexSource(s, s?.arch)).filter(Boolean), f) : 0;
+}
+
+function applyIndex(list, f) {
   let n = 0;
-  await Promise.all((sources ?? []).map(async (s) => {
-    const src = indexSource(s, s?.arch);
-    const q = src && indexQuery(src);
-    if (!q) return;
-    const had = indexLoads.get(src.key);
-    if (had && Date.now() - had.at < INDEX_FRESH_MS) { n += await had.p; return; }
-    const p = (async () => {
-      const ac = typeof AbortController === "function" ? new AbortController() : null;
-      const timer = setTimeout(() => ac?.abort(), timeout);
-      try {
-        const r = await get(`${base ?? indexBase()}?${q}`, ac ? { signal: ac.signal } : {});
-        if (!r?.ok) return 0;
-        const j = await r.json();
-        if (!j?.enabled || !Array.isArray(j.tweaks)) return 0;
-        let k = 0;
-        const got = [];
-        for (const e of j.tweaks) {
-          if (!e?.package) continue;
-          const key = `${e.package}@${e.version ?? ""}`;
-          indexed.set(key, { v: INFO_V, ...entryInfo(e) });
-          got.push(key);
-          k++;
-        }
-        tellVerdicts(got); // B377
-        return k;
-      } catch { return 0; } finally { clearTimeout(timer); }
-    })();
-    indexLoads.set(src.key, { at: Date.now(), p });
-    p.then((k) => { if (!k) indexLoads.delete(src.key); }); // nothing yet: asked again next time
-    n += await p;
-  }));
+  const got = new Set();
+  for (const src of list) {
+    const had = loadedSources.get(src.key);
+    if (had?.file === f) { n += had.infos.size; continue; }
+    const infos = new Map();
+    for (const e of answerFromFile(f, src)?.tweaks ?? []) {
+      if (e.package) infos.set(debKey(e), { v: INFO_V, ...entryInfo(e) });
+    }
+    for (const k of [...(had?.infos.keys() ?? []), ...infos.keys()]) got.add(k);
+    loadedSources.set(src.key, { src, file: f, infos });
+    n += infos.size;
+  }
+  if (got.size) {
+    mergeIndexed();
+    tellVerdicts([...got]); // B377
+  }
   return n;
 }
 

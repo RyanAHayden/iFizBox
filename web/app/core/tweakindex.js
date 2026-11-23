@@ -1,10 +1,10 @@
 // F344: the tweak index: which app every tweak of a Tweak Source is for, known before anyone opens it. The Worker
 // (worker/src/tweakindex.js) downloads each free tweak .deb of a source once per package and version, runs
-// core/tweaks.js inspectTweakDeb on it and serves the verdicts at GET /api/tweaks; the sideload app and the site read
-// them (screens/tweaks.js loadTweakIndex) into the same per-device cache an on-device check fills. Pure JS, shared by
-// both sides.
+// core/tweaks.js inspectTweakDeb on it and serves every source's verdicts as one file (core/tweakindexfile.js, F398),
+// which the sideload app and the site carry and read (screens/tweaks.js loadTweakIndex) beside the device's own checks.
+// GET /api/tweaks (one source's verdicts) stays for older builds. Pure JS, shared by both sides.
 //
-//   INDEX_PATH, INDEX_URL                       "/api/tweaks", and its absolute URL on brand.js DOMAIN
+//   INDEX_PATH                                  "/api/tweaks"
 //   indexSource({ uri, dist, components }, arch) -> { uri, dist, components, arch, key } | null   the canonical
 //                                                source the index keys on (key: "uri|dist|comp,comp|arch")
 //   indexQuery(source, { bundle })              the query string GET /api/tweaks takes for that source
@@ -29,10 +29,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { parseControl, parseRelations, compareVersions } from "./apt.js";
 import { injectableFromFields, TWEAK_ARCHES } from "./tweakfields.js";
-import { DOMAIN } from "../brand.js";
 
 export const INDEX_PATH = "/api/tweaks";
-export const INDEX_URL = `https://${DOMAIN}${INDEX_PATH}`;
 export const INDEX_ARCH = "iphoneos-arm64";
 
 const COMMERCIAL = "cydia::commercial";
