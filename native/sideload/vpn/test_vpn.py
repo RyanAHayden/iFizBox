@@ -205,6 +205,7 @@ class App(unittest.TestCase):
         step = int(re.search(r"waitStep: TimeInterval = (\d+)", src).group(1))
         self.assertLess(step, 30)
         self.assertEqual(loop["WFRepeatCount"] * step, 900)
+        self.assertIn("static let waitTurns = %d" % loop["WFRepeatCount"], src)
         for i, p in zip(ids, params):
             if i.startswith(me):
                 self.assertEqual(p["AppIntentDescriptor"]["BundleIdentifier"] + "." + p["AppIntentDescriptor"]["AppIntentIdentifier"], i)

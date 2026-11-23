@@ -16,7 +16,7 @@ test("Update shows only for an added Install Switch that can't do one trip, on a
   assert.equal(old[0].rows[0].detail, "Update");
   old[0].rows[0].onClick();
   assert.deepEqual(added, ["switch"]);
-  assert.match(old[0].footer, /Replace/);
+  assert.match(old[0].footer, /delete Install Switch in Shortcuts, then tap Update/);
   assert.match(old[1].footer, /once each way/, "its test still runs the old way");
   const now = shortcutGroups(vpn(true, true, true));
   assert.equal(now[0].rows[0].detail, "Added");

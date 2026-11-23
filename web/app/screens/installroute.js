@@ -267,7 +267,7 @@ export function shortcutGroups(st, { add = () => {}, test = () => {}, testing = 
   const f = failed[k];
   const groups = [{ rows: [row], ...(!sc[k] && f && checking !== k
     ? { footer: f.open ? shortcutDidntOpen(k, f.open) : shortcutDidntRun(k, f), warn: true }
-    : switchOld(st) ? { footer: "Update it to open Shortcuts once per install, not twice. Tap Shortcuts, then Replace, and come back." }
+    : switchOld(st) ? { footer: "To open Shortcuts once per install, delete Install Switch in Shortcuts, then tap Update." }
     : { footer: `${sc[k] ? "" : "Tap Shortcuts, then Add Shortcut, and come back. "}It opens Shortcuts only when needed: on cellular, to turn data off and on, or to bring back your VPN.` }) }];
   if (sc[k]) {
     groups.push({ rows: [{ label: "Test Install Switch", icon: rowIcon("testConnection"), onClick: test, ...(testing ? { detail: "Testing…", spin: true } : {}) }],

@@ -42,7 +42,7 @@ export const shortcutsAdded = (st) => switchAdded(st) || Boolean(st?.vpn?.shortc
 // own copy; this link is the fallback it opens in Safari. Shortcuts names an imported Shortcut after its file.
 export const shortcutFileURL = (k) => `https://${DOMAIN}/shortcuts/${encodeURIComponent(SHORTCUT_NAMES[k])}.shortcut`;
 // B359: a group footer for a Shortcut whose check run (vpn.checkShortcut) didn't pass: it isn't marked added.
-export const shortcutDidntRun = (k, err) => `"${SHORTCUT_NAMES[k]}" didn't run: ${err || "Shortcuts didn't say why"}. Tap Add to try again.`;
+export const shortcutDidntRun = (k, err) => `"${SHORTCUT_NAMES[k]}" didn't run: ${err || "Shortcuts didn't say why"}. ${/could not find/i.test(err ?? "") ? "If Shortcuts has two of it, delete both, then tap Add." : "Tap Add to try again."}`; // F394: Replace can leave two (iOS 27), and neither runs by name
 // ... and for an Add whose share sheet never opened (nothing was imported, so nothing ran either).
 export const shortcutDidntOpen = (k, err) => `"${SHORTCUT_NAMES[k]}" couldn't be shared to Shortcuts: ${err || "no reason given"}. Tap Add to try again.`;
 // This iPhone is set up: paired, and with the built-in VPN tested once (vpn.test). USE waits for it.

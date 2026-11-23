@@ -43,6 +43,7 @@ struct WaitForInstallIntent: AppIntent {
         while LocalVPN.tripWaiting(), Date().timeIntervalSince(t0) < LocalVPN.waitStep {
             try? await Task.sleep(nanoseconds: 200_000_000)
         }
+        LocalVPN.tripWaited()
         return .result()
     }
 }
