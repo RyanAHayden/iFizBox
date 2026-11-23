@@ -1146,9 +1146,9 @@ export function pushAddTweaks(bundleId, loc = globalThis.location) {
   loc.hash = `${h}/${encodeURIComponent(addTweaksToken(bundleId))}`;
 }
 
-// An app's Details group, right under the header: Add Tweaks with a count; it opens the Add Tweaks page (F352), or
-// `open` (My IPAs: the pushed sheet).
-export function addTweaksGroup({ bundleId, name = "", open = null, rows = sourceTweakRows, store = tweakStore, storage, push = pushAddTweaks } = {}) {
+// An app's Details group, right under the header: Add Tweaks with a count; it opens the Add Tweaks page (F352), under
+// an app's page and an IPA's in My IPAs alike (B361).
+export function addTweaksGroup({ bundleId, name = "", rows = sourceTweakRows, store = tweakStore, storage, push = pushAddTweaks } = {}) {
   style();
   if (bundleId && name) appNames.set(bundleId, name);
   const g = el("div", "group tw-app");
@@ -1174,11 +1174,7 @@ export function addTweaksGroup({ bundleId, name = "", open = null, rows = source
     foot.hidden = !foot.textContent;
     return { kept, made };
   }
-  b.addEventListener("click", async () => {
-    if (!open) { push(bundleId); return; }
-    await open({ bundleId, name, rows, store, storage });
-    refresh();
-  });
+  b.addEventListener("click", () => push(bundleId));
   // back from the Add Tweaks page: the count again (the page above may have added or removed some)
   globalThis.addEventListener?.("hashchange", function again() {
     if (!g.isConnected) { globalThis.removeEventListener?.("hashchange", again); return; }

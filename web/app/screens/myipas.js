@@ -57,6 +57,8 @@ import { libraryCall, installFromLibrary } from "../signing/library.js";
 import { signAndInstall } from "../signing/install.js";
 import { openSigning } from "../signing/device.js";
 import { handOffIpa } from "../signing/toobig.js";
+import { storeHeader, headerLine } from "./storepage.js"; // B361: the app page's header
+import { ipaRows, detailRows, tileCells, DETAILS_TITLE } from "./details.js"; // B361: and its Details rows
 import { siteCertificateAlert } from "./altstore.js";
 import { NAME } from "../brand.js";
 import { signingPage } from "../core/signingpage.js"; // C15: Installation & Signing in the sideload build
@@ -104,6 +106,8 @@ export function pageOf(route) {
   const file = fileOfToken(route.path[1]);
   if (!file) return { page: "missing" };
   if (route.path.length === 2) return { page: "ipa", file };
+  // B361: the IPA's Add Tweaks page (and the tweak pages it opens) are browse.js's, as under an app's page
+  if (browse.parseToken(route.path[2]).kind === "addtweaks") return { page: "browse" };
   if (route.path.length === 3 && route.path[2] === "options" && localSigning()) return { page: "options", file };
   return { page: "missing" };
 }
@@ -127,7 +131,7 @@ export function nav(route) {
     case "apps": return { title: "All Apps", style: "plain" };
     case "category": return { title: p.value || "Apps", style: "plain" };
     case "browse": return browse.nav(route);
-    case "ipa": return { title: known.get(p.file)?.name || p.file.replace(/\.ipa$/i, ""),
+    case "ipa": return { title: DETAILS_TITLE, // B361: the app page's Details, for a file
       right: { label: "Install", onClick: () => install(p.file) } };
     case "options": return { title: "Sign Options", right: { label: "Save", onClick: (e) => saveOptions(p.file, e.currentTarget) } };
     case "userapps": return { title: USERAPPS_TITLE, style: "plain" }; // F374
@@ -944,8 +948,9 @@ export async function addPickedFile(file, { store, read = readIpaFile, room = si
 }
 
 // F302a: the IPA page's tweak rows under its header: "<App> Is Locked" for an App Store copy (How to Get One), else
-// in the sideload app Add Tweaks (screens/tweaks.js), whose changes go into the file's Sign Options too, so Sign Now
-// and Save Signed IPA inject them as Install does.
+// in the sideload app the app page's Add Tweaks group (B361: tweaks.js addTweaksGroup with its tile, pushing the Add
+// Tweaks page, browse.js addtweaks:<bundle id>), whose changes go into the file's Sign Options too (syncOnTweakChange),
+// so Sign Now and Save Signed IPA inject them as Install does.
 async function ipaTweakRows(entry) {
   const t = await import("./tweaks.js");
   if (t.isEncrypted(entry.bundleId)) {
@@ -954,17 +959,44 @@ async function ipaTweakRows(entry) {
     footer: "This IPA came from the App Store and is still encrypted, so tweaks can't go in and it can't be signed. A decrypted copy works." }]);
   }
   if (site() || jailbreak() || entry.error) return null;
-  return t.addTweaksGroup({ bundleId: entry.bundleId, name: entry.name || entry.file,
-    open: async (o) => { let changed = false; await t.openAddTweaks({ ...o, onChange: () => { changed = true; } }); if (changed) await syncLibraryTweaks(entry); } }).el;
+  const g = t.addTweaksGroup({ bundleId: entry.bundleId, name: entry.name || entry.file }).el;
+  g.querySelector(".group-footer")?.remove(); // F350: as the app page: the row's detail says how many
+  syncOnTweakChange(g, entry);
+  return tileCells(g, "pkgTweaks");
+}
+
+// B361: the tweaks kept for the IPA's app change on the Add Tweaks page (and the tweak pages above it), so on every
+// navigation while the IPA's page is on a stack, the kept list is compared with the last one seen, and a change goes
+// into the file's Sign Options (syncLibraryTweaks). -> stop()
+export function syncOnTweakChange(node, entry, { saved = null, sync = syncLibraryTweaks, win = globalThis } = {}) {
+  const read = saved ?? (async () => (await import("./tweaks.js")).savedTweaks(entry.bundleId));
+  const sigOf = async () => (await read().catch(() => [])).map((x) => x.name).sort().join("\n");
+  let last = sigOf();
+  let running = Promise.resolve();
+  const stop = () => win.removeEventListener?.("hashchange", again);
+  function again() {
+    if (!node.isConnected) { stop(); return; }
+    running = running.then(async () => {
+      const [was, now] = [await last, await sigOf()];
+      if (was === now) return;
+      last = Promise.resolve(now);
+      await sync(entry);
+    });
+  }
+  win.addEventListener?.("hashchange", again);
+  return { stop, check: () => { again(); return running; } };
 }
 
 async function syncLibraryTweaks(entry) {
   try {
     const [t, { tweakParams }, { toBase64 }] = await Promise.all([import("./tweaks.js"), import("../core/tweaks.js"), import("../core/signing.js")]);
     const p = await t.preparedFor(entry.bundleId);
-    const o = entry.options ?? {};
-    await libraryCall("options", { ...optionsParams(entry, { ...o, tweaks: p ? tweakParams(p, toBase64) : null }),
+    const fresh = await entryOf(entry.file).then((r) => r.entry, () => null); // Sign Options may have been saved since
+    const now = fresh ?? entry;
+    const o = now.options ?? {};
+    await libraryCall("options", { ...optionsParams(now, { ...o, tweaks: p ? tweakParams(p, toBase64) : null }),
       ...(typeof o.keepBundleId === "boolean" ? { keepBundleId: o.keepBundleId } : {}) });
+    afterInstall({ list: () => {} }); // B361: the IPA's page again (Sign Options: Changed), once its entry changed
   } catch (e) {
     await showAlert({ title: "Can't Inject These Tweaks", message: String(e?.message ?? e), buttons: ["OK"] });
   }
@@ -1023,32 +1055,23 @@ async function entryOf(file) {
   return { entry: (r?.ipas ?? []).find((e) => e.file === file) ?? null, identity: Boolean(r?.identity) };
 }
 
-function setTitle(body, title) {
-  handleOf(body)?.setTitle(title);
-}
-
 const dateText = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" }) : "");
 
-function header(entry) {
+// B361: the app page's header (storepage.js storeHeader, as altstore.js renderApp draws it): the large icon, the
+// name, the bundle ID (the website's link: its host) where the developer goes, "Version 1.0 · 10.0 MB". No stars: a
+// local IPA has no ratings.
+export function header(entry, { isSite = site() } = {}) {
   const name = entry.name || entry.file;
-  const head = el("div", "pkg-head");
-  const icon = el("span", "pkg-icon large");
+  const icon = el("span", "pkg-icon large alt-app-icon");
   icon.append(el("span", "pkg-letter", name.charAt(0).toUpperCase()));
   putIcon(icon, entry.icon);
-  const ht = el("div", "pkg-head-text");
-  const top = el("span", "pkg-head-top");
-  top.append(el("span", isFileName(name) ? "pkg-head-name myipa-head-file" : "pkg-head-name", name)); // B92: a file name wraps
-  ht.append(top);
-  if (entry.version) ht.append(el("span", "pkg-head-version", entry.version));
-  ht.append(el("span", "pkg-head-version myipa-bundle", entry.bundleId || (site() ? hostOf(entry.url) : "")));
-  head.append(icon, ht);
-  const size = formatBytes(entry.size);
-  if (size) head.append(el("span", "pkg-head-size", size));
-  const g = el("div", "group");
-  const t = el("div", "table grouped pkg-head-table");
-  t.append(head);
-  g.append(t);
-  return g;
+  const h = storeHeader({ art: icon, name, author: entry.bundleId || (isSite ? hostOf(entry.url) : "") || null,
+    line: headerLine({ version: entry.version || null, size: formatBytes(entry.size) || null }) });
+  h.head.querySelector(".store-head-rating")?.remove();
+  if (isFileName(name)) h.head.querySelector(".store-head-name")?.classList.add("myipa-head-file"); // B92: a file name wraps
+  const page = el("div", "alt-app myipa-page");
+  page.append(h.head);
+  return page;
 }
 
 const hostOf = (u) => { try { return new URL(u).host; } catch { return ""; } };
@@ -1062,6 +1085,11 @@ export function siteIpaSections(details, onInstall = () => {}) {
   return [{ rows: [{ label: "Install", onClick: onInstall }], footer: SITE_IPA_INSTALL_FOOTER },
     { header: "Details", rows: details }];
 }
+
+// B361: an IPA's Version and Information rows (details.js ipaRows) from its library entry.
+export const ipaDetailRows = (entry, { sideload = !site() && !jailbreak() } = {}) => ipaRows({ sideload, bundleId: entry.bundleId || "",
+  version: entry.version || "", minimumOS: entry.minimumOS || "", size: formatBytes(entry.size) || null,
+  extensions: entry.extensions?.length ?? 0, file: entry.file });
 
 async function renderIpa(body, route, file) {
   const shown = { body, route, file, drawn: null };
@@ -1077,7 +1105,6 @@ async function renderIpa(body, route, file) {
     body.replaceChildren(grouped([{ rows: [{ label: "Not in My IPAs" }], footer: `${file} was deleted or moved.` }]));
     return;
   }
-  setTitle(body, entry.name || file);
   body.replaceChildren(header(entry));
   if (entry.bundleId) { // F302a: directly under the header (Install is the nav bar's)
     const tw = await ipaTweakRows(entry).catch(() => null);
@@ -1129,19 +1156,14 @@ async function renderIpa(body, route, file) {
     { label: "Sign Now", subtitle: entry.signed ? "Signed already: signs again" : "Signs on this iPhone, no connection needed", onClick: () => signNow(entry, body, route) },
     { label: "Save Signed IPA", subtitle: "Files, AirDrop and other apps", onClick: () => saveSigned(entry, body, route) },
   ];
-  const details = [
-    { label: "Version", detail: entry.version || "—" },
-    { label: "Bundle ID", detail: entry.bundleId || "—" },
-    { label: "Size", detail: formatBytes(entry.size) || "—" },
-  ];
-  if (entry.minimumOS) details.push({ label: "Requires", detail: `iOS ${entry.minimumOS}` });
-  if (entry.extensions?.length) details.push({ label: "Extensions", detail: String(entry.extensions.length) });
-  details.push({ label: "File", detail: entry.file });
   const groups = [
     { rows: status, footer: entry.error ? `This file can't be signed: ${entry.error}` : !identity ? `Add your certificate in ${signingPage()} to sign it.` : "" },
   ];
   if (!entry.error) groups.push({ rows: actions, footer: actionsFooter(storedRoute()) });
-  groups.push({ header: "Details", rows: details });
+  // B361: Version and Information as the app page has them (details.js: tiles), without what a local file lacks
+  const plan = ipaDetailRows(entry);
+  groups.push({ header: "Version", rows: detailRows(plan.version, { version: { chevron: false } }) });
+  groups.push({ header: "Information", rows: detailRows(plan.info, Object.fromEntries(plan.info.map((r) => [r.key, { chevron: false }]))) });
   groups.push({ rows: [{ label: "Delete", onClick: () => confirmDelete(entry) }] });
   body.append(grouped(groups));
   markFileRow(body, entry.file);
