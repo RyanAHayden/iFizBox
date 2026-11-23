@@ -1,0 +1,21 @@
+[
+ {"wait": 3000},
+ {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.swipeHint','1'); 'ok'"},
+ {"nav": "#/sources", "ms": 6000},
+ {"clicktext": "Edit", "ms": 2000},
+ {"clicktext": "Add", "ms": 2000},
+ {"eval": "(()=>{const i=[...document.querySelectorAll('input')].filter(x=>x.offsetParent!==null).at(-1); if(!i) return 'no input'; i.value='http://127.0.0.1:8732/'; i.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"},
+ {"clicktext": "Add Source", "ms": 4000},
+ {"clicktext": "Add Source", "ms": 10000},
+ {"shot": "sl-added"},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,600)"},
+ {"nav": "#/sources/*", "ms": 8000},
+ {"shot": "sl-sections"},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,600)"},
+ {"nav": "#/sources/*/section%3AApp%20Tweaks", "ms": 6000},
+ {"shot": "sl-apptweaks"},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,400)"},
+ {"nav": "#/sources/*/section%3AApp%20Tweaks/package%3Acom.x.iglite", "ms": 5000},
+ {"shot": "sl-package"},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,300)"}
+]

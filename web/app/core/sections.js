@@ -55,8 +55,12 @@ export const compareNames = (a, b) => collator.compare(a.name, b.name) || collat
 // Search's segmented control (F35): a few broad kinds over Cydia's sections. A section belongs to a group by its
 // simple name (simpleSection): "Themes (SpringBoard)" is a Theme, "Tweaks" a Tweak.
 export const SECTION_GROUPS = ["Tweaks", "Themes", "Apps", "Utilities"];
+
+// B341: the sideload build's Sections and Search list the Tweak Sources' injectable app tweaks under this one
+// section (core/catalog.js tweakRows); its packages keep their own Section: lines.
+export const APP_TWEAKS = "App Tweaks";
 const GROUP_NAMES = {
-  Tweaks: ["tweaks", "tweak"],
+  Tweaks: ["tweaks", "tweak", "app tweaks"],
   Themes: ["themes", "theme", "wallpaper", "ringtones", "fonts"],
   Apps: ["applications", "apps", "app", "games"],
   Utilities: ["utilities", "system", "terminal support", "networking", "development", "administration", "scripting"],
