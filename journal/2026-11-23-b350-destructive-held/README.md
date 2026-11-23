@@ -1,7 +1,7 @@
 # B350: red action-sheet buttons go down when tapped
 
-User report: the red buttons in action sheets (Delete Review in the review sheet, Remove, Delete Account) never
-looked pressed, while the other buttons did.
+Found in B345: the red buttons in action sheets (Delete Review in the review sheet, Remove, Delete Account) never
+looked pressed.
 
 ## Cause
 
