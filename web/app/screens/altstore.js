@@ -35,6 +35,7 @@ import { appQueue } from "../app-queue.js";
 import { appJob, appNavLabel, modifyActions, resignJob, MARK_NOT_INSTALLED, destructiveOf, sizeText as formatSize } from "../core/appqueue.js";
 import { markedVersionOnSource, markedResignJob } from "../core/appqueue.js"; // F221
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
+import { deviceError } from "../core/signing.js"; // B338
 import { compareVersions } from "../core/apt.js";
 import { altVersionList } from "../core/catalog.js"; // B232: Install Which Version? offers what Version History does
 import { ignoreVersionLabel, withVersionButton, versionToStore, IGNORE_VERSION } from "../core/appupdates.js"; // F281
@@ -274,14 +275,16 @@ export function signatureRow(record, { now = new Date(), window = resignWindow((
   return sig && (show || sig.state === "expired") ? { label: "Signature", detail: sig.long, cls: `sig-row-${sig.state}` } : null;
 }
 
-function trackingSection(app, pkg, source, body = null) {
+// B338: `box.redraw()` draws it again (the nav bar's mark toggle calls it after a tap); `box.drawn` is the first draw.
+// `store` and `signedOf` are where the section reads the record and the signature (tests hand in fakes).
+export function trackingSection(app, pkg, source, body = null, { store = apps, signedOf = (id) => signedRecordOf(id) } = {}) {
   const box = el("div");
   const mark = (version) => apps().then((store) => recordInstall(store, { id: app.bundleIdentifier, name: app.name, version, key: pkg.key,
     source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL })).then(draw, () => {});
   async function draw() {
     let rec = null;
-    try { rec = (await (await apps()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { /* no store */ }
-    const sigRow = signatureRow(await signedRecordOf(app.bundleIdentifier)); // F91
+    try { rec = (await (await store()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { /* no store */ }
+    const sigRow = signatureRow(await Promise.resolve().then(() => signedOf(app.bundleIdentifier)).catch(() => null)); // F91
     const versions = app.versions.map((x) => x.version).filter(Boolean);
     const byHand = handMarking(); // F242: the jailbreak app knows what's installed: no marking rows there
     const rows = rec
@@ -311,7 +314,8 @@ function trackingSection(app, pkg, source, body = null) {
     const i = await showActionSheet({ title: MARK_WHICH_TITLE, buttons: versions });
     if (i >= 0) mark(versions[i]);
   }
-  draw();
+  box.redraw = draw;
+  box.drawn = draw();
   // F88: an install's record lands when the helper's install ends: redraw, and stop once the page is gone.
   const offApps = onAppsChange(() => { if (box.isConnected) draw(); else offApps(); });
   // F80: queuing or clearing this app relabels the nav button (Modify); the page gone, it stops listening.
@@ -368,6 +372,9 @@ export async function installWhichVersion(app, pkg, source, { installed = "", as
 // trackingSection's Mark as Installed writes, no version picker). Installed (by iFizBox or marked): filled; a tap
 // forgets it (removeInstall, as Mark as Not Installed). No sheet: a haptic tick and a HUD, and the Installed section,
 // the nav label and Changes follow through onAppsChange. Hidden for iFizBox's own app and an app with nothing to mark.
+// B338: an app iFizBox signed counts as installed too (its signing.installed record, with or without an installed
+// record), and the off tap forgets both, as Installed's Remove from List does (installed.js forgetApp): a signature
+// left behind brings the record back (restoreSourceRecords) and the nav button keeps reading Modify.
 export const MARK_INSTALLED_LABEL = "Mark as Installed";
 export const MARK_NOT_INSTALLED_LABEL = "Mark as Not Installed";
 
@@ -390,11 +397,29 @@ async function markedRecord(app, store) {
   try { return (await (await store()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { return null; }
 }
 
+// B338: Installed's Remove from List (installed.js forgetApp), loaded when first used (installed.js imports this file).
+const forgetListed = async (r, native, remove) => (await import("./installed.js")).forgetApp(r, native, remove);
+const signatureOf = async (app, signedOf) => {
+  try { return (await signedOf(app.bundleIdentifier)) ?? null; } catch { return null; }
+};
+
+// The toggle's on/off: an installed record or a signature of iFizBox's.
+async function markedOrSigned(app, store, signedOf) {
+  return Boolean(await markedRecord(app, store)) || Boolean(await signatureOf(app, signedOf));
+}
+
 // One tap's work: true when the app is now marked installed, false when it was forgotten.
-export async function toggleMarked(app, pkg, source, { store = apps } = {}) {
+export async function toggleMarked(app, pkg, source, { store = apps, signedOf = (id) => signedRecordOf(id), native = undefined,
+  forget = forgetListed } = {}) {
   const s = await store();
-  if ((await s.all()).some((r) => r.id === app.bundleIdentifier)) {
-    await removeInstall(s, app.bundleIdentifier);
+  const rec = (await s.all()).find((r) => r.id === app.bundleIdentifier) ?? null;
+  const signed = await signatureOf(app, signedOf);
+  if (rec || signed) {
+    try {
+      await forget({ id: app.bundleIdentifier, signed, signedOnly: !rec }, native ?? nativeBridge(), async (id) => removeInstall(s, id));
+    } catch (e) {
+      throw Object.assign(e instanceof Error ? e : new Error(String(e)), { forgetFailed: true }); // markToggle says so
+    }
     return false;
   }
   await recordInstall(s, markRecordOf(app, pkg, source, app.versions.map((x) => x.version).find(Boolean) ?? ""));
@@ -402,9 +427,12 @@ export async function toggleMarked(app, pkg, source, { store = apps } = {}) {
 }
 
 const markFeedback = (text) => showHUD("").done(text, 900);
+const forgetWarning = (e) => showAlert({ title: "Error", message: deviceError(e).message, buttons: ["OK"] });
 
 // The button. `refresh()` redraws it from the record (renderApp calls it on every onAppsChange).
-export function markToggle(app, pkg, source, { store = apps, buzz = haptic, feedback = markFeedback } = {}) {
+// B338: `after()` runs once a tap's change is written (renderApp redraws the Installed section and the nav label).
+export function markToggle(app, pkg, source, { store = apps, signedOf = (id) => signedRecordOf(id), native = undefined, forget = forgetListed,
+  after = null, buzz = haptic, feedback = markFeedback, warn = forgetWarning } = {}) {
   const b = document.createElement("button");
   b.type = "button";
   b.className = "bar-button bar-icon mark-toggle";
@@ -419,12 +447,16 @@ export function markToggle(app, pkg, source, { store = apps, buzz = haptic, feed
     busy = true;
     try { buzz(); } catch { /* no haptics here */ }
     try {
-      const on = await toggleMarked(app, pkg, source, { store });
+      const on = await toggleMarked(app, pkg, source, { store, signedOf, native, forget });
       show(on);
       feedback(on ? "Marked as Installed" : "Marked as Not Installed");
-    } catch { /* no store: nothing changed */ } finally { busy = false; }
+      try { await after?.(); } catch { /* the page is gone */ }
+    } catch (e) {
+      // B338: signing.forget failed: an alert, as Installed's Remove from List shows; no store: nothing changed
+      if (e?.forgetFailed) { try { await warn(e); } catch { /* no alert here */ } }
+    } finally { busy = false; }
   });
-  b.refresh = async () => show(Boolean(await markedRecord(app, store)));
+  b.refresh = async () => show(await markedOrSigned(app, store, signedOf));
   b.refreshed = b.refresh();
   return b;
 }
@@ -909,10 +941,11 @@ export function renderApp(body, route, pkg, source, { related = null, onChange =
   // Mark as Installed: an app installed some other way (Feather, AltStore, another device's backup) can be put on
   // the Installed list by hand, so Changes and the update checks follow it; Mark as Not Installed takes it off.
   // F242: not in the jailbreak app, which can tell what's installed: there the section only shows the installed version.
-  details.append(trackingSection(app, pkg, source, body));
+  const tracking = trackingSection(app, pkg, source, body);
+  details.append(tracking);
   // F210: and the same in one tap from the nav bar (sideload and site only, F242).
   if (markToggleApplies(app)) {
-    const toggle = markToggle(app, pkg, source);
+    const toggle = markToggle(app, pkg, source, { after: () => tracking.redraw() }); // B338: the page follows at once
     if (!addNavIcon(body, toggle, "mark")) setTimeout(() => addNavIcon(body, toggle, "mark"), 0);
     const offMark = onAppsChange(() => { if (body.isConnected && toggle.isConnected) toggle.refresh(); else offMark(); });
   }
