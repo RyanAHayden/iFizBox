@@ -10,7 +10,7 @@ Research only, no code. Measured on the iPhone 15 Pro (iOS 27) on 2026-11-23, wi
 | 1 | Can a Shortcut connect a named VPN with no iOS prompt? | Yes. Set VPN set to iFizBox VPN ran silently and connected it. The app's own connect path then ran fine. |
 | 2 | Can a Shortcut switch back to Tailscale afterwards? | Yes, same action, no prompt. Tailscale shows Connected. |
 | 3 | Can the VPN be chosen by name from text (Shortcut Input)? | No, not in the forms tried. Plain text fails with a conversion error; a Find VPNs lookup by Name also did not pass a VPN on. |
-| 4 | Can one Shortcut do the whole set (switch off Tailscale, connect iFizBox, connect Tailscale back)? | Not built. The pieces exist, but the text-to-VPN step and the unread plist keys block a signed version. |
+| 4 | Can ONE Shortcut do the whole set (text start/end input, If: Cellular Data Off + connect iFizBox VPN / Cellular Data On + reconnect the previous VPN)? | Not built; the Cellular Data steps were not tested here. The pieces exist, but the text-to-VPN step and the unread plist keys block a signed version. |
 
 ## Detail
 
@@ -26,7 +26,9 @@ Research only, no code. Measured on the iPhone 15 Pro (iOS 27) on 2026-11-23, wi
 - Not tested: a real `signing.resign` install of Probe. Only `vpn.test` ran, which uses the same connect path.
 
 Baseline (the problem, confirmed): after any app-run `vpn.test`, Settings > VPN shows iFizBox VPN selected
-(checkmark), Not Connected, and Tailscale off. So This iPhone installs leave Tailscale off afterwards.
+(checkmark), Not Connected, and Tailscale off. This was seen after Check Connection only; a real install was
+not run, but it uses the same connect path. Order of events: the Shortcut connected iFizBox VPN (Settings showed
+Connected); Tailscale's `disconnected` log lines were captured in the later Check Connection run.
 
 The "Add VPN Configurations" prompt did not appear on this phone in two tries: once with Tailscale re-selected
 by the Shortcut, once with Tailscale re-selected by hand in Settings, then Check Connection. The re-prompt
@@ -38,8 +40,9 @@ could not be reproduced here. The configuration is already saved and allowed. `L
 - A second Set VPN set to Connect to Tailscale ran with no prompt. Tailscale got the checkmark and the VPN
   status showed Connected.
 - Settings then shows the footer "Tailscale will connect on demand." That is the normal text for Tailscale's
-  on-demand configuration, not an error. The VPN status-bar pill shows the connection. No On Demand message or
-  alert appeared.
+  on-demand configuration. It may be the "On Demand message" the task names; the task's wording does not say
+  where it appeared, so this is unconfirmed. The VPN status-bar pill shows the connection, and no alert
+  appeared.
 - The action's output is a VPN object card (icon, name, app).
 
 ### 3. Choosing the VPN
@@ -67,7 +70,7 @@ needs no prompt. What blocks a signed one-Shortcut version is the text-to-VPN co
 keys. A VPN picked in the editor works only in a hand-built Shortcut. An imported one would have to carry a VPN
 reference that exists only on that phone; `WFWorkflowImportQuestions` was not tried.
 
-What the device showed about the action: the legacy identifier is `is.workflow.actions.vpn.set`, class
+What the Mac showed about the action (not the phone): the legacy identifier is `is.workflow.actions.vpn.set`, class
 `WFSetVPNAction`, picker `WFVPNPickerParameter`, and `WFVPNConfiguration`, all found in the macOS 15 dyld cache
 (read over ssh to the mba). The iOS 27 plist key names for its parameters were not read.
 
@@ -76,9 +79,10 @@ What the device showed about the action: the legacy identifier is `is.workflow.a
 A Shortcut can switch between Tailscale and iFizBox VPN with no iOS prompt. So the cheapest safe fix for
 "Tailscale stays off after an install" is for the app, after the tunnel goes down (`LocalVPN.end`), to run a
 reconnect Shortcut that connects the previous VPN. Until the import or plist route is verified, that
-Shortcut's VPN choice has to be picked by the user in the Shortcuts editor (or set to Ask Each Time).
+Shortcut's VPN choice has to be picked by the user in the Shortcuts editor (Ask Each Time would prompt, so it
+does not fit an unattended run). This is a lead for F386, not a decision.
 
-Next research, to queue as R follow-ups: read the real plist (through an iCloud link, or a Mac with the
+Next research, queued as R77: read the real plist (through an iCloud link, or a Mac with the
 Shortcut); test `WFWorkflowImportQuestions` with the Set VPN action; test Get Current VPN's output through
 `x-success`.
 
