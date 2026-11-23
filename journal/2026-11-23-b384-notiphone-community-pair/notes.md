@@ -14,7 +14,7 @@
 - Test: `notiphone.test.js` new test (place, href, target, rel, page still up after clicks).
 
 ## Checks
-- `notiphone.test.js`: 4/4 pass.
+- `notiphone.test.js`: 4/4 pass; all of `web/app` under `node --test`: 3399 pass, 0 fail.
 - `capture.mjs` (Chromium over CDP, as mac/pc/android × light/dark × 1280/390 px): no sideways scroll; the tiles
   line up with the tables. Shots: `phone.png`, `desktop.png` in this folder.
 - Real mouse clicks on the Mac tile open `https://github.com/...` and the Discord invite in new tabs, with the

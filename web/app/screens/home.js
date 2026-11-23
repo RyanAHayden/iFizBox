@@ -53,7 +53,6 @@ import { nativeBridge } from "../native.js";
 import { routeFailure, ROUTE_KEY } from "../core/installroute.js"; // B316
 import { cellularWarning, CELLULAR } from "../core/installroute.js"; // F372
 
-
 export const title = "Home";
 
 // Recommended Sources: well-known flat repos, added in one tap (core/sources.js addSource takes flat repos only, so
