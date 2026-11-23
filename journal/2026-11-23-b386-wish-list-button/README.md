@@ -4,7 +4,8 @@
 `.bar-button.wish-button` in packages.css had `padding: 0 7px`, so the glass rect was about 78pt where the title needs
 88pt. Its `letter-spacing: -.01em` also made the CSS text about 1.4px narrower than UIKit's.
 
-**Fix.** Changed in web/app/ios26.css and web/app/screens/installed.js only:
+**Fix.** The sizes are hooks (`--wish-btn-pad`, `--nav-seg2-w`: used in packages.css with their defaults, set in
+ios26.css), since the gate refuses layout in an era stylesheet (the first try put it there):
 - The Wish List button under the iOS 26 style: `padding: 0 12px` and `letter-spacing: 0`.
 - The two-choice nav segments (User | Recent) are 120px, not 167px, so the count fits beside the title.
 - installed.js: the count is written as " (n)", with a leading space. The glass title is the button's textContent,

@@ -702,6 +702,7 @@ html.has-manage-toolbar .search-results::after { content: ""; }
    Search's segments. */
 .nav-title.nav-title-view { display: flex; justify-content: center; overflow: visible; max-width: none; }
 .nav-segments { display: flex; width: 167px; }
+.nav-segments:has(.scope-segment:nth-child(2):last-child) { width: var(--nav-seg2-w, 167px); }
 /* With the A–Z index down the right edge (User, Expert), the rows and the search bar above the list stop short of it,
    as UISearchBar does over an indexed table on iOS 6. */
 .page-body[data-section-index] > .installed-search, .page-body[data-section-index] > .installed-scope { padding-right: 24px; }
@@ -715,7 +716,7 @@ html.has-manage-toolbar .search-results::after { content: ""; }
 
 /* F147: Installed's Wish List bar button (screens/installed.js): beside the segmented title the name may end in "…",
    the count stays whole. */
-.bar-button.wish-button { display: inline-flex; padding: 0 7px; }
+.bar-button.wish-button { display: inline-flex; padding: var(--wish-btn-pad, 0 7px); }
 .wish-button .wish-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .wish-button .wish-count { flex: none; margin-left: .25em; }
 
