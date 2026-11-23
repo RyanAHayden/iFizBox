@@ -108,8 +108,8 @@ Faster start on older iPhones.
 ```
 
 Pass that file as `--notes`. Without `--notes`, `release.sh` makes the notes from the same files, one bullet per
-file. `publish.sh` deletes the files (all but `release-notes/README.md`) in its version commit, so the next release
-starts empty.
+file. `publish.sh` deletes the committed files (all but `release-notes/README.md`) in its version commit, so the
+next release starts empty.
 
 ## Cutting one
 
@@ -189,8 +189,8 @@ Options:
 - `--draft`: create a draft. The app ignores drafts (and GitHub's `releases/latest` doesn't return them) until it
   is published on the site.
 - Without `--notes`, the notes are one bullet per `release-notes/*.md` ("Release notes" above), or, when there are
-  none, the commit subjects since the last `v*` tag (minus `plan:` commits), followed by the standard footer about
-  the two files. Write the notes from those files for a real release.
+  none, "Smaller fixes and improvements.", followed by the standard footer about the two files. The commit subjects
+  are never used. Write the notes from those files for a real release.
 - `IFIZBOX_RELEASE_REPO=owner/name` publishes somewhere else, for a trial run on a fork.
 - `--minimum X.Y.Z`: the oldest iFizBox that may keep running without upgrading first (above).
 - `--out DIR`: also leave `Packages`, `Packages.gz`, `Release`, the notes and the updated `source.json` in DIR. With

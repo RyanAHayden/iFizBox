@@ -85,8 +85,8 @@ class Release(unittest.TestCase):
         self.assertIn("rootless jailbreak build", lines[-1])
         self.assertIn("  - Apps install straight from a source's page.", r.stdout)
 
-    def test_notes_fall_back_to_commits(self):
-        """D27: with no release-notes files, the default notes stay the commit subjects."""
+    def test_notes_without_files_skip_commits(self):
+        """D27: with no release-notes files, the default notes are one plain line, never the commit subjects."""
         self.fake_build("%s-7" % VERSION, VERSION)
         empty = os.path.join(self.tmp, "none")
         os.makedirs(empty)
@@ -95,7 +95,8 @@ class Release(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         with open(os.path.join(out, "notes.md")) as f:
             notes = f.read()
-        self.assertNotIn("- plan:", notes)
+        self.assertTrue(notes.startswith("Smaller fixes and improvements.\n\n"), notes)
+        self.assertNotIn("\n- ", notes)
         self.assertIn("rootless jailbreak build", notes)
 
     def assets(self, out):

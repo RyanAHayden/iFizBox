@@ -57,10 +57,10 @@ trap 'git worktree remove --force "$tmp/w" >/dev/null 2>&1 || true; rm -rf "$tmp
 # D27: the release notes waiting in release-notes/*.md (one per task; README.md stays). release.sh reads a copy of
 # them as the default notes (when no --notes), and the version commit deletes them, so the next release starts empty.
 mkdir "$tmp/release-notes"
-notefiles=()
-for f in release-notes/*.md; do
-  if [ -f "$f" ] && [ "$f" != release-notes/README.md ]; then notefiles+=("$f"); fi
-done
+notefiles=() # committed ones only: an untracked file is someone's unfinished work, left alone
+while IFS= read -r f; do
+  if [ "$f" != release-notes/README.md ]; then notefiles+=("$f"); fi
+done < <(git ls-files -- 'release-notes/*.md')
 [ ${#notefiles[@]} = 0 ] || cp "${notefiles[@]}" "$tmp/release-notes/"
 echo "publish: ${#notefiles[@]} release note(s) in release-notes/"
 
@@ -68,12 +68,9 @@ echo "publish: ${#notefiles[@]} release note(s) in release-notes/"
 [ "$(cat native/VERSION)" = "$version" ] || echo "$version" > native/VERSION
 if [ $dry = 0 ]; then
   git add native/VERSION
-  if [ ${#notefiles[@]} -gt 0 ]; then
-    git rm -q --ignore-unmatch -- "${notefiles[@]}"
-    rm -f -- "${notefiles[@]}" # an untracked one too: its sentence is in these notes
-  fi
-  if ! git diff --cached --quiet; then
-    git commit -q -m "Version $version"
+  [ ${#notefiles[@]} = 0 ] || git rm -q -- "${notefiles[@]}"
+  if ! git diff --cached --quiet -- native/VERSION release-notes; then
+    git commit -q -m "Version $version" -- native/VERSION release-notes
     git push -q origin main
   fi
 fi
