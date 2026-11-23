@@ -67,8 +67,8 @@ the keychain items were all still there in the own group. This is the only step 
 
 ## Suspects
 
-1. **Copy-in.** No loss in these runs; it never overwrites. The mark lives in standard prefs. A cleared mark was not
-   tested.
+1. **Copy-in.** No loss in these runs; it never overwrites. The mark lives in standard prefs. Cleared (step D2, below), the
+   copy ran again, added nothing and changed no keychain item.
 2. **zxPluginsInject's unpinned call before `groupfixInit`.** It reads and updates its own
    `zxPluginsInjectGenericEntry`, with no access group. Every later Instagram genp call logged was pinned to
    `S8NFX3A2LT.com.burbn.instagram`; key-class calls stay group-less. `RyukGram.dylib` made no logged keychain call
@@ -83,11 +83,10 @@ These were shown on the phone. They are not this report's cause as far as known.
 old way (one keychain group, no group fix). SideDrop has signed the fixed way since 2026-11-20. Filed as follow-ups,
 not fixed here.
 
-Filing: `run plan add B` for (a) and (b) was refused both times as already open and possibly the same work,
-naming B390 itself ("not added: already open, and may be the same work"). No ID was printed for either. Not forced:
-the two follow-ups are still to be filed (or added with `run plan note B390`) by whoever takes that decision.
+Filed as B392 (a) and B393 (b), with `--force`: `plan add` first refused both as like B390 itself, but they are
+different work.
 
-- **(a) Stale shared item.** RyukGram signed the old SideDrop way (keychain only `TEAM.com.ryha.sideload`) while its
+- **(a) Stale item in the own group.** RyukGram signed the old SideDrop way (keychain only `TEAM.com.ryha.sideload`) while its
   own group holds stale items from an earlier install (the keychain outlives a delete). The app's live session is in
   the shared group. After ours (pre-B327 too, and isolate), reads return the stale own item. The copy-in log reads
   "15 of 15 (15 already there)". The session marker went from `1795462434` to the stale `1795461569`.
@@ -96,6 +95,17 @@ the two follow-ups are still to be filed (or added with `run plan note B390`) by
   app's own `Library/Preferences` (`group.com.burbn.instagram.plist`). The group fix's first sign then shows an empty
   folder and suite (markers null). The legacy copy also pulled another app's `probe.marker` from
   `group.com.ryha.sideload.1` into RyukGram's suite.
+
+## The final dylib (after the spec review)
+
+- D1: a fresh install of 456 with the final dylib: the log's first line. **It says "ran before yes, 8 preferences"
+  on a fresh container**: RyukGram writes preferences in its own initialisers, before the group fix loads, so
+  `appRanBefore` takes a fresh RyukGram for one that ran and copies the shared group's items in. Added to B392.
+- D2: re-signed 456 whose spy empties the standard preferences (78 keys, the isolated mark with them) before the group
+  fix loads: the copy ran again, 15 items already in the own group were left alone, none added; planted session items,
+  app group folders and suites kept. Only the settings were gone (by the clearing itself).
+- Copy-in words in the log are now "N outside, added from [group n], already in the own group and left alone
+  [group n]"; the C3 line below is from the dylib before that change.
 
 ## The launch log
 
@@ -106,10 +116,11 @@ the two follow-ups are still to be filed (or added with `run plan note B390`) by
 ```
 
 Verified on the phone: written on the first copy-in, kept through an update with SideDrop's signer in between, and a
-second line reads "marked earlier". Read with FLEX's file browser in RyukGram.
+second line reads "marked earlier". The spy copied it to Documents for
+this check; a user can read it with FLEX's file browser (not tried).
 
-Reading it: a log with only new lines means a new container (the app was deleted and reinstalled, or it is another
-bundle ID). A long log beside lost settings means the app cleared them itself.
+Reading it: a log with only new lines points to a new container (deleted and reinstalled, or another bundle ID) or an app
+that cleared its Library. A long log means the container was kept.
 
 ## Phone left
 
@@ -134,7 +145,9 @@ One `pgrep -f nothing_matches` was run (no kill), against the run's rules. Harml
 - 1.6.0's conversion of real old data (gallery, deleted messages).
 - FLEX.
 - "Clear device & relaunch".
-- A cleared isolated mark.
+- A cleared mark when the shared group holds items the own group lacks (they would be copied in).
+- Keychain calls made before the group fix loads: they are not in the launch log.
+- A behavioural test of the log off the phone: the test only checks the built dylib names the file.
 - Extensions' keychain calls.
 - The live SideDrop server.
 - The system-log line (only the file was read).

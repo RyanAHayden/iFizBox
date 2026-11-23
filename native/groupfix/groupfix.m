@@ -194,6 +194,13 @@ static OSStatus fixDelete(CFDictionaryRef q) {
     return st;
 }
 
+// "TEAM.a 12, TEAM.b 3", for the log.
+static NSString *countList(NSCountedSet *n) {
+    NSMutableArray *out = [NSMutableArray array];
+    for (NSString *g in n) [out addObject:[NSString stringWithFormat:@"%@ %lu", g, (unsigned long)[n countForObject:g]]];
+    return [[out sortedArrayUsingSelector:@selector(compare:)] componentsJoinedByString:@", "];
+}
+
 // B327: copies every password the app can see outside its own group (TEAM.<App ID>, app groups) into its own group,
 // never over one it has there. YES when every item was read (none locked away, as before the first unlock).
 // The log's words for it: per class, the read's status, or how many were outside and how many of them are in the own group now.
@@ -229,7 +236,8 @@ static BOOL copySharedPasswords(void) {
         CFTypeRef out = NULL;
         st = realCopyMatching((__bridge CFDictionaryRef)q, &out);
         if (st != errSecSuccess) { ok = NO; [copyLog appendFormat:@" %@ data %d", what, (int)st]; continue; }
-        NSUInteger copied = 0, had = 0;
+        NSUInteger copied = 0;
+        NSCountedSet *added = [NSCountedSet set], *had = [NSCountedSet set]; // by the group they came from, for the log
         OSStatus bad = errSecSuccess;
         // in the order a read that names no group finds them, so the app keeps the one it read until now
         for (NSDictionary *item in (__bridge_transfer NSArray *)out) {
@@ -245,12 +253,14 @@ static BOOL copySharedPasswords(void) {
             OSStatus as = realAdd((__bridge CFDictionaryRef)add, NULL);
             if (as == errSecSuccess || as == errSecDuplicateItem) copied++;
             else { ok = NO; bad = as; }
-            if (as == errSecDuplicateItem) had++;
+            id from = item[(__bridge id)kSecAttrAccessGroup] ?: @"?";
+            if (as == errSecSuccess) [added addObject:from];
+            else if (as == errSecDuplicateItem) [had addObject:from];
         }
         // an item behind Face ID or a passcode (skipped above) would be out of reach once pinned: stay as before
         if (copied < outside) ok = NO;
-        [copyLog appendFormat:@" %@ %lu of %lu (%lu already there)%@", what, (unsigned long)copied, (unsigned long)outside,
-                              (unsigned long)had, bad ? [NSString stringWithFormat:@" add %d", (int)bad] : @""];
+        [copyLog appendFormat:@" %@ %lu outside, added from [%@], already in the own group and left alone [%@]%@", what, (unsigned long)outside,
+                              countList(added), countList(had), bad ? [NSString stringWithFormat:@", add error %d", (int)bad] : @""];
     }
     return ok;
 }
@@ -298,14 +308,12 @@ static NSString *itemCounts(CFStringRef cls) {
     for (NSDictionary *a in (__bridge_transfer NSArray *)all) {
         if ([a isKindOfClass:[NSDictionary class]]) [n addObject:a[(__bridge id)kSecAttrAccessGroup] ?: @"?"];
     }
-    NSMutableArray *out = [NSMutableArray array];
-    for (NSString *g in n) [out addObject:[NSString stringWithFormat:@"%@ %lu", g, (unsigned long)[n countForObject:g]]];
-    return [[out sortedArrayUsingSelector:@selector(compare:)] componentsJoinedByString:@", "];
+    return countList(n);
 }
 
 // Adds the launch's line to Library/ifizbox-groupfix.log (its last 200 lines kept), not in the app's preferences, which the app may
-// clear: a log that starts anew means a new container (the app was deleted or is another bundle ID), a long one
-// beside lost settings means the app cleared them itself. Readable before the first unlock; it holds no secrets.
+// clear: a log that starts anew points to a new container (the app was deleted or is another bundle ID, or it cleared
+// its Library); a long one means the container was kept. Readable before the first unlock; it holds no secrets.
 static void logLaunch(NSString *line) {
     os_log(OS_LOG_DEFAULT, "group fix: %{public}s", line.UTF8String);
     NSString *path = [NSHomeDirectory() stringByAppendingPathComponent:@"Library/ifizbox-groupfix.log"];
