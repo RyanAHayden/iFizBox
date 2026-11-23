@@ -18,9 +18,9 @@ test("the Signing rows open their own pages, only in the sideload build", () => 
 });
 
 test("F300: Install Apps With's page holds the choice and the chosen route's groups; This iPhone's holds its own", () => {
-  const all = installationGroups("iphone", { paired: "rp", localDevVPN: true });
-  assert.deepEqual(subGroups(all, "with").map((g) => g.header), ["Install Apps With", "This iPhone", "Connect With", "Tailscale"]);
-  assert.deepEqual(subGroups(all, "iphone").map((g) => g.header), ["This iPhone", "Connect With", "Tailscale"]);
+  const all = installationGroups("iphone", { paired: "rp", vpn: { available: true } });
+  assert.deepEqual(subGroups(all, "with").map((g) => g.header), ["Install Apps With", "Set Up", undefined]);
+  assert.deepEqual(subGroups(all, "iphone").map((g) => g.header), ["Set Up", undefined]);
   assert.equal(subGroups(all, null), all);
   const server = installationGroups("server", null, { server: () => [{ header: "Signing Server", rows: [{ label: "Server" }, { label: "Check Server" }, { label: "Run Your Own" }] }] });
   assert.deepEqual(subGroups(server, "with").map((g) => g.header), ["Install Apps With", "Signing Server"]);

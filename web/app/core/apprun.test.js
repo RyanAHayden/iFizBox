@@ -513,9 +513,7 @@ test("B137: rowStatus and runStatus per route: local says Installing, the server
 
 test("B137: a local row whose install goes through the Signing Server after all (phase asking) says Tap Install", () => {
   const rows = appRows(jobs("a", "b"));
-  Object.assign(rows[0], { state: "asking", local: true, phase: "vpn" });
-  assert.equal(rowStatus(rows[0]), "Waiting for LocalDevVPN…");
-  rows[0].phase = "asking";
+  Object.assign(rows[0], { state: "asking", local: true, phase: "asking" });
   assert.equal(rowStatus(rows[0]), "Tap Install on the iOS prompt");
   assert.equal(runStatus(rows), "Tap Install for A (1 of 2)");
   rows[0].local = false; rows[0].phase = null; // no local hint (website, tests): the old words

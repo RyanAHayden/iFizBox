@@ -220,7 +220,7 @@ class SideloadPlists(unittest.TestCase):
             info = plistlib.load(f)
         self.assertTrue(info["CADisableMinimumFrameDurationOnPhone"])
         self.assertIn("UIApplicationSceneManifest", info)
-        self.assertEqual(info["LSApplicationQueriesSchemes"], ["apple-magnifier", "localdevvpn", "tailscale"])
+        self.assertEqual(info["LSApplicationQueriesSchemes"], ["apple-magnifier"])
         self.assertNotIn("UIBackgroundModes", plistlib.loads(plist()))  # the jailbreak build stays as it was
 
     def test_splash_status_bar_reads_on_white_and_black(self):

@@ -33,8 +33,8 @@ test("the page leads with the two builds, then APT tweaks injected into sideload
   const tweaks = WHY_POINTS[1];
   assert.match(tweaks.lines.join(" "), /APT repos/);
   assert.match(tweaks.lines.join(" "), /ElleKit/);
-  assert.match(WHY_POINTS.find((p) => p.id === "routes").lines.join(" "), /Tailscale/);
-  assert.match(WHY_POINTS.find((p) => p.id === "routes").lines.join(" "), /LocalDevVPN/);
+  assert.match(WHY_POINTS.find((p) => p.id === "routes").lines.join(" "), /own VPN/);
+  assert.doesNotMatch(WHY_POINTS.find((p) => p.id === "routes").lines.join(" "), /Tailscale|LocalDevVPN/);
   assert.match(WHY_POINTS.find((p) => p.id === "sources").lines.join(" "), /AltStore.*APT/);
 });
 

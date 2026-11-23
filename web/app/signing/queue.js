@@ -121,9 +121,7 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
     if (!(await repromptPrepared(row, native))) throw Object.assign(new Error("no longer served"), { code: "gone" });
     opened = { bundleId: row.bundleId, expires: row.expires ?? null };
   } else try {
-    // B110: Open LocalDevVPN keeps this row (and so the queue, which installs one at a time) waiting on the run's page
-    // ("vpn": core/apprun.js says "Waiting for LocalDevVPN…"); the run's Cancel or the row's stop aborts the signal
-    route = server ? {} : await chooseRoute({ native, signal: signal ?? new AbortController().signal, onWait: () => progress("vpn", 0) });
+    route = server ? {} : await chooseRoute({ native });
     if (!route) throw Object.assign(new Error("Cancelled"), { code: "cancelled" });
     if (route.route) host = false; // This iPhone: installd updates iFizBox in place
     // B111: This iPhone has no iOS prompt: the row shows the copy and installd's percent (herePhase), and the reply
@@ -140,7 +138,7 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
     if (route.route) return { installed: opened?.installed ?? true, expires: opened?.expires ?? null };
   } catch (e) {
     const err = rowError(e, name);
-    // F366; B375: with idevice.status, so a failure through the built-in VPN offers no Open LocalDevVPN
+    // F366: with idevice.status, so the failure's words follow the VPN's state
     const fallback = route ? serverFallback(e, route, await routeStatus(route, native)) : null;
     throw fallback ? Object.assign(err, { fallback }) : err;
   }

@@ -14,24 +14,25 @@ const { routeWords } = await import("../signing/route.js");
 const { routeFailure, clearRouteFailure } = await import("../core/installroute.js");
 
 const src = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
-const TS_SIGNED_OUT = { paired: "rp", localDevVPN: false, otherVPN: true, tailscale: { connect: "auto", signedIn: false, address: "100.64.0.2", use: false } };
+const CELL_ST = { paired: "rp", otherVPN: false, vpn: { available: true, tested: true, cellular: true, shortcuts: {} } };
 const refused = Object.assign(new Error("refused: this iPhone refused RemotePairing on port 49152: it no longer has this pairing. Pair again"), { code: "refused" });
 const native = (st) => ({ call: (m) => (m === "idevice.status" ? Promise.resolve(st) : Promise.reject(new Error("no"))) });
 
 test("after a failed install the slot says the failure; after a passing check it's gone", async () => {
   clearRouteFailure();
   assert.equal(slotOrRoute(slotTile("sideload", { setUp: true, serverUp: true, identity: null }), routeTile("sideload", routeFailure(), "iphone")), null, "green before");
-  const why = await routeWords(refused, { title: "Couldn't Install Unbound", message: refused.message, open: null }, native(TS_SIGNED_OUT));
-  assert.equal(why.title, "Tailscale Is Signed Out", "the install's alert and log");
-  assert.equal(why.button, "Sign In");
+  const noRoute = Object.assign(new Error("route_refused: every port"), { code: "route_refused" });
+  const why = await routeWords(noRoute, { title: "Couldn't Install Unbound", message: noRoute.message, open: null }, native(CELL_ST));
+  assert.equal(why.title, "iPhone Refused", "the install's alert and log");
+  assert.equal(why.button, "Set Up");
   const t = slotOrRoute(slotTile("sideload", { setUp: true, serverUp: true, identity: null }), routeTile("sideload", routeFailure(), "iphone"));
-  assert.deepEqual(t, { stage: "close", kind: "route", title: "Tailscale Is Signed Out", subtitle: ROUTE_TILE_SUBTITLE });
+  assert.deepEqual(t, { stage: "close", kind: "route", title: "iPhone Refused", subtitle: ROUTE_TILE_SUBTITLE });
   clearRouteFailure(); // a check passed
   assert.equal(routeTile("sideload", routeFailure(), "iphone"), null);
 });
 
 test("only the sideload app installing through This iPhone; signing that stops everything stays first", () => {
-  const f = { title: "Tailscale Is Signed Out", short: "x", fix: "signIn" };
+  const f = { title: "iPhone Refused", short: "x", fix: "check" };
   assert.equal(routeTile("site", f, "iphone"), null);
   assert.equal(routeTile("jailbreak", f, "iphone"), null);
   assert.equal(routeTile("sideload", f, "server"), null, "the Signing Server route doesn't go through the phone");

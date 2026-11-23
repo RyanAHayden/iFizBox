@@ -321,7 +321,7 @@ export const SETTINGS = [
   },
   {
     // Settings > Installation (core/installroute.js): the Signing Server's install link, or This iPhone's own installd
-    // over LocalDevVPN (native/sideload/idevice). screens/installroute.js draws the page (This iPhone needs pairing).
+    // through the built-in VPN (native/sideload/idevice). screens/installroute.js draws the page (This iPhone needs pairing).
     key: "installRoute", section: "installation", kind: "choice", feature: "install-route", modes: ["sideload"], default: "server",
     label: "Install Apps With", options: ROUTE_OPTIONS,
   },

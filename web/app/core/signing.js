@@ -414,7 +414,7 @@ export function deviceSummary(identity, { now = new Date(), locale, timeZone } =
 }
 
 // The HUD's text for a signing.install progress event { phase, progress }. "here": This iPhone's own install (AFC
-// upload, then installd through LocalDevVPN, Sideload.swift installHere), with its percentage, so a page waiting
+// upload, then installd through the built-in VPN, Sideload.swift installHere), with its percentage, so a page waiting
 // offline at Downloading can't be taken for one waiting on the phone.
 const PHASES = { downloading: "Downloading", reading: "Reading", signing: "Signing", installing: "Installing",
   here: "Installing on this iPhone" };
@@ -471,9 +471,9 @@ export function deviceError(err, name = "") {
   if (isAts(err)) return { title: ATS_TITLE, open: null, message: atsText(name) };
   const dm = developerModeFailure(err); // F300: Developer Mode has no Settings row: the failure itself says what to do
   if (dm) return { ...dm, open: null };
-  // B316: This iPhone's route broken by Tailscale or refusing everything: the route's words and its fix (`fix`, the
+  // B316: This iPhone's route refusing everything: the route's words and its fix (`fix`, the
   // alert's second button `button`), not the pairing's. signing/route.js re-words the rest with idevice.status.
-  if (code === "tailscale_signed_out" || code === "route_refused" || code === "switch_failed") {
+  if (code === "route_refused" || code === "switch_failed") {
     const f = routeFailureOf(err);
     if (f) return { title: f.title, open: null, message: f.message, fix: f.fix, button: f.button };
   }

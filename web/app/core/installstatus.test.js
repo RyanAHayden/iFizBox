@@ -1,9 +1,9 @@
 // F284: Installation & Signing's top cell (core/installroute.js installStatus) and the main page's row details.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { installStatus, STATUS_ACTIONS, CHECKING, serverDetail, certificateDetail, tailscaleVPNOn, ALERTS, decideRoute } from "./installroute.js";
+import { installStatus, STATUS_ACTIONS, CHECKING, serverDetail, certificateDetail, ALERTS, decideRoute } from "./installroute.js";
 
-const paired = (o = {}) => ({ paired: "rp", localDevVPN: false, otherVPN: false, ...o, tailscale: { connect: "auto", signedIn: false, address: null, use: false, ...(o.tailscale || {}) } });
+const paired = (o = {}) => ({ paired: "rp", otherVPN: false, ...o, vpn: { available: true, tested: true, cellular: false, ...(o.vpn || {}) } });
 
 test("still checking: Checking… with Check Connection (dimmed by the page)", () => {
   assert.equal(installStatus("iphone", undefined), CHECKING);
@@ -11,56 +11,33 @@ test("still checking: Checking… with Check Connection (dimmed by the page)", (
   assert.equal(STATUS_ACTIONS[CHECKING.action], "Check Connection");
 });
 
-test("ready through LocalDevVPN or Tailscale, Check Connection, installs here", () => {
-  const l = installStatus("iphone", paired({ localDevVPN: true }));
-  assert.deepEqual([l.title, l.subtitle, STATUS_ACTIONS[l.action], l.local], ["Ready to Install", "Straight onto this iPhone, through LocalDevVPN.", "Check Connection", true]);
-  const t = installStatus("iphone", paired({ otherVPN: true, tailscale: { signedIn: true, address: "100.1.2.3", use: true } }));
-  assert.equal(t.subtitle, "Straight onto this iPhone, through Tailscale.");
-  assert.equal(serverDetail(t, "ifizbox.com"), "This iPhone");
+test("ready through the built-in VPN, Check Connection, installs here", () => {
+  const l = installStatus("iphone", paired());
+  assert.deepEqual([l.title, l.subtitle, STATUS_ACTIONS[l.action], l.local], ["Ready to Install", "Straight onto this iPhone, through iFizBox VPN.", "Check Connection", true]);
+  assert.equal(serverDetail(l, "ifizbox.com"), "This iPhone");
+  // another VPN being on is no state of its own: the shell turns the built-in VPN on for the install
+  assert.equal(installStatus("iphone", paired({ otherVPN: true })).state, "ready");
 });
 
-test("another VPN, only when it isn't Tailscale's: red, Open LocalDevVPN, the server meanwhile", () => {
-  const o = installStatus("iphone", paired({ otherVPN: true }));
-  assert.deepEqual([o.title, o.red, STATUS_ACTIONS[o.action], o.local], ["Another VPN Is On", true, "Open LocalDevVPN", false]);
-  assert.equal(serverDetail(o, "ifizbox.com"), "ifizbox.com");
-  // Tailscale's VPN is on, iFizBox not signed in: sign in, never a conflict
-  const s = installStatus("iphone", paired({ otherVPN: true, tailscale: { address: "100.1.2.3" } }));
-  assert.deepEqual([s.state, s.title, STATUS_ACTIONS[s.action]], ["signIn", "Sign In to Tailscale", "Sign In to Tailscale"]);
-  assert.ok(!s.red);
-  // signed in, but Connect With is LocalDevVPN
-  const c = installStatus("iphone", paired({ otherVPN: true, tailscale: { address: "100.1.2.3", signedIn: true, connect: "localdevvpn" } }));
-  assert.equal(c.state, "tailscaleConnect");
-  assert.equal(STATUS_ACTIONS[c.action], "Use Tailscale");
-  assert.ok(ALERTS.tailscaleConnect.title);
-  assert.equal(tailscaleVPNOn(paired({ tailscale: { address: "100.1.2.3" } })), true);
-  assert.equal(tailscaleVPNOn(paired()), false);
+test("on cellular without the Install Switch: the warning, with Add Install Switch", () => {
+  const c = installStatus("iphone", paired({ vpn: { cellular: true } }));
+  assert.deepEqual([c.state, STATUS_ACTIONS[c.action], c.local], ["cellular", "Add Install Switch", true]);
+  assert.equal(installStatus("iphone", paired({ vpn: { cellular: true, shortcuts: { switch: true } } })).state, "ready");
 });
 
-// User, 2026-11-20: the VPN follows what the user set up, never which apps are installed.
-test("another VPN opens the VPN the user set up: Tailscale, LocalDevVPN, or LocalDevVPN when nothing was chosen", () => {
-  const other = (tailscale) => installStatus("iphone", paired({ otherVPN: true, tailscale }));
-  const tsConnect = other({ connect: "tailscale", signedIn: true });
-  const tsSignedIn = other({ connect: "auto", signedIn: true }); // signed in through setup
-  const ldv = other({ connect: "localdevvpn", signedIn: true });
-  const none = other({ connect: "auto", signedIn: false });
-  for (const s of [tsConnect, tsSignedIn, ldv, none]) assert.deepEqual([s.title, s.red], ["Another VPN Is On", true]);
-  assert.equal(STATUS_ACTIONS[tsConnect.action], "Open Tailscale");
-  assert.equal(STATUS_ACTIONS[tsSignedIn.action], "Open Tailscale");
-  assert.equal(STATUS_ACTIONS[ldv.action], "Open LocalDevVPN");
-  assert.equal(STATUS_ACTIONS[none.action], "Open LocalDevVPN");
-  // decideRoute's alert says the same: no Open LocalDevVPN for a Tailscale setup
-  assert.equal(decideRoute("iphone", paired({ otherVPN: true, tailscale: { signedIn: true } })).alert, "otherVPNTailscale");
-  assert.equal(ALERTS.otherVPNTailscale.open, undefined);
-  assert.equal(decideRoute("iphone", paired({ otherVPN: true })).alert, "otherVPN");
-  assert.equal(decideRoute("iphone", paired({ otherVPN: true, tailscale: { connect: "localdevvpn", signedIn: true } })).alert, "otherVPN");
+test("a profile without Network Extensions: said plainly, the server meanwhile", () => {
+  for (const st of [{ paired: "rp" }, { paired: "rp", vpn: { available: false } }, { paired: null }]) {
+    const n = installStatus("iphone", st);
+    assert.deepEqual([n.state, n.title, STATUS_ACTIONS[n.action], n.local], ["noVPN", "No Network Extensions", "Check Connection", false]);
+    assert.equal(serverDetail(n, "ifizbox.com"), "ifizbox.com");
+  }
+  assert.equal(decideRoute("iphone", { paired: "rp" }).alert, "noVPN");
+  assert.ok(ALERTS.noVPN.title);
 });
 
-test("not paired: Pair This iPhone with Start Pairing; nothing on: the VPN the user set up", () => {
-  const p = installStatus("iphone", { paired: null, localDevVPN: true });
+test("not paired: Pair This iPhone with Start Pairing", () => {
+  const p = installStatus("iphone", paired({ paired: null }));
   assert.deepEqual([p.title, STATUS_ACTIONS[p.action]], ["Pair This iPhone", "Start Pairing"]);
-  assert.equal(installStatus("iphone", paired()).state, "vpnOff"); // nothing chosen: LocalDevVPN
-  assert.equal(installStatus("iphone", paired({ tailscale: { signedIn: true } })).action, "openTailscale");
-  assert.equal(installStatus("iphone", paired({ tailscale: { connect: "tailscale" } })).state, "signIn");
   assert.equal(installStatus("iphone", null).state, "noStatus");
 });
 
@@ -70,9 +47,8 @@ test("Signing Server chosen: ready through the server, Check Server", () => {
 });
 
 test("every subtitle stays short enough for the cell's two lines at 320pt", () => {
-  const all = [CHECKING, installStatus("iphone", null), installStatus("iphone", { paired: null }), installStatus("iphone", paired({ otherVPN: true })),
-    installStatus("iphone", paired({ tailscale: { address: "1", signedIn: true, connect: "localdevvpn" } })),
-    installStatus("iphone", paired({ tailscale: { connect: "tailscale", signedIn: true } })), installStatus("iphone", paired()),
+  const all = [CHECKING, installStatus("iphone", null), installStatus("iphone", { paired: null }), installStatus("iphone", { paired: "rp" }),
+    installStatus("iphone", paired({ paired: null })), installStatus("iphone", paired({ vpn: { cellular: true } })), installStatus("iphone", paired()),
     installStatus("server", undefined)];
   for (const s of all) assert.ok(s.subtitle.length <= 70, s.subtitle);
 });

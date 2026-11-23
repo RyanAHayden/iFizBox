@@ -15,8 +15,8 @@ const shell = (kept) => {
     kept,
     call(name, params) {
       calls.push([name, params]);
-      if (name === "tailscale.keptRoute") return Promise.resolve(this.kept);
-      if (name === "tailscale.keepRoute") { this.kept = params.value; return Promise.resolve(true); }
+      if (name === "route.kept") return Promise.resolve(this.kept);
+      if (name === "route.keep") { this.kept = params.value; return Promise.resolve(true); }
       return Promise.reject(new Error("unknown"));
     },
   };
@@ -41,7 +41,7 @@ test("a stored route is kept as it is, and every change after", async () => {
   await tick();
   assert.equal(settings.get("installRoute"), "iphone", "what this container has wins");
   assert.equal(native.kept, "iphone");
-  assert.ok(!native.calls.some(([n]) => n === "tailscale.keptRoute"));
+  assert.ok(!native.calls.some(([n]) => n === "route.kept"));
   settings.set("installRoute", "server");
   await tick();
   assert.equal(native.kept, "server");
@@ -59,7 +59,7 @@ test("nothing kept, a shell without the call, or a pick made meanwhile: nothing 
   const storage = mem();
   const settings = createSettings({ storage, mode: "sideload" });
   let answer;
-  const native = { calls: [], call(name, p) { this.calls.push([name, p]); return name === "tailscale.keptRoute" ? new Promise((r) => { answer = r; }) : Promise.resolve(true); } };
+  const native = { calls: [], call(name, p) { this.calls.push([name, p]); return name === "route.kept" ? new Promise((r) => { answer = r; }) : Promise.resolve(true); } };
   keepRoute({ settings, native, storage });
   await tick();
   settings.set("installRoute", "server");

@@ -1,9 +1,9 @@
-"""B159/B173: iFizBox's own update on the This iPhone route (Sideload.swift installHere, installd over LocalDevVPN or
-Tailscale RemotePairing). iOS 17.4+ installd doesn't end the running copy: it waits until it is gone, so
+"""B159/B173: iFizBox's own update on the This iPhone route (Sideload.swift installHere, installd through the
+built-in VPN, RemotePairing). iOS 17.4+ installd doesn't end the running copy: it waits until it is gone, so
 installation_proxy's Complete never comes while iFizBox runs. So installHere feeds installd's copy and statuses to
 HereClose (native/sign/SelfCloseClock.swift decides, tested in Swift by test_sideload.py): once installd accepted the
 install (its first status) it answers the install call and closes iFizBox through CloseForUpdate.hereReady, with an
-exit backstop off the main queue (B173: the close never fired over Tailscale). Checked as text: Sideload.swift only
+exit backstop off the main queue (B173: the close never fired). Checked as text: Sideload.swift only
 builds with the iOS SDK."""
 import os
 import unittest

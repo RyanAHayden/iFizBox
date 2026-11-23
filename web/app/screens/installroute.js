@@ -5,33 +5,23 @@
 //   installation/with  Install Apps With (F300): the choice (This iPhone / Signing Server, a checkmark), and under it
 //                      the chosen route's groups sliding in: This iPhone's (below) or the Signing Server's (Server,
 //                      Check Server, Run Your Own: screens/settings.js passes them as `server`)
-//   installation/iphone This iPhone: Pairing, the VPN, Open LocalDevVPN (none of the three LocalDevVPN rows when
-//                      Tailscale is the way in), Connect With, Tailscale
+//   installation/iphone This iPhone: Set Up (Pair This iPhone, Test Connection, Install Switch) and How It Works
 //   installation/pair  Pairing, one page that runs by itself (core setupState): one sentence on what it gives,
-//                      drawn at once with a spinner while it checks, then the VPN: which way is decided from the VPN
-//                      apps installed (core vpnRoute: LocalDevVPN's Open, Tailscale's Sign In and Open, a choice when
-//                      both are, Install LocalDevVPN when neither is; rechecked when the app comes back), then
-//                      pairing starts on its own: the 6-digit code big at the top and where to type it, a line and a
-//                      screenshot a step; it keeps pairing while the page is open. Paired: a check, Check Connection
-//                      (Pair Again when it fails) and Forget. Older iOS: Import Pairing File.
-//   Connect With (Automatic, LocalDevVPN, Tailscale) and Tailscale's Sign In / Test Connection / Sign Out on
-//   installation once paired.
-// The idevice.* bridge calls are native/sideload/idevice/IDeviceBridge.swift's, tailscale.* native/sideload/tailscale's.
+//                      drawn at once with a spinner while it checks, then pairing starts on its own: the 6-digit code
+//                      big at the top and where to type it, a line and a screenshot a step; it keeps pairing while
+//                      the page is open. Paired: a check, Check Connection (Pair Again when it fails) and Forget.
+//                      Older iOS: Import Pairing File. A profile without Network Extensions: NO_VPN says so.
+// The idevice.* bridge calls are native/sideload/idevice/IDeviceBridge.swift's, vpn.* native/sideload/vpn's.
 import { grouped, el } from "../nav/ui.js";
 import { format, settingsRoute, mounted, parse } from "../router.js";
 import { showAlert } from "../nav/alert.js";
-import { copyText } from "../nav/menu.js";
 import { toBase64 } from "../core/signing.js";
-import { vpnRoute, connectAlert, LOCALDEVVPN_STORE } from "../core/installroute.js";
-import { openTailscale, OPEN_TAILSCALE_BY_HAND } from "../core/installroute.js"; // B323
-import { ROUTE_KEY, ROUTE_OPTIONS, VPNS, VPN_POLL, vpnList, vpnOn, IPHONE_INTRO, setupState, PAIR_GUIDE, pairEvent, pairFooter, pairFromNative, pinText, PAIR_STEPS, verifyFailure, verifyVPN,
-  CONNECT_OPTIONS, connectFooter, tailscaleFooter, tailscaleTestResult } from "../core/installroute.js";
-import { ringStyle, vpnWaitText } from "../core/installroute.js";
-import { tailscaleRoute } from "../core/installroute.js";
+import { ROUTE_KEY, ROUTE_OPTIONS, IPHONE_INTRO, setupState, PAIR_GUIDE, pairEvent, pairFooter, pairFromNative, pinText, PAIR_STEPS, verifyFailure } from "../core/installroute.js";
+import { ringStyle } from "../core/installroute.js";
 import { leaveQuestion, LEAVE } from "../core/installroute.js";
-import { tailscaleVPNOn, installStatus, CHECKING, CHECKING_SERVER, STATUS_ACTIONS } from "../core/installroute.js";
+import { installStatus, CHECKING, CHECKING_SERVER, STATUS_ACTIONS } from "../core/installroute.js";
 import { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, NO_ANSWER_FAILURE } from "../core/installroute.js"; // B316
-import { builtinVPN, shortcutsAdded, setupFooter, iphoneSetUp, HOW_STEPS, SHORTCUT_NAMES, vpnTestResult } from "../core/installroute.js"; // F372
+import { builtinVPN, shortcutsAdded, setupFooter, iphoneSetUp, HOW_STEPS, SHORTCUT_NAMES, vpnTestResult, NO_VPN } from "../core/installroute.js"; // F372
 import { shortcutFileURL, shortcutDidntRun, shortcutDidntOpen } from "../core/installroute.js"; // B359
 import { switchAdded, switchTestResult, BUILTIN_VPN } from "../core/installroute.js"; // F386
 import { switchOld } from "../core/installroute.js"; // F394
@@ -50,16 +40,13 @@ export const PAGE = "installation";
 // F372: This iPhone's own pages (How It Works, Cellular Shortcuts) and the Signing Server's page, each pushed with the
 // slide from Installation & Signing's rows.
 export const SUB_TITLES = { pair: "Pairing", iphone: "This iPhone", with: "Install Apps With", how: "How It Works", shortcuts: "Install Switch", server: "Signing Server" };
-const VPN = VPNS[0];
-
-const route = (sub) => format(settingsRoute(sub ? [PAGE, sub] : [PAGE]));
+const route =(sub) => format(settingsRoute(sub ? [PAGE, sub] : [PAGE]));
 const goTo = (sub) => navGo(route(sub));
 const call = (native, m, p = {}, ev) => native?.call ? native.call(m, p, ev) : Promise.reject(new Error(`This needs the ${NAME} app.`));
 // F301: every call the page waits on has a deadline. Past it the row (or the alert) says Not Responding instead of
-// spinning on; a later answer is dropped. idevice.status answers in under a second (VPNCheck: no probe when no tunnel
-// is up, both ports at once otherwise), tailscale.status at once (UserDefaults and getifaddrs); idevice.verify and
-// tailscale.test talk to iOS or start Tailscale's node, so they get longer.
-export const TIMEOUTS = { status: 5000, tailscale: 4000, verify: 20000, test: 25000 };
+// spinning on; a later answer is dropped. idevice.status answers in under a second; idevice.verify talks to iOS, so
+// it gets longer.
+export const TIMEOUTS = { status: 5000, verify: 20000 };
 export const NOT_RESPONDING = "Not Responding";
 export function within(p, ms) {
   let t = null;
@@ -75,9 +62,6 @@ async function readStatus(native) {
   try { return { st: (await within(call(native, "idevice.status"), TIMEOUTS.status)) ?? null, late: false }; } catch (e) { return { st: null, late: isLate(e) }; }
 }
 async function status(native) { return (await readStatus(native)).st; }
-async function readTailscale(native) {
-  try { return { ts: (await within(call(native, "tailscale.status"), TIMEOUTS.tailscale)) ?? null, late: false }; } catch (e) { return { ts: null, late: isLate(e) }; }
-}
 
 // F301: the last idevice.status answer, shown at once the next time a page draws (its rows spinning while it's read
 // again). Kept for this run of the app only: after a relaunch the VPN may well be another, so the first read waits.
@@ -87,11 +71,11 @@ export function forgetStatus() { lastStatus = null; } // tests, and Forget Pairi
 export const cachedStatus = () => lastStatus;
 
 // B133: every step that waits on the phone, the network or the pairing shows iOS 6's activity indicator and what it
-// does. A one-off action (Check Connection, Forget Pairing, Test Connection, Sign Out, a Connect With pick, importing
-// a pairing file, opening another app) runs under the HUD (nav/hud.js: the large white spinner and a label, which
+// does. A one-off action (Check Connection, Forget Pairing, Test Connection, importing
+// a pairing file) runs under the HUD (nav/hud.js: the large white spinner and a label, which
 // also eats taps so it isn't started twice); it shows only once the call has taken `delay` ms, so a quick answer
 // doesn't flash it. Waits inside a page (status being read, the code coming, the iPhone connecting, the VPN coming
-// on, Tailscale signing in) draw the grey spinner in place: a row's `spin` or a group's `spinner` line.
+// on) draw the grey spinner in place: a row's `spin` or a group's `spinner` line.
 export const hudHooks = { show: (text) => { try { return showHUD(text); } catch { return () => {}; } }, delay: 250 };
 export async function busy(label, work) {
   let hide = null;
@@ -119,97 +103,30 @@ function spinRows(frag, sections) {
   return frag;
 }
 
-// The VPN row's detail from idevice.status.
-export function vpnDetail(st) {
-  if (!st) return "Unknown";
-  if (st.localDevVPN) return "On";
-  if (tailscaleVPNOn(st)) return "Off"; // F284: Tailscale's VPN is the route, not another VPN
-  return st.otherVPN ? "Another VPN" : "Off";
-}
-
-// Tailscale's sign-in while it runs: the step line ("Log in on the page"), or null.
-let signingIn = null;
-let signInVisit = null; // B143: the pair page's visit that started it (leaving that page stops it), null from the main page
-
-// Install Apps With's groups (pure, for tests): the choice and, under it, the chosen route's groups. This iPhone: its
-// state, Connect With and Tailscale; Signing Server: `server()`'s groups (Server, Check Server, Run Your Own).
-// `st.tailscale` is tailscale.status's answer (idevice.status carries it).
-// B133: `reading`: idevice.status hasn't answered yet: Pairing and the VPN say Checking…, Pairing with the spinner.
+// Install Apps With's groups (pure, for tests): the choice and, under it, the chosen route's groups. This iPhone: Set
+// Up and How It Works (localGroups); Signing Server: `server()`'s groups (Server, Check Server, Run Your Own).
+// B133: `reading`: idevice.status hasn't answered yet: the rows say Checking… from the first frame, with the spinner.
 // F300: `picking`: the choice was just tapped: its row is checked at once and spins until idevice.status answers.
-// `connectBusy`: a Connect With pick whose tailscale.setConnect hasn't answered: checked at once, with the spinner (and
-// `connectPick` keeps it checked and spinning while the status read after it runs). `hint`: the last idevice.status
-// read, so that while the page reads again the LocalDevVPN rows don't come and go (Tailscale the way in, or not).
+// `hint`: the last idevice.status read, drawn while the page reads again.
 // F300: no Developer Mode row (an app can't open without it; an install it stops says so in its alert).
-// F301: the page reads idevice.status (Pairing, the VPN) and tailscale.status (Connect With, Tailscale) at once, and
-// each part has its own state: `reading` the device part isn't known (`tsReading` the Tailscale part; it defaults to
-// `reading`), `refreshing: {device, tailscale}` the rows show the last answer (`st`, cached) with their spinner while
-// that part is read again, `late: {device, tailscale}` that part didn't answer in time: its rows say Not Responding.
-export function installationGroups(choice, st, { pick = () => {}, openVPN = () => {}, connect = () => {}, signIn = () => {}, test = () => {}, signOut = () => {}, busy = null,
-  reading = false, connectPick = null, picking = false, connectBusy = null, hint = null, server = () => [],
-  tsReading = reading, refreshing = {}, late = {}, testing = false, failure = null, fix = () => {}, pairChecking = false,
+// F301: `refreshing: {device}` the rows show the last answer (`st`, cached) with their spinner while it is read again,
+// `late: {device}` it didn't answer in time: its rows say Not Responding.
+export function installationGroups(choice, st, { pick = () => {}, test = () => {},
+  reading = false, picking = false, hint = null, server = () => [],
+  refreshing = {}, late = {}, testing = false, failure = null, fix = () => {}, pairChecking = false,
   addSwitch = () => {}, switchChecking = false } = {}) {
   const groups = [{
     header: "Install Apps With",
     rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", icon: rowIcon(ROUTE_ICON[o.value]), checked: o.value === choice, onClick: () => pick(o.value),
       ...(picking && o.value === choice ? { spin: true } : {}) })),
     footer: choice === "iphone"
-      ? `Signed apps go straight to iOS through ${vpnList()}. When it's off, installs use the Signing Server.`
+      ? `Signed apps go straight to iOS through ${BUILTIN_VPN}.`
       : "The Signing Server hands iOS each app's install link.",
   }];
   if (choice !== "iphone") return [...groups, ...(server() ?? [])];
-  // F372: the built-in VPN is the way in: This iPhone's page is Set Up and How It Works (no Tailscale, no LocalDevVPN)
-  if (builtinVPN(st ?? hint)) return [...groups, ...localGroups(st ?? hint, { reading: reading && !hint, refreshing: Boolean(refreshing.device), test, testing, failure, fix, late: Boolean(late.device), addSwitch, switchChecking })];
-  {
-    const ts = st?.tailscale ?? null;
-    // B167: while idevice.status (tailscale.status with it) hasn't answered, Tailscale's state is unknown, not signed
-    // out: its row says Checking… with the spinner (one row, as Sign In is), and Connect With keeps the pick just made.
-    const tsUnknown = (tsReading || !st) && !late.tailscale;
-    const tsAgain = Boolean(refreshing.tailscale) && !tsUnknown; // F301: the last answer shown while it's read again
-    const now = connectBusy ?? (tsUnknown || tsAgain ? connectPick : null) ?? ts?.connect ?? (tsUnknown ? hint?.tailscale?.connect : null) ?? "auto";
-    const spinning = connectBusy ?? (tsUnknown || tsAgain ? connectPick : null);
-    const viaTs = tailscaleRoute(tsUnknown ? hint : st, now); // F300: no LocalDevVPN rows then
-    const devLate = Boolean(late.device), devAgain = Boolean(refreshing.device) && !reading && !devLate;
-    // B316: Tailscale signed out with Tailscale's group already offering Sign In: the failure is said there (one
-    // Sign In row); any other failure goes in This iPhone's group with its fix row
-    const tsSignIn = !busy && !tsUnknown && !(late.tailscale && !ts) && !ts?.signedIn;
-    const failTs = Boolean(failure && failure.fix === "signIn" && tsSignIn);
-    const failHere = Boolean(failure) && !failTs;
-    const failText = failure ? `${failure.title}. ${failure.short}` : "";
-    groups.push({
-      header: "This iPhone",
-      rows: [
-        devLate ? { label: "Pairing", detail: NOT_RESPONDING, href: route("pair") }
-          : reading ? { label: "Pairing", detail: "Checking…", href: route("pair"), spin: true }
-          // B320: `pairChecking`: the kept pairing is checked (recheckPairing): this row spins, no HUD
-          : { label: "Pairing", detail: withDetail("iphone", st ?? {}, failure), href: route("pair"), ...(devAgain || pairChecking ? { spin: true } : {}) },
-        ...(viaTs ? [] : [
-          devLate ? { label: VPN, detail: NOT_RESPONDING }
-            : { label: VPN, detail: reading ? "Checking…" : vpnDetail(st), ...(reading || devAgain ? { spin: true } : {}) },
-          { label: `Open ${VPN}`, cls: "sign-import", onClick: openVPN },
-        ]),
-        // B316: the last check or install failed (core routeFailure): its fix row here, and the footer says what's wrong
-        ...(failHere && failure.fix !== "openVPN" ? [{ label: failure.button, cls: "sign-import", onClick: fix }] : []),
-      ],
-      ...(failHere ? { footer: failText, warn: true }
-        : viaTs ? {} : { footer: `${VPN} must be on while apps install.` }), // F317: no "(below)": Tailscale's group says its own
-    });
-    groups.push({
-      header: "Connect With",
-      rows: CONNECT_OPTIONS.map((o) => ({ label: o.label, checked: o.value === now, onClick: () => connect(o.value), ...(o.value === spinning ? { spin: true } : {}) })),
-      footer: connectFooter(now),
-    });
-    const rows = busy
-      ? [{ label: "Signing In…", detail: busy, spin: true }]
-      : late.tailscale && !ts ? [{ label: "Tailscale", detail: NOT_RESPONDING }]
-      : tsUnknown ? [{ label: "Tailscale", detail: "Checking…", spin: true }]
-      : ts?.signedIn
-        ? [{ label: "Device", detail: ts.name || NAME, ...(tsAgain ? { spin: true } : {}) },
-          { label: "Test Connection", cls: "sign-import", onClick: test, ...(testing ? { detail: "Testing…", spin: true } : {}) },
-          { label: "Sign Out", cls: "sign-import", onClick: signOut }]
-        : [{ label: "Sign In", cls: "sign-import", onClick: signIn }];
-    groups.push({ header: "Tailscale", rows, ...(failTs ? { footer: failText, warn: true } : { footer: tailscaleFooter(ts) }) });
-  }
-  return groups;
+  // F372: the built-in VPN is the way in: This iPhone's page is Set Up and How It Works, drawn from the first frame
+  // (rows Checking… until idevice.status answers). A profile without Network Extensions says so there (core NO_VPN).
+  return [...groups, ...localGroups(st ?? hint, { reading: reading && !hint && !st, refreshing: Boolean(refreshing.device) || pairChecking, test, testing, failure, fix, late: Boolean(late.device), addSwitch, switchChecking })];
 }
 
 // ---- F372: This iPhone with the built-in VPN (core BUILTIN_VPN; native/sideload/vpn)
@@ -223,24 +140,27 @@ export function localGroups(st, { reading = false, refreshing = false, test = ()
   addSwitch = () => {}, switchChecking = false } = {}) {
   const paired = Boolean(st?.paired), tested = Boolean(st?.vpn?.tested);
   const switchRow = { label: SHORTCUT_NAMES.switch, subtitle: "Optional: cellular, and your VPN back after", icon: rowIcon("cellular") };
+  const howGroup = { rows: [{ label: "How It Works", icon: rowIcon("help"), href: route("how") }] };
+  // A profile without Network Extensions: nothing to set up, and the page says so instead of the VPN's rows
+  if (st && !reading && !late && !builtinVPN(st)) {
+    return [{ header: "Set Up", rows: [{ label: "Network Extensions", detail: "Missing" }], footer: NO_VPN.message, warn: true }, howGroup];
+  }
   const pairRow = late ? { label: "Pair This iPhone", icon: rowIcon("pairPhone"), detail: NOT_RESPONDING, href: route("pair") }
     : reading ? { label: "Pair This iPhone", icon: rowIcon("pairPhone"), detail: "Checking…", href: route("pair"), spin: true }
     : { label: "Pair This iPhone", icon: rowIcon("pairPhone"), detail: paired ? "Done" : "Start", href: route("pair"), ...(refreshing ? { spin: true } : {}) };
   const rows = [
     pairRow,
-    { label: "Test Connection", icon: rowIcon("testConnection"), onClick: test,
-      detail: testing ? "Testing…" : failure ? FAILING : tested ? "Connected" : "Test", ...(testing ? { spin: true } : {}) },
-    switchChecking ? { ...switchRow, detail: "Checking…", spin: true }
+    reading ? { label: "Test Connection", icon: rowIcon("testConnection"), detail: "Checking…", spin: true }
+      : { label: "Test Connection", icon: rowIcon("testConnection"), onClick: test,
+        detail: testing ? "Testing…" : failure ? FAILING : tested ? "Connected" : "Test", ...(testing ? { spin: true } : {}) },
+    reading || switchChecking ? { ...switchRow, detail: "Checking…", spin: true }
       : switchAdded(st) ? { ...switchRow, detail: switchOld(st?.vpn) ? "Update" : "Done", href: route("shortcuts") }
       : { ...switchRow, detail: "Add", chevron: true, onClick: addSwitch },
     ...(failure && !testing ? [{ label: failure.button, cls: "sign-import", onClick: fix }] : []),
   ];
   const footer = failure ? { footer: `${failure.title}. ${failure.short}`, warn: true } : { footer: reading || late ? "" : setupFooter(st) };
   if (!footer.footer) delete footer.footer;
-  return [
-    { header: "Set Up", rows, ...footer },
-    { rows: [{ label: "How It Works", icon: rowIcon("help"), href: route("how") }] },
-  ];
+  return [{ header: "Set Up", rows, ...footer }, howGroup];
 }
 
 // How It Works (installation/how): the steps of one install, a row each (core HOW_STEPS).
@@ -455,7 +375,6 @@ export function pickRoute(v, { set }) {
 export const subGroups = (sections, sub) => (sub === "iphone" ? sections.slice(1) : sections);
 
 let picked = null; // F300: the choice just tapped, until idevice.status answers on the page it redrew
-let connectBusy = null; // F300: the Connect With pick whose tailscale.setConnect hasn't answered
 const painting = new WeakMap(); // page element → its latest paintInstallation (an older one stops painting)
 let testing = false; // F301: Test Connection runs (its row spins; a second tap waits for it)
 let pairChecking = false; // B320: Install Apps With's check of the kept pairing runs (the Pairing row spins)
@@ -469,15 +388,15 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
   // F301: what the rows show (the last answer at first, then each part as it answers) and each part's state
   let view = lastStatus;
   const cached = Boolean(view);
-  const got = { device: false, tailscale: false }, late = { device: false, tailscale: false };
+  const got = { device: false }, late = { device: false };
   // B320: recheckPairing's spinner here: the Pairing row, not the HUD
   const pairSpin = () => { pairChecking = true; paint(); return () => { pairChecking = false; redraw(); }; };
   const paint = () => {
     if (!mine()) return;
-    const devWait = !got.device && !late.device, tsWait = !got.tailscale && !late.tailscale;
+    const devWait = !got.device && !late.device;
     const sections = installationGroups(choice, view, {
-      reading: devWait && !cached, tsReading: tsWait && !view?.tailscale,
-      refreshing: { device: devWait && cached, tailscale: tsWait && Boolean(view?.tailscale) }, late, testing, pairChecking, switchChecking,
+      reading: devWait && !cached,
+      refreshing: { device: devWait && cached }, late, testing, pairChecking, switchChecking,
       addSwitch: async () => {
         if (switchChecking) return;
         // coming back from Shortcuts repaints the page with a new paintInstallation; this one's paint() then stops,
@@ -488,13 +407,12 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
         if (r.status && view) view = { ...view, vpn: { ...(view.vpn ?? {}), ...r.status } };
         repaint();
       },
-      connectPick, connectBusy, hint: lastStatus, server, picking: devWait && picked === choice,
+      hint: lastStatus, server, picking: devWait && picked === choice,
       failure: choice === "iphone" ? routeFailure() : null, // B316
       fix: () => {
         const f = routeFailure();
-        if (f?.fix === "signIn") return tailscaleSignIn(native, alert, redraw);
         if (!f || f.fix === "check") return check(native, alert, redraw, store);
-        return fixAction(f.fix, native, alert);
+        return fixAction(f.fix);
       },
       // the store's set redraws Settings' pages (this one too); a store that doesn't, redraws it here
       pick: (v) => {
@@ -502,42 +420,14 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
         picked = v; pickRoute(v, { set: (r) => store.set(ROUTE_KEY, r) }); if (mine()) redraw();
         if (v === "iphone" && v !== choice) recheckPairing(native, alert, redraw, { spin: pairSpin }); // B220: set up again, the kept pairing checked
       },
-      openVPN: () => openVPN(native, alert),
-      // F300: checked at once with the spinner in its row (no HUD), until setConnect and then the status answer.
-      // F301: setConnect answers with tailscale.status, which fills the Tailscale part at once.
-      connect: async (v) => {
-        if (connectBusy) return;
-        connectBusy = v;
-        connectPick = v;
-        paint();
-        let ts = null;
-        try { ts = await within(call(native, "tailscale.setConnect", { value: v }), TIMEOUTS.tailscale).catch(() => null); } finally { connectBusy = null; }
-        if (ts && typeof ts === "object" && ts.connect && lastStatus) lastStatus = { ...lastStatus, tailscale: ts };
-        redraw();
-        if (ts) recheckPairing(native, alert, redraw, { spin: pairSpin }); // B220: a new way in, the kept pairing checked over it
-      },
-      signIn: () => tailscaleSignIn(native, alert, redraw),
       test: async () => {
         if (testing) return;
         testing = true;
         paint();
         // F372: the built-in VPN's test (on, one connect with the pairing, off); not paired yet: Pairing first
-        if (builtinVPN(view ?? lastStatus)) {
-          if (!(view ?? lastStatus)?.paired) { testing = false; paint(); return goTo("pair"); }
-          try { await vpnTest(native, alert, store, { ended: () => { testing = false; view = lastStatus; paint(); } }); } finally { if (testing) { testing = false; paint(); } }
-          return;
-        }
-        try { await tailscaleTest(native, alert, () => { testing = false; paint(); }); } finally { if (testing) { testing = false; paint(); } }
+        if (!(view ?? lastStatus)?.paired) { testing = false; paint(); return goTo("pair"); }
+        try { await vpnTest(native, alert, store, { ended: () => { testing = false; view = lastStatus; paint(); } }); } finally { if (testing) { testing = false; paint(); } }
       },
-      signOut: async () => {
-        const { index } = await alert({ title: "Sign Out of Tailscale?", message: `${NAME} leaves your tailnet. Installs use LocalDevVPN until you sign in again.`, buttons: ["Cancel", "Sign Out"], cancel: 0 });
-        if (index !== 1) return;
-        let err = null;
-        await busy("Signing Out", () => call(native, "tailscale.signOut").catch((e) => { err = e; }));
-        if (err) alert({ title: "Couldn't Sign Out", message: err?.message || "No answer.", buttons: ["OK"] });
-        redraw();
-      },
-      busy: signingIn,
     });
     const shown = subGroups(sections, sub);
     patchGroups(el, shown, (s) => {
@@ -547,17 +437,14 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
     });
   };
   paint();
-  // F301: both reads at once; each part fills its rows as it answers. idevice.status is read for the Signing Server
-  // choice too (the choice row's spinner waits on it); tailscale.status only feeds This iPhone's groups.
-  const device = readStatus(native).then(({ st }) => {
+  // F301: idevice.status is read for the Signing Server choice too (the choice row's spinner waits on it)
+  await readStatus(native).then(({ st }) => {
     if (!mine()) return;
     got.device = Boolean(st);
     late.device = !st; // failed or too slow: Not Responding (a failure says no more than that)
     if (st) {
       rememberStatus(st);
-      view = got.tailscale && view?.tailscale ? { ...st, tailscale: view.tailscale } : st;
-      got.tailscale = true;
-      connectPick = null; // the answer carries Connect With now
+      view = st;
     }
     // B316: opened after a failure: the pairing is checked by itself; the page repaints when it passes or fails
     if (st?.paired && choice === "iphone") autoCheck(native, alert, () => { if (mine()) paint(); }, store);
@@ -566,18 +453,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
     if (choice !== "iphone" && !wasPicked) return; // nothing on the page waited on the answer
     paint();
   });
-  const tailscale = choice !== "iphone" ? null : readTailscale(native).then(({ ts }) => {
-    if (!mine() || got.tailscale) return; // idevice.status brought it first
-    if (!ts || typeof ts !== "object") { late.tailscale = true; paint(); return; } // idevice.status may still bring it
-    got.tailscale = true;
-    view = { ...(view ?? {}), tailscale: ts };
-    connectPick = null;
-    paint();
-  });
-  await Promise.all([device, tailscale]);
 }
-
-let connectPick = null; // B167: the Connect With pick just made, until idevice.status answers with it
 
 // F301: a repaint of a page's groups changes only what changed, in place: a group whose rows are the same keeps its
 // element and only the rows whose content changed are swapped (a detail, a spinner, a checkmark), a footer's text is
@@ -641,88 +517,14 @@ function warnFooters(sections) {
   return frag;
 }
 
-// B219: a finished sign-in says nothing and waits for no tap: Settings checks the connection by itself
-// (connectAfterSignIn) and only a failure gets an alert; This iPhone's setup page (`from`, its visit) has no pairing
-// to test yet: its poll starts pairing once the Tailscale VPN is on, and its rows say what it waits for.
-// `spin(label)`: B320, the page's own spinner for the check after it (Settings' main page: its status cell), returning
-// its stop; without it the check spins Test Connection's row.
-async function tailscaleSignIn(native, alert, redraw, from = null, { spin = null } = {}) {
-  if (signingIn) return;
-  signingIn = "Starting…";
-  signInVisit = from;
-  redraw();
-  try {
-    await call(native, "tailscale.signIn", {}, (ev) => {
-      const e = Array.isArray(ev) ? ev[0] : ev;
-      if (e?.step === "login") signingIn = "Log in on the page";
-      if (e?.step === "approval") signingIn = "Waiting for approval";
-      redraw();
-    });
-    signingIn = null;
-    signInVisit = null;
-    redraw();
-    if (from) return;
-    await connectAfterSignIn(native, alert, redraw, { spin });
-  } catch (e) {
-    signingIn = null;
-    signInVisit = null;
-    redraw();
-    if (!/^cancel+ed/.test(e?.message || "") && e?.code !== "canceled") alert({ title: "Couldn't Sign In", message: e?.message || "No answer.", buttons: ["OK"] });
-  }
-}
-
-// B219: right after a sign-in the tailnet is still coming up (the node's map without this iPhone yet, the Tailscale
-// app's VPN reconnecting), so tailscale.test is tried again every `gapMs` while a failure may pass by itself, until
-// `budgetMs` is spent; a failure only the user can fix (approve the device, sign in again, refused, ...) ends it at
-// once. Answers { ok, code, ... } as tailscale.test does (not_responding when it didn't answer in TIMEOUTS.test).
-export const AFTER_SIGN_IN = { budgetMs: 30000, gapMs: 2500 };
-// "error": tailscale.test itself failed (not signed in, the bridge refused it): trying again changes nothing.
-// B246: "not_paired": Tailscale reached iOS and iOS has no pairing; only pairing changes that.
-const FINAL_CODES = new Set(["needs_approval", "expired", "needs_login", "refused", "not_paired", "error"]);
-export async function testUntilConnected(native, now = () => Date.now()) {
-  const t0 = now();
-  for (;;) {
-    let r;
-    try { r = await within(call(native, "tailscale.test"), TIMEOUTS.test); } catch (e) { r = isLate(e) ? { ok: false, code: "not_responding" } : { ok: false, code: "error", detail: e?.message }; }
-    if (r?.ok || FINAL_CODES.has(r?.code) || now() - t0 + AFTER_SIGN_IN.gapMs >= AFTER_SIGN_IN.budgetMs) return r ?? { ok: false };
-    await new Promise((res) => setTimeout(res, AFTER_SIGN_IN.gapMs));
-  }
-}
-
-// B219: Settings' check after a sign-in: Test Connection's spinner (or the HUD) while testUntilConnected runs, then
-// the page redrawn on its connected state with no alert. A connection made, or refused, goes on to B220's check of the
-// kept pairing (recheckPairing forgets a refused one and starts pairing again, with its own alert). Any other failure
-// shows Test Connection's alert for it. Answers "ok", "repair" or the failing code.
-// B320: `spin(label)` (returning its stop) is the page's spinner for both checks, no HUD (docs/settings.md): Settings'
-// main page spins its status cell. Without it, Test Connection's row spins; `hud` (no row to spin, no spinner given)
-// is the HUD.
-export async function connectAfterSignIn(native, alert, redraw, { hud = false, spin = null } = {}) {
-  const rowSpin = () => { testing = true; redraw(); return () => { testing = false; redraw(); }; };
-  const s = spin ?? (hud ? null : rowSpin);
-  let r;
-  if (!s) r = await busy("Checking Connection", () => testUntilConnected(native));
-  else {
-    const stop = s("Checking Connection");
-    try { r = await testUntilConnected(native); } finally { stop(); }
-  }
-  // B246: not_paired with a pairing kept here means the phone forgot it: the same check forgets it and pairs again
-  if (r?.ok || r?.code === "refused" || (r?.code === "not_paired" && r.paired)) {
-    const how = await recheckPairing(native, alert, redraw, { spin: s });
-    if (r.ok) return "ok";
-    if (how === "repair" || how === "ok") return how; // ok: the pairing answered after all
-  }
-  await testAlert(alert, r);
-  return r?.code ?? "error";
-}
-
-// B220: setting Tailscale up again with a pairing kept used to skip the pairing, and every connect was then refused.
-// After a sign-in the kept pairing is checked once (the VPN route on); when the phone no longer accepts it
+// B220: choosing This iPhone again with a pairing kept used to skip the pairing, and every connect was then refused.
+// The kept pairing is checked once (the VPN route on); when the phone no longer accepts it
 // (verifyFailure's `unusable`: refused, or turned down) it is forgotten and the pair step runs again on Pairing. Other
 // failures (the VPN off, no answer) say nothing here: Check Connection explains them.
 // A refusal is tried again once after `retryMs` before the pairing is forgotten: remotepairingd restarting (the VPN
 // just came back) refuses for a moment, and redoing the pair step costs the user the 6-digit code.
-// B320: a pairing the phone answers and then drops (turnedDown, e.g. "connection invalidated" seen on the iPhone 15 Pro
-// right after a Tailscale sign-in) is tried once more too, and still dropped it is forgotten and pairing starts by
+// B320: a pairing the phone answers and then drops (turnedDown, e.g. "connection invalidated" seen on the iPhone 15 Pro)
+// is tried once more too, and still dropped it is forgotten and pairing starts by
 // itself, as a refused one: the user was left to find Forget Pairing. `spin(label)` (returning its stop) spins the
 // page's own row instead of the HUD.
 export const recheckHooks = { goPair: () => goTo("pair"), retryMs: 3000 }; // tests
@@ -738,7 +540,7 @@ export function turnedDown(why, err) {
 }
 export async function recheckPairing(native, alert, redraw, { spin = null } = {}) {
   const st = await status(native);
-  if (!st?.paired || !vpnOn(st)) return "skipped";
+  if (!st?.paired || !builtinVPN(st)) return "skipped";
   const verify = async () => {
     try { await within(call(native, "idevice.verify"), TIMEOUTS.verify); return null; } catch (e) { lastErr = e; return isLate(e) ? { late: true } : verifyFailure(e, st); }
   };
@@ -762,59 +564,12 @@ export async function recheckPairing(native, alert, redraw, { spin = null } = {}
   return "repair";
 }
 
-// F301: the test runs with the spinner in its own row (installationGroups' `testing`, no HUD), at most TIMEOUTS.test;
-// `ended()` stops the row's spinner before the answer's alert.
-// B274: with `verify`, tailscale.test also connects once with the kept pairing through Tailscale (idevice.verify), so
-// Connected means an install would connect; its deadline adds idevice.verify's.
-async function tailscaleTest(native, alert, ended = () => {}) {
-  let r;
-  const ms = TIMEOUTS.test + TIMEOUTS.verify;
-  try { r = await within(call(native, "tailscale.test", { verify: true }), ms); } catch (e) { r = isLate(e) ? { ok: false, code: "not_responding" } : { ok: false, code: "error", detail: e?.message }; }
-  ended();
-  if (r?.ok && r.verified) clearRouteFailure(); // B316: the pairing answered through Tailscale
-  else if (r?.code === "not_responding") rememberRouteFailure(NO_ANSWER_FAILURE);
-  else if (r?.code === "verify_failed") rememberRouteFailure(routeFailureOf({ message: String(r.detail || "connect_failed: Tailscale") }));
-  else if (["refused", "route_refused", "needs_login", "expired", "not_paired"].includes(r?.code)) rememberRouteFailure(routeFailureOf({ code: r.code, message: `${r.code}: ${r.detail || "Tailscale"}` }));
-  return testAlert(alert, r, { native, ms });
-}
-
-// tailscale.test's answer `r` as an alert (core tailscaleTestResult; Copy Rule when the tailnet's rules block it).
-// B274: Pair Again (`again`: the phone no longer accepts the kept pairing) forgets it and opens the pairing page.
-async function testAlert(alert, r, { native = null, ms = TIMEOUTS.test } = {}) {
-  const why = r?.code === "not_responding"
-    ? { title: NOT_RESPONDING, message: `Tailscale didn't answer in ${Math.round(ms / 1000)} seconds. Check that the Tailscale app's VPN is on, then test again.` }
-    : tailscaleTestResult(r);
-  if (why.again) {
-    const { index } = await alert({ title: why.title, message: why.message, buttons: ["Cancel", "Pair Again"], cancel: 0 }) || {};
-    if (index !== 1) return;
-    await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {}));
-    forgetStatus();
-    if (visit) visit.started = false;
-    recheckHooks.goPair();
-    return;
-  }
-  if (why.pair) { // B246: the route works, the pairing is missing: Pair opens the pairing page
-    const { index } = await alert({ title: why.title, message: why.message, buttons: ["Not Now", "Pair"], cancel: 0 });
-    if (index === 1) recheckHooks.goPair();
-    return;
-  }
-  if (!why.copy) return alert({ title: why.title, message: why.message, buttons: ["OK"] });
-  const { index } = await alert({ title: why.title, message: why.message, buttons: ["OK", "Copy Rule"], cancel: 0 });
-  if (index === 1) copyText(why.copy);
-}
-
-async function openVPN(native, alert) {
-  let r = null;
-  try { r = await busy(`Opening ${VPN}`, () => call(native, "idevice.openLocalDevVPN")); } catch { /* below */ }
-  if (!r?.opened) await alert({ title: `${VPN} Isn't Installed`, message: `Get ${VPN} from the App Store, open it and turn it on.`, buttons: ["OK"] });
-}
-
 // ---- Installation & Signing's main page (F284, option B of the concept)
 // Built once and updated in place: every row is there from the first frame, and an answer from the bridge only fills
 // a slot (the grey spinner while it loads, then the value fades in: opacity only, settings.css .value-slot). Answers
 // never add or remove rows or change footers; only a tap changes the layout (by opening another page).
 //   (top)         the status cell (core installStatus: two lines, always two lines tall) and one action row whose
-//                 label changes (Check Connection, Open LocalDevVPN, Start Pairing, Sign In to Tailscale…)
+//                 label changes (Check Connection, Start Pairing, Add Install Switch…)
 //   Install Apps With  F372/F392: This iPhone and Signing Server: a tap uses that way (a checkmark on the one in use),
 //                 the detail disclosure opens its page (installation/iphone: Set Up, How It Works; installation/server)
 //   Signing       Certificate > (days left), Signed Apps > (count)
@@ -878,7 +633,6 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
   const subtitle = slotOf(statusCell.querySelector(".cell-subtitle"), CHECKING.subtitle);
   const actionLabel = actionCell.querySelector(".cell-label");
   const checkButton = checkMark(actionCell); // B135: Check Connection's answer on the action row
-  const cellSpin = checkMark(statusCell); // B320: the status cell's spinner while a sign-in's checks run (spinStatus)
   actionCell.classList.add("is-dim");
   actionCell.setAttribute("aria-disabled", "true");
   // F392: the checkmark on the way in use (both rows have one, shown by opacity: settings.css .route-pick) and, beside
@@ -913,8 +667,7 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
   let known; // idevice.status once read
   let certRead = false; // B250: signing() has answered once (or failed)
   let certificate; // B250: signing.status has an identity (signing()'s `ready`); undefined until read
-  const paintStatus = (s, { force = false } = {}) => {
-    if (cellSpin.spinning() && !force) return; // B320: a sign-in's checks hold the cell (spinStatus) until they end
+  const paintStatus = (s) => {
     now = s;
     icon.className = `status-icon tone-${s.tone}`;
     title.set(s.title, { red: Boolean(s.red) });
@@ -985,24 +738,12 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
     await Promise.all(reads);
   };
   const after = () => refresh({ auto: false });
-  // B320: the checks after a Tailscale sign-in ("Checking Connection", "Checking Pairing") as the status cell's own
-  // wait: Checking… with the step under it and the grey spinner in its row, the action row dimmed
-  const spinStatus = (label) => {
-    paintStatus({ ...CHECKING, subtitle: `${label}…` }, { force: true });
-    return cellSpin.spinning() ? () => {} : cellSpin.spin(); // never two spinners in the cell
-  };
   const runAction = async (a) => {
     if (a === "check") return check(native, alert, after, store, checkButton).then(after);
     if (a === "checkServer") return checkServer();
-    if (a === "openVPN") return openVPN(native, alert).then(refresh);
     if (a === "pair") return goTo("pair");
     if (a === "certificate") return navGo(links.certificate); // B250: the Certificate page, as its row opens
     if (a === "shortcuts") return goTo("shortcuts"); // F372: on cellular without the Cellular Shortcuts
-    // B320: redrawn without its automatic check (it failed while signing in and drew an x on this row), and the check
-    // after it spins the status cell instead of a HUD
-    if (a === "signIn") return tailscaleSignIn(native, alert, after, null, { spin: spinStatus }).then(after);
-    if (a === "openTailscale") return openTailscaleApp(native, alert);
-    if (a === "useTailscale") { await busy("Switching", () => call(native, "tailscale.setConnect", { value: "auto" }).catch(() => {})); return refresh(); }
   };
   return { el: box, refresh, known: () => known, status: () => now };
 }
@@ -1015,19 +756,18 @@ let visit = null; // this visit of the page: { started, asked, failed, poll }; n
 
 // The page's groups for `state` (core setupState) and the pairing `p` (pure, for tests). The code and the steps
 // with their screenshots are drawn after the groups marked `pin` and `guide` (drawPair).
-// "checking" is drawn at once while idevice.status answers, with a spinner (`spinner` marks the group). "connect"
-// draws the way to connect `vpn` (core vpnRoute) with connectGroups.
+// "checking" is drawn at once while idevice.status answers, with a spinner (`spinner` marks the group). "noVPN"
+// says the profile has no Network Extensions (core NO_VPN).
 export const IMPORT_PAIRING = "Import Pairing File";
 export const TESTING_AFTER_PAIRING = "Testing the Connection…";
-export function setupGroups(state, st, p, { openVPN = () => {}, retry = () => {}, check = () => {}, forget = () => {}, failed = false,
-  vpn = "localdevvpn", choose = () => {}, signIn = () => {}, openTailscale = () => {}, install = () => {}, installTailscale = () => {}, busy = null,
+export function setupGroups(state, st, p, { retry = () => {}, check = () => {}, forget = () => {}, failed = false,
   importFile = () => {} } = {}) {
   const intro = { header: "Install on This iPhone", footer: IPHONE_INTRO };
   if (state === "paired") {
     return [intro,
       { rows: [{ label: "Paired", checked: true, cls: "pair-done" }] },
       { rows: [{ label: "Check Connection", cls: "sign-import", onClick: check }],
-        footer: `Checks that ${NAME} can reach this iPhone through ${vpnList()}.` },
+        footer: `Checks that ${NAME} can reach this iPhone through ${BUILTIN_VPN}.` },
       { rows: [{ label: "Forget Pairing", cls: "sign-import", onClick: forget }] }];
   }
   // F317: one group per numbered step (AGENTS.md, Hints), never the steps joined into one footer; the last step's
@@ -1039,12 +779,8 @@ export function setupGroups(state, st, p, { openVPN = () => {}, retry = () => {}
   }
   if (state === "checking") return [intro, { spinner: "Checking…" }];
   if (state === "testing") return [intro, { spinner: TESTING_AFTER_PAIRING }]; // B357: pairing's last step (finishSetup)
-  if (state === "connect") {
-    // B133: while the page polls for the VPN (its way known and nothing left to tap but the app), say so with a spinner
-    const waitFor = vpn === "localdevvpn" ? VPN : vpn === "tailscale" && st?.tailscale?.signedIn && !busy ? "Tailscale" : null;
-    return [intro, ...connectGroups(vpn, st, { openVPN, choose, signIn, openTailscale, install, installTailscale, busy }), ...(waitFor ? [{ spinner: vpnWaitText(waitFor) }] : [])];
-  }
-  const conn = { rows: [{ label: st ? verifyVPN(st) : VPN, detail: "On" }] }; // B277: the VPN that's on (Tailscale's too)
+  if (state === "noVPN") return [intro, { rows: [{ label: "Network Extensions", detail: "Missing" }], footer: NO_VPN.message, warn: true }];
+  const conn = { rows: [{ label: BUILTIN_VPN, detail: "On" }] }; // B277: the VPN that's on
   const line = failed && !p ? `Pairing stopped.` : p ? pairFooter(p) : "Starting…";
   // B133: while idevice.pair runs, the code's place spins until the code comes, and the step line spins with it
   // (waiting for the iPhone to connect, pairing) unless a try failed (then it waits on a tap on the iPhone).
@@ -1055,58 +791,11 @@ export function setupGroups(state, st, p, { openVPN = () => {}, retry = () => {}
     ...(failed && !p ? [{ rows: [{ label: "Try Again", cls: "sign-import", onClick: retry }] }] : [])];
 }
 
-// The VPN is off: what to turn on, from the VPN apps installed (core vpnRoute's answer `vpn`).
-//   localdevvpn  its state and Open LocalDevVPN
-//   tailscale    Sign In (or its state once signed in) and Open Tailscale
-//   ask          both installed: Connect With, LocalDevVPN or Tailscale; the answer is kept
-//   none         neither: Install LocalDevVPN (its App Store page), Tailscale named as the other way
-export const NO_VPN_FOOTER = `${NAME} pairs and installs through ${VPN}, a free app. This page checks again when you come back.`;
-export const NO_VPN_TAILSCALE_FOOTER = "The other way in: install Tailscale and sign in to it.";
-export const TAILSCALE_STORE = "https://apps.apple.com/app/tailscale/id1470499037";
-export function connectGroups(vpn, st, { openVPN = () => {}, choose = () => {}, signIn = () => {}, openTailscale = () => {}, install = () => {},
-  installTailscale = () => {}, busy = null } = {}) {
-  const goesOn = "This page goes on by itself when it's on.";
-  if (vpn === "ask") {
-    return [{
-      header: "Connect With",
-      rows: VPNS.map((label) => ({ label, onClick: () => choose(label.toLowerCase()) })),
-      footer: `${VPNS.join(" and ")} are both installed. Pick the one ${NAME} pairs and installs through; Connect With in Installation & Signing changes it later.`,
-    }];
-  }
-  if (vpn === "tailscale") {
-    const ts = st?.tailscale ?? null;
-    const rows = busy
-      ? [{ label: "Signing In…", detail: busy, spin: true }]
-      : !st ? [{ label: "Tailscale", detail: "Checking…", spin: true }] // B167: no status yet is unknown, not signed out
-      : ts?.signedIn ? [{ label: "Tailscale", detail: ts.address ? "On" : "Off" }] : [{ label: "Sign In", cls: "sign-import", onClick: signIn }];
-    rows.push({ label: "Open Tailscale", cls: "sign-import", onClick: openTailscale });
-    return [{
-      header: "Tailscale",
-      rows,
-      footer: ts?.signedIn ? `Turn on the Tailscale app's VPN. ${goesOn}` : `Sign ${NAME} in to your tailnet, then turn on the Tailscale app's VPN. ${goesOn}`,
-    }];
-  }
-  if (vpn === "none") {
-    // F317: one group per way in (AGENTS.md, Hints): LocalDevVPN's with its hint, Tailscale's with its own
-    return [{
-      rows: [{ label: VPN, detail: "Not Installed" }, { label: `Install ${VPN}`, cls: "sign-import", onClick: install }],
-      footer: NO_VPN_FOOTER,
-    }, {
-      rows: [{ label: "Install Tailscale", cls: "sign-import", onClick: installTailscale }],
-      footer: NO_VPN_TAILSCALE_FOOTER,
-    }];
-  }
-  return [{
-    rows: [{ label: VPN, detail: vpnDetail(st) }, { label: `Open ${VPN}`, cls: "sign-import", onClick: openVPN }],
-    footer: `Turn on ${VPN} to pair. ${goesOn}`,
-  }];
-}
-
 // setupGroups' sections as DOM: the code after the `pin` group, the steps after the `guide` group's header, and the
 // grey spinner with its line in the `spinner` group (packages.css .loading; settings.css .pair-wait when it sits in a
 // group with a header), and the spinner on rows marked `spin`.
 export function pairSections(sections) {
-  const frag = spinRows(grouped(sections), sections);
+  const frag = spinRows(warnFooters(sections), sections);
   const groups = [...frag.children];
   sections.forEach((s, i) => {
     if (s.pin) groups[i].append(el("p", "pair-code", pinText(pairing?.pin) || "––– –––"));
@@ -1119,23 +808,6 @@ export function pairSections(sections) {
     }
   });
   return frag;
-}
-
-// Opens another app or its App Store page; says so when iOS couldn't.
-async function openApp(native, alert, url, name) {
-  let opened = false;
-  try { opened = (await busy(`Opening ${name}`, () => call(native, "app.openURL", { url })))?.opened === true; } catch { /* below */ }
-  if (!opened) await alert({ title: `Couldn't Open ${name}`, message: "Try again.", buttons: ["OK"] });
-}
-
-// B323: Open Tailscale launches the app by its bundle ID (a tailscale: link shows Tailscale's "Could not sign
-// device"); when iOS won't, it says plainly to open Tailscale, with its App Store page one tap away.
-async function openTailscaleApp(native, alert) {
-  let opened = false;
-  try { opened = await busy("Opening Tailscale", () => openTailscale((m, p) => call(native, m, p))); } catch { /* below */ }
-  if (opened) return;
-  const r = await alert({ title: "Couldn't Open Tailscale", message: OPEN_TAILSCALE_BY_HAND, buttons: ["OK", "App Store"], cancel: 0 });
-  if (r?.index === 1) await openApp(native, alert, TAILSCALE_STORE, "App Store");
 }
 
 // The steps: a short line each, and the screenshot of the Settings row to tap, ringed.
@@ -1165,8 +837,8 @@ export function pairGuide(guide = PAIR_GUIDE) {
 }
 
 // While pairing, the app is in the background (the code is typed in Settings) and events sent then may never reach
-// the page: coming back, it reads the pairing from native, or rechecks the VPN while it waits for one. Leaving the
-// page ends the pairing.
+// the page: coming back, it reads the pairing from native, or reads idevice.status again. Leaving the page ends the
+// pairing.
 // B300: by the page the hash shows, so the Pairing page opened on another page's stack (Install IPAs' Set Up Signing:
 // #/home/~installed/myipas/~settings/installation/pair) is the Pairing page too. Pure (hash in), for the tests.
 export const isPairHash = (hash) => format(mounted(parse(hash))) === format(mounted(parse(route("pair"))));
@@ -1174,40 +846,32 @@ function onPairPage() { return isPairHash(location.hash); }
 async function reread() {
   if (!shown || document.visibilityState !== "visible") return;
   const { native, redraw } = shown;
-  if (!pairing) { if (visit) redraw(); return; } // the VPN may be on now
+  if (!pairing) { if (visit) redraw(); return; }
   let st = null;
   try { st = await call(native, "idevice.pairState"); } catch { return; }
   const now = pairFromNative(st);
   if (now && pairing) { pairing = now; redraw(); } // not active: idevice.pair's reply settles it
 }
-export function leave() { // also for tests: ends a visit (its VPN poll) without a hashchange
+export function leave() { // also for tests: ends a visit without a hashchange
   const was = visit;
-  if (visit?.poll) clearInterval(visit.poll);
   visit = null;
   if (was && pairing && shown) {
     call(shown.native, "idevice.pairCancel").catch(() => {}); // once, not again on the hashchange after Leave
     pairing = null; // B320: coming back starts (or rejoins: the shell keeps it a while) at once, not on this one's answer
   }
-  if (was && signingIn && signInVisit === was && shown) { // B143: the sign-in this page started (an older shell has no such call)
-    signInVisit = null;
-    call(shown.native, "tailscale.signInCancel").catch(() => {});
-  }
 }
 
 // B134: leaving the page while a step runs asks first (core leaveQuestion): "pairing" while idevice.pair waits (the
 // code coming or being typed), "checking" while the page's spinner waits on idevice.status; null otherwise (paired,
-// waiting for the VPN to come on, Try Again: nothing runs that leaving would stop). B143: "signingIn" while a Tailscale
-// sign-in this visit started runs (Starting…, Waiting for approval; its login page covers the app in between), and Leave
-// stops it with tailscale.signInCancel.
+// Try Again: nothing runs that leaving would stop).
 export function pendingStep(onPage = onPairPage()) {
   if (!visit || !onPage) return null;
   if (pairing) return "pairing";
-  if (signingIn && signInVisit === visit) return "signingIn";
   return visit.checking ? "checking" : null;
 }
 
 // Asks "Stop Setting Up?"; true when the step is gone (it ended while asking, or Leave: the visit ends and the pairing
-// or Tailscale sign-in is cancelled, as a plain leave() does). The page itself is left by the caller.
+// is cancelled, as a plain leave() does). The page itself is left by the caller.
 let asking = null;
 export function askLeave(alert = showAlert, onPage) {
   const q = leaveQuestion(pendingStep(onPage));
@@ -1278,26 +942,19 @@ async function finishSetup(v, native, alert, store, redraw) {
   try { await vpnTest(native, alert, store, { ended: done }); } finally { done(); }
 }
 
-async function vpnApps(native) { try { return await call(native, "idevice.vpnApps"); } catch { return null; } }
-
 async function drawPair(box, { store, native, alert, redraw }) {
   shown = { native, redraw };
-  visit ??= { started: false, asked: false, failed: false, poll: null };
+  visit ??= { started: false, failed: false };
   const v = visit;
   if (v.testing) { box.replaceChildren(pairSections(setupGroups("testing"))); return; } // B357: the test after pairing runs
   // B120: the page draws at once, a spinner while idevice.status answers (a redraw keeps what is on screen).
   if (!pairing && !box.firstChild) { box.replaceChildren(pairSections(setupGroups("checking"))); v.checking = true; } // B134: asked before leaving
   // In pairing mode the page draws from `pairing` alone, without waiting on idevice.status.
-  const [st, apps] = pairing ? [null, null] : await Promise.all([status(native), vpnApps(native)]);
+  const st = pairing ? null : await status(native);
   if (v !== visit) return; // left while idevice.status answered
   v.checking = false;
   rememberStatus(st);
   const state = setupState(st, pairing);
-  if (state !== "connect" && v.poll) { clearInterval(v.poll); v.poll = null; }
-  const connect = st?.tailscale?.connect ?? "auto";
-  const vpn = vpnRoute(apps, connect);
-  // Only Tailscale installed: acting on it makes Connect With Tailscale, as picking it does when both are.
-  const useTailscale = () => connect === "tailscale" ? Promise.resolve() : call(native, "tailscale.setConnect", { value: "tailscale" }).catch(() => {});
 
   const start = async () => {
     if (pairing) return;
@@ -1334,11 +991,10 @@ async function drawPair(box, { store, native, alert, redraw }) {
   const recheck = () => { if (visit === v && !pairing) box.replaceChildren(); return redraw(); };
   let checkButton = null; // B135: the Check Connection button's answer, set once the rows are drawn
   let input = null; // the pairing file picker, made below for the "file" state
-  // B321: in pairing mode st is null (not read again); the VPN row names the way in from the last answer (Tailscale too)
+  // B321: in pairing mode st is null (not read again)
   const sections = setupGroups(state, st ?? (pairing ? cachedStatus() : null), pairing, {
     importFile: () => input?.click(),
     failed: v.failed,
-    openVPN: () => openVPN(native, alert),
     retry: start,
     check: () => check(native, alert, recheck, store, checkButton),
     forget: async () => {
@@ -1346,13 +1002,6 @@ async function drawPair(box, { store, native, alert, redraw }) {
       forgetStatus(); // F301: the cached answer says Paired
       store.set(ROUTE_KEY, "server"); v.started = false; recheck();
     },
-    vpn,
-    busy: signingIn,
-    choose: async (value) => { await busy("Switching", () => call(native, "tailscale.setConnect", { value }).catch(() => {})); recheck(); },
-    signIn: async () => { await useTailscale(); tailscaleSignIn(native, alert, () => { if (visit === v) redraw(); }, v); }, // B143: once left, an ending sign-in mustn't draw the page (a new visit and its poll)
-    openTailscale: async () => { await useTailscale(); openTailscaleApp(native, alert); },
-    install: () => openApp(native, alert, LOCALDEVVPN_STORE, "App Store"),
-    installTailscale: () => openApp(native, alert, TAILSCALE_STORE, "App Store"),
   });
   if (state === "paired" && store.get(ROUTE_KEY) !== "iphone") store.set(ROUTE_KEY, "iphone"); // picked This iPhone, already paired
   const frag = pairSections(sections);
@@ -1384,20 +1033,7 @@ async function drawPair(box, { store, native, alert, redraw }) {
   }
   box.replaceChildren(frag);
 
-  if (state === "connect") {
-    // F301: one read at a time (a read slower than VPN_POLL used to start the next one on top of it)
-    v.poll ??= setInterval(async () => {
-      if (visit !== v || pairing || v.polling) return;
-      v.polling = true;
-      try { if (visit === v && !pairing && vpnOn(await status(native))) redraw(); } finally { v.polling = false; }
-    }, VPN_POLL);
-    const ask = connectAlert(vpn);
-    if (ask && !v.asked) {
-      v.asked = true;
-      const { index } = await alert({ ...ask, cancel: 0 }) || {};
-      if (index === ask.open) openVPN(native, alert);
-    }
-  } else if (state === "pairing" && !pairing && !v.started) {
+  if (state === "pairing" && !pairing && !v.started) {
     start();
   } else if (state === "paired") {
     autoCheck(native, alert, recheck, store, checkButton); // B316: opened after a failure, or just paired again: checks by itself
@@ -1407,12 +1043,12 @@ async function drawPair(box, { store, native, alert, redraw }) {
 // B135: Check Connection answers on its own button (`mark`, checkMark below): a success is a check and a green
 // "Successful" in place of the label, no alert; a failure keeps the alert and puts an x on the button.
 // F301: the check runs with the spinner on its own button (no HUD) and at most TIMEOUTS.verify. It reads
-// idevice.status first (under a second): with neither LocalDevVPN nor Tailscale's route on, idevice.verify could only
-// wait out its 30 s tunnel limit, so the answer (Turn On LocalDevVPN) comes at once instead.
+// idevice.status first (under a second): without the built-in VPN (no Network Extensions) idevice.verify can't
+// connect, so the answer (core NO_VPN) comes at once instead.
 // B316: a check that passes clears the remembered route failure (Installation & Signing and Home go green); one that
-// fails to reach the phone remembers it (core routeFailureOf: Tailscale's state before the pairing). `quiet`: the
+// fails to reach the phone remembers it (core routeFailureOf). `quiet`: the
 // automatic check when a page opens after a failure (autoCheck): no alert, the status and the button's x say it.
-// A failure whose fix isn't Pair Again (Tailscale signed out or off, every connection refused) offers its fix button.
+// A failure whose fix isn't Pair Again (every connection refused, no Network Extensions) offers its fix button.
 async function check(native, alert, redraw, store, mark = null, { quiet = false } = {}) {
   if (mark?.spinning() || checking) return; // a second tap while it checks
   checking = true;
@@ -1423,17 +1059,12 @@ let checking = false;
 // at most once every AUTO_CHECK.gapMs (moving between those pages doesn't check again at once).
 export const AUTO_CHECK = { gapMs: 15000, last: 0 };
 export function autoCheck(native, alert, redraw, store, mark = null, now = Date.now()) {
-  // B320: not while Tailscale signs in: the sign-in checks by itself once it's in (connectAfterSignIn), and a check
-  // run now fails (still signed out) and drew its x on the row just tapped
-  if (!routeFailure() || store.get(ROUTE_KEY) !== "iphone" || checking || signingIn || now - AUTO_CHECK.last < AUTO_CHECK.gapMs) return null;
+  if (!routeFailure() || store.get(ROUTE_KEY) !== "iphone" || checking || now - AUTO_CHECK.last < AUTO_CHECK.gapMs) return null;
   AUTO_CHECK.last = now;
   // the gap counts from the end too: a slow check (up to TIMEOUTS.verify) isn't followed by another at once
   return check(native, alert, redraw, store, mark, { quiet: true }).finally(() => { AUTO_CHECK.last = Math.max(AUTO_CHECK.last, Date.now()); });
 }
-async function fixAction(fix, native, alert) {
-  if (fix === "signIn") return goTo("with");
-  if (fix === "openTailscale") return openTailscaleApp(native, alert);
-  if (fix === "openVPN") return openVPN(native, alert);
+async function fixAction(fix) {
   if (fix === "pair") return goTo("pair");
   if (fix === "shortcuts") return goTo("shortcuts"); // F372
   return undefined;
@@ -1441,14 +1072,14 @@ async function fixAction(fix, native, alert) {
 async function checkOnce(native, alert, redraw, store, mark = null, { quiet = false } = {}) {
   mark?.reset();
   const stop = mark?.spin() ?? (() => {});
-  let st = null; // B258: the failure names the VPN this check went through
+  let st = null;
   try {
     st = await status(native);
     rememberStatus(st);
     // B381: coming back to this page redraws it and checks by itself; that must never open Shortcuts. Check Connection
     // (tapped) still does.
     if (quiet && switchWouldRun(st)) { stop(); return undefined; }
-    if (st && !vpnOn(st)) { stop(); throw Object.assign(new Error("connect_failed: neither LocalDevVPN nor Tailscale is on"), { code: "connect_failed" }); }
+    if (st && !builtinVPN(st)) { stop(); throw Object.assign(new Error("connect_failed: no Network Extensions"), { code: "connect_failed" }); }
     try { await within(call(native, "idevice.verify", ...(quiet ? [{ quiet: true }] : [])), TIMEOUTS.verify); } finally { stop(); }
     clearRouteFailure(); // B316
     if (store.get(ROUTE_KEY) !== "iphone") store.set(ROUTE_KEY, "iphone"); // a set redraws Settings' pages, and the mark with them
@@ -1457,7 +1088,7 @@ async function checkOnce(native, alert, redraw, store, mark = null, { quiet = fa
   } catch (e) {
     if (quiet && (e?.code ?? String(e?.message ?? e).split(":")[0]) === "switch_needed") return undefined; // B395: it would open Shortcuts
     const why = isLate(e)
-      ? { title: NOT_RESPONDING, message: `This iPhone didn't answer in ${TIMEOUTS.verify / 1000} seconds. Check that ${st ? verifyVPN(st) : `${VPN} (or Tailscale)`} is on, then check again.`, again: false }
+      ? { title: NOT_RESPONDING, message: `This iPhone didn't answer in ${TIMEOUTS.verify / 1000} seconds. Check that the VPN is on, then check again.`, again: false }
       : verifyFailure(e, st);
     rememberRouteFailure(isLate(e) ? NO_ANSWER_FAILURE : routeFailureOf(e, st)); // B316
     mark?.show(false);
@@ -1465,7 +1096,7 @@ async function checkOnce(native, alert, redraw, store, mark = null, { quiet = fa
     try {
       if (why.fix && why.button) {
         const { index } = await alert({ title: why.title, message: why.message, buttons: ["OK", why.button], cancel: 0 }) || {};
-        if (index === 1) await fixAction(why.fix, native, alert);
+        if (index === 1) await fixAction(why.fix);
         return undefined;
       }
       if (!why.again) return await alert({ title: why.title, message: why.message, buttons: ["OK"] });
@@ -1529,7 +1160,7 @@ export function checkMark(inner, text = STATUS_ACTIONS.check) {
 }
 
 // B148: This iPhone's page (installation/iphone) shown again, Back from Pairing: idevice.status read again and each
-// row's detail (Pairing: Paired / Not Paired, the VPN, Tailscale's Device) put on the row already drawn, in place.
+// row's detail (Pairing: Paired / Not Paired) put on the row already drawn, in place.
 // Rows the fresh answer would add or drop (Developer Mode once paired) wait for the page's next full draw.
 export function installationRows(sub, st, { store } = {}) {
   const choice = sub === "iphone" ? "iphone" : store.get(ROUTE_KEY);

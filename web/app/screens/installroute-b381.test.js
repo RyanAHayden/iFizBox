@@ -27,7 +27,7 @@ test("the Install Switch's end runs only when the run turned data off or another
   assert.equal(needed({ dataBack: true, vpnBack: true }), false);
   assert.equal(needed({ dataOff: true }), true, "data is off");
   assert.equal(needed({ dataOff: true, dataBack: true }), false, "cellular is in use: data is on");
-  assert.equal(needed({ vpnBefore: true }), true, "Tailscale was on and isn't");
+  assert.equal(needed({ vpnBefore: true }), true, "another VPN was on and isn't");
   assert.equal(needed({ vpnBefore: true, vpnBack: true }), false, "the user turned it on again");
   assert.equal(needed({ dataOff: true, vpnBefore: true, vpnBack: true }), true, "the VPN is back, data isn't");
   assert.equal(needed({ dataOff: true, dataBack: true, vpnBefore: true }), true);
@@ -43,7 +43,7 @@ test("the end is wired to the rule, and coming to the front ends nothing before 
   assert.match(swift, /if !notOpened\(r\.error\) \{ lock\.lock\(\); switchDataOff = true/);
 });
 
-const ST = ({ other = false, cellular = false, added = true } = {}) => ({ paired: "rp", localDevVPN: false, otherVPN: other, tunnels: other ? ["utun4"] : [],
+const ST = ({ other = false, cellular = false, added = true } = {}) => ({ paired: "rp", otherVPN: other, tunnels: other ? ["utun4"] : [],
   vpn: { available: true, tested: true, cellular, wifi: !cellular, shortcuts: { switch: added } } });
 
 test("switchWouldRun follows the app's rule for the start", () => {
@@ -68,7 +68,7 @@ test("coming back to the page after a failed install: the automatic check never 
     await autoCheck(native, async () => assert.fail("no alert"), () => {}, iphone, null, 100000);
     return calls;
   };
-  assert.deepEqual(await run(ST({ other: true })), ["idevice.status"], "Tailscale on: no connect, so no Shortcuts");
+  assert.deepEqual(await run(ST({ other: true })), ["idevice.status"], "another VPN on: no connect, so no Shortcuts");
   assert.ok(routeFailure(), "the failure stays until Check Connection or an install passes");
   assert.deepEqual(await run(ST({ cellular: true })), ["idevice.status"]);
   assert.deepEqual(await run(ST()), ["idevice.status", "idevice.verify"], "Wi-Fi, no other VPN: checks as before");

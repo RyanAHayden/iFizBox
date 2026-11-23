@@ -1,7 +1,7 @@
 // The built-in VPN for This iPhone installs (sideload build only): the app's side of PlugIns/iFizBoxVPN.appex
 // (../Extension/PacketTunnelProvider.swift, the phone at 10.7.0.1). IDevice.Session turns it on just before it
 // connects to iOS and off a moment after the last connection ends (`linger`, so a queue of installs or a reconnect
-// keeps it), so the user's own VPN (Tailscale) is paused only while an app installs; iOS brings it back through its
+// keeps it), so the user's own VPN (another app's) is paused only while an app installs; iOS brings it back through its
 // VPN On Demand.
 // On cellular (cellular in use, no Wi-Fi), with the user's two Shortcuts added (Settings > Installation & Signing >
 // This iPhone > Cellular Shortcuts), "Cellular Data Off" runs just before the connect and "Cellular Data On" once it
@@ -9,13 +9,13 @@
 // (journal/2026-11-21-r72-cellular-this-iphone). They run through Shortcuts' x-callback-url, which comes back to the
 // app (ifizbox://vpn-shortcut, App.swift's Incoming hands it here).
 // F386: with the Install Switch added instead (one Shortcut, tools/shortcuts/install-switch.plist), the first connect
-// of a queue runs it once with {"start":1}: it remembers the VPN that is on (Tailscale) and connects this VPN with
+// of a queue runs it once with {"start":1}: it remembers the VPN that is on (another app's) and connects this VPN with
 // Shortcuts' Set VPN, which iOS does without a prompt (R76). B375: on cellular it runs once more with {"dataOff":1}
 // once up() has this VPN connected: iOS starts no VPN without a network, and a VPN that is up stays up when data goes
 // off. Once the VPN has gone off after the last connect (`linger`), it runs with {"end":1[,"cellular":1]}: Cellular
 // Data back on and the remembered VPN connected again. One hop to Shortcuts each way per queue (two at the start on
 // cellular), not per app. An end that finds the app in the background waits until it is in front again.
-// F388: the start runs only when it is needed (switchNeeded): on cellular, or with another VPN up (Tailscale). On
+// F388: the start runs only when it is needed (switchNeeded): on cellular, or with another VPN up (another app's). On
 // Wi-Fi with no other VPN, an install never opens Shortcuts: this VPN comes on and goes off by itself.
 // F389: a VPN that is selected in Settings > VPN but idle (On Demand, no tunnel address) counts too: ours not enabled
 // means another one is (otherVPNSelected). The run gets "selected":1, remembers the On Demand one, and turns its On
@@ -257,7 +257,7 @@ enum LocalVPN {
         busy = true
         // F386: the first connect of a queue runs the Install Switch's start. F388: only when it is needed, so an
         // install doesn't flip to Shortcuts and back: on cellular (Cellular Data Off has no app API), or with another
-        // VPN up (Tailscale), which only its Set VPN brings back. On Wi-Fi with no other VPN, up() alone does it all.
+        // VPN up (another app's), which only its Set VPN brings back. On Wi-Fi with no other VPN, up() alone does it all.
         // F394: not without a network: up() below fails then (B375), so Shortcuts would open for nothing.
         let want = Path.online() && !switchedOn && (forced || switchAdded() && switchNeeded(cellular: onCellular, otherVPN: other))
         let ready = tripReady()
@@ -400,12 +400,12 @@ enum LocalVPN {
     /// F388: a queue's start runs the Install Switch only when the app can't do without it: on cellular (Cellular
     /// Data Off/On has no app API), or with another VPN up (F389: or selected and idle), which stays off after unless Set VPN puts it back
     /// (journal/2026-11-22-f372-builtin-vpn: our configuration keeps Settings > VPN's checkmark, so On Demand
-    /// never brings Tailscale back by itself).
+    /// never brings it back by itself).
     static func switchNeeded(cellular: Bool, otherVPN: Bool) -> Bool { cellular || otherVPN }
 
     /// B381: the end opens Shortcuts only for something to put back: Cellular Data, when the run turned it off and it
     /// isn't on again (`dataBack`), or another VPN, when one was up before the start and isn't again (`vpnBack`: every
-    /// address it had is there; a carrier's ipsec tunnel, which stays up throughout, doesn't stand in for Tailscale).
+    /// address it had is there; a carrier's ipsec tunnel, which stays up throughout, doesn't stand in for it).
     static func switchEndNeeded(dataOff: Bool, vpnBefore: Bool, dataBack: Bool, vpnBack: Bool) -> Bool { (dataOff && !dataBack) || (vpnBefore && !vpnBack) }
 
     /// F388: another app's VPN is up now: a tunnel interface (utun, ipsec, ppp) that is up with an IPv4 address that

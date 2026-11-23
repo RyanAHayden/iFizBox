@@ -26,7 +26,7 @@ export { loadIdentity, saveIdentity, clearIdentity, signingReady, getBring, setB
 export { isSelfIpa, signAndInstall, ORIGINAL_WARNED_KEY, originalWarning } from "./signing/install.js";
 export { deviceStatus, statusReady, importToDevice, removeFromDevice, firstInstallCheck,
   openSigning } from "./signing/device.js";
-export { ROUTE_HOLD, chooseRoute, forgetRoute, waitForVPN, installOnDevice } from "./signing/route.js";
+export { ROUTE_HOLD, chooseRoute, forgetRoute, installOnDevice } from "./signing/route.js";
 export { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, followSelfUpdate, HERE_CLOSING_LINE, followHereSelf,
   watchSelfUpdate } from "./signing/selfupdate.js";
 export { ASK_WAIT, prepareParams, prepareOnDevice, openPrepared, hereLabel, shownName, finishHere, herePhase,

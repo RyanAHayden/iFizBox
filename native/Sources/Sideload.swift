@@ -180,7 +180,7 @@ enum Sideload {
     // B64: both belong to one call and travel with it (signAndOpen's, serveAndOpen's `servers`). They were once shared
     // statics, and iFizBox's own job, started while another app still signed, made that app upload to /sign/host.
     // `local` (the call's `route: "idevice"`, Settings > Installation > This iPhone): no server at all; the signed IPA
-    // goes to this phone's installd through LocalDevVPN (installHere, native/sideload/idevice). It wins over `host`:
+    // goes to this phone's installd through the built-in VPN (installHere, native/sideload/idevice). It wins over `host`:
     // installd updates iFizBox itself in place.
     struct Servers {
         let manifest: String
@@ -555,7 +555,7 @@ enum Sideload {
         serveAndOpen(output, server: servers.manifest, app: app, record: record, log: log, job: job, opened: answered, served: served)
     }
 
-    // The "This iPhone" route (Servers.local): `output` (deleted after) goes to installd over LocalDevVPN, AFC upload then
+    // The "This iPhone" route (Servers.local): `output` (deleted after) goes to installd through the built-in VPN, AFC upload then
     // installation_proxy (IDevice.install). Progress is the page's "here" phase ("Installing on this iPhone", apart from
     // "Downloading"): connected 2%, the upload up to 30%, then installd's own percentage. Every step has a time limit
     // (IDevice.Limit), so a phone that stops answering ends the install with an error instead of a page left waiting. `opened` and `served` get the result once installd has installed it, so the
@@ -568,7 +568,7 @@ enum Sideload {
         // sent) then "installing" (installd's percent), so the run's row shows them and no "iOS prompt" step
         let isSelf = app.bundleID == Bundle.main.bundleIdentifier
         IDevice.ilog("This iPhone: \(app.bundleID) \(app.version), \(Sideload.size(output))")
-        let way = LocalVPN.available ? "\(LocalVPN.name) (\(IDevice.address))" : Tailscale.useForInstall() ? "Tailscale" : "LocalDevVPN (\(IDevice.address))" // F372
+        let way = "\(LocalVPN.name) (\(IDevice.address))"
         log?("Installing on this iPhone through \(way); nothing goes to a Signing Server")
         emit?("here", 0)
         if isSelf {
@@ -1216,7 +1216,7 @@ enum Sideload {
 
     // B138: the application-identifier the installed app `bid` carries, so an update keeps it (IPASigner): our record of
     // signing it, else installd's own answer through the pairing (records from before B138 don't have it, nor apps
-    // another signer installed). nil when it isn't installed or can't be told (no pairing, LocalDevVPN off, or no
+    // another signer installed). nil when it isn't installed or can't be told (no pairing, the VPN not starting, or no
     // answer within 25 s: the IDevice queue may be busy pairing); installd's error 15 then still reads plainly.
     static func installedAppID(_ bid: String, log: ((String) -> Void)? = nil) -> String? {
         let rec = records().first { $0.bundleID == bid }
@@ -1598,7 +1598,7 @@ enum CloseForUpdate {
         closeWith()
     }
 
-    // ---- B159: the This iPhone route (Sideload.installHere, installd over LocalDevVPN / Tailscale RemotePairing)
+    // ---- B159: the This iPhone route (Sideload.installHere, installd through the built-in VPN, RemotePairing)
 
     // iFizBox's own IPA is going to installd: a run of its own (an older hosted run's polls stop), followed as
     // `waiting` until installd stands still (hereReady) or answers (hereEnded). Main queue.

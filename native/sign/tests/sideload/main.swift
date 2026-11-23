@@ -422,12 +422,12 @@ test("This iPhone: a dropped connection is not a failed install (B246)") {
     for c: Int32 in [17, 19, 101, 103, 109] { check(HereRecheck.isDropped(code: "upload_failed", lib: c), "code \(c) is a drop") }
     for c: Int32 in [13, 15, 107, 203] { check(!HereRecheck.isDropped(code: "install_failed", lib: c), "installd's code \(c) is a real failure") }
     check(!HereRecheck.isDropped(code: "install_failed", lib: nil), "a failure of our own isn't a drop")
-    // seen on the 15 Pro: Tailscale's VPN off for 12 s mid-copy; the drop was Socket TimedOut, then the first
+    // seen on the 15 Pro: the VPN off for 12 s mid-copy; the drop was Socket TimedOut, then the first
     // reconnect's connect failed with InternalError("connect: Operation Timeout") (16)
     check(HereRecheck.shouldReconnect(code: "upload_failed", lib: 1, reconnecting: false), "the drop itself reconnects")
     check(!HereRecheck.shouldReconnect(code: "connect_failed", lib: 16, reconnecting: false), "a first connect that fails is the route being off")
     check(HereRecheck.shouldReconnect(code: "connect_failed", lib: 16, reconnecting: true), "a reconnect's failed connect tries again")
-    check(HereRecheck.shouldReconnect(code: "connect_failed", lib: nil, reconnecting: true), "so does 'Tailscale isn't back on yet'")
+    check(HereRecheck.shouldReconnect(code: "connect_failed", lib: nil, reconnecting: true), "so does 'the VPN isn't back on yet'")
     check(!HereRecheck.shouldReconnect(code: "refused", lib: nil, reconnecting: true), "a refused pairing never")
     check(!HereRecheck.shouldReconnect(code: "install_failed", lib: 203, reconnecting: true), "installd's refusal never")
 

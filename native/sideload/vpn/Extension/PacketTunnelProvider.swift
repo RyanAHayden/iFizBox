@@ -1,8 +1,7 @@
-// The built-in VPN's packet tunnel (sideload build only, PlugIns/iFizBoxVPN.appex): the loopback idea of StosVPN and
-// LocalDevVPN, written for iFizBox. The tunnel gives this phone the address 10.7.0.0 and routes only 10.7.0.1 into it
+// The built-in VPN's packet tunnel (sideload build only, PlugIns/iFizBoxVPN.appex): the loopback idea of StosVPN, written for iFizBox. The tunnel gives this phone the address 10.7.0.0 and routes only 10.7.0.1 into it
 // (no default route: every other connection keeps its own path). Each packet the app sends to 10.7.0.1 is written
 // straight back with its source and destination swapped, so it arrives at this phone's own services (RemotePairing,
-// lockdownd) as from a peer at 10.7.0.1 on the tunnel, which iOS takes where it refuses its own Wi-Fi or Tailscale
+// lockdownd) as from a peer at 10.7.0.1 on the tunnel, which iOS takes where it refuses its own Wi-Fi or another VPN
 // address. Swapping the two addresses keeps the IPv4 and TCP/UDP checksums as they are (the same words, summed in
 // another order), so nothing is recomputed. No internet is needed: nothing leaves the phone.
 // The app turns it on only while it connects to iOS and off after (native/sideload/vpn/App/LocalVPN.swift).

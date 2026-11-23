@@ -64,7 +64,7 @@ enum SignBridge {
         InstalledApps.register(b) // F374: apps.icon, library.decrypt / addTweaks / share (InstalledApps.swift)
         SignAhead.register(b) // F235: signing.prepare / open / discard, the IPA queue's sign-ahead run
         IDeviceBridge.register(b) // F15: idevice.*, the "no server" install route (native/sideload/idevice/)
-        TailscaleBridge.register(b) // tailscale.*, that route over Tailscale (native/sideload/tailscale/)
+        KeptRoute.register(b) // route.keep / route.kept: Install Apps With, kept in the Keychain (native/sideload/idevice/)
         LocalVPNBridge.register(b) // vpn.*, the built-in VPN for that route (native/sideload/vpn/)
     }
 
@@ -204,7 +204,7 @@ final class Throttle {
 
 // An IPA download to a file, with progress and a size cap.
 final class Download: NSObject, URLSessionDownloadDelegate {
-    // Airplane Mode (LocalDevVPN still on, so iOS may not say "offline" at once): a download fails with "offline:
+    // Airplane Mode (the built-in VPN may still be on, so iOS may not say "offline" at once): a download fails with "offline:
     // No internet connection…", not a bare URLError, so the page says why the install stopped at Downloading.
     static func offline(_ e: URLError) -> Bool {
         switch e.code {
@@ -218,7 +218,7 @@ final class Download: NSObject, URLSessionDownloadDelegate {
         "offline: No internet connection: downloading the IPA\(url?.host.map { " from \($0)" } ?? "") needs one. Turn off Airplane Mode or join Wi-Fi, then try again"
     }
 
-    /// Wi-Fi (en*) or cellular (pdp_ip*) has a routable address. LocalDevVPN's utun and loopback don't count.
+    /// Wi-Fi (en*) or cellular (pdp_ip*) has a routable address. The built-in VPN's utun and loopback don't count.
     static func hasInternetInterface() -> Bool {
         var list: UnsafeMutablePointer<ifaddrs>?
         guard getifaddrs(&list) == 0, let first = list else { return true } // can't tell: don't claim offline
@@ -314,25 +314,19 @@ final class Download: NSObject, URLSessionDownloadDelegate {
     }
 }
 
-// F359: This iPhone installs (Sideload.installHere: installd over LocalDevVPN or Tailscale, no iOS prompt) run side by
+// This iPhone installs (Sideload.installHere: installd through the built-in VPN, no iOS prompt) run side by
 // side, `width` at most, so the IPA queue's run (web/app/core/apprun.js HERE_PARALLEL) copies several apps at once.
-// Each has its own connection to iOS (IDevice.install opens a Session, a staging path and a watch per call). Over
-// Tailscale they still go one at a time: the install's node and its relay are one for the whole app
-// (Tailscale.beginInstall / endInstall), so a second install ending would stop the first one's node. Each waits for
+// Each has its own connection to iOS (IDevice.install opens a Session, a staging path and a watch per call). Each waits for
 // whatever IDevice.queue is doing first (idevice.pair holds it), as when every install ran on that queue.
 enum HereLane {
     static let width = 3
     private static let lane = DispatchQueue(label: "ifizbox.here", qos: .userInitiated, attributes: .concurrent)
     private static let slots = DispatchSemaphore(value: width)
-    private static let tailnet = DispatchSemaphore(value: 1)
 
     static func run(_ body: @escaping () -> Void) {
         lane.async {
             slots.wait()
             defer { slots.signal() }
-            let viaTailscale = Tailscale.useForInstall()
-            if viaTailscale { tailnet.wait() }
-            defer { if viaTailscale { tailnet.signal() } }
             IDevice.queue.sync {}
             body()
         }

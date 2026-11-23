@@ -68,7 +68,7 @@ import { storedKeep, originalState, originalNote, OLD_WAY_ALERT, OLD_WAY_TEXT } 
 import { loadStyle } from "../nav/motion.js";
 import { go as navGo, back, handleOf } from "../nav/go.js";
 import { nativeBridge } from "../native.js";
-import { storedRoute, vpnList } from "../core/installroute.js"; // B294
+import { storedRoute, BUILTIN_VPN } from "../core/installroute.js"; // B294
 import { USERAPPS, PAGE_TITLE as USERAPPS_TITLE, bundleIdOfToken, userAppTitle, listRow as userAppsRow } from "../core/userapps.js"; // F374
 
 export { MYIPAS };
@@ -1199,7 +1199,7 @@ const optionsChanged = (o) => Boolean(o && (o.name || o.bundleId || o.icon || o.
 // (core/installroute.js storedRoute): This iPhone's VPN, or the Signing Server's install manifest.
 export function actionsFooter(route) {
   const needs = route === "iphone"
-    ? `only the VPN to this iPhone (${vpnList()}), no Signing Server`
+    ? `only ${BUILTIN_VPN} to this iPhone, no Signing Server`
     : "a connection only for the Signing Server's install manifest";
   return `Signing happens on this iPhone and works offline. Installing needs ${needs}.`;
 }

@@ -1,5 +1,5 @@
 // The bridge calls for the "no server" install route (IDevice.swift), sideload build only:
-//   idevice.status        {paired: "rp"|"lockdown"|null, ios, pairOnPhone, localDevVPN, otherVPN, tunnels, tailscale,
+//   idevice.status        {paired: "rp"|"lockdown"|null, ios, pairOnPhone, otherVPN, tunnels,
 //                         vpn} (vpn: the built-in VPN's vpn.status, native/sideload/vpn/App/LocalVPN.swift)
 //   idevice.import        {data: base64 pairing file} -> status; a lockdown pairing record or a RemotePairing one
 //   idevice.pair          makes the 6-digit code first and emits [{pin}] at once (also posted as a notification, for
@@ -13,10 +13,6 @@
 //                         leaveGrace (90 s) more, so a page that comes back within it gets the same code
 //   idevice.verify        connects once: {ok: true, kind} or "not_paired:/connect_failed:/bad_pairing: ..."
 //   idevice.forget        deletes the pairing -> status
-//   idevice.openLocalDevVPN  opens the LocalDevVPN app ({opened: false} when it isn't installed)
-//   idevice.vpnApps       {localdevvpn: bool, tailscale: bool}: which VPN apps are installed (canOpenURL on their
-//                         schemes, listed in Info-sideload.plist LSApplicationQueriesSchemes); the page picks the
-//                         way to connect from it (web/app/core/installroute.js vpnRoute)
 // Installing through this route is IDevice.install(_:progress:), called by the install run.
 import Foundation
 import UIKit
@@ -39,11 +35,6 @@ enum IDeviceBridge {
     private static var pairing: PairSession? // guarded by lock
     private static let lock = NSLock()
     private static let pairQueue = DispatchQueue(label: "ifizbox.idevice.pair", qos: .userInitiated) // one pairing at a time
-    static let localDevVPNScheme = "localdevvpn://" // LocalDevVPN's URL scheme, to open it
-    // The Tailscale app's URL scheme: Tailscale's own deep links use it (tailscale/tailscale tka/deeplink.go,
-    // DeeplinkTailscaleURLScheme = "tailscale"). Only for canOpenURL (idevice.vpnApps): B323, opening any tailscale:
-    // link shows Tailscale's "Could not sign device"; Open Tailscale goes through signing.openApp with its bundle ID.
-    static let tailscaleScheme = "tailscale://"
     static let codeNoteID = "ifizbox-pairing-code"
     private static var now: [String: Any] = ["active": false] // idevice.pairState; guarded by lock
 
@@ -72,7 +63,7 @@ enum IDeviceBridge {
     }
 
     static func register(_ b: Bridge) {
-        // Not on IDevice.queue: a connect or a Tailscale sign-in can hold it, and the page asks for these meanwhile.
+        // Not on IDevice.queue: a connect can hold it, and the page asks for these meanwhile.
         b.on("idevice.status") { c in quick(c) { status() } }
         b.on("idevice.pairState") { c in quick(c) { lock.lock(); defer { lock.unlock() }; return now } }
         b.on("idevice.import") { c in
@@ -119,7 +110,7 @@ enum IDeviceBridge {
             c.emit([["pin": code]])
             KeepAlive.shared.begin()
             postCode(code)
-            // B320: on its own queue, not IDevice.queue: behind a check, a test or a Tailscale sign-in there, the code
+            // B320: on its own queue, not IDevice.queue: behind a check or a test there, the code
             // showed while nothing listened yet; and every connect waited behind a pairing with no time limit
             pairQueue.async {
                 var result: Any? = nil, failure: String? = nil
@@ -166,19 +157,6 @@ enum IDeviceBridge {
                 IDevice.deletePairing(.remotePairing)
                 IDevice.deletePairing(.lockdown)
                 return status()
-            }
-        }
-        b.on("idevice.openLocalDevVPN") { c in
-            DispatchQueue.main.async {
-                guard AppMode.current != .jailbreak, let u = URL(string: localDevVPNScheme) else { return c.reply(["opened": false], nil) }
-                UIApplication.shared.open(u, options: [:]) { ok in c.reply(["opened": ok], nil) }
-            }
-        }
-        b.on("idevice.vpnApps") { c in
-            DispatchQueue.main.async { // canOpenURL is main-thread UIKit
-                guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: the jailbreak app installs IPAs through its helper") }
-                let has = { (s: String) in URL(string: s).map { UIApplication.shared.canOpenURL($0) } ?? false }
-                c.reply(["localdevvpn": has(localDevVPNScheme), "tailscale": has(tailscaleScheme)], nil)
             }
         }
     }
@@ -228,7 +206,6 @@ enum IDeviceBridge {
         s["paired"] = IDevice.pairing().map { $0.kind.rawValue as Any } ?? NSNull()
         s["ios"] = "\(v.majorVersion).\(v.minorVersion)"
         s["pairOnPhone"] = v.majorVersion >= 27 // iOS 27 pairs with the app on the phone; older imports a file
-        s["tailscale"] = Tailscale.status() // native/sideload/tailscale: Connect With and the node
         s["vpn"] = LocalVPN.status() // F372: the built-in VPN (native/sideload/vpn), the way in when `available`
         return s
     }

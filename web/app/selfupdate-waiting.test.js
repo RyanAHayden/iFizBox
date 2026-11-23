@@ -73,7 +73,7 @@ test("installOnDevice on This iPhone: iFizBox still open after installd answered
     const calls = [];
     const n = { mode: "sideload", async call(m, p) {
       calls.push(m);
-      if (m === "idevice.status") return { paired: "rp", localDevVPN: true };
+      if (m === "idevice.status") return { paired: "rp", vpn: { available: true, tested: true } };
       if (m === "signing.install") { assert.equal(p.route, "idevice"); assert.ok(!p.host); return { bundleId: BUNDLE_ID, version: "2.0" }; }
       return null;
     } };
@@ -94,7 +94,7 @@ test("installOnDevice on This iPhone (B159): the shell answered for installd and
     const { h, lines, finishes } = fakeHUD();
     const timers = [];
     const n = { mode: "sideload", async call(m, p, onEvent) {
-      if (m === "idevice.status") return { paired: "rp", localDevVPN: true };
+      if (m === "idevice.status") return { paired: "rp", vpn: { available: true, tested: true } };
       if (m === "signing.install") { assert.equal(p.route, "idevice"); return { bundleId: BUNDLE_ID, version: "2.0" }; }
       if (m === "signing.selfUpdate") { onEvent?.({ state: "finished" }); return { state: "finished" }; }
       return null;

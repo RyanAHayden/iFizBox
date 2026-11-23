@@ -1,9 +1,9 @@
 // B220: a pairing the phone no longer accepts (every RemotePairing port refused, or the pairing turned down) means
-// pair again, not "turn on the VPN"; Tailscale's test says the same.
+// pair again, not "couldn't connect".
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { verifyFailure, tailscaleTestResult } from "./installroute.js";
+import { verifyFailure } from "./installroute.js";
 
 const err = (message, code) => Object.assign(new Error(message), code ? { code } : {});
 
@@ -21,16 +21,9 @@ test("refused and turned-down pairings are unusable: Pair Again", () => {
   }
 });
 
-test("the VPN off or no answer stays Turn On the VPN, not unusable", () => {
+test("no answer stays Couldn't Connect, not unusable", () => {
   const why = verifyFailure(err("connect_failed: timeout", "connect_failed"));
   assert.equal(why.again, false);
   assert.ok(!why.unusable);
   assert.ok(!verifyFailure(err("bad_pairing: x", "bad_pairing")).unusable);
-});
-
-test("Tailscale's test: refused says pair again, not Developer Mode", () => {
-  const r = tailscaleTestResult({ ok: false, code: "refused", detail: "port 49152" });
-  assert.equal(r.title, "iPhone Refused");
-  assert.match(r.message, /pair again/);
-  assert.doesNotMatch(r.message, /Developer Mode/);
 });

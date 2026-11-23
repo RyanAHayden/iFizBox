@@ -139,7 +139,7 @@ class BridgeContract(unittest.TestCase):
     def test_scanners_see_both_sides(self):
         """Guards against a scanner that quietly finds nothing: known calls of each shape and handlers of each
         source directory are found."""
-        for name in ["app.info", "helper.run", "idevice.pair", "tailscale.status", "share.debFetch", "library.pick"]:
+        for name in ["app.info", "helper.run", "idevice.pair", "route.kept", "share.debFetch", "library.pick"]:
             self.assertIn(name, self.handlers)
         calls = self.calls
         for name in ["app.info",            # native.call("...")

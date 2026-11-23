@@ -1,16 +1,11 @@
 // ---- Settings > Installation's route (core/installroute.js) -----------------------------------------------------
-// The bridge params one install adds for the chosen route: { route: "idevice" } (This iPhone, LocalDevVPN on and
-// paired), {} (the Signing Server), or null when the install was cancelled. When This iPhone can't be used, an alert
-// says the install goes through the server. A run of installs (the IPA queue, Re-sign All) asks once: the answer
+// The bridge params one install adds for the chosen route: { route: "idevice" } (This iPhone: paired, with the
+// built-in VPN), {} (the Signing Server), or null when the install was cancelled. When This iPhone can't be used, an
+// alert says the install goes through the server. A run of installs (the IPA queue, Re-sign All) asks once: the answer
 // holds for ROUTE_HOLD ms.
-// B110: Open LocalDevVPN in that alert keeps the install waiting (waitForVPN): a progress page "Waiting for
-// LocalDevVPN…" with Cancel (`hud`), or, with a `signal` (the IPA queue's row), no page of its own: onWait(text) says
-// it on the run's page and the run's Cancel aborts the signal. Once connected it goes on through This iPhone; null
-// only after Cancel.
 export const ROUTE_HOLD = 60_000;
 let heldRoute = null;
-export async function chooseRoute({ native, alert = showAlert, storage = storageOf(), now = Date.now, hud = progressHUD,
-  signal = null, onWait = null, wait = waitForVPN, later = setTimeout } = {}) {
+export async function chooseRoute({ native, alert = showAlert, storage = storageOf(), now = Date.now } = {}) {
   const choice = storedRoute(storage);
   if (choice !== "iphone") return {};
   if (heldRoute && now() - heldRoute.at < ROUTE_HOLD) return heldRoute.params;
@@ -20,14 +15,6 @@ export async function chooseRoute({ native, alert = showAlert, storage = storage
   if (d.alert) {
     const a = ROUTE_ALERTS[d.alert];
     const { index } = await alert({ title: a.title, message: a.message, buttons: a.buttons, cancel: 0 });
-    if (a.open != null && index === a.open) {
-      try { await bridge(native).call("idevice.openLocalDevVPN", {}); } catch { /* nothing to open: the alert said what to do */ }
-      heldRoute = null;
-      if (!(await waitVPN({ native, hud, signal, onWait, wait, later }))) return null;
-      const params = routeParams({ route: "idevice" });
-      heldRoute = { at: now(), params };
-      return params;
-    }
     // F372: on cellular without the Cellular Shortcuts: Set Up opens their page and this install stops; Use Server
     // goes on through the Signing Server (no way on through This iPhone: it always fails there)
     if (a.setup != null) {
@@ -44,8 +31,7 @@ export async function chooseRoute({ native, alert = showAlert, storage = storage
 export const forgetRoute = () => { heldRoute = null; };
 
 // B316: a This iPhone install that failed to reach the phone, worded by core routeFailureOf with idevice.status read
-// now (Tailscale signed out or off is said before the pairing is blamed) and remembered, so Installation & Signing and
-// Home show the broken state until a check passes. Other failures keep deviceError's words.
+// now and remembered, so Installation & Signing and Home show the broken state until a check passes. Other failures keep deviceError's words.
 export async function routeWords(err, why, native) {
   let st = null;
   try { st = await bridge(native).call("idevice.status", {}); } catch { st = null; }
@@ -54,17 +40,11 @@ export async function routeWords(err, why, native) {
   rememberRouteFailure(f);
   return { ...why, title: f.title, message: f.message, fix: f.fix, button: f.button };
 }
-// The fix button of a failure's alert: Install Apps With (Tailscale's Sign In is there), Pairing, the main page's
-// Check Connection, or the VPN app.
-export function runFix(fix, { native, go = openRoute } = {}) {
-  if (fix === "signIn") return go(["installation", "with"]);
+// The fix button of a failure's alert: Pairing, the main page's Check Connection, or the Install Switch's page.
+export function runFix(fix, { go = openRoute } = {}) {
   if (fix === "pair") return go(["installation", "pair"]);
   if (fix === "check") return go(["installation"]);
   if (fix === "shortcuts") return go(["installation", "shortcuts"]); // F372: Cellular Shortcuts
-  if (fix === "openTailscale") { // B323: by bundle ID, not tailscale:; plain words when iOS won't
-    return openTailscale((m, p) => bridge(native).call(m, p)).then((ok) => ok || showAlert({ title: "Couldn't Open Tailscale", message: OPEN_TAILSCALE_BY_HAND }));
-  }
-  if (fix === "openVPN") return Promise.resolve().then(() => bridge(native).call("idevice.openLocalDevVPN", {})).catch(() => {});
   return undefined;
 }
 import { showBanner } from "../nav/banner.js";
@@ -75,9 +55,8 @@ import { progressHUD, RESTART_BY_HAND, RETURN_LABEL, lockSelfUpdate, WAITING_LAB
 import { recordSelfUpdate } from "../core/selfupdate.js";
 import { showAlert } from "../nav/alert.js";
 import { NAME } from "../brand.js";
-import { storedRoute, decideRoute, ALERTS as ROUTE_ALERTS, routeParams, VPN_WAIT, VPN_CONNECTED, VPN_POLL,
-  vpnReady } from "../core/installroute.js";
-import { routeFailureOf, rememberRouteFailure, clearRouteFailure, openTailscale, OPEN_TAILSCALE_BY_HAND } from "../core/installroute.js"; // B316, B323
+import { storedRoute, decideRoute, ALERTS as ROUTE_ALERTS, routeParams } from "../core/installroute.js";
+import { routeFailureOf, rememberRouteFailure, clearRouteFailure } from "../core/installroute.js"; // B316
 import { SELF_RESTART } from "../core/apprun.js";
 import { KNOWN_MALWARE, askInsecure, bridge, failed, keepIpaHash, refusing, stopNative, storageOf,
   untilCancel } from "./common.js";
@@ -86,56 +65,6 @@ import { serverFallback, switchFailedAlert, USE_SERVER, USE_SERVER_LINE } from "
 import { isSelfIpa, finishHere, hereLabel, shownName } from "./common.js";
 import { lastDevice, openRoute } from "./device.js";
 import { followHereSelf, followSelfUpdate } from "./selfupdate.js";
-
-// B110: the wait itself. Its own page ends a tick after the answer, so the install's next step (a HUD opened at once)
-// carries on on the same page instead of it showing Complete first. -> true once connected.
-async function waitVPN({ native, hud, signal, onWait, wait, later }) {
-  if (signal) {
-    try { onWait?.(VPN_WAIT); } catch { /* only words */ }
-    return wait({ native, signal });
-  }
-  const h = hud(VPN_WAIT);
-  const ok = await wait({ native, signal: h.signal ?? null });
-  if (!ok || h.cancelled) return false;
-  later(() => h.done(VPN_CONNECTED), 0);
-  return true;
-}
-
-// B110: resolves true once idevice.status says this iPhone is paired with LocalDevVPN on (core/installroute.js
-// vpnReady), false when `signal` aborts. It asks every `every` ms and at once when the app comes back to the
-// foreground (visibilitychange); a failed call counts as not yet.
-export function waitForVPN({ native, signal = null, every = VPN_POLL, later = setTimeout, clear = clearTimeout, doc = globalThis.document } = {}) {
-  return new Promise((resolve) => {
-    let timer = null, busy = false, over = false;
-    const onShow = () => { if (doc?.visibilityState !== "hidden") check(); };
-    const onAbort = () => finish(false);
-    function finish(ok) {
-      if (over) return;
-      over = true;
-      if (timer != null) clear(timer);
-      timer = null;
-      doc?.removeEventListener?.("visibilitychange", onShow);
-      signal?.removeEventListener?.("abort", onAbort);
-      resolve(ok);
-    }
-    async function check() {
-      if (over || busy) return;
-      busy = true;
-      let st = null;
-      try { st = await bridge(native).call("idevice.status", {}); } catch { st = null; }
-      busy = false;
-      if (!over && vpnReady(st)) finish(true);
-    }
-    function tick() {
-      timer = null;
-      check().finally(() => { if (!over) timer = later(tick, every); });
-    }
-    if (signal?.aborted) { finish(false); return; }
-    signal?.addEventListener?.("abort", onAbort, { once: true });
-    doc?.addEventListener?.("visibilitychange", onShow);
-    timer = later(tick, every);
-  });
-}
 
 // Signs `url` (an IPA) on the phone and opens the install link: true once iOS was asked to install; false after an
 // error, which an alert explains (no_server and no_identity then open Settings > Signing).
@@ -215,7 +144,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
     if (h.cancelled) return false;
     if (e?.code === "cancelled") { h.hide(); return false; } // B104: Cancel on This Download Is Not Secure
     let why = deviceError(e, name);
-    if (route.route) why = await routeWords(e, why, native); // B316: Tailscale first, then the pairing; kept until a check passes
+    if (route.route) why = await routeWords(e, why, native); // B316: the route's own words; kept until a check passes
     failed(h, why.message);
     const fix = why.fix && why.button ? why : null;
     // F366: This iPhone couldn't be reached: the Signing Server for this install, besides the fix (alert and log)
@@ -224,13 +153,13 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
     const buttons = [...(fix ? ["OK", fix.button] : ["OK"]), ...(fallback ? [USE_SERVER] : [])];
     if (e?.code === "switch_failed" && fix && fallback) { // B395: one plain alert
       const { index } = await alert(switchFailedAlert(fix)) || {};
-      if (index === 1) runFix(fix.fix, { native, go });
+      if (index === 1) runFix(fix.fix, { go });
       if (index === 2) return fallback.run({ inline: true });
       return false;
     }
     const { index } = await alert({ title: e?.code === "malware" ? KNOWN_MALWARE : why.title, message: why.message, buttons, ...(buttons.length > 1 ? { cancel: 0 } : {}) }) || {};
     if (why.open === "signing") go(["signing"]);
-    if (fix && index === 1) runFix(fix.fix, { native, go });
+    if (fix && index === 1) runFix(fix.fix, { go });
     if (fallback && index === buttons.length - 1) return fallback.run({ inline: true });
     return false;
   }

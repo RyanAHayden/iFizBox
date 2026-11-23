@@ -1,6 +1,6 @@
 // The "no server" install route (docs/sideload.md, "idevice"): the app talks to this phone's own installd through
 // idevice (MIT, built from source by build.sh beside this file) as if it were a computer on USB. The phone is
-// reached at LocalDevVPN's loopback address, 10.7.0.1:
+// reached at the built-in VPN's address for this phone, 10.7.0.1:
 //   - iOS 17.4+ (and iOS 27, where lockdown's 62078 is refused over loopback): the RemotePairing service on 49152,
 //     an RPPairing tunnel (tunnel_create_rppairing) and RSD, with a RemotePairing pairing made on the phone
 //     (pairable host: Settings > Developer > Pair with <app> on this iPhone, a 6-digit code).
@@ -18,7 +18,7 @@ import Security
 import UIKit
 
 enum IDevice {
-    static let address = "10.7.0.1" // LocalDevVPN's loopback; the phone itself
+    static let address = "10.7.0.1" // the phone itself, through the built-in VPN
     static let lockdownPort: UInt16 = 62078
     // The RemotePairing service. iOS advertises it over mDNS (_remotepairing._tcp); 49152 is the port it had on the
     // iPhone 15 (iOS 27.0.1) for every probe (journal/2026-11-19-f15-idevice-install/notes.md).
@@ -461,7 +461,7 @@ enum IDevice {
                 ilog("the stuck call ended with: \(e.localizedDescription)")
             }
             relayLibraryLog()
-            throw Failure(code: "timeout", text: "\(why). Check that LocalDevVPN (or Tailscale) is on, then try again")
+            throw Failure(code: "timeout", text: "\(why). Check the connection and try again")
         }
         switch out.result! {
         case .success(let v):
@@ -502,7 +502,6 @@ enum IDevice {
     private final class HereRun {
         let ipa: URL, size: Int, remote: String, bundleID: String?, version: String?
         var connected = false   // the first try got as far as a session: later drops are worth connecting again
-        var tailnet: Bool?      // the route the first session took; later tries keep it
         var before: HereRecheck.Before?  // what iOS listed before the install; nil until asked
         var sent = 0            // bytes of the IPA iOS has
         var copied = false      // the whole IPA is in PublicStaging
@@ -523,7 +522,7 @@ enum IDevice {
     // early, and a restart (the phone's or the service's) can leave it elsewhere. Every connect to 49152 was then
     // refused while the app said the pairing was fine. The service is advertised over mDNS (_remotepairing._tcp), as
     // idevice's own pair_rsd_ios finds it. The port that worked last is tried first, then 49152, then every advertised
-    // port; a probe on 10.7.0.1 (or the phone's Tailscale address) picks the one this phone answers on (another
+    // port; a probe on 10.7.0.1 picks the one this phone answers on (another
     // device's advertised port is refused here, so it costs a millisecond). Every port refused means nothing serves
     // RemotePairing for this pairing any more (the phone dropped it): code "refused", and the page pairs again.
 
@@ -545,7 +544,7 @@ enum IDevice {
 
     /// The port this phone answers RemotePairing on, by `probe` (a TCP connect over the route in use). Throws
     /// "refused" when every candidate refused; otherwise the first port that didn't answer (a refused one can't be
-    /// it), and the connect says what's wrong (the VPN off, a tailnet rule). Blocking.
+    /// it), and the connect says what's wrong (the VPN off). Blocking.
     static func findRemotePairingPort(via: String = "the VPN", probe: (UInt16) -> VPNCheck.Probe) throws -> UInt16 {
         var tried: [UInt16] = [], refused: [UInt16] = [], silent: [UInt16] = []
         func attempt(_ ports: [UInt16]) -> UInt16? {
@@ -573,7 +572,7 @@ enum IDevice {
         // A port that didn't answer may still be the one (a slow route); one that refused isn't
         if let p = silent.first { return p }
         // B316: lockdownd (62078) listens whatever app is paired. When it refuses too, the route turns every connection
-        // down (the user's phone over Tailscale on cellular refused 49152 and 62078 alike, while the desktop reached
+        // down (the user's phone on cellular refused 49152 and 62078 alike, while the desktop reached
         // the 15's on Wi-Fi), and pairing again can't help: "route_refused", with the route named.
         let control = probe(lockdownPort)
         ilog("RemotePairing refused on \(refused.map(String.init).joined(separator: ", ")); lockdown's \(lockdownPort) through \(via): \(control)")
@@ -689,61 +688,30 @@ enum IDevice {
         private var heartbeat: OpaquePointer?
         private var beating = false
         private let watch: Watch
-        private var viaTailscale = false
-        private let pinnedTailscale: Bool? // B246: the route a reconnect must use (nil: Tailscale.useForInstall)
-        private let second: Bool // B251: a second look beside the install's own session: shares its Tailscale relay
+        private let second: Bool // a second look beside the install's own session: rides on its VPN
         let kind: Kind
-        private var builtIn = false // F372: through the built-in VPN, held (LocalVPN.begin) until deinit
-        private var dataOff = false // F372: Cellular Data Off ran for this connect; On runs once connected
-        var via: String { builtIn ? LocalVPN.name : viaTailscale ? "Tailscale" : "LocalDevVPN" }
-        var tailnet: Bool { viaTailscale }
+        private var builtIn = false // through the built-in VPN, held (LocalVPN.begin) until deinit
+        private var dataOff = false // Cellular Data Off ran for this connect; On runs once connected
+        var via: String { LocalVPN.name }
 
-        /// Where to connect for `port`: LocalDevVPN's 10.7.0.1, or (Tailscale.useForInstall) a 127.0.0.1 relay that
-        /// reaches this phone's own Tailscale address over the app's tailnet node (native/sideload/tailscale).
-        /// F372: the built-in VPN first, whenever this app can run it (LocalVPN.available): it turns on here and the
-        /// connect goes to the same 10.7.0.1; Tailscale and LocalDevVPN are left for an app signed without it.
+        /// Where to connect for `port`: the built-in VPN turns on here and the connect goes to 10.7.0.1 through it. A
+        /// build without Network Extensions (LocalVPN.available false) has no way in.
         private func endpoint(_ port: UInt16) throws -> (String, UInt16) {
-            if LocalVPN.available && pinnedTailscale != true {
-                if LocalVPN.failedNow() {
-                    // B378: it failed a moment ago: the other ways in only when one is on, else the same error again
-                    if !Session.otherRouteOn() { throw Session.lastVPNFailure() }
-                } else {
-                    if second || builtIn { return (address, port) } // a second look rides on the install's own session's VPN
-                    watch.begin("turning on \(LocalVPN.name)", Limit.tunnel)
-                    let w = watch
-                    do {
-                        dataOff = try LocalVPN.begin { w.alive($0) }
-                        builtIn = true
-                        return (address, port)
-                    } catch {
-                        let failure = (error as? Failure) ?? Failure(code: "vpn_failed", text: "\(LocalVPN.name) didn't start: \(error.localizedDescription)")
-                        Session.keepVPNFailure(failure)
-                        // B378: an install still goes through LocalDevVPN or Tailscale, but only when one is on: a
-                        // connect to 10.7.0.1 with no tunnel fails as "device socket io failed", hiding this error
-                        // B395: the Install Switch didn't run on cellular: iOS refuses the other ways in as well
-                        guard !(failure.code == "switch_failed" && LocalVPN.Path.now().cellular), Session.otherRouteOn() else { throw failure }
-                        ilog("\(LocalVPN.name) didn't start (\(failure.text)); trying LocalDevVPN or Tailscale")
-                    }
-                }
+            guard LocalVPN.available else { throw Failure(code: "vpn_failed", text: "this build has no Network Extensions, so \(Brand.name) can't connect to this iPhone") }
+            // it failed a moment ago: the same error again, not a new start
+            if LocalVPN.failedNow() { throw Session.lastVPNFailure() }
+            if second || builtIn { return (address, port) } // a second look rides on the install's own session's VPN
+            watch.begin("turning on \(LocalVPN.name)", Limit.tunnel)
+            let w = watch
+            do {
+                dataOff = try LocalVPN.begin { w.alive($0) }
+                builtIn = true
+                return (address, port)
+            } catch {
+                let failure = (error as? Failure) ?? Failure(code: "vpn_failed", text: "\(LocalVPN.name) didn't start: \(error.localizedDescription)")
+                Session.keepVPNFailure(failure)
+                throw failure
             }
-            let tailnet = Tailscale.useForInstall()
-            // B246: connecting again after a drop keeps the first connection's route. Automatic chose LocalDevVPN
-            // while Tailscale's VPN was coming back (the 15 Pro), and that connect could only fail.
-            if let want = pinnedTailscale, want != tailnet {
-                throw Failure(code: "connect_failed", text: want ? "Tailscale isn't back on yet" : "Tailscale came on; this install started over LocalDevVPN")
-            }
-            guard tailnet else { return (address, port) }
-            if second {
-                // the install's session runs the node and the relay; starting or stopping them here would cut it off
-                let local = Tailscale.mapPort(port)
-                guard local != port else { throw Failure(code: "connect_failed", text: "Tailscale: the install's relay isn't running") }
-                viaTailscale = true
-                return ("127.0.0.1", local)
-            }
-            watch.begin("starting Tailscale", Limit.tunnel)
-            let local = try Tailscale.beginInstall(port: port)
-            viaTailscale = true
-            return ("127.0.0.1", local)
         }
 
         // B378: the built-in VPN's last start failure, said again while LocalVPN.failedNow skips a new start
@@ -754,15 +722,8 @@ enum IDevice {
             failureLock.lock(); defer { failureLock.unlock() }
             return vpnFailure ?? Failure(code: "vpn_failed", text: "\(LocalVPN.name) didn't start a moment ago")
         }
-        /// B378: with the built-in VPN down, is another way in on: Tailscale for installs, or LocalDevVPN answering
-        /// at 10.7.0.1 (VPNCheck). Blocking (VPNCheck's probes: under a second).
-        static func otherRouteOn() -> Bool {
-            Tailscale.useForInstall() || (VPNCheck.status()["localDevVPN"] as? Bool ?? false)
-        }
-
-        init(watch: Watch, tailscale pinned: Bool? = nil, second: Bool = false) throws {
+        init(watch: Watch, second: Bool = false) throws {
             self.watch = watch
-            self.pinnedTailscale = pinned
             self.second = second
             guard let (kind, data) = IDevice.pairing() else {
                 throw Failure(code: "not_paired", text: "pair this iPhone first (Settings > Installation)")
@@ -774,21 +735,14 @@ enum IDevice {
                 let first = try endpoint(remotePairingPort)
                 let host = first.0
                 var port = first.1
-                // B220: the port it listens on now, by a probe over the same route (Tailscale's node is up by now)
+                // the port it listens on now, by a probe over the same route
                 watch.begin("finding RemotePairing's port through \(via)", Limit.tunnel)
-                let tailnet = viaTailscale
                 let w = watch
                 let rpPort = try IDevice.findRemotePairingPort(via: via) { p in
                     w.alive("probing port \(p)") // each probe gets the step's whole limit
-                    return tailnet ? Tailscale.probe(p) : VPNCheck.probe(p)
+                    return VPNCheck.probe(p)
                 }
-                if rpPort != remotePairingPort {
-                    if tailnet {
-                        let local = Tailscale.mapPort(rpPort)
-                        guard local != rpPort else { throw Failure(code: "connect_failed", text: "Tailscale: couldn't open the local relay") }
-                        port = local
-                    } else { port = rpPort }
-                }
+                if rpPort != remotePairingPort { port = rpPort }
                 watch.begin("connecting to iOS at \(host):\(port) through \(via) (RemotePairing tunnel, RSD)", Limit.tunnel)
                 var rp: OpaquePointer?
                 try data.withUnsafeBytes { try check(rp_pairing_file_from_bytes($0.baseAddress?.assumingMemoryBound(to: UInt8.self), UInt(data.count), &rp), "bad_pairing") }
@@ -906,18 +860,14 @@ enum IDevice {
             if let h = handshake { rsd_handshake_free(h) }
             if let a = adapter { adapter_free(a) }
             if let p = provider { idevice_provider_free(p) }
-            if viaTailscale && !second { Tailscale.endInstall() }
             if builtIn { LocalVPN.connected(dataOff: dataOff); LocalVPN.end() } // F372: data back on if a connect failed
         }
     }
 
-    /// Connects once with the stored pairing: "is the pairing still good and LocalDevVPN on". Blocking.
-    static func verify() throws -> Kind { try verify(tailscale: nil) }
-
-    /// B274: `tailscale` pins the route (Tailscale's Test Connection checks the pairing through Tailscale only).
-    static func verify(tailscale pinned: Bool?) throws -> Kind {
+    /// Connects once with the stored pairing: "is the pairing still good and the built-in VPN on". Blocking.
+    static func verify() throws -> Kind {
         try watched("verify") { w in
-            let s = try Session(watch: w, tailscale: pinned)
+            let s = try Session(watch: w)
             if let u = try? s.udid() { PhoneID.remember(u) } // a check is a free chance to learn it
             return s.kind
         }
@@ -983,7 +933,7 @@ enum IDevice {
     /// process, so the call never returns then. `note` gets a line per step for the progress page's console.
     ///
     /// B246: `bundleID` and `version` (the signed app's) let a dropped connection end well. A drop (the app left the
-    /// front, the tunnel or Tailscale reset) connects again, up to HereRecheck.reconnects times: during the copy it
+    /// front, the tunnel reset) connects again, up to HereRecheck.reconnects times: during the copy it
     /// carries on from the end of iOS's file; once the install was sent, it asks iOS for the app and reports it
     /// installed when iOS lists the new copy. Only installd's own error (or a drop that never reconnects) fails.
     static func install(_ ipa: URL, bundleID: String? = nil, version: String? = nil,
@@ -1009,7 +959,7 @@ enum IDevice {
                 return
             } catch let f as Failure where !run.connected && isEarlyEOF(f) && IDevice.pairing()?.kind == .remotePairing {
                 // B274: Pair Again, not the socket error (the row and its log say what to do)
-                let via = LocalVPN.available ? LocalVPN.name : Tailscale.useForInstall() ? "Tailscale" : "LocalDevVPN"
+                let via = LocalVPN.name
                 ilog("first connect reset during pair-verify through \(via): \(f.text); the pairing is stale")
                 throw pairAgain(f, via: via)
             } catch let f as Failure where run.connected && HereRecheck.shouldReconnect(code: f.code, lib: f.lib, reconnecting: firstDrop != nil) {
@@ -1034,9 +984,8 @@ enum IDevice {
     /// after a drop, ask iOS whether the install it was sent landed.
     private static func installTry(_ run: HereRun, watch w: Watch, note: @escaping (String) -> Void,
                                    progress: @escaping (Step) -> Void) throws {
-        let s = try Session(watch: w, tailscale: run.tailnet)
+        let s = try Session(watch: w)
         let route = s.kind == .remotePairing ? "\(s.via) (RemotePairing tunnel)" : "\(s.via) (lockdown)"
-        if run.tailnet == nil { run.tailnet = s.tailnet }
         if !run.connected {
             note("Connected to iOS through \(route)")
             progress(.connected)
@@ -1180,7 +1129,7 @@ enum IDevice {
     private static func secondLook(_ run: HereRun, bid: String, version: String) -> HereRecheck.Verdict? {
         do {
             return try watched("second look") { (w: Watch) -> HereRecheck.Verdict in
-                let s = try Session(watch: w, tailscale: run.tailnet, second: true)
+                let s = try Session(watch: w, second: true)
                 let ip = try s.installationProxy()
                 defer { installation_proxy_client_free(ip) }
                 let now = try appState(ip, bid, watch: w)

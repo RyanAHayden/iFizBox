@@ -8,11 +8,12 @@ so nothing reaches the Signing Server, there's no install sheet to keep alive, a
 | --- | --- |
 | `pin.env` | the idevice commit and the cargo features built (`tools/setup/cli/Cargo.toml` pins the same commit) |
 | `LICENSE` | idevice's MIT licence, from that commit |
-| `patches/*.patch` | our changes on top of that commit (MIT): `pairable_host_set_pin`, a setup code the app picks and shows before the phone connects; `tunnel_set_port_map`, so the tunnel's port can go through a local relay (Tailscale, `../tailscale/`) |
+| `patches/*.patch` | our changes on top of that commit (MIT): `pairable_host_set_pin`, a setup code the app picks and shows before the phone connects; `tunnel_set_port_map`, so the tunnel's port can go through a local relay |
 | `build.sh` | builds `libidevice_ffi.a` + `idevice.h` for arm64 iOS 15 from that commit plus `patches/` on Linux (`--probe`: is the toolchain there) |
 | `module.modulemap` | `import IDeviceFFI` for the Swift files |
-| `IDevice.swift` | pairing (Keychain), connecting over LocalDevVPN, AFC upload, installation_proxy with progress |
-| `VPNCheck.swift` | is LocalDevVPN on (10.7.0.1 answers), is another VPN on instead (tunnel interfaces up) |
+| `IDevice.swift` | pairing (Keychain), connecting through the built-in VPN (`../vpn/`), AFC upload, installation_proxy with progress |
+| `VPNCheck.swift` | the tunnel interfaces that are up, another app's VPN among them, and the probe of 10.7.0.1's ports |
+| `KeptRoute.swift` | Install Apps With (`route.keep` / `route.kept`), kept in the Keychain across a reinstall |
 | `IDeviceBridge.swift` | the `idevice.*` bridge calls (listed at the top of the file) |
 | `test_idevice.py` | the gate's checks that need no phone |
 
@@ -28,18 +29,18 @@ so nothing reaches the Signing Server, there's no install sheet to keep alive, a
 RemotePairing's port isn't fixed: 49152 is the first of iOS's dynamic ports, which remotepairingd usually gets, but
 after a restart it can listen elsewhere. A connect probes the port that answered last in this run, then 49152, then
 every port `_remotepairing._tcp` is advertised on over mDNS (listed in `NSBonjourServices`), over the route in use
-(10.7.0.1, or the phone's Tailscale address). When every port refuses, nothing serves this pairing any more: the
+(10.7.0.1). When every port refuses, nothing serves this pairing any more: the
 connect fails with `refused` (a turned-down pairing with `pairing_rejected`), and the page pairs again.
 
-Pair-setup isn't allowed over loopback, Wi-Fi or Tailscale (`allowsPairSetup` false), so a connection only ever
-verifies an existing pairing. LocalDevVPN must be on while installing; iOS lets no app switch another app's VPN.
+Pair-setup isn't allowed over loopback or Wi-Fi (`allowsPairSetup` false), so a connection only ever
+verifies an existing pairing. The built-in VPN is on while installing (the app turns it on and off); iOS lets no app switch another app's VPN, so the Install Switch Shortcut does. A build without Network Extensions has no way to connect (`vpn_failed`).
 
 ## When the connection drops mid-install
 
-Leaving the app, a tunnel reset or Tailscale's node going quiet can drop the connection to iOS (idevice's
+Leaving the app, or a tunnel reset can drop the connection to iOS (idevice's
 `Socket(Kind(UnexpectedEof))`, or the watchdog's timeout). That is not iOS refusing the app, so `IDevice.install`
 connects again, up to 4 times with a growing pause (`../../sign/HereRecheck.swift` holds the rules), always over the
-route the install started on (Automatic would pick LocalDevVPN while Tailscale's VPN is still coming back); a connect
+VPN; a connect
 that fails while it is connecting again counts as one of the tries:
 
 - **During the copy**: it carries on from the end of iOS's file in `PublicStaging` (a whole 1 MB chunk back).
@@ -51,8 +52,7 @@ that fails while it is connecting again counts as one of the tries:
 
 Only installd's own error codes fail an install. A wait that ran far past its 0.5 s tick means iOS suspended the
 app; the step's time limit then starts again. The copy's speed in front and in the background goes to the log
-(`AFC: copied 351.5 MB in 20.1 s: 18.2 MB/s in front, 17.3 MB/s in the background`, measured on an iPhone 15 Pro
-over Tailscale).
+(`AFC: copied 351.5 MB in 20.1 s: 18.2 MB/s in front, 17.3 MB/s in the background`, measured on an iPhone 15 Pro).
 
 ## Building
 

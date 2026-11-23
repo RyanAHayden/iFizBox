@@ -11,8 +11,8 @@ import { readySections, FREE_ENTRY_FOOTER, FREE_FIELDS_FOOTER, FREE_PASSWORD_FOO
 import { FOOTER as TWEAKS_FOOTER, WITH_ELLEKIT } from "./tweaks.js";
 import { ROULETTE_INTRO } from "./roulette.js";
 import { IMPORT_FOOTER } from "./manage.js";
-import { setupGroups, connectGroups, IMPORT_PAIRING, NO_VPN_FOOTER, NO_VPN_TAILSCALE_FOOTER, TAILSCALE_STORE } from "./installroute.js";
-import { PAIR_STEPS } from "../core/installroute.js";
+import { setupGroups, IMPORT_PAIRING } from "./installroute.js";
+import { PAIR_STEPS, NO_VPN } from "../core/installroute.js";
 import { siteIpaSections, SITE_IPA_INSTALL_FOOTER, SITE_KEPT_FOOTER } from "./myipas.js";
 
 let saved;
@@ -31,7 +31,8 @@ test("every new footer is one or two short sentences", () => {
   for (const f of [...Object.values(HELP_NOT_JAILBROKEN_FOOTER), ...Object.values(HELP_KINDS_FOOTER), HELP_CHANGES_FOOTER,
     HELP_REFRESH_FOOTER, ELLEKIT_FOOTER, CANISTER_FOOTER, FREE_ENTRY_FOOTER, FREE_FIELDS_FOOTER, FREE_PASSWORD_FOOTER,
     freeWaitFooter(new Date(2026, 10, 20, 14, 5)), FREE_ZIP_FOOTER, FREE_RENEW_FOOTER, TWEAKS_FOOTER, WITH_ELLEKIT,
-    ROULETTE_INTRO, IMPORT_FOOTER, NO_VPN_FOOTER, NO_VPN_TAILSCALE_FOOTER, SITE_IPA_INSTALL_FOOTER, SITE_KEPT_FOOTER]) short(f);
+    ROULETTE_INTRO, IMPORT_FOOTER, SITE_IPA_INSTALL_FOOTER, SITE_KEPT_FOOTER]) short(f);
+  short(NO_VPN.message, 180); // two sentences naming the cause and both ways out
   for (const s of PAIR_STEPS.file) short(s);
 });
 
@@ -51,7 +52,7 @@ test("Help: Not Jailbroken and the jailbreak kinds a group each, Check for Chang
 
 test("Credits > Software: ElleKit and Canister each in their own group with their footer, the notices together", () => {
   const g = softwareSections();
-  assert.deepEqual(g.map(labels), [["ElleKit"], ["Canister"], ["zsign", "OpenSSL", "zlib", "idevice", "Tailscale"]]);
+  assert.deepEqual(g.map(labels), [["ElleKit"], ["Canister"], ["zsign", "OpenSSL", "zlib", "idevice"]]);
   assert.equal(g[0].header, "Software");
   assert.equal(g[0].footer, ELLEKIT_FOOTER);
   assert.match(g[0].footer, /Évelyne Bélanger/);
@@ -84,15 +85,10 @@ test("Pairing with a file: one group per numbered step, Import Pairing File in t
   assert.deepEqual(labels(steps.at(-1)), [IMPORT_PAIRING]);
 });
 
-test("no VPN installed: LocalDevVPN's group and Tailscale's group, each with its own footer", () => {
-  let opened = 0;
-  const g = connectGroups("none", null, { installTailscale: () => opened++ });
-  assert.deepEqual(g.map(labels), [["LocalDevVPN", "Install LocalDevVPN"], ["Install Tailscale"]]);
-  assert.equal(g[0].footer, NO_VPN_FOOTER);
-  assert.equal(g[1].footer, NO_VPN_TAILSCALE_FOOTER);
-  g[1].rows[0].onClick();
-  assert.equal(opened, 1);
-  assert.match(TAILSCALE_STORE, /^https:\/\/apps\.apple\.com\/app\/tailscale\/id\d+$/);
+test("no Network Extensions: the status row and one footer under it", () => {
+  const g = setupGroups("noVPN", null, null);
+  assert.deepEqual(g.slice(1).map(labels), [["Network Extensions"]]);
+  assert.equal(g[1].footer, NO_VPN.message);
 });
 
 test("My IPAs on the website: the Install hint under an Install row, Details with no footer", () => {

@@ -14,7 +14,7 @@ hudHooks.show = () => () => {};
 hudHooks.delay = 0;
 
 const store = (route) => { const m = { installRoute: route }; return { get: (k) => m[k], set: (k, v) => { m[k] = v; } }; };
-const PAIRED_ON = { paired: "rp", pairOnPhone: true, localDevVPN: true, otherVPN: false, tailscale: { connect: "auto", signedIn: false } };
+const PAIRED_ON = { paired: "rp", pairOnPhone: true, otherVPN: false, vpn: { available: true, tested: true } };
 const bridge = (answers) => ({ call: (m) => Promise.resolve(answers[m]) });
 const LINKS = { with: "#w", certificate: "#c", apps: "#a", help: "#h" };
 const cellsOf = (page) => [...page.el.querySelectorAll(".cell-inner")];
