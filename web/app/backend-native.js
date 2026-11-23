@@ -61,11 +61,13 @@ import { encodeUrl } from "./core/urlencode.js";
 import { reviewsApi, reviewsBase } from "./core/reviews.js";
 import { updateFailures, failureFor, liveUpdate } from "./core/aptupdate.js";
 import { createKeepAwake } from "./core/keepawake.js";
+import { parseUserApps } from "./core/userapps.js"; // F374
 
 // F287: the shell calls that are work the screen must stay on for: a streamed helper run (apt-get update, an apply,
 // a rollback, an uninstall with its console), a .deb's download and install, an IPA or paid package's install.
 // A quick helper call (simulate, auto, app-versions) has no stream and lets the screen be.
-const LONG_CALLS = new Set(["share.debFetch", "share.debInstall", "ipa.install", "paid.install"]);
+const LONG_CALLS = new Set(["share.debFetch", "share.debInstall", "ipa.install", "paid.install",
+  "library.decrypt", "library.addTweaks"]); // F374
 export const longCall = (method, params) => LONG_CALLS.has(method) || (method === "helper.run" && Boolean(params?.stream));
 
 // The one apt source file iFizBox writes (ifizbox-helper addsource/removesource, F33).
@@ -384,6 +386,18 @@ function queueCalls(backend, q, call) {
       }
       return r.code === 0 ? parseAppVersions(r.stdout) : null;
     },
+    // F374: Installed Apps, every app installd put on the phone (ifizbox-helper user-apps: name, version, path, still
+    // encrypted, App Store), core/userapps.js parseUserApps. Throws a BackendError("helper") with the helper's reason.
+    async userApps() {
+      const r = await backend.helper(["user-apps"]);
+      if (r.code !== 0) throw new BackendError("helper", lastLine(r.stderr).replace(/^ifizbox-helper:\s*/, "") || "The apps couldn't be listed.");
+      return parseUserApps(r.stdout);
+    },
+    // F374: Decrypt (library.decrypt: ifizbox-helper decrypt-app, then the IPA zipped into My IPAs; onEvent sees the
+    // { fd, line } stream) and Add Tweaks (library.addTweaks: a copy of a library IPA with the prepared tweaks in,
+    // core/tweaks.js tweakParams). Both keep the screen on (LONG_CALLS). -> the shell's reply ({ file, ipas, ... }).
+    decryptApp: (bundleId, onEvent) => call("library.decrypt", { bundleId, stream: Boolean(onEvent) }, onEvent),
+    addTweaksTo: (file, tweaks) => call("library.addTweaks", { file, tweaks }),
     // I4: core/installed.js records with the real versions (withRealVersions); as they were when those can't be read.
     async installedApps(records) {
       return withRealVersions(records, await backend.appVersions());

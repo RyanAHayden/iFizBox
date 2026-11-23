@@ -10,14 +10,14 @@ LD64_LLD ?= $(shell p=$$(rustc --print sysroot 2>/dev/null)/lib/rustlib/x86_64-u
 
 host:
 	mkdir -p build/host
-	$(CC) $(WARN) $(HOST_DEFS) $(CFLAGS) -o build/host/ifizbox-helper main.c policy.c ipa.c paid.c
+	$(CC) $(WARN) $(HOST_DEFS) $(CFLAGS) -o build/host/ifizbox-helper main.c policy.c ipa.c paid.c decrypt.c
 	$(CC) $(WARN) $(HOST_DEFS) $(CFLAGS) -o build/host/test_driver test_driver.c policy.c spawn.c ipa.c paid.c
 
 ios:
 	@[ -n "$(IOS_SDK)" ] || { echo "set IOS_SDK"; exit 3; }
 	mkdir -p build/ios
 	clang -target arm64-apple-ios15.0 -isysroot "$(IOS_SDK)" $(WARN) $(CFLAGS) -fuse-ld=lld --ld-path="$(LD64_LLD)" \
-		-Wl,-adhoc_codesign -o build/ios/ifizbox-helper main.c policy.c ipa.c paid.c \
+		-Wl,-adhoc_codesign -o build/ios/ifizbox-helper main.c policy.c ipa.c paid.c decrypt.c \
 		-framework CoreFoundation -lobjc
 	clang -target arm64-apple-ios15.0 -isysroot "$(IOS_SDK)" $(WARN) $(CFLAGS) -c spawn.c -o build/ios/spawn.o
 

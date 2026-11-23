@@ -200,7 +200,7 @@ if [ "$what" != ipa ]; then
   libexec=$root/var/jb/usr/libexec/ifizbox
   mkdir -p "$libexec"
   clang "${hflags[@]}" -fuse-ld=lld --ld-path="$lld" -Wl,-adhoc_codesign -o "$libexec/ifizbox-helper" helper/main.c helper/policy.c \
-    helper/ipa.c helper/paid.c -framework CoreFoundation -lobjc
+    helper/ipa.c helper/paid.c helper/decrypt.c -framework CoreFoundation -lobjc
   chmod 0755 "$libexec/ifizbox-helper"
   # F59: appinst's entitlements, for install-ipa's installApplication:withOptions:error: (helper/entitlements.plist).
   if [ -n "$ldid" ]; then
