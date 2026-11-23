@@ -43,6 +43,7 @@ import * as more from "./moresources.js"; // F327: #/sources/more, More Sources
 import { pageViews } from "../nav/pageviews.js"; // C25
 import { setSourceErrorHooks } from "./sourceerror.js"; // B177
 import { nativeBridge } from "../native.js";
+import { attachRowSwipe, fullSwipeEra } from "../nav/rowswipe.js"; // B356
 
 export const title = "Sources";
 
@@ -627,6 +628,7 @@ function draw(view) {
     at += g.list.length;
   }
   attachRowGestures(ul);
+  attachDeleteSwipe(ul); // B356
   box.replaceChildren(ul);
   if (!list.length && !tweakList.length) {
     box.append(note(searching ? "No sources match." : "No sources. Tap Manage, then Sources."));
@@ -817,7 +819,8 @@ function attachRowGestures(ul) {
   ul.addEventListener("pointerdown", (e) => {
     const li = e.target.closest(".source-row");
     swiped = false;
-    start = li && !e.target.closest(".del-confirm") ? { li, x: e.clientX, y: e.clientY } : null;
+    start = li && !e.target.closest(".del-confirm") && !fullSwipeEra()
+      ? { li, x: e.clientX, y: e.clientY } : null; // B356: iOS 7 and later swipe the row off instead (attachDeleteSwipe)
   });
   ul.addEventListener("pointermove", (e) => {
     if (!start) return;
@@ -834,6 +837,22 @@ function attachRowGestures(ul) {
   ul.addEventListener("pointercancel", stop);
 }
 
+// B356: under iOS 7, 13 and 26 (fullSwipeEra) a source's Delete is a full-row swipe, as Installed's apps list
+// (B332): drag the row off its left edge and the source goes, red behind it; a failed removal brings the row back.
+// iOS 6 keeps the swipe that shows the red Delete (attachRowGestures). The built-in source has no Delete.
+function attachDeleteSwipe(ul) {
+  return attachRowSwipe(ul, {
+    rowSelector: ".source-row",
+    canStart: (li) => fullSwipeEra() && !state.editing && !li.dataset.builtin && !li.classList.contains("armed")
+      && !ul.querySelector(".source-row.armed"),
+    prepare: (li) => { const source = byKey(li.dataset.key); return source && !isBuiltin(source) ? { source } : null; },
+    kindOf: () => "remove",
+    full: () => true,
+    commit: (li, a) => remove(li, a.source),
+  });
+}
+
+// -> false when the source stays (the backend refused it; the alert says why).
 async function remove(li, source) {
   li.classList.add("removing");
   try {
@@ -841,7 +860,7 @@ async function remove(li, source) {
   } catch (e) {
     li.classList.remove("removing");
     await showAlert({ title: "Error", message: e.message, buttons: ["OK"] });
-    return;
+    return false;
   }
   state.sources = state.sources.filter((s) => s.key !== source.key);
   setTimeout(() => {
@@ -849,6 +868,7 @@ async function remove(li, source) {
     collapse(li);
     for (const v of views.all()) if (!v.body.contains?.(li)) draw(v); // C25: the other copy of the page
   }, 200);
+  return true;
 }
 
 
