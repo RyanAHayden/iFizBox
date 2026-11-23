@@ -36,7 +36,7 @@
  * only because iFizBox is signed with com.apple.private.persona-mgmt. Run by anything else it is plain mobile and
  * refuses. It runs exactly one of apt-get update|install|remove|upgrade, apt-mark hold|unhold|showhold or
  * dpkg --configure -a from the rootless
- * prefix, with fixed options; the caller only picks the verb and package names ([a-z0-9][a-z0-9.+-]+, known to
+ * prefix, with fixed options; the caller only picks the verb and package names ([A-Za-z0-9][A-Za-z0-9._+-]+, known to
  * dpkg or apt). If fd 3 is open, apt's/dpkg's status lines go there (pmstatus:pkg:percent:text); stdout and stderr
  * are apt's own. addsource/removesource (F33) run nothing: they edit <prefix>/etc/apt/sources.list.d/ifizbox.sources
  * (temp file + rename) and print what they did. Exit: 64 refused arguments, 77 refused caller, 74 ifizbox.sources

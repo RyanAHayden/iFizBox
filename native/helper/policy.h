@@ -171,11 +171,12 @@ int helper_paid_path_ok(const char *dir, const char *path);
  * jailbreak's /Applications) and asks installd to uninstall it (LSApplicationWorkspace uninstallApplication:
  * withOptions:). path is the folder, argv the verb and the id (helper_ipa_bundle_id_ok). */
 
-/* 1 if s is a package name the helper passes on: [a-z0-9][a-z0-9.+-]+, at most HELPER_NAME_MAX bytes. */
+/* 1 if s is a package name the helper passes on: dpkg's rule (two letters at least), [A-Za-z0-9][A-Za-z0-9._+-]+, at most
+ * HELPER_NAME_MAX bytes. Plans pass it on in lower case, as dpkg and apt keep every name. */
 int helper_name_ok(const char *s);
 
-/* N4: 1 if s is a Debian version apt can be asked for: a digit first, then [A-Za-z0-9.+~:-], at most
- * HELPER_VERSION_MAX bytes (an epoch "1:2.0" included). */
+/* N4: 1 if s is a Debian version apt can be asked for: a digit first, then [A-Za-z0-9.+~:-] and no - at
+ * the end, at most HELPER_VERSION_MAX bytes (an epoch "1:2.0" included). dpkg installs no other. */
 int helper_version_ok(const char *s);
 
 /* Turn the caller's words (argv[0] is the verb: one of HELPER_VERBS) into the one command the helper may run.

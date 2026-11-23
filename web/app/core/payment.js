@@ -30,7 +30,7 @@
 
 const COMMERCIAL_TAG = "cydia::commercial";
 const CALLBACK_SCHEMES = ["sileo:", "ifizbox:"];
-const PKG = /^[a-z0-9][a-z0-9+.-]*$/i;
+const PKG = /^[a-z0-9][a-z0-9+._-]*$/i;
 
 export function isCommercial(st) {
   const tag = typeof st === "string" ? st : st?.tag ?? st?.Tag ?? "";

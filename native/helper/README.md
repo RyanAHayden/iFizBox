@@ -66,8 +66,8 @@ executable failing is an error.
 **The queue:** `simulate` and `apply` take items: `name` installs the newest, `name=version` that exact
 version (Reinstall, Downgrade and the Version History pick one), `-name` removes. apt gets `name`, `name=version`
 and `name-` in one `apt-get install`, so one run does the whole queue, as Cydia's does. A name follows the rules
-below (an install's must not end in `-` or `+`, which apt would read as a modifier); a version is a digit, then
-`[A-Za-z0-9.+~:-]`, at most 255 bytes; no package twice. Install items must be known to dpkg's status or apt's lists,
+below (an install's must not end in `-`, which apt would read as a removal); a version is a digit, then
+`[A-Za-z0-9.+~:-]`, not ending in `-`, at most 255 bytes; no package twice. Names go to apt in lower case, and the known and twice checks ignore case. Install items must be known to dpkg's status or apt's lists,
 removals to dpkg's status. `--reinstall` makes an item naming the installed version do something; `--allow-downgrades`
 is what lets `-y` take an older version on purpose. Cydia's finish protocol: maintainer scripts write `finish:restart`
 (and so on) to the fd named in `$CYDIA`; `APT::Keep-Fds` keeps fd 3 open through apt and dpkg, so those lines arrive
@@ -178,11 +178,10 @@ for a refused path or file, 74 couldn't copy, else apt's.
 options, fd 3 required, and apt-get runs with a pipe on its stdin that gets only the `Y`/`N` lines from the helper's
 own stdin (`C` cancels), so a conffile both you and the package changed brings the Configuration Upgrade alert.
 
-- **Arguments:** only the verb and package names. A name matches `[a-z0-9][a-z0-9.+-]+` (so never an option), is
+- **Arguments:** only the verb and package names. A name matches dpkg's own `[A-Za-z0-9][A-Za-z0-9._+-]+` (so never an option), is
   at most 255 bytes, at most 256 of them, and must be known: for `install` a `Package:` line in dpkg's status or an
   apt `*_Packages` list, for `remove`, `hold` and `unhold` in dpkg's status. The last rule stops apt from reading
-  an unknown name as a regex (`com.foo.bar` would match `com.foo.bar2`) or a modifier (`foo-` removes, `foo+`
-  installs). Virtual packages (only in `Provides:`) are refused for that reason; install the real one.
+  an unknown name as a regex (`com.foo.bar` would match `com.foo.bar2`) or a modifier (`foo-` removes). An install's name may end in `+` (`libdb18.1++`), not in `-`. Virtual packages (only in `Provides:`) are refused for that reason; install the real one.
 - **Caller:** real and effective uid 0 (only the entitled app can arrange that), and the parent's executable
   (`proc_pidpath(getppid())`) is the same device + inode as `/var/jb/Applications/iFizBox.app/iFizBox`.
 - **Process:** stdin `/dev/null` (apply-ask: the relay's pipe, above), cwd `/`, fds above 2 closed (3 kept when open, for status), signals default,

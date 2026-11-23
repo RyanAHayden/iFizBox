@@ -16,13 +16,21 @@
 
 int helper_name_ok(const char *s) {
     size_t n = strlen(s);
-    if (n < 2 || n > HELPER_NAME_MAX) return 0;
-    if (!((s[0] >= 'a' && s[0] <= 'z') || (s[0] >= '0' && s[0] <= '9'))) return 0; /* never an option */
+    if (n < 2 || n > HELPER_NAME_MAX) return 0; /* Debian's two at least: "-o" stays an option, not a removal of "o" */
     for (size_t i = 0; i < n; i++) {
         char c = s[i];
-        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '+' || c == '-')) return 0;
+        int an = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+        if (!an && (!i || !strchr("._+-", c))) return 0; /* i 0: never an option */
     }
     return 1;
+}
+
+/* dpkg and apt lower-case a package name (a name's case never tells two packages apart), and apt-get finds a package
+ * of another architecture only by that spelling: B405. ASCII only, as dpkg; helper_name_ok ran first. */
+static char lower(char c) { return c >= 'A' && c <= 'Z' ? (char)(c - 'A' + 'a') : c; }
+
+static void lower_name(char *s) {
+    for (; *s; s++) *s = lower(*s);
 }
 
 int helper_version_ok(const char *s) {
@@ -33,7 +41,7 @@ int helper_version_ok(const char *s) {
         if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || strchr(".+~:-", c)))
             return 0;
     }
-    return 1;
+    return s[n - 1] != '-'; /* dpkg: an empty revision */
 }
 
 static int alnum(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'); }
@@ -134,9 +142,10 @@ static int paid_plan(int argc, char *const argv[], const char *prefix, int statu
     static char status_apt[64], keep_fd[64];
     if (argc != 4) { *err = "install-paid takes a .deb path, a package name and a version"; return -1; }
     if (!helper_paid_path_ok(HELPER_PAID_DIR, argv[1])) { *err = "bad .deb path (only " HELPER_PAID_DIR "/<name>.deb)"; return -1; }
-    if (!helper_name_ok(argv[2])) { *err = "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"; return -1; }
-    if (!helper_version_ok(argv[3])) { *err = "bad version (a digit, then [A-Za-z0-9.+~:-])"; return -1; }
+    if (!helper_name_ok(argv[2])) { *err = "bad package name (allowed: [A-Za-z0-9][A-Za-z0-9._+-]+)"; return -1; }
+    if (!helper_version_ok(argv[3])) { *err = "bad version (a digit, then [A-Za-z0-9.+~:-], not ending in -)"; return -1; }
     snprintf(p->name_buf[0], sizeof p->name_buf[0], "%s", argv[2]);
+    lower_name(p->name_buf[0]);
     snprintf(p->item_buf[0], sizeof p->item_buf[0], "%s", argv[3]);
     if ((size_t)snprintf(p->deb, sizeof p->deb, "%s", argv[1]) >= sizeof p->deb) { *err = "path too long"; return -1; }
     if ((size_t)snprintf(p->path, sizeof p->path, "%s/usr/bin/apt-get", prefix) >= sizeof p->path) {
@@ -336,20 +345,22 @@ static int queue_plan(int argc, char *const argv[], const char *prefix, int stat
         const char *name = rm ? w + 1 : w;
         const char *eq = rm ? NULL : strchr(name, '=');
         size_t len = eq ? (size_t)(eq - name) : strlen(name);
-        if (len > HELPER_NAME_MAX) { *err = "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"; return -1; }
+        if (len > HELPER_NAME_MAX) { *err = "bad package name (allowed: [A-Za-z0-9][A-Za-z0-9._+-]+)"; return -1; }
         memcpy(p->name_buf[i], name, len);
         p->name_buf[i][len] = 0;
-        /* An install of a name ending in - or + would read to apt as a removal or an install modifier. */
-        if (!helper_name_ok(p->name_buf[i]) || (!rm && (name[len - 1] == '-' || name[len - 1] == '+'))) {
-            *err = "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"; return -1;
+        /* An install of a name ending in - could read to apt as a removal. One ending in + (libdb18.1++) is fine: apt
+         * looks for the whole name first, and + only means install. */
+        if (!helper_name_ok(p->name_buf[i]) || (!rm && name[len - 1] == '-')) {
+            *err = "bad package name (allowed: [A-Za-z0-9][A-Za-z0-9._+-]+)"; return -1;
         }
-        if (eq && !helper_version_ok(eq + 1)) { *err = "bad version (a digit, then [A-Za-z0-9.+~:-])"; return -1; }
+        if (eq && !helper_version_ok(eq + 1)) { *err = "bad version (a digit, then [A-Za-z0-9.+~:-], not ending in -)"; return -1; }
+        lower_name(p->name_buf[i]);
         for (int j = 0; j < i; j++)
             if (!strcmp(p->name_buf[j], p->name_buf[i])) { *err = "a package is named twice"; return -1; }
         p->names[i] = p->name_buf[i];
         p->removing[i] = (char)rm;
         if (rm) snprintf(p->item_buf[i], sizeof p->item_buf[i], "%s-", p->name_buf[i]);
-        else snprintf(p->item_buf[i], sizeof p->item_buf[i], "%s", name);
+        else snprintf(p->item_buf[i], sizeof p->item_buf[i], "%s%s", p->name_buf[i], eq ? eq : "");
     }
     if ((size_t)snprintf(p->path, sizeof p->path, "%s/usr/bin/apt-get", prefix) >= sizeof p->path) {
         *err = "prefix too long"; return -1;
@@ -453,8 +464,14 @@ static int uicache_plan(int argc, const char *prefix, struct helper_plan *p, con
 #endif
 
 int helper_deb_name_version(const char *file, const char *id, char *ver, size_t size) {
-    size_t il = strlen(id), fl = strlen(file);
-    if (!il || fl < il + 8 || memcmp(file, id, il) || file[il] != '_' || strcmp(file + fl - 4, ".deb")) return 0;
+    size_t il = 0, fl = strlen(file);
+    if (!*id) return 0;
+    for (const char *q = id; *q; q++) { /* apt's archive names write the id's "_" as %5f */
+        if (*q == '_' && !strncasecmp(file + il, "%5f", 3)) il += 3;
+        else if (file[il] == *q) il++;
+        else return 0;
+    }
+    if (fl < il + 8 || file[il] != '_' || strcmp(file + fl - 4, ".deb")) return 0;
     const char *v = file + il + 1, *end = file + fl - 4, *us = NULL;
     for (const char *q = v; q < end; q++)
         if (*q == '_') { if (us) return 0; us = q; } /* exactly two "_": a version never has one */
@@ -492,7 +509,7 @@ static DIR *open_store(const char *dir, const char *id, uid_t root_uid, char *pa
                        const char **err) {
     struct stat st;
     *missing = 0;
-    if (!helper_name_ok(id)) { *err = "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"; return NULL; }
+    if (!helper_name_ok(id)) { *err = "bad package name (allowed: [A-Za-z0-9][A-Za-z0-9._+-]+)"; return NULL; }
     if ((size_t)snprintf(path, size, "%s/%s", dir, id) >= size) { *err = "prefix too long"; return NULL; }
     if (lstat(dir, &st) && errno == ENOENT) { *missing = 1; return NULL; }
     if (!safe_dir(dir, root_uid)) { *err = "the rollback folder isn't a root-owned directory only root can write"; return NULL; }
@@ -507,7 +524,7 @@ int helper_rollback_file(const char *dir, const char *id, const char *version, u
                          const char **err) {
     char path[PATH_MAX], ver[HELPER_VERSION_MAX + 1], file[PATH_MAX];
     int missing;
-    if (!helper_version_ok(version)) { *err = "bad version (a digit, then [A-Za-z0-9.+~:-])"; return -1; }
+    if (!helper_version_ok(version)) { *err = "bad version (a digit, then [A-Za-z0-9.+~:-], not ending in -)"; return -1; }
     DIR *d = open_store(dir, id, root_uid, path, sizeof path, &missing, err);
     if (!d) {
         if (missing) *err = "no stored .deb of that version (Roll Back keeps only what automatic updates replaced)";
@@ -567,7 +584,7 @@ int helper_control_matches(const char *text, const char *id, const char *version
             const char *v = l + skip;
             size_t vl = len - skip;
             while (vl && (*v == ' ' || *v == '\t')) { v++; vl--; }
-            if (*hit || strlen(want) != vl || memcmp(want, v, vl)) return 0; /* twice, or another value */
+            if (*hit || strlen(want) != vl || (want == id ? strncasecmp(want, v, vl) : memcmp(want, v, vl))) return 0; /* twice, or another value */
             *hit = 1;
         }
         if (!e) break;
@@ -619,11 +636,12 @@ static int rollback_plan(int argc, char *const argv[], const char *prefix, int s
     static char status_apt[64], keep_fd[64];
     int list = p->verb == HV_ROLLBACKS;
     if (list ? argc != 2 : argc != 3) { *err = list ? "rollbacks takes a package name" : "rollback takes a package name and a version"; return -1; }
-    if (!helper_name_ok(argv[1])) { *err = "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"; return -1; }
-    if (!list && !helper_version_ok(argv[2])) { *err = "bad version (a digit, then [A-Za-z0-9.+~:-])"; return -1; }
+    if (!helper_name_ok(argv[1])) { *err = "bad package name (allowed: [A-Za-z0-9][A-Za-z0-9._+-]+)"; return -1; }
+    if (!list && !helper_version_ok(argv[2])) { *err = "bad version (a digit, then [A-Za-z0-9.+~:-], not ending in -)"; return -1; }
     char dir[PATH_MAX];
     if ((size_t)snprintf(dir, sizeof dir, "%s%s", prefix, HELPER_ROLLBACK_DIR) >= sizeof dir) { *err = "prefix too long"; return -1; }
     snprintf(p->name_buf[0], sizeof p->name_buf[0], "%s", argv[1]);
+    lower_name(p->name_buf[0]);
     if (list) {
         snprintf(p->path, sizeof p->path, "%s", dir);
         p->argv[0] = argv[0];
@@ -633,7 +651,7 @@ static int rollback_plan(int argc, char *const argv[], const char *prefix, int s
         return 0;
     }
     snprintf(p->item_buf[0], sizeof p->item_buf[0], "%s", argv[2]);
-    if (helper_rollback_file(dir, argv[1], argv[2], IFIZBOX_ROOT_UID, p->deb, sizeof p->deb, err)) return -1;
+    if (helper_rollback_file(dir, p->name_buf[0], argv[2], IFIZBOX_ROOT_UID, p->deb, sizeof p->deb, err)) return -1;
     if ((size_t)snprintf(p->path, sizeof p->path, "%s/usr/bin/apt-get", prefix) >= sizeof p->path) {
         *err = "prefix too long"; return -1;
     }
@@ -722,7 +740,11 @@ static int plan_words(int argc, char *const argv[], const char *prefix, int stat
     if (wants_packages && n < 1) { *err = "no package names"; return -1; }
     if (n > HELPER_MAX_PACKAGES) { *err = "too many package names"; return -1; }
     for (int i = 1; i < argc; i++)
-        if (!helper_name_ok(argv[i])) { *err = "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"; return -1; }
+        if (!helper_name_ok(argv[i])) { *err = "bad package name (allowed: [A-Za-z0-9][A-Za-z0-9._+-]+)"; return -1; }
+    for (int i = 0; i < n; i++) {
+        snprintf(p->name_buf[i], sizeof p->name_buf[i], "%s", argv[i + 1]);
+        lower_name(p->name_buf[i]);
+    }
 
     int mark = p->verb == HV_HOLD || p->verb == HV_UNHOLD || p->verb == HV_SHOWHOLD || p->verb == HV_AUTO;
     const char *tool = p->verb == HV_CONFIGURE ? "dpkg" : mark ? "apt-mark" : "apt-get";
@@ -750,7 +772,7 @@ static int plan_words(int argc, char *const argv[], const char *prefix, int stat
         a[k++] = verb; /* hold, unhold, showhold or auto: the literals checked above */
         p->packages = (const char *const *)&a[k];
         p->npackages = n;
-        for (int i = 1; i < argc; i++) a[k++] = argv[i];
+        for (int i = 1; i < argc; i++) a[k++] = p->name_buf[i - 1];
     } else {
         if (p->verb != HV_UPDATE) {
             a[k++] = "-y";
@@ -771,7 +793,7 @@ static int plan_words(int argc, char *const argv[], const char *prefix, int stat
         a[k++] = verb; /* one of the literals checked above */
         p->packages = (const char *const *)&a[k];
         p->npackages = n;
-        for (int i = 1; i < argc; i++) a[k++] = argv[i];
+        for (int i = 1; i < argc; i++) a[k++] = p->name_buf[i - 1];
     }
     a[k] = NULL;
     p->argc = k;
@@ -816,7 +838,7 @@ static void scan(const char *path, const struct helper_plan *p, char *found) {
         while (e > s && (e[-1] == '\n' || e[-1] == '\r' || e[-1] == ' ' || e[-1] == '\t')) e--;
         size_t n = (size_t)(e - s);
         for (int i = 0; i < p->npackages; i++)
-            if (!found[i] && strlen(p->packages[i]) == n && !memcmp(p->packages[i], s, n)) found[i] = 1;
+            if (!found[i] && strlen(p->packages[i]) == n && !strncasecmp(p->packages[i], s, n)) found[i] = 1;
     }
     free(line);
     fclose(f);

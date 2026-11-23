@@ -251,6 +251,8 @@ class Decisions(Base):
         ver = lambda f, i: self.run_driver("debver", f, i).strip()
         self.assertEqual(ver("libfoo_2%3a3.2-1_iphoneos-arm64.deb", "libfoo"), "2:3.2-1")
         self.assertEqual(ver("com.ex.tweak_1.2_iphoneos-arm64.deb", "com.ex.tweak"), "1.2")
+        for f in ("com.a%5fb_1.2_arm.deb", "com.a_b_1.2_arm.deb"):  # apt writes the id's "_" as %5f
+            self.assertEqual(ver(f, "com.a_b"), "1.2", f)
         for bad in ("libfoo2_1.0_arm.deb", "libfoo_1.0.deb", "libfoo__arm.deb", "libfoo_1.0_arm.deb.partial",
                     "libfoo_1.0_.deb", "libfoo_1_0_arm.deb"):
             self.assertEqual(ver(bad, "libfoo"), "no", bad)
