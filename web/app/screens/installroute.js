@@ -918,6 +918,7 @@ let visit = null; // this visit of the page: { started, asked, failed, poll }; n
 // "checking" is drawn at once while idevice.status answers, with a spinner (`spinner` marks the group). "connect"
 // draws the way to connect `vpn` (core vpnRoute) with connectGroups.
 export const IMPORT_PAIRING = "Import Pairing File";
+export const TESTING_AFTER_PAIRING = "Testing the Connection…";
 export function setupGroups(state, st, p, { openVPN = () => {}, retry = () => {}, check = () => {}, forget = () => {}, failed = false,
   vpn = "localdevvpn", choose = () => {}, signIn = () => {}, openTailscale = () => {}, install = () => {}, installTailscale = () => {}, busy = null,
   importFile = () => {} } = {}) {
@@ -937,6 +938,7 @@ export function setupGroups(state, st, p, { openVPN = () => {}, retry = () => {}
       ...(i === last ? { rows: [{ label: IMPORT_PAIRING, cls: "sign-import", onClick: importFile }] } : {}), footer: `${i + 1}. ${s}` }))];
   }
   if (state === "checking") return [intro, { spinner: "Checking…" }];
+  if (state === "testing") return [intro, { spinner: TESTING_AFTER_PAIRING }]; // B357: pairing's last step (finishSetup)
   if (state === "connect") {
     // B133: while the page polls for the VPN (its way known and nothing left to tap but the app), say so with a spinner
     const waitFor = vpn === "localdevvpn" ? VPN : vpn === "tailscale" && st?.tailscale?.signedIn && !busy ? "Tailscale" : null;
@@ -1166,12 +1168,23 @@ if (typeof document !== "undefined" && typeof window !== "undefined") {
   for (const t of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) document.addEventListener(t, (e) => guardSwipe(e), true);
 }
 
+// B357: with the built-in VPN, setting up ends with its test (vpn.test, as Test Connection runs it), right after
+// pairing, before the page says Paired: the first test is when iOS asks to add the VPN configuration (the one Allow),
+// so setup isn't Done until that's answered. `st` is the idevice.status from before pairing (it has `vpn`).
+export const needsTestAfterPairing = (st) => builtinVPN(st) && !st.vpn.tested;
+async function finishSetup(v, native, alert, store, redraw) {
+  if (visit === v) redraw(); // Testing the Connection…, with the spinner
+  const done = () => { if (!v.testing) return; v.testing = false; if (visit === v) redraw(); };
+  try { await vpnTest(native, alert, store, { ended: done }); } finally { done(); }
+}
+
 async function vpnApps(native) { try { return await call(native, "idevice.vpnApps"); } catch { return null; } }
 
 async function drawPair(box, { store, native, alert, redraw }) {
   shown = { native, redraw };
   visit ??= { started: false, asked: false, failed: false, poll: null };
   const v = visit;
+  if (v.testing) { box.replaceChildren(pairSections(setupGroups("testing"))); return; } // B357: the test after pairing runs
   // B120: the page draws at once, a spinner while idevice.status answers (a redraw keeps what is on screen).
   if (!pairing && !box.firstChild) { box.replaceChildren(pairSections(setupGroups("checking"))); v.checking = true; } // B134: asked before leaving
   // In pairing mode the page draws from `pairing` alone, without waiting on idevice.status.
@@ -1200,7 +1213,10 @@ async function drawPair(box, { store, native, alert, redraw }) {
       await call(native, "idevice.pair", {}, (ev) => { if (mine()) { pairing = pairEvent(pairing, ev); redraw(); } });
       if (visit === v) pairing = null;
       AUTO_CHECK.last = 0; // B316: paired again: the paired page checks at once and goes green on its own
+      const test = visit === v && needsTestAfterPairing(lastStatus ?? await status(native)); // no remembered answer: read it
+      if (test) v.testing = true; // before the store's set redraws the page
       store.set(ROUTE_KEY, "iphone");
+      if (test) return finishSetup(v, native, alert, store, redraw);
       if (visit === v) redraw();
     } catch (e) {
       if (visit !== v) return;
@@ -1255,7 +1271,10 @@ async function drawPair(box, { store, native, alert, redraw }) {
       try {
         const data = toBase64(new Uint8Array(await f.arrayBuffer()));
         await busy("Importing", () => call(native, "idevice.import", { data }));
+        const test = visit === v && needsTestAfterPairing(lastStatus ?? await status(native));
+        if (test) v.testing = true;
         store.set(ROUTE_KEY, "iphone");
+        if (test) return finishSetup(v, native, alert, store, recheck);
         recheck();
       } catch (e) {
         alert({ title: "Not a Pairing File", message: e?.message || "That file isn't a pairing for this iPhone.", buttons: ["OK"] });

@@ -282,12 +282,12 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   `networkextension` entitlement); when the app's embedded profile lacks `packet-tunnel-provider`, This iPhone keeps
   using LocalDevVPN or Tailscale. `IDevice.Session` turns the VPN on just before it connects to iOS (`LocalVPN.begin`,
   saving the configuration the first time: iOS asks to allow it) and off 3 seconds after the last connection ends,
-  so a queue of installs or a reconnect finds it on. The configuration is never On Demand: iOS runs one VPN at a
-  time, so the user's own VPN (Tailscale) pauses for the install. Turning ours on takes Settings > VPN's checkmark
-  from it, and its On Demand only runs while it has the checkmark, so when another VPN was on before, ours is
-  removed once off: the checkmark goes back and Tailscale's On Demand reconnects it (within about a minute on the
-  iPhone 15 Pro). The price is iOS's "Add VPN Configurations" Allow at each install for those users; without
-  another VPN the configuration stays and iOS asks once.
+  so a queue of installs or a reconnect finds it on. The configuration is never On Demand and never removed: it
+  stays in Settings > VPN, only connected during installs, so iOS's "Add VPN Configurations" Allow comes once.
+  Setting up asks it: right after pairing (or importing a pairing file), the pairing page runs the same test as
+  Test Connection (`vpn.test`) before it says Paired. iOS runs one VPN at a time, so the user's own VPN pauses for
+  the install, and since ours keeps Settings > VPN's checkmark, a VPN that relies on On Demand (Tailscale) stays
+  off until the user turns it on again.
   On cellular (cellular in use, no Wi-Fi joined) iOS refuses these connections while cellular data is on
   (journal/2026-11-21-r72-cellular-this-iphone), so, as SideStore's Cellular Refresh, the user adds two Shortcuts
   once: "Cellular Data Off" and "Cellular Data On" (each one action, Set Cellular Data, Off or On). With both added,
