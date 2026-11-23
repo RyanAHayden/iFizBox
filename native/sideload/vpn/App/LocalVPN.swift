@@ -965,7 +965,7 @@ enum LocalVPN {
 
     /// B359: vpn.openShortcuts {which, url}: our signed Shortcut (web/shortcuts/<name>.shortcut in the app, signed by
     /// tools/shortcuts/sign.sh) in a share sheet, where Shortcuts opens it on its Add Shortcut sheet (shortcuts://
-    /// import-shortcut takes only iCloud links). Without the bundled file, `url` (the same file on the site) opens in
+    /// import-shortcut can't take it). Without the bundled file, `url` (the same file on the site) opens in
     /// Safari. F392: with `link`, our Shortcut's iCloud link, Shortcuts opens on its Add Shortcut at once, no share
     /// sheet. Replies {opened, via: "shortcuts"|"share"|"site"} when the sheet closes; Shortcuts never says it was added, so the
     /// page runs vpn.checkShortcut once the user is back.
@@ -974,11 +974,10 @@ enum LocalVPN {
         guard let name = shortcutNames[w] else { return c.reply(nil, "no Shortcut \(w)") }
         DispatchQueue.main.async {
             if let s = c.params["link"] as? String { // F392
-                let host = URL(string: s)?.host
-                var u = URLComponents(string: "shortcuts://import-shortcut")
-                u?.queryItems = [URLQueryItem(name: "url", value: s), URLQueryItem(name: "name", value: name)]
-                guard host == "www.icloud.com" || host == "icloud.com", let url = u?.url else { return c.reply(nil, "not an iCloud link") }
-                return UIApplication.shared.open(url, options: [:]) { ok in
+                // The link itself, a universal link Shortcuts takes: shortcuts://import-shortcut downloads its web page
+                // and says the file isn't in the correct format (F399, iOS 27).
+                guard let url = URL(string: s), url.scheme == "https", url.host == "www.icloud.com" || url.host == "icloud.com" else { return c.reply(nil, "not an iCloud link") }
+                return UIApplication.shared.open(url, options: [.universalLinksOnly: true]) { ok in
                     log("Shortcut \(name): Shortcuts \(ok ? "opened" : "didn't open") on its link")
                     if ok { c.reply(["opened": true, "via": "shortcuts"], nil) } else { c.reply(nil, "Shortcuts didn't open") }
                 }

@@ -42,7 +42,7 @@ export const shortcutsAdded = (st) => switchAdded(st) || Boolean(st?.vpn?.shortc
 // own copy; this link is the fallback it opens in Safari. Shortcuts names an imported Shortcut after its file.
 export const shortcutFileURL = (k) => `https://${DOMAIN}/shortcuts/${encodeURIComponent(SHORTCUT_NAMES[k])}.shortcut`;
 // F392: our Shortcut's iCloud link (Shortcuts > Share > Copy iCloud Link, made once by hand by the Apple ID that owns
-// it): the only link Shortcuts' own Add Shortcut opens from (shortcuts://import-shortcut refuses any other). null:
+// it): opened as it is, Shortcuts shows its Add Shortcut (shortcuts://import-shortcut can't read it). null:
 // Add shares the file instead. It holds the Shortcut as it was when the link was made: a re-signed one (a changed
 // tools/shortcuts plist) needs a new link.
 export const SHORTCUT_LINKS = { switch: "https://www.icloud.com/shortcuts/733163d13cc04d469e36a6c85c66f32e" };
