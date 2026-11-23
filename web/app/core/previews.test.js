@@ -186,6 +186,24 @@ test("an AltStore app's links: developer website, GitHub (code field, website, o
   assert.deepEqual(appGithub(appStanza(hosted.apps[0], { url: "https://feather.github.io/Feather/source.json" }).ipa), { owner: "feather", repo: "Feather" });
 });
 
+test("an AltStore app in a source repo not named for it: the source's website or a lone app makes the repo the app's", () => {
+  const url = "https://raw.githubusercontent.com/imxieyi/Kernarium/main/sideload/source.json";
+  const andarium = { name: "Andarium", bundleIdentifier: "com.imxieyi.andarium", developerName: "imxieyi",
+    versions: [{ version: "1.1", downloadURL: "https://github.com/imxieyi/Kernarium/releases/download/v1.1/Andarium.ipa" }] };
+  const other = { name: "Other", bundleIdentifier: "o", versions: [{ version: "1", downloadURL: "https://cdn.dev/o.ipa" }] };
+  const gh = (json) => appGithub(appStanza(parseIpaSource("altstore", json).apps[0], { url, name: json.name }).ipa);
+  const kernarium = { owner: "imxieyi", repo: "Kernarium" };
+  // Kernarium's source.json: its website names the repo, and it lists one app.
+  assert.deepEqual(gh({ name: "Kernarium", website: "https://github.com/imxieyi/Kernarium", apps: [andarium] }), kernarium);
+  assert.deepEqual(gh({ name: "Kernarium", website: "https://github.com/imxieyi/Kernarium", apps: [andarium, other] }), kernarium,
+    "the website names the repo");
+  assert.deepEqual(gh({ name: "Kernarium", apps: [andarium] }), kernarium, "the source lists one app");
+  assert.equal(gh({ name: "Kernarium", website: "https://kernarium.dev", apps: [andarium, other] }), null,
+    "a many-app source whose website names no repo");
+  assert.equal(gh({ name: "Kernarium", website: "https://github.com/imxieyi/Other", apps: [andarium, other] }), null,
+    "a website naming another repo");
+});
+
 test("a package's links: Homepage:, GitHub from it or the depiction's buttons, the Sileo depiction's web buttons", () => {
   assert.deepEqual(sileoLinks(SILEO), [{ label: "Source Code", url: "https://github.com/dev/Tweak" }, { label: "Twitter", url: "https://twitter.com/dev" }]);
   const links = packageLinks({ homepage: "https://tweak.dev/" }, SILEO);
