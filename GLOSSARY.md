@@ -130,3 +130,10 @@ _Said_: App Tweaks
 _On screen_: App Tweaks
 _In code_: APP_TWEAKS, tweakRows
 _Avoid_: injectable section, tweak apps
+
+**Anchored menu**:
+In the iOS 26 style, the choices a button offers, shown as a rounded list that grows out of that button and folds back into it
+_Said_: menu that pops out of the button
+_On screen_: (a list of choices over the button)
+_In code_: menuSheet, .action-menu
+_Avoid_: popover, dropdown

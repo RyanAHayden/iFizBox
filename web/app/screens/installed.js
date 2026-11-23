@@ -1437,7 +1437,7 @@ export async function selectButton({ view = latest.apps, sheet = showActionSheet
     options: () => selectSheet(view.manageRows),
     apply: (preset) => { view.selected = new Set(presetIds(view.manageRows, preset)); sync(); },
     clear: () => { view.selected = new Set(); sync(); },
-    sheet,
+    sheet: (o) => sheet({ ...o, from: view.wish ?? null }), // B351: the sheet (iOS 26: the menu) comes out of Select…
   });
 }
 

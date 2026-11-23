@@ -1581,8 +1581,10 @@ function recordApp(pkg, source, v) {
 }
 
 // An action sheet over [{ label, run }]; runs the tapped one.
+// B351: the source button of packageActions' sheets (Install / Modify), so they (iOS 26: the anchored menu) come out of it.
+let sheetFrom = null;
 async function sheet(title, actions) {
-  const i = await showActionSheet({ title, buttons: actions.map((a) => a.label),
+  const i = await showActionSheet({ title, from: sheetFrom?.isConnected ? sheetFrom : null, buttons: actions.map((a) => a.label),
     destructive: actions.flatMap((a, j) => (a.red ? [j] : [])) });
   if (i >= 0) actions[i].run();
 }
@@ -1697,6 +1699,7 @@ export async function installHold(route, button, { pages = packagePages, mode = 
 }
 
 async function packageActions(route, button) {
+  sheetFrom = button ?? null;
   const page = packagePages.get(format(route));
   if (!page || !page.body.isConnected) return;
   const { id, pkg, source, history } = page;
