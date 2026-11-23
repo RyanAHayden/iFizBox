@@ -315,3 +315,45 @@ test("B365: an HTML depiction never opens as a white sheet: live, its own HTML w
   assert.match(live.frame.getAttribute("sandbox"), /allow-scripts/);
   for (const f of [stat.frame, live.frame]) assert.doesNotMatch(f.getAttribute("sandbox"), /allow-same-origin/);
 });
+
+test("F383: on the site, a depiction host that refuses framing (Chariz) shows Open in Safari, read from the proxy's X-Upstream-* headers", async () => {
+  const { proxiedFraming, framingRefused, openHtmlDepiction } = await import("./browse.js");
+  const SITE = "https://ifizbox.com";
+  const h = (o) => new Headers(o);
+  // the proxy's own CSP is never read as the page's
+  const PROXY = { "Content-Security-Policy": "default-src 'none'; sandbox", "Content-Type": "application/octet-stream" };
+  assert.deepEqual(proxiedFraming(h(PROXY)), {});
+  assert.equal(framingRefused(proxiedFraming(h({ ...PROXY, "X-Upstream-Frame-Ancestors": "cydia.saurik.com" })), SITE), true, "Chariz");
+  assert.equal(framingRefused(proxiedFraming(h({ ...PROXY, "X-Upstream-Frame-Options": "DENY" })), SITE), true);
+  assert.equal(framingRefused(proxiedFraming(h({ ...PROXY, "X-Upstream-Frame-Options": "DENY", "X-Upstream-Frame-Ancestors": "*" })), SITE), false,
+    "frame-ancestors wins");
+  assert.equal(framingRefused(proxiedFraming(h({ "X-Upstream-Frame-Ancestors": "*, 'self'" })), SITE), true, "every policy has to let us in");
+  assert.equal(framingRefused(proxiedFraming(h({ "X-Upstream-Frame-Ancestors": "https://ifizbox.com" })), SITE), false);
+  assert.equal(framingRefused(proxiedFraming(h({ "X-Upstream-Frame-Ancestors": "'none'" })), SITE), true);
+  assert.deepEqual(proxiedFraming(null), {});
+
+  // The sheet on the site backend: Chariz's answer through the proxy opens Open in Safari, not a white frame
+  const { fakeDocument } = await import("../nav/fakedom.test-helper.js");
+  const URL_ = "https://chariz.com/depiction/x";
+  const sheet = async (headers) => {
+    const saved = globalThis.document, savedLoc = globalThis.location;
+    const doc = fakeDocument();
+    globalThis.document = doc;
+    Object.defineProperty(globalThis, "location", { value: { protocol: "https:", origin: SITE }, configurable: true, writable: true });
+    try {
+      const fetch = async () => new Response("<p>Chariz depiction text, long enough to read as a page of its own.</p>", { headers: { ...PROXY, ...headers } });
+      openHtmlDepiction(URL_, "X", { backend: { kind: "http", fetch }, open: () => {} });
+      for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
+      return { frame: doc.querySelector("iframe"), text: doc.body.textContent };
+    } finally {
+      globalThis.document = saved;
+      Object.defineProperty(globalThis, "location", { value: savedLoc, configurable: true, writable: true });
+    }
+  };
+  const chariz = await sheet({ "X-Upstream-Frame-Options": "DENY", "X-Upstream-Frame-Ancestors": "cydia.saurik.com" });
+  assert.equal(chariz.frame, null, "no white frame");
+  assert.match(chariz.text, /chariz\.com doesn't let its depiction open inside .+\./);
+  assert.match(chariz.text, /Open in Safari/);
+  const plain = await sheet({});
+  assert.equal(plain.frame?.src, URL_, "no framing headers: the live page");
+});
