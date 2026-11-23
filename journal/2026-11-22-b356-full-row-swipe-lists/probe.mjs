@@ -24,7 +24,7 @@ const server = createServer(async (req, res) => {
 });
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const base = `http://127.0.0.1:${server.address().port}/`;
-const prof = await mkdtemp(join(tmpdir(), "b332-"));
+const prof = await mkdtemp(join(tmpdir(), "b356-"));
 const port = 9900 + Math.floor(Math.random() * 90);
 const chrome = spawn("chromium", ["--headless", "--hide-scrollbars", "--no-first-run", `--remote-debugging-port=${port}`, `--user-data-dir=${prof}`, "about:blank"], { stdio: "ignore" });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
