@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "0.22.0",
+          "date": "2026-11-23T04:30:30Z",
+          "localizedDescription": "Sideload app: a built-in VPN for This iPhone installs\nRe-signed apps keep their logins: re-sign them once\nSwipe back from anywhere on a page\nWhat's New on top of Details when an update is out\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.22.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.22.0/iFizBox.ipa",
+          "size": 39668956,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.21.0",
           "date": "2026-11-23T02:04:00Z",
           "localizedDescription": "A real iOS 26 tab bar, era icon sets, and era app icons with dark modes\niOS 26 style on iOS 26+: the tab bar is iOS's own, with its press-drag lens and shrink on scroll\niOS 13 and iOS 26 styles get their own icon sets for rows, tabs and Home\nTheme > App Icon has iOS 7, iOS 13 and iOS 26 icons that turn dark with the Home Screen\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.21.0",
@@ -250,14 +258,6 @@
           "localizedDescription": "Push notifications, Make Certificate, every capability for your own App IDs, and Developer Mode status.\nPush notifications: turn on Settings > Updates > Push Notifications to be told about app updates from followed sources, new iFizBox versions and signatures about to expire. Test Push checks it works.\niFizBox keeps its own bundle ID when you sign it, so its notifications work.\nApple Developer Account works with or without a certificate. With an API key, Make Certificate creates an Apple Distribution certificate for you.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.12.0",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.12.0/iFizBox.ipa",
           "size": 15669334,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.11.0",
-          "date": "2026-11-20T01:16:25Z",
-          "localizedDescription": "Apple Developer Account: add an App Store Connect API key and iFizBox makes each app's App ID and Ad Hoc profile itself, with Push.\nSettings > Installation & Signing is one page in the app; Remove Certificate sits beside Replace Certificate.\nA hint shows how to see the install queue while apps wait in it.\nClearer wording on how signed apps get their own notifications.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.11.0",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.11.0/iFizBox.ipa",
-          "size": 15615508,
           "minOSVersion": "15.0"
         }
       ]
