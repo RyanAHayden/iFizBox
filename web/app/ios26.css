@@ -497,6 +497,23 @@ html[data-style="ios26"][data-theme="dark"] .search-cancel { background: none; b
 html[data-style="ios26"] .action-button { font-size: 20px; font-weight: 400; border-radius: 13px; }
 html[data-style="ios26"] .action-button.cancel { font-weight: 600; }
 html[data-style="ios26"][data-theme="dark"] .action-button.destructive:not(:active):not(.is-pressed) { background: var(--action-destructive); }
+/* B376: the bottom sheet (no source button) uses iOS 13's grouped geometry, as ios13.css does: one 13pt block split by
+   .5pt hairlines, 8pt from the sides and bottom, and Cancel in its own box 8pt under it. These rules are scoped to the
+   sheet and leave out the anchored menu, which keeps its own padding and rows. */
+html[data-style="ios26"][data-theme="light"] { --i26-action-cell: var(--action-btn); }
+html[data-style="ios26"][data-theme="dark"] { --i26-action-cell: var(--dk-action-btn); }
+html[data-style="ios26"] .action-sheet:not(.action-menu) {
+  --action-sheet-pad: 8px 8px; --action-sheet-pad-bottom: 8px;
+  --action-gap: 8px; --action-list-gap: 0px; --action-list-bleed: 0px;
+  --action-title-margin: 0 0 -8px; --action-title-pad: 14px 16px; /* -8: the sheet's 8pt gap closed under the title */
+  --action-cancel-gap: 0px;
+}
+html[data-style="ios26"] .action-sheet:not(.action-menu) .action-list { border-radius: 13px; }
+html[data-style="ios26"] .action-sheet:not(.action-menu) .action-list > .action-button { border-width: 0; border-radius: 0; }
+html[data-style="ios26"] .action-sheet:not(.action-menu) .action-list > .action-button + .action-button,
+html[data-style="ios26"] .action-sheet:not(.action-menu) .action-title + .action-list > .action-button:first-child { box-shadow: inset 0 .5px 0 var(--i26-alert-line); }
+html[data-style="ios26"] .action-sheet:not(.action-menu) .action-title { background: var(--i26-action-cell); border-radius: 13px 13px 0 0; }
+html[data-style="ios26"] .action-sheet:not(.action-menu) .action-title + .action-list { border-top-left-radius: 0; border-top-right-radius: 0; }
 /* The anchored menu (a sheet opened from a button, nav/actionsheet.js .action-menu): iOS 26's UIMenu, a rounded glass
    list over a light dim; rows of label-coloured 17pt text, red for destructive, no separators, a grey pressed row.
    The sheet's tokens are re-pointed inside it, so packages.css's look rules (dark ones too) paint the rows. */
