@@ -181,16 +181,20 @@ enum LocalVPN {
 
     /// The tunnel up (blocking): started if it isn't, then until iOS says connected.
     static func up(_ step: (String) -> Void = { _ in }) throws {
-        var m = try manager()
-        if m.connection.status == .connected { return }
+        // B375: iOS starts no VPN without a network: it goes connecting then disconnected ("No network available")
+        // faster than the loop below can see, which then waited out startLimit. F394: asked before manager(), whose
+        // save takes the user's own VPN's place
+        if !Path.online() {
+            if connectedNow() { return }
+            throw IDevice.Failure(code: "vpn_failed", text: "\(name) can't start without a network: iOS starts a VPN only with Wi-Fi or cellular data on")
+        }
+        lock.lock(); let on = cached?.connection.status == .connected; lock.unlock()
+        if on { return }
         // F394: another VPN set since (the Install Switch's Set VPN back) disabled ours, which the kept copy doesn't
         // say: its start gives no error and never connects. Read it again (manager() enables and saves it when off)
         lock.lock(); cached = nil; lock.unlock()
-        m = try manager()
+        let m = try manager()
         if m.connection.status == .connected { return }
-        // B375: iOS starts no VPN without a network: it goes connecting then disconnected ("No network available")
-        // faster than the loop below can see, which then waited out startLimit
-        if !Path.online() { throw IDevice.Failure(code: "vpn_failed", text: "\(name) can't start without a network: iOS starts a VPN only with Wi-Fi or cellular data on") }
         step("turning on \(name)")
         let t0 = Date()
         do { try m.connection.startVPNTunnel() } catch {

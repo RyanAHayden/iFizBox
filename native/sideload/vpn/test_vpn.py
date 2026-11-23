@@ -154,7 +154,8 @@ class App(unittest.TestCase):
         begin = src[src.index("static func begin("):src.index("static func waitOffCellular(")]
         self.assertNotIn('switchInput("start", cellular', src)
         self.assertLess(begin.index("try up(step)"), begin.index('switchInput("dataOff")'))
-        self.assertIn("if !Path.online() { throw", src)  # no network: say so at once, not after startLimit
+        up = src[src.index("static func up("):src.index("static func down(")]
+        self.assertLess(up.index("if !Path.online() {"), up.index("try manager()"))  # no network: say so at once, not after startLimit
         repo = os.path.dirname(NATIVE)
         with open(os.path.join(repo, "tools", "shortcuts", "install-switch.plist"), "rb") as f:
             acts = plistlib.load(f)["WFWorkflowActions"]
