@@ -32,12 +32,30 @@
 ## What was tried and decided
 
 - On the sideload app the IPA moves into My IPAs when signing.open goes through (the prompt opened, or This iPhone
-  installed), not when iOS confirms the install. An install whose iOS prompt is then cancelled still leaves the IPA in
-  My IPAs. Accepted: the user chose to install it and can install it again from there.
+  installed), not when iOS confirms the install. If the iOS prompt is dismissed (signing.progress closed), the row drops
+  the kept IPA again. Only an install that ends unknown (Sent to iOS) keeps it.
 - The jailbreak app's queue (AltStore installs through helperLanes) and AltStore page installs send no
   `keepInLibrary`: they never saved to My IPAs.
 - Apt.swift does not hard-link: the helper refuses an IPA with more than one link (`native/helper/ipa.c`
   st_nlink != 1) and installs from its own copy, so the file is moved afterwards.
+
+## Spec review
+
+- Fixed: a row whose iOS prompt was cancelled now drops the kept IPA. `signing/queue.js` `openPrepared` calls
+  `library.delete` on signing.open's `libraryFile` and forgets it (test in `web/app/screens/myipas-kept.test.js`).
+- Fixed: new `native/test_kept_download.py` reads `SignAhead.swift` and `Apt.swift` for the wiring: prepare holds the url
+  download before signing (not for a Re-sign); open moves it and replies `libraryFile`; failure and forget delete it;
+  `ipa.install` moves after the helper, never a hard link. The shell can't run off the phone, so this is the check.
+  The Swift test covers `IPALibrary.hold` and `keep`.
+- Kept as is: `signing.install` (`Sideload.swift`) gets no `keepInLibrary`. No Custom Install that saves to My IPAs goes
+  through it: the sideload queue uses signing.prepare/open, and F379's saves come from the queue and the jailbreak's
+  `ipa.install`. So `Sideload.swift` is unchanged.
+- Kept as is: a tapped .ipa link and `ifizbox://install` pass `keep` too. They already saved via `library.add`
+  (F379's `rememberIpa`), so this only removes their second download.
+- Kept as is: `runIpaConsole` sends `keep` only without a `native` stand-in. The only stand-in is share.js's staged file,
+  which has no download.
+- Kept as is: the url-keyed `noteKeptIpa` map. A leftover entry is checked against `library.list` before use, so at worst
+  a save reuses an IPA of the same link.
 
 ## Not verified
 

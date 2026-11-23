@@ -124,3 +124,17 @@ test("jailbreak: Install from URL asks ipa.install to keep the IPA, and saveIpaC
   assert.deepEqual(shell.fetches, []);
   assert.deepEqual(shell.lib.map((e) => e.file), ["Delta-1.5.ipa"]);
 });
+
+test("a row whose iOS prompt was cancelled (dismissed) drops the kept IPA again: nothing was installed", async () => {
+  store.clear();
+  forgetRoute();
+  const shell = fakeShell();
+  const call = shell.native.call;
+  const native = { call: (m, p) => (m === "signing.progress" ? Promise.resolve({ installed: false, dismissed: true }) : call(m, p)) };
+  const job = customJob();
+  const prep = await prepareOnDevice(job, { tag: "d#2", native });
+  const r = await openPrepared({ id: job.id, name: "Delta", token: prep.token, bundleId: prep.bundleId, job }, { tag: "d#2", native, server: true });
+  assert.equal(r.dismissed, true);
+  assert.deepEqual(shell.lib, []);
+  assert.equal(takeKeptIpa(URL1), null);
+});

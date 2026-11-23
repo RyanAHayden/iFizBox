@@ -98,6 +98,10 @@ export async function prepareOnDevice(job, { tag, signal = null, progress = () =
 
 // F380: core/myipas.js noteKeptIpa, loaded only when the shell kept a file (it stays out of the startup modules)
 const keptIpa = (url, file) => import("../core/myipas.js").then((m) => m.noteKeptIpa(url, file)).catch(() => {});
+const dropKeptIpa = (url, file, native) => import("../core/myipas.js").then(async (m) => {
+  if (m.takeKeptIpa(url) !== file) return;
+  await bridge(native).call("library.delete", { file });
+}).catch(() => {});
 
 // F366: `server`: this row goes through the default Signing Server whatever Install Apps With says (the run's Use the
 // Signing Server). A This iPhone failure that offers it (core/installroute.js serverFallback) throws with `fallback`,
@@ -166,6 +170,8 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
     return { installed: null, expires: opened?.expires ?? null, handedOff: true, later };
   }
   // B85: dismissed: iOS's prompt closed and iOS never asked for the IPA (the user tapped Cancel on it)
+  // F380: nothing was installed, so the IPA the shell kept in My IPAs for it goes again
+  if (r?.dismissed && opened?.libraryFile) await dropKeptIpa(row?.job?.url, opened.libraryFile, native);
   if (r?.dismissed) return { installed: r?.installed ?? null, expires: opened?.expires ?? null, dismissed: true };
   // B146: once iOS took the IPA, "not installed" can't be told apart from "installed but not seen" (isInstalled is
   // unreliable on iOS 27, a re-signed app may not show): the row ends Sent to iOS (null), never Failed
