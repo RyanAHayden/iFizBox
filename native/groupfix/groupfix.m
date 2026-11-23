@@ -58,7 +58,8 @@ static NSURL *(*origContainer)(id, SEL, NSString *);
 static id (*origSuite)(id, SEL, NSString *);
 
 // Copies what `from` holds into `to`, never over what's there; Library/Caches stays behind, and so do the original
-// groups' own folders at the top (B393: a shim's, in the profile group). NO when something couldn't be read (locked).
+// groups' own folders at the top (B393: a shim's, in the profile group). NO when something is to be tried
+// again: locked, or no space (anything else would fail at every launch).
 static BOOL copyMissing(NSURL *from, NSURL *to, NSString *rel) {
     NSFileManager *fm = [NSFileManager defaultManager];
     BOOL ok = YES;
@@ -73,7 +74,7 @@ static BOOL copyMissing(NSURL *from, NSURL *to, NSString *rel) {
         [item getResourceValue:&dir forKey:NSURLIsDirectoryKey error:NULL];
         if (dir.boolValue && [fm fileExistsAtPath:dest.path]) ok = copyMissing(item, dest, path) && ok;
         else if (![fm fileExistsAtPath:dest.path] && ![fm copyItemAtURL:item toURL:dest error:&e]) {
-            ok = ok && e.code != NSFileReadNoPermissionError && e.code != NSFileWriteNoPermissionError;
+            ok = ok && e.code != NSFileReadNoPermissionError && e.code != NSFileWriteNoPermissionError && e.code != NSFileWriteOutOfSpaceError;
         }
     }
     return ok;
@@ -134,19 +135,18 @@ static NSURL *ownFolder(NSString *group) {
     BOOL bring = NO;
     if (broughtIn) { // at launch only
         bring = fresh ? ranBeforeLaunch : [fm fileExistsAtPath:pending];
-        if (bring && fresh) {
-            [fm createDirectoryAtPath:pending.stringByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:NULL];
-            [fm createFileAtPath:pending contents:[NSData data] attributes:@{ NSFileProtectionKey: NSFileProtectionNone }];
-        }
     }
     BOOL emptySuite = NO;
-    if (bring) {
-        // as before this group's first copy, which may have been cut short after its suite
+    if (bring && fresh) {
         CFArrayRef keys = CFPreferencesCopyKeyList((__bridge CFStringRef)[@"ifizbox.appgroup." stringByAppendingString:group],
                                                    kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
-        emptySuite = !keys || !CFArrayGetCount(keys) || !fresh;
+        emptySuite = !keys || !CFArrayGetCount(keys);
         if (keys) CFRelease(keys);
-    }
+        [fm createDirectoryAtPath:pending.stringByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:NULL];
+        // holds whether the suite was empty, for the next try (this one may fill it in part)
+        [fm createFileAtPath:pending contents:emptySuite ? [@"suite" dataUsingEncoding:NSUTF8StringEncoding] : [NSData data]
+                  attributes:@{ NSFileProtectionKey: NSFileProtectionNone }];
+    } else if (bring) emptySuite = [fm contentsAtPath:pending].length > 0;
     for (NSString *sub in @[ @"Library/Preferences", @"Library/Caches" ]) {
         [fm createDirectoryAtURL:[u URLByAppendingPathComponent:sub isDirectory:YES] withIntermediateDirectories:YES
                       attributes:nil error:NULL];
