@@ -403,3 +403,24 @@ test("B82: the This Build card (no header, ours only, its own lines) and the App
   const css = readFileSync(new URL("../reviews.css", import.meta.url), "utf8");
   assert.match(css, /\.store-appstore-big \{[^}]*font-size: 28px; font-weight: bold;/, "the concept's bold 28px average");
 });
+
+test("F390: both Details pages put their tabs under the swipe, and the segments follow the pager", async () => {
+  for (const file of ["./browse.js", "./altstore.js"]) {
+    const src = readFileSync(new URL(file, import.meta.url), "utf8");
+    assert.match(src, /body\.replaceChildren\([^\n]*\.\.\.tabs\.nodes\);\n\s*tabs\.swipeOn\(body\)/, file);
+  }
+  const { tabPagers, tabSwipeTakesBack } = await import("../nav/swipe.js");
+  const body = document.createElement("div");
+  body.className = "page-body";
+  document.body.append(body);
+  const tabs = sp.storeTabs();
+  body.append(...tabs.nodes);
+  tabs.swipeOn(body);
+  assert.equal(tabPagers.get(body).live(), true);
+  assert.equal(tabSwipeTakesBack(tabs.panes.details), false, "Details: swipe back");
+  globalThis.matchMedia = () => ({ matches: true }); // reduced motion: no slide
+  tabs.select(1);
+  delete globalThis.matchMedia;
+  assert.equal(tabSwipeTakesBack(tabs.panes.reviews), true);
+  assert.ok(tabs.buttons[1].classList.contains("selected"));
+});
