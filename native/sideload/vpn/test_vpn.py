@@ -166,6 +166,21 @@ class App(unittest.TestCase):
         cond = acts[offs[1] - 1]["WFWorkflowActionParameters"]
         self.assertEqual(cond["WFInput"]["Variable"]["Value"]["OutputName"], "Data Off")
 
+    def test_install_switch_only_when_needed(self):
+        """F388: a queue's start runs the Install Switch only on cellular or with another VPN up (which only its Set
+        VPN brings back); on Wi-Fi with no other VPN the app's own up() does it all and Shortcuts never opens. Our own
+        tunnel's 10.7.0.x address never counts as another VPN."""
+        src = read("App", "LocalVPN.swift")
+        begin = src[src.index("static func begin("):src.index("static func waitOffCellular(")]
+        self.assertIn("switchNeeded(cellular: onCellular, otherVPN: other)", begin)
+        self.assertIn("static func switchNeeded(cellular: Bool, otherVPN: Bool) -> Bool { cellular || otherVPN }", src)
+        other = src[src.index("static func otherVPNUp()"):]
+        other = other[:other.index("\n    }\n")]
+        self.assertIn('hasPrefix("10.7.0.")', other)
+        self.assertIn("AF_INET", other)
+        web = read("web", "app", "screens", "installroute.js", base=os.path.dirname(NATIVE))
+        self.assertIn("It opens Shortcuts only when needed: on cellular", web)
+
 
 if __name__ == "__main__":
     unittest.main()
