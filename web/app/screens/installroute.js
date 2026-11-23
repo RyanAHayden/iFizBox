@@ -31,6 +31,8 @@ import { tailscaleRoute } from "../core/installroute.js";
 import { leaveQuestion, LEAVE } from "../core/installroute.js";
 import { tailscaleVPNOn, installStatus, CHECKING, CHECKING_SERVER, STATUS_ACTIONS } from "../core/installroute.js";
 import { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, NO_ANSWER_FAILURE } from "../core/installroute.js"; // B316
+import { builtinVPN, shortcutsAdded, setupFooter, iphoneSetUp, HOW_STEPS, SHORTCUT_NAMES, vpnTestResult, shortcutsTestResult } from "../core/installroute.js"; // F372
+import { loadStyle } from "../nav/motion.js";
 import { NAME, DOMAIN } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
 import { showHUD } from "../nav/hud.js";
@@ -41,7 +43,9 @@ import { nativeBridge } from "../native.js";
 export const PAGE = "installation";
 // F300: Installation & Signing's main page links to Install Apps With (`with`: the choice and the chosen route's
 // groups); `iphone` still opens This iPhone's groups alone. The Pairing row opens the setup (`pair`).
-export const SUB_TITLES = { pair: "Pairing", iphone: "This iPhone", with: "Install Apps With" };
+// F372: This iPhone's own pages (How It Works, Cellular Shortcuts) and the Signing Server's page, each pushed with the
+// slide from Installation & Signing's rows.
+export const SUB_TITLES = { pair: "Pairing", iphone: "This iPhone", with: "Install Apps With", how: "How It Works", shortcuts: "Cellular Shortcuts", server: "Signing Server" };
 const VPN = VPNS[0];
 
 const route = (sub) => format(settingsRoute(sub ? [PAGE, sub] : [PAGE]));
@@ -148,6 +152,8 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
       : "The Signing Server hands iOS each app's install link.",
   }];
   if (choice !== "iphone") return [...groups, ...(server() ?? [])];
+  // F372: the built-in VPN is the way in: This iPhone's page is Set Up and How It Works (no Tailscale, no LocalDevVPN)
+  if (builtinVPN(st ?? hint)) return [...groups, ...localGroups(st ?? hint, { reading: reading && !hint, refreshing: Boolean(refreshing.device), test, testing, failure, fix, late: Boolean(late.device) })];
   {
     const ts = st?.tailscale ?? null;
     // B167: while idevice.status (tailscale.status with it) hasn't answered, Tailscale's state is unknown, not signed
@@ -201,10 +207,130 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
   return groups;
 }
 
+// ---- F372: This iPhone with the built-in VPN (core BUILTIN_VPN; native/sideload/vpn)
+// The page (installation/iphone): Set Up (Pair This iPhone, Test Connection, Cellular Shortcuts) with a footer that
+// says the next step (core setupFooter), then How It Works. `st` is idevice.status (its `vpn`), `reading` while the
+// first answer is out, `refreshing` while it's read again (the rows keep the last answer, Pairing spins), `late`
+// when it didn't answer. A failed check or install (B316's `failure`) is said in the footer, red, with its fix row.
+export function localGroups(st, { reading = false, refreshing = false, test = () => {}, testing = false, failure = null, fix = () => {}, late = false } = {}) {
+  const paired = Boolean(st?.paired), tested = Boolean(st?.vpn?.tested), both = shortcutsAdded(st);
+  const pairRow = late ? { label: "Pair This iPhone", icon: rowIcon("pairPhone"), detail: NOT_RESPONDING, href: route("pair") }
+    : reading ? { label: "Pair This iPhone", icon: rowIcon("pairPhone"), detail: "Checking…", href: route("pair"), spin: true }
+    : { label: "Pair This iPhone", icon: rowIcon("pairPhone"), detail: paired ? "Done" : "Start", href: route("pair"), ...(refreshing ? { spin: true } : {}) };
+  const rows = [
+    pairRow,
+    { label: "Test Connection", icon: rowIcon("testConnection"), onClick: test,
+      detail: testing ? "Testing…" : failure ? FAILING : tested ? "Connected" : "Test", ...(testing ? { spin: true } : {}) },
+    { label: "Cellular Shortcuts", subtitle: "Optional, for installs on cellular", icon: rowIcon("cellular"), detail: both ? "Done" : "Add", href: route("shortcuts") },
+    ...(failure && !testing ? [{ label: failure.button, cls: "sign-import", onClick: fix }] : []),
+  ];
+  const footer = failure ? { footer: `${failure.title}. ${failure.short}`, warn: true } : { footer: reading || late ? "" : setupFooter(st) };
+  if (!footer.footer) delete footer.footer;
+  return [
+    { header: "Set Up", rows, ...footer },
+    { rows: [{ label: "How It Works", icon: rowIcon("help"), href: route("how") }] },
+  ];
+}
+
+// How It Works (installation/how): the steps of one install, a row each (core HOW_STEPS).
+export function howGroups() {
+  return [
+    { header: "Each Install", rows: HOW_STEPS.map((s) => ({ ...s })), footer: "Takes a few seconds more than an install over Wi-Fi." },
+    { header: "Without Wi-Fi or Data", rows: [{ label: "Offline", detail: "Works" }],
+      footer: "Apps you already downloaded install with no connection at all." },
+  ];
+}
+
+// Cellular Shortcuts (installation/shortcuts): each Shortcut in its own group with its Add row (it opens Shortcuts on a
+// new Shortcut and marks it added), then Test Shortcuts once both are. `st` is vpn.status (or idevice.status's vpn).
+export function shortcutGroups(st, { add = () => {}, test = () => {}, testing = false, reading = false } = {}) {
+  const sc = st?.shortcuts ?? {};
+  const row = (k) => reading ? { label: SHORTCUT_NAMES[k], icon: rowIcon("cellular"), detail: "Checking…", spin: true }
+    : sc[k] ? { label: SHORTCUT_NAMES[k], icon: rowIcon("cellular"), detail: "Added" }
+    : { label: SHORTCUT_NAMES[k], icon: rowIcon("cellular"), detail: "Add", chevron: true, onClick: () => add(k) };
+  const groups = [
+    { header: "Turn Off", rows: [row("off")], footer: `Opens Shortcuts on a new Shortcut: add Set Cellular Data, set it to Off, and name it "${SHORTCUT_NAMES.off}". Then come back.` },
+    { header: "Turn On", rows: [row("on")], footer: `The same with Cellular Data set to On, named "${SHORTCUT_NAMES.on}". It turns data back on once the install has connected.` },
+  ];
+  if (sc.off && sc.on) {
+    groups.push({ rows: [{ label: "Test Shortcuts", icon: rowIcon("testConnection"), onClick: test, ...(testing ? { detail: "Testing…", spin: true } : {}) }],
+      footer: "Turns Cellular Data off and on again once." });
+  }
+  return groups;
+}
+
+// F372: USE on This iPhone before it was set up opened its setup; the test that finishes it uses This iPhone.
+// It holds for USE_HOLD ms: a test long after the user backed out of the setup doesn't switch the way in.
+let useAfterSetup = 0;
+export const USE_HOLD = 10 * 60 * 1000;
+export const setUseAfterSetup = (v, now = Date.now()) => { useAfterSetup = v ? now : 0; };
+const takeUseAfterSetup = (now = Date.now()) => { const on = useAfterSetup > 0 && now - useAfterSetup < USE_HOLD; useAfterSetup = 0; return on; };
+export const TEST_MS = 120000; // vpn.test: the first one waits for the user's Allow on iOS's Add VPN Configurations
+
+// Test Connection with the built-in VPN: vpn.test (on, one connect with the pairing, off). A pass clears a remembered
+// failure, marks This iPhone set up and, after USE, uses it.
+export async function vpnTest(native, alert, store, { ended = () => {}, onPass = () => {} } = {}) {
+  let r = null, err = null;
+  try { r = await within(call(native, "vpn.test"), TEST_MS); } catch (e) { err = e; }
+  // the row says Connected under the alert: the status is marked tested before the row repaints (ended)
+  if (r?.ok && lastStatus) lastStatus = { ...lastStatus, vpn: { ...(lastStatus.vpn ?? {}), tested: true } };
+  ended();
+  if (r?.ok) {
+    clearRouteFailure();
+    if (takeUseAfterSetup() && store?.get(ROUTE_KEY) !== "iphone") store?.set(ROUTE_KEY, "iphone");
+    onPass();
+  } else if (isLate(err)) rememberRouteFailure(NO_ANSWER_FAILURE);
+  else { const f = routeFailureOf(err, lastStatus); if (f) rememberRouteFailure(f); }
+  const why = isLate(err) ? { title: NOT_RESPONDING, message: `This iPhone didn't answer in ${Math.round(TEST_MS / 1000)} seconds. Try again.` } : vpnTestResult(r, err);
+  if (why.again) {
+    const { index } = await alert({ title: why.title, message: why.message, buttons: ["Cancel", "Pair Again"], cancel: 0 }) || {};
+    if (index === 1) recheckHooks.goPair();
+    return r;
+  }
+  await alert({ title: why.title, message: why.message, buttons: ["OK"] });
+  return r;
+}
+
+let shortcutsTesting = false;
+async function drawShortcuts(box, { native, alert }) {
+  let st = lastStatus?.vpn ?? null;
+  let reading = !st;
+  const paint = () => {
+    const groups = shortcutGroups(st, {
+      reading, testing: shortcutsTesting,
+      add: async (k) => {
+        try { await call(native, "vpn.openShortcuts"); } catch { /* the footer says what to make */ }
+        try { st = await call(native, "vpn.setShortcut", { which: k, added: true }); } catch { st = { ...(st ?? {}), shortcuts: { ...(st?.shortcuts ?? {}), [k]: true } }; }
+        if (lastStatus) lastStatus = { ...lastStatus, vpn: { ...(lastStatus.vpn ?? {}), ...st } };
+        paint();
+      },
+      test: async () => {
+        if (shortcutsTesting) return;
+        shortcutsTesting = true; paint();
+        let r = null;
+        try { r = await within(call(native, "vpn.testShortcuts"), 60000); } catch (e) { r = { ok: false, off: { ok: false, error: e?.message } }; }
+        shortcutsTesting = false;
+        try { st = await call(native, "vpn.status"); } catch { /* keeps the last */ }
+        paint();
+        const why = shortcutsTestResult(r);
+        await alert({ title: why.title, message: why.message, buttons: ["OK"] });
+      },
+    });
+    patchGroups(box, groups, (s) => spinRows(grouped(s), s));
+  };
+  paint();
+  try { st = await within(call(native, "vpn.status"), TIMEOUTS.status); } catch { /* the last answer, or nothing added */ }
+  reading = false;
+  paint();
+}
+
 // `server`: the Signing Server's groups for Install Apps With's page (screens/settings.js serverSections).
 export async function drawInstallation(el, sub, { store, native = nativeBridge(), alert = showAlert, server = () => [] } = {}) {
   const redraw = () => drawInstallation(el, sub, { store, native, alert, server });
   if (sub === "pair") return drawPair(el, { store, native, alert, redraw });
+  if (sub === "server") { el.replaceChildren(grouped(server() ?? [])); return; } // F372: the Signing Server's own page
+  if (sub === "how") { el.replaceChildren(grouped(howGroups())); return; }
+  if (sub === "shortcuts") return drawShortcuts(el, { native, alert });
   return paintInstallation(el, { store, native, alert, redraw, server, sub: SUB_TITLES[sub] ? sub : null });
 }
 
@@ -284,6 +410,12 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
         if (testing) return;
         testing = true;
         paint();
+        // F372: the built-in VPN's test (on, one connect with the pairing, off); not paired yet: Pairing first
+        if (builtinVPN(view ?? lastStatus)) {
+          if (!(view ?? lastStatus)?.paired) { testing = false; paint(); return goTo("pair"); }
+          try { await vpnTest(native, alert, store, { ended: () => { testing = false; view = lastStatus; paint(); } }); } finally { if (testing) { testing = false; paint(); } }
+          return;
+        }
         try { await tailscaleTest(native, alert, () => { testing = false; paint(); }); } finally { if (testing) { testing = false; paint(); } }
       },
       signOut: async () => {
@@ -572,15 +704,14 @@ async function openVPN(native, alert) {
 // never add or remove rows or change footers; only a tap changes the layout (by opening another page).
 //   (top)         the status cell (core installStatus: two lines, always two lines tall) and one action row whose
 //                 label changes (Check Connection, Open LocalDevVPN, Start Pairing, Sign In to Tailscale…)
-//   Installation  Install Apps With > (installation/with: the choice and its route's groups), its detail the route
-//                 and, for This iPhone, the pairing: "This iPhone · Paired" (F300: one row for This iPhone and the
-//                 Signing Server)
+//   Install Apps With  F372: This iPhone > (installation/iphone: Set Up, How It Works) and Signing Server >
+//                 (installation/server), each with USE beside its link, the way in use ACTIVE (green)
 //   Signing       Certificate > (days left), Signed Apps > (count)
 //   How Signing Works >
 // `links` holds the hrefs, `signing()` resolves {certificate: {text, red}, ready} (`ready`: a certificate kept; false turns
 // the status cell into Import Your Certificate, B250), `apps()` the Signed Apps count (text),
 // `checkServer` is Settings' Check Server and `host()` the Signing Server's host.
-export const MAIN_ROWS = ["status", "action", "with", "certificate", "apps", "help"];
+export const MAIN_ROWS = ["status", "action", "iphone", "server", "certificate", "apps", "help"]; // F372: both ways
 
 // F300/F351: Install Apps With's detail on the main page: This iPhone's pairing once idevice.status said (`st`
 // undefined: not answered yet; null: it failed). The route itself is the row's label, subtitle and icon (ROUTE_ROW).
@@ -621,9 +752,11 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
   };
   const sections = [
     { rows: [{ label: "", subtitle: " ", cls: "install-status" }, { label: STATUS_ACTIONS.check, cls: "install-action", onClick: act }] },
-    // F351: the chosen route is the row (its icon, its name, what it does), under the question as the header
-    { header: "Install Apps With", rows: [{ label: ROUTE_ROW.server.label, subtitle: ROUTE_ROW.server.sub, detail: "", href: links.with, icon: rowIcon(ROUTE_ROW.server.icon) }],
-      footer: "Tap to choose how signed apps reach iOS." },
+    // F372: both ways, a row each (its icon, name and one line). A tap on the row opens its page; USE at its right
+    // uses it (This iPhone not set up yet: its setup opens, and finishing it uses it); the way in use says ACTIVE.
+    { header: "Install Apps With", rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, icon: rowIcon(ROUTE_ROW[o.value].icon),
+      href: route(o.value), cls: "route-pick" })),
+      footer: "Tap USE to install that way." },
     { header: "Signing", rows: [{ label: "Certificate", detail: "", href: links.certificate, icon: rowIcon("signing") },
       { label: "Signed Apps", detail: "", href: links.apps, icon: rowIcon("websiteApps") }] },
     { rows: [{ label: "How Signing Works", href: links.help, icon: rowIcon("help") }] },
@@ -641,15 +774,41 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
   const cellSpin = checkMark(statusCell); // B320: the status cell's spinner while a sign-in's checks run (spinStatus)
   actionCell.classList.add("is-dim");
   actionCell.setAttribute("aria-disabled", "true");
-  const withCell = cells[2];
-  const showRoute = (c) => {
-    const r = ROUTE_ROW[c === "iphone" ? "iphone" : "server"];
-    withCell.querySelector(".cell-label").textContent = r.label;
-    withCell.querySelector(".cell-subtitle").textContent = r.sub;
-    withCell.querySelector(".cell-icon img").src = rowIcon(r.icon).src;
+  // F372: USE / ACTIVE at the right of each way's row: the App Store price button (myipas.css), the green ACTIVE
+  // revealed over it from the right as the red Delete is in Sources (clip-path, settings.css .route-active). Beside the
+  // row's link, not inside it (as My IPAs' price buttons): a tap on USE never also follows the link.
+  loadStyle("myipas.css");
+  const routeCells = { iphone: cells[2], server: cells[3] };
+  const useButtons = {};
+  for (const [v, c] of Object.entries(routeCells)) {
+    const wrap = el("span", "route-use");
+    const useBtn = el("button", "price-btn route-use-btn", "USE");
+    useBtn.type = "button";
+    useBtn.setAttribute("aria-label", `Use ${ROUTE_ROW[v].label}`);
+    const active = el("span", "price-btn route-active", "ACTIVE");
+    active.classList.add("go"); // the green state, added apart so the era sheets keep .go a state of the button
+    active.setAttribute("aria-hidden", "true");
+    useBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); use(v); });
+    wrap.append(useBtn, active);
+    useButtons[v] = useBtn;
+    c.parentElement?.append(wrap);
+    c.parentElement?.classList.add("has-use");
+  }
+  const showRoute = (choice) => {
+    for (const [v, c] of Object.entries(routeCells)) {
+      const on = v === (choice === "iphone" ? "iphone" : "server");
+      c.parentElement?.classList.toggle("route-on", on);
+      useButtons[v].tabIndex = on ? -1 : 0;
+    }
   };
-  const slots = {};
-  ["with", "certificate", "apps"].forEach((k, i) => { slots[k] = slotOf(cells[i + 2].querySelector(".cell-detail")); });
+  const use = (v) => {
+    if (v === "iphone" && !iphoneSetUp(known ?? lastStatus)) { setUseAfterSetup(true); return goTo("iphone"); } // not set up: its setup
+    showRoute(v);
+    // the store's change redraws the page; it waits for the reveal to finish
+    if (store.get(ROUTE_KEY) !== v) setTimeout(() => { store.set(ROUTE_KEY, v); refresh(); }, 260);
+  };
+  const slots = { with: slotOf(el("span", "cell-detail")) }; // This iPhone's pairing is said on its own page now
+  ["certificate", "apps"].forEach((k, i) => { slots[k] = slotOf(cells[i + 4].querySelector(".cell-detail")); });
 
   let known; // idevice.status once read
   let certRead = false; // B250: signing() has answered once (or failed)
@@ -738,6 +897,7 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
     if (a === "openVPN") return openVPN(native, alert).then(refresh);
     if (a === "pair") return goTo("pair");
     if (a === "certificate") return navGo(links.certificate); // B250: the Certificate page, as its row opens
+    if (a === "shortcuts") return goTo("shortcuts"); // F372: on cellular without the Cellular Shortcuts
     // B320: redrawn without its automatic check (it failed while signing in and drew an x on this row), and the check
     // after it spins the status cell instead of a HUD
     if (a === "signIn") return tailscaleSignIn(native, alert, after, null, { spin: spinStatus }).then(after);
@@ -1156,6 +1316,7 @@ async function fixAction(fix, native, alert) {
   if (fix === "openTailscale") return openTailscaleApp(native, alert);
   if (fix === "openVPN") return openVPN(native, alert);
   if (fix === "pair") return goTo("pair");
+  if (fix === "shortcuts") return goTo("shortcuts"); // F372
   return undefined;
 }
 async function checkOnce(native, alert, redraw, store, mark = null, { quiet = false } = {}) {
@@ -1252,7 +1413,7 @@ export function installationRows(sub, st, { store } = {}) {
   return subGroups(installationGroups(choice, st), sub).flatMap((g) => g.rows);
 }
 export async function refreshInstallation(el, sub, { store, native = nativeBridge(), patch } = {}) {
-  if (sub === "pair") return;
+  if (sub === "pair" || sub === "how" || sub === "server" || sub === "shortcuts") return; // F372: nothing read there to patch
   const st = await status(native);
   patch(el, installationRows(SUB_TITLES[sub] ? sub : null, st, { store }));
 }

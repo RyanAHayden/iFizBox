@@ -109,3 +109,17 @@ _Said_: swipe back, back swipe, edge swipe
 _On screen_: (a gesture: no wording)
 _In code_: nav/swipe.js attachEdgeSwipe, attachPageSwipe, pageSwipeBlocked
 _Avoid_: back gesture, pop gesture
+
+**Built-in VPN**:
+The app's own VPN that lets This iPhone installs reach iOS on the phone itself; on only while an install connects
+_Said_: built-in VPN
+_On screen_: iFizBox VPN
+_In code_: LocalVPN, BUILTIN_VPN, builtinVPN, vpn.*
+_Avoid_: LocalDevVPN, loopback VPN
+
+**Cellular Shortcuts**:
+Two Shortcuts the user adds once so This iPhone installs work on cellular: data off while the install connects, back on after
+_Said_: cellular shortcuts
+_On screen_: Cellular Shortcuts, Cellular Data Off, Cellular Data On
+_In code_: SHORTCUT_NAMES, shortcutGroups, LocalVPN.runShortcut
+_Avoid_: cellular refresh

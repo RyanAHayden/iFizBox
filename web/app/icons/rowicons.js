@@ -115,6 +115,7 @@ export const GLYPHS = {
 
 // Icon name -> tile colour and glyph. One name per thing a row is about, so the same thing looks the same everywhere.
 export const ROW_ICONS = {
+  pairPhone: [C.blue, "link"], testConnection: [C.green, "checkCircle"], cellular: [C.orange, "bolt"], // F372: This iPhone's Set Up
   account: [C.sky, "person"], createAccount: [C.green, "personPlus"], signInKey: [C.gold, "key"],
   syncNow: [C.blue, "arrows"], lastSynced: [C.grey, "clock"], syncCert: [C.orange, "seal"], showKey: [C.dark, "eye"],
   general: [C.grey, "gear"], theme: [C.indigo, "contrast"], updates: [C.green, "download"], signing: [C.orange, "pen"],

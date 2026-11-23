@@ -206,6 +206,7 @@ def check(path):
             problems.append("executable: %s" % e)
 
     problems += intents_problems(files)
+    problems += vpn_problems(files)
 
     if APP + "bridge.js" not in files:
         problems.append("bridge.js missing (ifizboxNative and the mode come from it)")
@@ -252,6 +253,33 @@ def intents_problems(files):
         bad = sorted(k for k in ents if k.startswith(PRIVATE))
         if bad:
             problems.append("jailbreak entitlements in the widget extension: %s" % ", ".join(bad))
+    return problems
+
+
+# F372: the built-in VPN for This iPhone installs (native/sideload/vpn): a packet tunnel extension, and the
+# Network Extensions entitlement on it and on the app (the user's signer swaps in its profile's).
+VPN = APP + "PlugIns/%sVPN.appex/" % NAME
+NE = "com.apple.developer.networking.networkextension"
+
+
+def vpn_problems(files):
+    problems = []
+    exe, info = files.get(VPN + NAME + "VPN"), files.get(VPN + "Info.plist")
+    if not exe or not info:
+        return ["no built-in VPN extension (PlugIns/%sVPN.appex)" % NAME]
+    try:
+        point = plistlib.loads(info[1]).get("NSExtension", {}).get("NSExtensionPointIdentifier")
+    except plistlib.InvalidFileException as e:
+        return ["the VPN extension's Info.plist: %s" % e]
+    if point != "com.apple.networkextension.packet-tunnel":
+        problems.append("the VPN extension is a %s, not a packet tunnel" % point)
+    for what, data in (("the VPN extension", exe[1]), ("the app", files.get(APP + NAME, (0, b""))[1])):
+        try:
+            ents = macho_entitlements(data) or {}
+        except (ValueError, struct.error):
+            ents = {}
+        if "packet-tunnel-provider" not in (ents.get(NE) or []):
+            problems.append("%s lacks the %s packet-tunnel-provider entitlement" % (what, NE))
     return problems
 
 

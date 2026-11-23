@@ -27,6 +27,6 @@ test("F300: Install Apps With's page holds the choice and the chosen route's gro
   assert.deepEqual(server[1].rows.map((r) => r.label), ["Server", "Check Server", "Run Your Own"]);
 });
 
-test("F300: the main page's rows are fixed: status, its action, one Installation row, two Signing rows, How Signing Works", () => {
-  assert.deepEqual(MAIN_ROWS, ["status", "action", "with", "certificate", "apps", "help"]);
+test("F372: the main page's rows are fixed: status, its action, both ways, two Signing rows, How Signing Works", () => {
+  assert.deepEqual(MAIN_ROWS, ["status", "action", "iphone", "server", "certificate", "apps", "help"]);
 });

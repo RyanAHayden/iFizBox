@@ -562,7 +562,8 @@ enum Sideload {
         // sent) then "installing" (installd's percent), so the run's row shows them and no "iOS prompt" step
         let isSelf = app.bundleID == Bundle.main.bundleIdentifier
         IDevice.ilog("This iPhone: \(app.bundleID) \(app.version), \(Sideload.size(output))")
-        log?("Installing on this iPhone through \(Tailscale.useForInstall() ? "Tailscale" : "LocalDevVPN (\(IDevice.address))"); nothing goes to a Signing Server")
+        let way = LocalVPN.available ? "\(LocalVPN.name) (\(IDevice.address))" : Tailscale.useForInstall() ? "Tailscale" : "LocalDevVPN (\(IDevice.address))" // F372
+        log?("Installing on this iPhone through \(way); nothing goes to a Signing Server")
         emit?("here", 0)
         if isSelf {
             saveRecords(SignedRecords.adding(record, to: records()))

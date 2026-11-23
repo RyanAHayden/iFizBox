@@ -13,12 +13,69 @@ export const STORAGE_KEY = "ifizbox." + ROUTE_KEY;
 export const VPNS = ["LocalDevVPN", "Tailscale"];
 export const vpnList = (vpns = VPNS) => vpns.length < 2 ? vpns.join("") : `${vpns.slice(0, -1).join(", ")} or ${vpns.at(-1)}`;
 
-// Subtitles: one short point per line (the rows wrap them, settings.css .route-row).
-// F300: This iPhone first, then the Signing Server (still the default).
+// F300: This iPhone first, then the Signing Server (still the default). F372: one line each, as Installation &
+// Signing's rows show them beside USE.
 export const ROUTE_OPTIONS = [
-  { value: "iphone", label: "This iPhone", subtitle: `${vpnList()}\nNo server, no install popup\nUpdates itself` },
-  { value: "server", label: "Signing Server", subtitle: `Default\nUses ${DOMAIN}` },
+  { value: "iphone", label: "This iPhone", subtitle: "Works offline - no install popup" },
+  { value: "server", label: "Signing Server", subtitle: `Default - Uses ${DOMAIN}` },
 ];
+
+// ---- F372: the built-in VPN (native/sideload/vpn): This iPhone's own way in
+// idevice.status's `vpn` ({available, tested, cellular, wifi, shortcuts: {off, on}}) says the app can run it: its
+// profile has Network Extensions. Then it is the way in, whatever Tailscale or LocalDevVPN do: the shell turns it on
+// for each connect and off after. Without it (an older shell, or a profile without the capability) the Tailscale and
+// LocalDevVPN rules below still apply.
+export const BUILTIN_VPN = `${NAME} VPN`;
+export const builtinVPN = (st) => Boolean(st?.vpn?.available);
+// The two Shortcuts for installs on cellular, named as the user names them in Shortcuts.
+export const SHORTCUT_NAMES = { off: "Cellular Data Off", on: "Cellular Data On" };
+export const shortcutsAdded = (st) => Boolean(st?.vpn?.shortcuts?.off && st?.vpn?.shortcuts?.on);
+// This iPhone is set up: paired, and with the built-in VPN tested once (vpn.test). USE waits for it.
+export const iphoneSetUp = (st) => Boolean(st?.paired) && (!builtinVPN(st) || Boolean(st.vpn.tested));
+// Set Up's footer: the next step, or what is set up.
+export function setupFooter(st) {
+  if (!st?.paired) return "Pair this iPhone once to install straight onto it.";
+  if (builtinVPN(st) && !st.vpn.tested) return "Test the connection to finish setting up.";
+  if (shortcutsAdded(st)) return "Set up. Apps install straight onto this iPhone, on Wi-Fi, cellular or offline.";
+  return "Set up for Wi-Fi and offline. Add the Cellular Shortcuts to install on cellular too.";
+}
+// User 2026-11-22: This iPhone in use, the phone on cellular (no Wi-Fi), and the Cellular Shortcuts not added: iOS
+// refuses the connection, so Home, Installation & Signing's status and an install that starts say so, with a button
+// to the Cellular Shortcuts page.
+export const cellularWarning = (choice, st) => choice === "iphone" && builtinVPN(st) && Boolean(st.vpn.cellular) && !shortcutsAdded(st);
+export const CELLULAR = {
+  title: "Add the Cellular Shortcuts",
+  message: `On cellular, iOS refuses installs straight onto this iPhone while cellular data is on. Add the two Cellular Shortcuts, and ${NAME} turns it off for the moment each install connects.`,
+  short: "On cellular, installs need them.",
+  button: "Set Up",
+};
+// How It Works: the steps of one install, a row each.
+export const HOW_STEPS = [
+  { label: "1. Download", subtitle: "The app downloads over Wi-Fi or cellular." },
+  { label: "2. Sign", subtitle: "Signed on this iPhone with your certificate." },
+  { label: `3. ${BUILTIN_VPN} On`, subtitle: "iOS runs one VPN at a time, so Tailscale pauses." },
+  { label: "4. Cellular Data Off", subtitle: "On cellular only: a Shortcut turns it off for a moment." },
+  { label: "5. Install", subtitle: "Copied straight to iOS. No internet needed." },
+  { label: "6. All Back On", subtitle: "Data back on, VPN off, Tailscale reconnects." },
+];
+// vpn.test's answer, or its error, as the alert's words.
+export function vpnTestResult(r, err = null) {
+  if (r?.ok) return { title: "Connected", message: `${BUILTIN_VPN} reached this iPhone${r.ms ? ` in ${r.ms} ms` : ""}, then turned off again.` };
+  const raw = String(err?.message ?? err ?? "");
+  if (/^vpn_failed:/.test(raw)) return { title: `${BUILTIN_VPN} Didn't Start`, message: `${raw.replace(/^vpn_failed:\s*/, "")}.` };
+  const why = verifyFailure(err, { paired: true, vpn: { available: true } });
+  return { title: why.title, message: why.message, again: why.again };
+}
+// vpn.testShortcuts' answer as the alert's words: both ran, or which one didn't.
+export function shortcutsTestResult(r) {
+  if (r?.ok) {
+    const seen = r.cellular ? (r.wentOff ? "Cellular Data went off and came back on." : "Both ran, but cellular stayed in use: check that the first one sets Cellular Data to Off.") : "Both ran. On Wi-Fi nothing changes; on cellular they turn Cellular Data off and on.";
+    return { title: "Shortcuts Work", message: seen };
+  }
+  const which = !r?.off?.ok ? SHORTCUT_NAMES.off : SHORTCUT_NAMES.on;
+  const err = (!r?.off?.ok ? r?.off?.error : r?.on?.error) || "it didn't run";
+  return { title: "Shortcut Didn't Run", message: `"${which}": ${err}. Check that it's in Shortcuts with exactly that name.` };
+}
 
 // This iPhone's page says what it gives in one sentence under its title. Installs through installation_proxy never
 // show iOS's install prompt, so that is one of the points.
@@ -37,6 +94,7 @@ export function decideRoute(choice, status) {
   if (choice !== "iphone") return { route: "server" };
   if (!status) return { route: "server", alert: "noStatus" };
   if (!status.paired) return { route: "server", alert: "notPaired" };
+  if (builtinVPN(status)) return cellularWarning(choice, status) ? { route: "idevice", alert: "cellular" } : { route: "idevice" }; // F372
   const ts = status.tailscale;
   if (ts?.use) return { route: "idevice" };
   if (ts?.connect === "tailscale") {
@@ -71,6 +129,9 @@ export const ALERTS = {
   // F284: set up with Tailscale and a VPN that isn't Tailscale's is on (no Open: the shell's open is LocalDevVPN's)
   otherVPNTailscale: { title: "Another VPN Is On", message: "Installing on this iPhone needs the Tailscale app's VPN, and iOS runs one VPN at a time. Turn Tailscale on, or install through the Signing Server.", buttons: ["OK"] },
   tailscaleConnect: { title: "Tailscale Is On", message: "This install goes through the Signing Server because Connect With is LocalDevVPN. Pick Automatic in Settings > Installation & Signing > This iPhone to install through Tailscale.", buttons: ["OK"] },
+  // F372 (user 2026-11-22): on cellular without the Cellular Shortcuts. `setup` opens their page (the install stops);
+  // `idevice` tries This iPhone anyway (cellular data may be off by hand).
+  cellular: { title: CELLULAR.title, message: CELLULAR.message, buttons: ["Use Server", "Try Anyway", CELLULAR.button], idevice: 1, setup: 2 },
 };
 
 // F284: the Tailscale app's VPN is on: idevice.status's tailscale.address is this phone's own tailnet address, there
@@ -91,7 +152,7 @@ export const setUpWithTailscale = (ts) => ts?.connect === "tailscale" || Boolean
 export const STATUS_ACTIONS = {
   check: "Check Connection", checkServer: "Check Server", openVPN: `Open ${VPNS[0]}`, pair: "Start Pairing",
   signIn: "Sign In to Tailscale", openTailscale: "Open Tailscale", useTailscale: "Use Tailscale",
-  certificate: "Import Certificate",
+  certificate: "Import Certificate", shortcuts: "Add Cellular Shortcuts",
 };
 export const CHECKING = { state: "checking", title: "Checking…", subtitle: "Pairing and the VPN.", action: "check", tone: "wait", local: false };
 // B250: `certificate` is whether signing.status has an identity (signing/device.js statusReady): false says Import Your
@@ -113,6 +174,10 @@ function routeStatus(choice, st, { host = DOMAIN, certificate } = {}) {
   const later = `Installs use ${host} for now.`;
   if (!st) return { state: "noStatus", title: "Can't Reach This iPhone", subtitle: later, action: "check", tone: "warn", local: false };
   if (!st.paired) return { state: "pair", title: "Pair This iPhone", subtitle: `Installs use ${host} until it's paired.`, action: "pair", tone: "warn", local: false };
+  if (builtinVPN(st)) { // F372: the shell turns the built-in VPN on for each install; only cellular can stop it
+    if (cellularWarning(choice, st)) return { state: "cellular", title: CELLULAR.title, subtitle: CELLULAR.short, action: "shortcuts", tone: "warn", local: true };
+    return { state: "ready", via: BUILTIN_VPN, title: "Ready to Install", subtitle: `Straight onto this iPhone, through ${BUILTIN_VPN}.`, action: "check", tone: "ok", local: true };
+  }
   const ts = st.tailscale ?? {};
   const ready = (via) => ({ state: "ready", via, title: "Ready to Install", subtitle: `Straight onto this iPhone, through ${via}.`, action: "check", tone: "ok", local: true });
   if (ts.use) return ready("Tailscale");
@@ -254,7 +319,7 @@ export function setupState(status, pairing = null) {
 
 // A way to reach this iPhone: LocalDevVPN (10.7.0.1 reachable, idevice.status localDevVPN) or Tailscale (the shell's
 // tailscale.use: its VPN on and signed in, or Connect With: Tailscale).
-export function vpnOn(status) { return Boolean(status?.localDevVPN || status?.tailscale?.use); }
+export function vpnOn(status) { return Boolean(builtinVPN(status) || status?.localDevVPN || status?.tailscale?.use); } // F372: the built-in VPN needs nothing on
 
 // ---- Developer Mode (F300: no row of its own: an app this route installs can't open without it, iFizBox included)
 // An install that fails because Developer Mode is off says so in its alert (core/signing.js deviceError).
@@ -389,6 +454,7 @@ export function pairFooter(p) {
 // (setUpWithTailscale); with no status, Tailscale when the shell's error names it (Tailscale.swift, IDevice.swift).
 // (Both on: the shell connects through Tailscale whenever tailscale.use is set; see decideRoute.)
 export function verifyVPN(st, raw = "") {
+  if (builtinVPN(st)) return BUILTIN_VPN; // F372
   if (st) {
     if (st.tailscale?.use) return VPNS[1];
     if (st.localDevVPN) return VPNS[0];
@@ -416,7 +482,7 @@ const CONNECT_CODES = new Set(["refused", "pairing_rejected", "pair_again", "con
 // iFizBox isn't signed in to it) or "off" (Connect With: Tailscale and its VPN is off).
 export function tailscaleProblem(st) {
   const ts = st?.tailscale;
-  if (!ts || ts.connect === "localdevvpn") return null;
+  if (!ts || ts.connect === "localdevvpn" || builtinVPN(st)) return null; // F372: the built-in VPN doesn't go through Tailscale
   if (ts.connect !== "tailscale" && !tailscaleVPNOn(st)) return null;
   // Automatic with LocalDevVPN really on (VPNCheck counts a refusal only through a tunnel): the connect went to
   // 10.7.0.1, so a refusal there is the pairing's, not Tailscale's
@@ -443,6 +509,11 @@ export const TAILSCALE_VPN_OFF = {
 // pairing. Over Tailscale it is the phone on cellular: iOS takes RemotePairing (49152) and lockdownd (62078) from
 // the network only on Wi-Fi, and on cellular refuses every port; over LocalDevVPN a stale tunnel.
 export function routeRefused(vpn = VPNS[0]) {
+  if (vpn === BUILTIN_VPN) { // F372: on cellular iOS refuses every port while data is on (R72); the Shortcuts are the fix
+    return { title: "iPhone Refused", again: false, fix: "shortcuts", button: CELLULAR.button,
+      message: `This iPhone refused every connection through ${BUILTIN_VPN}, so it isn't the pairing. On cellular, add the Cellular Shortcuts, or join Wi-Fi.`,
+      short: "Every connection was refused. On cellular, add the Shortcuts." };
+  }
   if (vpn === VPNS[1]) {
     return { title: "Tailscale Refused", again: false, fix: "openTailscale", button: "Open Tailscale",
       message: `This iPhone takes installs through Tailscale only on Wi-Fi: on cellular, iOS refuses every connection, so it isn't the pairing. Join Wi-Fi, or use the Signing Server.`,
@@ -495,7 +566,7 @@ export const NO_ANSWER_FAILURE = { title: "Not Responding", message: "This iPhon
   short: "This iPhone didn't answer the last check.", fix: "check", button: "Check Again" };
 
 // The status cell for a remembered failure: red, with the fix as its action row.
-const FIX_ACTIONS = { signIn: "signIn", openTailscale: "openTailscale", openVPN: "openVPN", pair: "pair", check: "check" };
+const FIX_ACTIONS = { signIn: "signIn", openTailscale: "openTailscale", openVPN: "openVPN", pair: "pair", check: "check", shortcuts: "shortcuts" };
 export function failureStatus(f) {
   return { state: "failed", title: f.title, subtitle: f.short, action: FIX_ACTIONS[f.fix] ?? "check", tone: "warn", red: true, local: false };
 }
@@ -508,7 +579,7 @@ export function verifyFailure(err, st = null) {
   // B316: Tailscale's own state before the pairing. The shell found iFizBox's node logged out, or a connect failed
   // while Tailscale is the way in and iFizBox isn't signed in to it (or its VPN is off): the fix is Tailscale's.
   if (code === "tailscale_signed_out" || code === "needs_login" || code === "expired") return TAILSCALE_SIGNED_OUT;
-  if (code === "route_refused") return routeRefused(/Tailscale/i.test(raw) ? VPNS[1] : VPNS[0]);
+  if (code === "route_refused") return routeRefused(builtinVPN(st) ? BUILTIN_VPN : /Tailscale/i.test(raw) ? VPNS[1] : VPNS[0]);
   if (CONNECT_CODES.has(code)) {
     const t = tailscaleProblem(st);
     if (t === "signedOut") return TAILSCALE_SIGNED_OUT;
@@ -522,6 +593,9 @@ export function verifyFailure(err, st = null) {
     // (an EOF is read on a socket that was open: the TCP connect to RemotePairing had worked, so the route did too)
     const through = st || /Tailscale/i.test(raw) ? ` through ${verifyVPN(st, raw)}` : "";
     return { title: "Pair Again", message: `This iPhone answered${through}, then closed the connection: it no longer accepts ${NAME}'s pairing. Pair again.`, again: true };
+  }
+  if (code === "connect_failed" && builtinVPN(st)) { // F372: the shell had its own VPN on; nothing to turn on
+    return { title: "Couldn't Connect", message: `${BUILTIN_VPN} was on, but ${NAME} couldn't reach this iPhone through it. Try again.${st.vpn.cellular ? " On cellular, add the Cellular Shortcuts first." : ""}`, again: false };
   }
   if (code === "connect_failed") {
     const vpn = verifyVPN(st, raw);

@@ -63,6 +63,7 @@ enum SignBridge {
         SignAhead.register(b) // F235: signing.prepare / open / discard, the IPA queue's sign-ahead run
         IDeviceBridge.register(b) // F15: idevice.*, the "no server" install route (native/sideload/idevice/)
         TailscaleBridge.register(b) // tailscale.*, that route over Tailscale (native/sideload/tailscale/)
+        LocalVPNBridge.register(b) // vpn.*, the built-in VPN for that route (native/sideload/vpn/)
     }
 
     static func status() -> [String: Any] {
