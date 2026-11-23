@@ -4,7 +4,7 @@
 // drawing its look-alike; without it (the iPhone 7's iOS 15 WebKit, desktop browsers, every other style) the same
 // markup gets the look-alikes.
 //
-//   controlsFor({ style, nativeIos, userAgent, supports, touch }) -> "native" | null
+//   controlsFor({ style, nativeIos, userAgent, supports }) -> "native" | null
 //   applyControls(doc, opts)    puts the answer on <html data-controls> (or takes it off); true when it changed
 //   initNativeControls()        follows Theme > Style live and, in the app, the shell's app.info `ios`
 //   nativeControls(doc)         whether the hook is on now (nav/switch.js asks when it draws a switch)
@@ -17,21 +17,17 @@ import { nativeBridge, hasNativeCall } from "./native.js";
 // iOS 26's controls came with WebKit 26. In a web view the user agent's OS version is frozen (the 15 Pro on iOS 27
 // says "iPhone OS 18_7") and there is no Version/, so:
 // - in the app the shell's app.info `ios` decides (once it has answered);
-// - Safari, and WebKit browsers that keep Safari's Version/, by that version;
-// - anything else on an iPhone or iPad (the app before app.info answers, Home Screen web apps, other browsers) by a
-//   feature WebKit first shipped in 26: CSS anchor positioning (true on the 15 Pro's web view, absent from iOS 15's
-//   WebKit on the iPhone 7 and from iOS 18's).
+// - before it answers, on an iPhone or iPad, by a feature WebKit first shipped in 26: CSS anchor positioning (true on
+//   the 15 Pro's web view, absent from iOS 15's WebKit on the iPhone 7 and from iOS 18's).
+// (C69: the website has no eras, so no Safari path.)
 export const FEATURE_26 = "anchor-name: --a";
 
 const IOS_DEVICE = /\b(iPhone|iPad|iPod)\b/;
 const major = (v) => parseInt(String(v ?? ""), 10);
 
-export function drawsIos26Controls({ nativeIos = null, userAgent = "", supports = () => false, touch = 0 } = {}) {
+export function drawsIos26Controls({ nativeIos = null, userAgent = "", supports = () => false } = {}) {
   if (nativeIos) return major(nativeIos) >= 26;
-  const ios = IOS_DEVICE.test(userAgent) || (/\bMacintosh\b/.test(userAgent) && touch > 1); // iPadOS asks for desktop pages
-  if (!ios) return false;
-  const v = /\bVersion\/(\d+)/.exec(userAgent);
-  if (v) return Number(v[1]) >= 26;
+  if (!IOS_DEVICE.test(userAgent)) return false;
   try { return Boolean(supports(FEATURE_26)); } catch { return false; }
 }
 
@@ -45,7 +41,6 @@ const envOf = () => ({
   nativeIos,
   userAgent: globalThis.navigator?.userAgent ?? "",
   supports: (q) => Boolean(globalThis.CSS?.supports?.(q)),
-  touch: globalThis.navigator?.maxTouchPoints ?? 0,
 });
 
 export function applyControls(doc = globalThis.document, env = envOf()) {

@@ -97,7 +97,8 @@ export const SETTINGS = [
     // F201: the iOS era the whole app is drawn in, put on <html data-style> (theme-boot.js before first paint,
     // screens/settings.js applyTheme after). iOS 6 is the base look (ios6.css); iOS 7 is ios7.css over it, with its
     // own two themes (STYLE_PALETTES), so the Themes rows (`style: "ios6"`) hide while it is on.
-    key: "style", section: "style", kind: "choice", feature: "appearance", modes: ALL, default: "ios6",
+    // C69: the eras are the two apps' only; the website is iOS 6 and has no Style rows (createSettings drops a stored one).
+    key: "style", section: "style", kind: "choice", feature: "appearance", modes: BOTH, default: "ios6",
     label: "Style",
     // F202: iOS 13 (ios13.css), inset grouped with large titles and card sheets (STYLE_HOOKS)
     options: [{ value: "ios6", label: "iOS 6" }, { value: "ios7", label: "iOS 7" }, { value: "ios13", label: "iOS 13" },
@@ -450,6 +451,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
   if (!MODES.includes(mode)) throw new Error(`unknown mode ${mode}`);
   const store = safeStorage(storage);
   dropRetired(store);
+  if (mode === "site") store.remove(PREFIX + "style"); // C69: the website is iOS 6; an era stored there is cleared
   // F37: a site visitor who picked an Architecture before Device existed keeps it as their device type; the app's
   // detected type becomes `arch` for getArch().
   const detected = mode === "jailbreak" ? bridgeArch(native) : null;
@@ -470,6 +472,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
 
   function get(key) {
     const d = def(key);
+    if (key === "style" && mode === "site") return defaultOf(d); // C69
     const raw = store.get(PREFIX + key);
     const hit = raw == null ? null : d.options.find((o) => String(o.value) === raw);
     if (!hit && raw != null && d.accepts?.(raw)) return raw; // F329: a value outside the list the setting takes

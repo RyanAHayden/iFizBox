@@ -79,7 +79,7 @@ test("F128: pages like iOS 6's Settings: General, Theme, Updates (Signing in the
   const compat = [["worksOnMyPhone"], ["compatMarks"]];
   assert.deepEqual(layout("site"), [
     ["general", "General", [["device", "iosVersion"], ...compat, ["returnHome"]]], // C14: the site refreshes by itself
-    theme,
+    ["theme", "Theme", theme[2].slice(1)], // C69: no Style on the website (iOS 6 only)
     ["updates", "Updates", [["holds"]]],
     ["signing", "Signing", [["keepBundleId"]]], // F237: the website signs too
   ]);
@@ -256,7 +256,7 @@ test("holds: the helper is only used in jailbreak mode", async () => {
 test("rows each mode shows once every feature exists", () => {
   const show = (mode) => keysOf(createSettings({ storage: memStorage(), mode, features: everything }));
   assert.deepEqual(show("site"),
-    ["style", "appearance", "lightTheme", "darkTheme", "device", "worksOnMyPhone", "compatMarks", "iosVersion", "returnHome", "holds", "keepBundleId"]);
+    ["appearance", "lightTheme", "darkTheme", "device", "worksOnMyPhone", "compatMarks", "iosVersion", "returnHome", "holds", "keepBundleId"]);
   assert.deepEqual(show("jailbreak"),
     ["style", "appearance", "lightTheme", "darkTheme", "iconMatch", "lightIcon", "darkIcon", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds",
       "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
@@ -273,7 +273,22 @@ test("rows wait for their feature: today Appearance, the sources settings, Works
   assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak", features: new Set(["appearance"]) }).isShown("autoInstall"), false);
   assert.ok(FEATURES.has("appearance"));
   assert.deepEqual(createSettings({ storage: memStorage(), mode: "site", features: new Set(["appearance"]) })
+    .sections().map((x) => x.id), ["appearance", "themes"]); // C69: no Style on the website
+  assert.deepEqual(createSettings({ storage: memStorage(), mode: "sideload", features: new Set(["appearance"]) })
     .sections().map((x) => x.id), ["style", "appearance", "themes"]);
+});
+
+test("C69: the website is iOS 6: a stored era is cleared and reads as iOS 6; the apps keep it", () => {
+  const st = memStorage();
+  st.setItem("ifizbox.style", "ios26");
+  const site = createSettings({ storage: st, mode: "site" });
+  assert.equal(site.get("style"), "ios6");
+  assert.equal(st.getItem("ifizbox.style"), null);
+  for (const mode of ["jailbreak", "sideload"]) {
+    const s2 = memStorage();
+    s2.setItem("ifizbox.style", "ios13");
+    assert.equal(createSettings({ storage: s2, mode }).get("style"), "ios13", mode);
+  }
 });
 
 test("sections come in page order, empty ones dropped", () => {
