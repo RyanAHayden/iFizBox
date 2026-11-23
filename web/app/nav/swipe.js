@@ -176,10 +176,11 @@ export function attachPageSwipe(root, { canStart, blocked = () => false, decide 
 // The touch side of nav/tabswipe.js (the Details / Reviews / Related panes): the same passive touch stream as the page
 // swipe, both ways. One touch is never both: rightward it is the tabs' only with a tab before (tabSwipeTakesBack keeps
 // swipe back out), leftward it is never swipe back's.
+const STRIP = 20; // px, the edge strip's width (style.css .edge-swipe)
 export const tabPagers = new WeakMap(); // page body -> the pager it shows
 
-// Rows with swipe actions and a depiction's own tabs, besides pageSwipeBlocked's list.
-export const TAB_SWIPE_SKIP = ".pkg-row, .source-row, .dep-tabs";
+// Rows with swipe actions and a depiction's own tab bar, besides pageSwipeBlocked's list.
+export const TAB_SWIPE_SKIP = ".pkg-row, .source-row, .dep-tabs > .store-segmented";
 
 // Leftward is always the tabs' (the last one rubber-bands); rightward only with a tab before, else it is swipe back's.
 export function tabSwipeDecide(dx, dy, hasPrev) {
@@ -204,7 +205,7 @@ export function attachTabSwipe(root, { canStart, blocked = () => false, onBegin 
     canStart,
     blocked(target, point) {
       pager = pagerAt(target);
-      return !pager || point.clientX <= EDGE || Boolean(target.closest(TAB_SWIPE_SKIP))
+      return !pager || point.clientX < STRIP || Boolean(target.closest(TAB_SWIPE_SKIP))
         || Boolean(pageSwipeBlocked(target, pager.scroller, win, { ends: true })) || blocked(target);
     },
     decide: (dx, dy) => (pager.live() ? tabSwipeDecide(dx, dy, pager.selected() > 0) : "none"),

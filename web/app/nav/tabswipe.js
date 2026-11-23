@@ -30,7 +30,7 @@ export function tabPager({ panes, mark = () => {}, fill = () => {} }) {
   let scroller = null;
   const pos = new Map(); // pane index -> { x, y } where it shows, px from its place; empty at rest
   let headY = 0;         // the same for everything above the panes
-  let run = null;        // the slide in progress: { steps: [{ set, from, to }], anims, easing, duration, jump } (jump: across two tabs)
+  let run = null;        // the slide in progress: { steps: [{ set, from, to }], anims, easing, duration }
   let drag = null;       // the finger's: { x0, dir, width, still } (still: reduced motion, nothing follows it)
 
   const has = (j) => j >= 0 && j < panes.length;
@@ -99,14 +99,14 @@ export function tabPager({ panes, mark = () => {}, fill = () => {} }) {
     stop(1);
     rest();
   }
-  // A finger takes over a slide where it is. One across two tabs has no neighbour in order: it ends instead.
+  // A finger or another tap takes over a slide where it is.
   function take() {
     if (!run) return;
-    if (run.jump) { finish(); return; }
     const t = Number(run.anims[0].currentTime) || 0;
     stop(CURVES[run.easing](Math.min(1, t / run.duration)));
   }
-  function slideTo(targets, { duration, easing, jump = false }) {
+  // Every pane to its place beside the chosen one.
+  function slideHome(width, { duration, easing }) {
     const steps = [];
     const anims = [];
     const step = (els, set, from, to) => {
@@ -114,9 +114,9 @@ export function tabPager({ panes, mark = () => {}, fill = () => {} }) {
       set(to); // inline, so there is nothing to hand over when the animations end
       for (const e of els) anims.push(e.animate([{ transform: transform(from) }, { transform: transform(to) }], { duration, easing }));
     };
-    for (const [j, to] of targets) step([panes[j]], (v) => { pos.set(j, v); paint(j); }, pos.get(j), to);
+    for (const [j, from] of [...pos]) step([panes[j]], (v) => { pos.set(j, v); paint(j); }, from, { x: (j - now) * width, y: j === now ? 0 : from.y });
     if (headY) step(heads(), (v) => paintHead(v.y), { x: 0, y: headY }, { x: 0, y: 0 });
-    run = { steps, anims, easing, duration, jump };
+    run = { steps, anims, easing, duration };
     const mine = run;
     anims[0].onfinish = anims[0].oncancel = () => { if (run === mine) finish(); };
   }
@@ -136,7 +136,7 @@ export function tabPager({ panes, mark = () => {}, fill = () => {} }) {
     mark(j);
     const d = before - scroller.scrollTop;
     for (const [k, p] of pos) pos.set(k, { x: p.x, y: p.y - d });
-    lift(old, box, pos.get(old).y);
+    for (const [k, p] of pos) if (k !== j) lift(k, box, p.y);
     panes[j].style.willChange = "transform";
     for (const k of pos.keys()) paint(k);
     if (d || headY) paintHead(headY - d);
@@ -163,29 +163,29 @@ export function tabPager({ panes, mark = () => {}, fill = () => {} }) {
     if (j === now) { if (!run) switchNow(j); return; }
     if (!live() || reduced() || typeof panes[j].animate !== "function") { switchNow(j); return; }
     const from = now;
-    const dir = Math.sign(j - from);
-    // A tap during a slide carries on from where things are; a pane not in order beside the chosen one ends it first.
     take();
     const width = scroller.clientWidth;
     if (!pos.has(from)) pos.set(from, { x: 0, y: 0 });
     const x = pos.get(from).x;
-    for (const k of [...pos.keys()]) if (k !== from && k !== j) putAway(k);
-    if (!pos.has(j)) bringIn(j, x + dir * width);
-    else pos.set(j, { ...pos.get(j), x: x + dir * width });
+    // Across two tabs the one between passes by.
+    const dir = Math.sign(j - from);
+    for (let k = from + dir; k !== j + dir; k += dir) if (!pos.has(k)) bringIn(k, x + (k - from) * width);
     choose(j);
-    slideTo([[j, { x: 0, y: 0 }], [from, { x: -dir * width, y: pos.get(from).y }]], { duration: DURATION, easing: EASE, jump: Math.abs(j - from) > 1 });
+    slideHome(width, { duration: DURATION, easing: EASE });
   }
 
   // ---- the finger ---------------------------------------------------------------------------------------------
   function place(x) {
     const dir = x ? -Math.sign(x) : drag.dir; // the side whose pane shows: 1 the next, -1 the one before
     const j = now + dir;
-    for (const k of [...pos.keys()]) if (k !== now && k !== j) putAway(k);
-    pos.set(now, { x, y: pos.get(now)?.y ?? 0 });
-    paint(now);
-    if (!has(j)) return;
-    if (!pos.has(j)) bringIn(j, x + dir * drag.width);
-    else { pos.set(j, { x: x + dir * drag.width, y: pos.get(j).y }); paint(j); }
+    if (!pos.has(now)) pos.set(now, { x, y: 0 });
+    for (const [k, p] of [...pos]) {
+      const kx = x + (k - now) * drag.width;
+      if (k !== now && k !== j && Math.abs(kx) >= drag.width) { putAway(k); continue; }
+      pos.set(k, { x: kx, y: p.y });
+      paint(k);
+    }
+    if (has(j) && !pos.has(j)) bringIn(j, x + dir * drag.width);
   }
   function begin(dx) {
     take();
@@ -199,7 +199,8 @@ export function tabPager({ panes, mark = () => {}, fill = () => {} }) {
   function follow(dx) {
     let x = drag.x0 + dx;
     if (!has(now + (x < 0 ? 1 : -1))) x = rubber(x, drag.width);
-    return Math.max(-drag.width, Math.min(drag.width, x));
+    const most = Math.max(drag.width, Math.abs(drag.x0)); // a slide across two tabs taken over is further out
+    return Math.max(-most, Math.min(most, x));
   }
   function move(dx) {
     if (drag && !drag.still) place(follow(dx));
@@ -219,18 +220,11 @@ export function tabPager({ panes, mark = () => {}, fill = () => {} }) {
     place(x);
     drag = null;
     // Keep the slide's speed close to the finger's: a fast flick finishes fast (as app.js backSwipe).
-    const part = (go ? d.width - Math.abs(x) : Math.abs(x)) / d.width;
+    const part = Math.min(1, Math.abs(go ? d.width - Math.abs(x) : x) / d.width);
     const speed = cancelled ? 0 : Math.abs(vx) * DURATION / d.width;
     const opts = { duration: Math.max(120, Math.min(DURATION, part * DURATION / Math.max(1, speed))), easing: EASE_OUT };
-    const from = now;
-    if (go) {
-      choose(to);
-      slideTo([[to, { x: 0, y: 0 }], [from, { x: -dir * d.width, y: pos.get(from).y }]], opts);
-    } else {
-      const targets = [[now, { x: 0, y: 0 }]];
-      if (pos.has(to) && to !== now) targets.push([to, { x: dir * d.width, y: pos.get(to).y }]);
-      slideTo(targets, opts);
-    }
+    if (go) choose(to);
+    slideHome(d.width, opts);
   }
 
   const api = {

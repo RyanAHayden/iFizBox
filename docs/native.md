@@ -114,6 +114,11 @@ What (a) does to hold 120 Hz:
   changes. It steps aside in text fields and sliders, `touch-action: none` areas (custom drags), a sideways scroller
   not at its left end, a list showing a row's Delete, selected text and popups (`nav/swipe.js pageSwipeBlocked`).
   Off on the website, like the edge strip.
+- Tab swipe: on a package's or app's page the panes follow the finger on Details, Reviews and Related (`nav/swipe.js
+  attachTabSwipe` = passive touches; `nav/tabswipe.js tabPager` = the panes, transforms only). The chosen pane stays
+  in the flow and the neighbour is lifted out of it (absolute), so the page's height is the chosen pane's. A rightward
+  swipe is the tabs' on Reviews and Related, and swipe back's on Details. The edge strip always goes back, and nothing
+  starts from a sideways scroller at any position.
 - Each screen scrolls in its own `overflow-y: auto` box (a native UIScrollView in the UI process), with a virtualised
   list: a fixed pool of absolutely positioned rows moved by `translate3d`. `web/app/` can take `list.js` from the spike.
 - Parsing in a Web Worker (module workers load from the app scheme; see 4), the index cached in IndexedDB.

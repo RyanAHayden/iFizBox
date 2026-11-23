@@ -129,18 +129,19 @@ test("one swipe moves one tab; right goes back one; Related rubber-bands; Detail
   assert.ok(rubber(-100000, W) > -W);
 });
 
-test("a tap on a tab slides the same way, two tabs across too; only transforms animate", () => {
+test("a tap on a tab slides the same way, two tabs across pass the one between; only transforms animate", () => {
   const p = page();
   p.pager.select(2);
   assert.deepEqual(p.marks, [2]);
-  assert.deepEqual(p.anims.map((a) => [p.panes.indexOf(a.el), a.frames[0].transform, a.frames[1].transform]),
-    [[2, "translate3d(400px,0px,0)", "translate3d(0px,0px,0)"], [0, "translate3d(0px,0px,0)", "translate3d(-400px,0px,0)"]]);
+  const t = (x) => `translate3d(${x}px,0px,0)`;
+  assert.deepEqual(p.anims.map((a) => [p.panes.indexOf(a.el), a.frames[0].transform, a.frames[1].transform]).sort(),
+    [[0, t(0), t(-800)], [1, t(400), t(-400)], [2, t(800), t(0)]]);
   for (const a of p.anims) for (const f of a.frames) assert.deepEqual(Object.keys(f), ["transform"]);
-  assert.deepEqual(p.fills, [2], "Reviews isn't asked for");
+  assert.deepEqual(p.fills, [1, 2]);
   p.done();
   p.atRest(2);
   p.pager.select(0);
-  assert.equal(p.anims[0].frames[0].transform, "translate3d(-400px,0px,0)", "from the left");
+  assert.equal(p.anims.find((a) => a.el === p.panes[0]).frames[0].transform, t(-800), "from the left");
   p.done();
   p.atRest(0);
 });
@@ -187,11 +188,19 @@ test("rapid swipes: a second drag takes the slide over where it is; a tap during
   p.done();
   p.atRest(2);
   p.pager.select(0);
-  p.pager.begin(-11); // a slide across two tabs ends first
-  assert.equal(p.x(0), 0);
-  p.pager.end(0, 0, true);
+  p.pager.begin(-11); // a slide across two tabs is taken over too
+  assert.deepEqual([p.x(0), p.x(1), p.x(2)], [-800, -400, 0]);
+  p.pager.move(-30);
+  assert.deepEqual([p.x(0), p.x(1), p.x(2)], [-800, -400, 0], "held at its end");
+  p.pager.end(-30, 0, true);
   p.done();
   p.atRest(0);
+  p.pager.select(1); // a tap further on while one slides: nothing on screen goes away
+  p.pager.select(2);
+  assert.deepEqual(p.anims.slice(-3).map((a) => p.panes.indexOf(a.el)).sort(), [0, 1, 2]);
+  assert.equal(p.panes[0].hidden, false);
+  p.done();
+  p.atRest(2);
 });
 
 test("reduced motion: nothing follows the finger, the tab switches as it lets go", () => {
@@ -244,7 +253,10 @@ test("never from the edge strip, a sideways scroller at either end, a swipe row,
   const t = touches(p);
   p.pager.select(1);
   p.done();
-  assert.deepEqual(t.drag(p.panes[1], 20, 380), [1, 0], "the edge strip's place");
+  assert.deepEqual(t.drag(p.panes[1], 19, 380), [1, 0], "the edge strip's place");
+  assert.deepEqual(t.drag(p.panes[1], 20, 380), [0, 0], "just beside it: the tab before");
+  p.pager.select(1);
+  p.done();
   const gallery = fakeDocument().createElement("div");
   Object.assign(gallery, { overflowX: "auto", scrollWidth: 900, clientWidth: 300, scrollLeft: 0 });
   gallery.matches = () => false;
