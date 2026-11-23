@@ -48,6 +48,7 @@
 #include "policy.h"
 #include "launch.h"
 #include "ownicon.h" /* F329 */
+#include "decrypt.h" /* F374 */
 
 #include <dirent.h>
 #include <errno.h>
@@ -559,6 +560,24 @@ int main(int argc, char *argv[]) {
         }
         printf("Refreshing the Home Screen icon\n");
         return 0;
+    }
+
+    /* F374: Installed Apps. user-apps reads installd's containers, decrypt-app writes the app's decrypted Mach-O
+     * files into the app's own decrypt folder (decrypt.h); neither runs anything. */
+    if (argc >= 2 && !strcmp(argv[1], "user-apps")) {
+        if (argc != 2) { fprintf(stderr, "ifizbox-helper: user-apps takes no arguments\n"); return HELPER_EX_USAGE; }
+        if (helper_user_apps(HELPER_APPS_DIR, stdout, &err) < 0) {
+            fprintf(stderr, "ifizbox-helper: %s: %s\n", err, strerror(errno));
+            return HELPER_EX_IOERR;
+        }
+        return fflush(stdout) ? HELPER_EX_IOERR : 0;
+    }
+    if (argc >= 2 && !strcmp(argv[1], "decrypt-app")) {
+        if (argc != 3) { fprintf(stderr, "ifizbox-helper: decrypt-app takes one bundle ID\n"); return HELPER_EX_USAGE; }
+        umask(022);
+        int rc = helper_decrypt_app(HELPER_APPS_DIR, HELPER_DECRYPT_DIR, argv[2], fcntl(3, F_GETFD) != -1 ? 3 : -1, stdout, &err);
+        if (rc) fprintf(stderr, "ifizbox-helper: %s\n", err);
+        return rc;
     }
 
     int status_fd = fcntl(3, F_GETFD) != -1 ? 3 : -1;

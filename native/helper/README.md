@@ -24,6 +24,15 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
     ifizbox-helper remove-malware <path>...                                 (Malware Found's Delete)
     ifizbox-helper own-icon a|b <dir>                                       (your own app icon into one set; ownicon.h)
     ifizbox-helper own-icon-refresh                                         (uicache -p the app, detached; ownicon.h)
+    ifizbox-helper user-apps                                                (Installed Apps: name, version, encrypted; decrypt.h)
+    ifizbox-helper decrypt-app <bundle id>                                  (Decrypt: the app's decrypted Mach-O files; decrypt.h)
+
+`decrypt-app` writes only the files that were encrypted, decrypted and with cryptid 0, under
+`/var/mobile/Library/Caches/com.ryha.ifizbox/decrypt/<bundle id>/` (the app zips them with the rest of the .app). Each
+file goes through `mremap_encrypted` first; one this phone has never run (an extension iOS never started) is started
+suspended instead and its decrypted pages read through its task port, then killed before any of its code runs
+(hence `task_for_pid-allow` in entitlements.plist). A file still refused stays encrypted and is said; only the main
+executable failing is an error.
 
 | verb        | runs (from `/var/jb/usr/bin`)                                                               |
 |-------------|---------------------------------------------------------------------------------------------|

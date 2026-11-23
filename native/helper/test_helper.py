@@ -62,6 +62,9 @@ def build(out, sources, defs=()):
     # F57: main.c calls paid.c's install-paid.
     if "main.c" in sources and "paid.c" not in sources:
         sources = [*sources, "paid.c"]
+    # F374: main.c calls decrypt.c's user-apps and decrypt-app.
+    if "main.c" in sources and "decrypt.c" not in sources:
+        sources = [*sources, "decrypt.c"]
     subprocess.run([CC, "-pipe", *FLAGS, *SAN_FLAGS, *defs, "-o", out, *(os.path.join(HERE, s) for s in sources)], check=True,
                    capture_output=True, env=cc_env(os.path.dirname(out)))
 
