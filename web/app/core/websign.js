@@ -208,7 +208,8 @@ export const isZip = (b) => b?.length >= 4 && b[0] === 0x50 && b[1] === 0x4b;
 //   signatureEnd(profile)     ISO date the signature ends: the profile's expiry, or its certificates' latest end when
 //                             that is earlier (the signing certificate is one of them); null when unknown
 // 1: own keychain group first and the group fix's own folders (B227, B211), as the app's SignerStamp 1.
-export const WEB_SIGNER_VERSION = 1;
+// 2: every app with a keychain group of its own gets the group fix's isolate (B327), as SignerStamp 2.
+export const WEB_SIGNER_VERSION = 2;
 export async function groupFixHash(bytes) {
   if (!bytes?.length) return null;
   try {

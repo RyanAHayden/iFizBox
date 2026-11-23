@@ -660,11 +660,26 @@ An app keeps its data in three places, and a re-sign must leave each where the a
   sign mapped onto the profile's first group gets that folder and suite copied into its own once (`legacy` in
   `ifizbox-groupfix.plist`; only for an app that had run before it got this fix, never a fresh install, which would
   take in what other apps left in that shared group).
+- **Keeping an app's passwords to itself**: `TEAM.<App ID>` (and the profile's app groups) stay keychain groups every
+  app under that App ID can reach, and a read that names no group finds what is there: a fresh app took over another
+  app's item, and one app's delete that named no group (a fresh install clearing its keychain, a logout, any app the
+  group fix strips) deleted every other app's items there, signing them out at no re-sign of their own. So whenever
+  the app gets a group of its own first, both signers give it the group fix with `isolate` (that group), even when
+  its original names no groups: the dylib names that group on every generic and internet password call (add, read,
+  update, delete), so no other app's call reaches the app's passwords and the app never sees theirs. The first launch
+  with it copies every password the app could see outside its own group into its own (`copySharedPasswords`, never
+  over one it has, in the order a read naming no group finds them, so it keeps the one it read until now), only for
+  an app that had run before (anything of its own in its preferences, Documents, Application Support or
+  Library/AppGroups; a fresh install copies nothing) and marks `ifizbox.groupfix.isolated` in its preferences. Until
+  every item could be copied (locked before the first unlock after a restart, or behind Face ID or a passcode) calls
+  stay as before and the next launch tries again. Keys and certificates keep the plain stripping. Extensions don't
+  get the dylib; they have the app's keychain groups, so they still find its items.
 
 Every sign logs what it gave the app, so a report of an app that lost its sign-in or settings can be read from
 Console Logs (the run's log): `Keychain: TEAM.<its ID>, TEAM.<App ID> (application-identifier TEAM.<App ID>)`, the
 groups in their order (new items go to the first), and `Group fix: <groups> -> the app's own folder; keychain groups
-stripped; <group> copied in once if the app ran before` (every part of `ifizbox-groupfix.plist`), or `Group fix:
+stripped; <group> copied in once if the app ran before; passwords kept in TEAM.<its ID>, the shared groups' copied in
+once if the app ran before` (every part of `ifizbox-groupfix.plist`), or `Group fix:
 none (<why>)`: the original names no groups, iFizBox's own IPA, or no fix dylib in the build (the app's groups then
 go unmapped). The app's signer writes them to the log (`Profile.keychainLine`, `GroupFix.logLine`); the website's
 job returns them as `signLog` (`core/websign.js keychainLogLine`, `core/groupfix.js groupFixLogLine`), which the

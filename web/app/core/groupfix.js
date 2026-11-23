@@ -8,8 +8,9 @@
 //
 //   machoEntitlements(bin)                  the entitlements (XML slot) of a Mach-O's first slice, or null when unsigned
 //   entitlementsRead(read)                  the same through read(pos, len), reading only the parts it needs
-//   groupFixPlan(original, profileEnts, previous)  { groups, target, keychain, legacy?, lost? } to fix, or null when the app needs
-//                                           nothing; previous: the config an earlier sign left in the app
+//   groupFixPlan(original, profileEnts, previous, keychainGroups)  { groups, target, keychain, legacy?, lost?, isolate? } to
+//                                           fix, or null when the app needs nothing; previous: the config an earlier sign
+//                                           left in the app; keychainGroups: the signed app's (appEntitlements')
 //   readConfig(bytes)                       that config's { groups, keychain }, or null
 //   groupFixTweaks(plan, dylib)             { files, inject } for the F288 tweak path (putTweaks / TweakSet)
 //   withGroupFix(tweaks, plan, dylib)       a prepared tweak set (or null) with the fix added
@@ -85,13 +86,19 @@ export function entitlementsRead(read) {
 // with the profile shared it. The app's own folder is the same under any profile, App ID or certificate. An app an
 // earlier sign mapped to a profile group keeps it while the profile still has it; `lost` names it when it doesn't
 // (iOS keeps that group's folder from the app: worth a warning before signing).
-export function groupFixPlan(original, profileEnts = {}, previous = null) {
+// B327: `isolate`, the app's own keychain group, whenever the signed app has one besides TEAM.<App ID> (the keychain
+// every app under that App ID shares): the dylib keeps the app's passwords there, so another app clearing its
+// keychain can't sign it out. Every app gets the fix then, even one whose original names no groups.
+export function groupFixPlan(original, profileEnts = {}, previous = null, keychainGroups = []) {
   const have = strings(profileEnts?.[APP_GROUPS]);
   const groups = [...new Set([...strings(original?.[APP_GROUPS]), ...strings(previous?.groups)])].filter((g) => !have.includes(g));
   const keychain = strings(original?.[KEYCHAIN]).length > 0 || previous?.keychain === true;
-  if (!groups.length && !keychain) return null;
+  const kc = strings(keychainGroups);
+  const isolate = kc.length > 1 ? kc[0] : "";
+  if (!groups.length && !keychain && !isolate) return null;
   const was = typeof previous?.target === "string" ? previous.target : "";
   const plan = { groups, target: was && have.includes(was) ? was : "", keychain };
+  if (isolate) plan.isolate = isolate;
   if (was && !have.includes(was)) plan.lost = was;
   // the group the older rule (the profile's first) would have picked: the dylib copies its folder and suite into the
   // app's own once, so an app signed that way, now signed again from its original IPA, keeps that data
@@ -105,7 +112,8 @@ export const GROUPFIX_NOT_NEEDED = "the original signature names no app groups o
 export function groupFixLogLine(plan, none = GROUPFIX_NOT_NEEDED) {
   if (!plan) return `Group fix: none (${none})`;
   return `Group fix: ${plan.groups.length ? plan.groups.join(", ") : "no app groups"} -> ${plan.target || "the app's own folder"}`
-    + (plan.keychain ? "; keychain groups stripped" : "") + (plan.legacy ? `; ${plan.legacy} copied in once if the app ran before` : "");
+    + (plan.keychain ? "; keychain groups stripped" : "") + (plan.legacy ? `; ${plan.legacy} copied in once if the app ran before` : "")
+    + (plan.isolate ? `; passwords kept in ${plan.isolate}, the shared groups' copied in once if the app ran before` : "");
 }
 
 export function readConfig(bytes) {
@@ -120,7 +128,7 @@ export function groupFixTweaks(plan, dylib) {
   return {
     files: [{ path: GROUPFIX.dylib, data },
       { path: GROUPFIX.config, data: new TextEncoder().encode(plistXml({ groups: plan.groups, target: plan.target, keychain: plan.keychain,
-        ...(plan.legacy ? { legacy: plan.legacy } : {}) })) }],
+        ...(plan.legacy ? { legacy: plan.legacy } : {}), ...(plan.isolate ? { isolate: plan.isolate } : {}) })) }],
     inject: [GROUPFIX.inject],
   };
 }
