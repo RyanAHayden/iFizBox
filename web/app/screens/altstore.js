@@ -301,7 +301,8 @@ export function trackingSection(app, pkg, source, body = null, { store = apps, s
       ? [{ label: "Installed Version", detail: rec.version || "Unknown" },
         // B232: installs another of the source's versions (Install Which Version?), as Version History does
         ...(byHand && installWhichButtons(app, rec.version || "", currentDevice().ios ?? null).versions.some(Boolean) ? [{ label: "Change Installed Version", onClick: () => installWhichVersion(app, pkg, source, { installed: rec.version || "" }).catch(() => {}) }] : []),
-        ...(byHand ? [{ label: MARK_NOT_INSTALLED_LABEL, onClick: () => apps().then((store) => removeInstall(store, rec.id)).then(draw, () => {}) }] : [])]
+        // B373: as the nav bar's toggle: both records, held until the page is left
+        ...(byHand ? [{ label: MARK_NOT_INSTALLED_LABEL, onClick: () => sectionMarkNotInstalled(app, pkg, source, { store, signedOf, body }).then(draw, () => {}) }] : [])]
       : byHand ? [{ label: MARK_INSTALLED_LABEL, onClick: () => (held() ? remark() : versions.length > 1 ? pick() : mark(versions[0] ?? "")) }] : [];
     // The nav bar's button says what it will do, as Cydia's does: Upgrade when a newer version is out than the one
     // installed, Reinstall when it's the same, Install when it isn't installed.
@@ -505,6 +506,21 @@ export async function toggleMarked(app, pkg, source, { store = apps, signedOf = 
   }
   await recordInstall(s, markRecordOf(app, pkg, source, app.versions.map((x) => x.version).find(Boolean) ?? ""));
   return true;
+}
+
+// B373: the Installed section's Mark as Not Installed row: the toggle's off tap (toggleMarked), so iFizBox's signed
+// record goes with the installed one (left behind, restoreSourceRecords brings the record back), and on the app page
+// (`body`) both wait until the page is left. A forget already held is left as it is (the row is gone while held).
+// -> true when a forget is held or done. A forget that fails at once shows `warn`.
+export async function sectionMarkNotInstalled(app, pkg, source, { store = apps, signedOf = (id) => signedRecordOf(id), native = undefined,
+  forget = forgetListed, body = null, warn = forgetWarning } = {}) {
+  if (forgetHeld(app.bundleIdentifier)) return true;
+  try {
+    return !(await toggleMarked(app, pkg, source, { store, signedOf, native, forget, body, warn }));
+  } catch (e) {
+    if (e?.forgetFailed) { try { await warn(e); } catch { /* no alert here */ } }
+    return false;
+  }
 }
 
 const markFeedback = (text) => showHUD("").done(text, 900);
