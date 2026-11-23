@@ -111,7 +111,7 @@ test("More Tweaks: Browse Tweak Sources, Search All Repos, From Files, and one s
   assert.match(g.textContent, /More Tweaks.*Browse Tweak Sources.*Search All Repos.*From Files…/);
   const feet = g.querySelectorAll(".group-footer");
   assert.equal(feet.length, 1);
-  assert.equal(feet[0].textContent, "Only tweaks that work in YouTube without a jailbreak are listed.");
+  assert.equal(feet[0].textContent, "Only tweaks for YouTube, or for any app, are listed.");
   for (const b of g.querySelectorAll("button")) await b.fire("click");
   assert.deepEqual(opened, [["browse", "com.me.app"], ["search", "YouTube"]]);
 }));

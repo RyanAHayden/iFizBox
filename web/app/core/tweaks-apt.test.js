@@ -161,6 +161,7 @@ test("catalog: a Tweak Source keeps injectable tweaks only, counts on its own pa
     "Package: com.x.theme\nArchitecture: iphoneos-arm64\nSection: Themes\nVersion: 1\n",
     "Package: com.x.old\nName: Old\nArchitecture: iphoneos-arm\nSection: Tweaks\nVersion: 1\n",
   ].join("\n");
+  c.setTweakVerdicts({ "com.x.yt@1": false, "com.x.old@1": false }); // B391: checked, they work
   assert.equal(c.load("deb:https://repo.x/:./", text, "https://repo.x/", "iphoneos-arm64", { tweaks: true }), 2);
   assert.deepEqual(c.list("deb:https://repo.x/:./").map((r) => r.id).sort(), ["com.x.old", "com.x.yt"]);
   assert.equal(c.list("deb:https://repo.x/:./")[0].compat, null, "no Jailbreak only mark");

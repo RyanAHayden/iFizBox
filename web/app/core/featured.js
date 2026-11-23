@@ -74,7 +74,7 @@ export function parseFeatured(input, base = null) {
 // B182: the banners whose package `has(id)` finds in the source's loaded catalog, in order. A repo's banners can name
 // packages this build never loads: the sideload app keeps only a Tweak Source's injectable tweaks (Chariz's
 // SpringBoard tweaks drop out), and the jailbreak app only this arch's. Those tiles would open "Package not found",
-// so they are left out. `has` may be async; each id is asked once; a lookup that throws counts as missing.
+// so they are left out, and so is a tweak its lists hide (B391, core/catalog.js shows). `has` may be async; each id is asked once; a lookup that throws counts as missing.
 export async function bannersInCatalog(banners, has) {
   const list = Array.isArray(banners) ? banners : [];
   const asked = new Map();

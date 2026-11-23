@@ -11,6 +11,8 @@
 //     or a Description that is about a library/framework; injectableFromFields then answers { library: true,
 //     why: LIBRARY_WHY }
 //   countInjectable(packagesText) -> n               the Sources tab's count for a Tweak Source
+//   hintMatcher(known) -> (stanza) -> [bundle id]    B391: the apps a tweak's name or description mentions, as words
+//     (the known ones below and the user's, { bundleId: name }); core/tweakindex.js paidHint is this for one stanza
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { parseControl, parseRelations } from "./apt.js";
@@ -82,4 +84,30 @@ export function countInjectable(text) {
   const ids = new Set();
   for (const st of parseControl(text)) if (injectableFromFields(st).ok) ids.add(st.package);
   return ids.size;
+}
+
+// App names as they appear in tweak names and descriptions ("for YouTube", "Instagram tweak").
+const HINT_NAMES = {
+  "com.google.ios.youtube": ["YouTube"], "com.google.ios.youtubemusic": ["YouTube Music", "YTMusic"],
+  "com.burbn.instagram": ["Instagram"], "com.zhiliaoapp.musically": ["TikTok"], "com.spotify.client": ["Spotify"],
+  "net.whatsapp.WhatsApp": ["WhatsApp"], "ph.telegra.Telegraph": ["Telegram"], "com.reddit.Reddit": ["Reddit"],
+  "com.toyopagroup.picaboo": ["Snapchat"], "com.facebook.Facebook": ["Facebook"], "com.facebook.Messenger": ["Messenger"],
+  "com.hammerandchisel.discord": ["Discord"], "com.netflix.Netflix": ["Netflix"], "tv.twitch": ["Twitch"],
+  "com.soundcloud.TouchApp": ["SoundCloud"], "com.atebits.Tweetie2": ["Twitter"],
+};
+const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export function hintMatcher(known = {}) {
+  const names = new Map(Object.entries(HINT_NAMES));
+  for (const [id, n] of Object.entries(known ?? {})) if (n && String(n).length >= 4) names.set(id, [...(names.get(id) ?? []), String(n)]);
+  const tests = [...names].map(([id, list]) => [id, new RegExp(`(^|[^A-Za-z0-9])(?:${list.map(esc).join("|")})($|[^A-Za-z0-9])`, "i")]);
+  return (st) => {
+    const text = `${st?.name ?? ""}\n${st?.description ?? ""}`;
+    const out = tests.filter(([, re]) => re.test(text)).map(([id]) => id);
+    // "YouTube Music" also says "YouTube": the longer name wins
+    if (out.includes("com.google.ios.youtubemusic") && !/youtube(?! ?music)/i.test(text.replace(/youtube ?music/gi, ""))) {
+      return out.filter((id) => id !== "com.google.ios.youtube");
+    }
+    return out;
+  };
 }

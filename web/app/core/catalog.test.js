@@ -206,6 +206,7 @@ test("B363: the author page keeps what can't work, marked, and spacing or case n
   const lite = createCatalog();
   lite.setDevice({ ios: "27.0", jailbreak: "none" });
   lite.load("bb", bigboss, "http://apt.thebigboss.org/repofiles/cydia/", "iphoneos-arm", { tweaks: true });
+  lite.setTweakVerdicts({ "com.bb.case@1": false, "com.bb.old@1": false }); // B391: checked, they work
   assert.equal(lite.list(ALL).length, 0);
   // (Only what the sideload build can inject loads from a Tweak Source: here the two iphoneos-arm tweaks.)
   assert.deepEqual(ids(lite.author("BigBoss")), ["com.bb.case", "com.bb.old"], "the Tweak Source's packages are listed");
@@ -489,6 +490,7 @@ test("search finds Havoc's paid Aerial in the jailbreak and sideload builds (B36
   // out, and Other Sources leaves out what an added source lists, so Aerial was nowhere).
   const lite = createCatalog();
   lite.setDevice({ ios: "27.0", jailbreak: "none" });
+  lite.setTweakKnown({ worked: ["jp.uzra.aerial", "com.polytweaks.aerial2", "com.mikifp.griddy"] }); // B391
   lite.load("https://havoc.app/", havoc, "https://havoc.app/", "iphoneos-arm64", { tweaks: true });
   lite.loadAlt("alt:https://apps.example/", JSON.stringify({ name: "Apps", apps: [{ name: "Aerial Photos", bundleIdentifier: "com.x.aerialphotos",
     developerName: "X", version: "1.0", downloadURL: "https://apps.example/a.ipa", localizedDescription: "drone shots" }] }));

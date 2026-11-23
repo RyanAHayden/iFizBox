@@ -86,17 +86,13 @@ import { APP_MODE_LABEL } from "../core/appqueue.js";
 import { rowAppJob, queueOriginalCheck } from "./altstore.js";
 import { signedRecordOf, forgetHeld, cancelHeldForget, appVersionInstalled } from "./altstore.js"; // F392
 import { queueApp } from "./queue.js";
-import { worksInGroup, addToApp, addableTweakRows, checkTweakRows } from "./tweaks.js"; // F302
-import { loadRowsIndex } from "./tweaks.js"; // F344
+import { worksInGroup, addToApp } from "./tweaks.js"; // F302
 import { DETAILS_TITLE, packageRows, moreInfoShown, detailRows, descGroup, footerGroup,
   detailsFooter, MORE_INFO_LABEL } from "./details.js"; // F350
 import { rowIcon } from "../icons/rowicons.js";
 import { appInfoNodes } from "./altstore.js"; // F350: an app's More Information
 import { loadStyle } from "../nav/motion.js"; // F352: Add Tweaks' price button (myipas.css)
-import { liteTweaks } from "../core/tweakindex.js"; // F352: Add Tweaks' background check
 
-// B269: in the sideload build a Tweak Source's list leaves out the tweaks already checked and refused on this device.
-export const sideloadListRows = (rows, mode = detectMode()) => (mode === "sideload" ? addableTweakRows(rows) : rows);
 
 const ROW_HEIGHT = 58;
 // F348: Cydia's tall package cell (Installed and a source's section lists): name, 'from <Author> (<Section>)', then the
@@ -210,8 +206,7 @@ export function render(body, route, ctx) {
   const p = pageOf(route);
   switch (p.page) {
     case "sections": return isAltKey(p.key) ? renderAltSource(body, route, p.key, ctx) : renderSections(body, route, p.key, ctx);
-    case "section": return renderList(body, route, async () => sideloadListRows(await catalog.list(p.key, p.value)), true,
-      detectMode() === "sideload" && !isAltKey(p.key) ? dropRefusedTweaks : null);
+    case "section": return renderList(body, route, () => catalog.list(p.key, p.value), true);
     case "author": return renderAuthor(body, route, p.value);
     case "package": return renderPackage(body, route, p.key, p.value, ctx);
     case "info": return renderInfo(body, p.key, p.value);
@@ -912,14 +907,7 @@ function maybeHint(listEl, queued = () => installQueue.size, apps = false, actio
 }
 
 // Exported for Home's Browse (F46).
-// B269: a sideload Tweak Source's list checks the tweaks not checked yet (screens/tweaks.js checkTweakRows) and
-// drops each refused one, so no row is left that only leads to "can't go into an app".
-function dropRefusedTweaks(body, list, rows) {
-  checkTweakRows(rows, { stop: () => !list.el.isConnected, index: loadRowsIndex, // F344: the shared index first
-    onRefused: (ids) => { const out = new Set(ids); list.setItems(withLetterHeaders(rows.filter((r) => !out.has(r.id)), (r) => indexLetter(r.name))); } });
-}
-
-async function renderList(body, route, fetchRows, letters, after = null) {
+async function renderList(body, route, fetchRows, letters) {
   body.append(placeholder("list"));
   let rows;
   try {
@@ -933,7 +921,6 @@ async function renderList(body, route, fetchRows, letters, after = null) {
   if (!rows.length) { body.append(note("No packages.")); return; }
   const list = packageList(body, route, rows, { letters, wide: true }); // F348: a source's section lists, Cydia's tall rows
   body.append(list.el);
-  after?.(body, list, rows);
 }
 
 // F124: Browse's lists (New, Recently Updated, Popular, Featured, Free..., a category): the grey search bar, then the
@@ -987,9 +974,8 @@ async function renderAddTweaks(body, route, bundleId) {
   const ph = placeholder("list");
   body.append(bar.el, none, ph);
   loadStyle("myipas.css"); // the price button
-  let made = [], any = [], kept = [], list = null, checking = null;
-  const l = await tw.appTweakRows(bundleId).catch(() => ({ made: [], any: [], rows: [], infoOf: () => null }));
-  ({ made, any } = l);
+  let made = [], any = [], kept = [], list = null;
+  ({ made, any } = await tw.appTweakRows(bundleId, { name: appName }).catch(() => ({ made: [], any: [] })));
   const reload = async () => { kept = await tw.savedTweaks(bundleId).catch(() => []); draw(bar.input.value); };
   const decorate = (row, item) => {
     row._.add?.remove();
@@ -1003,7 +989,7 @@ async function renderAddTweaks(body, route, bundleId) {
   };
   const more = tw.moreTweaksGroup({ bundleId, name: appName, onChange: reload });
   const draw = (q) => {
-    if (!body.isConnected && list) { checking?.stop(); return; }
+    if (!body.isConnected && list) return;
     const items = tw.addTweaksItems({ made, any, kept, query: q, appName });
     none.textContent = items.length ? "" : q.trim() ? "No tweaks match your search." : `No tweaks for ${appName || "this app"} in your Tweak Sources yet.`;
     none.hidden = items.length > 0;
@@ -1016,14 +1002,6 @@ async function renderAddTweaks(body, route, bundleId) {
   kept = await tw.savedTweaks(bundleId).catch(() => []);
   draw("");
   bar.onQuery(draw);
-  // the tweaks no index or earlier look has checked: checked here in the background, listed as they pass (F344)
-  if (l.rows?.length) {
-    checking = tw.checkForApp(l.rows, bundleId, { name: appName, onChecked: (r, info) => {
-      if (!info?.ok) return;
-      const next = liteTweaks(l.rows, bundleId, l.infoOf);
-      if (next.made.length !== made.length || next.any.length !== any.length) { ({ made, any } = next); draw(bar.input.value); }
-    } });
-  }
 }
 
 // The grey search bar alone (Changes' and Search's look, packages.css), for a list's own filter.
