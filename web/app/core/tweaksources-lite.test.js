@@ -18,7 +18,9 @@ test("Lite's defaults are GitHub tweak repos only; the jailbroken defaults never
   assert.deepEqual(lite.map((s) => `${s.github.user}/${s.github.repo}`), raw.filter((s) => s.inject).map((s) => s.github));
   const jb = await loadTweakSources();
   assert.ok(jb.length && !jb.some(isGithubSource), "the jailbroken defaults stay APT repos");
-  for (const name of ["BigBoss", "Chariz", "Havoc"]) assert.ok(jb.some((s) => s.name === name), `${name} stays a jailbroken default`);
+  for (const name of ["Chariz", "Havoc"]) assert.ok(jb.some((s) => s.name === name), `${name} stays a jailbroken default`);
+  // The old rootful repos (BigBoss, Telesphoreo at apt.saurik.com) are no default at all.
+  assert.ok(!raw.some((s) => /bigboss|saurik/i.test(`${s.name} ${s.uri ?? ""}`)), "no BigBoss or Telesphoreo default");
 });
 
 test("a seeded GitHub default has the key and shape Add Source would save for that repo", async () => {

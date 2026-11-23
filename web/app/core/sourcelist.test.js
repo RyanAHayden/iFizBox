@@ -25,7 +25,6 @@ test("export writes one line per source: a URL, or a deb line for a dist repo", 
   const text = exportText(ALL, { date: new Date("2026-11-17T12:00:00Z") });
   const lines = text.trim().split("\n");
   assert.equal(lines[0], `# iFizBox sources (${ALL.length}), 2026-11-17`);
-  assert.ok(lines.includes("deb http://apt.saurik.com/ ios/1800.00 main"));
   assert.ok(lines.includes("deb https://apt.procurs.us/ 1800 main"));
   assert.ok(lines.includes("https://repo.chariz.com/"));
   assert.ok(lines.includes("https://fizl0.github.io/apps/source.json"));
@@ -89,7 +88,8 @@ test("Cydia's sources.list.d/cydia.list", () => {
     ["https://havoc.app/", "./", [], "https://havoc.app/"],
   ]);
   const r = reviewImport(entries, DEFAULT_SOURCES);
-  assert.deepEqual(r.map((e) => e.status), ["listed", "listed", "listed"]);
+  // Telesphoreo isn't a default (rootful only): new; Chariz and Havoc are listed.
+  assert.deepEqual(r.map((e) => e.status), ["new", "listed", "listed"]);
 });
 
 test("Sileo's sileo.sources (deb822)", () => {

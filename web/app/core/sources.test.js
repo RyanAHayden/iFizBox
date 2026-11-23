@@ -10,6 +10,11 @@ import { fakeIndexedDB } from "../fakes.test-helper.js";
 
 const DEFAULT_SOURCES = await loadTweakSources(); // web/app/tweak-sources.json
 const DEFAULT_ALT_SOURCES = await loadAppSources(); // web/app/app-sources.json
+// Old rootful Cydia repos, no longer defaults: the dist-repo shapes some tests below need.
+const [BIGBOSS, TELESPHOREO] = tweakSourcesFrom([
+  { name: "BigBoss", uri: "http://apt.thebigboss.org/repofiles/cydia/", dist: "stable", components: ["main"] },
+  { name: "Telesphoreo", uri: "http://apt.saurik.com/", dist: "ios/1800.00", components: ["main"] },
+]);
 
 
 // A backend whose repos are a map of URL -> body (string or Uint8Array). Missing URLs fail as the proxy does:
@@ -143,11 +148,11 @@ test("add through the HTTP backend: the proxy's 403 refused reaches the alert; n
 test("store: seeded once with the defaults, sorted by name; deletes stick", async () => {
   const idb = fakeIndexedDB();
   let st = await openSourceStore({ indexedDB: idb });
-  assert.deepEqual((await st.list()).map(displayName), ["BigBoss", "Chariz", "Havoc", "Procursus", "Telesphoreo"]);
+  assert.deepEqual((await st.list()).map(displayName), ["Chariz", "Havoc", "Procursus"]);
   await st.remove(sourceKey({ uri: "https://havoc.app/", dist: "./" }));
   await st.put({ key: "deb:https://9.example/:./", uri: "https://9.example/", dist: "./", components: [] });
   st = await openSourceStore({ indexedDB: idb }); // reopen: the defaults don't come back
-  assert.deepEqual((await st.list()).map(displayName), ["BigBoss", "Chariz", "Procursus", "Telesphoreo", "9.example"]);
+  assert.deepEqual((await st.list()).map(displayName), ["Chariz", "Procursus", "9.example"]);
   assert.equal(await st.update("deb:nope:./", { count: 1 }), undefined);
 });
 
@@ -159,7 +164,7 @@ test("sorting: letters first, then without case or diacritics", () => {
 
 test("icon URL: flat dir, or dists/<dist>/ for dist repos", () => {
   assert.equal(sourceIconUrls(DEFAULT_SOURCES.find((s) => s.name === "Chariz"))[0], "https://repo.chariz.com/CydiaIcon.png");
-  assert.equal(sourceIconUrls(DEFAULT_SOURCES.find((s) => s.name === "BigBoss"))[0],
+  assert.equal(sourceIconUrls(BIGBOSS)[0],
     "http://apt.thebigboss.org/repofiles/cydia/dists/stable/CydiaIcon.png");
 });
 
@@ -173,7 +178,7 @@ test("icon URLs: a dist repo tries dists/<dist>/, then the top level; a flat rep
 });
 
 test("refresh: dist repo counts every component for our arch; rootful-only Release counts 0 without fetching", async () => {
-  const bigboss = DEFAULT_SOURCES.find((s) => s.name === "BigBoss");
+  const bigboss = BIGBOSS;
   const base = "http://apt.thebigboss.org/repofiles/cydia/dists/stable/";
   const b = fakeBackend({
     [base + "Release"]: "Origin: BigBoss\nArchitectures: iphoneos-arm iphoneos-arm64\n",
@@ -183,7 +188,7 @@ test("refresh: dist repo counts every component for our arch; rootful-only Relea
   assert.equal(r.count, 3);
   assert.equal(r.error, null);
 
-  const tele = DEFAULT_SOURCES.find((s) => s.name === "Telesphoreo");
+  const tele = TELESPHOREO;
   const t = fakeBackend({ "http://apt.saurik.com/dists/ios/1800.00/Release": "Origin: Telesphoreo\nArchitectures: darwin-arm iphoneos-arm\n" });
   assert.equal((await refreshSource(t, tele)).count, 0);
   assert.ok(!t.calls.some((c) => c.startsWith("packages")));
