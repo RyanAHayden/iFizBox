@@ -227,7 +227,6 @@ function bringToTop(box, win = globalThis) {
   // the visible area has settled (visualViewport resize), within KEYBOARD_MS of the tap.
   const vv = win.visualViewport;
   if (!vv?.addEventListener) return;
-  const until = Date.now() + KEYBOARD_MS;
   let timer = 0;
   const settle = () => {
     clearTimeout(timer);
@@ -239,7 +238,7 @@ function bringToTop(box, win = globalThis) {
   };
   vv.addEventListener("resize", settle);
   vv.addEventListener("scroll", settle);
-  setTimeout(() => { vv.removeEventListener("resize", settle); vv.removeEventListener("scroll", settle); }, until - Date.now());
+  setTimeout(() => { vv.removeEventListener("resize", settle); vv.removeEventListener("scroll", settle); }, KEYBOARD_MS);
 }
 
 // F317: the route's hints in the iOS 6 hint style (AGENTS.md, Hints): each under the group it explains, one or two
