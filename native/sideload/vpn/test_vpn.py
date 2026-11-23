@@ -113,7 +113,7 @@ class App(unittest.TestCase):
         import plistlib
         src = read("App", "LocalVPN.swift")
         self.assertIn('runShortcut("switch", input: switchInput("start", selected: selected))', src)
-        self.assertIn("if stop { down(); endTrip(gen); endSwitch() }", src)
+        self.assertIn("if stop { down(); endTrip(gen); endSwitch(); sayLost() }", src)
         self.assertIn("UIApplication.didBecomeActiveNotification", src)  # an end found in the background runs later
         self.assertIn('b.on("vpn.testSwitch")', src)
         repo = os.path.dirname(NATIVE)
@@ -227,11 +227,33 @@ class App(unittest.TestCase):
             if i.startswith(me):
                 self.assertEqual(p["AppIntentDescriptor"]["BundleIdentifier"] + "." + p["AppIntentDescriptor"]["AppIntentIdentifier"], i)
         begin = src[src.index("static func begin("):src.index("static func waitOffCellular(")]
-        self.assertIn("let trip = start && tripReady() && takeTrip(", begin)
+        self.assertIn("opens.take(ready ? .trip : .start)", begin)
         self.assertLess(begin.index("if start { savePending("), begin.index("takeTrip("))
         self.assertIn("LocalVPN.restorePending()", src[src.index("static func register("):])
         self.assertIn("guard #available(iOS 16.0, *)", src)
         self.assertIn("switchEndDue = switchedOn && !tripOn", src)  # the trip's own end goes first
+
+    def test_shortcuts_opens_are_capped(self):
+        """B395: every run of the Install Switch around a queue goes through SwitchOpens (its rules are tested in
+        native/sign/tests/sideload), a queue holds through an install's reconnects, and one check runs it twice at most."""
+        src = read("App", "LocalVPN.swift")
+        begin = src[src.index("static func begin("):src.index("static func waitOffCellular(")]
+        self.assertEqual(begin.count("runShortcut("), 3)  # start, dataOff, the old Cellular Data Off
+        self.assertEqual(begin.count("takeTrip("), 1)
+        self.assertLess(begin.index("opens.take(ready ? .trip : .start)"), begin.index("takeTrip("))
+        self.assertLess(begin.index("opens.take(.dataOff)"), begin.index('switchInput("dataOff")'))
+        self.assertLess(begin.index('"switch_failed"'), begin.index("try up(step)"))  # before our VPN takes another's place
+        end = src[src.index("static func endSwitch()"):src.index("// ---- B395")]
+        self.assertEqual(end.count("runShortcut("), 1)
+        self.assertLess(end.index("opens.take(.end)"), end.index("runShortcut("))
+        self.assertLess(end.index("clearPending() // B395"), end.index("runShortcut("))  # a kill during the end: not again
+        self.assertIn('failure.code == "switch_failed" && LocalVPN.Path.now().cellular', read("idevice", "IDevice.swift", base=os.path.dirname(HERE)))  # Wi-Fi keeps the other ways in
+        check = src[src.index("static func checkShortcut("):src.index("static func switchEnded(")]
+        self.assertNotRegex(check, r"\b(for|while)\b.*\{")
+        self.assertIn("installs == 0", src[src.index("static func stopLater("):])
+        idev = read("idevice", "IDevice.swift", base=os.path.dirname(HERE))
+        self.assertIn("LocalVPN.installBegan()", idev)
+        self.assertIn("defer { LocalVPN.installEnded() }", idev)
 
 
 if __name__ == "__main__":

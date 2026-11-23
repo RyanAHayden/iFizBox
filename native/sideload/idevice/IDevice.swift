@@ -720,7 +720,8 @@ enum IDevice {
                         Session.keepVPNFailure(failure)
                         // B378: an install still goes through LocalDevVPN or Tailscale, but only when one is on: a
                         // connect to 10.7.0.1 with no tunnel fails as "device socket io failed", hiding this error
-                        guard Session.otherRouteOn() else { throw failure }
+                        // B395: the Install Switch didn't run on cellular: iOS refuses the other ways in as well
+                        guard !(failure.code == "switch_failed" && LocalVPN.Path.now().cellular), Session.otherRouteOn() else { throw failure }
                         ilog("\(LocalVPN.name) didn't start (\(failure.text)); trying LocalDevVPN or Tailscale")
                     }
                 }
@@ -992,6 +993,8 @@ enum IDevice {
         let run = HereRun(ipa: ipa, size: size, remote: "\(stagingDir)/\(UUID().uuidString).ipa", bundleID: bundleID, version: version)
         var attempt = 0
         var firstDrop: Failure?
+        LocalVPN.installBegan() // B395: its reconnects share one queue, so one run of the Install Switch
+        defer { LocalVPN.installEnded() }
         while true {
             do {
                 try watched(attempt == 0 ? "install" : "install, connection \(attempt + 1)") { (w: Watch) -> Void in

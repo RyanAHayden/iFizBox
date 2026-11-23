@@ -795,4 +795,52 @@ test("a downloaded IPA waits for the retry (F400)") {
     check((try FileManager.default.contentsOfDirectory(atPath: kept.path)).sorted() == ["com.a.ipa", "not.ours.pending"], "staged leftovers go")
 }
 
+test("This iPhone: Shortcuts opens a bounded number of times per queue (B395)") {
+    let t0 = Date(timeIntervalSince1970: 1_000_000)
+    let all: [SwitchOpens.Run] = [.trip, .start, .dataOff, .end]
+    // whatever is asked for, in any order and however often: never above the cap, each run once
+    for seed in 0..<500 {
+        var o = SwitchOpens(), x = UInt64(seed) &* 2_654_435_761 &+ 1, got: [SwitchOpens.Run] = []
+        for _ in 0..<60 {
+            x = x &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            let r = all[Int((x >> 33) % 4)]
+            if o.take(r, now: t0) { got.append(r) }
+            if (x >> 40) % 5 == 0 { o.fail(rest: (x >> 50) % 2 == 0, now: t0) }
+        }
+        check(Set(got).count == got.count, "each once: \(got)")
+        check(got.filter { $0 != .end }.count <= (got.contains(.trip) ? 1 : 2), "one trip, or start and dataOff: \(got)")
+    }
+    var o = SwitchOpens()
+    check(o.take(.trip, now: t0) && !o.take(.start, now: t0) && !o.take(.dataOff, now: t0), "a trip, nothing of the old way")
+    check(o.take(.end, now: t0) && !o.take(.end, now: t0), "its end once")
+    o.newQueue()
+    check(o.take(.start, now: t0) && !o.take(.start, now: t0), "the next queue again; a reconnect in it no second start")
+    check(o.take(.dataOff, now: t0) && !o.take(.dataOff, now: t0) && o.take(.end, now: t0), "data off and the end once")
+    // a failed run: only the end in its queue, no start for a while after
+    o = SwitchOpens()
+    check(o.take(.start, now: t0), "start")
+    o.fail(now: t0)
+    check(!o.take(.dataOff, now: t0) && o.take(.end, now: t0), "only the end after a failed run")
+    o.newQueue()
+    check(!o.take(.trip, now: t0.addingTimeInterval(SwitchOpens.rest - 1)) && o.used.isEmpty, "the next app's queue opens nothing")
+    check(o.take(.end, now: t0), "an end due after a kill still may")
+    o.newQueue()
+    check(o.take(.trip, now: t0.addingTimeInterval(SwitchOpens.rest)), "later it may")
+    o = SwitchOpens(); _ = o.take(.trip, now: t0); o.fail(now: t0); o.forgive(); o.newQueue()
+    check(o.take(.trip, now: t0), "a check the user tapped forgets it")
+    o = SwitchOpens(); _ = o.take(.trip, now: t0); o.fail(rest: false, now: t0)
+    check(!o.take(.start, now: t0), "an older one ignored the trip: not its start in this queue")
+    o.newQueue()
+    check(o.take(.start, now: t0), "but in the next")
+    o = SwitchOpens(); _ = o.take(.trip, now: t0); o.untake(.trip)
+    check(o.take(.trip, now: t0), "a run that never opened Shortcuts doesn't count")
+    // one Add or Update check
+    check(SwitchOpens.checkLimit == 2, "two runs at most")
+    let nf = "Could not find the shortcut \u{201C}Install Switch.\u{201D}"
+    check(SwitchOpens.again(0, error: nf, actions: true) == .same && SwitchOpens.again(1, error: nf, actions: true) == nil, "not found: once more, then no more")
+    check(SwitchOpens.again(0, error: "refused", actions: true) == .plain && SwitchOpens.again(0, error: "refused", actions: false) == nil, "refused: the plain one")
+    check(SwitchOpens.again(0, error: "the Shortcut was canceled", actions: true) == nil, "canceled: none")
+    check(SwitchOpens.again(0, error: "Shortcuts didn't come back in 25 s", actions: true) == nil, "no answer: none")
+}
+
 if failures == 0 { print("all passed") } else { print("\(failures) failed"); exit(1) }
