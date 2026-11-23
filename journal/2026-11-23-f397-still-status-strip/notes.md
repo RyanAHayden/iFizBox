@@ -29,8 +29,8 @@ User wants, in the iOS 6 era only:
 
 ## Chromium check
 
-`capture.mjs` here: console, Add Tweaks and Confirm sheets (Confirm is the scaffold with its title and class, empty
-body), shells site and app, eras iOS 6/7/13/26, light and dark, mid-slide up, settled and mid-slide down: 144 shots,
+`capture.mjs` here: console, Add Tweaks and Confirm sheets (Add Tweaks and Confirm are the
+sheet scaffold with their titles and classes and an empty body), shells site and app, eras iOS 6/7/13/26, light and dark, mid-slide up, settled and mid-slide down: 144 shots,
 run on this branch and on the code before it.
 - iOS 6 (36 shots): the top 54 pt is pure black in every one, and the first non-black row is at 62 pt: the page's bar
   mid-slide, the sheet's once settled. `grid.png` shows the app shell (rows console, Add Tweaks, Confirm; columns
@@ -45,3 +45,4 @@ run on this branch and on the code before it.
 - Real phones not checked. The repo rule is Chromium first.
 - WebKit's own compositing of `clip-path` on a moving sheet (and its feel at 120 Hz) is only reasoned about. The clip
   is a static rectangle and only `transform` animates.
+- The other sheets (signing, Write a Review, depiction) and a sheet over a sheet were not shot; they share `.sheet`.
