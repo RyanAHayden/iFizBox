@@ -22,6 +22,15 @@
 - The slot follows `onAppsChange` so the page stays right after the nav bar's mark toggle or an update finishes,
   without a full redraw.
 
+## Spec review
+
+- Fixed: the first draw no longer waits on the page body being attached (`alive` only unsubscribes now); notes that
+  are only whitespace count as no notes.
+- Kept, though the review flagged them as not asked: the redraw on `onAppsChange` and the slide. The nav bar's mark
+  toggle changes the record while the page is open (B338 redraws the page for it), and the user's rule is that size
+  changes slide. Without these, the card would be wrong until the page reopened.
+- Kept: the malicious-report card still goes above this one, since a safety warning comes first.
+
 ## Checks
 
 - `node --test` on the new test and the altstore/storepage/handoff/marktoggle tests: pass.

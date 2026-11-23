@@ -23,6 +23,7 @@ test("updateNewsShown: no notes on the newest version, or no versions, shows not
   const bare = { ...APP, versions: [{ version: "2.1" }] };
   assert.equal(updateNewsShown(bare, "2.0"), false);
   assert.equal(updateNewsShown({ ...APP, versions: [] }, "2.0"), false);
+  assert.equal(updateNewsShown({ ...APP, versions: [{ version: "2.1", localizedDescription: "  \n" }] }, "2.0"), false);
 });
 
 test("updateNewsGroup: the What's New card with the version, notes and Version History; null for another app's record", async () => {

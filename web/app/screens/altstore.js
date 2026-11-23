@@ -1032,7 +1032,7 @@ export function appInfoNodes(app, { lookup = (id) => storeLookup(id) } = {}) {
 export function updateNewsShown(app, installedVersion) {
   const v = app?.versions?.[0];
   const have = installedVersion == null ? "" : String(installedVersion);
-  return Boolean(v?.version && v.localizedDescription && have && compareVersions(String(v.version), have) > 0);
+  return Boolean(v?.version && String(v.localizedDescription ?? "").trim() && have.trim() && compareVersions(String(v.version), have) > 0);
 }
 export function updateNewsGroup(app, record, history = null) {
   if (!record || record.id !== app?.bundleIdentifier || !updateNewsShown(app, record.version)) return null;
@@ -1044,7 +1044,6 @@ export function updateNewsGroup(app, record, history = null) {
 export function updateNewsSlot(app, history = null, { store = apps, onChange = onAppsChange, alive = () => true } = {}) {
   const slot = el("div", "alt-update-news");
   const draw = () => Promise.resolve().then(store).then((s) => s.all()).then((list) => {
-    if (!alive()) return;
     const card = updateNewsGroup(app, (list ?? []).find((r) => r?.id === app.bundleIdentifier) ?? null, history);
     if (!card && !slot.firstChild) return;
     slideChange(slot, () => slot.replaceChildren(...(card ? [card] : [])));
