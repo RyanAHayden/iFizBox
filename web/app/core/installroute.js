@@ -30,6 +30,11 @@ export const builtinVPN = (st) => Boolean(st?.vpn?.available);
 // The two Shortcuts for installs on cellular, named as the user names them in Shortcuts.
 export const SHORTCUT_NAMES = { off: "Cellular Data Off", on: "Cellular Data On" };
 export const shortcutsAdded = (st) => Boolean(st?.vpn?.shortcuts?.off && st?.vpn?.shortcuts?.on);
+// B359: our signed Shortcut on the site (web/app/shortcuts/, signed by tools/shortcuts/sign.sh). The app shares its
+// own copy; this link is the fallback it opens in Safari. Shortcuts names an imported Shortcut after its file.
+export const shortcutFileURL = (k) => `https://${DOMAIN}/shortcuts/${encodeURIComponent(SHORTCUT_NAMES[k])}.shortcut`;
+// B359: a group footer for a Shortcut whose check run (vpn.checkShortcut) didn't pass: it isn't marked added.
+export const shortcutDidntRun = (k, err) => `"${SHORTCUT_NAMES[k]}" didn't run: ${err || "Shortcuts didn't say why"}. Tap Add to try again.`;
 // This iPhone is set up: paired, and with the built-in VPN tested once (vpn.test). USE waits for it.
 export const iphoneSetUp = (st) => Boolean(st?.paired) && (!builtinVPN(st) || Boolean(st.vpn.tested));
 // Set Up's footer: the next step, or what is set up.
