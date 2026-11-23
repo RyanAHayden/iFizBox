@@ -703,17 +703,26 @@ enum IDevice {
         /// F372: the built-in VPN first, whenever this app can run it (LocalVPN.available): it turns on here and the
         /// connect goes to the same 10.7.0.1; Tailscale and LocalDevVPN are left for an app signed without it.
         private func endpoint(_ port: UInt16) throws -> (String, UInt16) {
-            if LocalVPN.available && pinnedTailscale != true && !LocalVPN.failedNow() {
-                if second || builtIn { return (address, port) } // a second look rides on the install's own session's VPN
-                watch.begin("turning on \(LocalVPN.name)", Limit.tunnel)
-                let w = watch
-                do {
-                    dataOff = try LocalVPN.begin { w.alive($0) }
-                    builtIn = true
-                    return (address, port)
-                } catch {
-                    // an install still goes through LocalDevVPN or Tailscale when they're on; vpn.test says the error
-                    ilog("\(LocalVPN.name) didn't start (\(error.localizedDescription)); trying LocalDevVPN or Tailscale")
+            if LocalVPN.available && pinnedTailscale != true {
+                if LocalVPN.failedNow() {
+                    // B378: it failed a moment ago: the other ways in only when one is on, else the same error again
+                    if !Session.otherRouteOn() { throw Session.lastVPNFailure() }
+                } else {
+                    if second || builtIn { return (address, port) } // a second look rides on the install's own session's VPN
+                    watch.begin("turning on \(LocalVPN.name)", Limit.tunnel)
+                    let w = watch
+                    do {
+                        dataOff = try LocalVPN.begin { w.alive($0) }
+                        builtIn = true
+                        return (address, port)
+                    } catch {
+                        let failure = (error as? Failure) ?? Failure(code: "vpn_failed", text: "\(LocalVPN.name) didn't start: \(error.localizedDescription)")
+                        Session.keepVPNFailure(failure)
+                        // B378: an install still goes through LocalDevVPN or Tailscale, but only when one is on: a
+                        // connect to 10.7.0.1 with no tunnel fails as "device socket io failed", hiding this error
+                        guard Session.otherRouteOn() else { throw failure }
+                        ilog("\(LocalVPN.name) didn't start (\(failure.text)); trying LocalDevVPN or Tailscale")
+                    }
                 }
             }
             let tailnet = Tailscale.useForInstall()
@@ -734,6 +743,20 @@ enum IDevice {
             let local = try Tailscale.beginInstall(port: port)
             viaTailscale = true
             return ("127.0.0.1", local)
+        }
+
+        // B378: the built-in VPN's last start failure, said again while LocalVPN.failedNow skips a new start
+        private static let failureLock = NSLock()
+        private static var vpnFailure: Failure? // guarded by failureLock
+        static func keepVPNFailure(_ f: Failure) { failureLock.lock(); vpnFailure = f; failureLock.unlock() }
+        static func lastVPNFailure() -> Failure {
+            failureLock.lock(); defer { failureLock.unlock() }
+            return vpnFailure ?? Failure(code: "vpn_failed", text: "\(LocalVPN.name) didn't start a moment ago")
+        }
+        /// B378: with the built-in VPN down, is another way in on: Tailscale for installs, or LocalDevVPN answering
+        /// at 10.7.0.1 (VPNCheck). Blocking (VPNCheck's probes: under a second).
+        static func otherRouteOn() -> Bool {
+            Tailscale.useForInstall() || (VPNCheck.status()["localDevVPN"] as? Bool ?? false)
         }
 
         init(watch: Watch, tailscale pinned: Bool? = nil, second: Bool = false) throws {

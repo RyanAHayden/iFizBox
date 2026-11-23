@@ -540,7 +540,8 @@ export function routeRefused(vpn = VPNS[0]) {
 // A failed connect (idevice.verify, an install on this iPhone, tailscale.test's verify) as a remembered failure
 // { title, message, short, fix, button }, or null when the error isn't about reaching this iPhone (Developer Mode,
 // signing, a download): those don't make the route broken.
-const ROUTE_CODES = new Set([...CONNECT_CODES, "route_refused", "tailscale_signed_out", "needs_login", "expired", "not_paired"]);
+// B378: vpn_failed: the built-in VPN didn't start and no other way in was on (the shell says why, e.g. no network)
+const ROUTE_CODES = new Set([...CONNECT_CODES, "route_refused", "tailscale_signed_out", "needs_login", "expired", "not_paired", "vpn_failed"]);
 export function routeFailureOf(err, st = null) {
   const raw = String(err?.message ?? err ?? "");
   const code = err?.code ?? raw.split(":")[0];
@@ -584,6 +585,15 @@ export function failureStatus(f) {
   return { state: "failed", title: f.title, subtitle: f.short, action: FIX_ACTIONS[f.fix] ?? "check", tone: "warn", red: true, local: false };
 }
 
+// B378: the built-in VPN didn't start for an install and neither LocalDevVPN nor Tailscale was on, so the shell said
+// the VPN's own error (e.g. "can't start without a network") instead of a connect to 10.7.0.1 with no tunnel.
+export function vpnFailed(raw) {
+  const why = String(raw ?? "").replace(/^vpn_failed:\s*/, "").trim();
+  const noNetwork = /without a network|no network/i.test(why);
+  const first = why.startsWith(NAME) ? why : `${why.charAt(0).toUpperCase()}${why.slice(1)}`; // the name keeps its own case
+  return { title: `${BUILTIN_VPN} Didn't Start`, message: `${first || `${BUILTIN_VPN} didn't start`}.`,
+    short: noNetwork ? `${BUILTIN_VPN} needs Wi-Fi or cellular data to start.` : `${BUILTIN_VPN} didn't start.`, fix: "check", button: "Check Again", again: false };
+}
 // What a failed idevice.verify means: { title, message, again } (`again`: offer Pair Again). `st` is the
 // idevice.status read for the check (null or left out: not known), which names the VPN the check went through.
 export function verifyFailure(err, st = null) {
@@ -592,6 +602,7 @@ export function verifyFailure(err, st = null) {
   // B316: Tailscale's own state before the pairing. The shell found iFizBox's node logged out, or a connect failed
   // while Tailscale is the way in and iFizBox isn't signed in to it (or its VPN is off): the fix is Tailscale's.
   if (code === "tailscale_signed_out" || code === "needs_login" || code === "expired") return TAILSCALE_SIGNED_OUT;
+  if (code === "vpn_failed") return vpnFailed(raw); // B378
   if (code === "route_refused") return routeRefused(builtinVPN(st) ? BUILTIN_VPN : /Tailscale/i.test(raw) ? VPNS[1] : VPNS[0]);
   if (CONNECT_CODES.has(code)) {
     const t = tailscaleProblem(st);
