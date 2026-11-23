@@ -35,7 +35,7 @@ tools/ui-7.sh $ID open ifizbox://sources
 tools/ui-7.sh $ID tap 375 600         # screenshot pixels, portrait
 tools/ui-7.sh $ID swipe 375 2 375 900 0.4   # from the top edge: Notification Centre
 tools/ui-7.sh $ID home
-tools/ui-7.sh unlock $ID              # always, also after a failure
+tools/ui-7.sh unlock $ID              # always, also after a failure: closes every app, locks the screen
 ```
 
 - `open` takes any URL. `ifizbox://<tab>` (home, sources, changes, installed, search, settings) opens iFizBox on

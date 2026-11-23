@@ -1,6 +1,7 @@
 #!/bin/sh
 # Give back every phone UI lock (iPhone 15, iPhone 7, 4S) a task holds, so a task that ends or is dropped never
-# leaves a phone locked until the 30-minute stale timeout.
+# leaves a phone locked until the 30-minute stale timeout. Each unlock also closes the phone's apps and locks its
+# screen.
 #   tools/ui-release.sh [ID]   ID defaults to this worktree's branch, task/<ID>
 # The runner calls it when a slot's session ends (runner.toml `[run] on_exit`, run in the slot's worktree with
 # AGENT_SLOT set). A lock whose `slot` file names this AGENT_SLOT is freed whoever owns it: the runner may already
@@ -13,7 +14,10 @@ locks=${XDG_RUNTIME_DIR:-/tmp}
 if [ -z "${1:-}" ] && [ -n "${AGENT_SLOT:-}" ]; then
   for phone in 15 7 4s; do
     d=$locks/ifizbox-$phone-ui.lock
-    if [ "$(cat "$d/slot" 2>/dev/null || true)" = "$AGENT_SLOT" ]; then rm -rf "$d"; fi
+    if [ "$(cat "$d/slot" 2>/dev/null || true)" = "$AGENT_SLOT" ]; then
+      sh "$here/ui-$phone.sh" unlock "$(cat "$d/owner")" || true  # closes its apps and locks the screen too
+      rm -rf "$d"
+    fi
   done
 fi
 id=${1:-$(git -C "$here" rev-parse --abbrev-ref HEAD 2>/dev/null || true)}

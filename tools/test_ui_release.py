@@ -16,6 +16,7 @@ class UiRelease(unittest.TestCase):
         self.run_dir = Path(self.tmp.name)
         self.env = {**os.environ, "XDG_RUNTIME_DIR": self.tmp.name}
         self.env.pop("AGENT_SLOT", None)  # the gate itself runs in a runner slot
+        self.env["IFIZBOX_UI_TIDY"] = "0"  # never touch the real phones from the gate
 
     def tearDown(self):
         self.tmp.cleanup()
