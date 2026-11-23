@@ -64,7 +64,14 @@ export function mounted(route) {
 // "~settings" (Install's Set Up Signing: #/home/~installed/myipas/~settings/signing; Settings' root as a final
 // "~settings"), any other page as "~<tab>" again. Left as a plain route, the stack swapped the mounted page for the new
 // one without a slide.
+// B380: Settings' pages: Installation & Signing is one page under two routes (settings/signing, settings/installation:
+// the sideload build), and its pages hang off either. A link to one of its pages that isn't above or below the one on
+// screen (settings/signing -> settings/installation/iphone -> settings/installation/pair) is a push, mounted as
+// "~settings"; left as a plain route the stack swapped the page without a slide. One the route's Settings pages already
+// stand on (onSettings) is a pop to it.
 export function mountLink(from, to) {
+  const on = from && inHome(to) ? onSettings(from, to) : null;
+  if (on) return on;
   if (from && from.tab !== "home" && inHome(to)) to = { tab: IN_HOME, path: to.path.slice(1) };
   else if (from && from.path.some(isMount) && inHome(to)) {
     to = { tab: IN_HOME, path: to.path.slice(1) };
@@ -74,15 +81,37 @@ export function mountLink(from, to) {
     }
   }
   if (!from || !to.path.length) return null;
+  if (from.tab === "home" && inHome(from) && inHome(to) && ofSigning(to.path[1]) && !from.path.some(isMount) && !related(from.path, to.path)) {
+    return { tab: from.tab, path: [...from.path, MOUNT + IN_HOME, ...to.path.slice(1)] };
+  }
   if (to.tab === from.tab && to.path.length <= from.path.length && to.path.every((s, i) => s === from.path[i])) return null;
   const k = from.path.lastIndexOf(MOUNT + to.tab);
   if (to.tab === from.tab && k < 0 && from.path.some(isMount)) return { tab: from.tab, path: [...from.path, MOUNT + to.tab, ...to.path] };
   const inner = k >= 0 ? from.path.slice(k + 1) : to.tab === from.tab ? from.path : null;
-  const branches = inner && inner.length && inner[0] !== to.path[0] && !inner.some(isMount);
+  const branches = inner && inner.length && !inner.some(isMount)
+    && (to.tab === IN_HOME && ofSigning(to.path[0]) ? !related(inner, to.path) : inner[0] !== to.path[0]);
   if (branches) return { tab: from.tab, path: [...from.path, MOUNT + to.tab, ...to.path] };
   if (to.tab === from.tab && k < 0) return null; // within the tab: a plain push, pop or sibling
   const base = k >= 0 ? from.path.slice(0, k) : from.path;
   return { tab: from.tab, path: [...base, MOUNT + to.tab, ...to.path] };
+}
+
+// Whether one path is on the way to the other.
+const related = (a, b) => a.slice(0, b.length).every((s, i) => s === b[i]);
+const ofSigning = (seg) => seg === "signing" || seg === "installation";
+// The Settings page's path, Installation & Signing's two routes as one.
+const settingsPage = (path) => (path.length === 1 && path[0] === "installation" ? "signing" : path.join("\n"));
+// B380: the page of `from`'s topmost run of Settings pages (one mounted on another) that shows `to`, as a route; null
+// when none does. The lowest one: a page under a mount may stand for a level its link left out.
+function onSettings(from, to) {
+  const want = settingsPage(mounted(to).path);
+  let found = null;
+  for (const path of prefixes(from.path).reverse()) {
+    const r = mounted({ tab: from.tab, path });
+    if (r.tab !== IN_HOME) break;
+    if (settingsPage(r.path) === want) found = { tab: from.tab, path };
+  }
+  return found;
 }
 
 // The route one level up, or null at a tab's root.
@@ -147,6 +176,7 @@ export function createRouter({ win, onRoute }) {
     try { s = win.history.state?.[STEP]; } catch { s = undefined; }
     return Number.isInteger(s) ? s : null;
   };
+  let linked = false; // the route on screen came from a link (a new entry), not a back, a tab or replace()
   function sync() {
     let route = parse(win.location.hash);
     const known = tracks && !replacing ? stepOf() : null; // a step: an entry walked to again; null: a new one
@@ -154,9 +184,14 @@ export function createRouter({ win, onRoute }) {
       : (!tracks || replacing) && seen.length > 1 && seen.at(-2) === format(route);
     // An entry walked to again already holds the route the router gave it: only a new one can be a mounted link.
     const link = !switching && !back && known == null ? mountLink(current, route) : null;
-    switching = false;
     if (link) route = link;
     const canonical = format(route);
+    const fresh = tracks && !replacing && known == null;
+    // B380: a link to the page already on screen by another name (Installation & Signing's other route): its entry is
+    // walked off again, so the next Back isn't spent on it.
+    if (fresh && link && current && format(current) === canonical) return win.history.back();
+    linked = fresh && !switching;
+    switching = false;
     if (tracks) {
       const s = known ?? (replacing && step ? step : ++lastStep);
       lastStep = Math.max(lastStep, s);
@@ -181,6 +216,7 @@ export function createRouter({ win, onRoute }) {
     start() { win.addEventListener("hashchange", sync); sync(); },
     stop() { win.removeEventListener("hashchange", sync); },
     current: () => current,
+    linked: () => linked,
     go(route) {
       const hash = format(route);
       if (win.location.hash === hash) return;

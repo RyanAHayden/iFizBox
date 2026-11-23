@@ -24,7 +24,8 @@ export function createStacks({ tabs, create }) {
     // "pop" (one or more screens off the top), "replace" (anything else within the tab), "none".
     // from/to: the top entry before and after (from is null on the first route). removed: entries taken off,
     // top first; the caller removes their pages once any animation is done.
-    sync(route) {
+    // linked: the route came from a link, not from walking the history back (router.js linked).
+    sync(route, { linked = false } = {}) {
       const stack = stacks[route.tab];
       const want = prefixes(route.path);
       const before = activeTab;
@@ -57,7 +58,8 @@ export function createStacks({ tabs, create }) {
       // Switching tabs adds history entries in between, so after one no entry can trust history any more: the back
       // button then goes straight to the parent (Sources > BigBoss, Search, Sources, Back went to Search).
       if (kind === "push") to.pushed = added.length === 1;
-      if (kind === "tab") for (const t of tabs) for (const e of stacks[t]) e.pushed = false;
+      // A link up to a page below (B380) adds an entry too: the one right behind it is the page it left, not the parent.
+      if (kind === "tab" || (kind === "pop" && linked)) for (const t of tabs) for (const e of stacks[t]) e.pushed = false;
       return { kind, tab: route.tab, from, to, added, removed };
     },
   };

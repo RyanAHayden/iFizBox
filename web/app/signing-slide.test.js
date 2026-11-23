@@ -39,7 +39,7 @@ function setup(start) {
   const win = fakeWindow(start);
   const stacks = createStacks({ tabs: BAR_TABS, create: (tab, path) => ({ tab, path }) });
   const results = [];
-  const router = createRouter({ win, onRoute: (r) => results.push(stacks.sync(r)) });
+  const router = createRouter({ win, onRoute: (r) => results.push(stacks.sync(r, { linked: router.linked() })) });
   router.start();
   // a tapped link, or signing/device.js openRoute (location.hash = "/home/settings/signing"): both set the hash
   const open = (hash) => { win.location.hash = hash; return results.at(-1); };
@@ -48,6 +48,7 @@ function setup(start) {
 
 const SIGNING = format(settingsRoute(["signing"])); // Home's tiles, Settings' row, Why's and the guides' rows, Install
 const INSTALLATION = format(settingsRoute(["installation"]));
+const sub = (...path) => format(settingsRoute(path));
 const shows = (hash) => mounted(parse(hash));
 
 // Where each way in starts: Home (its certificate and Install Lite tiles), Settings (its row), Why and a guide (their
@@ -112,4 +113,77 @@ test("B300: the Pairing page opened on another page's stack is still the Pairing
   assert.equal(isPairHash("#/installed/myipas/~settings/installation/pair"), true);
   assert.equal(isPairHash("#/home/settings/installation"), false);
   assert.equal(isPairHash("#/home/~installed/myipas/~settings/signing"), false);
+});
+
+// B380 (user 2026-11-23: "Installation & Signing still teleports into This iPhone and its pages"): the merged page opens
+// as settings/signing, but its This iPhone pages are settings/installation/…, a sibling branch: the stack swapped the
+// page (replace) without a slide. The concept check started on settings/installation, where they slid.
+const PAGES = [["installation", "iphone"], ["installation", "with"], ["installation", "server"], ["installation", "pair"],
+  ["installation", "shortcuts"], ["installation", "how"], ["signing", "certificate"], ["signing", "apps"], ["signing", "help"], ["signing", "udid"]];
+for (const start of ["#/home", "#/home/settings", "#/home/~installed/myipas", "#/installed/myipas", "#/sources/bigboss/com.example.app"]) {
+  for (const main of [SIGNING, INSTALLATION]) {
+    test(`B380: from ${start}, every page of Installation & Signing (${main}) pushes, Back returns`, () => {
+      for (const page of PAGES) {
+        const { win, open, results } = setup(start);
+        open(main);
+        const before = win.location.hash;
+        const r = open(sub(...page));
+        assert.equal(r.kind, "push", `${before} -> ${win.location.hash}`);
+        assert.equal(r.to.pushed, true);
+        assert.deepEqual(shows(win.location.hash), { tab: "settings", path: page });
+        win.history.back();
+        assert.equal(results.at(-1).kind, "pop");
+        assert.equal(win.location.hash, before);
+      }
+    });
+  }
+}
+
+test("B380: one page's fix row or goTo() to another (This iPhone > Pairing, Signed Apps > Shortcuts) pushes too, and Back walks each", () => {
+  for (const start of ["#/home", "#/installed/myipas"]) {
+    for (const [a, b] of [["iphone", "pair"], ["with", "pair"], ["iphone", "shortcuts"], ["pair", "with"]]) {
+      const { win, open, results } = setup(start);
+      open(SIGNING);
+      const main = win.location.hash;
+      open(sub("installation", a));
+      const first = win.location.hash;
+      assert.equal(open(sub("installation", b)).kind, "push", `${a} -> ${b}`);
+      win.history.back();
+      assert.equal(results.at(-1).kind, "pop");
+      assert.equal(win.location.hash, first);
+      win.history.back();
+      assert.equal(results.at(-1).kind, "pop");
+      assert.equal(win.location.hash, main);
+    }
+  }
+});
+
+test("B380: Installation & Signing by its other route, from one of its pages, pops to it; Back then leaves it by the stack", () => {
+  const { win, open } = setup("#/home");
+  open("#/home/settings");
+  open(SIGNING);
+  open(sub("installation", "iphone"));
+  const r = open(INSTALLATION);
+  assert.equal(r.kind, "pop");
+  assert.equal(win.location.hash, SIGNING);
+  assert.equal(r.to.pushed, false); // history's entry behind is This iPhone: Back goes by the stack, not history.back()
+});
+
+test("B380: Installation & Signing by its other route while on screen changes nothing, and Back still leaves it", () => {
+  const { win, open, results } = setup("#/home");
+  open(SIGNING);
+  const n = results.length;
+  open(INSTALLATION);
+  assert.equal(results.length, n);
+  assert.equal(win.location.hash, SIGNING);
+  win.history.back();
+  assert.equal(results.at(-1).kind, "pop");
+  assert.equal(win.location.hash, "#/home");
+});
+
+test("B380: Settings' root from This iPhone's page pops to it", () => {
+  const { win, open } = setup("#/home");
+  for (const h of ["#/home/settings", SIGNING, sub("installation", "iphone")]) open(h);
+  assert.equal(open("#/home/settings").kind, "pop");
+  assert.equal(win.location.hash, "#/home/settings");
 });
