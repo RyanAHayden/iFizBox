@@ -9,6 +9,8 @@ import time
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# B329: every apt-get and apt-mark the helper runs gets this right after the tool's name (no Translation files read).
+NOLANG = ["-o", "Acquire::Languages=none"]
 CC = shutil.which(os.environ.get("CC", "cc")) or shutil.which("clang") or shutil.which("gcc")
 FLAGS = ["-std=c11", "-Wall", "-Wextra", "-Werror", "-D_DEFAULT_SOURCE", "-O1"]
 
@@ -149,17 +151,17 @@ class Helper(unittest.TestCase):
         """N6: unsigned repos are read (apt-get update exits 100 on one otherwise, and most jailbreak repos are)."""
         insecure = ["-o", "Acquire::AllowInsecureRepositories=true"]
         self.assertEqual(self.plan("update"),
-                         ["/var/jb/usr/bin/apt-get", "apt-get", *insecure, "-o", "APT::Status-Fd=3", "update"])
-        self.assertEqual(self.plan("update", fd="-1"), ["/var/jb/usr/bin/apt-get", "apt-get", *insecure, "update"])
+                         ["/var/jb/usr/bin/apt-get", "apt-get", *NOLANG, *insecure, "-o", "APT::Status-Fd=3", "update"])
+        self.assertEqual(self.plan("update", fd="-1"), ["/var/jb/usr/bin/apt-get", "apt-get", *NOLANG, *insecure, "update"])
 
     def test_install_remove_upgrade(self):
         fixed = ["-y", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold",
                  "--allow-unauthenticated", "-o", "APT::Status-Fd=3"]
         self.assertEqual(self.plan("install", "com.a.b", "libstdc++"),
-                         ["/var/jb/usr/bin/apt-get", "apt-get", *fixed, "install", "com.a.b", "libstdc++"])
+                         ["/var/jb/usr/bin/apt-get", "apt-get", *NOLANG, *fixed, "install", "com.a.b", "libstdc++"])
         self.assertEqual(self.plan("remove", "com.a.b"),
-                         ["/var/jb/usr/bin/apt-get", "apt-get", *fixed, "remove", "com.a.b"])
-        self.assertEqual(self.plan("upgrade"), ["/var/jb/usr/bin/apt-get", "apt-get", *fixed, "upgrade"])
+                         ["/var/jb/usr/bin/apt-get", "apt-get", *NOLANG, *fixed, "remove", "com.a.b"])
+        self.assertEqual(self.plan("upgrade"), ["/var/jb/usr/bin/apt-get", "apt-get", *NOLANG, *fixed, "upgrade"])
 
     def test_configure(self):
         self.assertEqual(self.plan("configure"), ["/var/jb/usr/bin/dpkg", "dpkg", "--force-confdef",
@@ -168,14 +170,14 @@ class Helper(unittest.TestCase):
     def test_hold_unhold_showhold(self):
         """F22: apt-mark, with no status fd and nothing but the verb and the names."""
         self.assertEqual(self.plan("hold", "com.a.b", "libstdc++"),
-                         ["/var/jb/usr/bin/apt-mark", "apt-mark", "hold", "com.a.b", "libstdc++"])
-        self.assertEqual(self.plan("unhold", "com.a.b", fd="-1"), ["/var/jb/usr/bin/apt-mark", "apt-mark", "unhold", "com.a.b"])
-        self.assertEqual(self.plan("showhold"), ["/var/jb/usr/bin/apt-mark", "apt-mark", "showhold"])
+                         ["/var/jb/usr/bin/apt-mark", "apt-mark", *NOLANG, "hold", "com.a.b", "libstdc++"])
+        self.assertEqual(self.plan("unhold", "com.a.b", fd="-1"), ["/var/jb/usr/bin/apt-mark", "apt-mark", *NOLANG, "unhold", "com.a.b"])
+        self.assertEqual(self.plan("showhold"), ["/var/jb/usr/bin/apt-mark", "apt-mark", *NOLANG, "showhold"])
 
     def test_auto(self):
         """F234: apt-mark auto for the packages a queue run installed only for another's sake."""
         self.assertEqual(self.plan("auto", "com.a.b", "libstdc++"),
-                         ["/var/jb/usr/bin/apt-mark", "apt-mark", "auto", "com.a.b", "libstdc++"])
+                         ["/var/jb/usr/bin/apt-mark", "apt-mark", *NOLANG, "auto", "com.a.b", "libstdc++"])
         for words, why in {("auto",): "no package names", ("auto", "-o", "x"): "bad package name",
                            ("auto", "a*"): "bad package name", ("Auto", "ab"): "unknown verb"}.items():
             out = self.plan(*words)
@@ -215,7 +217,7 @@ class Helper(unittest.TestCase):
                 out = self.plan(*words)
                 self.assertEqual(len(out), 1, out)
                 self.assertTrue(out[0].startswith("error: ") and msg in out[0], out)
-        self.assertEqual(len(self.plan("install", *(["ab"] * 256))), 2 + 9 + 256)
+        self.assertEqual(len(self.plan("install", *(["ab"] * 256))), 2 + len(NOLANG) + 9 + 256)
 
     # --- F33: addsource / removesource and ifizbox.sources
 
@@ -388,21 +390,40 @@ class Helper(unittest.TestCase):
                        "--reinstall", "--allow-downgrades", "--allow-unauthenticated", "-o", "APT::Keep-Fds::=3", "-o",
                        "APT::Status-Fd=3"]
         self.assertEqual(self.plan("apply", "com.a.b", "com.c=1:1.0~b1+x-2", "-com.d"),
-                         ["/var/jb/usr/bin/apt-get", "apt-get", *apply_fixed, "install", "com.a.b", "com.c=1:1.0~b1+x-2",
+                         ["/var/jb/usr/bin/apt-get", "apt-get", *NOLANG, *apply_fixed, "install", "com.a.b", "com.c=1:1.0~b1+x-2",
                           "com.d-"])
-        self.assertEqual(self.plan("apply", "com.a.b", fd="-1")[2:], ["-y", "-o", "Dpkg::Options::=--force-confdef", "-o",
+        self.assertEqual(self.plan("apply", "com.a.b", fd="-1")[2:], [*NOLANG, "-y", "-o", "Dpkg::Options::=--force-confdef", "-o",
                          "Dpkg::Options::=--force-confold", "--reinstall", "--allow-downgrades", "--allow-unauthenticated", "install",
                          "com.a.b"])
         # simulate: apt-get -s, no status fd even when one is open (nothing to report)
         self.assertEqual(self.plan("simulate", "com.a.b=2", "-com.d"),
-                         ["/var/jb/usr/bin/apt-get", "apt-get", "-s", "--reinstall", "--allow-downgrades",
+                         ["/var/jb/usr/bin/apt-get", "apt-get", *NOLANG, "-s", "--reinstall", "--allow-downgrades",
                           "--allow-unauthenticated", "install", "com.a.b=2", "com.d-"])
-        self.assertEqual(len(self.plan("apply", *[f"p{i:03d}" for i in range(256)])), 2 + 13 + 256)
+        self.assertEqual(len(self.plan("apply", *[f"p{i:03d}" for i in range(256)])), 2 + len(NOLANG) + 13 + 256)
+
+    def test_no_translations_for_any_apt_run(self):
+        """B329: a repo that answers its Translation URL with a web page (repo.twickd.com, HTTP 200 and no hash in its
+        Release) left a file apt can't parse in its lists, and every apt command (simulate too) failed with
+        "Encountered a section with no Package: header": the Confirm sheet said apt refused every queue. No apt-get
+        or apt-mark the helper runs may read Translation files, so the option sits right after the tool's name."""
+        runs = [("update",), ("install", "com.a.b"), ("remove", "com.a.b"), ("upgrade",), ("hold", "com.a.b"),
+                ("unhold", "com.a.b"), ("showhold",), ("auto", "com.a.b"), ("simulate", "com.a.b"),
+                ("apply", "com.a.b=1.0", "-com.d"), ("apply-ask", "com.a.b")]
+        for words in runs:
+            with self.subTest(words=words):
+                got = self.plan(*words)
+                self.assertIn(got[1], ("apt-get", "apt-mark"), got)
+                self.assertEqual(got[2:4], NOLANG, got)
+                self.assertEqual(got.count("Acquire::Languages=none"), 1, got)
+        # the caller's names still follow the verb (helper_first_unknown reads them from the plan)
+        self.assertEqual(self.plan("hold", "com.a.b", "libstdc++")[-2:], ["com.a.b", "libstdc++"])
+        # verbs that run no apt get no option
+        self.assertNotIn("Acquire::Languages=none", self.plan("configure"))
 
     def test_apply_ask_plan(self):
         """F63: apply-ask is apply without the conffile options, and needs the status fd to ask on."""
         self.assertEqual(self.plan("apply-ask", "com.a.b", "-com.d"),
-                         ["/var/jb/usr/bin/apt-get", "apt-get", "-y", "--reinstall", "--allow-downgrades",
+                         ["/var/jb/usr/bin/apt-get", "apt-get", *NOLANG, "-y", "--reinstall", "--allow-downgrades",
                           "--allow-unauthenticated", "-o", "APT::Keep-Fds::=3", "-o", "APT::Status-Fd=3", "install", "com.a.b", "com.d-"])
         self.assertEqual(self.plan("apply-ask", "com.a.b", fd="-1"), ["error: apply-ask needs the status fd (3) to ask on"])
         self.assertEqual(self.plan("apply-ask", "ab-"), ["error: bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"])
@@ -521,7 +542,7 @@ class Helper(unittest.TestCase):
     def test_chain(self):
         p, app, helper = self.chain_prefix()
         out = self.run_driver("spawn", helper, "install", "com.repo.tweak", driver=app)
-        self.assertIn(f"1: argv: {p}/usr/bin/apt-get -y -o Dpkg::Options::=--force-confdef -o "
+        self.assertIn(f"1: argv: {p}/usr/bin/apt-get -o Acquire::Languages=none -y -o Dpkg::Options::=--force-confdef -o "
                       "Dpkg::Options::=--force-confold --allow-unauthenticated -o APT::Status-Fd=3 install com.repo.tweak", out)
         self.assertIn("1: cwd: /", out)
         self.assertIn("1: stdin: eof", out)
@@ -543,14 +564,14 @@ class Helper(unittest.TestCase):
         """N4: apply gets CYDIA="3 1" (Cydia's finish fd) and keeps fd 3; simulate gets neither."""
         p, app, helper = self.chain_prefix()
         out = self.run_driver("spawn", helper, "apply", "com.repo.tweak=1", "-installed.one", driver=app)
-        self.assertIn(f"1: argv: {p}/usr/bin/apt-get -y -o Dpkg::Options::=--force-confdef -o "
+        self.assertIn(f"1: argv: {p}/usr/bin/apt-get -o Acquire::Languages=none -y -o Dpkg::Options::=--force-confdef -o "
                       "Dpkg::Options::=--force-confold --reinstall --allow-downgrades --allow-unauthenticated "
                       "-o APT::Keep-Fds::=3 -o APT::Status-Fd=3 install com.repo.tweak=1 installed.one-", out)
         env = next(l for l in out if l.startswith("1: env: ")).split(" ", 2)[2]
         self.assertIn("CYDIA=3 1", env)
         self.assertIn("3: pmstatus:com.repo.tweak:50.0:Installing", out)
         out = self.run_driver("spawn", helper, "simulate", "com.repo.tweak", driver=app)
-        self.assertIn(f"1: argv: {p}/usr/bin/apt-get -s --reinstall --allow-downgrades --allow-unauthenticated install com.repo.tweak", out)
+        self.assertIn(f"1: argv: {p}/usr/bin/apt-get -o Acquire::Languages=none -s --reinstall --allow-downgrades --allow-unauthenticated install com.repo.tweak", out)
         self.assertNotIn("CYDIA=", next(l for l in out if l.startswith("1: env: ")))
         out = self.run_driver("spawn", helper, "apply", "-com.repo.tweak", driver=app)
         self.assertIn("2: ifizbox-helper: unknown package: com.repo.tweak", out)
@@ -568,7 +589,7 @@ class Helper(unittest.TestCase):
             return r.stdout.splitlines()
 
         out = ask("close", "Z,D,maybe,Y", "apply-ask", "com.repo.tweak=1")
-        self.assertIn(f"1: argv: {p}/usr/bin/apt-get -y --reinstall --allow-downgrades --allow-unauthenticated "
+        self.assertIn(f"1: argv: {p}/usr/bin/apt-get -o Acquire::Languages=none -y --reinstall --allow-downgrades --allow-unauthenticated "
                       "-o APT::Keep-Fds::=3 -o APT::Status-Fd=3 install com.repo.tweak=1", out)
         self.assertIn("1: stdin: Y", out)
         self.assertEqual(out.count("2: ifizbox-helper: ignored an answer that isn't Y or N"), 3, out)
@@ -636,6 +657,31 @@ class Helper(unittest.TestCase):
                 with open(done) as f:
                     self.assertRegex(f.read().strip(), r"^\d+$")  # the postinst's IFIZBOX_HELPER_PID
 
+    def test_chain_html_translation_file(self):
+        """B329's cause, through the app -> helper -> apt chain: a repo's web page saved as its Translation file
+        (repo.twickd.com_._en) is in apt's lists. The stand-in apt-get refuses as the real one did on the iPhone 7
+        unless told to read no Translation files; with the helper's option the Confirm sheet's simulate goes through."""
+        p, app, helper = self.b84_prefix(
+            'lists="$(dirname "$0")/../../var/lib/apt/lists"\n'
+            'case " $* " in *" Acquire::Languages=none "*) echo "Inst com.repo.tweak (1.0 Repo [iphoneos-arm64])"; exit 0;; esac\n'
+            'for f in "$lists"/*_en; do if [ -f "$f" ] && head -c 1 "$f" | grep -q "<"; then\n'
+            '  echo "E: Encountered a section with no Package: header" >&2\n'
+            '  echo "E: Problem with MergeList $f" >&2; exit 100; fi; done\n'
+            'echo "Inst com.repo.tweak (1.0 Repo [iphoneos-arm64])"\n')
+        lists = os.path.join(p, "var/lib/apt/lists")
+        os.makedirs(lists, exist_ok=True)
+        with open(os.path.join(lists, "repo.twickd.com_._en"), "w") as f:
+            f.write("<!DOCTYPE html>\n<html lang=\"en\">\n<head><title>Featured</title></head></html>\n")
+        out = self.run_driver("spawn", helper, "simulate", "com.repo.tweak", driver=app)
+        self.assertIn("1: Inst com.repo.tweak (1.0 Repo [iphoneos-arm64])", out)
+        self.assertFalse(any("MergeList" in l for l in out), out)
+        self.assertEqual(out[-1], "exit: 0")
+        # the stand-in does refuse without the option (what every simulate met before the fix)
+        stand_in = os.path.join(p, "usr/bin/apt-get")
+        r = subprocess.run([stand_in, "-s", "install", "com.repo.tweak"], capture_output=True, text=True, timeout=10)
+        self.assertEqual(r.returncode, 100)
+        self.assertIn("Problem with MergeList", r.stderr)
+
     def test_chain_helper_pid(self):
         """B84: IFIZBOX_HELPER_PID is the pid the app waits on (the postinst holds uicache until it is gone), only for
         verbs that run dpkg; the apt-get child runs in a session of its own, away from the app's process group."""
@@ -658,14 +704,14 @@ class Helper(unittest.TestCase):
         os.makedirs(updates)
         open(os.path.join(updates, "tmp.i"), "w").close()  # dpkg's scratch file alone isn't an interrupted run
         ran = lambda *w: [l for l in self.run_driver("spawn", helper, *w, driver=app) if "ran:" in l or "interrupted" in l]
-        self.assertEqual(ran("install", "com.repo.tweak"), [f"1: ran: apt-get -y -o Dpkg::Options::=--force-confdef -o "
+        self.assertEqual(ran("install", "com.repo.tweak"), [f"1: ran: apt-get -o Acquire::Languages=none -y -o Dpkg::Options::=--force-confdef -o "
                          "Dpkg::Options::=--force-confold --allow-unauthenticated -o APT::Status-Fd=3 install com.repo.tweak"])
         open(os.path.join(updates, "0007"), "w").close()
         out = ran("apply", "com.repo.tweak")
         self.assertEqual(out[0], "2: ifizbox-helper: dpkg was interrupted: running dpkg --configure -a first")
         self.assertEqual([l for l in out if "ran:" in l],
                          ["1: ran: dpkg --force-confdef --force-confold --status-fd 3 --configure -a",
-                          "1: ran: apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold "
+                          "1: ran: apt-get -o Acquire::Languages=none -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold "
                           "--reinstall --allow-downgrades --allow-unauthenticated -o APT::Keep-Fds::=3 -o "
                           "APT::Status-Fd=3 install com.repo.tweak"])
         self.assertEqual(ran("configure"), ["1: ran: dpkg --force-confdef --force-confold --status-fd 3 --configure -a"])
@@ -674,12 +720,12 @@ class Helper(unittest.TestCase):
     def test_chain_holds(self):
         p, app, helper = self.chain_prefix()
         out = self.run_driver("spawn", helper, "hold", "installed.one", driver=app)
-        self.assertIn(f"1: argv: {p}/usr/bin/apt-mark hold installed.one", out)
+        self.assertIn(f"1: argv: {p}/usr/bin/apt-mark -o Acquire::Languages=none hold installed.one", out)
         self.assertEqual(out[-1], "exit: 7")
         out = self.run_driver("spawn", helper, "unhold", "installed.one", "libstdc++", driver=app)
-        self.assertIn(f"1: argv: {p}/usr/bin/apt-mark unhold installed.one libstdc++", out)
+        self.assertIn(f"1: argv: {p}/usr/bin/apt-mark -o Acquire::Languages=none unhold installed.one libstdc++", out)
         out = self.run_driver("spawn", helper, "showhold", driver=app)
-        self.assertIn(f"1: argv: {p}/usr/bin/apt-mark showhold", out)
+        self.assertIn(f"1: argv: {p}/usr/bin/apt-mark -o Acquire::Languages=none showhold", out)
 
     def test_chain_refuses(self):
         p, app, helper = self.chain_prefix()
@@ -732,9 +778,9 @@ class Helper(unittest.TestCase):
                  "-o", "Dir::Etc::SourceList=/var/jb/etc/apt/ifizbox-update-source.XXXXXX",
                  "-o", "Dir::Etc::SourceParts=/dev/null", "-o", "APT::Get::List-Cleanup=0"]
         self.assertEqual(self.plan("update-source", "https://r.test/", "./"),
-                         ["/var/jb/usr/bin/apt-get", "apt-get", *fixed, "-o", "APT::Status-Fd=3", "update"])
+                         ["/var/jb/usr/bin/apt-get", "apt-get", *NOLANG, *fixed, "-o", "APT::Status-Fd=3", "update"])
         self.assertEqual(self.plan("update-source", "https://r.test/deb/", "stable", "main", "extra", fd="-1"),
-                         ["/var/jb/usr/bin/apt-get", "apt-get", *fixed, "update"])
+                         ["/var/jb/usr/bin/apt-get", "apt-get", *NOLANG, *fixed, "update"])
         cases = {
             ("update-source",): "needs a URI and a suite",
             ("update-source", "https://r.test/"): "needs a URI and a suite",
@@ -774,7 +820,7 @@ class Helper(unittest.TestCase):
         out = self.run_driver("spawn", helper, "update-source", "https://r.test/deb/", "stable", "main", "extra",
                               driver=app)
         argv = next(l for l in out if l.startswith("1: argv: "))
-        self.assertRegex(argv, rf"^1: argv: {p}/usr/bin/apt-get -o Acquire::AllowInsecureRepositories=true -o "
+        self.assertRegex(argv, rf"^1: argv: {p}/usr/bin/apt-get -o Acquire::Languages=none -o Acquire::AllowInsecureRepositories=true -o "
                          rf"Dir::Etc::SourceList={etc}/ifizbox-update-source\.[A-Za-z0-9]{{6}} -o "
                          r"Dir::Etc::SourceParts=/dev/null -o APT::Get::List-Cleanup=0 -o APT::Status-Fd=3 update$")
         self.assertIn("1: list: deb https://r.test/deb/ stable main extra", out)
@@ -1397,9 +1443,9 @@ class Rollback(unittest.TestCase):
         deb = f"{d}/com.example.tweak_1%3a1.0~b1_iphoneos-arm64.deb"
         fixed = ["-y", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold", "--allow-downgrades"]
         self.assertEqual(plan("rollback", "com.example.tweak", "1:1.0~b1"),
-                         [f"{p}/usr/bin/apt-get", "apt-get", *fixed, "-o", "APT::Keep-Fds::=3", "-o", "APT::Status-Fd=3",
+                         [f"{p}/usr/bin/apt-get", "apt-get", *NOLANG, *fixed, "-o", "APT::Keep-Fds::=3", "-o", "APT::Status-Fd=3",
                           "install", deb])
-        self.assertEqual(plan("rollback", "com.example.tweak", "1:1.0~b1", fd="-1")[1:], ["apt-get", *fixed, "install", deb])
+        self.assertEqual(plan("rollback", "com.example.tweak", "1:1.0~b1", fd="-1")[1:], ["apt-get", *NOLANG, *fixed, "install", deb])
         self.assertEqual(plan("rollbacks", "com.example.tweak"),
                          [f"{p}/var/cache/ifizbox/rollback", "rollbacks", "com.example.tweak"])
         cases = {
@@ -1444,7 +1490,7 @@ class Rollback(unittest.TestCase):
                                             "1: 1:1.0~b1 com.example.tweak_1%3a1.0~b1_iphoneos-arm64.deb"])
         self.assertEqual(self.run_driver("spawn", helper, "rollbacks", "com.example.none", driver=app), ["exit: 0"])
         out = self.run_driver("spawn", helper, "rollback", "com.example.tweak", "0.9", driver=app)
-        self.assertIn(f"1: argv: {p}/usr/bin/apt-get -y -o Dpkg::Options::=--force-confdef -o "
+        self.assertIn(f"1: argv: {p}/usr/bin/apt-get -o Acquire::Languages=none -y -o Dpkg::Options::=--force-confdef -o "
                       "Dpkg::Options::=--force-confold --allow-downgrades -o APT::Keep-Fds::=3 -o APT::Status-Fd=3 "
                       f"install {d}/com.example.tweak_0.9_iphoneos-arm64.deb", out)
         self.assertIn("CYDIA=3 1", next(l for l in out if l.startswith("1: env: ")))
@@ -1504,10 +1550,10 @@ class InstallPaid(unittest.TestCase):
         deb = PAID_DIR + "/0A1B.deb"
         fixed = ["-y", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"]
         self.assertEqual(self.run_driver("plan", "/var/jb", "3", "install-paid", deb, "com.example.paid", "1:1.0"),
-                         ["/var/jb/usr/bin/apt-get", "apt-get", *fixed, "-o", "APT::Keep-Fds::=3", "-o",
+                         ["/var/jb/usr/bin/apt-get", "apt-get", *NOLANG, *fixed, "-o", "APT::Keep-Fds::=3", "-o",
                           "APT::Status-Fd=3", "install", deb])
         self.assertEqual(self.run_driver("plan", "/var/jb", "-1", "install-paid", deb, "com.example.paid", "1.0")[1:],
-                         ["apt-get", *fixed, "install", deb])
+                         ["apt-get", *NOLANG, *fixed, "install", deb])
         cases = {
             ("install-paid",): "a .deb path, a package name and a version",
             ("install-paid", deb, "com.example.paid"): "a .deb path, a package name and a version",
@@ -1566,7 +1612,7 @@ class InstallPaid(unittest.TestCase):
         out = self.spawn(app, helper, "install-paid", self.deb(paid), "com.example.paid", "1:1.0")
         self.assertEqual(out[-1], "exit: 0", out)
         argv = next(l for l in out if l.startswith("1: argv: "))
-        self.assertTrue(argv.startswith("1: argv: -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold "
+        self.assertTrue(argv.startswith("1: argv: -o Acquire::Languages=none -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold "
                                         f"-o APT::Keep-Fds::=3 -o APT::Status-Fd=3 install {work}/ifizbox-paid."), argv)
         self.assertTrue(argv.endswith("/paid.deb"), argv)  # the root-owned copy, not the app's file
         self.assertIn("1: copy: Package: com.example.paid", out)
@@ -1637,13 +1683,13 @@ class LocalDeb(unittest.TestCase):
     def test_plan(self):
         deb = DEB_DIR + "/0A1B.deb"
         self.assertEqual(self.run_driver("plan", "/var/jb", "3", "simulate-deb", deb),
-                         ["/var/jb/usr/bin/apt-get", "apt-get", "-s", "--reinstall", "--allow-downgrades", "install", deb])
+                         ["/var/jb/usr/bin/apt-get", "apt-get", *NOLANG, "-s", "--reinstall", "--allow-downgrades", "install", deb])
         fixed = ["-y", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold",
                  "--reinstall", "--allow-downgrades"]
         self.assertEqual(self.run_driver("plan", "/var/jb", "3", "install-deb", deb),
-                         ["/var/jb/usr/bin/apt-get", "apt-get", *fixed, "-o", "APT::Keep-Fds::=3", "-o",
+                         ["/var/jb/usr/bin/apt-get", "apt-get", *NOLANG, *fixed, "-o", "APT::Keep-Fds::=3", "-o",
                           "APT::Status-Fd=3", "install", deb])
-        self.assertEqual(self.run_driver("plan", "/var/jb", "-1", "install-deb", deb)[1:], ["apt-get", *fixed, "install", deb])
+        self.assertEqual(self.run_driver("plan", "/var/jb", "-1", "install-deb", deb)[1:], ["apt-get", *NOLANG, *fixed, "install", deb])
         cases = {
             ("simulate-deb",): "simulate-deb takes one .deb path",
             ("install-deb", deb, deb): "install-deb takes one .deb path",
@@ -1693,7 +1739,7 @@ class LocalDeb(unittest.TestCase):
                 argv = next(l for l in out if l.startswith("1: argv: "))
                 self.assertIn(f" install {work}/ifizbox-deb.", argv)
                 self.assertTrue(argv.endswith("/deb.deb"), argv)  # the root-owned copy, not the app's file
-                self.assertEqual(argv.startswith("1: argv: -s "), verb == "simulate-deb", argv)
+                self.assertEqual(argv.startswith("1: argv: -o Acquire::Languages=none -s "), verb == "simulate-deb", argv)
                 self.assertIn("1: copy: a shared deb", out)
                 env = next(l for l in out if l.startswith("1: env: "))
                 self.assertEqual("CYDIA=3 1" in env, verb == "install-deb", env)
@@ -1704,7 +1750,7 @@ class LocalDeb(unittest.TestCase):
         """F239: install-deb-ask is install-deb without the conffile options, and needs the status fd to ask on."""
         deb = DEB_DIR + "/0A1B.deb"
         self.assertEqual(self.run_driver("plan", "/var/jb", "3", "install-deb-ask", deb),
-                         ["/var/jb/usr/bin/apt-get", "apt-get", "-y", "--reinstall", "--allow-downgrades",
+                         ["/var/jb/usr/bin/apt-get", "apt-get", *NOLANG, "-y", "--reinstall", "--allow-downgrades",
                           "-o", "APT::Keep-Fds::=3", "-o", "APT::Status-Fd=3", "install", deb])
         self.assertEqual(self.run_driver("plan", "/var/jb", "-1", "install-deb-ask", deb),
                          ["error: install-deb-ask needs the status fd (3) to ask on"])
@@ -1730,7 +1776,7 @@ class LocalDeb(unittest.TestCase):
                 out = r.stdout.splitlines()
                 self.assertEqual(out[-1], "exit: 0", out)
                 argv = next(l for l in out if l.startswith("1: argv: "))
-                self.assertTrue(argv.startswith("1: argv: -y --reinstall --allow-downgrades "), argv)
+                self.assertTrue(argv.startswith("1: argv: -o Acquire::Languages=none -y --reinstall --allow-downgrades "), argv)
                 self.assertNotIn("confold", argv)
                 self.assertTrue(argv.endswith("/deb.deb"), argv)
                 self.assertIn("1: copy: a shared deb", out)

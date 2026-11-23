@@ -680,8 +680,8 @@ static int uninstall_app_plan(int argc, char *const argv[], struct helper_plan *
     return 0;
 }
 
-int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd, struct helper_plan *p,
-                const char **err) {
+static int plan_words(int argc, char *const argv[], const char *prefix, int status_fd, struct helper_plan *p,
+                      const char **err) {
     static char status_apt[64], status_dpkg[16];
     memset(p, 0, sizeof *p);
     if (argc < 1) { *err = "no verb (" HELPER_VERBS ")"; return -1; }
@@ -776,6 +776,30 @@ int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd,
     a[k] = NULL;
     p->argc = k;
     return 0;
+}
+
+/* B329: every apt-get and apt-mark the helper runs skips Translation files (Acquire::Languages=none). The app reads
+ * descriptions from Packages and never uses them, and a repo that answers its Translation URL with a web page (HTTP
+ * 200, no hash in its Release to catch it: repo.twickd.com) left a file in apt's lists that apt can't parse, which
+ * made every apt command, simulate included, fail with "Encountered a section with no Package: header". With the
+ * option apt never reads such a file, and update's list cleanup deletes the one already there. */
+static void skip_translations(struct helper_plan *p) {
+    if (!p->argv[0] || (strcmp(p->argv[0], "apt-get") && strcmp(p->argv[0], "apt-mark"))) return;
+    const char **a = p->argv;
+    if ((size_t)p->argc + 3 > sizeof p->argv / sizeof *p->argv) return; /* never: the longest plan leaves room */
+    int inside =p->packages >= (const char *const *)a && p->packages < (const char *const *)a + p->argc;
+    memmove(a + 3, a + 1, sizeof *a * (size_t)p->argc); /* argv[1..argc], the NULL included */
+    a[1] = "-o";
+    a[2] = HELPER_APT_NO_TRANSLATIONS;
+    p->argc += 2;
+    if (inside) p->packages += 2;
+}
+
+int helper_plan(int argc, char *const argv[], const char *prefix, int status_fd, struct helper_plan *p,
+                const char **err) {
+    int r = plan_words(argc, argv, prefix, status_fd, p, err);
+    if (!r) skip_translations(p);
+    return r;
 }
 
 /* Mark in found[] every package named by a "Package: <name>" line of path. A missing file is no error. */
