@@ -83,7 +83,7 @@ import { compat, compatCode, isIncompatible, normalizeDevice, needText } from ".
 import { parseSource, appStanza, isAltKey, runsOn, installOptions, signableApp } from "./altstore.js";
 import { depIndex, explain, explainApt } from "./deps.js";
 import { withIpaInfo } from "./ipainfo.js";
-import { IdMap, IdSet, sameId } from "./idmap.js"; // B407: package names compare ignoring case
+import { IdMap, IdSet, sameId } from "./apt.js"; // B407: package names compare ignoring case
 import { needsRestart } from "./queue.js";
 import { packageKind } from "./progress.js";
 import { injectableFromFields, hintMatcher } from "./tweakfields.js"; // F302; C32: not tweaks.js, which pulls unpack.js in

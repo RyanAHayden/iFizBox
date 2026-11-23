@@ -26,7 +26,7 @@
 // Dependencies of dependencies are followed (a few levels down), so a missing library two steps away still gets
 // its sentence: "Needs Foo, which needs libbar, which none of your sources has".
 import { parseRelations, satisfies, compareVersions } from "./apt.js";
-import { IdMap, IdSet, sameId } from "./idmap.js"; // B407: package names compare ignoring case
+import { IdMap, IdSet, sameId } from "./apt.js"; // B407: package names compare ignoring case
 
 // Where well-known libraries live when none of the user's sources has them: rootless (iphoneos-arm64) builds,
 // checked against each repo's Packages file on 2026-11-17. Every repo here is also in core/recommended.js (recommended.test.js).
@@ -160,7 +160,7 @@ export function explain(stanza, { device = null, index = depIndex(), homes = KNO
     for (const [id, ist] of installedOffers) {
       if (sameId(id, self)) continue;
       for (const g of [...parseRelations(ist.conflicts), ...parseRelations(ist.breaks)]) for (const r of g) {
-        const hit = mine.find((m) => sameId(m.name, r.name) &&(!r.op || (m.version != null && satisfies(m.version, r.op, r.version))));
+        const hit = mine.find((m) => sameId(m.name, r.name) && (!r.op || (m.version != null && satisfies(m.version, r.op, r.version))));
         if (!hit) continue;
         const n = names(id);
         push({ kind: "conflicted", id, blocking: true, via: [],

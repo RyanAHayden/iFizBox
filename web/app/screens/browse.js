@@ -22,7 +22,7 @@ import { aptHeader, infoGroup } from "./sourcepage.js"; // F384: one source page
 import { catalog, ALL } from "../catalog.js";
 import { NO_SECTION, indexLetter, parseAuthor } from "../core/catalog.js";
 import { packageIcon } from "../core/sectionicons.js";
-import { description, parseRelations, compareVersions } from "../core/apt.js";
+import { description, parseRelations, compareVersions, sameId } from "../core/apt.js";
 import { displayName, releaseDepiction } from "../core/sources.js";
 import { insecureNote } from "../core/sources.js"; // F220
 import { renderSileo, mediaUrl, reviewBody } from "./depiction.js";
@@ -53,8 +53,6 @@ import { ipaInstallAvailable } from "../ipa-install.js";
 import { IPA_FOOTER } from "../core/ipainstall.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall } from "../core/installed.js";
-import { sameId } from "../core/idmap.js";
-import { lowerId } from "../core/queue.js";
 import { rememberedApps } from "../app-updates.js";
 import { ignoreVersionLabel, versionToStore, IGNORE_VERSION } from "../core/appupdates.js"; // F281
 import { openInGroup, setSourceShare, shareHeadButton } from "./handoff.js";
@@ -1281,7 +1279,7 @@ async function renderPackage(body, route, key, id, ctx) {
   // F29: Version History, every version the sources offer (Downgrade's list).
   const [depReport, history, installedList] = await Promise.all([catalog.deps(id, key).catch(() => null),
     catalog.history(id, key).catch(() => null), catalog.installed().catch(() => null)]);
-  const inst = installedList?.find((r) => r.id === pid) ?? null;
+  const inst = installedList?.find((r) => sameId(r.id, pid)) ?? null;
   const author = parseAuthor(st.author);
   const maint = parseAuthor(st.maintainer);
   const section = pkg.row.section && pkg.row.section !== NO_SECTION ? pkg.row.section : null;
@@ -2107,7 +2105,6 @@ async function installedGroup(id, { version = true } = {}) {
   try { rows = await catalog.installed(); } catch { return null; }
   const p = rows?.find((r) => sameId(r.id, id));
   if (!p) return null;
-  const heldId = lowerId(id); // B407: apt-mark showhold's spelling
   // On the site a hold in the uploaded status file is dpkg's, set on the phone: shown, not switchable here.
   const dpkgHeld = p.held && catalog.statusSource() !== "native";
   const mark = autoMarkShown(settings); // F70: Update Automatically, for Only Packages I Mark
@@ -2116,7 +2113,7 @@ async function installedGroup(id, { version = true } = {}) {
   if (!dpkgHeld) {
     // grouped() draws plain rows; the switch goes into its cell afterwards, as on the Settings tab.
     const cell = frag.querySelectorAll(".cell-inner")[at];
-    cell.append(createSwitch({ label: "Ignore Upgrades", checked: settings.holds.has(heldId), onToggle: (on) => { settings.holds.set(heldId, on); } }));
+    cell.append(createSwitch({ label: "Ignore Upgrades", checked: settings.holds.has(id), onToggle: (on) => { settings.holds.set(id, on); } }));
     cell.classList.add("has-switch");
   }
   if (mark) {

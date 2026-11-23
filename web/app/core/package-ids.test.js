@@ -2,7 +2,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createCatalog } from "./catalog.js";
-import { withLowerIds } from "./idmap.js";
+import { withLowerIds } from "./apt.js";
+import { createSettings } from "./settings.js";
+import { wishCount, wishRows } from "./wishlist.js";
 import { dependedOn, findUpgrades, installedStanzas, markedRows, modeRows } from "./installed.js";
 
 const A = "deb:https://a.example/:./";
@@ -78,6 +80,20 @@ test("a package's two spellings in one source are one package; apps' bundle IDs 
   c.loadAlt("alt:https://a.example/apps.json", { name: "Apps", identifier: "x", apps: [app("com.x.App"), app("com.x.app")] });
   c.setDevice({ ios: "18.0", jailbreak: "none" });
   assert.deepEqual(c.list().map((r) => r.id).sort(), ["com.x.App", "com.x.app"]);
+});
+
+test("holds and the wish list match ignoring case", async () => {
+  const m = new Map();
+  const storage = { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) };
+  const s = createSettings({ storage, mode: "site" });
+  s.holds.replace(["oreo"]);
+  assert.equal(s.holds.has("Oreo"), true);
+  await s.holds.set("Oreo", true);
+  assert.deepEqual(s.holds.list(), ["oreo"]);
+  await s.holds.set("Oreo", false);
+  assert.deepEqual(s.holds.list(), []);
+  assert.deepEqual(wishRows(["oreo"], [{ id: "Oreo" }]).length, 1);
+  assert.equal(wishCount(["oreo"], ["Oreo"]), 0);
 });
 
 test("the marks, dates and names dpkg and apt give in lower case", () => {

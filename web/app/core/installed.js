@@ -13,8 +13,7 @@ import { parseControl, description, compareVersions, parseRelations } from "./ap
 import { sectionName, parseAuthor, compareNames, sectionGroup } from "./sections.js"; // C36: not catalog.js, which imports this file
 import { NAME } from "../brand.js";
 import { nativeBridge } from "../native.js";
-import { IdMap, IdSet } from "./idmap.js"; // B407: package names compare ignoring case
-import { lowerId } from "./queue.js";
+import { IdMap, IdSet, lowerId } from "./apt.js"; // B407: package names compare ignoring case
 
 // Where dpkg keeps it: rootful, then rootless (Dopamine, palera1n rootless).
 export const STATUS_PATHS = ["/var/lib/dpkg/status", "/var/jb/var/lib/dpkg/status"];
