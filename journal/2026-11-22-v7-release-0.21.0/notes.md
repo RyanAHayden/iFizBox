@@ -21,6 +21,13 @@
 - `--verify-live 0.21.0`: /repo/source.json and /repo/Packages list 0.21.0 (-4195) first.
 - `gh release view v0.21.0`: draft=false, prerelease=false, published 2026-11-23T02:04:07Z (UTC).
 
+## Spec review
+- `web/app/source.json` dropped 0.10.0: the source keeps at most 20 versions (`tools/altsource.py`), intended.
+- Bar buttons: F369 kept the UIKit glass bar buttons that 0.20.1 already shipped (its subject: "UIKit glass bar
+  buttons kept"), so the notes say they stay; the new part is the tab bar.
+- B324-B326 in the notes: they landed with the three features and a release ships all of main.
+- Journal dated 2026-11-22 local time; GitHub shows 2026-11-23 UTC.
+
 ## Not verified
 - No install of 0.21.0 on a phone: the task asks for the release only; the features were phone-checked in
   their own tasks.
