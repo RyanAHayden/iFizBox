@@ -409,7 +409,22 @@ function keep(store, key, shots, now) {
   try { store?.setItem(PREVIEW_CACHE_PREFIX + key, JSON.stringify(v)); } catch { /* full or private: memory only */ }
 }
 
-export function clearPreviewMemory() { memory.clear(); }
+export function clearPreviewMemory() { memory.clear(); pages.clear(); descriptions.clear(); }
+
+// B328: an HTML depiction page is fetched once for its pictures (loadPreviews) and its description
+// (loadDepictionDescription), which ask at the same time: the fetch is shared, the last few pages kept in memory.
+const pages = new Map(); // url -> Promise<text>
+const PAGES_KEPT = 8;
+function depictionPage(url, text) {
+  let p = pages.get(url);
+  if (!p) {
+    p = Promise.resolve().then(() => text(url));
+    pages.set(url, p);
+    p.catch(() => { if (pages.get(url) === p) pages.delete(url); });
+    while (pages.size > PAGES_KEPT) pages.delete(pages.keys().next().value);
+  }
+  return p;
+}
 
 // A repo's README (any of the usual names, at HEAD) and its latest release -> pictures. Each fetch may fail alone.
 export async function githubShots(gh, text) {
@@ -442,7 +457,7 @@ export async function loadPreviews(key, { shots = [], html = null, gh = null } =
   if (hit) return hit;
   let found = [];
   if (html) {
-    try { found = htmlShots(await text(html), html); } catch { /* unreadable */ }
+    try { found = htmlShots(await depictionPage(html, text), html); } catch { /* unreadable */ }
   }
   if (!found.length && gh) found = await githubShots(gh, text);
   const out = dedupeShots(found).slice(0, MAX_SHOTS);
@@ -528,4 +543,155 @@ export function sileoWhatsNew(json) {
   }
   const body = text.join("\n").trim();
   return title || body ? { title, text: body } : null;
+}
+
+// ---- B328: an HTML depiction's description -----------------------------------------------------------------------
+//
+//   depictionDescription(html, baseUrl) -> string ("" when none): the description text of a Zebra/Cydia HTML
+//     depiction. BigBoss's <fieldset id="description"> first; else a block named for its description, an <article>
+//     or <main>, a block named content/entry/post, the <body>: the first of those with real text. Scripts, styles,
+//     frames, forms, nav, header, footer, asides and button links are left out. Plain text: line breaks kept, a link
+//     as its text with its URL after it (the page shows URLs as links), pictures dropped, no HTML.
+//   betterDescription(field, fromDepiction) -> the longer of the Description: field's text and the depiction's.
+//   loadDepictionDescription(url, { text, store, now }) -> Promise<string>: the page (shared with loadPreviews'
+//     fetch) through depictionDescription, cached per URL for a day in `store`; "" when it can't be read.
+
+const NAMED_ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", bull: "•", middot: "·",
+  hellip: "…", mdash: "—", ndash: "–", lsquo: "‘", rsquo: "’", ldquo: "“", rdquo: "”", copy: "©", reg: "®",
+  trade: "™", deg: "°", times: "×", rarr: "→", larr: "←", laquo: "«", raquo: "»" };
+
+function decodeAll(s) {
+  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e) => {
+    if (e[0] === "#") {
+      const n = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+      try { return n > 0 && n !== 0xfeff ? String.fromCodePoint(n) : ""; } catch { return ""; }
+    }
+    return NAMED_ENTITIES[e.toLowerCase()] ?? m;
+  });
+}
+
+// The inside of the element whose opening tag starts at `at` (same-name tags nested inside are counted).
+function innerOf(html, at, tag) {
+  const open = html.indexOf(">", at);
+  if (open < 0) return "";
+  const re = new RegExp(`<(/?)${tag}\\b[^>]*>`, "gi");
+  re.lastIndex = open + 1;
+  let depth = 1;
+  for (let m; (m = re.exec(html));) {
+    depth += m[1] ? -1 : 1;
+    if (!depth) return html.slice(open + 1, m.index);
+  }
+  return html.slice(open + 1);
+}
+
+const DROP_WHOLE = ["script", "style", "noscript", "template", "iframe", "object", "svg", "head", "title", "select", "button", "textarea"];
+const CHROME = ["nav", "header", "footer", "aside", "form"];
+
+function stripped(html) {
+  let s = str(html).replace(/<!--[\s\S]*?-->/g, "");
+  for (const t of DROP_WHOLE) s = s.replace(new RegExp(`<${t}\\b[\\s\\S]*?</${t}\\s*>`, "gi"), " ");
+  return s.replace(/<(?:iframe|object|embed)\b[^>]*>/gi, " ");
+}
+
+function dropElements(html, tags) {
+  let s = html;
+  for (const t of tags) {
+    for (let guard = 0; guard < 200; guard++) {
+      const m = new RegExp(`<${t}\\b[^>]*>`, "i").exec(s);
+      if (!m) break;
+      const inner = innerOf(s, m.index, t);
+      const end = s.indexOf(inner, m.index) + inner.length;
+      const close = new RegExp(`</${t}\\s*>`, "i").exec(s.slice(end));
+      s = s.slice(0, m.index) + " " + s.slice(end + (close ? close.index + close[0].length : 0));
+    }
+  }
+  return s;
+}
+
+// HTML -> plain text with its line breaks.
+function htmlToText(html, base) {
+  let s = html
+    // BigBoss's button links (View All Screenshots, Developer Website) are chrome, not description
+    .replace(/<a\b[^>]*\bclass\s*=\s*["']?[^"'>]*\bbutton\b[^>]*>[\s\S]*?<\/a\s*>/gi, " ")
+    .replace(/<label\b[^>]*>[\s\S]*?<\/label\s*>/gi, " ")
+    .replace(/\s+/g, " ")
+    .replace(/<a\b([^>]*)>([\s\S]*?)<\/a\s*>/gi, (m, attrs, inner) => {
+      const label = inner.replace(/<[^>]*>/g, "").trim();
+      const href = resolve(attr(` ${attrs}`, "href"), base);
+      if (!href) return inner;
+      const shown = decodeAll(label);
+      if (!shown) return ` ${href} `;
+      const same = (u) => u.replace(/^https?:\/\/(www\.)?/i, "").replace(/\/+$/, "").toLowerCase();
+      return same(shown) === same(href) || shown.includes(href) ? inner : `${inner} (${href})`;
+    })
+    .replace(/<br\b[^>]*>/gi, "\n")
+    .replace(/<li\b[^>]*>/gi, "\n\u0000")
+    .replace(/<\/?(?:p|div|section|article|main|fieldset|blockquote|pre|ul|ol|dl|dt|dd|table|tr|h[1-6]|hr|center|panel)\b[^>]*>/gi, "\n")
+    .replace(/<\/?(?:td|th)\b[^>]*>/gi, " ")
+    .replace(/<[^>]*>/g, "");
+  s = decodeAll(s);
+  const lines = s.split("\n").map((l) => l.replace(/[ \t ]+/g, " ").trim());
+  const out = [];
+  for (const l of lines) {
+    const line = l.startsWith("\u0000") ? (/^\u0000\s*[•·\-*]/.test(l) ? l.slice(1).trim() : `• ${l.slice(1).trim()}`) : l;
+    if (line === "•") continue;
+    out.push(line);
+  }
+  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+const MAX_DESCRIPTION = 8000;
+const realText = (t) => t.replace(/https?:\/\/\S+/g, "").replace(/[^\p{L}\p{N}]+/gu, "").length >= 20;
+
+export function depictionDescription(html, baseUrl) {
+  const page = stripped(html);
+  if (!page.trim()) return "";
+  const base = resolve(attr(/<base\b[^>]*>/i.exec(str(html))?.[0] ?? "", "href"), baseUrl) || baseUrl;
+  const cap = (t) => (t.length > MAX_DESCRIPTION ? t.slice(0, MAX_DESCRIPTION).replace(/\s+\S*$/, "") + "…" : t);
+  const pick = (inner) => htmlToText(dropElements(inner, CHROME), base);
+  // BigBoss: <fieldset id="description">
+  const bb = /<fieldset\b[^>]*\bid\s*=\s*["']?description\b[^>]*>/i.exec(page);
+  if (bb) {
+    const t = pick(innerOf(page, bb.index, "fieldset"));
+    if (realText(t)) return cap(t);
+  }
+  const blocks = (re) => [...page.matchAll(re)].map((m) => pick(innerOf(page, m.index, m[1].toLowerCase())));
+  const tries = [
+    /<(div|section|fieldset|td|p)\b[^>]*\b(?:id|class)\s*=\s*["']?[^"'>]*\bdesc(?:ription)?\b[^>]*>/gi,
+    /<(article|main)\b[^>]*>/gi,
+    /<(div|section)\b[^>]*\b(?:id|class)\s*=\s*["']?[^"'>]*\b(?:content|entry|post|main)\b[^>]*>/gi,
+  ];
+  for (const re of tries) {
+    const found = blocks(re).filter(realText).sort((a, b) => b.length - a.length)[0];
+    if (found) return cap(found);
+  }
+  const body = /<body\b[^>]*>/i.exec(page);
+  const t = pick(body ? innerOf(page, body.index, "body") : page);
+  return realText(t) ? cap(t) : "";
+}
+
+const flat = (t) => str(t).replace(/\s+/g, " ");
+export function betterDescription(field, fromDepiction) {
+  const f = str(field);
+  const d = str(fromDepiction);
+  return d && flat(d).length > flat(f).length ? d : f;
+}
+
+const DESC_CACHE_PREFIX = "ifizbox.depdesc.";
+const descriptions = new Map(); // url -> { at, text }
+
+export async function loadDepictionDescription(url, { text, store = globalThis.localStorage, now = Date.now() } = {}) {
+  if (!isHttp(url) || typeof text !== "function") return "";
+  const m = descriptions.get(url);
+  if (m && now - m.at < PREVIEW_TTL) return m.text;
+  try {
+    const v = JSON.parse(store?.getItem(DESC_CACHE_PREFIX + url) ?? "null");
+    if (v && typeof v.text === "string" && now - v.at < PREVIEW_TTL) { descriptions.set(url, v); return v.text; }
+  } catch { /* unreadable: fetch */ }
+  let found;
+  try { found = depictionDescription(await depictionPage(url, text), url); } catch { return ""; }
+  const v = { at: now, text: found };
+  descriptions.set(url, v);
+  try { store?.setItem(DESC_CACHE_PREFIX + url, JSON.stringify(v)); } catch { /* full or private: memory only */ }
+  return found;
 }

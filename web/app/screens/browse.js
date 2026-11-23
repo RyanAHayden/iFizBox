@@ -33,6 +33,9 @@ import { compat, markOf, isIncompatible } from "../core/compat.js";
 import { isAltKey } from "../core/altstore.js";
 import { renderAltSource, renderApp, installRows, appBundleId, formatDate, osRange, appPageAction, appPageCustom } from "./altstore.js";
 import { previewSlot } from "./altstore.js";
+import { previewText } from "./altstore.js"; // B328: the depiction page's fetch, shared with the gallery's
+import { loadDepictionDescription, betterDescription } from "../core/previews.js"; // B328
+import { slideChange } from "../nav/slide.js"; // B328: the longer description slides in
 import { jailbreakModify } from "./altstore.js"; // B69
 import { descriptionGroup } from "./description.js";
 import { packageLinks, packageGithub, aptShots, sileoShots, sileoRatings, sileoWhatsNew } from "../core/previews.js";
@@ -1299,9 +1302,17 @@ async function renderPackage(body, route, key, id, ctx) {
   const moreSlot = el("div");
   const showMore = () => moreSlot.replaceChildren(grouped([{ rows: [{ label: MORE_INFO_LABEL, icon: rowIcon("pkgMore"),
     href: deeper(route, token("info", id)) }] }]));
-  if (descText) details.append(descGroup(descText, { onOverflow: () => { if (!moreSlot.firstChild) showMore(); } }));
-  details.append(moreSlot);
+  const descSlot = el("div", "package-desc-slot");
+  const drawDesc = (t) => descSlot.replaceChildren(...(t ? [descGroup(t, { onOverflow: () => { if (!moreSlot.firstChild) showMore(); } })] : []));
+  drawDesc(descText);
+  details.append(descSlot, moreSlot);
   if (moreInfoShown({ text: descText, depiction: Boolean(sileo || html) })) showMore();
+  // B328: an HTML depiction (BigBoss's) often holds the real description and Description: only a line of it: the
+  // depiction's text takes the box when it's longer, sliding in.
+  depictionDescriptionOf(st).then((t) => {
+    const better = betterDescription(descText, t);
+    if (better !== descText && descSlot.isConnected) slideChange(descSlot, () => drawDesc(better));
+  });
 
   // Installed Package (or Version): Version with CHANGE (Install Which Version?), Version History, Filesystem Content.
   const versionBox = grouped([{ header: plan.versionHeader, rows: detailRows(plan.version, {
@@ -1350,6 +1361,14 @@ async function renderPackage(body, route, key, id, ctx) {
   if (sileo) sileoJson.then((json) => { if (previews.isConnected) { drawPreviews(json); drawLinks(json); } });
 }
 
+// B328: the description text of a package's own HTML Depiction: (not with a Sileo one, which Details draws, nor the
+// source's Release template, which isn't about the package). "" without one or when it can't be read.
+export function depictionDescriptionOf(st, { load = loadDepictionDescription, text = previewText } = {}) {
+  const url = httpUrl(st?.depiction);
+  if (!url || httpUrl(st?.sileodepiction)) return Promise.resolve("");
+  return load(url, { text: (u) => text(u) }).catch(() => "");
+}
+
 // F350: More Information: the whole description in the dashed box, What's New and the depiction (a Sileo one drawn
 // here, an HTML one behind Open Depiction); an app's: the whole text, What's New and Permissions (altstore.js).
 async function renderInfo(body, key, id) {
@@ -1366,7 +1385,14 @@ async function renderInfo(body, key, id) {
   const html = st.depiction?.trim() ? httpUrl(st.depiction) : releaseDepiction(source, st.package || id);
   const news = el("div", "store-news-slot");
   const slot = el("div", "depiction-slot");
-  body.replaceChildren(...(text ? [descGroup(text, { full: true })] : []), news, slot);
+  const descSlot = el("div", "package-desc-slot");
+  const drawDesc = (t) => descSlot.replaceChildren(...(t ? [descGroup(t, { full: true })] : []));
+  drawDesc(text);
+  body.replaceChildren(descSlot, news, slot);
+  depictionDescriptionOf(st).then((t) => { // B328: as on Details, the depiction's longer text in the full box
+    const better = betterDescription(text, t);
+    if (better !== text && descSlot.isConnected) slideChange(descSlot, () => drawDesc(better));
+  });
   if (sileo) {
     loadSileo(slot, sileo, { fallback: "" }).then((json) => {
       const notes = json ? sileoWhatsNew(json) : null;
