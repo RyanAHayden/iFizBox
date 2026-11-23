@@ -61,7 +61,6 @@ import { encodeUrl } from "./core/urlencode.js";
 import { reviewsApi, reviewsBase } from "./core/reviews.js";
 import { updateFailures, failureFor, liveUpdate } from "./core/aptupdate.js";
 import { createKeepAwake } from "./core/keepawake.js";
-import { parseUserApps } from "./core/userapps.js"; // F374
 
 // F287: the shell calls that are work the screen must stay on for: a streamed helper run (apt-get update, an apply,
 // a rollback, an uninstall with its console), a .deb's download and install, an IPA or paid package's install.
@@ -391,6 +390,7 @@ function queueCalls(backend, q, call) {
     async userApps() {
       const r = await backend.helper(["user-apps"]);
       if (r.code !== 0) throw new BackendError("helper", lastLine(r.stderr).replace(/^ifizbox-helper:\s*/, "") || "The apps couldn't be listed.");
+      const { parseUserApps } = await import("./core/userapps.js"); // only on that page: kept out of startup (F313)
       return parseUserApps(r.stdout);
     },
     // F374: Decrypt (library.decrypt: ifizbox-helper decrypt-app, then the IPA zipped into My IPAs; onEvent sees the
