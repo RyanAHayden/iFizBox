@@ -84,7 +84,8 @@ test("Home's Install iFizBox App (F93): signs iFizBox with the certificate, or o
   const calls = [];
   let marked = 0;
   const deps = (ready, bring) => ({ ready: async () => ready, bring: () => bring, go: (h) => calls.push(["go", h]), installed: () => marked++,
-    install: ({ onInstalled, ...o }) => { calls.push(["install", o]); onInstalled(); } });
+    install: ({ onInstalled, ...o }) => { calls.push(["install", o]); onInstalled(); },
+    sheet: async () => "certificate", free: async () => false, focus: () => {} }); // F385: Sign iFizBox First's pick
   assert.equal(await installApp(deps(false, true)), "signing");
   assert.equal(await installApp(deps(true, false)), "install");
   assert.deepEqual(calls, [["go", "/home/settings/signing"], ["install", { url: APP_IPA_URL, name: APP_NAME, bring: false }]]);

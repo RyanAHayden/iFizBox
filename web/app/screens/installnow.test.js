@@ -113,7 +113,8 @@ test("Home's Install iFizBox App without a certificate remembers the install on 
   const calls = [];
   const remembered = [];
   const deps = (ready) => ({ ready: async () => ready, bring: () => true, go: (h) => calls.push(["go", h]), installed: () => {},
-    install: ({ onInstalled, ...o }) => calls.push(["install", o]), remember: (r) => remembered.push(r) });
+    install: ({ onInstalled, ...o }) => calls.push(["install", o]), remember: (r) => remembered.push(r),
+    sheet: async () => "certificate", free: async () => false, focus: () => {} }); // F385: Sign iFizBox First's pick
   assert.equal(await installApp(deps(false)), "signing");
   assert.equal(remembered.length, 1);
   assert.equal(remembered[0].name, APP_NAME);

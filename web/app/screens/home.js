@@ -89,12 +89,23 @@ export const MORE_SOURCES_TILE = { label: "More Sources", href: MORE_SOURCES_HRE
 // F96: once iOS was asked to install it, the website stops asking "Install iFizBox First" (websign-gate.js).
 // F177: on the way to Signing it remembers this install (signing.js rememberInstall), so Signing offers Install Now
 // once the certificate is in.
+// F385: not straight to Signing any more: Sign iFizBox First (signing-sheet.js signFirstSheet) says why and lists the
+// ways (Use a Free Apple ID only while the Apple relay is on); a pick opens Signing at its group, Cancel stays here.
+// -> "install" | "signing" | "cancelled"
+const freeRouteOn = async () => (await import("./free-apple-id.js")).relayAvailable();
+const signFirst = async (opts) => (await import("../signing-sheet.js")).signFirstSheet(opts);
+const focusWay = async (id) => (await import("../signing-sheet.js")).focusSigningGroup(id);
 export async function installApp({ ready = signingReady, install = signAndInstall, bring = getBring, go = navGo,
-  installed = markiFizBoxInstalled, remember = rememberInstall } = {}) {
+  installed = markiFizBoxInstalled, remember = rememberInstall, sheet = signFirst, free = freeRouteOn, focus = focusWay } = {}) {
   const run = () => install({ url: APP_IPA_URL, name: APP_NAME, bring: bring(), onInstalled: () => installed() });
   if (!(await ready())) {
+    let on = false;
+    try { on = Boolean(await free()); } catch { /* no relay: no free route */ }
+    const way = await sheet({ free: on });
+    if (!way) return "cancelled";
     remember({ name: APP_NAME, run });
     go(format(settingsRoute(["signing"])).replace(/^#/, ""));
+    focus(way);
     return "signing";
   }
   run();
