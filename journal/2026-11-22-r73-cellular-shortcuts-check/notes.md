@@ -35,9 +35,11 @@ USE / ACTIVE). The signing profile must have Network Extensions (iFizBox's own A
    go), back on, and Shortcuts returns to iFizBox by itself; alert **Shortcuts Work**: "Cellular Data went off and
    came back on." (Other wordings: "cellular stayed in use" = the first Shortcut doesn't set Off; "Shortcut Didn't
    Run" = a name is wrong.)
-8. This iPhone > **Check Connection**: expected Connected; data goes off for the connect and comes back on.
+8. This iPhone > **Test Connection** (the task's "Check Connection": with the built-in VPN this page's button is
+   Test Connection; Check Connection is the Pairing page's, try it too): expected Connected; data goes off for the
+   connect and comes back on.
 9. My IPAs > an IPA > Install: no alert; data off for a moment, install log says "Connected to iOS through iFizBox
-   VPN", ends "iOS installed ...", cellular data back on after, and Tailscale (if used) reconnects within minutes.
+   VPN", ends "iOS installed ...", cellular data back on after.
 
 Send back, per step: what iFizBox said (alert titles and text, status cell, Home slot), and anything that hung or
 needed a manual tap (most likely: Shortcuts not returning to iFizBox, data left off).
@@ -45,6 +47,13 @@ needed a manual tap (most likely: Shortcuts not returning to iFizBox, data left 
 ## What iFizBox said at each step
 
 Not run yet: waits on the user (CONFIRM). Fill in from their answer when R73 reopens.
+
+## Spec review
+
+- Fixed: step 8 named Check Connection, which isn't on the This iPhone page with the built-in VPN (it has Test
+  Connection; Check Connection is on Pairing); now names both. Dropped a Tailscale line from step 9 (not asked;
+  R66 replaces Tailscale).
+- Kept: the setup lines (steps 1 and 6) and the failure wordings, so the user can run the check from scratch.
 
 ## Tried and failed
 
