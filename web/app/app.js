@@ -123,7 +123,7 @@ function button(spec, cls) {
   b.textContent = spec.label;
   if (spec.onClick) b.addEventListener("click", spec.onClick);
   if (spec.onPress) b.addEventListener("pointerdown", spec.onPress); // touch-down (Sources' Add: Type before the Paste bubble)
-  if (spec.onHold) holdButton(b, spec.onHold); // F346: a package page's Install held opens Install Which Version?
+  if (spec.onHold) holdButton(b, spec.onHold); // a package page's Install held: its options (B330), Modify held: Install Which Version? (F346)
   if (spec.ref) spec.ref(b); // F147: the screen keeps the button to change its label later (Installed's Wish List count)
   return b;
 }
