@@ -33,3 +33,23 @@ test("both Share buttons are the bar button the era rules target", () => {
   assert.match(read("nav/sharesheet.js"), /"bar-button bar-icon share-button"/);
   assert.match(read("screens/handoff.js"), /"bar-button bar-icon share-button store-head-share"/);
 });
+
+// The app page's queue toggle (screens/altstore.js queueToggle): the same, for its plus and its X while queued.
+for (const [era, colour] of Object.entries(ERAS)) {
+  test(`${era} draws its own queue toggle glyphs, not iOS 6's`, () => {
+    const css = read(`${era}.css`);
+    const sel = `html[data-style="${era}"] .bar-button.queue-toggle`;
+    const body = ruleFor(css, `${sel}::before`);
+    assert.ok(body, `${era}.css has no queue toggle glyph rule`);
+    for (const re of [/background-image:\s*none/, /filter:\s*none/, /(^|[;\s])mask:\s*url\(/, /-webkit-mask:\s*url\(/]) assert.match(body, re);
+    assert.ok(body.includes(`background-color: var(${colour})`), `the glyph isn't painted in ${colour}`);
+    const queued = ruleFor(css, `${sel}.is-queued::before`);
+    assert.match(queued ?? "", /-webkit-mask-image:\s*url\(.*[\s;]mask-image:\s*url\(/s);
+  });
+}
+
+test("the header's rating wraps beside Share instead of running under it", () => {
+  const css = read("packages.css");
+  assert.doesNotMatch(css, /\.store-head-rating \{[^}]*nowrap/);
+  assert.match(css, /\.store-head-rating \{ min-height: 15px; \}/);
+});
