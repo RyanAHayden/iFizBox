@@ -52,8 +52,10 @@ enum NativeAlerts {
                 field(f, type: input["type"] as? String ?? "text")
                 guard submit >= 0, submit < buttons.count else { return }
                 // A paste ends the alert as the button's own tap would: dismissed, then answered.
+                var pasting = false // a second paste during the dismissal must not dismiss what is under the alert
                 let d = PasteSubmits {
-                    guard !replied else { return }
+                    guard !replied, !pasting else { return }
+                    pasting = true
                     // The text is read now: once dismissed, nothing may hold the alert any more.
                     let text = shown?.textFields?.first?.text ?? ""
                     guard let vc = shown else { return answer(submit, pasted: text) }

@@ -14,7 +14,10 @@ Sources' Add under the native controls hook (`data-controls="native"`) shows a U
   whole field (as the CSS Paste sets the value), then the alert is dismissed and answered as that button with
   `pasted: true`. A blank paste pastes as usual. The reply closure now holds the alert weakly (no retain cycle
   through its actions); the pasted text is read before the dismissal.
-- Tests in `web/app/nav/alert-native.test.js`; docs/eras.md's Alerts row says the Paste answers for the button.
+- Tests in `web/app/nav/alert-native.test.js`. The docs/eras.md Alerts row is outside this task's files: filed as D28.
+- Spec review: a second paste during the dismissal animation could dismiss again (and so whatever is under the
+  alert); a `pasting` flag now stops it. A drop of text into the field also answers for the button: the paste
+  delegate gets drops too and can't tell them apart, and a dropped URL meaning "add this" is fine.
 
 Why the paste delegate and not the text field's `delegate`: UIKit routes the edit menu's Paste (and keyboard
 shortcut, and drops) through `pasteDelegate`, so typing, the URL keyboard's ".com" key and dictation never trigger
