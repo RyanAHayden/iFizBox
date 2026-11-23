@@ -103,18 +103,18 @@ enum NativeMenus {
         let items = (p["items"] as? [Any] ?? []).map { "\($0)" }
         guard !items.isEmpty, let area = rect(p["rect"]) else { return c.reply(nil, "bad params: items and rect") }
         if let live {
-            if live.answered { live.next = { menu(c) } } else { c.reply(["index": -1], nil) }
+            if live.answered, live.next == nil { live.next = { menu(c) } } else { c.reply(["index": -1], nil) }
             return
         }
         let sheet = p["sheet"] as? Bool ?? false
         let x = (p["x"] as? NSNumber).map { CGFloat($0.doubleValue) } ?? area.midX
         let once = Once(c)
-        let session = MenuSession(once)
+        let session = MenuSession(once, guarded: sheet)
         let destructive = Set((p["destructive"] as? [Any] ?? []).compactMap { ($0 as? NSNumber)?.intValue })
         let icons = p["icons"] as? [Any] ?? []
-        // A choice doesn't close the menu by itself: MenuSession.pick does, so an early tap leaves it up.
+        // A button's menu: a choice doesn't close it by itself: MenuSession.pick does, so an early tap leaves it up.
         var held: UIMenuElement.Attributes = []
-        if #available(iOS 16.0, *) { held = .keepsMenuPresented }
+        if sheet, #available(iOS 16.0, *) { held = .keepsMenuPresented }
         let actions = items.enumerated().map { i, label in
             UIAction(title: label, image: i < icons.count ? icon(icons[i]) : nil,
                      attributes: held.union(destructive.contains(i) ? .destructive : [])) { _ in session.pick(i) }
@@ -213,7 +213,8 @@ enum NativeMenus {
         var ended: (() -> Void)?
         var dismiss: (() -> Void)?
         var next: (() -> Void)? // the menu asked for while this one goes
-        fileprivate init(_ once: Once) { self.once = once }
+        private let guarded: Bool // a button's menu: fast taps choose nothing
+        fileprivate init(_ once: Once, guarded: Bool) { self.once = once; self.guarded = guarded }
 
         // A run of fast taps on the button lands on the menu's first item as it grows: those choose nothing and the
         // menu stays up. A tap counts this long after the menu showed and after the tap before it.
@@ -223,10 +224,10 @@ enum NativeMenus {
             guard !answered else { return }
             let now = CACurrentMediaTime(), since = now - max(shownAt ?? 0, lastTap)
             lastTap = now
-            guard since >= Self.deliberate else { return }
+            guard !guarded || since >= Self.deliberate else { return }
             answered = true
             once.reply(i)
-            dismiss?()
+            if guarded { dismiss?() }
         }
 
         func end() {

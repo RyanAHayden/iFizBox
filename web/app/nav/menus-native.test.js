@@ -191,7 +191,7 @@ test("F345c: the shell's handlers: an .actionSheet with its popover at the rect,
 test("B383: one menu at a time; early taps keep it up; the glass button opens its own; a put-away answers at once", () => {
   const read = (f) => readFileSync(new URL(`../../../native/Sources/${f}`, import.meta.url), "utf8");
   const swift = read("NativeMenus.swift");
-  assert.match(swift, /if live\.answered \{ live\.next = \{ menu\(c\) \} \} else \{ c\.reply\(\["index": -1\], nil\) \}/);
+  assert.match(swift, /if live\.answered, live\.next == nil \{ live\.next = \{ menu\(c\) \} \} else \{ c\.reply\(\["index": -1\], nil\) \}/);
   assert.match(swift, /keepsMenuPresented/);
   assert.match(swift, /NativeGlass\.button\(at: area, in: web\)/);
   assert.match(swift, /isUserInteractionEnabled = false/, "the invisible button takes no taps once its menu goes");
