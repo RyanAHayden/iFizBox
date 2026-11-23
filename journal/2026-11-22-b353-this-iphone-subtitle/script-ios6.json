@@ -1,0 +1,30 @@
+[
+ {
+  "eval": "localStorage.setItem('ifizbox.style','ios6'); localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"
+ },
+ {
+  "nav": "#/settings/installation",
+  "ms": 3000
+ },
+ {
+  "eval": "document.documentElement.dataset.style + ' ' + innerWidth + ' | ' + [...document.querySelectorAll('.page.is-top li.has-use')].map(li => { const s = li.querySelector('.cell-subtitle'); const t = li.querySelector('.cell-text'); const u = li.querySelector('.route-use'); const b = t.getBoundingClientRect(); const ub = u.getBoundingClientRect(); return s.textContent + ' sw=' + s.scrollWidth + ' cw=' + s.clientWidth + ' h=' + Math.round(s.getBoundingClientRect().height) + ' textR=' + Math.round(b.right) + ' useL=' + Math.round(ub.left) + ' useW=' + Math.round(ub.width); }).join(' || ')"
+ },
+ {
+  "shot": "main"
+ },
+ {
+  "eval": "document.querySelectorAll('.page.is-top li.has-use .cell-subtitle').forEach(e=>e.style.letterSpacing='.08em'); 'wider text (stand-in for SF)'"
+ },
+ {
+  "eval": "document.documentElement.dataset.style + ' ' + innerWidth + ' | ' + [...document.querySelectorAll('.page.is-top li.has-use')].map(li => { const s = li.querySelector('.cell-subtitle'); const t = li.querySelector('.cell-text'); const u = li.querySelector('.route-use'); const b = t.getBoundingClientRect(); const ub = u.getBoundingClientRect(); return s.textContent + ' sw=' + s.scrollWidth + ' cw=' + s.clientWidth + ' h=' + Math.round(s.getBoundingClientRect().height) + ' textR=' + Math.round(b.right) + ' useL=' + Math.round(ub.left) + ' useW=' + Math.round(ub.width); }).join(' || ')"
+ },
+ {
+  "wait": 800
+ },
+ {
+  "shot": "wide"
+ },
+ {
+  "eval": "(()=>{const s=document.querySelector('.page.is-top li.has-use .cell-subtitle');const out=[];for(let e=s;e&&e.tagName!=='UL';e=e.parentElement){const c=getComputedStyle(e);out.push(e.tagName+'.'+e.className+' h='+Math.round(e.getBoundingClientRect().height)+' H='+c.height+' minH='+c.minHeight+' maxH='+c.maxHeight+' lh='+c.lineHeight+' ov='+c.overflow)}return out.join(' / ')})()"
+ }
+]

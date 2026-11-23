@@ -758,3 +758,9 @@ html[data-style="ios26"][data-theme] .review-button:disabled { color: var(--i26-
 html[data-style="ios26"][data-theme] :is(.review-report, .review-tap-remove) { color: var(--i26-tint); }
 html[data-style="ios26"][data-theme] .review-delete-own { color: var(--i26-red); }
 html[data-style="ios26"] :is(.review-report, .review-tap-remove, .review-delete-own):is(:active, .is-pressed) { opacity: .3; }
+
+/* Install Apps With's rows (settings.css .has-use): SF at iOS 26 sizes is wider than settings.css's 80px gap for
+   USE / ACTIVE leaves room for ("Works offline - no install pop..." on the 15 Pro). The gap shrinks to 72px (11px
+   clear of the button) and the subtitle wraps to a second line instead of ending in "...". 6px above and below
+   keep a one-line row at its 48px and give a two-line row room before the divider. */
+html[data-style="ios26"] .install-main .has-use { --route-use-gap: 72px; --route-sub-wrap: normal; --route-row-pad-y: 6px; }
