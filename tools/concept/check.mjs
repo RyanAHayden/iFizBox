@@ -14,7 +14,8 @@
 // list by mouse: the row pressed shows its pressed state and the app saw a touch (pointerType "touch", touchstart),
 // the list follows the drag, keeps going after the release (momentum) and lets go of the press, and pulling past the
 // top rubber-bands and springs back; a drag from the left edge goes back; on Sources a left drag shows a row's
-// Delete, a tap puts it away and a hold shows the row's menu. Then the device changes to another size and back with the app running, and
+// Delete and a tap puts it away (iOS 7 and later: the full-row swipe arms, and dragged back it springs back), and a
+// hold shows the row's menu. Then the device changes to another size and back with the app running, and
 // window error events count as errors too, in the page and in the phone (ResizeObserver's loop warning is one).
 // Last, the page is served once more sandboxed (an opaque origin, where IndexedDB's open() throws) and each mode
 // checks that the phone came up on the shell's in-memory IndexedDB, Sources lists its sources and Home's tile isn't
@@ -26,6 +27,7 @@ import { createServer } from "node:http";
 import { readFile, writeFile, mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { FULL_SWIPE_ERAS } from "../../web/app/nav/rowswipe.js";
 
 const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf(name); if (i < 0) return def; const v = args[i + 1]; args.splice(i, 2); return v; };
@@ -246,32 +248,60 @@ async function fingerChecks(name) {
   const popped = await inApp("return w.location.hash");
   check(popped !== at.hash, `${name}: dragging from the left edge went back (${at.hash} -> ${popped})`);
 }
-// On Sources: a left drag on a row shows its Delete (screens/sources.js), a tap on another row only puts it away,
-// and holding a row shows the black Copy URL menu (nav/menu.js longPress).
+// On Sources, by the era's Delete (iOS 6's red button, or the full-row swipe of FULL_SWIPE_ERAS), then holding a row
+// shows the Copy URL menu (nav/menu.js longPress).
 async function rowChecks(name) {
   await inApp(`w.location.hash = "#/sources"`);
   await sleep(1500);
   const rows = await ev(`(() => { ${FIND} if (!sc) return [];
     return [...sc.querySelectorAll(".source-row[data-url]")].slice(0, 3).map((li, i) => { li.setAttribute("data-concept-row", i);
-      const b = li.getBoundingClientRect(); return toPage(b.left + b.width * 0.6, b.top + b.height / 2); }); })()`);
+      const b = li.getBoundingClientRect(); return { ...toPage(b.left + b.width * 0.6, b.top + b.height / 2), left: toPage(b.left, 0).x, right: toPage(b.right, 0).x }; }); })()`);
   if (rows.length < 3) { console.log(`ok   ${name}: no source rows to swipe here (${rows.length})`); return; }
   const row = (i, expr) => inApp(`const li = d.querySelector('[data-concept-row="${i}"]'); return ${expr}`);
-  await mouse("mousePressed", rows[1].x, rows[1].y);
-  for (let i = 1; i <= 8; i++) { await mouse("mouseMoved", rows[1].x - i * 15, rows[1].y); await sleep(16); }
-  await mouse("mouseReleased", rows[1].x - 120, rows[1].y);
-  await sleep(600);
-  check(await row(1, `li.classList.contains("armed")`), `${name}: a left drag on a source row shows its Delete`);
   const hash = await inApp("return w.location.hash");
-  await tap('[data-concept-row="2"]');
-  await sleep(600);
-  check(!(await row(1, `li.classList.contains("armed")`)) && (await inApp("return w.location.hash")) === hash,
-    `${name}: a tap on another row only puts the Delete away`);
+  if (FULL_SWIPE_ERAS.includes(await inApp(`return d.documentElement.getAttribute("data-style")`))) await fullSwipeChecks(name, rows[1], row, hash);
+  else await redDeleteChecks(name, rows[1], row, hash);
   await mouse("mousePressed", rows[2].x, rows[2].y);
   await sleep(900);
   const menu = await inApp(`const m = d.querySelector(".menu"); return Boolean(m && m.getClientRects().length)`);
   await mouse("mouseReleased", rows[2].x, rows[2].y);
   await sleep(300);
   check(menu && (await inApp("return w.location.hash")) === hash, `${name}: holding a row shows its menu (and opens nothing)`);
+}
+// iOS 6: a left drag on a row shows its Delete (screens/sources.js), a tap on another row only puts the Delete away.
+async function redDeleteChecks(name, at, row, hash) {
+  await mouse("mousePressed", at.x, at.y);
+  for (let i = 1; i <= 8; i++) { await mouse("mouseMoved", at.x - i * 15, at.y); await sleep(16); }
+  await mouse("mouseReleased", at.x - 120, at.y);
+  await sleep(600);
+  check(await row(1, `li.classList.contains("armed")`), `${name}: a left drag on a source row shows its Delete`);
+  await tap('[data-concept-row="2"]');
+  await sleep(600);
+  check(!(await row(1, `li.classList.contains("armed")`)) && (await inApp("return w.location.hash")) === hash,
+    `${name}: a tap on another row only puts the Delete away`);
+}
+// B356's full-row swipe: past half the row the red Delete strip is armed; dragged back and let go, the row springs
+// back. It never lets go armed: that would remove the source, and the later runs use the same sources.
+async function fullSwipeChecks(name, at, row, hash) {
+  const look = () => row(1, `(() => { const back = li.querySelector(":scope > .row-swipe"), inner = li.querySelector(":scope > .cell-inner");
+    return { kind: back?.dataset.kind ?? "", shown: Boolean(back?.getClientRects().length), armed: Boolean(back?.classList.contains("armed")),
+      x: Math.round(new w.DOMMatrixReadOnly(w.getComputedStyle(inner).transform).m41), width: li.clientWidth }; })()`);
+  const start = await look();
+  const steps = 12, far = (at.right - at.left) * 0.8;
+  // from near the row's right edge, so the far end stays inside the phone
+  const x0 = at.left + (at.right - at.left) * 0.9;
+  await mouse("mousePressed", x0, at.y);
+  for (let i = 1; i <= steps; i++) { await mouse("mouseMoved", x0 - far * i / steps, at.y); await sleep(16); }
+  await sleep(100);
+  const out = await look();
+  check(!start.shown && out.shown && out.kind === "remove" && out.armed && out.x < -out.width / 2,
+    `${name}: a left drag on a source row shows its Delete, armed past half the row (${out.x} of ${out.width} px, ${out.kind || "no strip"}${out.armed ? ", armed" : ""})`);
+  for (let i = steps - 1; i >= 0; i--) { await mouse("mouseMoved", x0 - far * i / steps, at.y); await sleep(16); }
+  await mouse("mouseReleased", x0, at.y);
+  await sleep(800);
+  const back = await look();
+  check(!back.shown && back.x === 0 && (await inApp("return w.location.hash")) === hash,
+    `${name}: dragged back and let go, the row springs back (${back.x} px) and opens nothing`);
 }
 // The device changes size with the app running, and back (frame.html loads a fresh app at the new size; resizing
 // the running one set off ResizeObserver's loop warning).
