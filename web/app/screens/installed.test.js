@@ -335,6 +335,7 @@ async function autoInstalledOf(native) {
 // ---- B36: every app row opens, holds and swipes ------------------------------------------------------------------
 import { appListElement, appRowHref, appActions, appSheet, appPageSections, keptIpaOf, appIdOf, appToken, OPEN, RESIGN,
   SAVE_IPA, REMOVE } from "./installed.js";
+import { deleteSwipeAction, swipeDelete } from "./installed.js"; // B332
 
 // A fake DOM good enough for nav/ui.js plain() and the list's decoration: class selectors only.
 function b36Dom() {
@@ -438,6 +439,81 @@ test("B36: every row is a link (pressed highlight), extra rows included; Delete 
   swipe(cells[0]);
   assert.ok(!cells[0].classList.contains("armed"));
 }));
+
+// B332: iOS 7, 13 and 26 swipe a row off (Mail's delete, nav/rowswipe.js's full-row swipe); iOS 6 keeps the red Delete.
+function eraDom(style) {
+  const d = b36Dom();
+  const make = d.createElement;
+  d.createElement = (t) => Object.assign(make(t), {
+    prepend(x) { x.parentNode = this; this.children.unshift(x); },
+    removeEventListener(t2, f) { this.listeners[t2] = (this.listeners[t2] ?? []).filter((g) => g !== f); },
+  });
+  d.documentElement = { getAttribute: (k) => (k === "data-style" ? style : null) };
+  return d;
+}
+
+test("B332: under iOS 7 and later a long left swipe slides the row off its left edge; iOS 6 shows the button", async () => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, "document");
+  const raf = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = (f) => { queueMicrotask(f); return 1; };
+  const drag = async (ul, li, to) => {
+    const target = li.querySelector(".cell-label");
+    const ev = (x) => ({ target, clientX: x, clientY: 10, pointerId: 1, isPrimary: true, button: 0 });
+    ul.fire("pointerdown", ev(300));
+    await new Promise((r) => setTimeout(r, 0));
+    ul.fire("pointermove", ev(285));
+    ul.fire("pointermove", ev(to));
+    await new Promise((r) => setTimeout(r, 0));
+    return ev;
+  };
+  try {
+    for (const style of ["ios7", "ios13", "ios26"]) {
+      globalThis.document = eraDom(style);
+      const ul = appListElement([{ rows: B36_ROWS }], B36_EXTRA, { route: r(), cands: new Map(), signed: B36_SIGNED, editing: false });
+      const cells = ul.querySelectorAll(":scope > .cell");
+      const ev = await drag(ul, cells[1], 285 - 250);
+      assert.ok(!cells[1].classList.contains("armed"), `${style}: no red button`);
+      assert.ok(cells[1].classList.contains("swiping"), `${style}: the row moves`);
+      assert.equal(cells[1]._swipeBack.dataset.kind, "remove");
+      assert.equal(cells[1]._swipeBack.dataset.full, "1");
+      assert.ok(cells[1]._swipeBack.classList.contains("armed"), `${style}: armed past half the row`);
+      assert.match(cells[1].querySelector(".cell-inner").style.transform, /translate3d\(-250px/, "1:1 with the finger, no rubber band");
+      ul.fire("pointerup", ev(285 - 250));
+      assert.match(cells[1].querySelector(".cell-inner").style.transform, /translate3d\(-320px/, "slides off the row's left edge");
+      // iFizBox's own row never moves.
+      await drag(ul, cells[0], 285 - 250);
+      assert.ok(!cells[0].classList.contains("swiping"));
+    }
+    globalThis.document = eraDom("ios6");
+    const ul = appListElement([{ rows: B36_ROWS }], B36_EXTRA, { route: r(), cands: new Map(), signed: B36_SIGNED, editing: false });
+    const cells = ul.querySelectorAll(":scope > .cell");
+    await drag(ul, cells[1], 240);
+    assert.ok(cells[1].classList.contains("armed"), "iOS 6: the red Delete");
+    assert.ok(!cells[1].classList.contains("swiping"), "iOS 6: the row doesn't slide");
+  } finally {
+    if (had) Object.defineProperty(globalThis, "document", had); else delete globalThis.document;
+    globalThis.requestAnimationFrame = raf;
+  }
+});
+
+test("B332: the full-row swipe's action and commit: Remove from List goes at once, Delete asks, Still Installed springs back", async () => {
+  const rec = { id: "com.example.delta", name: "Delta", version: "1.6" };
+  assert.equal(deleteSwipeAction({ ...rec, actual: "1.6" }, { mode: "jailbreak" }).full, true);
+  assert.equal(deleteSwipeAction(rec, { mode: "site" }).full, true);
+  assert.equal(deleteSwipeAction({ ...rec, installed: true }, { mode: "sideload" }).full, false, "only explains: springs back");
+  assert.equal(deleteSwipeAction({ ...rec, self: true }, { mode: "jailbreak" }), null);
+  const li = (cls = []) => ({ _app: rec, classList: { contains: (c) => cls.includes(c) } });
+  // Remove from List: the row collapses, the record goes, the row stays gone.
+  const did = [];
+  assert.equal(await swipeDelete(li(), { kind: "forget" }, { gone: () => did.push("gone"), forget: async (r) => did.push(r.id),
+    confirm: () => assert.fail("no sheet") }), true);
+  assert.deepEqual(did, ["gone", "com.example.delta"]);
+  // Delete: its sheet; Cancel (false) or a failed uninstall (no .removing) keep the row; done, it goes.
+  assert.equal(await swipeDelete(li(), { kind: "uninstall" }, { confirm: async () => false }), false);
+  assert.equal(await swipeDelete(li(), { kind: "uninstall" }, { confirm: async () => true }), false);
+  assert.equal(await swipeDelete(li(["removing"]), { kind: "uninstall" }, { confirm: async () => true }), true);
+  assert.equal(await swipeDelete(li(), { kind: "installed" }, { confirm: async () => false }), false);
+});
 
 test("B36: a hold opens the sheet with the actions that apply", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });

@@ -151,3 +151,10 @@ _Said_: decrypt
 _On screen_: Decrypt, Decrypt Again
 _In code_: decrypt-app, library.decrypt, decryptApp, native/helper/decrypt.c
 _Avoid_: dump, crack
+
+**Full-Row Swipe**:
+Deleting or removing a row by dragging the whole row off the screen to the left, as in Mail; used in the iOS 7, 13 and 26 styles
+_Said_: full-row swipe, swipe to delete like Mail
+_On screen_: (a row dragged off its left edge, red behind it)
+_In code_: nav/rowswipe.js attachRowSwipe full, fullSwipeEra; screens/installed.js attachDeleteSwipe
+_Avoid_: swipe-to-delete button

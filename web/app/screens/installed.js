@@ -102,6 +102,8 @@ import { rowIcon } from "../icons/rowicons.js";
 import { siteEntries, libraryCounts, ipaCountText } from "../core/myipas.js";
 import { tweakPill, tweakUpdateApps, runTweakUpdates } from "./tweaks.js"; // F302a
 import { tweakCountText } from "../core/tweaks.js"; // F302a
+import { attachRowSwipe, fullSwipeEra } from "../nav/rowswipe.js"; // B332
+import { collapse } from "../nav/ui.js"; // B332
 
 // B46: Delete means what it says (user 2026-11-18: "I swiped and deleted an app in Installed and it just got rid of the
 // icon, I had to remove it again"). In the jailbreak app, an app the helper sees in installd's containers (`actual`, I4)
@@ -839,6 +841,7 @@ export function appListElement(appSecs, extra, { route, cands = new Map(), signe
   [...rows, ...extra].forEach((r, i) => addTweakPill(cells[i], index.get(r.id), view.tweakUps)); // F302a
   if (manage) [...rows, ...extra].forEach((r, i) => { if (manageKinds(r)) selectCircle(cells[i], selected.has(r.id) && managing); });
   attachRowGestures(ul, view);
+  attachDeleteSwipe(ul, view);
   attachRowHold(ul, { view, ...hold });
   return ul;
 }
@@ -1013,7 +1016,8 @@ function attachRowGestures(ul, appView) {
   ul.addEventListener("pointerdown", (e) => {
     const li = e.target.closest(".installed-app");
     swiped = false;
-    start = li && !li.dataset.self && !appView.editing && !appView.managing && !e.target.closest(".del-confirm") ? { li, x: e.clientX, y: e.clientY } : null;
+    start = li && !li.dataset.self && !appView.editing && !appView.managing && !e.target.closest(".del-confirm") && !fullSwipeEra()
+      ? { li, x: e.clientX, y: e.clientY } : null; // B332: iOS 7 and later swipe the row off instead (attachDeleteSwipe)
   });
   ul.addEventListener("pointermove", (e) => {
     if (!start) return;
@@ -1028,6 +1032,41 @@ function attachRowGestures(ul, appView) {
   const stop = () => { start = null; };
   ul.addEventListener("pointerup", stop);
   ul.addEventListener("pointercancel", stop);
+}
+
+// B332: under iOS 7, 13 and 26 (fullSwipeEra) a row's Delete or Remove from List is a full-row swipe, as deleting in
+// Mail: drag the row off its left edge and it goes (nav/rowswipe.js, the swipe Browse's rows queue with), red behind
+// it. iOS 6 keeps the swipe that shows the red Delete (attachRowGestures). A Delete that uninstalls still asks with its
+// sheet, and Cancel there brings the row back; "Still Installed" only explains, so that row springs back.
+export function deleteSwipeAction(r, opts) {
+  const a = deleteAction(r, opts);
+  return a ? { ...a, full: a.kind !== "installed" } : null;
+}
+
+function attachDeleteSwipe(ul, appView) {
+  return attachRowSwipe(ul, {
+    rowSelector: ".installed-app",
+    canStart: (li) => fullSwipeEra() && !!li._app && !li.dataset.self && !appView.editing && !appView.managing
+      && !li.classList.contains("armed"),
+    prepare: (li) => deleteSwipeAction(li._app),
+    kindOf: () => "remove",
+    full: (li, a) => a.full,
+    commit: (li, a) => swipeDelete(li, a),
+  });
+}
+
+// The swipe's commit -> false when the row stays (Cancel on the sheet, Still Installed, a failed uninstall).
+export async function swipeDelete(li, a, { confirm = confirmDelete, forget = forgetApp, gone = collapse, alert = showAlert } = {}) {
+  const r = li._app;
+  if (a.kind !== "forget") return (await confirm(r, { li })) && li.classList.contains("removing");
+  gone(li); // the rows under it slide up into its place
+  try {
+    await forget(r);
+  } catch (e) {
+    await alert({ title: "Error", message: r.signedOnly ? deviceError(e).message : e.message, buttons: ["OK"] });
+    loadAllApps(); // drawn again with the row back
+  }
+  return true;
 }
 
 // B112: the drawn apps list (not the Install IPAs row's table): in the pinned .search-results under the search bar
