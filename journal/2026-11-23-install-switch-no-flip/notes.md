@@ -117,7 +117,16 @@ Airplane Mode for "data off", in every phone test above.
   building if the Shortcut survives iFizBox coming to the front.
 - C does not remove the Shortcuts handoff in any version by this reading; low priority.
 
-These are not measured results. Do not build on them before R78a to R78d report.
+These are not measured results. Do not build on them before R78a to R78c report.
+
+### R78d status (2026-11-23): no final recommendation yet
+
+R78d was run to replace this section with a final one. It cannot be: R78a, R78b and R78c are all open and blocked
+(the iPhone 15 Pro UI lock was held by T76; R78b waits on R78a's probe intents, R78c on F393's probe build). None of
+`shared-piece.md`, `options-ab.md` or `options-cd.md` exists, so there is no measurement to base a pick on. The
+provisional section above stays as the best current reading, and is still a hypothesis. R78d is reopened after R78a to
+R78c merge; it then replaces the section with a per-version table (iOS 27, iOS 16 to 26) built only from their
+results.
 
 ## Not verified
 
