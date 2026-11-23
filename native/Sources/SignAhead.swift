@@ -13,6 +13,9 @@
 //        route: "idevice" (This iPhone): installd installs it, no prompt (stream: {phase: "copying" | "installing",
 //        progress}); the reply comes once it is installed and says installed: true
 //   signing.discard {token}                       forgets a kept IPA that will not be installed -> {discarded}
+//   F380: signing.prepare {url, keepInLibrary: true} (a custom install) keeps the downloaded IPA for My IPAs too
+//        (IPALibrary.hold, native/sign/KeptDownload.swift); signing.open moves it into the library once it has gone
+//        through and its reply adds {libraryFile}. Discarded, failed or forgotten, the held IPA goes with the kept one.
 //
 // `tag` is the app's (one per try): signing.cancel {tag} stops that app's download, signing or serving only
 // (SignJob.cancel(tag:)), and signing.progress {bundleId, tag} ends its watch. The kept IPAs live in SignBridge.work
@@ -22,7 +25,8 @@
 import Foundation
 
 enum SignAhead {
-    private struct Kept { let output: URL; let app: SignedApp; let record: SignedRecord }
+    // F380: `mine`, the download held for My IPAs (keepInLibrary), moved into the library once opened
+    private struct Kept { let output: URL; let app: SignedApp; let record: SignedRecord; var mine: URL? = nil }
     private static var kept = [String: Kept]() // on SignBridge.queue
     // B263: the signer's own lane (one app at a time, as before), off SignBridge.queue so signing.open isn't held by it
     private static let signer = DispatchQueue(label: "ifizbox.sign.ahead", qos: .userInitiated)
@@ -48,6 +52,7 @@ enum SignAhead {
     private static func forget(_ tok: String) -> Bool {
         guard let k = kept.removeValue(forKey: tok) else { return false }
         try? FileManager.default.removeItem(at: k.output)
+        if let m = k.mine { try? FileManager.default.removeItem(at: m) } // F380: never installed, not saved
         Sideload.dropOriginal(k.app.bundleID, sha256: k.record.sha256) // F343: never installed
         return true
     }
@@ -102,9 +107,14 @@ enum SignAhead {
             }
             // B263: the hash and the signer run on `signer`, not SignBridge.queue, so another app's signing.open (the
             // queue's next install) never waits for this one's signing; the kept copy and the answer go back there
-            let signThat = { (file: URL) in
+            // F380: `mine`, the download held for My IPAs (keepInLibrary), deleted when this doesn't sign
+            let signHeld = { (file: URL, mine: URL?) in
                 signer.async {
                     let signed: (SignedApp, SignedRecord, URL, String?)
+                    let unsigned = { (e: Error) in
+                        if let m = mine { try? FileManager.default.removeItem(at: m) }
+                        fail(e)
+                    }
                     do {
                         // F292: the IPA's hash before signing; a known-malware one stops here
                         let sha: String?
@@ -115,12 +125,12 @@ enum SignAhead {
                         let (app, record, output) = try sign(file, url: source, id: id, profile: profile, options: options, emit: emit, log: log, job: job,
                                                              sha256: sha) // F343
                         signed = (app, record, output, sha)
-                    } catch { return fail(error) }
+                    } catch { return unsigned(error) }
                     SignBridge.queue.async {
                         let (app, record, output, sha) = signed
                         keepInLibrary(c, output: output, app: app, record: record, options: options, id: id, log: log) // B229
                         let tok = SignBridge.token()
-                        kept[tok] = Kept(output: output, app: app, record: record)
+                        kept[tok] = Kept(output: output, app: app, record: record, mine: mine)
                         SignBridge.queue.asyncAfter(deadline: .now() + life) { forget(tok) }
                         job.end()
                         var j: [String: Any] = ["token": tok, "bundleId": app.bundleID, "originalBundleId": app.originalBundleID,
@@ -132,6 +142,7 @@ enum SignAhead {
                     }
                 }
             }
+            let signThat = { (file: URL) in signHeld(file, nil) }
             // B275: iFizBox's own record (signed from its own bundle) signs from the running bundle, as signing.resign does
             if source == SelfIPA.url {
                 let out = SignBridge.work.appendingPathComponent("\(SignBridge.token())-self.ipa")
@@ -152,13 +163,16 @@ enum SignAhead {
             // B104: a recorded app's http link was let through at install; a new one follows the page's insecure
             let http: Sideload.HTTPPolicy = (c.params["record"] as? String ?? "").isEmpty ? Sideload.httpPolicy(c) : .fallback
             let started = Date()
+            let keepIt = record == nil && MyIPAs.wantsKeep(c) // F380: not a Re-sign's download
             let d = Sideload.download(url, http: http, emit: emit, // B262: the Log's line and the row's MB/s once a second
                                       bytes: Sideload.downloadTicks(log: log, event: { c.emitOnMain([$0]) })) { res in
                 switch res {
                 case .failure(let e): fail(e)
                 case .success(let file):
                     log(Sideload.downloaded(file, since: started))
-                    signThat(file)
+                    // F380: a custom install (keepInLibrary) keeps this download for My IPAs: a second name now, as
+                    // the signer deletes the first; it moves into the library once signing.open has gone through
+                    signHeld(file, keepIt ? IPALibrary.hold(file, in: SignBridge.work, token: SignBridge.token()) : nil)
                 }
             }
             job.onCancel { d.cancel() }
@@ -226,6 +240,7 @@ enum SignAhead {
             let job = SignJob.begin(tag: tag) // until iOS has fetched the IPA (serveAndOpen ends it)
             if job.cancelled {
                 try? FileManager.default.removeItem(at: k.output)
+                if let m = k.mine { try? FileManager.default.removeItem(at: m) } // F380
                 job.end()
                 return Apt.reply(c, nil, SignBridge.text(SignJob.cancelledError))
             }
@@ -239,7 +254,7 @@ enum SignAhead {
                     try? FileManager.default.removeItem(at: s)
                     return false
                 }
-                kept[tok] = Kept(output: s, app: k.app, record: k.record)
+                kept[tok] = Kept(output: s, app: k.app, record: k.record, mine: k.mine) // F380: still to be saved
                 SignBridge.queue.asyncAfter(deadline: .now() + life) { _ = forget(tok) }
                 return true
             }
@@ -247,7 +262,12 @@ enum SignAhead {
                 switch r {
                 case .failure(let e):
                     job.end()
-                    SignBridge.queue.async { if !keepAgain() { Sideload.dropOriginal(k.app.bundleID, sha256: k.record.sha256) } } // F343
+                    SignBridge.queue.async {
+                        if !keepAgain() {
+                            Sideload.dropOriginal(k.app.bundleID, sha256: k.record.sha256) // F343
+                            if let m = k.mine { try? FileManager.default.removeItem(at: m) } // F380: not installed, not saved
+                        }
+                    }
                     Apt.reply(c, nil, job.cancelled ? SignBridge.text(SignJob.cancelledError) : (e as? Sideload.Failed)?.text ?? SignBridge.text(e))
                 case .success(let (app, rec)):
                     if let s = spare { try? FileManager.default.removeItem(at: s) } // B337: nothing opens it again
@@ -255,7 +275,14 @@ enum SignAhead {
                                             "version": app.version, "removed": app.removed, "fixedArm64e": app.fixedArm64e]
                     if let x = rec.expires { j["expires"] = ISO8601DateFormatter().string(from: x) }
                     if servers.local { j["installed"] = true } // B111: installd has it, no iOS prompt to wait for
-                    Apt.reply(c, j, nil)
+                    guard let m = k.mine, let u = URL(string: k.record.url) else { return Apt.reply(c, j, nil) }
+                    // F380: the held download into My IPAs, so the page's save doesn't download it again
+                    let answer = j
+                    SignBridge.queue.async {
+                        var out = answer
+                        if let f = MyIPAs.keepDownload(m, url: u, log: log) { out["libraryFile"] = f }
+                        Apt.reply(c, out, nil)
+                    }
                 }
             }
             if servers.local {

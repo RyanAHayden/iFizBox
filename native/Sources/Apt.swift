@@ -118,7 +118,8 @@ enum Apt {
             let stream = (c.params["stream"] as? Bool) ?? false
             // B113: insecure: true is the page's Install Anyway (web/app/ipa-install.js): plain http, no https twin
             let insecure = c.params["insecure"] as? Bool == true
-            IPAInstall.run(url, insecure: insecure, emit: stream ? { c.emitOnMain($0) } : nil) { reply(c, $0, $1) }
+            IPAInstall.run(url, insecure: insecure, keep: MyIPAs.wantsKeep(c), // F380
+                           emit: stream ? { c.emitOnMain($0) } : nil) { reply(c, $0, $1) }
         }
         // F196: ipa.cancel, the IPA install page's Cancel (web/app/screens/ipa-install.js): stops ipa.install's download,
         // or keeps ifizbox-helper from starting; an error once the helper runs (it can't be stopped halfway) or when
@@ -556,7 +557,10 @@ enum IPAInstall {
         }
     }
 
-    static func run(_ url: URL, insecure: Bool = false, emit: (([[String: Any]]) -> Void)?, done finished: @escaping (Any?, String?) -> Void) {
+    // F380: `keep` (keepInLibrary: true, a custom install) moves the download into My IPAs once the helper installed
+    // it (it installs from a copy of its own), instead of removing it; the reply adds {libraryFile}.
+    static func run(_ url: URL, insecure: Bool = false, keep: Bool = false, emit: (([[String: Any]]) -> Void)?,
+                    done finished: @escaping (Any?, String?) -> Void) {
         let job = Run()
         runLock.lock(); running = job; runLock.unlock()
         let done = { (v: Any?, e: String?) in
@@ -581,7 +585,11 @@ enum IPAInstall {
                     let out = r["stdout"] as? String ?? "", errText = r["stderr"] as? String ?? ""
                     if code == 0 {
                         let id = out.split(separator: "\n").last { $0.hasPrefix("Installed ") }.map { String($0.dropFirst(10)) }
-                        return done(["code": 0, "stdout": out, "stderr": errText, "bundleId": id ?? ""], nil)
+                        var ok: [String: Any] = ["code": 0, "stdout": out, "stderr": errText, "bundleId": id ?? ""]
+                        if keep, let f = SignBridge.queue.sync(execute: { MyIPAs.keepDownload(URL(fileURLWithPath: path), url: url) }) {
+                            ok["libraryFile"] = f // F380
+                        }
+                        return done(ok, nil)
                     }
                     let why = errText.split(separator: "\n").last { $0.hasPrefix("ifizbox-helper: ") }
                         .map { String($0.dropFirst(16)) } ?? "ifizbox-helper exited with \(code)"

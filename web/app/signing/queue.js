@@ -28,7 +28,7 @@ import { askInsecure, bridge, keepIpaHash, refusing, storageOf } from "./common.
 import { getServer, defaultServer } from "./identity.js";
 import { serverFallback } from "../core/installroute.js"; // F366
 import { chooseRoute, holdApp } from "./route.js";
-import { withSavedIpa } from "../core/appqueue.js"; // F379
+import { withSavedIpa, customInstallSave } from "../core/appqueue.js"; // F379
 export { hereLabel, shownName, finishHere } from "./common.js";
 
 export const ASK_WAIT = 600; // seconds the queue waits for Install on iOS's prompt before the row fails
@@ -73,6 +73,9 @@ export async function prepareOnDevice(job, { tag, signal = null, progress = () =
   try { params = await (await import("../screens/tweaks.js")).keptTweakParams(params, job, { log }); } catch (e) {
     throw Object.assign(new Error(`Can't inject the tweaks: ${String(e?.message ?? e)}`), { code: "tweaks" });
   }
+  // F380: a Custom Install, saved in My IPAs once it lands (screens/queue.js saveCustomIpa), keeps its own download
+  // there (signing.open's libraryFile, openPrepared below), so the save downloads nothing
+  if (params?.url && customInstallSave(job)) params = { ...params, keepInLibrary: true };
   try {
     // B104: an http link with no https twin asks first (askInsecure); Cancel ends the row as its stop does
     const r = await askInsecure((extra) => abortable(native, "signing.prepare", { ...params, ...refusing(), ...extra }, (ev) => {
@@ -92,6 +95,9 @@ export async function prepareOnDevice(job, { tag, signal = null, progress = () =
     throw rowError(e, job?.name || job?.id || "");
   }
 }
+
+// F380: core/myipas.js noteKeptIpa, loaded only when the shell kept a file (it stays out of the startup modules)
+const keptIpa = (url, file) => import("../core/myipas.js").then((m) => m.noteKeptIpa(url, file)).catch(() => {});
 
 // F366: `server`: this row goes through the default Signing Server whatever Install Apps With says (the run's Use the
 // Signing Server). A This iPhone failure that offers it (core/installroute.js serverFallback) throws with `fallback`,
@@ -120,6 +126,8 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
         const p = route.route ? herePhase(ev) : null;
         if (p) progress(p.phase, p.fraction);
       }, { tag, signal });
+    // F380: the IPA the shell kept in My IPAs for this install (keepInLibrary), for the save after it lands
+    if (opened?.libraryFile) await keptIpa(row?.job?.url, opened.libraryFile);
     if (route.route) return { installed: opened?.installed ?? true, expires: opened?.expires ?? null };
   } catch (e) {
     const err = rowError(e, name);

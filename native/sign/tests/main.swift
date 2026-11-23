@@ -727,6 +727,47 @@ test("B229: My IPAs keeps the queue's signed copy") {
     check(((try? FileManager.default.contentsOfDirectory(atPath: lib.store.path)) ?? ["x"]).isEmpty, "nothing left behind")
 }
 
+// F380: signing.prepare {url, keepInLibrary} (SignAhead.swift) holds its one download before the signer deletes it, and
+// signing.open moves that into My IPAs: a library entry from the same bytes, with no second download (library.add).
+test("F380: a custom install's download lands in My IPAs without a second download") {
+    let lib = IPALibrary(root: work.appendingPathComponent("lib380/Documents"), store: work.appendingPathComponent("lib380/Store"))
+    let tmp = work.appendingPathComponent("lib380/work")
+    try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+    // the one download (Sideload.download's file in SignBridge.work)
+    let download = tmp.appendingPathComponent("t1-in.ipa")
+    try FileManager.default.copyItem(at: fixtures.appendingPathComponent("rich.ipa"), to: download)
+    let held = IPALibrary.hold(download, in: tmp, token: "t1")
+    check(held != nil && held!.lastPathComponent == "t1-mine.ipa", "held \(held?.path ?? "nil")")
+    check(((try? FileManager.default.attributesOfItem(atPath: download.path))?[.referenceCount] as? Int) == 2,
+          "a hard link, not a copy")
+    // SignAhead.sign: the signer reads the download and deletes it after
+    let profile = try Profile(try fixture("profile.mobileprovision"))
+    let out = tmp.appendingPathComponent("t1-ahead.ipa")
+    _ = try IPASigner(profile: profile, identity: identity).sign(download, to: out)
+    try FileManager.default.removeItem(at: download)
+    check(lib.files().isEmpty, "nothing in My IPAs before the install went through")
+    // signing.open went through: MyIPAs.keepDownload
+    let file = try lib.keep(held!, url: URL(string: "https://example.com/dl/Fixture-1.0.ipa")!)
+    check(file == "Fixture-1.0.ipa" && lib.files() == [file], "one library entry \(lib.files())")
+    check(!FileManager.default.fileExists(atPath: held!.path), "moved, not copied")
+    check(try entries(lib.root.appendingPathComponent(file)) == entries(fixtures.appendingPathComponent("rich.ipa")), "the downloaded IPA as it came")
+    let d = try lib.details(file)
+    check(d.bundleID == "dev.ifizbox.fixture" && d.error == nil, "listed as the app \(d.bundleID)")
+    // a link without .ipa is named after the app inside, as library.add names it
+    let again = tmp.appendingPathComponent("t2-in.ipa")
+    try FileManager.default.copyItem(at: fixtures.appendingPathComponent("rich.ipa"), to: again)
+    let named = try lib.keep(IPALibrary.hold(again, in: tmp, token: "t2")!, url: URL(string: "https://example.com/get?id=7")!)
+    check(named.hasPrefix(d.name) && named.hasSuffix(".ipa"), "named after the app: \(named)")
+    // a held file that isn't an IPA isn't kept, and stays for the caller to delete
+    let bad = IPALibrary.hold(fixtures.appendingPathComponent("notanipa.ipa"), in: tmp, token: "t3")!
+    check((try? lib.keep(bad, url: URL(string: "https://example.com/x.ipa")!)) == nil, "not an IPA: refused")
+    check(lib.files().count == 2 && FileManager.default.fileExists(atPath: bad.path), "nothing added for it")
+    try FileManager.default.removeItem(at: bad)
+    try FileManager.default.removeItem(at: out)
+    try FileManager.default.removeItem(at: again)
+    for f in lib.files() { try lib.delete(f) }
+}
+
 // F236: this iPhone in the profile (DeviceCheck.swift; core/signing.js deviceCheck is the same check).
 test("device check") {
     func prof(_ extra: String) -> Data {

@@ -4,6 +4,8 @@
 //
 //   library.list                    -> {ipas: [entry], identity: bool}   (entry: IPALibrary.json)
 //   library.add {url} (stream: {phase: "downloading", progress})  -> {file, ipas}
+//                                   F380: a custom install's own download lands here without it (keepInLibrary on
+//                                   signing.prepare and ipa.install, wantsKeep / keepDownload below)
 //   library.pick {dir?, single?}    the iOS Files picker (.ipa, several at once) -> {files: [name], ipas} ([] on Cancel);
 //                                   B334: dir opens it in that folder, single allows one file
 //   library.options {file, name?, bundleId?, icon?, removeExtensions?, fixArm64e?, keepBundleId?}  Sign Options -> entry
@@ -164,6 +166,23 @@ enum MyIPAs {
     }
 
     // ---- adding
+
+    // F380: a custom install's call (signing.prepare, ipa.install) asks to keep its download in My IPAs.
+    static func wantsKeep(_ c: Bridge.Call) -> Bool { c.params["keepInLibrary"] as? Bool == true }
+
+    // F380: a custom install's download, held by IPALibrary.hold, moved into the library once the install has gone
+    // through -> its file name, or nil when it couldn't be kept (the held file is deleted). Runs on SignBridge.queue.
+    static func keepDownload(_ held: URL, url: URL, log: ((String) -> Void)? = nil) -> String? {
+        do {
+            let file = try library.keep(held, url: url)
+            log?("Saved the IPA in My IPAs as \(file), no second download")
+            return file
+        } catch {
+            try? FileManager.default.removeItem(at: held)
+            log?("Couldn't save the IPA in My IPAs: \(error.localizedDescription)")
+            return nil
+        }
+    }
 
     static func add(_ c: Bridge.Call) {
         guard let url = Apt.httpURL(c.params["url"]) else { return Apt.reply(c, nil, "bad_url: not an http(s) URL") }

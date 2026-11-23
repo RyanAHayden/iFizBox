@@ -27,10 +27,13 @@ export function forgetAllowedHttp() { allowedHttp.clear(); } // tests
 
 export const ipaInstallAvailable = (mode = detectMode()) => mode === "jailbreak" && Boolean(nativeBridge()?.call);
 
-export async function installIpa(url, onEvent = null, { native = nativeBridge(), insecure = false } = {}) {
+// F380: `keep` (an install whose IPA is saved in My IPAs after it) sends keepInLibrary: the shell moves its download
+// into My IPAs once installed and the answer adds { libraryFile }.
+export async function installIpa(url, onEvent = null, { native = nativeBridge(), insecure = false, keep = false } = {}) {
   if (!native?.call) throw Object.assign(new Error("sideload: no native bridge"), { code: "sideload" });
   try {
-    return await native.call("ipa.install", { url, stream: Boolean(onEvent), ...(insecure ? { insecure: true } : {}) }, onEvent ?? undefined);
+    return await native.call("ipa.install", { url, stream: Boolean(onEvent), ...(insecure ? { insecure: true } : {}),
+      ...(keep ? { keepInLibrary: true } : {}) }, onEvent ?? undefined);
   } catch (e) {
     const msg = e?.message || String(e);
     const m = msg.match(/^([a-z_]+): /);
@@ -48,7 +51,8 @@ export async function installIpa(url, onEvent = null, { native = nativeBridge(),
 // screens/ipa-install.js stopIpaInstall).
 // B113: `ask` puts up This Download Is Not Secure for an http link with no https twin (askInsecureIpa); its Cancel
 // resolves { ok: false, cancelled: true, declined: true } (the page closes, as for its own Cancel).
-export async function runIpaInstall({ url, name = "" }, view, { native = nativeBridge(), signal = null,
+// F380: `keep` goes to installIpa; the result carries the shell's libraryFile (null when none was kept).
+export async function runIpaInstall({ url, name = "", keep = false }, view, { native = nativeBridge(), signal = null,
   ask = askInsecureIpa } = {}) {
   const log = [];
   const line = (type, text) => {
@@ -93,7 +97,7 @@ export async function runIpaInstall({ url, name = "" }, view, { native = nativeB
       let insecure = allowedHttp.has(url);
       for (;;) {
         try {
-          return await installIpa(url, onEvent, { native, insecure });
+          return await installIpa(url, onEvent, { native, insecure, ...(keep ? { keep: true } : {}) });
         } catch (e) {
           if (insecure || !isInsecure(e) || stopped()) throw e;
           line("warning", `No https copy of the IPA: ${String(e?.message ?? e).replace(/^insecure: /, "")}`);
@@ -125,5 +129,6 @@ export async function runIpaInstall({ url, name = "" }, view, { native = nativeB
     view.status("Done");
   }
   view.progress(100);
-  return { ok: !error, bundleId: result?.bundleId || "", error, log: log.join("\n"), cancelled: false };
+  return { ok: !error, bundleId: result?.bundleId || "", error, log: log.join("\n"), cancelled: false,
+    ...(result?.libraryFile ? { libraryFile: result.libraryFile } : {}) }; // F380
 }
