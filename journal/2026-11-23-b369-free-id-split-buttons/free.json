@@ -1,0 +1,17 @@
+[
+  { "wait": 2000 },
+  { "eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'" },
+  { "nav": "#/home/settings/signing", "ms": 6000 },
+  { "eval": "document.querySelector('.banner')?.remove(); (() => { const g = document.querySelector('.page.is-top .free-route'); if (!g) return 'no free route'; const b = document.querySelector('.page.is-top .page-body'); b.scrollTop += g.getBoundingClientRect().top - 500; return 'ok ' + b.scrollTop; })()" },
+  { "wait": 800 },
+  { "shot": "entry" },
+  { "clicktext": "Use a Free Apple ID", "ms": 1500 },
+  { "eval": "(() => { const g = document.querySelector('.page.is-top .free-route .group'); const n = document.getElementById('navbar').getBoundingClientRect().bottom; const r = [...document.querySelectorAll('.page.is-top .free-route .cell-inner')].map((e) => { const b = e.getBoundingClientRect(); return e.textContent.trim().slice(0, 12) + ' ' + Math.round(b.left) + ',' + Math.round(b.top) + ' ' + Math.round(b.width) + 'x' + Math.round(b.height); }); return { navBottom: n, groupTop: g.getBoundingClientRect().top, cells: r, focused: document.activeElement?.getAttribute('aria-label') }; })()" },
+  { "shot": "signin" },
+  { "eval": "document.documentElement.dataset.theme = 'dark'; 'ok'" },
+  { "wait": 500 },
+  { "shot": "signin-dark" },
+  { "eval": "document.documentElement.dataset.theme = 'light'; document.documentElement.dataset.style = 'ios26'; 'ok'" },
+  { "wait": 500 },
+  { "shot": "signin-ios26" }
+]

@@ -137,3 +137,62 @@ test("devModeShot: nav bar, rows (switch, detail, chevron, mark) and the alert, 
     globalThis.document = saved;
   }
 });
+
+test("B369: Sign In and Verify sit beside Cancel in one split row, the footer under the pair", async () => {
+  const { signInButtons, codeButtons, splitButtons, FREE_PASSWORD_FOOTER, freeWaitFooter } = await import("./free-apple-id.js");
+  const s = signInButtons();
+  assert.deepEqual(s.rows.map((r) => [r.label, r.cls]), [["Cancel", "free-button"], ["Sign In", "free-primary"]]);
+  assert.equal(s.footer, FREE_PASSWORD_FOOTER);
+  assert.equal(signInButtons({ busy: true }).rows[1].label, "Signing In…");
+  const wait = new Date("2026-11-23T12:15:00Z");
+  assert.equal(signInButtons({ wait }).footer, freeWaitFooter(wait));
+  assert.deepEqual(codeButtons().rows.map((r) => r.label), ["Cancel", "Verify"]);
+  assert.equal(codeButtons().footer, null);
+
+  const fake = (tag) => {
+    const e = { tag, className: "", textContent: "", children: [], on: {},
+      append: (...c) => e.children.push(...c), addEventListener: (k, f) => { e.on[k] = f; } };
+    return e;
+  };
+  const saved = globalThis.document;
+  globalThis.document = { createElement: fake };
+  try {
+    const tapped = [];
+    const g = splitButtons(signInButtons({ onSignIn: () => tapped.push("in"), onCancel: () => tapped.push("cancel") }));
+    assert.equal(g.className, "group");
+    const [ul, foot] = g.children;
+    assert.equal(ul.className, "table grouped free-split"); // one table: the two halves share a row
+    assert.equal(ul.children.length, 2);
+    assert.deepEqual(ul.children.map((li) => li.className), ["cell free-button", "cell free-primary"]);
+    const buttons = ul.children.map((li) => li.children[0]);
+    assert.deepEqual(buttons.map((b) => [b.tag, b.type, b.className]), [["button", "button", "cell-inner"], ["button", "button", "cell-inner"]]);
+    assert.deepEqual(buttons.map((b) => b.children[0].children[0].textContent), ["Cancel", "Sign In"]);
+    buttons[1].on.click();
+    buttons[0].on.click();
+    assert.deepEqual(tapped, ["in", "cancel"]);
+    assert.equal(foot.className, "group-footer");
+    assert.equal(foot.textContent, FREE_PASSWORD_FOOTER);
+    assert.equal(splitButtons(codeButtons()).children.length, 1); // Verify's pair has no footer
+  } finally {
+    globalThis.document = saved;
+  }
+});
+
+test("B369: freeid.css lays the split out as one row of two equal halves", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const css = await readFile(new URL("../freeid.css", import.meta.url), "utf8");
+  assert.match(css, /\.table\.grouped\.free-split \{ display: flex; \}/);
+  assert.match(css, /\.free-split > \.cell \{ flex: 1 1 0; min-width: 0; \}/);
+  assert.match(css, /\.free-split > \.cell \+ \.cell \{ border-top: 0; border-left: 1px solid var\(--divider\)/);
+});
+
+test("B369: scrollTarget puts the Sign In group at the top, under the nav bar", async () => {
+  const { scrollTarget, TOP_GAP } = await import("./free-apple-id.js");
+  // the scroller fills the screen from 0 and runs under a 64px nav bar; the group is 500px down, 100px scrolled
+  assert.equal(scrollTarget({ groupTop: 500, scrollerTop: 0, scrollTop: 100, navBottom: 64 }), 100 + 500 - 64 - TOP_GAP);
+  // no nav bar over the scroller: only the gap
+  assert.equal(scrollTarget({ groupTop: 300, scrollerTop: 50, scrollTop: 0, navBottom: 50, gap: 0 }), 250);
+  // never past the end or above the top
+  assert.equal(scrollTarget({ groupTop: 900, scrollerTop: 0, scrollTop: 0, navBottom: 64, max: 400 }), 400);
+  assert.equal(scrollTarget({ groupTop: 20, scrollerTop: 0, scrollTop: 0, navBottom: 64 }), 0);
+});
