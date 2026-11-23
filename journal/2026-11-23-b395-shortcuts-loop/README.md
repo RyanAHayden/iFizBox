@@ -45,10 +45,12 @@ This fits the user's words, but their own phone log wasn't seen, so it isn't pro
 
 Counted from SpringBoard's "user action request ... com.apple.shortcuts" lines.
 
-- OLD (F386's Install Switch, the base build's check): 1 open.
 - Old Install Switch (F386's, 636a09ee) on the base build: start and end, 2 opens per install, no loop.
 - Base build, check with Shortcuts unable to find it (Add/Update): 5 opens in 15 s (16:26:20 to 16:26:35), ending in
   "Could not find the shortcut". This is the loop.
+- Base build, MISSING, trip flag: vpn.test opened it twice (trip, then an end that couldn't find it either).
+- Fixed build, OLD Install Switch (F386's): check 1; app update with Tailscale 2 (start, end; VPN back); own update 1,
+  then 1 at the relaunch (end; VPN back).
 - Fixed build, MISSING Shortcut, older flags:
   - app update (signing.resign of Probe) with Tailscale: 1 open, alert "Your VPN Is Off".
   - app update without Tailscale: 0 opens.
@@ -97,6 +99,13 @@ Counted from SpringBoard's "user action request ... com.apple.shortcuts" lines.
 - The Update row tapped in the UI on the phone: a bridge call was used instead.
 - The user's own phone; the page's quiet check on the phone.
 - iOS 15 to 26.
+- The review fixes after the phone checks (the pending key cleared before the end opens, an end that never opened tried
+  again in front, Wi-Fi keeping LocalDevVPN/Tailscale after a failed run, an idle VPN said too): built and tested on
+  Linux, and on the phone only a normal app update (1 open) and own update (1, then 1 at the relaunch) with the current one.
+- Cellular data left off while on Wi-Fi isn't said: iOS doesn't tell an app then.
+- Without Tailscale, only an app update with the missing and the current Install Switch ran (0 opens: the rule never
+  starts it on Wi-Fi with no other VPN); the old and duplicated ones, and an own update, weren't run without it. An own
+  update with the duplicated one wasn't run either.
 - A localised "could not find" text: then the end is tried once too.
 - A first app whose App ID isn't recorded is asked for while signing. That is a queue of its own, with one more
   capped run.

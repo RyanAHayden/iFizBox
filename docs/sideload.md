@@ -338,7 +338,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   nothing but the end. A failed start or trip rests the queue's starts for 5 minutes, except an older Install Switch's
   trip that it ignored (the next app of a run is often a queue of its own); a passed check or a tapped Test Install
   Switch ends the rest. When Shortcuts can't find the Shortcut ("could not find the shortcut"), no end is opened at
-  all. The end runs once: an end that opened Shortcuts isn't tried again at the next launch.
+  all. The end runs once: an end that opened Shortcuts isn't tried again at the next launch; one that never opened it waits until the app is in front again. A VPN or cellular data still off after it rests the starts too.
   A run that failed on Wi-Fi doesn't stop the install: it goes on, and the built-in VPN connects by itself. On cellular
   the install stops with `switch_failed` before this VPN starts, because iOS refuses the connect while cellular data
   is on and nothing else would turn it off. The same happens on either network when this VPN then fails to start after

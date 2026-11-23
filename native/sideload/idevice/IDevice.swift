@@ -721,7 +721,7 @@ enum IDevice {
                         // B378: an install still goes through LocalDevVPN or Tailscale, but only when one is on: a
                         // connect to 10.7.0.1 with no tunnel fails as "device socket io failed", hiding this error
                         // B395: the Install Switch didn't run on cellular: iOS refuses the other ways in as well
-                        guard failure.code != "switch_failed", Session.otherRouteOn() else { throw failure }
+                        guard !(failure.code == "switch_failed" && LocalVPN.Path.now().cellular), Session.otherRouteOn() else { throw failure }
                         ilog("\(LocalVPN.name) didn't start (\(failure.text)); trying LocalDevVPN or Tailscale")
                     }
                 }

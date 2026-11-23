@@ -264,7 +264,7 @@ enum LocalVPN {
         let start = want && opens.take(ready ? .trip : .start) // B395: not again in this queue, nor after one that failed
         let deciding = !switchedOn && holds == 1
         if start { switchedOn = true; switchDataOff = false; switchVPNBefore = before; switchSelectedBefore = selected }
-        else if want { lose(before) }
+        else if want { lose(before, idle: selected && before.isEmpty) }
         let skipped = !want && !switchedOn && holds == 1 && switchAdded() // said once per queue
         lock.unlock()
         // T77: what the start decided from, for a phone where a carrier's ipsec tunnel may count as another VPN
@@ -332,7 +332,7 @@ enum LocalVPN {
         if notOpened(error) { opens.untake(run) } else { opens.fail(rest: !older) }
         let nothing = older || notOpened(error) || SwitchOpens.notFound(error)
         if nothing {
-            lose(switchVPNBefore)
+            lose(switchVPNBefore, idle: switchSelectedBefore && switchVPNBefore.isEmpty)
             switchedOn = false; switchVPNBefore = []; switchSelectedBefore = false
         }
         lock.unlock()
@@ -508,23 +508,32 @@ enum LocalVPN {
         }
         log("Install Switch: end (data off \(dataOff), on again \(dataBack); another VPN before \(vpnBefore), now \(vpnBack))")
         lock.lock(); let may = opens.take(.end); lock.unlock()
+        clearPending() // B395: once, whatever it answers, also when the app is killed while it runs
         let r = may ? switchEnded(runShortcut("switch", input: switchInput("end", cellular: dataOff))) : (ok: false, error: "it ran already")
-        // B395: once, whatever it answered (a run that never opened Shortcuts is tried at the next launch)
-        if !notOpened(r.error) { clearPending() }
         log(r.ok ? "Install Switch: end ran" : "Install Switch: end didn't run: \(r.error ?? "?")")
-        if !notOpened(r.error) { lock.lock(); lose(before, data: dataOff); lock.unlock(); sayLost() }
+        if notOpened(r.error) { // nothing opened: the next time the app is in front
+            savePending(cellular: dataOff, vpn: before, selected: selected)
+            lock.lock(); opens.untake(.end); switchedOn = true; switchEndDue = holds == 0 && installs == 0; lock.unlock()
+            return
+        }
+        lock.lock(); lose(before, idle: selected && before.isEmpty && !r.ok, data: dataOff); lock.unlock()
+        sayLost()
     }
 
     // ---- B395: what stayed off, in words
 
+    private static let idleMark = "selected" // in `lost`, beside the addresses
     private static let lostKey = "ifizbox.vpn.lost"
     private static let leftOffKey = "ifizbox.vpn.leftOff"
     static let leftOffLimit: TimeInterval = 8 // a VPN needs a moment to have its address
     private static var leftOffCall: Bridge.Call? // guarded by lock: the page's vpn.leftOff, waiting
 
     /// Under lock: to be said at the queue's end. Kept, so a launch after a kill (iFizBox's own update) says it too.
-    private static func lose(_ vpn: Set<String>, data: Bool = false) {
-        lost.formUnion(vpn); lostData = lostData || data
+    /// `idle`: a VPN that was selected and not up (F389), which has no address to look for: its place in Settings > VPN.
+    private static func lose(_ vpn: Set<String>, idle: Bool = false, data: Bool = false) {
+        lost.formUnion(vpn)
+        if idle { lost.insert(idleMark) }
+        lostData = lostData || data
         if !lost.isEmpty || lostData { UserDefaults.standard.set(["vpn": Array(lost), "cellular": lostData] as [String: Any], forKey: lostKey) }
     }
 
@@ -546,8 +555,7 @@ enum LocalVPN {
         if !vpn.isEmpty || data { sayLeftOff(vpn: vpn, dataOff: data, gen) }
     }
 
-    /// Looks for a while, and tells the page what isn't back on (its alert; kept until the page was told). An idle VPN
-    /// has no address to look for, so nothing is said of it. When another connect began meanwhile, its own end looks.
+    /// Looks for a while, and tells the page what isn't back on (its alert; kept until the page was told). When another connect began meanwhile, its own end looks.
     private static func sayLeftOff(vpn: Set<String>, dataOff: Bool, _ gen: Int) {
         DispatchQueue.global(qos: .utility).async {
             let t0 = Date()
@@ -559,13 +567,15 @@ enum LocalVPN {
                     return
                 }
                 let path = Path.now()
-                vpnOff = !vpn.isEmpty && !vpn.isSubset(of: otherVPNAddresses())
+                let up = otherVPNAddresses()
+                vpnOff = vpn.contains { $0 == idleMark ? up.isEmpty && !otherVPNSelected() : !up.contains($0) }
                 dataStill = dataOff && !path.cellular && !path.wifi
                 if !vpnOff && !dataStill { return forgetLost() }
                 Thread.sleep(forTimeInterval: 0.5)
             }
             log("still off after the queue: VPN \(vpnOff), cellular data \(dataStill)")
             UserDefaults.standard.set(["vpn": vpnOff, "cellular": dataStill], forKey: leftOffKey)
+            lock.lock(); opens.fail(); lock.unlock() // what it can't put back it doesn't take again at once
             forgetLost()
             answerLeftOff()
         }

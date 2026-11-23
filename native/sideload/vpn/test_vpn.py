@@ -246,6 +246,8 @@ class App(unittest.TestCase):
         end = src[src.index("static func endSwitch()"):src.index("// ---- B395")]
         self.assertEqual(end.count("runShortcut("), 1)
         self.assertLess(end.index("opens.take(.end)"), end.index("runShortcut("))
+        self.assertLess(end.index("clearPending() // B395"), end.index("runShortcut("))  # a kill during the end: not again
+        self.assertIn('failure.code == "switch_failed" && LocalVPN.Path.now().cellular', read("idevice", "IDevice.swift", base=os.path.dirname(HERE)))  # Wi-Fi keeps the other ways in
         check = src[src.index("static func checkShortcut("):src.index("static func switchEnded(")]
         self.assertNotRegex(check, r"\b(for|while)\b.*\{")
         self.assertIn("installs == 0", src[src.index("static func stopLater("):])
