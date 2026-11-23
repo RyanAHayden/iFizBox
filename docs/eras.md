@@ -139,13 +139,17 @@ the app supports iOS 15.0, so cascade layers are out.
 | `--action-title-margin`, `--action-title-pad`, `--action-cancel-gap` | -6px 0 2px, 0, 14px | the sheet's title, and the extra space over Cancel |
 | `--alert-w`, `--alert-pad` | 340px, 16px 12px 11px | the alert box (`sources.css`) |
 | `--alert-buttons-margin`, `--alert-buttons-gap`, `--alert-stacked-gap`, `--alert-button-h` | 4px 0 0, 8px, 9px, 43px | the alert's button row (a negative side margin takes it to the box's edges), two side by side, stacked buttons, a button's height |
+| `--share-layout` | grid | the share sheet's layout, read from the root element (`nav/sharesheet.js`): `grid` is iOS 6's activity sheet, `action` hands the items to the action sheet |
+| `--share-row-icon`, `--share-row-radius`, `--share-row-glyph`, `--share-row-letter` | 29px, 6.5px, 20px, 16px | a share item's icon in an action sheet row (`--share-layout: action`): its size and corners, its glyph and its initial |
+| `--share-row-gap`, `--share-row-pad`, `--share-row-dir`, `--share-row-justify` | 12px, 0 16px, row, flex-start | the same row: the gap to the label, its padding, which side the icon sits on, and how the row is justified |
 
 A hook never reuses a look token's name (`ios6-css.test.js` checks the switch, Mode and Home hooks): the knob's size is
 `--sw-knob-size` because `--sw-knob` is the knob's paint.
 
-No hook yet, on purpose: the reload bar's 44pt, the share sheet's grid, the pull area and the placeholders.
+No hook yet, on purpose: the reload bar's 44pt, the share sheet's grid (its icons and pages; `--share-layout` picks
+the grid or the action sheet, but nothing sizes the grid), the pull area and the placeholders.
 `packages.css` and the other component stylesheets keep their layout in their own rules; only Home's, Theme's
-Mode, the action sheet and the alert take the hooks above.
+Mode, the action sheet, the alert and the share sheet's action rows take the hooks above.
 
 The bars' own heights (`--nav-h`, `--tab-h`) are layout that every screen depends on; an era that changes them
 (large titles, a floating tab bar) does it through a nav hook, not by setting them.
@@ -184,7 +188,8 @@ The bars' own heights (`--nav-h`, `--tab-h`) are layout that every screen depend
   `--share-glyph-qr`, `--share-app-gloss`, `--share-app-shine`, `--share-letter`, `--share-letter-emboss`,
   `--share-pressed`, `--share-label`, `--share-label-emboss`, `--share-dot`, `--share-dot-on`, `--share-cancel`,
   `--share-cancel-edge`, `--share-cancel-shadow`, `--share-cancel-text`, `--share-cancel-emboss`,
-  `--share-cancel-stroke`, `--share-cancel-pressed`; the nav bar's Share glyph `--bar-glyph-emboss`.
+  `--share-cancel-stroke`, `--share-cancel-pressed`, `--share-line-copy`, `--share-line-qr` (the grey line-art Copy
+  and QR glyphs the eras set `--share-glyph-copy` and `--share-glyph-qr` to); the nav bar's Share glyph `--bar-glyph-emboss`.
 - Reload bar `--reload-bar`, `--reload-text`, `--reload-emboss`; undo bar `--undo-bar`, `--undo-text`,
   `--undo-emboss`.
 - Pull to refresh: `--pull-arrow`, `--pull-text`, `--pull-emboss`, `--pull-emboss-dark`.
@@ -296,7 +301,7 @@ against these classes. The classes and states are the hooks: keep them when an o
 |---|---|---|---|
 | Alert | `alert.js` | `.alert-scrim`, `.alert`, `.alert-title`, `.alert-message`, `.alert-field`, `.alert-field-row`, `.alert-paste`, `.alert-buttons` (`.stacked`), `.alert-button` (`.cancel`, `.green`, `.red`) | `sources.css`, literal |
 | Action sheet | `actionsheet.js` | `.action-scrim`, `.action-dim`, `.action-sheet`, `.action-title`, `.action-list`, `.action-button` (`.destructive`, `.cancel`); iOS 26's anchored menu (a sheet opened from a button): `.action-menu-scrim`, `.action-menu`, `.action-menu-room` | `packages.css`, tokens: `--action-*`; dark `--dk-action-sheet`, `--dk-action-btn`, `--dk-action-cancel`; the menu: `ios26.css`, `--i26-menu`, `--i26-menu-pressed`, `--i26-menu-dim` |
-| Share sheet | `sharesheet.js` | `.share-scrim`, `.share-dim`, `.share-sheet`, `.share-pages`, `.share-grid`, `.share-item`, `.share-icon` (`.system`, `.app`, `.has-image`), `.share-glyph` (`.glyph-copy`, `.glyph-qr`), `.share-letter`, `.share-image`, `.share-label`, `.share-dots` (`span.on`), `.share-cancel`; the nav bar's `.share-button` | `ios6.css`, tokens: `--share-*`, the glyphs `--share-glyph-copy`, `--share-glyph-qr`; an app's own colour comes in `--share-tint` |
+| Share sheet | `sharesheet.js` | `.share-scrim`, `.share-dim`, `.share-sheet`, `.share-pages`, `.share-grid`, `.share-item`, `.share-icon` (`.system`, `.app`, `.has-image`), `.share-glyph` (`.glyph-copy`, `.glyph-qr`), `.share-letter`, `.share-image`, `.share-label`, `.share-dots` (`span.on`), `.share-cancel`; the nav bar's `.share-button`. Under `--share-layout: action` it is the action sheet: `.action-button.has-icon`, its `.action-icon` (with `.share-icon`) and `.action-label` | `ios6.css`, tokens: `--share-*`, the glyphs `--share-glyph-copy`, `--share-glyph-qr`; an app's own colour comes in `--share-tint` |
 | HUD | `hud.js` | `.hud-scrim`, `.hud`, `.hud-spinner`, `.hud-label`, `.hud-check` | `ios6.css`, tokens: `--hud`, `--hud-text`, `--hud-emboss`, `--spinner-large`, `--hud-check` (the checkmark's art) |
 | Spinners | `spinner.js` | `.hud-spinner`, `.reload-spinner`, `.pull-spinner`, `.badge.spinning`, `.source-row.is-loading`, `.loading-spinner`, `.bar-button.is-reloading` | tokens `--spinner-white`, `--spinner-gray`, `--spinner-large` in `ios6.css` and again in `ios7.css`, `ios13.css` and `ios26.css`, each era's own; the hook `--spinner-turns` (`style.css`: `hud-spin`, 30 degrees a turn, or `hud-spin-8`, 45) |
 | Reload bar | `reloadbar.js` | `.reload-bar`, `.reload-spinner`, `.reload-text`, `.reload-cancel` (a `.bar-button.done`) | `ios6.css`, tokens: `--reload-bar`, `--reload-text`, `--reload-emboss` |
