@@ -228,3 +228,10 @@ _Said_: selected but idle On Demand VPN
 _On screen_: idle VPN
 _In code_: LocalVPN.otherVPNSelected, shortcuts.idle, vpnIdle
 _Avoid_: sleeping VPN, inactive VPN
+
+**Cannot Comply**:
+What the Confirm sheet becomes when apt, or the part that asks it, won't go ahead with the queue: why, the way out per package, and Close, which keeps the queue
+_Said_: the error sheet when queuing
+_On screen_: Cannot Comply; Close; Remove <name> from Queue
+_In code_: openConfirm, refusedGroups, unqueueGroup, helperRefusal, refusalIds
+_Avoid_: error sheet, failed Confirm

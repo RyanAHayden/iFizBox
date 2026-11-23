@@ -219,6 +219,7 @@ confirmCase("no package named: a row per queued package", async () => answer(fal
 
 confirmCase("a missing helper says reinstalling puts it back", async () => { throw new Error("ifizbox-helper is not installed at /var/jb/x"); }, async (c) => {
   assert.match(c.sheet().querySelector(".sheet-scroll").textContent, /Reinstalling .* puts it back/);
+  assert.equal(c.rows().length, 2);
   await closeKeepsBoth(c);
 });
 
@@ -234,7 +235,7 @@ test("helperRefusal: which package and why, by the helper's own rule", () => {
   assert.deepEqual([rm.ids, rm.sentences], [["com.x.rm"], ["com.x.rm isn't installed, so it can't be removed."]]);
   const other = helperRefusal(helperError("the calling process isn't the installed app").message, jobs);
   assert.deepEqual([other.ids, other.missing], [[], false]);
-  assert.match(other.sentences[0], /the calling process isn't the installed app$/);
+  assert.match(other.sentences[0], /isn't the installed /);
 });
 
 test("refusalIds: the queued packages apt's refusal names", () => {
@@ -247,5 +248,6 @@ test("refusalIds: the queued packages apt's refusal names", () => {
   assert.deepEqual(ids(" com.a : Depends: com.b but it is not going to be installed\n          Depends: com.c but it is not going to be installed"), ["com.a", "com.c"]);
   assert.deepEqual(ids("", { issues: ["Couldn't download D from https://e.x/d.deb, where its source says it is: no"] }), ["com.d"]);
   assert.deepEqual(ids("WARNING: The following essential packages will be removed.\nThis should NOT be done unless you know exactly what you are doing!\n  dpkg tar (due to com.c)\nE: Essential packages were removed"), ["com.c"]);
+  assert.deepEqual(ids(" com.a:iphoneos-arm64 : Depends: com.gone but it is not installable"), ["com.a"]);
   assert.deepEqual(ids("E: Could not get lock"), []);
 });

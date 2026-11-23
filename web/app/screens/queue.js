@@ -356,7 +356,7 @@ function refusedGroups(err, jobs, names) {
   const g = frag.querySelector(".group");
   g.classList.add("confirm-problem", "confirm-issues");
   [...g.querySelectorAll(".cell")].forEach((li, i) => li.replaceChildren(el("div", "pkg-description", why.sentences[i])));
-  if (!why.missing) frag.append(unqueueGroup(why.ids, jobs, names));
+  frag.append(unqueueGroup(why.ids, jobs, names));
   return frag;
 }
 

@@ -56,12 +56,15 @@ export function helperRefusal(message, jobs, names = {}) {
   if (/ifizbox-helper is not installed|can't start ifizbox-helper: No such file/.test(why)) {
     return { ...about([], null, `The part of ${NAME} that runs apt is missing from this iPhone, so nothing can be installed or removed.`), missing: true };
   }
+  if (/calling process|parent/.test(why)) return about([], null, `iOS didn't let ${NAME} run apt: the app that is running isn't the installed ${NAME}. Close and open ${NAME}, then try again.`);
+  if (/can't start ifizbox-helper/.test(why)) return about([], null, `iOS didn't let ${NAME} run apt (${why.replace(/^.*?: /, "")}). Is the jailbreak on?`);
   return about([], null, `${NAME} couldn't ask apt about these packages: ${why || "it gave no reason"}`);
 }
 
 export function refusalIds(r, jobs) {
   const out = new Set();
-  const add = (id, when = () => true) => { for (const j of jobs) if (id && same(j.id, id) && when(j)) out.add(j.id); };
+  // "com.a:iphoneos-arm64": apt adds the architecture to a foreign one
+  const add = (id, when = () => true) => { id = id?.replace(/:.*$/, ""); for (const j of jobs) if (id && same(j.id, id) && when(j)) out.add(j.id); };
   for (const id of r?.plan?.essential ?? []) add(id);
   // F131/F133: a linked download's sentence names its link
   for (const s of r?.issues ?? []) for (const j of jobs) if (j.debUrl && s.includes(j.debUrl)) out.add(j.id);
