@@ -5,7 +5,8 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { themeFor, paletteFor, themeState, createSettings, DARK_PALETTES, LIGHT_PALETTES } from "./core/settings.js";
-import { STYLES, hooksOf } from "./core/settings.js"; // F202
+import { STYLES, hooksOf, setPhoneIos } from "./core/settings.js"; // F202
+setPhoneIos("26.0"); // C70: the iOS 26 style needs an iOS 26 phone
 import { applyTheme, settings, THEME_COLORS } from "./screens/settings.js";
 
 const here = new URL(".", import.meta.url);
@@ -34,6 +35,8 @@ function boot({ appearance = null, lightTheme = null, darkTheme = null, systemDa
     ...(native ? { ifizboxNative: {} } : {}), // C69: the eras are the apps' (the shell's bridge); the website is iOS 6
     location: { hash },
     localStorage: { getItem: (k) => store[k] ?? null },
+    navigator: { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15" }, // C70: iOS 26 needs WebKit 26's
+    CSS: { supports: () => true },
     matchMedia: () => ({ matches: systemDark }),
     document: {
       documentElement: { setAttribute: (k, v) => { attrs[k] = v; } },
@@ -241,9 +244,9 @@ test("F203: ios26.css is linked after ios13.css, only styles html[data-style=ios
   // F370: its own filled tab glyphs, only on the tabs (rowicons.test.js checks them against the icon map)
   for (const m of css.matchAll(/([^{}]+)\{[^}]*--glyph:/g)) assert.match(m[1].trim(), /^html\[data-style="ios26"\] \.tab\[data-tab="\w+"\](\.active)?$/);
   const blurring = rules.filter(([, body]) => /backdrop-filter/.test(body));
-  assert.equal(blurring.length, 4); // B333: the undo bar floats over the content in the same glass; B351: the anchored menu
+  assert.equal(blurring.length, 3); // B333: the undo bar floats over the content in the same glass
   for (const [sel, body] of blurring) {
-    assert.match(sel, /\.tabbar|\.tab\[data-tab="search"\]|\.undo-bar$|\.action-menu$/, sel);
+    assert.match(sel, /\.tabbar|\.tab\[data-tab="search"\]|\.undo-bar$/, sel);
     for (const m of body.matchAll(/backdrop-filter:\s*([^;]+)/g)) assert.equal(m[1].trim(), "var(--i26-glass-blur)", sel);
   }
   // 22pt table corners, capsule bar buttons

@@ -10,7 +10,7 @@ import { nativeBridge, hasNativeCall } from "../native.js";
 // The native controls hook, read inline as nav/alert.js does: importing actionsheet.js's wantsNativeControls would
 // load it at startup (module-graph.test.js's budget).
 const wantsNativeControls = (native, doc = globalThis.document) =>
-  hasNativeCall(native) && doc?.documentElement?.getAttribute?.("data-controls") === "native";
+  hasNativeCall(native) && doc?.documentElement?.getAttribute?.("data-style") === "ios26";
 
 export const HOLD_MS = 550; // B48: a little longer than 500, nearer iOS's own, so a finger resting before a slow scroll doesn't hold
 export const HOLD_SLOP = 10;
@@ -46,7 +46,7 @@ export function showMenu(anchor, items, opts = {}) {
   }, () => {
     if (open !== ctl) return;
     close();
-    cssMenu(anchor, items, opts); // an older shell ("unknown method ui.menu"), or no menu opened
+    cssMenu(anchor, items, opts); // no menu opened (the concept frame has no shell)
   });
   return close;
 }

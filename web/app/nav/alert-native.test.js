@@ -1,5 +1,5 @@
 // F345b: showAlert goes through the shell's ui.alert (a UIAlertController, native/Sources/NativeAlerts.swift) only in
-// the app under the native controls hook; countdown alerts, a shell without ui.alert, the site and every other style
+// the app under the iOS 26 style; countdown alerts, a shell without ui.alert, the site and every other style
 // get the CSS alert.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -9,12 +9,12 @@ import { fakeDocument } from "./fakedom.test-helper.js";
 
 // Runs fn with a fake document (data-controls as given) and the bridge (or none); returns what fn returned plus the
 // elements the CSS alert made.
-async function withPage({ controls = "native", native = null }, fn) {
+async function withPage({ controls = "ios26", native = null }, fn) {
   const document = fakeDocument();
   const made = [];
   const make = document.createElement;
   document.createElement = (tag) => { const e = make(tag); made.push(e); return e; };
-  if (controls) document.documentElement.setAttribute("data-controls", controls);
+  if (controls) document.documentElement.setAttribute("data-style", controls);
   const saved = { document: globalThis.document, native: globalThis.ifizboxNative };
   globalThis.document = document;
   if (native) globalThis.ifizboxNative = native; else delete globalThis.ifizboxNative;
@@ -64,10 +64,10 @@ test("F345b: an answer out of range counts as the cancel button", async () => {
 
 test("F345b: countdown alerts, the site, other styles and old shells keep the CSS alert", async () => {
   const native = shell(() => ({ index: 0 }));
-  assert.equal(wantsNativeAlert({ countdown: { button: 1, seconds: 5 } }, native, { documentElement: { getAttribute: () => "native" } }), false);
+  assert.equal(wantsNativeAlert({ countdown: { button: 1, seconds: 5 } }, native, { documentElement: { getAttribute: () => "ios26" } }), false);
   assert.equal(wantsNativeAlert({}, native, { documentElement: { getAttribute: () => null } }), false, "no native hook");
-  assert.equal(wantsNativeAlert({}, undefined, { documentElement: { getAttribute: () => "native" } }), false, "the site");
-  assert.equal(wantsNativeAlert({}, native, { documentElement: { getAttribute: () => "native" } }), true);
+  assert.equal(wantsNativeAlert({}, undefined, { documentElement: { getAttribute: () => "ios26" } }), false, "the site");
+  assert.equal(wantsNativeAlert({}, native, { documentElement: { getAttribute: () => "ios26" } }), true);
 
   for (const [name, page, opts] of [
     ["countdown", { native }, { countdown: { button: 1, seconds: 5 } }],

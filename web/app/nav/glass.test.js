@@ -1,4 +1,4 @@
-// F367: the iOS 26 style's Liquid Glass bars. Under the native controls hook with the floating tab bar, the app's
+// F367: the iOS 26 style's Liquid Glass bars. Under the iOS 26 style with the floating tab bar, the app's
 // shell draws the tab bar and the nav bar's buttons (ui.glass): open with their rects, labels and selection; nothing
 // sent when nothing changed (scrolling); the look-alikes go see-through on the shell's answer and show at once when the
 // glass hides (a push sliding, a popup, a sheet over them); taps click the look-alike; closed when the hook goes off;
@@ -51,7 +51,7 @@ function el(tag, cls, rect, kids = []) {
 function app(native) {
   globalThis.ifizboxNative = native;
   const root = doc.documentElement;
-  root.setAttribute("data-controls", "native");
+  root.setAttribute("data-style", "ios26");
   root.setAttribute("data-tabbar", "float");
   root.setAttribute("data-theme", "light");
   const tab = (name, x, w) => {
@@ -95,15 +95,15 @@ function reset() {
   resetGlass();
 }
 
-test("only in the app, under the native controls hook with the floating tab bar", () => {
+test("only in the app, under the iOS 26 style with the floating tab bar", () => {
   reset();
   const { native } = fakeShell();
   app(native);
   assert.equal(glassWanted(doc, native), true);
   assert.equal(glassWanted(doc, null), false, "the site: no bridge");
-  doc.documentElement.removeAttribute("data-controls");
-  assert.equal(glassWanted(doc, native), false, "iOS 15-25, or another style: no native controls hook");
-  doc.documentElement.setAttribute("data-controls", "native");
+  doc.documentElement.removeAttribute("data-style");
+  assert.equal(glassWanted(doc, native), false, "iOS 15-25, or another style: no iOS 26 style");
+  doc.documentElement.setAttribute("data-style", "ios26");
   doc.documentElement.removeAttribute("data-tabbar");
   assert.equal(glassWanted(doc, native), false);
   assert.equal(glassSnapshot(doc, win, native), null);
@@ -257,7 +257,7 @@ test("closed when the hook goes off (another style); every look-alike shows", ()
   const { native, calls } = fakeShell();
   const { bar } = app(native);
   syncGlass(doc, native, win);
-  doc.documentElement.removeAttribute("data-controls");
+  doc.documentElement.removeAttribute("data-style");
   syncGlass(doc, native, win);
   assert.deepEqual([calls.at(-1).op, calls.at(-1).key], ["close", GLASS_KEY]);
   assert.equal(doc.documentElement.getAttribute("data-glass"), null);

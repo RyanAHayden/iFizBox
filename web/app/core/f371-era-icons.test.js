@@ -3,13 +3,14 @@
 // (Icon-ios7 = ios7 + ios7dark) to the shell; a fixed Mode keeps the one icon.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSettings, iconFor, iconState, pairName, lightOnlyName, ERA_ICONS, APP_ICONS } from "./settings.js";
+import { setPhoneIos, createSettings, iconFor, iconState, pairName, lightOnlyName, ERA_ICONS, APP_ICONS } from "./settings.js";
 import { iconOf, iconSrc } from "../appicon.js";
 
 function memStorage() {
   const m = new Map();
   return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) };
 }
+setPhoneIos("26.0"); // C70: the iOS 26 style needs an iOS 26 phone
 const store = () => createSettings({ storage: memStorage(), mode: "sideload" });
 
 const want = { ios6: ["classic", "gunmetal"], ios7: ["ios7", "ios7dark"], ios13: ["ios13", "ios13dark"], ios26: ["glass", "glass"] };

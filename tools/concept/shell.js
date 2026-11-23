@@ -490,7 +490,7 @@
     },
     "net.icon": function () { throw fail("not_found", "the concept has no network"); },
     "app.info": function () {
-      return { version: C.version || "1.0", build: "", ios: "18.1", jailbreak: C.mode === "jailbreak" ? "rootless" : null, mode: C.mode,
+      return { version: C.version || "1.0", build: "", ios: "26.0", jailbreak: C.mode === "jailbreak" ? "rootless" : null, mode: C.mode,
         machine: C.device.ipad ? "iPad14,1" : "iPhone17,1", cf: 2000, markers: [] };
     },
     "apps.isInstalled": function (p) {

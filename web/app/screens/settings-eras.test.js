@@ -6,6 +6,7 @@ import { fakeDocument } from "../fakes.test-helper.js";
 
 globalThis.ifizboxNative = { mode: "jailbreak" };
 const { applyTheme, settings } = await import("./settings.js");
+(await import("../core/settings.js")).setPhoneIos("26.0"); // C70: the iOS 26 style needs an iOS 26 phone
 const settingsDoc = () => Object.assign(fakeDocument(), { head: null });
 const fakeElement = (tag) => settingsDoc().createElement(tag);
 globalThis.document = settingsDoc();

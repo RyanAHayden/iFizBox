@@ -103,7 +103,7 @@ export const SETTINGS = [
     // F202: iOS 13 (ios13.css), inset grouped with large titles and card sheets (STYLE_HOOKS)
     options: [{ value: "ios6", label: "iOS 6" }, { value: "ios7", label: "iOS 7" }, { value: "ios13", label: "iOS 13" },
       { value: "ios26", label: "iOS 26" }], // F203: Liquid Glass (ios26.css), large titles, card sheets, floating tab bar
-    footer: "iOS 7, iOS 13 and iOS 26 have two themes of their own: White, and OLED Black in Dark mode.",
+    footer: "iOS 7 and iOS 13 (and iOS 26, on iOS 26 or later) have two themes of their own: White, and OLED Black in Dark mode.",
   },
   {
     // F199: Theme's Mode, drawn as an iOS 6 segmented control. Kept under its old key (ifizbox.appearance) so a
@@ -447,6 +447,22 @@ export function dropRetired(storage = globalThis.localStorage) {
 // helper(["hold", "com.foo"]). The app's bridge provides it as `ifizboxNative.helper` (N3); without one the holds
 // stay a list on the device, as in the other modes.
 // `native` (jailbreak mode): the bridge, for the detected jailbreak type (bridgeArch).
+// C70: the iOS 26 style is for a phone on iOS 26 or later (its bars and controls are the shell's own). `phoneIos` is the
+// shell's app.info `ios` (setPhoneIos, once it answered); before that, `guess` (the web view's CSS anchor positioning,
+// WebKit 26's, as theme-boot.js asks) stands in. An older phone is not offered it, and a stored ios26 draws iOS 6.
+let phoneIos = null;
+let guess26 = () => {
+  try { return /\b(iPhone|iPad|iPod)\b/.test(globalThis.navigator?.userAgent ?? "") && Boolean(globalThis.CSS?.supports?.("anchor-name: --a")); } catch { return false; }
+};
+const iosListeners = new Set();
+export const ios26Offered = (ios) => parseInt(String(ios ?? ""), 10) >= 26;
+export const ios26Here = () => (phoneIos != null ? ios26Offered(phoneIos) : Boolean(guess26()));
+export function setPhoneIos(ios, guess) {
+  if (guess) guess26 = guess;
+  if (ios != null && String(ios) !== String(phoneIos)) phoneIos = String(ios);
+  for (const f of iosListeners) f();
+}
+
 export function createSettings({ storage = globalThis.localStorage, mode = "site", features = FEATURES, helper, native = null } = {}) {
   if (!MODES.includes(mode)) throw new Error(`unknown mode ${mode}`);
   const store = safeStorage(storage);
@@ -460,6 +476,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     store.set(PREFIX + "device", store.get(PREFIX + "arch"));
   }
   const listeners = new Set();
+  iosListeners.add(() => { if (mode !== "site") notify("style", get("style")); });
 
   function def(key) {
     const d = byKey.get(key);
@@ -474,6 +491,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     const d = def(key);
     if (key === "style" && mode === "site") return defaultOf(d); // C69
     const raw = store.get(PREFIX + key);
+    if (key === "style" && raw === "ios26" && !ios26Here()) return defaultOf(d); // C70: iOS 26 needs an iOS 26 phone
     const hit = raw == null ? null : d.options.find((o) => String(o.value) === raw);
     if (!hit && raw != null && d.accepts?.(raw)) return raw; // F329: a value outside the list the setting takes
     return hit ? hit.value : defaultOf(d);
@@ -920,6 +938,8 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     isShown: (key) => { const d = byKey.get(key); return Boolean(d && shown(d)); },
     visible: () => SETTINGS.filter(shown),
     sections,
+    // C70: a choice's options this phone offers (Style without iOS 26 below iOS 26)
+    optionsOf: (key) => def(key).options.filter((o) => !(key === "style" && o.value === "ios26" && !ios26Here())),
     footerOf: (key) => resolve(byKey.get(key)?.footer, mode),
     // F128: Settings' pages, each with the groups this mode shows; pages left empty are dropped.
     pages() {
@@ -959,7 +979,7 @@ export function paletteFor(theme, darkTheme, lightTheme) {
 // F201: `style` is the era (<html data-style>): iOS 6's themes are the lightTheme and darkTheme picks; another era has
 // its own pair (STYLE_PALETTES) and no picks, so neither the picks nor a preview change it.
 export function themeState({ style = "ios6", appearance, lightTheme, darkTheme, preview = null }, systemDark) {
-  const era = STYLES.includes(style) ? style : STYLE_DEFAULT;
+  const era = STYLES.includes(style) && !(style === "ios26" && !ios26Here()) ? style : STYLE_DEFAULT;
   const own = STYLE_PALETTES[era];
   const theme = !own && (preview === "light" || preview === "dark") ? preview : themeFor(appearance, systemDark);
   return { theme, palette: own ? own[theme] : paletteFor(theme, darkTheme, lightTheme), style: era };

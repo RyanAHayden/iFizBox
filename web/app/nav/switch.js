@@ -1,11 +1,11 @@
 // The iOS 6 switch (ios6.css .switch), for settings rows (screens/settings.js makeSwitch) and anything else (F24's
 // Section Visibility): `checked` is where it starts, `onToggle(on)` hears every change.
-// F345a: under the native controls hook (<html data-controls="native">, native-controls.js) it is WebKit's own
+// F345a: under the iOS 26 style (<html data-style="ios26">) it is WebKit's own
 // switch instead, an <input type=checkbox switch> (nativeSwitch below). Either kind is a `.switch` whose state is its
 // aria-checked: callers read it, and set it to put the switch back without hearing onToggle.
 const made = new WeakMap(); // switch -> how it was made, so redrawSwitches can draw it again in the other kind
 
-const nativeHook = () => globalThis.document?.documentElement?.getAttribute?.("data-controls") === "native";
+const nativeHook = () => globalThis.document?.documentElement?.getAttribute?.("data-style") === "ios26";
 
 export function createSwitch({ label, checked = false, onToggle = () => {} }) {
   const sw = nativeHook() ? nativeSwitch({ label, checked, onToggle }) : artSwitch({ label, checked, onToggle });

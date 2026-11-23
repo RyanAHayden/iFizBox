@@ -1,4 +1,4 @@
-// B324: a rows page's bar (nav/progress.js rowBar): WebKit's <progress> under the native controls hook (iOS 26's
+// B324: a rows page's bar (nav/progress.js rowBar): WebKit's <progress> under the iOS 26 style (iOS 26's
 // UIProgressView), the drawn track and fill everywhere else; ios26.css paints both in the era's look.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -16,13 +16,13 @@ function fakeDoc(controls) {
     };
     return e;
   };
-  const doc = { createElement: make, documentElement: { getAttribute: (k) => (k === "data-controls" ? controls : null) } };
+  const doc = { createElement: make, documentElement: { getAttribute: (k) => (k === "data-style" ? controls : null) } };
   globalThis.document = doc;
   return doc;
 }
 
-test("B324: under the native controls hook a row's bar is a <progress>, no value while it sweeps", () => {
-  const doc = fakeDoc("native");
+test("B324: under the iOS 26 style a row's bar is a <progress>, no value while it sweeps", () => {
+  const doc = fakeDoc("ios26");
   const { bar, set } = rowBar(doc);
   assert.equal(bar.className, "qr-native");
   const [progress, wait] = bar.children;
@@ -54,7 +54,7 @@ test("B324: without the hook it is the drawn track and fill, scaled (120 Hz), sw
 });
 
 test("F391: a signed app waiting its turn covers either bar with the stripes, and takes them off again", () => {
-  for (const controls of ["native", null]) {
+  for (const controls of ["ios26", null]) {
     const { bar, set } = rowBar(fakeDoc(controls));
     assert.equal(bar.children[1].className, "qr-wait");
     set(0.5, false, true);

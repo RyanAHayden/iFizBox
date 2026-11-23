@@ -20,22 +20,21 @@
   // bars don't move after first paint.
   // C69: the eras exist in the two apps only (the shell's bridge is there before this runs); the website shows iOS 6
   // whatever is stored.
-  var era = window.ifizboxNative && (s === "ios7" || s === "ios13" || s === "ios26") ? s : "ios6";
+  // C70: the iOS 26 style needs a phone on iOS 26 or later; until the shell's app.info answers (core/settings.js
+  // ios26Here) that is guessed by a feature WebKit first shipped in 26 (CSS anchor positioning), which the iPhone 7's
+  // iOS 15 and iOS 18 lack: a stored ios26 there draws iOS 6.
+  var f26 = false;
+  try {
+    var ua = (window.navigator || {}).userAgent || "";
+    f26 = /\b(iPhone|iPad|iPod)\b/.test(ua) && !!(window.CSS && CSS.supports && CSS.supports("anchor-name: --a"));
+  } catch (e) { /* no CSS.supports */ }
+  var era = window.ifizboxNative && (s === "ios7" || s === "ios13" || (s === "ios26" && f26)) ? s : "ios6";
   var own = era !== "ios6"; // an era with its own White / OLED Black pair
   if (m && !own) dark = m[1] === "darkTheme";
   var root = document.documentElement;
   root.setAttribute("data-style", era);
   if (era === "ios13" || era === "ios26") root.setAttribute("data-sheet", "card");
   if (era === "ios26") root.setAttribute("data-tabbar", "float");
-  // F345a: the native controls hook, as native-controls.js drawsIos26Controls() (which corrects it once app.info
-  // answers): iOS 26's form controls are WebKit's own only on an iPhone or iPad whose WebKit has anchor positioning
-  // (first in WebKit 26).
-  if (era === "ios26") {
-    var ua = (window.navigator || {}).userAgent || "";
-    var css = window.CSS, f26 = false;
-    try { f26 = !!(css && css.supports && css.supports("anchor-name: --a")); } catch (e) { /* no CSS.supports */ }
-    if (/\b(iPhone|iPad|iPod)\b/.test(ua) && f26) root.setAttribute("data-controls", "native");
-  }
   root.setAttribute("data-theme", dark ? "dark" : "light");
   // Each tone's themes, in core/settings.js's order, and the default (its `default`: Gunmetal, Classic): a new theme
   // adds its name here, beside its ios6.css or palettes.css block (F200), and its top-bar colour below.

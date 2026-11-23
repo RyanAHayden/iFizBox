@@ -8,9 +8,9 @@ import { showActionSheet, wantsNativeControls, tapRect, watchTaps, TAP_FRESH_MS 
 import { showMenu, copyText } from "./menu.js";
 import { fakeDocument, tick } from "./fakedom.test-helper.js";
 
-async function withPage({ controls = "native", native = null }, fn) {
+async function withPage({ controls = "ios26", native = null }, fn) {
   const document = fakeDocument();
-  if (controls) document.documentElement.setAttribute("data-controls", controls);
+  if (controls) document.documentElement.setAttribute("data-style", controls);
   const saved = { document: globalThis.document, native: globalThis.ifizboxNative };
   globalThis.document = document;
   if (native) globalThis.ifizboxNative = native; else delete globalThis.ifizboxNative;
@@ -103,8 +103,8 @@ test("F345c: the rect is the button the last touch went down on, only while that
 test("F345c: the site, other styles and old shells keep the CSS sheet", async () => {
   const native = shell({});
   assert.equal(wantsNativeControls(native, { documentElement: { getAttribute: () => null } }), false, "no native hook");
-  assert.equal(wantsNativeControls(undefined, { documentElement: { getAttribute: () => "native" } }), false, "the site");
-  assert.equal(wantsNativeControls(native, { documentElement: { getAttribute: () => "native" } }), true);
+  assert.equal(wantsNativeControls(undefined, { documentElement: { getAttribute: () => "ios26" } }), false, "the site");
+  assert.equal(wantsNativeControls(native, { documentElement: { getAttribute: () => "ios26" } }), true);
   for (const [name, page] of [["no hook", { native, controls: null }], ["the site", { native: null }], ["old shell", { native }]]) {
     await withPage(page, async (document) => {
       showActionSheet({ buttons: ["One"] });
