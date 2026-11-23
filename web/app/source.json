@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "0.25.0",
+          "date": "2026-11-23T15:05:00Z",
+          "localizedDescription": "Share opens each style's own menu\nInstall Switch opens only when it's needed\nInstalls on cellular with the Install Switch\nFewer system-only tweaks in App Tweaks\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.25.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.25.0/iFizBox.ipa",
+          "size": 39767405,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.24.1",
           "date": "2026-11-23T08:58:21Z",
           "localizedDescription": "Install Switch reconnects your VPN more reliably\nInstall Switch no longer stops early on iOS 27 when it reconnects your own VPN after an install, so its next run starts clean.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.24.1",
@@ -250,14 +258,6 @@
           "localizedDescription": "Tweak injection unpacks zstd and bzip2 .debs, and bundles ElleKit for tweaks that need Substrate\nAll Apps row on Sources and AltStore source pages: every app, newest version\nInstallation & Signing simplified: one Install Apps With row; faster This iPhone settings\nSmoother: pages, sheets and alerts slide when they grow or shrink; fixes for cancelled installs and Paste\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.16.0",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.16.0/iFizBox.ipa",
           "size": 16265583,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.15.0",
-          "date": "2026-11-20T10:38:02Z",
-          "localizedDescription": "Inject tweaks when signing: add .dylib, .deb or .framework tweaks to any IPA\nSafety nets: Known Safe / Trusted / Unknown labels on sources, an Unknown Source check when adding one\nA one-time note before untrusted installs on iOS versions with public exploits, and Report as Malicious\nSelf-update on This iPhone closes iFizBox only once iOS is ready to install\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.15.0",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.15.0/iFizBox.ipa",
-          "size": 15846917,
           "minOSVersion": "15.0"
         }
       ]
