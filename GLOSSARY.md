@@ -187,6 +187,13 @@ _On screen_: Install Switch
 _In code_: SHORTCUT_NAMES.switch, switchAdded, LocalVPN.endSwitch, vpn.testSwitch, install-switch.plist
 _Avoid_: VPN Shortcut, switch shortcut
 
+**Version**:
+The page under a package's or app's Details that lists its versions, each row an install button with the chevron (an installed one that can't be reinstalled says INSTALLED); its notes fold to three lines with Show More
+_Said_: versions, version page
+_On screen_: Version
+_In code_: screens/browse.js version rows (version-go), packages.css .version-go, Details' Version row
+_Avoid_: version history, change version
+
 **Waiting Bar**:
 The full bar with moving stripes on a run's row whose app is signed and waiting its turn to install
 _Said_: waiting bar, moving stripes

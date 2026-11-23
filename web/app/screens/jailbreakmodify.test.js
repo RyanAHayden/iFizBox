@@ -1,5 +1,5 @@
 // B69: in the jailbreak app, Modify on an installed app's page opens Cydia's sheet (Upgrade/Reinstall, Ignore Upgrades,
-// Remove, Downgrade, Version History) instead of installing at once; Install (not installed) keeps its one tap.
+// Remove, Downgrade, Version) instead of installing at once; Install (not installed) keeps its one tap.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -46,7 +46,7 @@ test("installed, upgrade out: the sheet, nothing installed until a button is pic
   assert.equal(r.done, true);
   assert.deepEqual(r.installs, []);
   assert.equal(r.asked[0].title, "A");
-  assert.deepEqual(r.asked[0].buttons, ["Upgrade", IGNORE_VERSION, IGNORE_UPGRADES, "Remove", "Downgrade", "Version History"]);
+  assert.deepEqual(r.asked[0].buttons, ["Upgrade", IGNORE_VERSION, IGNORE_UPGRADES, "Remove", "Downgrade", "Version"]);
   assert.deepEqual(r.asked[0].destructive, [2, 3, 1]);
 });
 
@@ -56,7 +56,7 @@ test("F281: Ignore This Version keeps only the version on offer; Stop Ignoring T
   assert.deepEqual(r.installs, []);
   assert.deepEqual(iv.map, { "com.x.a": "3" });
   const again = await run([{ id: "com.x.a", version: "2" }], STOP_IGNORING_VERSION, { iv });
-  assert.deepEqual(again.asked[0].buttons, ["Upgrade", STOP_IGNORING_VERSION, IGNORE_UPGRADES, "Remove", "Downgrade", "Version History"]);
+  assert.deepEqual(again.asked[0].buttons, ["Upgrade", STOP_IGNORING_VERSION, IGNORE_UPGRADES, "Remove", "Downgrade", "Version"]);
   assert.deepEqual(iv.map, {});
   // Ignored whole (Ignore Upgrades): no version button; an older ignored version than the one on offer: Ignore again.
   const held = await run([{ id: "com.x.a", version: "2" }], () => -1, { holds: memHolds(["com.x.a"]), iv: memVersions() });
@@ -96,12 +96,12 @@ test("F281: Changes' hold menu: Ignore This Version on an available upgrade row,
 test("Upgrade installs the newest; Reinstall the installed version; Downgrade asks which", async () => {
   assert.deepEqual((await run([{ id: "com.x.a", version: "2" }], "Upgrade")).installs, ["3"]);
   const re = await run([{ id: "com.x.a", version: "3" }], "Reinstall");
-  assert.deepEqual(re.asked[0].buttons, ["Reinstall", "Remove", "Downgrade", "Version History"]); // no upgrade: no Ignore
+  assert.deepEqual(re.asked[0].buttons, ["Reinstall", "Remove", "Downgrade", "Version"]); // no upgrade: no Ignore
   assert.deepEqual(re.installs, ["3"]);
   const down = await run([{ id: "com.x.a", version: "3" }], (o, n) => (n === 1 ? o.buttons.indexOf("Downgrade") : 1));
   assert.deepEqual(down.asked[1].buttons, ["2", "1"]);
   assert.deepEqual(down.installs, ["1"]);
-  assert.deepEqual((await run([{ id: "com.x.a", version: "3" }], "Version History")).installs, ["history"]);
+  assert.deepEqual((await run([{ id: "com.x.a", version: "3" }], "Version")).installs, ["history"]);
 });
 
 test("Ignore Upgrades holds the app on the device (no dpkg); Stop Ignoring Upgrades lets it go", async () => {
@@ -109,7 +109,7 @@ test("Ignore Upgrades holds the app on the device (no dpkg); Stop Ignoring Upgra
   await run([{ id: "com.x.a", version: "2" }], IGNORE_UPGRADES, { holds });
   assert.deepEqual(holds.calls, [["com.x.a", true, { dpkg: false }]]);
   const again = await run([{ id: "com.x.a", version: "2" }], STOP_IGNORING, { holds });
-  assert.deepEqual(again.asked[0].buttons, ["Upgrade", STOP_IGNORING, "Remove", "Downgrade", "Version History"]);
+  assert.deepEqual(again.asked[0].buttons, ["Upgrade", STOP_IGNORING, "Remove", "Downgrade", "Version"]);
   assert.equal(holds.has("com.x.a"), false);
 });
 
@@ -119,7 +119,7 @@ test("Remove hands the app to the Installed tab's Delete", async () => {
   assert.deepEqual(removed, [{ id: "com.x.a", name: "A" }]);
 });
 
-test("jailbreakModifyButtons: one version, nothing older, no Version History", () => {
+test("jailbreakModifyButtons: one version, nothing older, no Version", () => {
   assert.deepEqual(jailbreakModifyButtons({ installed: "1", newest: "1" }), ["Reinstall", "Remove"]);
 });
 

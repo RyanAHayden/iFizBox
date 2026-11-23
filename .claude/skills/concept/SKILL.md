@@ -16,7 +16,7 @@ on the first glance and teaches the user nothing about how the change will reall
 A concept is held to the same rules as shipped code, because approved concepts get built as they are:
 
 - iOS 6 is the base style. Build the change from what `web/app/ios6.css` already draws: bar buttons (`.bar-button`),
-  the App Store price button (`.price-btn`, as FREE in Browse and My IPAs), grouped tables, segmented controls,
+  the App Store price button (`.price-btn`, as FREE in Browse and ADD in More Sources), grouped tables, segmented controls,
   switches, sheets and alerts (`nav/alert.js`, `nav/sheet.js`; `alert/confirm/prompt` don't work in the Artifact,
   the app's own alerts are DOM and do). No new visual styles: no new gradients, glows, highlights or bottom lines.
   A control the app doesn't have yet is drawn the way `ios6.css` draws its neighbours (sampled from the 4S's UIKit

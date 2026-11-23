@@ -49,7 +49,7 @@ Like Cydia's apt.saurik.com, iFizBox has a source of its own that is built in an
 
   `Packages` lists every published release's iFizBox, not just the newest (the newest 20 releases, like the
   AltStore source), so apt (`apt-cache policy com.ryha.ifizbox`), the app's Modify > Downgrade and its Version
-  History offer the older builds too. Each `Filename:` names the release the .deb belongs to,
+  page offer the older builds too. Each `Filename:` names the release the .deb belongs to,
   `v0.9.7/com.ryha.ifizbox_0.9.7-1337_iphoneos-arm64.deb`. The Worker's `/repo/<tag>/<file>.deb` fetches it from
   `releases/download/<tag>/<file>` the same way: redirect followed by the Worker, only `vX.Y.Z` tags and `.deb`
   names, cached for a day because a published asset never changes. To build that list, a real release reads the older

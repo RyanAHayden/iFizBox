@@ -9,7 +9,7 @@ test("Install Apps With: This iPhone and Signing Server, the chosen one checked,
   const [g, more] = installationGroups("server", null);
   assert.equal(g.header, "Install Apps With");
   assert.deepEqual(g.rows.map((r) => [r.label, r.checked]), [["This iPhone", false], ["Signing Server", true]]);
-  assert.deepEqual(g.rows.map((r) => r.subtitle), ["Works offline - no install popup", "Default - Uses ifizbox.com"]); // F372
+  assert.deepEqual(g.rows.map((r) => r.subtitle), ["Works offline", "Default - Uses ifizbox.com"]); // F372
   assert.ok(g.rows.every((r) => r.cls === "route-row"));
   assert.equal(more, undefined);
 });

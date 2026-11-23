@@ -371,7 +371,7 @@ export async function deleteEntries(entries, { site = false, storage = globalThi
   return { deleted, failed, ipas };
 }
 
-// ---- F224: Install IPAs as one page: the user's IPAs only, Not Installed / Installed, the price button, Manage --------
+// ---- F224: Install IPAs as one page: the user's IPAs only, Not Installed / Installed, Manage --------
 //
 //   installedIdOf(entry)                   the bundle ID iOS knows the app by (the signed copy's, Sign Options', the IPA's)
 //   ipaLine(entry, opts)                   the row's line: "Version 1.2 · 14.3 MB · Signed" ("Not signed"; the website's
@@ -380,12 +380,6 @@ export async function deleteEntries(entries, { site = false, storage = globalThi
 //   ipaSections(entries, { installed, query, site, jailbreak })   [{ key, header, rows }]: Not Installed, then
 //                                          Installed, A-Z, empty groups left out. `installed`: { bundleId: bool } (or a
 //                                          function id -> bool); each row gets `installed` and `line`
-//   priceButton(row, { armed, busy, site, jailbreak })   the row's price button: { kind, label, green } or null
-//                                          kind "sign" (grey SIGN, or INSTALL when signed: a first tap arms it),
-//                                          "confirm" (green INSTALL: the second tap), "install" (one tap: the jailbreak
-//                                          app, a website link), "open" (installed), "busy" (SIGNING / INSTALLING, filling)
-//   priceTap(state, row, opts)             -> { state, act: "arm" | "install" | "open" | null }; state { armed: file | null }
-//   priceProgress(label, prev)             a HUD label ("Signing 40%") -> { label, fill 0..1 } for the filling button
 //   IPA_PRESETS, ipaPresetFiles(rows, p), ipaSelectSheet(rows), ipaSelectLabel(rows, selected)   Manage's Select…
 //   ipaCounts(rows, selected, opts)        -> { n, sign, unsign, del, installed }
 //   ipaSummary(rows, selected)             "2 selected · 5 IPAs · 1 signed · 3 installed"
@@ -418,42 +412,6 @@ export function ipaSections(entries, { installed = {}, query = "", site = false,
     { key: "notInstalled", header: "Not Installed", rows: rows.filter((r) => !r.installed) },
     { key: "installed", header: "Installed", rows: rows.filter((r) => r.installed) },
   ].filter((s) => s.rows.length);
-}
-
-export const PRICE = { SIGN: "SIGN", INSTALL: "INSTALL", OPEN: "OPEN", SIGNING: "SIGNING", INSTALLING: "INSTALLING" };
-
-export function priceButton(row, { armed = null, busy = null, site = false, jailbreak = false } = {}) {
-  if (!row?.file || row.error) return null;
-  if (busy) return { kind: "busy", label: busy.label || PRICE.INSTALLING, fill: busy.fill ?? 0, green: false };
-  if (row.installed) return { kind: "open", label: PRICE.OPEN, green: false };
-  if (jailbreak || (site && !row.stored)) return { kind: "install", label: PRICE.INSTALL, green: false };
-  if (armed === row.file) return { kind: "confirm", label: PRICE.INSTALL, green: true };
-  return { kind: "sign", label: row.signed ? PRICE.INSTALL : PRICE.SIGN, green: false };
-}
-
-// A tap on a row's price button. A first tap on SIGN arms it (green INSTALL); the second installs. Tapping another
-// row's button moves the armed one; a tap anywhere else is { type: "away" } (priceAway).
-export function priceTap(state, row, opts = {}) {
-  const b = priceButton(row, { ...opts, armed: state?.armed ?? null });
-  if (!b || b.kind === "busy") return { state, act: null };
-  if (b.kind === "sign") return { state: { ...state, armed: row.file }, act: "arm" };
-  if (b.kind === "open") return { state: { ...state, armed: null }, act: "open" };
-  return { state: { ...state, armed: null }, act: "install" };
-}
-export const priceAway = (state) => (state?.armed ? { ...state, armed: null } : state);
-
-// The library's phases on the button: reading and signing fill the first 60%, installing the rest; it never goes back.
-export function priceProgress(text, prev = null) {
-  const s = String(text ?? "").trim();
-  const m = s.match(/^(.*?)\s*\(?(\d{1,3}(?:\.\d+)?)\s?%\)?$/);
-  const word = (m ? m[1] : s).toLowerCase();
-  const pct = m ? Math.max(0, Math.min(100, Number(m[2]))) / 100 : null;
-  let label = prev?.label ?? PRICE.SIGNING, fill = prev?.fill ?? 0;
-  if (/^(reading|downloading|looking)/.test(word)) { label = PRICE.SIGNING; fill = 0.1 * (pct ?? 0.5); }
-  else if (/^sign/.test(word)) { label = PRICE.SIGNING; fill = 0.1 + 0.5 * (pct ?? 0); }
-  else if (/^(install|upload|serv)/.test(word)) { label = PRICE.INSTALLING; fill = 0.6 + 0.35 * (pct ?? 0.5); }
-  else if (/^done/.test(word)) fill = 1;
-  return { label, fill: Math.max(prev?.fill ?? 0, Math.min(1, fill)) };
 }
 
 // ---- Manage (Installed's pattern, F222: core/installed.js's Select… / Deselect words) --------------------------------

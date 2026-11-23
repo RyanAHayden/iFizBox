@@ -348,8 +348,8 @@ The page is a walkthrough (`screens/signing.js`) of two steps, each ticking gree
 Certificate** (a big Select All Files button over the three rows: one multi-select pick of the `.p12`, the
 `.mobileprovision` and the password file, or their `.zip`, fills whatever is missing, over a picture of the iOS
 file picker, `web/app/icons/steps/select-files-light.jpg` and `-dark.jpg`) and
-**Signing Server** (the server row and Check Server). Install on an AltStore app's page and Version History's rows
-first look whether both are there (`firstInstallCheck`: `signing.status` and `getServer()`); the first Install with
+**Signing Server** (the server row and Check Server). Install on an AltStore app's page and the Version page's
+rows first look whether both are there (`firstInstallCheck`: `signing.status` and `getServer()`); the first Install with
 one missing opens this page at that step, with no alert. Then `signing.install {url, manifestServer}`
 (`installOnDevice`); the HUD follows its phase events (`phaseLabel`: "Downloading 42%", "Reading", "Signing",
 "Installing") and an error alerts by its code (`deviceError`): `no_server` and `no_identity` then open Settings >
@@ -745,7 +745,7 @@ A web page can't read the UDID, but iOS gives it to a "Profile Service" profile 
 ### The page's side: installing
 
 - **Install** on an AltStore app in the sideload build (`signing-client.js` `signAndInstall`, so the package page,
-  Sign with My Certificate and Version History alike) signs and installs straight away (one tap). **Custom
+  Sign with My Certificate and the Version page alike) signs and installs straight away (one tap). **Custom
   Install**, the row under it on an app page (`signing-sheet.js` `customInstall`), goes through `signing-sheet.js`:
   `signing.inspect` under a Downloading HUD, then a sheet (iOS 6 grouped table, **Install** at the top right of its
   bar, a red **Cancel** at the bottom): the app's head, **Install As** (Name, Bundle
@@ -763,7 +763,7 @@ A web page can't read the UDID, but iOS gives it to a "Profile Service" profile 
   the look's token and time, the edits). Confirm signs each in turn with its own options (`queue.js installCustom`):
   the token while it's under 14 minutes old (the phone keeps the looked-at IPA 15), else `{url, ...edits}`, which
   downloads it again; a token goes with one try only. The Queue row says what's custom ("Custom: as \"Name\", ID").
-  Version History's rows sign straight away.
+  A version's row on the Version page opens the Install sheet (on the website it installs straight away).
 - **The queue's run** in the sideload app (Confirm's Confirm, so app pages, Changes' Upgrade (N), Re-sign and Re-sign
   All; `screens/apprun.js` on the black progress page, the brain `core/apprun.js`): one row per app, iFizBox's own
   last. Every app is downloaded and signed first, two at a time (`signing.prepare`, which keeps the signed IPA for 30

@@ -1,6 +1,6 @@
 // The price button (myipas.css .price-btn, and every button built on it: More Sources' and Find More's .rec-add)
 // draws its own era in the iOS 7 and iOS 13 styles, never iOS 6's glossy button. Every look a sheet gives a price
-// button variant (a state class such as .go / .busy / .added, or :active / :disabled) needs a rule of its own in
+// button variant (a state class such as .added / .adding, or :active / :disabled) needs a rule of its own in
 // ios7.css and ios13.css, so a later variant can't keep the gloss there.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -70,11 +70,11 @@ function eraVariants(css, era, classes) {
   return out;
 }
 
-// State classes the screens toggle on a price button (myipas.js paintPrice, findmore.js setButton): each is a variant
+// State classes the screens toggle on a price button (findmore.js setButton): each is a variant
 // too, styled in an era sheet or not.
 function jsStates() {
   const out = new Map();
-  for (const [f, fn] of [["screens/myipas.js", "paintPrice"], ["screens/findmore.js", "setButton"]]) {
+  for (const [f, fn] of [["screens/findmore.js", "setButton"]]) {
     const src = read(f);
     const at = src.indexOf(`function ${fn}(`);
     assert.ok(at >= 0, `${f} has ${fn}`);
@@ -89,7 +89,7 @@ const wanted = new Map([...variants(classes), ...jsStates()]);
 
 test("the scan finds the price button's known variants (a broken scan would pass everything)", () => {
   assert.ok(classes.has("rec-add"), "More Sources' ADD is built on .price-btn");
-  for (const k of [".go", ":active", ":disabled", ".busy ::before", ".added"]) assert.ok(wanted.has(k), `found ${k}`);
+  for (const k of [":active", ":disabled", ".added"]) assert.ok(wanted.has(k), `found ${k}`);
 });
 
 for (const [era, css] of Object.entries(eras)) {
@@ -101,21 +101,15 @@ for (const [era, css] of Object.entries(eras)) {
     }
   });
 
-  test(`${era}: the base price button is flat and tinted, the confirm tap's INSTALL the tint fill with white text`, () => {
+  test(`${era}: the base price button is flat and tinted`, () => {
     const base = have.find((h) => h.toks.length === 0 && h.sel.endsWith(" .price-btn"));
     assert.ok(base, "a base .price-btn rule");
     assert.match(base.body, new RegExp(`color:\\s*var\\(${tint[era]}\\)`));
     assert.match(base.body, /text-shadow:\s*none/);
     assert.match(base.body, /box-shadow:\s*none/);
     assert.doesNotMatch(base.body, /gradient/);
-    const go = have.find((h) => h.toks.join(" ") === ".go");
-    assert.ok(go, "a .go rule");
-    assert.match(go.body, new RegExp(`background:\\s*var\\(${tint[era]}\\)`));
-    assert.match(go.body, /color:\s*(#fff\b|var\(--i7-tint-text\))/);
     const dim = have.find((h) => h.toks.includes(":disabled") && !h.toks.includes(":active"));
     assert.match(dim.body, /color:\s*var\(--i(7|13)-get-dim-text\)/, "disabled greys out");
-    assert.match(dim.sel, /:not\(\.busy\)/, "busy keeps its tinted label while disabled");
-    const fill = have.find((h) => h.toks.join(" ") === ".busy ::before");
-    assert.match(fill.body, /background:\s*var\(--i(7|13)-get-fill\)/, "busy keeps a fill, in the era's tint");
+    assert.match(dim.sel, /:not\(\.adding\)/, "adding keeps its tinted label while disabled");
   });
 }

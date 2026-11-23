@@ -26,14 +26,14 @@ test("updateNewsShown: no notes on the newest version, or no versions, shows not
   assert.equal(updateNewsShown({ ...APP, versions: [{ version: "2.1", localizedDescription: "  \n" }] }, "2.0"), false);
 });
 
-test("updateNewsGroup: the What's New card with the version, notes and Version History; null for another app's record", async () => {
+test("updateNewsGroup: the What's New card with the version, notes and its Version row; null for another app's record", async () => {
   await withDocument(async () => {
     const card = updateNewsGroup(APP, { id: "com.x.a", version: "2.0" }, { href: "#v" });
     assert.ok(card);
     const text = card.textContent;
     assert.match(text, /What’s New in 2\.1/);
     assert.match(text, /Faster sync\./);
-    assert.match(text, /Version History/);
+    assert.match(text, /Version/);
     assert.equal(updateNewsGroup(APP, { id: "com.x.b", version: "2.0" }), null);
     assert.equal(updateNewsGroup(APP, null), null);
     assert.equal(updateNewsGroup(APP, { id: "com.x.a", version: "2.1" }), null);

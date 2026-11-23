@@ -1,8 +1,7 @@
-// F224: Install IPAs as one page: Not Installed / Installed, the row's line, the price button's SIGN -> INSTALL two-tap
-// and its filling, Manage's presets, counts, summary, toolbar and sheets, and Unsign keeping the IPA file.
+// F224: Install IPAs as one page: Not Installed / Installed, the row's line, Manage's presets, counts, summary, toolbar and sheets, and Unsign keeping the IPA file.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { installedIdOf, ipaLine, matchIpa, ipaSections, priceButton, priceTap, priceAway, priceProgress, ipaPresetFiles,
+import { installedIdOf, ipaLine, matchIpa, ipaSections, ipaPresetFiles,
   ipaSelectSheet, ipaSelectLabel, ipaCounts, ipaSummary, ipaToolbar, ipaSheet, unsignEntries, IPA_SELECT, IPA_DESELECT } from "./myipas.js";
 import { SELECT, DESELECT } from "./installed.js";
 
@@ -45,60 +44,6 @@ test("sections: Not Installed then Installed, A-Z, empty ones left out; the sear
   assert.ok(matchIpa({ name: "Delta" }, "DEL") && matchIpa({ file: "Delta.ipa" }, "") && !matchIpa({ name: "Delta" }, "zz"));
   // a function answers too; a broken file never counts as installed
   assert.deepEqual(ipaSections(LIST, { installed: (id) => id === "com.x.car" })[1].rows.map((r) => r.file), ["Car.ipa"]);
-});
-
-test("the price button: SIGN (INSTALL when signed), green INSTALL once armed, OPEN installed, none for a broken file", () => {
-  const [, , , car] = LIST;
-  const rows = ipaSections(LIST, { installed: INSTALLED }).flatMap((s) => s.rows);
-  const by = (f) => rows.find((r) => r.file === f);
-  assert.deepEqual(priceButton(by("Delta.ipa")), { kind: "sign", label: "SIGN", green: false });
-  assert.deepEqual(priceButton(by("Car.ipa")), { kind: "sign", label: "INSTALL", green: false });
-  assert.deepEqual(priceButton(by("Delta.ipa"), { armed: "Delta.ipa" }), { kind: "confirm", label: "INSTALL", green: true });
-  assert.deepEqual(priceButton(by("Alpha.ipa")), { kind: "open", label: "OPEN", green: false });
-  assert.equal(priceButton(by("Broken.ipa")), null);
-  assert.deepEqual(priceButton(by("Delta.ipa"), { busy: { label: "SIGNING", fill: 0.3 } }), { kind: "busy", label: "SIGNING", fill: 0.3, green: false });
-  // F212: the jailbreak app installs as it is, in one tap; the website's link opens its sheet in one tap
-  assert.deepEqual(priceButton(by("Delta.ipa"), { jailbreak: true }), { kind: "install", label: "INSTALL", green: false });
-  assert.equal(priceButton({ file: "l.ipa", url: "https://x/l.ipa" }, { site: true }).kind, "install");
-  assert.equal(priceButton({ file: "k.ipa", stored: true }, { site: true }).label, "SIGN"); // a kept file signs here
-  assert.ok(car);
-});
-
-test("SIGN -> INSTALL: the first tap arms, the second installs; another row's tap moves it; a tap away disarms", () => {
-  const delta = { ...LIST[0], installed: false };
-  const car = { ...LIST[3], installed: false };
-  let s = { armed: null };
-  let r = priceTap(s, delta);
-  assert.equal(r.act, "arm");
-  assert.equal(r.state.armed, "Delta.ipa");
-  r = priceTap(r.state, car);
-  assert.equal(r.act, "arm");
-  assert.equal(r.state.armed, "Car.ipa", "one green button at a time");
-  assert.deepEqual(priceAway(r.state), { armed: null });
-  s = priceTap({ armed: null }, delta).state;
-  r = priceTap(s, delta);
-  assert.equal(r.act, "install");
-  assert.equal(r.state.armed, null);
-  assert.equal(priceTap({ armed: null }, { ...LIST[1], installed: true }).act, "open");
-  assert.equal(priceTap({ armed: null }, delta, { jailbreak: true }).act, "install", "one tap in the jailbreak app");
-  assert.equal(priceTap({ armed: null }, delta, { busy: { label: "SIGNING" } }).act, null, "a running one ignores taps");
-  assert.equal(priceTap({ armed: null }, LIST[2]).act, null);
-});
-
-test("the button fills: signing the first 60%, installing the rest, never backwards", () => {
-  let p = priceProgress("Reading");
-  assert.equal(p.label, "SIGNING");
-  p = priceProgress("Signing 50%", p);
-  assert.equal(p.fill, 0.35);
-  p = priceProgress("Signing", p); // no percent: stays where it was
-  assert.equal(p.fill, 0.35);
-  p = priceProgress("Installing", p);
-  assert.equal(p.label, "INSTALLING");
-  assert.ok(p.fill > 0.6 && p.fill < 1);
-  const before = p.fill;
-  p = priceProgress("Reading", p);
-  assert.equal(p.fill, before);
-  assert.equal(priceProgress("Done", p).fill, 1);
 });
 
 test("Manage: Select… presets All IPAs / Not Installed (n) / Signed (n); Deselect once every row is picked", () => {

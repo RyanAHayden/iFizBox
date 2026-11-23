@@ -46,8 +46,8 @@ test("the This iPhone option names the VPN apps from one list: LocalDevVPN and T
 });
 
 test("F372: each way's subtitle is one line, as the concept says it", () => {
-  assert.deepEqual(ROUTE_OPTIONS.map((o) => o.subtitle), ["Works offline - no install popup", "Default - Uses ifizbox.com"]);
-  // beside USE a row keeps about 200pt for its subtitle at 375pt; 13px Helvetica averages about 6.5pt a character
+  assert.deepEqual(ROUTE_OPTIONS.map((o) => o.subtitle), ["Works offline", "Default - Uses ifizbox.com"]);
+  // beside the checkmark and the disclosure a row keeps about 200pt for its subtitle at 375pt; 13px Helvetica averages about 6.5pt a character
   for (const o of ROUTE_OPTIONS) assert.ok(!o.subtitle.includes("\n") && o.subtitle.length <= 32, o.subtitle);
 });
 

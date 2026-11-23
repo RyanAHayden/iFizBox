@@ -371,7 +371,7 @@ export function reviewsGroup(reviews, renderText) {
 
 // ---- What's New ------------------------------------------------------------------------------------------------
 
-// The What's New card: "What's New in 2.1.3" with the date on the right, the notes, and Version History under them
+// The What's New card: "What's New in 2.1.3" with the date on the right, the notes, and Version under them
 // in the same card. `history`: a row ({ label, href }) or null.
 export function whatsNewGroup({ version = null, date = null, notes = null, history = null } = {}) {
   if (!notes && !history) return null;

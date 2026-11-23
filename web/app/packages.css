@@ -527,27 +527,38 @@ html[data-theme="dark"] .action-button:not(.cancel):not(.destructive):not(:activ
 html[data-theme="dark"] .action-button.cancel:not(:active):not(.is-pressed) { background: var(--dk-action-cancel); background-origin: border-box; }
 /* ==== } look-only ==== */
 
-/* ---- Version History (F29, browse.js renderVersions): one cell per version, version and marks on top, sources or
-   date and size beside, release notes under; versions this iPhone can't run are greyed ---- */
+/* ---- The Version page (F29, browse.js renderVersions): one cell per version, version and marks on top, date, size and
+   iOS (or the sources) under it, release notes folded to 3 lines; versions this iPhone can't run are greyed. F392: one
+   that can be installed is a button (.version-go) with the chevron; an installed one that can't wears INSTALLED. ---- */
 .version-row .cell-inner { flex-direction: column; align-items: stretch; gap: 2px; padding-top: 9px; padding-bottom: 9px; }
 .version-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .version-top .cell-label {
   flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
-.version-top .cell-detail { margin-left: auto; }
 .version-tag { flex: none; padding: 0 4px; white-space: nowrap; }
 .version-sub { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .version-notes { margin: 2px 0 0; white-space: pre-line; overflow-wrap: anywhere; }
-/* ==== look-only { ==== Version History */
+.version-notes.folded { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.version-row { position: relative; }
+.version-go { position: relative; width: 100%; }
+.version-go .version-top, .version-go .version-sub, .version-go .version-notes { padding-right: 20px; }
+.version-go.chevron::after { position: absolute; right: 10px; top: 22px; }
+.version-row > .version-mark { position: absolute; right: 10px; top: 10px; cursor: default; pointer-events: none; }
+.version-row.has-mark .version-top, .version-row.has-mark .version-sub { padding-right: 96px; }
+.version-row .version-more .cell-inner { flex-direction: row; align-items: center; width: 100%; min-height: 36px; padding: 4px 10px 8px; cursor: pointer; }
+/* ==== look-only { ==== the Version page */
 .version-top .cell-label { font-weight: bold; }
-.version-top .cell-detail { font-size: 14px; }
 .version-tag {
   border: 1px solid currentColor; border-radius: 4px; font-size: 10px; font-weight: bold; line-height: 13px;
   color: var(--detail);
 }
 .version-sub { font-size: 14px; color: var(--subtitle); }
 .version-notes { font-size: 14px; line-height: 18px; color: var(--text); }
-.version-row.unavailable .cell-label, .version-row.unavailable .version-notes { color: var(--subtitle); }
+.version-go { text-align: left; }
+.version-more .cell-label { font-size: 15px; }
+.price-btn.version-mark.added { color: var(--tw-added-text); border-color: var(--tw-added-edge); }
+html[data-theme="dark"] .price-btn.version-mark.added { color: var(--subtitle); }
+.version-row.unavailable .version-top .cell-label, .version-row.unavailable .version-notes { color: var(--subtitle); }
 /* ==== } look-only ==== */
 
 /* The section index (nav/sectionindex.js): UITableView's, 12px bold slate letters spread down the right edge
@@ -1288,15 +1299,13 @@ html[data-theme="dark"] .dep-piracy .dep-review-title { color: var(--dk-bad); }
 /* ==== } look-only ==== */
 
 /* F350: the Details page (screens/details.js), after Cydia's on the 4S: the description in a dashed box (its first 6
-   lines; More Information shows it whole), Version's CHANGE price button at the row's right, the centred footer in
+   lines; More Information shows it whole), the centred footer in
    every era, and Filesystem Content's paths. */
 .cy-desc-group { margin-top: 10px; }
 .cy-desc { margin: 0 var(--cy-desc-inset); padding: 11px 13px; border: 1.5px dashed; border-radius: 9.5px; }
 .cy-desc .cy-desc-text { padding: 0; line-height: 18px; max-height: 108px; overflow: hidden;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; }
 .cy-desc-full .cy-desc-text { max-height: none; -webkit-line-clamp: unset; display: block; }
-.cell-inner.has-change .cell-detail { margin-right: 10px; }
-.cy-change { flex: none; }
 .group-footer.cy-foot { text-align: center; }
 .pkg-files .cell-label { white-space: normal; overflow-wrap: anywhere; }
 /* ==== look-only { ==== the Details page: the box's dashes in the table's edge (an era sets its own keyline) */

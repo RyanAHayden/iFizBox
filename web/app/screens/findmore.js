@@ -18,7 +18,7 @@
 //   searchAllRepos({ appName })     Add Tweaks' Search All Repos: Canister's packages, injectable ones only, in a sheet
 //
 // Rules: core/canister.js (repoLabel, canisterSafe, mapRepos). Piracy-listed repos (core/warnings.js) are never shown.
-import { el, plain, grouped, note, placeholder } from "../nav/ui.js";
+import { el, plain, grouped, note, placeholder, buttonZone } from "../nav/ui.js";
 import { searchBar, pinned } from "../nav/searchbar.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
@@ -304,7 +304,7 @@ function decorate(li, r, ctx, trusted) {
   sub?.prepend(...labelNode(labelOf(r, { trusted })));
   const icon = li.querySelector(".cell-icon");
   try { icon?.append(sourceIconImage(r.key, sourceIcons({ key: r.key, uri: r.uri, dist: r.dist, components: r.components }), getBackend())); } catch { /* the letter stays */ }
-  li.append(addButton(r, ctx));
+  buttonZone(li, addButton(r, ctx));
 }
 
 function footer() {

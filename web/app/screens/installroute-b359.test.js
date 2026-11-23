@@ -12,7 +12,7 @@ globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), se
 globalThis.document ??= fakeDocument();
 
 const { SHORTCUT_NAMES, shortcutFileURL, shortcutDidntRun } = await import("../core/installroute.js");
-const { shortcutGroups, addShortcut, addSwitch, backInApp } = await import("./installroute.js");
+const { shortcutGroups, addShortcut, addSwitch, backInApp, SHARE_SHORTCUT } = await import("./installroute.js");
 const { DOMAIN } = await import("../brand.js");
 
 const here = new URL(".", import.meta.url);
@@ -75,6 +75,37 @@ test("F386: Set Up's Add says a failed check run in an alert; a pass says nothin
   const closed = phone({ opened: false });
   await addSwitch(closed.native, alert, { whenBack: async () => true });
   assert.deepEqual(shown, [], "a closed share sheet: nothing to say");
+});
+
+test("F392: with our iCloud link Add opens Shortcuts itself; Share Shortcut File shares the file", async () => {
+  const link = "https://www.icloud.com/shortcuts/0123456789abcdef0123456789abcdef";
+  const a = phone();
+  await addShortcut(a.native, "switch", { whenBack: async () => true, link });
+  assert.deepEqual(a.calls[0][1], { which: "switch", url: shortcutFileURL("switch"), link });
+  const b = phone();
+  await addShortcut(b.native, "switch", { whenBack: async () => true, link, via: "share" });
+  assert.deepEqual(b.calls[0][1], { which: "switch", url: shortcutFileURL("switch") }, "no link: the share sheet");
+  // the page: the backup row only where Add isn't the share sheet already, and only while there is something to add
+  const rows = (st, o) => shortcutGroups(st, o).flatMap((g) => g.rows.map((r) => r.label));
+  const tapped = [];
+  const gs = shortcutGroups({ shortcuts: { switch: false } }, { direct: true, add: (...x) => tapped.push(x) });
+  assert.equal(gs[1].rows[0].label, SHARE_SHORTCUT);
+  gs[1].rows[0].onClick(); gs[0].rows[0].onClick();
+  assert.deepEqual(tapped, [["switch", "share"], ["switch"]]);
+  assert.match(gs[0].footer, /^Add opens Shortcuts/);
+  assert.ok(rows({ trips: true, shortcuts: { switch: true } }, { direct: true }).includes(SHARE_SHORTCUT), "Update too");
+  assert.ok(!rows({ shortcuts: { switch: true } }, { direct: true }).includes(SHARE_SHORTCUT));
+  assert.ok(!rows({ shortcuts: { switch: false } }, { direct: false }).includes(SHARE_SHORTCUT));
+});
+
+test("F392: Share File on the alert of an Add that failed shares the file", async () => {
+  const p = phone({ check: { ok: false, error: "Could not find the shortcut" } });
+  const asked = [];
+  const alert = async (a) => { asked.push(a.buttons); return { index: asked.length === 1 ? 1 : 0 }; };
+  await addSwitch(p.native, alert, { whenBack: async () => true });
+  assert.deepEqual(asked, [["Cancel", "Share File"], ["Cancel", "Share File"]]);
+  assert.deepEqual(p.calls.map((c) => c[0]), ["vpn.openShortcuts", "vpn.checkShortcut", "vpn.openShortcuts", "vpn.checkShortcut"]);
+  assert.deepEqual(p.calls[2][1], { which: "switch", url: shortcutFileURL("switch") });
 });
 
 test("Add: a share sheet that never opened says so, not that the Shortcut didn't run", async () => {

@@ -2,15 +2,14 @@
 // F79: the page is Install IPAs, reached from Home's tile. F224 (user 2026-11-18): one page for the user's own IPAs only
 // (browsing source apps is Sources' and Search's): back | Install IPAs | Manage; a search bar over the IPAs, an
 // 'Add an IPA' group (Choose from Files, Download from URL; the website's Choose File), then Not Installed and
-// Installed, A-Z, each row with iOS 6's App Store price button (grey SIGN, a first tap turns it green INSTALL, the
-// second is the IPA page's Install, Confirm and all; installed rows OPEN). A left swipe shows Delete in place of the
-// button (deletes at once); Manage is Installed's (F222): select circles, Select… presets, the grey summary line and a
+// Installed, A-Z, each row opening the IPA's page (F392: no button of its own; the page's bar says Install, or Open
+// when the app is on the phone). A left swipe shows Delete (deletes at once); Manage is Installed's (F222): select circles, Select… presets, the grey summary line and a
 // Sign / Unsign / Delete toolbar, each confirmed by an action sheet, then the 1-of-n HUD.
 //
 //   #/installed/myipas                      Install IPAs (above)
 //   #/installed/myipas/search, /apps, /category:<name> and below   F79's Browse pages, kept for older links only
-//   .../package:<id> and deeper             browse.js's pages (an app's page, Version History)
-//   #/installed/myipas/ipa:<file>           an IPA's page, like a package page: header, Install (nav bar), Sign
+//   .../package:<id> and deeper             browse.js's pages (an app's page, its Version page)
+//   #/installed/myipas/ipa:<file>           an IPA's page, like a package page: header, Install / Open (nav bar), Sign
 //                                           Options, Sign Now, Save Signed IPA, details, Delete
 //   #/installed/myipas/ipa:<file>/options   Sign Options: name, bundle ID, icon, extensions, arm64e fix-up
 //
@@ -43,8 +42,8 @@ import { apps, recordInstall, onAppsChange } from "../core/installed.js";
 import { appQueue } from "../app-queue.js";
 import { MYIPAS, libraryRows, stateOf, formatBytes, ipaToken, fileOfToken, optionsParams, siteEntries, addSiteUrl,
   STATE_LABELS, addSiteFile, removeSiteEntry, openIpaStore, memoryIpaStore, listState, listStep, tapOpens,
-  deleteSheetTitle, deleteButtonText, deleteEntries, holdActions, HOLD, libraryMode, ipaSections, installedIdOf, priceButton, priceTap, priceAway,
-  priceProgress, ipaSelectSheet, ipaSelectLabel, ipaPresetFiles, ipaCounts, ipaSummary, ipaToolbar, ipaSheet, unsignEntries,
+  deleteSheetTitle, deleteButtonText, deleteEntries, holdActions, HOLD, libraryMode, ipaSections, installedIdOf,
+  ipaSelectSheet, ipaSelectLabel, ipaPresetFiles, ipaCounts, ipaSummary, ipaToolbar, ipaSheet, unsignEntries,
   IPA_SELECT, siteTooBig, freshNote } from "../core/myipas.js";
 import { mediaUrl } from "./depiction.js";
 import { barButton } from "../nav/ui.js";
@@ -78,8 +77,8 @@ const view = { body: null, page: null, add: null, search: null, route: null, seq
 const known = new Map(); // file -> the last entry seen (titles, the page before its list call answers)
 // F208/F224: the list's swipe and Manage state (core/myipas.js listStep: `editing` is Manage, `armed` the row showing
 // Delete, `selected` the picked files), its controller, the bottom toolbar, the IPAs and which of them iOS has, the
-// search, the price buttons' state (`armed`: the green INSTALL) and the ones running (file -> { label, fill }).
-const lib = { state: listState(), ctl: null, bar: null, list: [], installed: {}, shared: {}, query: "", price: { armed: null }, busy: new Map(),
+// search.
+const lib = { state: listState(), ctl: null, bar: null, list: [], installed: {}, shared: {}, query: "",
   manageBtn: null, selectBtn: null, summary: null };
 
 export const PAGE_TITLE = "Install IPAs";
@@ -124,7 +123,6 @@ export function nav(route) {
   switch (p?.page) {
     case "list": // F224: Manage only (Add is the page's own group); a new list page starts out of Manage
       lib.state = listState();
-      lib.price = { armed: null };
       return { title: PAGE_TITLE, right: { label: "Manage", onClick: () => setManaging(!lib.state.editing),
         ref: (b) => { lib.manageBtn = b; b.classList.add("manage-button"); } } };
     case "search": return { title: "Search Apps", style: "plain" };
@@ -132,7 +130,8 @@ export function nav(route) {
     case "category": return { title: p.value || "Apps", style: "plain" };
     case "browse": return browse.nav(route);
     case "ipa": return { title: DETAILS_TITLE, // B361: the app page's Details, for a file
-      right: { label: "Install", onClick: () => install(p.file) } };
+      // F392: Open when the app is on the phone (Install is then a row of the page)
+      right: { label: barLabel(isInstalled(known.get(p.file))), onClick: () => barTap(p.file) } };
     case "options": return { title: "Sign Options", right: { label: "Save", onClick: (e) => saveOptions(p.file, e.currentTarget) } };
     case "userapps": return { title: USERAPPS_TITLE, style: "plain" }; // F374
     case "userapp": return { title: userAppTitle(p.id) };
@@ -345,10 +344,9 @@ function redraw() {
   const jb = jailbreak();
   const files = libraryRows(lib.list, { site: isSite, jailbreak: jb }).map((r) => r.file);
   lib.state = files.length ? listStep(lib.state, { type: "list", files }) : { ...listState(), editing: lib.state.editing };
-  if (lib.price.armed && !files.includes(lib.price.armed)) lib.price = { armed: null };
   lib.ctl = libraryGroup(lib.list, { site: isSite, jailbreak: jb, state: lib.state, installed: lib.installed, shared: lib.shared,
-    query: lib.state.editing ? "" : lib.query, price: lib.price, busy: lib.busy, fresh: view.fresh?.file ?? null,
-    on: { change: onListChange, delete: (es) => swipeDelete(es), hold: (e) => holdSheet(e), price: (r) => onPrice(r) } });
+    query: lib.state.editing ? "" : lib.query, fresh: view.fresh?.file ?? null,
+    on: { change: onListChange, delete: (es) => swipeDelete(es), hold: (e) => holdSheet(e) } });
   view.body.replaceChildren(lib.ctl.el);
   onListChange(lib.state);
 }
@@ -388,10 +386,10 @@ export function libraryFooterText(site, { jailbreak = false } = {}) {
 
 // The IPAs' groups for `list`: Not Installed, then Installed (core/myipas.js ipaSections), the footer under the last.
 // -> { el (a div holding the groups), ul (that div), rows (the rows shown, in order), sections, state, step(action),
-// cellOf(file), price(file) (the row's price button) }. on.change(state) after each step, on.delete([row]) for a row's
-// Delete, on.hold(row) for a held row, on.price(row) for a tap on its price button.
+// cellOf(file) }. on.change(state) after each step, on.delete([row]) for a row's Delete, on.hold(row) for a held row.
+// F392: a row has no button of its own: it opens the IPA's page, which installs and opens.
 export function libraryGroup(list, { site: isSite = site(), jailbreak: jb = jailbreak(), state = listState(), installed = {}, query = "",
-  price = { armed: null }, busy = new Map(), on = {}, shared = {}, fresh = null } = {}) {
+  on = {}, shared = {}, fresh = null } = {}) {
   const sections = freshFirst(sharedSections(list, { installed, shared, query, site: isSite, jailbreak: jb }), fresh);
   const rows = sections.flatMap((s) => s.rows);
   const any = libraryRows(list, { site: isSite, jailbreak: jb }).length > 0;
@@ -404,11 +402,9 @@ export function libraryGroup(list, { site: isSite = site(), jailbreak: jb = jail
   box.append(grouped(groups));
   const cells = [...box.querySelectorAll(".cell")];
   const byFile = new Map();
-  const buttons = new Map();
   const ctl = {
     el: box, ul: box, rows, sections, state,
     cellOf: (file) => byFile.get(file) ?? null,
-    price: (file) => buttons.get(file) ?? null,
     step(a) {
       const next = listStep(ctl.state, a);
       if (next === ctl.state) return next;
@@ -427,15 +423,6 @@ export function libraryGroup(list, { site: isSite = site(), jailbreak: jb = jail
     putIcon(li.querySelector(".cell-icon"), r.icon);
     if (!r.icon && r.iconUrl) putIconUrl(li.querySelector(".cell-icon"), r.iconUrl); // F257: a kept link's app icon
     if (r.fresh) li.classList.add("is-fresh");
-    const spec = priceButton(r, { armed: price.armed, busy: busy.get(r.file) ?? null, site: isSite, jailbreak: jb });
-    if (spec) {
-      const b = Object.assign(document.createElement("button"), { type: "button", className: "price-btn" });
-      paintPrice(b, spec, r.title);
-      b.addEventListener("click", (e) => { e.preventDefault?.(); e.stopPropagation?.(); on.price?.(r); });
-      li.classList.add("has-price");
-      li.append(b);
-      buttons.set(r.file, b);
-    }
     const confirm = Object.assign(document.createElement("button"), { type: "button", className: "del-confirm", textContent: "Delete" });
     confirm.addEventListener("click", () => on.delete?.([r]));
     const circle = Object.assign(document.createElement("span"), { className: "manage-check" });
@@ -457,17 +444,6 @@ export function libraryGroup(list, { site: isSite = site(), jailbreak: jb = jail
   return ctl;
 }
 
-// A price button's look from its spec (core/myipas.js priceButton): grey, green (.go), or filling (.busy, --fill).
-export function paintPrice(b, spec, name = "") {
-  b.textContent = spec.label;
-  b.dataset.kind = spec.kind;
-  b.classList.toggle("go", Boolean(spec.green));
-  b.classList.toggle("busy", spec.kind === "busy");
-  b.disabled = spec.kind === "busy";
-  b.style.setProperty?.("--fill", String(spec.kind === "busy" ? Math.round((spec.fill ?? 0) * 1000) / 1000 : 0));
-  b.setAttribute("aria-label", `${spec.label[0]}${spec.label.slice(1).toLowerCase()} ${name}`.trim());
-}
-
 // As Installed's attachRowGestures (B36): a left swipe shows Delete, a right swipe or a tap puts it away; managing,
 // a tap picks the row instead of opening it. A hold (nav/menu.js longPress) opens the row's sheet, but not while
 // managing or while a Delete shows.
@@ -476,8 +452,7 @@ function attachLibraryGestures(ul, ctl, on) {
   let swiped = false;
   ul.addEventListener("click", (e) => {
     if (e.target.closest(".del-confirm")) return;
-    if (swiped) { swiped = false; e.preventDefault(); e.stopPropagation(); return; } // B315: a swipe's lift on the button signs nothing
-    if (e.target.closest(".price-btn")) return;
+    if (swiped) { swiped = false; e.preventDefault(); e.stopPropagation(); return; } // B315: a swipe's lift opens nothing
     const li = e.target.closest(".myipa-row");
     if (!li || tapOpens(ctl.state)) return;
     e.preventDefault();
@@ -536,7 +511,6 @@ function attachDeleteSwipe(ul, ctl, on) {
 export function setManaging(on) {
   if (!lib.ctl) { lib.state = on ? listStep(lib.state, { type: "edit" }) : listState(); onListChange(lib.state); return; }
   if (on && lib.query) { lib.query = ""; if (view.search?.set) view.search.set(""); else { const input = view.search?.querySelector?.("input"); if (input) input.value = ""; } }
-  lib.price = { armed: null };
   if (on) { lib.state = listStep(lib.state, { type: "edit" }); redraw(); } else lib.ctl.step({ type: "done" });
 }
 
@@ -629,17 +603,11 @@ function syncToolbar() {
 if (typeof window !== "undefined") {
   window.addEventListener("hashchange", () => { if (lib.state.editing && !listShown()) setManaging(false); });
   // Back from iOS's install prompt or another app: which IPAs are installed may have changed.
-  document.addEventListener?.("visibilitychange", () => { if (document.visibilityState === "visible" && listShown()) recheck(); });
+  document.addEventListener?.("visibilitychange", () => { if (document.visibilityState === "visible") afterInstall(); });
   // B277: an app out of the IPA queue (installed, or cleared) or Installed's records changed: the list and the IPA's
   // page read the library again (its signed copy, which IPA is on the phone), even under the run's page
   appQueue.subscribe((e) => { if (e.type === "clear" || e.type === "clearAll") afterInstall(); });
   onAppsChange(() => afterInstall());
-  // A tap anywhere but a green INSTALL puts it back to SIGN (as the App Store's confirm button).
-  document.addEventListener?.("pointerdown", (e) => {
-    if (!lib.price.armed || e.target?.closest?.(".price-btn")) return;
-    lib.price = priceAway(lib.price);
-    repaintPrices();
-  }, true);
 }
 
 // B277: after an install from the IPA queue (an IPA's own Install, Confirm, the run's page): Install IPAs reads the
@@ -647,7 +615,7 @@ if (typeof window !== "undefined") {
 // only on screen: the list sits under the IPA's page). Several changes at once draw once. The IPA's page is drawn
 // again only when its library entry changed (ipaChanged), so an unrelated app's change never blanks it.
 let againSoon = false;
-export async function ipaChanged(shown, { read = entryOf } = {}) {
+export async function ipaChanged(shown, { read = pageState } = {}) {
   if (!shown?.body?.isConnected || shown.drawn == null) return false;
   let now;
   try { now = await read(shown.file); } catch { return false; }
@@ -662,16 +630,6 @@ export function afterInstall({ list = () => { if (view.body?.isConnected) rechec
   if (againSoon) return;
   againSoon = true;
   setTimeout(() => { againSoon = false; list(); page(); }, 0);
-}
-
-// The price buttons again from lib (armed, busy) without rebuilding the rows.
-function repaintPrices() {
-  if (!lib.ctl) return;
-  for (const r of lib.ctl.rows) {
-    const b = lib.ctl.price(r.file);
-    const spec = priceButton(r, { armed: lib.price.armed, busy: lib.busy.get(r.file) ?? null, site: site(), jailbreak: jailbreak() });
-    if (b && spec) paintPrice(b, spec, r.title);
-  }
 }
 
 // A toolbar button: the confirm sheet, then each picked IPA in turn behind the 1-of-n HUD; Manage ends and the list
@@ -774,20 +732,22 @@ export async function deleteMany(es, { sheet = showActionSheet, isSite = site(),
   return swipeDelete(es, { isSite, ...rest });
 }
 
-// ---- F224: the price button: SIGN, then INSTALL (green), which is the IPA page's Install; OPEN ------------
+// ---- F392: the IPA's page: Open in the bar when its app is on the phone, else Install ------------------------------
 
-async function onPrice(r) {
-  if (lib.state.armed) { lib.ctl?.step({ type: "tap", file: lib.state.armed }); return; } // a tap only puts a Delete away
-  const opts = { site: site(), jailbreak: jailbreak(), busy: lib.busy.get(r.file) ?? null };
-  const { state, act } = priceTap(lib.price, r, opts);
-  lib.price = state;
-  repaintPrices();
-  if (act === "open") return openApp(r);
-  if (act === "install") return install(r.file, r); // the IPA page's Install: Confirm in the sideload app (user 2026-11-19)
+const barLabel = (installed) => (installed ? "Open" : "Install");
+// Whether the entry's app is on the phone, from the last answer (an ID shared with another IPA: only the one installed).
+function isInstalled(entry, { installed = lib.installed, shared = lib.shared } = {}) {
+  const id = entry && !entry.error ? installedIdOf(entry) : null;
+  if (!id || installed?.[id] !== true) return false;
+  return shared?.[id] ? shared[id].file === entry.file : true;
+}
+function barTap(file) {
+  const entry = known.get(file);
+  return entry && isInstalled(entry) ? openApp(entry) : install(file);
 }
 
 async function openApp(r, { native = nativeBridge(), alert = showAlert } = {}) {
-  const name = r.options?.name || r.name || r.title;
+  const name = shownName(r);
   if (!site() && !jailbreak() && typeof native?.call === "function") {
     try { if ((await native.call("signing.openApp", { bundleId: installedIdOf(r) }))?.opened) return true; } catch { /* below */ }
     await alert({ title: "Couldn't Open", message: `iOS didn't open ${name}.`, buttons: ["OK"] });
@@ -1052,7 +1012,20 @@ async function addFromUrl() {
 async function entryOf(file) {
   const r = await entries();
   remember(r?.ipas);
-  return { entry: (r?.ipas ?? []).find((e) => e.file === file) ?? null, identity: Boolean(r?.identity) };
+  return { entry: (r?.ipas ?? []).find((e) => e.file === file) ?? null, identity: Boolean(r?.identity), list: r?.ipas ?? [] };
+}
+
+// F392: what the IPA's page shows: its entry, whether there's a certificate, and whether its app is on the phone.
+async function pageState(file) {
+  const { entry, identity, list } = await entryOf(file);
+  if (entry) {
+    try {
+      const map = await installedOf(list, { mode: listMode() });
+      lib.shared = await sharedInstalls(list, map);
+      lib.installed = map;
+    } catch { /* the last answer */ }
+  }
+  return { entry, identity, installed: Boolean(entry && isInstalled(entry)) };
 }
 
 const dateText = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" }) : "");
@@ -1095,12 +1068,15 @@ async function renderIpa(body, route, file) {
   const shown = { body, route, file, drawn: null };
   view.ipa = shown; // B277: drawn again when an install changes its entry (afterInstall, ipaChanged)
   body.append(placeholder("page"));
-  let entry, identity;
-  try { ({ entry, identity } = await entryOf(file)); } catch (e) {
+  let entry, identity, installed;
+  try { ({ entry, identity, installed } = await pageState(file)); } catch (e) {
     body.replaceChildren(note(deviceError(e).message));
     return;
   }
-  shown.drawn = JSON.stringify({ entry, identity });
+  shown.drawn = JSON.stringify({ entry, identity, installed });
+  const bar = handleOf(body)?.rightButton();
+  if (bar) bar.textContent = barLabel(installed);
+  const installRow = { label: "Install", onClick: () => install(file), chevron: false };
   if (!entry) {
     body.replaceChildren(grouped([{ rows: [{ label: "Not in My IPAs" }], footer: `${file} was deleted or moved.` }]));
     return;
@@ -1129,6 +1105,7 @@ async function renderIpa(body, route, file) {
     return;
   }
   if (site()) {
+    if (installed) body.append(grouped([{ rows: [installRow] }]));
     body.append(grouped([
       { header: "Link", rows: [{ label: entry.url, chevron: false }],
         footer: `Install opens this link in ${NAME}, AltStore, SideStore or Feather, which sign it on the iPhone, or downloads the IPA.` },
@@ -1138,6 +1115,7 @@ async function renderIpa(body, route, file) {
     return;
   }
   if (jailbreak()) {
+    if (installed) body.append(grouped([{ rows: [installRow] }]));
     body.append(grouped(jailbreakIpaGroups(entry, () => confirmDelete(entry), () => shareFile(entry))));
     markFileRow(body, entry.file);
     markDelete(body);
@@ -1152,6 +1130,7 @@ async function renderIpa(body, route, file) {
   }
   const changed = optionsChanged(entry.options);
   const actions = [
+    ...(installed ? [installRow] : []),
     { label: "Sign Options", detail: changed ? "Changed" : "As Is", href: format({ tab: "installed", path: [...ipaPath(file), "options"] }) },
     { label: "Sign Now", subtitle: entry.signed ? "Signed already: signs again" : "Signs on this iPhone, no connection needed", onClick: () => signNow(entry, body, route) },
     { label: "Save Signed IPA", subtitle: "Files, AirDrop and other apps", onClick: () => saveSigned(entry, body, route) },

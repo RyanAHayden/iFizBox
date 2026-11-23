@@ -363,6 +363,10 @@ Split, with their layout in their own rules and their paint in look-only stretch
 `settings.css`. Their iOS 6 decorations are tokens an era sets:
 
 - the Done bar button: `--done-btn`, `--done-btn-edge`, `--done-btn-edge-top`, `--done-btn-pressed` (`:root`);
+- settings' disclosure: `--accessory-detail` (iOS 6's blue detail arrow, `:root`) and `--accessory-info` (the info circle
+  of iOS 7, 13 and 26, a mask painted in each era's tint: `--i7-tint`, `--i13-tint`, `--i26-tint`). A row's button
+  (`.cell-accessory`) is the one that opens the way's page; Install Apps With's checkmark (`.route-pick`, `.route-on`)
+  is shown by opacity, so nothing moves;
 - Home's tiles: `--tile`, `--tile-edge`, `--tile-radius`, `--tile-green`, `--tile-glyph-green`, `--tile-purple*`,
   `--by`, `--home-icon-shadow`, on `.home` (so an era sets them on `html[data-style=…] .home`);
 - Theme's preview: `--preview-ground`, `--preview-shadow`, `--preview-grip` (the grabber's layers, from
@@ -382,12 +386,12 @@ shadows, embosses):
 | `reviews.css` | the stars and Tap to Rate; Write a Review / More Reviews, the hidden note, Report; the Write a Review sheet; the App Store view's card | `--review-star-emboss`, `--review-btn`, `--review-btn-edge`, `--review-btn-emboss`, `--review-btn-pressed` |
 | `guides.css` | the answer text, steps and number badges; the terminal panel and its Copy button; the warning row, Copying Files' rows and glyphs | `--guide-num`, `--guide-num-edge`, `--guide-num-emboss`, `--guide-num-shine`, `--guide-done`, `--guide-done-edge`, `--guide-copy`, `--guide-copy-emboss`, `--guide-copy-pressed` |
 | `freeid.css` | the checklist's marks, fields and buttons; Developer Mode's step heads and badges | `--free-done`, `--free-done-edge`, `--free-failed`, `--free-failed-edge`, `--free-optional` |
-| `myipas.css` | the list's icons and lines, the File row, Delete; Install IPAs' fades, picks and New note; the price button | `--price-btn`, `--price-btn-edge`, `--price-btn-emboss`, `--price-btn-pressed`, `--price-btn-pressed-inset`, `--price-btn-go`, `--price-btn-go-edge`, `--price-btn-go-edge-top`, `--price-btn-go-emboss`, `--price-btn-go-pressed`, `--price-btn-fill` |
+| `myipas.css` | the list's icons and lines, the File row, Delete; Install IPAs' fades, picks and New note; the price button (ADD / ADDED, and the Version page's INSTALLED) | `--price-btn`, `--price-btn-edge`, `--price-btn-emboss`, `--price-btn-pressed`, `--price-btn-pressed-inset` |
 | `signing.css` | the walkthrough's cards, badges, text and buttons; the certificate step's picture | `--walk-badge`, `--walk-badge-edge`, `--walk-badge-emboss`, `--walk-badge-shine`, `--walk-badge-done`, `--walk-badge-done-edge`, `--walk-badge-todo`, `--walk-action`, `--walk-action-edge`, `--walk-action-emboss`, `--walk-action-pressed` |
 | `signsheet.css` | the sign sheet's head, field rows and red Cancel; Settings > Signing's warnings and Signed Apps' rows | `--ss-icon-shadow`, `--ss-icon-placeholder`, `--ss-icon-letter-emboss`, `--ss-cancel`, `--ss-cancel-edge`, `--ss-cancel-emboss`, `--ss-cancel-pressed` |
 | `extras.css` | the featured banners and their titles | `--featured-title-emboss`, `--featured-title-shade` |
 | `queue.css` | queued packages in every list; Confirm's sections and the console; Continue Queuing, "needed by", the queue run's strip | `--console-bar`, `--console-btn`, `--console-btn-edge`, `--console-btn-pressed` |
-| `tweaks.css` | the tweak rows, the ADD button, the pills | myipas.css's `--price-btn*` (all but `-go-pressed` and `-fill`, same values), `--tweak-pill`, `--tweak-pill-up`, `--tweak-pill-shadow` |
+| `tweaks.css` | the tweak rows, the ADD button (ADDED once a tweak is on: `.tw-add.on`), the pills | its own copy of myipas.css's `--price-btn*` (same values), `--price-btn-go`, `--price-btn-go-edge`, `--price-btn-go-edge-top`, `--price-btn-go-emboss` (the added state), `--tweak-pill`, `--tweak-pill-up`, `--tweak-pill-shadow` |
 | `notiphone.css` | the hero, the domain, the steps' text | `--notiphone-icon-shadow` |
 | `account.css` | the account key | none |
 | `manage.css` | the grabber, the dragged row, the foot's links; Import's rows and the QR sheet | `--manage-grabber`, `--manage-drag-shadow` |

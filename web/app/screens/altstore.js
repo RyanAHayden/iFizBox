@@ -44,7 +44,7 @@ import { queueApp } from "./queue.js";
 import { descriptionGroup } from "./description.js";
 import { infoGroup, sourceHeader } from "./sourcepage.js"; // F384: one source page
 import { storeHeader, headerLine, storeTabs, whatsNewGroup } from "./storepage.js";
-import { appRows, moreInfoShown, detailRows, descGroup, changeButton, tileCells, footerGroup, detailsFooter, MORE_INFO_LABEL,
+import { appRows, moreInfoShown, detailRows, descGroup, tileCells, footerGroup, detailsFooter, MORE_INFO_LABEL,
   PREVIEW_HEADER } from "./details.js"; // F350
 import { rowIcon } from "../icons/rowicons.js";
 import { reviewsTab } from "./reviews.js";
@@ -367,17 +367,15 @@ export function installWhichButtons(app, installed = "", ios = null) {
 // Sideload: the version's job is queued (Confirm); when nothing could be queued, the install rows' first one runs, as
 // Version History falls back to its rows (siteInstallVersion picks the same first row).
 export async function installWhichVersion(app, pkg, source, { installed = "", ask = showActionSheet, mode = detectMode(), ios = currentDevice().ios ?? null,
-  queueVersion = (v) => appPageAction(pkg, source, { version: v.version }), siteInstall = (v) => siteInstallVersion(pkg, v, source),
-  jailbreakInstall = null } = {}) {
+  queueVersion = (v) => appPageAction(pkg, source, { version: v.version }), siteInstall = (v) => siteInstallVersion(pkg, v, source) } = {}) {
   const { buttons, versions } = installWhichButtons(app, installed, ios);
   if (!versions.some(Boolean)) return null;
-  if (mode === "jailbreak" && !jailbreakInstall) return null; // F346: the jailbreak app's hold brings its own install
+  if (mode === "jailbreak") return null; // it knows what's installed: no Change Installed Version there
   const i = await ask({ title: INSTALL_WHICH_TITLE, buttons });
   const v = i >= 0 ? versions[i] : null;
   if (!v) return null;
   if (mode === "sideload") { if (!(await queueVersion(v))) await siteInstall(v); }
   else if (mode === "site") await siteInstall(v);
-  else if (mode === "jailbreak") await jailbreakInstall(v);
   else return null;
   return v;
 }
@@ -409,6 +407,17 @@ export function cancelHeldForget(id) {
   if (!heldForgets.delete(id)) return false;
   heldNotify();
   return true;
+}
+
+// F392: the version the Version page marks as installed: the record's (B358: by the installed bundle ID first), or what
+// this app signed with no record; "" unknown, null not installed (a held forget too).
+export async function appVersionInstalled(app, { store = apps, signedOf = (id) => signedRecordOf(id) } = {}) {
+  const id = app?.bundleIdentifier;
+  if (!id || forgetHeld(id)) return null;
+  const signed = await Promise.resolve().then(() => signedOf(id)).catch(() => null);
+  let rec = null;
+  try { rec = recordOf(await (await store()).all(), id, signed); } catch { /* no store */ }
+  return rec ? rec.version || "" : signed ? signed.version || "" : null;
 }
 
 // Runs the held forgets whose page is gone (`all`: every one, as the app or tab goes away).
@@ -727,8 +736,8 @@ export async function queueOriginalCheck(job, warn = originalWarning) {
 // B69: the jailbreak app's Modify for an installed app (a record in core/installed.js, as the nav label reads it):
 // Cydia's sheet instead of installing at once. Upgrade or Reinstall, Ignore Upgrades (Settings' Ignored Upgrades,
 // kept on the device: no dpkg hold for an app) while a newer version is out or once it's ignored, Remove (red: the
-// Installed tab's Delete, which asks again), Downgrade (then which version) and Version History. `install(version)`
-// installs one of the app's versions (browse.js: the helper's Install row), `history()` opens Version History (null:
+// Installed tab's Delete, which asks again), Downgrade (then which version) and Version. `install(version)`
+// installs one of the app's versions (browse.js: the helper's Install row), `history()` opens the Version page (null:
 // no row). Resolves false when the app isn't installed (Install keeps its one tap), true once the sheet took over.
 export const IGNORE_UPGRADES = "Ignore Upgrades";
 export const STOP_IGNORING = "Stop Ignoring Upgrades";
@@ -736,7 +745,7 @@ export function jailbreakModifyButtons({ installed = "", newest = null, held = f
   const upgrade = Boolean(newest && installed && compareVersions(newest, installed) > 0);
   return [...modifyActions({ installed, newest, build: "jailbreak" }).filter((b) => b !== "Remove"),
     ...(held ? [STOP_IGNORING] : upgrade ? [IGNORE_UPGRADES] : []), "Remove",
-    ...(older ? ["Downgrade"] : []), ...(history ? ["Version History"] : [])];
+    ...(older ? ["Downgrade"] : []), ...(history ? ["Version"] : [])];
 }
 
 // F281: Ignore This Version / Stop Ignoring This Version (core/appupdates.js) on an app's sheet, after Upgrade.
@@ -781,7 +790,7 @@ export async function jailbreakModify(pkg, { install, history = null, ask = show
   else if (b === "Downgrade") {
     const j = await ask({ title: "Downgrade to", buttons: older.map((x) => x.version) });
     if (j >= 0) await install(older[j]);
-  } else if (b === "Version History") history();
+  } else if (b === "Version") history();
   return true;
 }
 
@@ -900,10 +909,9 @@ export async function siteCertificateAlert({ download = () => {}, alert = showAl
 // F181: the iOS 6 App Store's page (screens/storepage.js): the header, then Details / Reviews / Related. `related`
 // fills the Related tab (browse.js relatedPane); the Details pane is returned for what the caller adds to it.
 // F350: Details in Cydia's style (screens/details.js): Add Tweaks with its tile, Preview, the description's dashed box,
-// More Information (a long text, What's New, Permissions), Version with CHANGE (`onChange`: Install Which Version?)
-// and Version History, Information with tiles, the install groups, Links with globe tiles, then `tail` (the caller's
+// More Information (a long text, What's New, Permissions), Version (its row opens the Version page), Information with tiles, the install groups, Links with globe tiles, then `tail` (the caller's
 // Wish List and Installed App) and the centred footer. -> { details, tabs, tail }
-export function renderApp(body, route, pkg, source, { related = null, onChange = null } = {}) {
+export function renderApp(body, route, pkg, source, { related = null } = {}) {
   const st = pkg.stanza;
   const app = st.ipa;
   const v = app.versions[0];
@@ -970,7 +978,7 @@ export function renderApp(body, route, pkg, source, { related = null, onChange =
   // F302a: Add Tweaks, directly under the header's Install and above the screenshots (the sideload build)
   // (imported up front, so the row is there with the page and doesn't pop in; its count fills in when known)
   // F350: with its tile, and no footer naming every tweak (user 2026-11-21): the row's own detail says how many.
-  const rowsPlan = appRows({ sideload: detectMode() === "sideload", bundleId: app.bundleIdentifier, versions: app.versions.length,
+  const rowsPlan = appRows({ sideload: detectMode() === "sideload", bundleId: app.bundleIdentifier,
     version: `${v.version}${v.buildVersion ? ` (${v.buildVersion})` : ""}` });
   // F376: an update is out for this app: What's New in the newest version at the very top of Details.
   details.append(updateNewsSlot(app, { href: deeper(route, `versions:${pkg.row.id}`) }, { alive: () => body.isConnected }));
@@ -1003,11 +1011,9 @@ export function renderApp(body, route, pkg, source, { related = null, onChange =
   drawText(app.localizedDescription || "");
   if (!app.localizedDescription) merged.then((m) => { if (m.description && body.isConnected) drawText(m.description); });
 
-  // Version with CHANGE (Install Which Version?), and Version History (F29: its own page, browse.js renderVersions,
-  // every versions[] entry, older ones installable).
+  // Version: its row opens the Version page (F29, browse.js renderVersions: every versions[] entry, older ones installable).
   const versionBox = grouped([{ header: "Version", rows: detailRows(rowsPlan.version, {
-    history: { href: deeper(route, `versions:${pkg.row.id}`) } }), footer: v.date ? `Updated ${formatDate(v.date)}` : null }]).firstElementChild;
-  if (onChange) changeButton(versionBox, onChange, { disabled: !rowsPlan.change });
+    version: { href: deeper(route, `versions:${pkg.row.id}`) } }), footer: v.date ? `Updated ${formatDate(v.date)}` : null }]).firstElementChild;
   details.append(versionBox);
 
   // F161: Information is drawn again once the App Store's facts are in (developer, category, its version and iOS).
@@ -1164,7 +1170,7 @@ export function updateNewsGroup(app, record, history = null) {
   if (!record || record.id !== app?.bundleIdentifier || !updateNewsShown(app, record.version)) return null;
   const v = app.versions[0];
   return whatsNewGroup({ version: v.version, date: formatDate(v.date), notes: v.localizedDescription,
-    history: history ? { label: "Version History", ...history } : null });
+    history: history ? { label: "Version", ...history } : null });
 }
 // The slot, filled once the installed list is read and again whenever it changes (Mark as Installed, an install).
 export function updateNewsSlot(app, history = null, { store = apps, onChange = onAppsChange, alive = () => true } = {}) {

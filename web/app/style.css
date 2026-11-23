@@ -537,3 +537,7 @@ html.has-reload :is(.page-body, .sheet-scroll, .search-results, .progress-scroll
   white-space: nowrap; overflow: hidden;
 }
 @media (prefers-reduced-motion: reduce) { .pull-arrow { transition: none; } .pull-spinner { animation-duration: 3s; } }
+/* F392: the right end of a row belongs to its button (nav/ui.js buttonZone); the button's own place is its sheet's */
+.has-zone { position: relative; }
+.tap-zone { position: absolute; top: 0; bottom: 0; right: 0; width: 92px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.has-zone > button { z-index: 1; }
