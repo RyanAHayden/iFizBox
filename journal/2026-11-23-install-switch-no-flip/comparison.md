@@ -11,8 +11,8 @@ probe used 20 hand-built Shortcuts and, for the notification test, one automatio
 
 | Option | Shortcuts opens (times) | Extra taps per install | Set-up taps | Seconds added | iOS versions | Restored after failure / kill / timeout | Measured or not |
 |---|---|---|---|---|---|---|---|
-| Today's Install Switch (two or three hops by x-callback) | 2 or 3 per queue | 0 | 2 to add the Install Switch (Add Shortcut sheet) | About 1 s per Shortcuts open (measured for one hop, option C) | 16 to 27 in the repo; only 27 known | From the repo: the app runs the end hop by x-callback. Not measured here | Not measured now (from the repo) |
-| D: one trip | 1 | 0 | 2 to add the Install Switch, plus 1 Allow at its first run | Connect VPN 0.2 to 0.3 s. Restore about 2 s after the loop ends. The loop adds up to 10 s unless the wait returns at once (not measured) | 27 measured; 16 to 26 not run | Failure: no, inside the Shortcut. The app must restore (end hop). Kill: no, restored at next launch. Timeout: yes | Measured on 27 |
+| Today's Install Switch (two or three hops by x-callback) | 2 or 3 per queue | 0 | 2 to add the Install Switch (Add Shortcut sheet) | About 1 s per Shortcuts open (borrowed from the C measurement, not measured for this row) | 16 to 27 in the repo; only 27 known | From the repo: the app runs the end hop by x-callback. Not measured here | Not measured now (from the repo) |
+| D: one trip | 1, plus 1 for the end hop after a failure or kill (proposed, not measured) | 0 | 2 to add the Install Switch, plus 1 Allow at its first run | Connect VPN 0.2 to 0.3 s. Restore about 2 s after the loop ends. The loop adds up to 10 s unless the wait returns at once (not measured). The 10 s loop granularity is reasoned, not measured | 27 measured; 16 to 26 not run | Failure: measured with the last wait throwing, not a real failed install: not restored inside the Shortcut. The app must restore (end hop, proposed). Kill: not restored inside the Shortcut (measured); restore at next launch is proposed, not measured. Timeout: VPN and the marker action restored (measured); data on unverified (no SIM) | Measured on 27 |
 | A: Notification automation | 0 | 0 | 13 taps, 2 swipes, 2 typed words for the automation; 2 taps to add the Install Switch; 1 Allow at its first run; iFizBox notifications on | About 2 s from the notification to the first action, plus the Connect VPN time | 27 only | Failure: not measured (the body is a Shortcut, so an error loses the tail as in D). Kill: no end is posted; restored at next launch (not measured). Timeout: not measured | Partly: firing, latency and a full switch run measured. Failure, kill and timeout not measured |
 | C: share sheet row | 2 or 3 per queue (one per hop, as today) | 1 (opening the share sheet, against a button) | None beyond adding the Install Switch (2) | About 1 s per Shortcuts open | 27 | As today (the x-success and x-error callbacks return to the app). Not tested on its own | Measured on 27 for the tap and the return |
 | B: App Opened automation | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured. Not needed, since A worked |
@@ -51,14 +51,24 @@ keeps going with iFizBox in front. The Dynamic Island shows it running.
 - Wait times out: the bounded loop is the deadline. When it ends the tail runs, so a timeout is restored.
 
 A Shortcut has no try/catch and no break out of Repeat. So a failure or a kill cannot be restored inside the
-Shortcut. The app must restore itself: after a failure it runs the end hop by x-callback, and after a kill it
-does so at the next launch.
+Shortcut. The app must restore itself (proposed, not measured): after a failure it runs the end hop by
+x-callback, and after a kill it does so at the next launch.
 
 ## A Notification automation
 
 In this Shortcuts app an automation is a Shortcut whose first action is a trigger. The action picker lists the
 triggers under Automation. "Notification: When I receive a notification from [App]" has Add Filter. The
 Automation list shows it as "Run Shortcut" with a switch.
+
+Checks A1 to A7 of notes.md:
+
+- A1, fires with the app in front: yes (banner, list, none).
+- A2, latency: about 2 s.
+- A3, Shortcuts stays closed: yes.
+- A4, Set VPN and Set Cellular Data run without a prompt beyond the first-run Allow: yes (cellular effect unverified).
+- A5, notification removed at once: not tested.
+- A6, a Focus blocks it: not tested.
+- A7, a signed .shortcut carries the trigger: not determined. The by-hand tap count is given instead.
 
 - A local notification posted by iFizBox while iFizBox is in front fires the automation. This was yes for all
   three presentation settings: banner, list, and none (suppressed).
@@ -107,10 +117,12 @@ end hop by x-callback, so Shortcuts opens once. After a kill, it does so at the 
 
 C does not remove the Shortcuts open in any version, so do not build it. B was not needed.
 
+The iOS 27 pick rests on A's measured firing, latency and full run, while its failure, kill and timeout handling and the trigger in a signed .shortcut are not measured, so the build waits on the follow-up that measures them; the iOS 16 to 26 pick rests on reading and the iOS 27 measurements, since nothing was run on those versions (the 30 s wait limit was measured on iOS 27 only).
+
 ## Not verified
 
 - Cellular data: the phone has no cellular service (SOS), so every cellular effect is unverified.
-- Airplane Mode as "no network": not tried.
+- Airplane Mode as "no network": not tried for any option. An earlier run showed iOS starts no VPN without a network.
 - Screen locked: not tested for the intents, the Shortcuts or the automation.
 - iOS 16 to 26: nothing was run there. The 30 s wait limit was measured on iOS 27 only. The iOS 16 starting point
   comes from the Shortcuts x-callback and App Intents support, not from a run.
