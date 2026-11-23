@@ -16,7 +16,8 @@
 //
 // `tag` is the app's (one per try): signing.cancel {tag} stops that app's download, signing or serving only
 // (SignJob.cancel(tag:)), and signing.progress {bundleId, tag} ends its watch. The kept IPAs live in SignBridge.work
-// (emptied at launch) and go once opened, discarded or after `life`.
+// (emptied at launch) and go once opened, discarded or after `life`; one whose This iPhone install failed is kept again
+// under its token (B337), so the Signing Server Fallback opens it without signing again.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 
@@ -35,6 +36,12 @@ enum SignAhead {
             let tok = c.params["token"] as? String ?? ""
             SignBridge.queue.async { Apt.reply(c, ["discarded": forget(tok)], nil) }
         }
+    }
+
+    // B337: a second name for a kept IPA (a hard link: no copy, same folder) that outlives the first one's removal
+    private static func spareLink(_ u: URL) -> URL? {
+        let to = u.deletingLastPathComponent().appendingPathComponent("\(SignBridge.token())-spare.ipa")
+        do { try FileManager.default.linkItem(at: u, to: to); return to } catch { return nil }
     }
 
     @discardableResult
@@ -222,13 +229,28 @@ enum SignAhead {
                 job.end()
                 return Apt.reply(c, nil, SignBridge.text(SignJob.cancelledError))
             }
+            // B337: This iPhone's install deletes the IPA it is given, and its failure offers the Signing Server
+            // Fallback, which opens the same token again (screens/apprun.js offerServer, run.installAgain): a hard
+            // link of the kept IPA goes back into `kept` on a failure that wasn't a cancel, forgotten after `life`
+            let spare = servers.local ? spareLink(k.output) : nil
+            let keepAgain = { () -> Bool in
+                guard let s = spare else { return false }
+                guard !job.cancelled, FileManager.default.fileExists(atPath: s.path) else {
+                    try? FileManager.default.removeItem(at: s)
+                    return false
+                }
+                kept[tok] = Kept(output: s, app: k.app, record: k.record)
+                SignBridge.queue.asyncAfter(deadline: .now() + life) { _ = forget(tok) }
+                return true
+            }
             let opened = { (r: Result<(SignedApp, SignedRecord), Error>) in
                 switch r {
                 case .failure(let e):
                     job.end()
-                    SignBridge.queue.async { Sideload.dropOriginal(k.app.bundleID, sha256: k.record.sha256) } // F343
+                    SignBridge.queue.async { if !keepAgain() { Sideload.dropOriginal(k.app.bundleID, sha256: k.record.sha256) } } // F343
                     Apt.reply(c, nil, job.cancelled ? SignBridge.text(SignJob.cancelledError) : (e as? Sideload.Failed)?.text ?? SignBridge.text(e))
                 case .success(let (app, rec)):
+                    if let s = spare { try? FileManager.default.removeItem(at: s) } // B337: nothing opens it again
                     var j: [String: Any] = ["bundleId": app.bundleID, "originalBundleId": app.originalBundleID, "name": app.name,
                                             "version": app.version, "removed": app.removed, "fixedArm64e": app.fixedArm64e]
                     if let x = rec.expires { j["expires"] = ISO8601DateFormatter().string(from: x) }
