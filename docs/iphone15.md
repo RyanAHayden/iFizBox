@@ -97,11 +97,6 @@ keychain, put it on the search list (`security list-keychains -d user -s tmp.key
   otherwise. That's normal.
 - **`lock-button` is a short side-button press** (an IOHID event). WDA's own `/wda/lock` holds the button, which
   on iOS 27 opens Siri setup instead of locking.
-- **The rig's builds sign as App ID `com.ryha.sideload`**, not their bundle ID. fileproviderd then refuses the File
-  Provider bookmark of a file opened from Files ("surprising bundle identifier" in its log), and UIKit drops the open
-  without calling the scene delegate; `native/Sources/OpenRescue.swift` takes the URL from the open action instead.
-  Files outside iFizBox's own folder stay unreadable that way (the page asks to choose them in the picker). To see
-  it: `pymobiledevice3 syslog live -pn fileproviderd` while tapping the file.
 - **Other phones on the same USB are fine**: every `ios` call names this phone's UDID (`IFIZBOX_15_UDID`).
 - **Developer Mode** must stay on, and the phone must be trusted by this desktop (usbmuxd pairing record).
 - **Notification icons are cached until a restart.** After installing a build or switching the app icon, iOS keeps
