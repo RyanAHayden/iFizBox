@@ -60,10 +60,8 @@ const OFF = `transform .25s ${EASE}`;
 
 // B332: whether the page's era deletes a row with a full-row swipe. iOS 6 keeps its swipe-then-red-Delete (iOS 6
 // Mail's own: the kit's "Email Delete" button); iOS 7, 13 and 26 (<html data-style>) swipe the row off.
-export const fullSwipeEra = (doc = globalThis.document) => {
-  const style = doc?.documentElement?.getAttribute?.("data-style");
-  return !!style && style !== "ios6";
-};
+export const FULL_SWIPE_ERAS = ["ios7", "ios13", "ios26"];
+export const fullSwipeEra = (doc = globalThis.document) => FULL_SWIPE_ERAS.includes(doc?.documentElement?.getAttribute?.("data-style"));
 
 // The strip behind a row, made once per pooled row: the pinstripes and the control.
 function backOf(row) {

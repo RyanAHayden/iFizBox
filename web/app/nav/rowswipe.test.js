@@ -220,6 +220,7 @@ test("fullSwipeEra: iOS 7, 13 and 26 swipe a row off; iOS 6 (or no era set) keep
   for (const s of ["ios7", "ios13", "ios26"]) assert.equal(fullSwipeEra(doc(s)), true, s);
   assert.equal(fullSwipeEra(doc("ios6")), false);
   assert.equal(fullSwipeEra(doc(null)), false);
+  assert.equal(fullSwipeEra(doc("ios99")), false, "an era it doesn't know keeps the button");
   assert.equal(fullSwipeEra(undefined), false);
 });
 

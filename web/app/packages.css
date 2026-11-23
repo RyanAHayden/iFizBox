@@ -1155,7 +1155,7 @@ html[data-theme="dark"] .store-review-response { background: var(--dk-inset-box)
    on them reads in either, and dark values would be fixed colours in a dark rule (theme-palette.test.js). */
 html:is([data-style="ios7"], [data-style="ios13"], [data-style="ios26"]) .row-swipe .row-swipe-control::before { display: none; }
 /* ==== look-only { ==== the row swipe in iOS 7, 13 and 26 */
-html[data-style="ios7"] { --swipe-add: #4cd964; --swipe-remove: #ff3b30; --swipe-cancel: #c7c7cc; }
+html[data-style="ios7"] { --swipe-add: #4cd964; --swipe-remove: #ff3b30; --swipe-cancel: #8e8e93; }
 html:is([data-style="ios13"], [data-style="ios26"]) { --swipe-add: #34c759; --swipe-remove: #ff3b30; --swipe-cancel: #8e8e93; }
 html:is([data-style="ios7"], [data-style="ios13"], [data-style="ios26"]) .row-swipe { background: var(--swipe-add); box-shadow: none; }
 html:is([data-style="ios7"], [data-style="ios13"], [data-style="ios26"]) .row-swipe[data-kind="remove"] { background: var(--swipe-remove); }

@@ -18,6 +18,14 @@
   pinstripes. That is the queue swipe's icon fix: before, those eras showed iOS 6's glossy control on pinstripes.
   iOS 6 is unchanged.
 
+iOS 6's queue swipe keeps its pinstripes and the kit's glossy green / red / grey control: that is iOS 6's (and
+Cydia's) own look, so the "colour per era" for iOS 6 is the one it already had. The cancel glyph in the other eras is
+the plus rotated 45° by the base layout rule (`[data-kind="cancel"] ::after`), seen as a white x in the shots.
+
+Spec review (fresh subagent) findings fixed: `fullSwipeEra` names its eras (an unknown one keeps the button), iOS 7's
+cancel grey is systemGray #8e8e93 (white on #c7c7cc was faint), and the release note names Delete as well. Not
+changed: the glyph stays a minus, not Mail's trash label (the same control set as the queue swipe).
+
 ## Tried and dropped
 
 - Dark-tone values for iOS 13/26 (systemGreen #30d158, systemRed #ff453a) in `packages.css`:
