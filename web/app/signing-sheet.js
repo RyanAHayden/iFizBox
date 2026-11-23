@@ -34,7 +34,7 @@ import { keepGuideHref, openAppHelp } from "./screens/guides.js";
 import { tweaksGroup } from "./screens/tweaks.js"; // F288
 import { tweakParams } from "./core/tweaks.js";
 import { toBase64 } from "./core/signing.js";
-import { loadStyle } from "./nav/motion.js";
+import { loadStyle, EASE, DURATION } from "./nav/motion.js";
 import { nativeBridge } from "./native.js";
 
 const ICON_SIZE = 180; // the 60pt @3x icon; the signer writes the same PNG as @2x and @3x
@@ -380,4 +380,97 @@ export async function iconPNG(file) {
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+// ---- F385: Sign <NAME> First ----------------------------------------------------------------------------------
+// The website's Install <NAME> App with no signing set up (screens/home.js installApp): an iOS 6 action sheet that
+// says the app has to be signed first and lists the ways, each with one short hint under it (AGENTS.md Hints):
+// Import Certificate, Use a Free Apple ID (only while the Apple relay is on, as Settings > Signing shows it) and
+// Developer Account. A pick opens Settings > Signing at that way's group (focusSigningGroup).
+//
+//   signFirstOptions({ free })   pure: [{ id: "certificate" | "free" | "account", label, hint }] in order
+//   await signFirstSheet({ free })  the picked id, or null for Cancel (a tap on the dimmed screen, Escape)
+//   focusSigningGroup(id)        once Settings > Signing draws that group, scrolls it into view
+export const SIGN_FIRST_TITLE = `Sign ${NAME} First`;
+export const SIGN_FIRST_TEXT = `iOS only installs apps signed for your iPhone. Set up one of these, `
+  + `then Settings > Signing offers to install ${NAME}.`;
+export const FREE_HINT = "Signs up to 3 apps for 7 days at a time, no certificate needed. "
+  + `They install from the ${NAME} app, not this website.`; // free-apple-id.js FREE_ENTRY_FOOTER's words
+export function signFirstOptions({ free = false } = {}) {
+  return [
+    { id: "certificate", label: "Import Certificate",
+      hint: "Get a .p12 and its .mobileprovision from a certificate seller or your Apple developer account. Then choose both files and the password." },
+    ...(free ? [{ id: "free", label: "Use a Free Apple ID", hint: FREE_HINT }] : []),
+    { id: "account", label: "Developer Account",
+      hint: `With your developer account's App Store Connect API key, ${NAME} makes the certificate and profiles for you.` },
+  ];
+}
+
+export function signFirstSheet({ free = false } = {}, { doc = globalThis.document } = {}) {
+  style(); // .action-hint
+  const options = signFirstOptions({ free });
+  return new Promise((resolve) => {
+    const make = (tag, cls, text) => Object.assign(doc.createElement(tag), { className: cls, ...(text != null ? { textContent: text } : {}) });
+    const scrim = make("div", "action-scrim sign-first");
+    const dim = make("div", "action-dim");
+    const sheet = make("div", "action-sheet");
+    sheet.setAttribute("role", "dialog");
+    sheet.setAttribute("aria-modal", "true");
+    sheet.setAttribute("aria-label", SIGN_FIRST_TITLE);
+    sheet.append(make("p", "action-title sign-first-title", SIGN_FIRST_TITLE), make("p", "action-title", SIGN_FIRST_TEXT));
+    const list = make("div", "action-list");
+    list.dataset.scroller = "";
+    sheet.append(list);
+    for (const o of options) {
+      const b = make("button", "action-button", o.label);
+      b.type = "button";
+      b.dataset.way = o.id;
+      b.addEventListener("click", (e) => { e.stopPropagation(); close(o.id); });
+      list.append(b, make("p", "action-hint", o.hint));
+    }
+    const cancel = make("button", "action-button cancel", "Cancel");
+    cancel.type = "button";
+    cancel.addEventListener("click", (e) => { e.stopPropagation(); close(null); });
+    sheet.append(cancel);
+    dim.addEventListener("click", () => close(null));
+    scrim.append(dim, sheet);
+    doc.body.append(scrim);
+    const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); close(null); } };
+    doc.addEventListener("keydown", onKey);
+    dim.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: DURATION, easing: "ease-out" });
+    sheet.animate?.([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: DURATION, easing: EASE });
+    cancel.focus?.({ preventScroll: true });
+    let done = false;
+    function close(id) {
+      if (done) return;
+      done = true;
+      doc.removeEventListener("keydown", onKey);
+      scrim.style.pointerEvents = "none";
+      resolve(id); // answered before the slide-out, which can't hold it (actionsheet.js B202)
+      let timer = 0;
+      const end = () => { clearTimeout(timer); scrim.remove(); };
+      try {
+        dim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250, easing: "ease-in", fill: "forwards" });
+        const a = sheet.animate([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: 250, easing: EASE, fill: "forwards" });
+        timer = setTimeout(end, 250 + 300);
+        a.finished.then(end, end);
+      } catch { end(); }
+    }
+  });
+}
+
+// Each way's group on Settings > Signing (screens/settings.js certificateGroup, devaccount.js accountGroup,
+// free-apple-id.js freeRouteBlock), found by what it draws.
+// The certificate group by its file input (.p12 and .mobileprovision): .sign-import alone also marks other rows.
+export const SIGNING_GROUP_OF = { certificate: 'input[accept*=".mobileprovision"]', free: ".free-route", account: ".asc-add, .asc-guide-link" };
+export function focusSigningGroup(id, { doc = globalThis.document, later = setTimeout, tries = 40 } = {}) {
+  const sel = SIGNING_GROUP_OF[id];
+  if (!sel || !doc) return;
+  const look = (n) => {
+    const hit = doc.querySelector(sel);
+    const group = hit?.closest?.(".group") ?? hit;
+    if (group) { group.scrollIntoView?.({ block: "center", behavior: "smooth" }); return; }
+    if (n > 0) later(() => look(n - 1), 100);
+  };
+  later(() => look(tries), 350); // after the push slide (nav/motion.js DURATION)
 }

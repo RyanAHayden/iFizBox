@@ -66,3 +66,16 @@
 .signed-row.armed .cell-detail { opacity: 0; }
 .signed-row.removing { opacity: 0; }
 /* ==== } look-only ==== */
+
+/* F385: Sign <NAME> First (signing-sheet.js signFirstSheet): the action sheet's title in bold, and a short hint
+   under each way's button, centred in the title's colour and emboss (each era's --action-title tokens). */
+.sign-first .sign-first-title { font-size: 17px; line-height: 22px; font-weight: bold; margin-bottom: 0; }
+.action-hint { margin: -2px 6px 4px; font-size: 13px; line-height: 16px; text-align: center; white-space: normal;
+  color: var(--action-title); text-shadow: var(--action-title-emboss); }
+/* The later eras draw no panel behind an action sheet (--action-sheet: none), so the title and hints sit on cards
+   in a button's colour there, or they'd be unreadable over the page. */
+html:is([data-style="ios7"], [data-style="ios13"], [data-style="ios26"]) .sign-first :is(.action-title, .action-hint) {
+  margin: 0; padding: 8px 14px; border-radius: 13px; background: var(--action-btn); }
+html[data-style="ios7"] .sign-first :is(.action-title, .action-hint) { border-radius: 3px; }
+html:is([data-style="ios7"], [data-style="ios13"], [data-style="ios26"])[data-theme="dark"] .sign-first .action-sheet :is(.action-title, .action-hint) {
+  background: var(--dk-action-btn); }
