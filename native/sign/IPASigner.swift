@@ -254,7 +254,8 @@ final class IPASigner {
             log(GroupFix.logLine(nil, none: "\(Brand.name)'s own IPA"))
         } else if let exe = main.plist["CFBundleExecutable"] as? String, files[appDir + exe] != nil {
             let plan = GroupFix.plan(original: Inspect.entitlements(try contents(appDir + exe, files, zip)), profile: appEnts,
-                                     previous: files[appDir + GroupFix.configPath] == nil ? nil : try? contents(appDir + GroupFix.configPath, files, zip))
+                                     previous: files[appDir + GroupFix.configPath] == nil ? nil : try? contents(appDir + GroupFix.configPath, files, zip),
+                                     keychainGroups: appEnts["keychain-access-groups"] as? [String] ?? [])
             if let plan = plan, let dylib = GroupFix.dylib() {
                 tweaks = try GroupFix.adding(plan, dylib: dylib, to: tweaks)
                 groupFix = SignerStamp.hash(dylib)

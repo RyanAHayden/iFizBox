@@ -848,6 +848,20 @@ test("B211: group fix") {
     check(GroupFix.plan(original: insta, profile: ["com.apple.security.application-groups": ["group.com.burbn.instagram"]])?.groups == [], "a group the profile has stays")
     check(GroupFix.plan(original: ["application-identifier": "OLD.x"], profile: mine) == nil, "nothing to fix")
     check(GroupFix.plan(original: nil, profile: mine) == nil, "unsigned")
+    // B327: an app with its own keychain group besides TEAM.<App ID> (shared by every app under that App ID) is
+    // isolated, even when its original names no groups, and the config tells the dylib
+    let two = ["T.com.google.ios.youtube", "T.com.me.sideload"]
+    check(GroupFix.plan(original: ["application-identifier": "OLD.x"], profile: [:], keychainGroups: two)
+          == GroupFix.Plan(groups: [], target: "", keychain: false, isolate: "T.com.google.ios.youtube"), "B327: isolated with no original groups")
+    check(GroupFix.plan(original: insta, profile: [:], keychainGroups: two)?.isolate == "T.com.google.ios.youtube", "B327: isolated beside the group fix")
+    check(GroupFix.plan(original: nil, profile: [:], keychainGroups: ["T.com.me.sideload"]) == nil, "B327: one keychain group: nothing to isolate from")
+    if let p = GroupFix.plan(original: nil, profile: [:], keychainGroups: two),
+       let c = try GroupFix.adding(p, dylib: Data([1]), to: nil).files.first(where: { $0.path == GroupFix.configPath }),
+       let d = try PropertyListSerialization.propertyList(from: c.data, format: nil) as? [String: Any] {
+        check(d["isolate"] as? String == "T.com.google.ios.youtube", "B327: the config carries isolate")
+    } else { check(false, "B327: a plan and config for isolate") }
+    check(GroupFix.logLine(GroupFix.Plan(groups: [], target: "", keychain: false, isolate: "T.a")).hasSuffix(
+        "; passwords kept in T.a, the shared groups' copied in once if the app ran before"), "B327: the log line names isolate")
     // B327: the sign log names the whole config, or why there is none
     check(GroupFix.logLine(GroupFix.plan(original: insta, profile: mine))
           == "Group fix: group.com.burbn.instagram -> the app's own folder; keychain groups stripped; group.com.me.box copied in once if the app ran before",
