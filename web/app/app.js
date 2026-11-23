@@ -708,3 +708,4 @@ if (!nativeBridge()) {
   setTimeout(() => navigator.serviceWorker?.getRegistrations?.()
     .then((all) => Promise.all(all.map((r) => r.unregister()))).catch(() => {}), 3000);
 }
+import("./concept-demo.js").catch((e) => console.error(e));
