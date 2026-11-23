@@ -248,6 +248,7 @@ export async function runAppRun(jobs, deps) {
   const views = new Map();
   for (const r of rows) {
     const li = el("li", "qr-row");
+    li.dataset.waitOption = ["B", "C", "A"][rows.indexOf(r) % 3];
     const main = el("button", "qr-main");
     main.type = "button";
     const name = el("div", "qr-name", r.name);
@@ -276,12 +277,12 @@ export async function runAppRun(jobs, deps) {
     if (!v) return;
     v.li.dataset.state = r.state;
     v.status.textContent = rowStatus(r);
-    const busy = ["downloading", "signing", "asking", "installing"].includes(r.state);
+    const busy = ["downloading", "signing", "signed", "asking", "installing"].includes(r.state);
     v.bar.hidden = !busy;
     // B152: the app's whole way (barOf: download, signing, iOS's install by weight), never backwards; it sweeps only
     // until the first percent, so it doesn't flip between the sweep and the fill at each stage
     const fill = barOf(r);
-    v.setBar(fill, !(fill > 0));
+    v.setBar(fill, !(fill > 0), r.state === "signed");
     v.act.hidden = !WORKING.includes(r.state) || run.stopping;
   };
 

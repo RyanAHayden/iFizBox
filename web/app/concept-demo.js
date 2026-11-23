@@ -33,3 +33,20 @@ async function demo() {
   return r;
 }
 setTimeout(() => demo().catch((e) => console.error("demo", e)), 1200);
+
+// The page's All | A | B | C: which option the waiting rows wear; with All each row wears its own and says which.
+const NAMES = { A: "A: Moving Stripes", B: "B: Back and Forth", C: "C: Still Stripes" };
+let pick = "all";
+addEventListener("message", (e) => { if (e.data?.waitbar) { pick = e.data.waitbar; label(); } });
+function label() {
+  for (const li of document.querySelectorAll(".qr-row")) {
+    const own = li.dataset.waitOption;
+    if (!own) continue;
+    const o = pick === "all" ? own : pick;
+    if (li.dataset.wait !== o) li.dataset.wait = o;
+    const st = li.querySelector(".qr-status");
+    const t = pick === "all" ? `Signed (${NAMES[own]})` : "Signed";
+    if (li.dataset.state === "signed" && st.textContent !== t) st.textContent = t;
+  }
+}
+setInterval(label, 80);

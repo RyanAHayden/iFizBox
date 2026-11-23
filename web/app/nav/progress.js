@@ -80,10 +80,12 @@ export function rowBar(doc = globalThis.document) {
   }
   const bar = el("div", "qr-bar");
   const fill = el("div", "qr-fill");
-  bar.append(fill);
+  const wait = el("div", "qr-wait"); // signed, waiting its turn: the bar full (progress.css)
+  bar.append(fill, wait);
   return {
     bar,
-    set(fraction, sweep) {
+    set(fraction, sweep, waiting = false) {
+      bar.classList.toggle("is-waiting", !!waiting);
       bar.classList.toggle("is-indeterminate", !!sweep);
       fill.style.transform = `scaleX(${Math.max(0, Math.min(1, Number(fraction) || 0))})`;
     },
