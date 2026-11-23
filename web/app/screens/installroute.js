@@ -260,8 +260,11 @@ export function shortcutGroups(st, { add = () => {}, test = () => {}, testing = 
 }
 
 // F372: USE on This iPhone before it was set up opened its setup; the test that finishes it uses This iPhone.
-let useAfterSetup = false;
-export const setUseAfterSetup = (v) => { useAfterSetup = Boolean(v); };
+// It holds for USE_HOLD ms: a test long after the user backed out of the setup doesn't switch the way in.
+let useAfterSetup = 0;
+export const USE_HOLD = 10 * 60 * 1000;
+export const setUseAfterSetup = (v, now = Date.now()) => { useAfterSetup = v ? now : 0; };
+const takeUseAfterSetup = (now = Date.now()) => { const on = useAfterSetup > 0 && now - useAfterSetup < USE_HOLD; useAfterSetup = 0; return on; };
 export const TEST_MS = 120000; // vpn.test: the first one waits for the user's Allow on iOS's Add VPN Configurations
 
 // Test Connection with the built-in VPN: vpn.test (on, one connect with the pairing, off). A pass clears a remembered
@@ -273,7 +276,7 @@ export async function vpnTest(native, alert, store, { ended = () => {}, onPass =
   if (r?.ok) {
     clearRouteFailure();
     if (lastStatus) lastStatus = { ...lastStatus, vpn: { ...(lastStatus.vpn ?? {}), tested: true } };
-    if (useAfterSetup) { useAfterSetup = false; if (store?.get(ROUTE_KEY) !== "iphone") store?.set(ROUTE_KEY, "iphone"); }
+    if (takeUseAfterSetup() && store?.get(ROUTE_KEY) !== "iphone") store?.set(ROUTE_KEY, "iphone");
     onPass();
   } else if (isLate(err)) rememberRouteFailure(NO_ANSWER_FAILURE);
   else { const f = routeFailureOf(err, lastStatus); if (f) rememberRouteFailure(f); }
@@ -781,7 +784,8 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
     const useBtn = el("button", "price-btn route-use-btn", "USE");
     useBtn.type = "button";
     useBtn.setAttribute("aria-label", `Use ${ROUTE_ROW[v].label}`);
-    const active = el("span", "price-btn go route-active", "ACTIVE");
+    const active = el("span", "price-btn route-active", "ACTIVE");
+    active.classList.add("go"); // the green state, added apart so the era sheets keep .go a state of the button
     active.setAttribute("aria-hidden", "true");
     useBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); use(v); });
     wrap.append(useBtn, active);

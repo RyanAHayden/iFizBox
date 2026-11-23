@@ -44,6 +44,18 @@ markTested are replaced by real bridge calls.
   USB). Lock taken and given back.
 - First build: `NWPath` ambiguous (NetworkExtension's deprecated NWPath vs Network's): qualified as Network.NWPath.
 
+## Spec review
+
+- Fixed: USE before setup kept a module flag forever, so a later Test Connection switched the way in after the user
+  had backed out; it now holds 10 minutes (USE_HOLD), with a node test.
+- Kept, on purpose: the fallback to LocalDevVPN/Tailscale when the built-in VPN won't start, and the old groups
+  without `vpn.available` (a profile without Network Extensions still installs; C64 removes them after the user's
+  OK); home.js and signing/route.js are the user's 2026-11-22 note; mkipa/test_ipa check the new extension.
+- Answered: the App ID capability is already asked for (core/asc.js and ASC.swift APP_ID_CAPS have
+  NETWORK_EXTENSIONS); the Signing Server page gets settings.js's `server` sections; Add marks a Shortcut added
+  when tapped, as the concept does, and Test Shortcuts is what proves it (under Not verified).
+- Filed R73 (after F372): the cellular check on the user's phone, which blocks CONFIRM with the steps.
+
 ## Not verified
 
 - **Anything on a phone**: the tunnel starting, iOS's "Add VPN Configurations" prompt, pair/test/install through it,

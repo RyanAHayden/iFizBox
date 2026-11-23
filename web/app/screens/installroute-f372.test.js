@@ -134,6 +134,22 @@ test("a failed connect through the built-in VPN never says to turn on LocalDevVP
   assert.ok(!/LocalDevVPN|Tailscale/.test(JSON.stringify([why, refused])));
 });
 
+test("the test that finishes setting up uses This iPhone only after USE, and only for a while", async () => {
+  const { vpnTest, setUseAfterSetup, USE_HOLD } = screens;
+  const m = { installRoute: "server" };
+  const store = { get: (k) => m[k], set: (k, v) => { m[k] = v; } };
+  const native = { call: (x) => (x === "vpn.test" ? Promise.resolve({ ok: true, ms: 40 }) : Promise.reject(new Error("no"))) };
+  const alert = async () => ({ index: 0 });
+  await vpnTest(native, alert, store);
+  assert.equal(m.installRoute, "server", "a plain test switches nothing");
+  setUseAfterSetup(true, Date.now() - USE_HOLD - 1);
+  await vpnTest(native, alert, store);
+  assert.equal(m.installRoute, "server", "USE long ago");
+  setUseAfterSetup(true);
+  await vpnTest(native, alert, store);
+  assert.equal(m.installRoute, "iphone", "USE, then the test: ACTIVE");
+});
+
 // ---- user 2026-11-22: on cellular without the Cellular Shortcuts
 
 test("cellular + no Shortcuts -> the warning; Wi-Fi, or the Shortcuts added -> none", () => {
