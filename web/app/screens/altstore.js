@@ -285,12 +285,9 @@ export function trackingSection(app, pkg, source, body = null, { store = apps, s
   const box = el("div");
   const mark = (version) => apps().then((store) => recordInstall(store, { id: app.bundleIdentifier, name: app.name, version, key: pkg.key,
     source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL })).then(draw, () => {});
-  // B372: on the app page (`body`), Mark as Not Installed holds the forget as the nav bar's toggle does, and Mark as
-  // Installed while it is held cancels it (the records as they were, the signature's expiry too)
+  // B372: while the toggle or Modify holds a forget, the section reads Not Installed, and Mark as Installed cancels it
+  // (the records as they were, the signature's expiry too)
   const held = () => forgetHeld(app.bundleIdentifier);
-  const unmark = (rec) => (body
-    ? toggleMarked(app, pkg, source, { store, signedOf, body }).then(draw, () => {})
-    : apps().then((store) => removeInstall(store, rec.id)).then(draw, () => {}));
   const remark = () => { cancelHeldForget(app.bundleIdentifier); return draw(); };
   async function draw() {
     let rec = null;
@@ -304,7 +301,7 @@ export function trackingSection(app, pkg, source, body = null, { store = apps, s
       ? [{ label: "Installed Version", detail: rec.version || "Unknown" },
         // B232: installs another of the source's versions (Install Which Version?), as Version History does
         ...(byHand && installWhichButtons(app, rec.version || "", currentDevice().ios ?? null).versions.some(Boolean) ? [{ label: "Change Installed Version", onClick: () => installWhichVersion(app, pkg, source, { installed: rec.version || "" }).catch(() => {}) }] : []),
-        ...(byHand ? [{ label: MARK_NOT_INSTALLED_LABEL, onClick: () => unmark(rec) }] : [])]
+        ...(byHand ? [{ label: MARK_NOT_INSTALLED_LABEL, onClick: () => apps().then((store) => removeInstall(store, rec.id)).then(draw, () => {}) }] : [])]
       : byHand ? [{ label: MARK_INSTALLED_LABEL, onClick: () => (held() ? remark() : versions.length > 1 ? pick() : mark(versions[0] ?? "")) }] : [];
     // The nav bar's button says what it will do, as Cydia's does: Upgrade when a newer version is out than the one
     // installed, Reinstall when it's the same, Install when it isn't installed.

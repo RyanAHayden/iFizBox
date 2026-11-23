@@ -82,10 +82,10 @@ test("installWhichVersion: the installed row and Cancel install nothing; the jai
 // left; marking it installed again before that cancels it, so the signed record and its expiry stay.
 import { toggleMarked, appPageAction, forgetHeld, flushHeldForgets, cancelHeldForget } from "./altstore.js";
 import { memoryAppStore } from "../core/installed.js";
-import { MARK_NOT_INSTALLED } from "../core/appqueue.js";
-import { createAppQueue } from "../core/appqueue.js";
+import { MARK_NOT_INSTALLED, createAppQueue } from "../core/appqueue.js";
 
 function signedRig() {
+  cancelHeldForget("com.x.a"); // a failed test's held forget doesn't reach the next
   const signed = new Map([["com.x.a", { bundleId: "com.x.a", version: "2.1", expires: "2026-12-01T00:00:00Z" }]]);
   const mem = memoryAppStore([{ id: "com.x.a", version: "2.1" }]);
   const calls = [];
