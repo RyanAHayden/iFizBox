@@ -938,7 +938,9 @@ a.store-head-author:active { color: var(--detail); }
 html[data-theme="dark"] .store-stars { --star: var(--dk-star-off); }
 /* ==== } look-only ==== */
 
-/* The panes under the segmented control: the one chosen shows. */
+/* The panes under the segmented control: the one chosen shows; they slide sideways (nav/tabswipe.js). flow-root: a pane
+   lifted out of the flow keeps the margins it has in it. */
+.store-pane { display: flow-root; }
 .store-pane[hidden] { display: none; }
 .store-pane > .empty { margin: 30px 20px; }
 

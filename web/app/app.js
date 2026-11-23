@@ -14,7 +14,7 @@ import { load, loaded, mod, missing, loadAll, NotLoaded } from "./lazy.js";
 import { grouped, placeholder } from "./nav/ui.js";
 import { createStacks, swipeCommits } from "./nav/stack.js";
 import { animate, setProgress, clear, DURATION, EASE_OUT } from "./nav/transition.js";
-import { attachEdgeSwipe, attachPageSwipe, pageSwipeBlocked } from "./nav/swipe.js";
+import { attachEdgeSwipe, attachPageSwipe, attachTabSwipe, pageSwipeBlocked, tabSwipeTakesBack } from "./nav/swipe.js";
 import { keepRow, ghostFor } from "./nav/selection.js";
 import { createTabbar, tapTab, scrollToTop, isSliding } from "./nav/tabbar.js";
 import { scrollerOf } from "./nav/searchbar.js";
@@ -404,17 +404,22 @@ attachEdgeSwipe(edgeEl, backSwipe);
 // F373: the same pop from a rightward drag anywhere on the page, as iOS 26 (nav/swipe.js attachPageSwipe). Off on the
 // web with the edge strip (webBack, in canStart). While the pairing page has a step running it asks "Stop Setting
 // Up?" first and Leave goes Back, as the edge strip does (screens/installroute.js guardSwipe).
+// The row a drag started on lets go of its blue, as UIKit cancels a cell's highlight when the pop begins.
+const dropPress = () => { if (pressed) { pressed.classList.remove("is-pressed"); pressed = null; lastPress = null; } };
 attachPageSwipe(screensEl, {
   ...backSwipe,
   begin() {
-    // The row the drag started on lets go of its blue, as UIKit cancels a cell's highlight when the pop begins.
-    if (pressed) { pressed.classList.remove("is-pressed"); pressed = null; lastPress = null; }
+    dropPress();
     return backSwipe.begin();
   },
-  blocked: (target) => !!pageSwipeBlocked(target, screensEl) || popupOpen(),
+  blocked: (target) => tabSwipeTakesBack(target) || !!pageSwipeBlocked(target, screensEl) || popupOpen(),
   held: () => !!pendingStep(),
   onHeld: () => { askLeave(guardHooks.alert).then((go) => { if (go) goBack(); }); },
 });
+
+// F390: a swipe on a Details page moves between its Details, Reviews and Related tabs (nav/swipe.js attachTabSwipe); on Reviews and
+// Related the rightward one is theirs, and swipe back keeps the edge strip there.
+attachTabSwipe(screensEl, { canStart: () => !running && !gesture, blocked: () => popupOpen(), onBegin: dropPress });
 
 // Tab taps go through selectTab so each tab keeps its place; the href is there for no-JS fallbacks and a11y.
 for (const tab of BAR_TABS) tabbar.items[tab].href = format({ tab });

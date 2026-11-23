@@ -8,9 +8,10 @@
 //     nav bar's right button (user 2026-11-18: "keep the install / modify button in the top right"). `action`: an
 //     element for the header's right edge, where the App Store's install button sat (F194: an app page's Share).
 //   headerLine({ version, size, price })   -> "Version 2.1.3 · 412 kB · Free"
-//   storeTabs({ details, reviews, related }) -> { control, panes: { details, reviews, related }, select(i), nodes }
+//   storeTabs({ details, reviews, related }) -> { control, panes: { details, reviews, related }, select(i), swipeOn(body), nodes }
 //     The Details / Reviews / Related segmented control (ios6.css .store-segmented) over three panes. Details is
-//     filled by the caller at once; reviews(pane) and related(pane) run the first time their tab is chosen.
+//     filled by the caller at once; reviews(pane) and related(pane) run the first time their tab is chosen or a swipe
+//     begins to show it. swipeOn(body), once `nodes` are in the page: swipes and taps slide the panes (F390, nav/tabswipe.js).
 //   tileRow({ rating })                    -> { row, set(key, tile | null) }  the sideways info tiles, in TILE_ORDER
 //     (F206: starts with the Rating tile's placeholder, pendingRatingTile(), unless rating: false)
 //   worksOnTile(fit)                       -> { label, value, sub, ok }  compat()'s verdict as the Works On tile
@@ -24,8 +25,9 @@
 //   storeStars(rating, cls)                -> five stars filled to the rating (the App Store's orange)
 //
 // A rating r: { average (0-5), count, noun: "Ratings" | "Reviews", histogram?: [n5, n4, n3, n2, n1], from }.
-// Everything moves by transform/opacity only (120 Hz); the panes switch with `hidden`, as the App Store did.
+// Everything moves by transform/opacity only (120 Hz).
 import { el, grouped, segmented } from "../nav/ui.js";
+import { tabPager } from "../nav/tabswipe.js";
 import { starCounts } from "../core/reviews.js";
 
 export const TAB_LABELS = ["Details", "Reviews", "Related"];
@@ -111,22 +113,17 @@ export function storeTabs({ reviews = null, related = null } = {}) {
   const keys = ["details", "reviews", "related"];
   const fill = { reviews, related };
   const filled = new Set(["details"]);
-  let now = 0;
-  const control = segmented(TAB_LABELS, { onSelect: (i) => select(i) });
-  function select(i) {
-    if (!(i >= 0 && i < keys.length)) return;
-    now = i;
-    control.mark(i);
-    keys.forEach((k, j) => { panes[k].hidden = j !== i; });
+  const fillPane = (i) => {
     const k = keys[i];
-    if (!filled.has(k)) {
-      filled.add(k);
-      try { Promise.resolve(fill[k]?.(panes[k])).catch(() => {}); } catch { /* a pane that fails stays empty */ }
-    }
-  }
-  select(0);
-  return { control: control.bar, buttons: control.buttons, panes, select, selected: () => keys[now],
-    nodes: [control.bar, panes.details, panes.reviews, panes.related] };
+    if (filled.has(k)) return;
+    filled.add(k);
+    try { Promise.resolve(fill[k]?.(panes[k])).catch(() => {}); } catch { /* a pane that fails stays empty */ }
+  };
+  const control = segmented(TAB_LABELS, { onSelect: (i) => pager.select(i) });
+  const pager = tabPager({ panes: keys.map((k) => panes[k]), mark: control.mark, fill: fillPane });
+  pager.select(0);
+  return { control: control.bar, buttons: control.buttons, panes, select: pager.select, selected: () => keys[pager.selected()],
+    swipeOn: pager.attach, nodes: [control.bar, panes.details, panes.reviews, panes.related] };
 }
 
 // ---- the info tiles --------------------------------------------------------------------------------------------
