@@ -272,7 +272,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     if (f.ctl.signal.aborted || ended(r)) return;
     const first = r.phase !== phase;
     if (first && helperRow(r)) { // B71a: the jailbreak app's helper: one step per app, no signing, no iOS prompt
-      if (phase === "installing") log(r, "step", `${r.mode === "remove" ? "Removing" : "Installing"} ${label(r)}`);
+      if (phase === "installing" && !info?.word) log(r, "step", `${r.mode === "remove" ? "Removing" : "Installing"} ${label(r)}`);
     } else if (first) {
       if (phase === "downloading") log(r, "step", `Downloading ${label(r)}${r.size ? ` ${sizeText(r.size)}` : ""}`);
       else if (phase === "signing") log(r, "step", `Signing ${label(r)}`);
@@ -284,13 +284,16 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       } else if (phase === "installing") log(r, "step", `iOS is installing ${label(r)}`);
       else if (phase === "busy") log(r, "step", busyText(label(r))); // B312: iOS installs it for another app first
     }
+    // B400: the helper's step ({ word, percent }, screens/apprun.js helperLanes): each logged once, "Preparing" not at all
+    const word = helperRow(r) && info?.word ? { word: info.word, wordPercent: info.percent ?? null } : {};
+    if (word.word && word.word !== r.word && word.word !== "Preparing") log(r, "step", `${word.word} ${label(r)}`);
     const settled = !r.here && phase === "copying"; // F359: its This iPhone route is settled: others may join it
     const here = r.here || phase === "copying";
     const state = phase === "copying" ? "installing" : SIGNING.has(phase) || WITH_IOS.has(phase) ? phase : r.state;
     let frac = Math.max(0, Math.min(1, Number(fraction) || 0));
     if (phase === "signing" && SIGN_STEPS[step]) frac = SIGN_STEPS[step][0] + (SIGN_STEPS[step][1] - SIGN_STEPS[step][0]) * frac;
     const dl = phase === "downloading" && info ? { bytes: Number(info.bytes) || 0, total: Number(info.total) || 0, rate: Number(info.rate) || 0 } : {};
-    set(r, { phase, state, here, fraction: frac, ...dl });
+    set(r, { phase, state, here, fraction: frac, ...dl, ...word });
     if (SIGNING.has(phase)) arm(r, f);
     // F359: the shell signs one app at a time, so a downloaded app waits for the signer with no progress of its own:
     // while another row's signing moves, the downloaded rows' stall clocks start again (a stuck signer still fails)
@@ -373,7 +376,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     const f = fly(r);
     const again = Boolean(r.again);
     const reinstall = Boolean(r.reinstall); // B337: installAgain's row
-    set(r, { state: "asking", phase: null, fraction: 0, again: false, reinstall: false, here: false, local: localRoute(r) });
+    set(r, { state: "asking", phase: null, fraction: 0, word: null, wordPercent: null, again: false, reinstall: false, here: false, local: localRoute(r) });
     let res;
     try {
       res = await install(r, { signal: f.ctl.signal, progress: progressOf(r, f), ...(again ? { again: true } : {}) });
@@ -595,6 +598,10 @@ export const helperRow = (row) => Boolean(row?.job?.helper);
 function helperStatus(row) {
   const p = pct(row.fraction);
   const verb = row.mode === "remove" ? "Removing" : "Installing";
+  if (row.state === "installing" && row.word) { // B400: the helper's step and its own percent
+    const w = Number(row.wordPercent);
+    return w > 0 && w < 100 ? `${row.word} ${w}%` : row.word;
+  }
   switch (row.state) {
     case "waiting": case "signed": return "Waiting";
     case "downloading": case "signing": return "Checking";
@@ -656,7 +663,7 @@ export function runStatus(rows) {
     return withIos.every((r) => r.phase === "copying") ? `Copying ${withIos.length} apps to iPhone` : `Installing ${withIos.length} apps`;
   }
   const ios = withIos[0];
-  if (ios && helperRow(ios)) return `${ios.mode === "remove" ? "Removing" : "Installing"} ${label(ios)} (${pos(ios)})`;
+  if (ios && helperRow(ios)) return `${ios.state === "installing" && ios.word ? ios.word : ios.mode === "remove" ? "Removing" : "Installing"} ${label(ios)} (${pos(ios)})`;
   if (ios?.phase === "busy") return busyText(label(ios)); // B312
   if (ios?.phase === "copying") return `Copying ${label(ios)} to iPhone (${pos(ios)})`; // B111: This iPhone
   if (selfClosing(ios)) return `Installing ${label(ios)}: ${SELF_CLOSING}`;
@@ -675,6 +682,7 @@ export function runStatus(rows) {
 export function rowProgress(r) {
   const f = Math.max(0, Math.min(1, Number(r?.fraction) || 0));
   if (ended(r)) return 1;
+  if (helperRow(r)) return r.state === "installing" ? f : 0; // B400: no signing: the helper's bar is the row's whole bar
   if (r?.state === "installing" && r.phase === "copying") return 0.5 + 0.1 * f;
   if (r?.state === "installing" && r.here) return 0.6 + 0.4 * f;
   if (r?.state === "downloading") return 0.25 * f;

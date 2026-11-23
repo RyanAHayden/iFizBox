@@ -517,7 +517,7 @@ enum IPAInstall {
     }()
 
     // F196: the running ipa.install, for ipa.cancel. Guarded by runLock.
-    final class Run { var task: URLSessionTask?; var fetch: DebFetch?; var cancelled = false; var helper = false }
+    final class Run { var task: URLSessionTask?; var watch: NSKeyValueObservation?; var fetch: DebFetch?; var cancelled = false; var helper = false }
     static let runLock = NSLock()
     static var running: Run?
 
@@ -530,6 +530,19 @@ enum IPAInstall {
         r.fetch?.cancel()
     }
 
+    // B400: a download's fraction as a dlstatus line per new whole percent, never back.
+    static func percents(_ emit: (([[String: Any]]) -> Void)?) -> (Double) -> Void {
+        let lock = NSLock()
+        var shown = 0 // download's first line already said 0
+        return { p in
+            let pct = Int((min(max(p, 0), 1) * 100).rounded(.down))
+            lock.lock(); defer { lock.unlock() }
+            guard pct > shown else { return }
+            shown = pct
+            emit?([["fd": "status", "line": "dlstatus:ipa:\(pct):Downloading"]])
+        }
+    }
+
     // B113: an http:// link, as Sideload.download does for the sideload app (B104): IPAInstall.session is URLSession,
     // which ATS keeps off plain http. Without `insecure` the https twin (Sideload.httpsTwin, 20 s idle limit) is
     // downloaded instead; when it has none, the call answers "insecure: …" and the page asks (web/app/ipa-install.js,
@@ -539,13 +552,7 @@ enum IPAInstall {
     static func fetchHTTP(_ url: URL, twin: URL, insecure: Bool, to path: String, emit: (([[String: Any]]) -> Void)?,
                           answer: (([String: String]) -> Void)? = nil, done: @escaping (String?) -> Void) -> DebFetch {
         let dest = URL(fileURLWithPath: path)
-        var shown = -1
-        let progress = { (p: Double) in
-            let pct = Int((min(max(p, 0), 1) * 100).rounded(.down))
-            guard pct != shown else { return }
-            shown = pct
-            emit?([["fd": "status", "line": "dlstatus:ipa:\(pct):Downloading"]])
-        }
+        let progress = percents(emit)
         // Download's and PlainDownload's "the server answered 404" is ipa.install's not_found, as for https links.
         let finished = { (err: String?) in
             if let e = err, let r = e.range(of: "network: the server answered 4"), r.lowerBound == e.startIndex {
@@ -572,8 +579,11 @@ enum IPAInstall {
                     done finished: @escaping (Any?, String?) -> Void) {
         let job = Run()
         runLock.lock(); running = job; runLock.unlock()
+        // B400: KeepAlive from the call to its answer, so leaving the app mid-download or mid-install freezes nothing.
+        let held = Sideload.holdUntilAnswer()
         let done = { (v: Any?, e: String?) in
-            runLock.lock(); if running === job { running = nil }; let stopped = job.cancelled; runLock.unlock()
+            held()
+            runLock.lock(); job.watch = nil; if running === job { running = nil }; let stopped = job.cancelled; runLock.unlock()
             finished(stopped && e != nil ? nil : v, stopped && e != nil ? "cancelled: Cancelled" : e)
         }
         let fm = FileManager.default
@@ -662,7 +672,9 @@ enum IPAInstall {
             catch { return done(nil, "install: can't keep the download: \(error.localizedDescription)") }
             downloaded(path, WaitingIPA.Answer(headers: IPAFetch.headers(http)))
         }
-        runLock.lock(); job.task = task; let early = job.cancelled; runLock.unlock()
+        let progress = percents(emit) // B400
+        let watch = task.progress.observe(\.fractionCompleted) { p, _ in progress(p.fractionCompleted) }
+        runLock.lock(); job.task = task; job.watch = watch; let early = job.cancelled; runLock.unlock()
         if early { task.cancel() }
         task.resume()
     }

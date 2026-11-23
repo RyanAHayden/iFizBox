@@ -212,7 +212,7 @@ export async function runIpaConsole({ url, name = "", onInstalled = () => {}, na
       run.line(type === "error" ? `E: ${text}` : type === "status" ? `» ${text}` : text);
       page.line(type === "status" ? "step" : type === "info" ? "raw" : type, text);
     },
-    status(text) { page.status(text); },
+    status(text, step = null) { page.status(step != null ? `${text} ${step}%` : text); }, // B400
     progress(pct) { page.progress(pct); },
   };
 

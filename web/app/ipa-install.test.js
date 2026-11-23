@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { crc32 } from "node:zlib";
 import { join } from "node:path";
-import { ipaUrl, looksLikeIpa, ipaName, ipaStatus, ipaError, NO_ADHOC_HELP } from "./core/ipainstall.js";
+import { ipaUrl, looksLikeIpa, ipaName, ipaStatus, ipaStep, ipaError, NO_ADHOC_HELP } from "./core/ipainstall.js";
 import { installIpa, runIpaInstall, ipaInstallAvailable } from "./ipa-install.js";
 import { createFakeNative, makeFixture } from "../../native/fake/fake-native.mjs";
 
@@ -74,6 +74,12 @@ test("ipaStatus: the download is the bar's first fifth, installd's percent the r
   assert.deepEqual(ipaStatus("dlstatus:ipa:0:Downloading"), { text: "Downloading", percent: 0 });
   assert.deepEqual(ipaStatus("pmstatus:com.example.demo:50:Installing"), { text: "Installing", percent: 60 });
   assert.deepEqual(ipaStatus("pmstatus:com.example.demo:100:Installed"), { text: "Installed", percent: 100 });
+  // B400: each step's own percent beside the bar's
+  assert.deepEqual(ipaStatus("dlstatus:ipa:40:Downloading"), { text: "Downloading", percent: 8, step: 40 });
+  assert.deepEqual(ipaStatus("pmstatus:com.example.demo:75:Installing 40%"), { text: "Installing", percent: 80, step: 40 });
+  assert.deepEqual(["Preparing", "Downloading", "Copying the IPA", "Unpacking", "Sealing the app (ldid)", "Signing ad hoc (ldid)",
+    "Adding the application-identifier entitlement (ldid)", "Installing (AppSync Unified)", "Installed", "Done"].map(ipaStep),
+  ["Preparing", "Downloading", "Copying", "Unpacking", "Signing", "Signing", "Signing", "Installing", null, null]);
   assert.deepEqual(ipaStatus("pmerror:com.example.demo:0:oops"), { text: "oops", percent: null, error: true });
   assert.equal(ipaStatus("Installed com.example.demo"), null);
 });

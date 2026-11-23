@@ -177,6 +177,7 @@ class Ipa(unittest.TestCase):
         info = plistlib.loads(plist())
         info.pop("CFBundleURLTypes", None)
         info.pop("CFBundleDocumentTypes", None)
+        info.pop("UIBackgroundModes", None)  # B400: audio is in the base too
         with open(os.path.join(self.app, "Info.plist"), "wb") as f:
             f.write(plistlib.dumps(info))
         p = " | ".join(self.problems())
@@ -221,7 +222,9 @@ class SideloadPlists(unittest.TestCase):
         self.assertTrue(info["CADisableMinimumFrameDurationOnPhone"])
         self.assertIn("UIApplicationSceneManifest", info)
         self.assertEqual(info["LSApplicationQueriesSchemes"], ["apple-magnifier"])
-        self.assertNotIn("UIBackgroundModes", plistlib.loads(plist()))  # the jailbreak build stays as it was
+        # B400: the jailbreak build keeps its IPA installs running in the background, and no more than that
+        self.assertEqual(plistlib.loads(plist())["UIBackgroundModes"], ["audio"])
+        self.assertEqual(info["UIBackgroundModes"], ["audio", "fetch"])
 
     def test_splash_status_bar_reads_on_white_and_black(self):
         # The neutral splash is white in light mode: LightContent would put a white status bar on it.

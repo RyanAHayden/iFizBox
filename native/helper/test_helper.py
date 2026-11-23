@@ -1173,22 +1173,72 @@ class InstallIpa(unittest.TestCase):
         self.assert_clean(work)
 
     def test_chain_appsync(self):
-        """AppSync Unified and a binary with application-identifier: the IPA itself goes to installd, as appinst
-        does; nothing is signed."""
+        """AppSync Unified and a binary with application-identifier: nothing is signed, and the unpacked .app goes to
+        installd (B400), so it doesn't unpack the IPA again."""
         p, app, helper, ipa_dir, work = self.chain(ldid=True, appsync=True)
         ents = "\t<key>application-identifier</key>\n\t<string>ABCDE12345.com.example.demo</string>\n"
         out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir, ents=ents))
         self.assertEqual(out[-1], "exit: 0", out)
-        self.assertIn("1: install ipa com.example.demo", out)
+        self.assertIn("1: install app com.example.demo (PackageType Developer)", out)
         self.assertFalse(any(l.startswith("1: ldid") for l in out), out)
         self.assertFalse(any("ldid -e" in l for l in out), out)  # the probe's stderr stays out of the console
+        # B400: the steps' lines: the bar never goes back, installd's own percent ends its text
+        pcts = [int(l.split(":")[3]) for l in out if l.startswith("3: pmstatus:")]
+        self.assertEqual(pcts, sorted(pcts), out)
+        self.assertIn("3: pmstatus:com.example.demo:50:Installing (AppSync Unified)", out)
+        self.assertIn("3: pmstatus:com.example.demo:59:Installing 20%", out)
+        self.assertIn("3: pmstatus:com.example.demo:79:Installing 60%", out)
+        self.assertEqual(pcts[-1], 100, out)
         self.assert_clean(work)
-        # No ldid at all: the IPA goes as it is (installd may still refuse it)
+        # No ldid at all: the app goes as it is (installd may still refuse it)
         p, app, helper, ipa_dir, work = self.chain(appsync=True)
         out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir))
         self.assertEqual(out[-1], "exit: 0", out)
-        self.assertIn("1: install ipa com.example.demo", out)
+        self.assertIn("1: install app com.example.demo (PackageType Developer)", out)
         self.assert_clean(work)
+
+    def test_chain_appsync_ipa_itself(self):
+        """B400: installd unpacks the IPA itself, as appinst does, when unzip's result may differ from its own (a zip
+        made on Windows, a warning from unzip) or an IPA install keeps more (iTunesMetadata.plist)."""
+        import zipfile
+        p, app, helper, ipa_dir, work = self.chain(ldid=True, appsync=True)
+        ents = "\t<key>application-identifier</key>\n\t<string>ABCDE12345.com.example.demo</string>\n"
+        meta = self.ipa(ipa_dir, name="M.ipa", ents=ents)
+        with zipfile.ZipFile(meta, "a") as z:
+            z.writestr("iTunesMetadata.plist", "x")
+        dos = self.ipa(ipa_dir, name="D.ipa", ents=ents)
+        with zipfile.ZipFile(dos, "a") as z:
+            i = zipfile.ZipInfo("Payload/Demo.app/extra.txt")
+            i.create_system = 0
+            z.writestr(i, "x")
+        for path in (meta, dos):
+            with self.subTest(path=os.path.basename(path)):
+                out = self.spawn(app, helper, "install-ipa", path)
+                self.assertEqual(out[-1], "exit: 0", out)
+                self.assertIn("1: install ipa com.example.demo", out)
+                self.assert_clean(work)
+        with open(os.path.join(p, "usr/bin/unzip"), "a") as f:
+            f.write("exit 1\n")
+        out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir, name="W.ipa", ents=ents))
+        self.assertIn("1: install ipa com.example.demo", out)
+
+    def test_chain_progress_moves(self):
+        """B400: Copying and Unpacking move with their bytes: a slow unzip shows more than its first percent."""
+        p, app, helper, ipa_dir, work = self.chain(ldid=True, appsync=True)
+        with open(os.path.join(p, "usr/bin/unzip"), "w") as f:  # fills pkg/ first, then takes its time: no race to lose
+            f.write('#!/bin/sh\npython3 -I -m zipfile -e "$3" "$5" || exit 9\nsleep 2\n')
+        path = os.path.join(ipa_dir, "Big.ipa")
+        import zipfile
+        with zipfile.ZipFile(path, "w") as z:
+            z.writestr("Payload/Demo.app/Info.plist", PLIST.format("com.example.demo"))
+            z.writestr("Payload/Demo.app/Demo", b"\xcf\xfa\xed\xfe")
+            z.writestr("Payload/Demo.app/blob", b"x" * 400000)
+        out = self.spawn(app, helper, "install-ipa", path)
+        self.assertEqual(out[-1], "exit: 0", out)
+        at = lambda text: [int(l.split(":")[3]) for l in out if l.startswith("3: pmstatus:ipa:") and l.endswith(":" + text)]
+        self.assertGreater(len(at("Copying the IPA")), 2, out)
+        self.assertEqual(at("Unpacking")[0], 5, out)
+        self.assertEqual(at("Unpacking")[-1], 40, out)
 
     def test_chain_appsync_fakesign(self):
         """B59: AppSync Unified and an unsigned binary: installd still wants application-identifier, so the binary
@@ -1298,13 +1348,13 @@ class InstallIpa(unittest.TestCase):
         self.assertIn("<string>FAKESIGNED.com.example.demo.widget</string>", ents[1])
         self.assertEqual(len([l for l in out if l.startswith("1: ldid -s ")]), 1, out)
         self.assert_clean(work)
-        # Everything signed already: nothing is touched and the IPA goes as it is
+        # Everything signed already: nothing is touched
         exts = [("PlugIns/Widget.appex", "com.example.demo.widget", has("ABCDE12345.com.example.demo.widget"))]
         out = self.spawn(app, helper, "install-ipa", self.ipa(ipa_dir, name="Y.ipa", ents=has("ABCDE12345.com.example.demo"),
                                                               exts=exts))
         self.assertEqual(out[-1], "exit: 0", out)
         self.assertFalse(any(l.startswith("1: ldid") for l in out), out)
-        self.assertIn("1: install ipa com.example.demo", out)
+        self.assertIn("1: install app com.example.demo (PackageType Developer)", out)
         self.assert_clean(work)
 
     def test_chain_min_os(self):
