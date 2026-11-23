@@ -42,4 +42,32 @@ as SideDrop's `sign_ipa`) into `build/last-probe.ipa`, install it, then `tools/r
 --from-last` (our signer adds our fix on top). `run.sh`'s own `sidedrop` signer adds no group fix, so it can't
 show this bug on its own.
 
-RESULTS: see below.
+Results (identity A, SideDrop's cert and profile; App ID com.ryha.sideload):
+
+1. SideDrop's way with its fix, installed as is (after uninstalling an older probe with another App ID, which
+   installd refused to upgrade: MismatchedApplicationIdentifierEntitlement): launches, the app group maps to
+   `Library/AppGroups/…`, all four keychain items kept.
+2. Then main's website signer (old `ifizbox-groupfix.dylib`, `SIGNER_REPO=~/repos/iFizBox`): installs, never writes
+   a report. Crash log `Probe-2026-11-22-225116.ips`: EXC_BAD_ACCESS, KERN_PROTECTION_FAILURE in the stack guard,
+   frames all `fixCopyMatching`. The bug, reproduced.
+3. The same SideDrop-signed IPA (made again), then this branch's website signer: launches, documents, prefs, app
+   group folder and suite and all four keychain items kept; only the app's own group's items are visible (the copies
+   in com.ryha.sideload no longer show), so our pinned group is what the keychain saw, with SideDrop's fix in front.
+   A second launch: the same. No new crash log.
+
+Only the website signer was run on the phone; the app's signer (`native`, signbench-linux) injects the same
+committed dylib file, so the fix is the same, but its signing of a SideDrop IPA wasn't tried on the phone.
+
+## Review
+
+Spec review: no (a)/(c) beyond the journal's missing results (now above) and the release note's "first sign-in"
+(now "save or read a password"). Noted, left as is: the `dlopen(RTLD_NOLOAD)` handle isn't closed (Security is
+linked, so it stays loaded either way); the design differs from both of the brief's options, for the reason above.
+The static `= SecItem*` initial values are only a fallback: `dlsym` on Security returns its export, whatever the
+compiler does with the initialisers.
+
+## Not verified
+
+- The app's own (native) signer on a SideDrop-signed IPA on the phone: not run (same dylib file; see above).
+- An IPA where our fix loads before SideDrop's: zsign `-l` and our signers both append the load command, so a
+  SideDrop IPA signed by us always loads SideDrop's first; the reasoning covers the other order but it wasn't run.
