@@ -71,8 +71,15 @@ rows or change footers. Top to bottom:
   Pairing…" under it, the grey spinner; no HUD), and a pairing the phone dropped is redone on Pairing by itself.
   Pair Again (a check the phone turned down) opens Pairing, which starts pairing at once.
   Tailscale's own VPN is never a conflict. With Signing Server chosen: Ready to Install through the server, Check Server.
-- **Installation**: one row, Install Apps With › (`installation/with`), its detail the route and, for This iPhone,
-  the pairing: "This iPhone · Paired", "This iPhone · Not Paired" or "Signing Server".
+  With the built-in VPN (the app's profile has Network Extensions): Ready to Install, "Straight onto this iPhone,
+  through iFizBox VPN"; on cellular with the Cellular Shortcuts not added, Add the Cellular Shortcuts with Add
+  Cellular Shortcuts (it opens their page).
+- **Install Apps With**: This iPhone ("Works offline - no install popup") and Signing Server ("Default - Uses
+  ifizbox.com"), a row each with its icon. A tap on the row opens its page (`installation/iphone`,
+  `installation/server`) with the push slide; **USE**, the App Store price button beside the row's link (never
+  inside it), uses that way and slides to a green **ACTIVE** (revealed from the right with clip-path, as Sources'
+  Delete). USE on This iPhone before it's set up (paired and its connection tested once) opens its page instead,
+  and the test that finishes setting up makes it ACTIVE.
 - **Signing**: Certificate › (`signing/certificate`, days left: the Certificate, Files, Provisioning Profile,
   Apple Developer Account and options groups, and Share Your Certificate), Signed Apps › (`signing/apps`, the
   count: Certificate Status and the list).
@@ -80,7 +87,18 @@ rows or change footers. Top to bottom:
 
 The pages under it:
 
-- **Install Apps With**: This iPhone (installd over LocalDevVPN or Tailscale, docs/sideload.md) or Signing Server
+- **This iPhone with the built-in VPN** (`installation/iphone`, when `idevice.status`'s `vpn.available`): **Set Up**:
+  Pair This iPhone (Start / Done, opens Pairing), Test Connection (Test / Testing… / Connected: `vpn.test` turns
+  the VPN on, connects once with the pairing and turns it off; the first time, iOS asks to allow the VPN
+  configuration), Cellular Shortcuts (Add / Done, "Optional, for installs on cellular"), with a footer that says
+  the next step (pair, test, or add the Shortcuts for cellular) or that it's set up. A failed check or install is
+  said there instead, red, with its fix row. Then **How It Works** › (`installation/how`: the six steps of one install
+  and Offline). **Cellular Shortcuts** (`installation/shortcuts`): Turn Off (Cellular Data Off) and Turn On (Cellular
+  Data On), each Add opening Shortcuts on a new Shortcut with the footer saying what to put in it, then Test
+  Shortcuts (`vpn.testShortcuts` runs both) once both are added. **Signing Server** (`installation/server`): Server,
+  Check Server, Run Your Own. Without the built-in VPN (an older shell, or a profile without Network Extensions)
+  This iPhone's page keeps the LocalDevVPN and Tailscale groups below.
+- **Install Apps With** (`installation/with`, the older page): This iPhone (installd over LocalDevVPN or Tailscale, docs/sideload.md) or Signing Server
   (the manifest and iOS's Install prompt, the default), with a checkmark, each subtitle a short point per line,
   wrapped. This iPhone's says LocalDevVPN or Tailscale / No server, no install popup / Updates itself: installs
   through installation_proxy never show iOS's install prompt. Under the choice, the chosen route's groups slide in:

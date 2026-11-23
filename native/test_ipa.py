@@ -28,6 +28,8 @@ def signed_macho(entitlements):
 
 
 IDEVICE_MARKS = b"ifizbox.idevice.pairing\0_remotepairing-pairable-host._tcp\0"
+# F372: the app and its built-in VPN's packet tunnel carry Network Extensions (packet-tunnel-provider)
+APP_ENTS = {"get-task-allow": True, mkipa.NE: ["packet-tunnel-provider"]}
 
 
 class Ipa(unittest.TestCase):
@@ -36,7 +38,7 @@ class Ipa(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmp)
         self.app = os.path.join(self.tmp, "iFizBox.app")
         os.makedirs(os.path.join(self.app, "web/nav"))
-        self.write("iFizBox", signed_macho({"get-task-allow": True}), 0o755)
+        self.write("iFizBox", signed_macho(APP_ENTS), 0o755)
         base = os.path.join(self.tmp, "base.plist")
         with open(base, "wb") as f:
             f.write(plist())
@@ -50,7 +52,25 @@ class Ipa(unittest.TestCase):
         self.intents(sorted(mkipa.SIDELOAD_INTENTS))
         self.write("PlugIns/iFizBoxWidget.appex/iFizBoxWidget", signed_macho({"get-task-allow": True}), 0o755)
         self.write("PlugIns/iFizBoxWidget.appex/Info.plist", plist())
+        self.vpn()
         self.ipa = os.path.join(self.tmp, "iFizBox.ipa")
+
+    def vpn(self, ents=APP_ENTS, point="com.apple.networkextension.packet-tunnel"):
+        self.write("PlugIns/iFizBoxVPN.appex/iFizBoxVPN", signed_macho(ents), 0o755)
+        self.write("PlugIns/iFizBoxVPN.appex/Info.plist", plistlib.dumps({"NSExtension": {"NSExtensionPointIdentifier": point}}))
+
+    def test_vpn_extension_checked(self):
+        # F372: the built-in VPN's packet tunnel, with Network Extensions on it and on the app
+        self.vpn(ents={"get-task-allow": True})
+        self.assertTrue(any("VPN extension lacks" in p for p in self.problems()))
+        self.vpn(point="com.apple.share-services")
+        self.assertTrue(any("not a packet tunnel" in p for p in self.problems()))
+        self.vpn()
+        self.write("iFizBox", signed_macho({"get-task-allow": True}), 0o755)
+        self.assertTrue(any("the app lacks" in p for p in self.problems()))
+        self.write("iFizBox", signed_macho(APP_ENTS), 0o755)
+        shutil.rmtree(os.path.join(self.app, "PlugIns/iFizBoxVPN.appex"))
+        self.assertTrue(any("no built-in VPN extension" in p for p in self.problems()))
 
     def intents(self, names, where="Metadata.appintents"):
         import json
@@ -72,7 +92,7 @@ class Ipa(unittest.TestCase):
         names = zipfile.ZipFile(self.ipa).namelist()
         self.assertEqual(names[0], "Payload/")
         self.assertIn("Payload/iFizBox.app/iFizBox", names)
-        self.assertIn("entitlements get-task-allow", mkipa.check(self.ipa)[1])
+        self.assertRegex(mkipa.check(self.ipa)[1], r"entitlements .*get-task-allow")
 
     def test_executable_bit_survives(self):
         mkipa.build(self.app, self.ipa, mtime=0)
@@ -184,8 +204,10 @@ class SideloadPlists(unittest.TestCase):
     def test_entitlements_get_task_allow_only(self):
         with open(os.path.join(HERE, "entitlements-sideload.plist"), "rb") as f:
             # N8: plus the App Group the widget reads the count from (signers such as AltStore register it).
+            # F372: and Network Extensions' packet tunnel, for the built-in VPN.
             self.assertEqual(plistlib.load(f), {"get-task-allow": True,
-                                                "com.apple.security.application-groups": ["group.com.ryha.ifizbox"]})
+                                                "com.apple.security.application-groups": ["group.com.ryha.ifizbox"],
+                                                mkipa.NE: ["packet-tunnel-provider"]})
 
     def test_overlay_keeps_base_keys(self):
         tmp = tempfile.mkdtemp()

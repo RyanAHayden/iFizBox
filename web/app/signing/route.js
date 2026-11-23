@@ -28,6 +28,14 @@ export async function chooseRoute({ native, alert = showAlert, storage = storage
       heldRoute = { at: now(), params };
       return params;
     }
+    // F372: on cellular without the Cellular Shortcuts: Set Up opens their page and this install stops; Try Anyway
+    // goes on through This iPhone; Use Server through the Signing Server
+    if (a.setup != null && index === a.setup) { heldRoute = null; openRoute(["installation", "shortcuts"]); return null; }
+    if (a.idevice != null) {
+      const params = routeParams(index === a.idevice ? d : { route: "server" });
+      heldRoute = { at: now(), params };
+      return params;
+    }
   }
   const params = routeParams(d);
   heldRoute = { at: now(), params };
@@ -52,6 +60,7 @@ export function runFix(fix, { native, go = openRoute } = {}) {
   if (fix === "signIn") return go(["installation", "with"]);
   if (fix === "pair") return go(["installation", "pair"]);
   if (fix === "check") return go(["installation"]);
+  if (fix === "shortcuts") return go(["installation", "shortcuts"]); // F372: Cellular Shortcuts
   if (fix === "openTailscale") { // B323: by bundle ID, not tailscale:; plain words when iOS won't
     return openTailscale((m, p) => bridge(native).call(m, p)).then((ok) => ok || showAlert({ title: "Couldn't Open Tailscale", message: OPEN_TAILSCALE_BY_HAND }));
   }

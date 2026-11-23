@@ -5,6 +5,8 @@
 	<!-- The sideload IPA (I2): get-task-allow only, like Feather. The user's signer swaps in its own profile's. -->
 	<key>get-task-allow</key><true/>
 	<!-- N8: the App Group the widget extension reads the update count from (intents/App/WidgetStore.swift) -->
+	<!-- F372: the built-in VPN (native/sideload/vpn): the app saves and starts its packet tunnel's configuration -->
+	<key>com.apple.developer.networking.networkextension</key><array><string>packet-tunnel-provider</string></array>
 	<key>com.apple.security.application-groups</key><array><string>group.com.ryha.ifizbox</string></array>
 </dict>
 </plist>

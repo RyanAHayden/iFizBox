@@ -37,8 +37,6 @@ test("Another VPN Is On offers the server first and Open LocalDevVPN", () => {
 
 test("the This iPhone option names the VPN apps from one list: LocalDevVPN and Tailscale", () => {
   assert.deepEqual(VPNS, ["LocalDevVPN", "Tailscale"]);
-  const o = ROUTE_OPTIONS.find((x) => x.value === "iphone");
-  assert.equal(o.subtitle.split("\n")[0], "LocalDevVPN or Tailscale");
   assert.equal(vpnList(["LocalDevVPN", "Tailscale"]), "LocalDevVPN or Tailscale");
   assert.deepEqual(ROUTE_OPTIONS.map((x) => x.label), ["This iPhone", "Signing Server"]); // F300: This iPhone first
   const d = SETTINGS.find((x) => x.key === "installRoute");
@@ -47,12 +45,10 @@ test("the This iPhone option names the VPN apps from one list: LocalDevVPN and T
   assert.match(IPHONE_INTRO, /^Installs straight onto this iPhone: no server, no install popup, and .+ can update itself\.$/);
 });
 
-test("the This iPhone subtitle lists the no-popup benefit, each line short enough for a 375pt-wide row", () => {
-  const lines = ROUTE_OPTIONS.find((x) => x.value === "iphone").subtitle.split("\n");
-  assert.equal(lines[1], "No server, no install popup");
-  // A grouped row on a 375pt phone leaves about 250pt beside the check mark; 13px Helvetica averages about 7pt a
-  // character, so 30 characters a line stays on one line.
-  for (const o of ROUTE_OPTIONS) for (const l of o.subtitle.split("\n")) assert.ok(l.length <= 30, l);
+test("F372: each way's subtitle is one line, as the concept says it", () => {
+  assert.deepEqual(ROUTE_OPTIONS.map((o) => o.subtitle), ["Works offline - no install popup", "Default - Uses ifizbox.com"]);
+  // beside USE a row keeps about 200pt for its subtitle at 375pt; 13px Helvetica averages about 6.5pt a character
+  for (const o of ROUTE_OPTIONS) assert.ok(!o.subtitle.includes("\n") && o.subtitle.length <= 32, o.subtitle);
 });
 
 test("This iPhone's page: the VPN first, then pairing by itself; Paired and older iOS as before", () => {

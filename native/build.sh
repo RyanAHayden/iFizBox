@@ -83,7 +83,7 @@ sideload/tailscale/build.sh # build/tailscale/libtsnet.a, once per pin
   -emit-const-values-path "$out/$BRAND_NAME.swiftconstvalues" \
   -Xfrontend -const-gather-protocols-file -Xfrontend intents/protocols.json \
   -module-name "$BRAND_NAME" -c Sources/*.swift sign/*.swift intents/*.swift intents/App/*.swift share/*.swift share/App/*.swift \
-  sideload/idevice/*.swift sideload/tailscale/*.swift -o "$out/$BRAND_NAME.o"
+  sideload/idevice/*.swift sideload/tailscale/*.swift sideload/vpn/App/*.swift -o "$out/$BRAND_NAME.o"
 clang -target "$target" -isysroot "$sdk" -O2 -c Sources/availability.c -o "$out/availability.o"
 clang -target "$target" -isysroot "$sdk" -O2 -c Sources/mode.c -o "$out/mode.o"
 # The app's half of the root helper (ifizbox_helper_spawn), and the helper itself (N2's native/helper/).
@@ -96,7 +96,7 @@ link() {
   clang -target "$target" -isysroot "$sdk" -fuse-ld=lld --ld-path="$lld" "$out/$BRAND_NAME.o" "$out/availability.o" \
     "$out/mode.o" "$out/spawn.o" -L "$sdk/usr/lib/swift" -lz -lbz2 -Wl,-rpath,/usr/lib/swift -Wl,-dead_strip -Wl,-adhoc_codesign \
     -L "$out/idevice/lib" -lidevice_ffi -liconv \
-    -Wl,-weak_framework,AppIntents "$@"
+    -Wl,-weak_framework,AppIntents -framework NetworkExtension "$@"
 }
 link "$out/tsnet-stub.o" -o "$out/$BRAND_NAME"
 link "$out/tailscale/libtsnet.a" -framework CoreFoundation -framework Security -framework SystemConfiguration -lresolv \
@@ -185,6 +185,9 @@ bundle() {
   # N9: the share extension (share/build.sh): a shared link -> ifizbox://share?url=…
   SWIFTC=$swiftc SDK=$sdk RD=$rd LLD=$lld OUT=$out VERSION=$version BUILD=$build LDID=$ldid RCODESIGN=$rcodesign \
     share/build.sh "$variant" "$app"
+  # F372: the built-in VPN's packet tunnel, the IPA's only (This iPhone installs; the jailbreak app has its helper)
+  [ -z "$overlay" ] || SWIFTC=$swiftc SDK=$sdk RD=$rd LLD=$lld OUT=$out VERSION=$version BUILD=$build LDID=$ldid \
+    RCODESIGN=$rcodesign sideload/vpn/build.sh "$app"
   [ -z "$overlay" ] || python3 mkipa.py plist "$app/Info.plist" "$overlay" "$app/Info.plist"
   [ -z "$overlay" ] || cp sideload/tailscale/LICENSE "$app/LICENSE-tailscale.txt" # tsnet is BSD-3-Clause
   printf 'APPL????' > "$app/PkgInfo"
