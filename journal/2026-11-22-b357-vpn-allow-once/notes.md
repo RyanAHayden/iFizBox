@@ -26,6 +26,16 @@
 - Set Up's "Pair This iPhone" row still says Done once paired (it is): the test runs on the pairing page before that
   page says Paired, which is where the user saw Done-without-test.
 
+## Spec review
+
+- Fixed: the test after pairing depended on the remembered idevice.status; with none it would be skipped silently.
+  It now reads the status when none is remembered (test added).
+- Kept: Set Up's Pair This iPhone row says Done once paired (it is paired); the pairing page, where setup ends, is
+  what now waits for the test. `finishSetup` is returned, not awaited, inside pairing's try: `vpnTest` handles its own
+  errors, and a test failure must not read as Couldn't Pair.
+- Known, by design: a phone already tested under F372's build gets no automatic test, so its first install after
+  updating asks Allow once (seen on the 15), then never again; Tailscale isn't given its checkmark back (docs say so).
+
 ## iPhone 15 Pro (2026-11-23 00:03-00:06, lock B357)
 
 Built with `native/build.sh ipa` (native/build/iFizBox.ipa), installed with `tools/ui-15.sh B357 install`, driven

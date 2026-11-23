@@ -73,6 +73,17 @@ test("built-in VPN: pairing runs the test itself, with the page's spinner, and s
   leave();
 });
 
+test("built-in VPN: with no remembered idevice.status when pairing ends, it's read, and the test still runs", async () => {
+  const s = await setUp(NOT_PAIRED(VPN()));
+  forgetStatus();
+  s.pair();
+  await tick(); await tick(); await tick();
+  assert.equal(s.calls.filter((c) => c === "vpn.test").length, 1);
+  s.test();
+  await tick(); await tick(); await tick();
+  leave();
+});
+
 test("built-in VPN: a failed test after pairing says why, and the page still shows Paired (Test Connection tries again)", async () => {
   const s = await setUp(NOT_PAIRED(VPN()));
   s.pair();

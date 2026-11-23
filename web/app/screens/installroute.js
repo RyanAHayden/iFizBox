@@ -1213,7 +1213,7 @@ async function drawPair(box, { store, native, alert, redraw }) {
       await call(native, "idevice.pair", {}, (ev) => { if (mine()) { pairing = pairEvent(pairing, ev); redraw(); } });
       if (visit === v) pairing = null;
       AUTO_CHECK.last = 0; // B316: paired again: the paired page checks at once and goes green on its own
-      const test = visit === v && needsTestAfterPairing(lastStatus);
+      const test = visit === v && needsTestAfterPairing(lastStatus ?? await status(native)); // no remembered answer: read it
       if (test) v.testing = true; // before the store's set redraws the page
       store.set(ROUTE_KEY, "iphone");
       if (test) return finishSetup(v, native, alert, store, redraw);
@@ -1271,7 +1271,7 @@ async function drawPair(box, { store, native, alert, redraw }) {
       try {
         const data = toBase64(new Uint8Array(await f.arrayBuffer()));
         await busy("Importing", () => call(native, "idevice.import", { data }));
-        const test = visit === v && needsTestAfterPairing(lastStatus);
+        const test = visit === v && needsTestAfterPairing(lastStatus ?? await status(native));
         if (test) v.testing = true;
         store.set(ROUTE_KEY, "iphone");
         if (test) return finishSetup(v, native, alert, store, recheck);
