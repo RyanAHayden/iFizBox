@@ -137,7 +137,13 @@ enum MyIPAs {
                              job: SignJob? = nil, keep: Bool? = nil, log: ((String) -> Void)? = nil) throws -> IPALibrary.Signed {
         let identity = try KeychainIdentity(id)
         if let p = DeviceCheck.problem(PhoneID.check(profile)) { throw p } // F236: before iOS's "integrity" alert
-        if let s = library.signed(file, certificate: identity.certificate, keep: keep) { return s }
+        if let s = library.signed(file, certificate: identity.certificate, keep: keep) {
+            // A copy signed under another App ID than the installed app's (or one from before copies kept it) would be
+            // refused by iOS (installd error 15): signed again below, where the signer keeps the installed one.
+            guard let have = Sideload.installedAppID(s.bundleID, log: log), have != s.appID else { return s }
+            log?("The signed copy of \(file) has App ID \(s.appID ?? "(not kept)"), the installed app \(have): signing again")
+            library.dropSigned(file)
+        }
         if let p = profile.problem(with: identity.certificate) { throw p }
         if let why = try library.details(file).error { throw SignError("bad_ipa", why) }
         try job?.check()
@@ -268,7 +274,7 @@ enum MyIPAs {
             }
             let record = SignedRecord(bundleID: s.bundleID, originalBundleID: s.originalBundleID, name: s.name, version: s.version,
                                       url: libraryURL(file), signed: s.signed, expires: s.expires, options: s.options,
-                                      signer: s.signer) // B259
+                                      appID: s.appID, signer: s.signer) // B259; appID: the next Re-sign reads it, as SignAhead's
             if !servers.local { emit("installing", 0) } // This iPhone: installHere sends its own phase ("here")
             // B29: the progress page's console, as signing.install has it: the bundle ID and what iOS fetched.
             let log = { (line: String) in c.emitOnMain([["log": line]]) }
