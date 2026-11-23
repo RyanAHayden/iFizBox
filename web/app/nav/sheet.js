@@ -9,6 +9,7 @@
 //   close.sheet / .h1 / .left / .right / .content   its nodes (.content is the .sheet-body the body goes in)
 //   close.setTitle(t)            the title and the dialog's label
 //   close.closed()               true once close() ran
+//   close.cover(on)              B401: a black sheet slid away without closing (nav/progress.js hide) and back
 //
 // Options beyond title/body/onClose:
 //   left                         a node (or array) at the left of the bar (empty by default)
@@ -24,6 +25,7 @@
 // <html>: --sheet-behind-scale, --sheet-behind-shift (px down) and --sheet-behind-opacity. Off (iOS 6) nothing
 // behind the sheet moves.
 import { EASE, DURATION, SHEET_IN } from "./motion.js";
+import { coverDark } from "./statusbar.js";
 
 const PAGE = ["navbar", "screens", "tabbar"];  // index.html's page, under every sheet
 let behind = null;                            // the page's open card animations, while a card sheet is up
@@ -100,12 +102,15 @@ export function showSheet({ title = "", body = null, onClose = () => {}, left = 
   sheet.animate?.([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: SHEET_IN, easing: EASE });
   const card = cardSheets(doc);
   if (card && cards++ === 0) behind = pushBack(doc);
+  // B401: light status-bar text over the black page (.console), and over the black ground a card's page sinks onto
+  const cover = card || cls.split(" ").includes("console") ? coverDark() : () => {};
 
   let gone = null;
   const onKey = (e) => { if (e.key === "Escape") close(); };
   function close() {
     if (gone) return gone;
     doc.removeEventListener?.("keydown", onKey);
+    cover(false); // as it starts down: its top edge leaves the status bar first
     if (card && --cards === 0 && behind) { bringForward(behind); behind = null; }
     gone = new Promise((resolve) => {
       const end = () => {
@@ -126,5 +131,6 @@ export function showSheet({ title = "", body = null, onClose = () => {}, left = 
     sheet, h1, left: l, right: r, content,
     setTitle(t) { h1.textContent = t; sheet.setAttribute("aria-label", t); },
     closed: () => gone !== null,
+    cover(on) { if (!gone) cover(on); },
   });
 }

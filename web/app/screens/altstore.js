@@ -65,6 +65,7 @@ import { installedOnPhone } from "../core/appqueue.js"; // B136
 import { whereFromGroup, reportBanner, reports, reportMalicious } from "./safety.js"; // F291
 import { addTweaksGroup, installTweaksChoice } from "./tweaks.js"; // F302a
 import { EASE, DURATION } from "../nav/motion.js";
+import { coverDark } from "../nav/statusbar.js"; // B401
 import { nativeBridge } from "../native.js";
 
 function img(url, cls) {
@@ -1389,6 +1390,7 @@ export function zoomShots(list, index = 0) {
   }
   layer.append(track);
   document.body.append(layer);
+  const cover = coverDark(); // B401: light status-bar text on the black layer
   track.scrollLeft = index * track.clientWidth;
   const from = list[index]?.getBoundingClientRect?.();
   const to = track.children[index]?.firstElementChild?.getBoundingClientRect?.();
@@ -1401,6 +1403,7 @@ export function zoomShots(list, index = 0) {
   img?.animate?.(grow, ease);
   const close = () => {
     layer.removeEventListener("click", close);
+    cover(false);
     const fade = layer.animate?.([{ opacity: 1 }, { opacity: 0 }], { ...ease, fill: "forwards" });
     if (fade) fade.onfinish = () => layer.remove(); else layer.remove();
   };

@@ -26,6 +26,7 @@ import { nativeBridge, hasNativeCall } from "../native.js";
 import { isOwnIcon, detectMode } from "../core/settings.js";
 import { createSwitch } from "../nav/switch.js";
 import { swipeDecide } from "../nav/rowswipe.js";
+import { coverDark } from "../nav/statusbar.js"; // B401
 import { NAME } from "../brand.js";
 
 export const OUT = 1024; // px: the stored picture (the shell draws it: OwnIcons.add)
@@ -383,6 +384,7 @@ export async function openCrop(file, { key, store, added = null }) {
     screen.append(row);
   }
   document.body.append(screen);
+  const cover = coverDark(); // B401: light status-bar text on the black screen
 
   // left/top: the square's corner in the screen's own coordinates (the screen may be mid-slide when measured)
   let c = null, left = 0, top = 0;
@@ -446,6 +448,7 @@ export async function openCrop(file, { key, store, added = null }) {
 
   const close = () => {
     removeEventListener("resize", layout);
+    cover(false);
     screen.classList.remove("is-open");
     let gone = false;
     const done = () => { if (!gone) { gone = true; screen.remove(); } };

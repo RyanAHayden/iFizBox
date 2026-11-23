@@ -25,6 +25,7 @@ import { setFloatingTabbar } from "../nav/tabbar.js"; // F203 (app.js loads it a
 import { launchKey } from "../core/settings.js"; // B235
 import { showAlert, alertOK } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
+import { darkCovered, onDarkCover } from "../nav/statusbar.js"; // B401
 import { parseProfile, checkP12Password, deviceSummary, deviceError, summary, profileKind, deviceCheck, deviceCheckText } from "../core/signing.js";
 import { sortCertFiles, resolvePassword } from "../core/certfiles.js";
 import { mod, load } from "../lazy.js";
@@ -906,6 +907,9 @@ export function applyTheme(doc = document, win = window) {
 // pinstripes, not the kit's blue-grey.
 // B221: statusBar "dark" (sent only then) while the theme showing has a light bar (iOS 7's White): the shell's status
 // bar text goes dark; without it the text stays light, as on every iOS 6 bar.
+// B401: not while something dark covers the status bar (nav/statusbar.js coverDark: the black run page, a photo full
+// screen): the same message goes again without it, and with it once the cover is gone. The shell saves the rest of the
+// message only, so the saved launch theme stays as it was.
 export const DARK_TEXT_BARS = new Set(["white"]);
 export function themeMessage(appearance, theme, darkPalette = "gunmetal", lightPalette = "classic", darkText = false) {
   const params = { style: appearance === "auto" ? "auto" : theme, theme, darkPalette, lightPalette };
@@ -913,10 +917,13 @@ export function themeMessage(appearance, theme, darkPalette = "gunmetal", lightP
   return { id: 0, method: "app.theme", params };
 }
 let lastSent = "";
+let lastTold = null; // tellShell's last arguments, for a cover coming or going
+onDarkCover(() => { if (lastTold) tellShell(...lastTold); });
 function tellShell(appearance, theme, win, darkPalette, lightPalette, darkText) {
+  lastTold = [appearance, theme, win, darkPalette, lightPalette, darkText];
   const h = win.webkit?.messageHandlers?.ifizbox;
   if (!h) return;
-  const msg = themeMessage(appearance, theme, darkPalette, lightPalette, darkText);
+  const msg = themeMessage(appearance, theme, darkPalette, lightPalette, darkText && !darkCovered());
   const key = JSON.stringify(msg.params);
   if (key === lastSent) return;
   lastSent = key;

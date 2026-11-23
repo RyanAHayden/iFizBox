@@ -121,3 +121,47 @@ test("openProgress: pane() and view() work on the real page", async () => {
     page.close();
   });
 });
+
+// B401: the black page covers the status bar while it is up: not while hidden, not once closed (also while hidden).
+test("openProgress: the page is a dark cover from open to close, not while hidden", async () => {
+  const { withDocument } = await import("../fakes.test-helper.js");
+  const { openProgress } = await import("./progress.js");
+  const { darkCovered } = await import("./statusbar.js");
+  const anim = () => ({ finished: new Promise(() => {}), cancel() {} });
+  withDocument(() => {
+    assert.equal(darkCovered(), false);
+    const page = openProgress();
+    page.sheet.animate = anim;
+    assert.equal(darkCovered(), true);
+    page.hide();
+    assert.equal(darkCovered(), false);
+    page.show();
+    assert.equal(darkCovered(), true);
+    const other = openProgress(); // two at once: until the last one goes
+    page.close();
+    assert.equal(darkCovered(), true);
+    other.close();
+    assert.equal(darkCovered(), false);
+    const third = openProgress();
+    third.sheet.animate = anim;
+    third.hide();
+    third.close();
+    assert.equal(darkCovered(), false);
+  });
+});
+
+test("openProgress: Close and the Return button end the cover", async () => {
+  const { withDocument } = await import("../fakes.test-helper.js");
+  const { openProgress, RETURN_LABEL } = await import("./progress.js");
+  const { darkCovered } = await import("./statusbar.js");
+  for (const label of ["Close", RETURN_LABEL]) {
+    await withDocument(async (doc) => {
+      const page = openProgress();
+      page.finish();
+      assert.equal(darkCovered(), true);
+      const b = doc.querySelectorAll("button").find((n) => n.textContent === label);
+      await (label === "Close" ? b.click() : b.onclick());
+      assert.equal(darkCovered(), false, label);
+    });
+  }
+});

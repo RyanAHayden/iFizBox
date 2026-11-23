@@ -21,6 +21,27 @@ export function statusBarTarget(doc, pageBody) {
   return all.filter((el) => el.scrollTop > 0 && shown(el)).at(-1) || null;
 }
 
+// B401: what is under the status bar while something dark covers it: the black run page, a photo full screen, Move and
+// Scale, and the black ground around a card sheet. The theme's dark status-bar text (screens/settings.js
+// DARK_TEXT_BARS) would be black on black there, so the shell is told light until the last cover goes.
+//   const cover = coverDark()   covered from now on; cover(false) ends it, cover(true) starts it again (a page that
+//                               hides and comes back); the same answer twice does nothing
+//   darkCovered() / onDarkCover(fn)   fn() runs when the first cover comes and when the last one goes
+const covers = new Set();
+const coverWatchers = new Set();
+export const darkCovered = () => covers.size > 0;
+export function onDarkCover(fn) { coverWatchers.add(fn); }
+export function coverDark() {
+  const mine = {};
+  const cover = (on) => {
+    const was = darkCovered();
+    if (on) covers.add(mine); else covers.delete(mine);
+    if (was !== darkCovered()) for (const f of coverWatchers) f();
+  };
+  cover(true);
+  return cover;
+}
+
 // globalThis.ifizboxScrollToTop: true when something scrolled.
 export function makeScrollToTop(doc, topBody, win = globalThis) {
   return () => scrollToTop(statusBarTarget(doc, topBody()), win);
