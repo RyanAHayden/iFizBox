@@ -63,10 +63,66 @@ after making a new SideDrop invite link and at other times.
 - `ios list` / go-ios: no usbmuxd, no phone on USB (above). The Wi-Fi lockdown route (memory: read-only StartSession
   works on the LAN) can't install or pull app containers, which the matrix needs.
 
+## Session 2: the device repro (iPhone 15 Pro on USB)
+
+Probe runs in `probe-runs.jsonl` (tools/resignprobe; identity A = SideDrop's adhoc profile, team S8NFX3A2LT, App ID
+`com.ryha.sideload`, keychain `TEAM.*`; "sidedrop" = SideDrop's old signing, keychain `[TEAM.com.ryha.sideload]`, no
+fix; "native"/"web" = this branch's signers). Fresh bundle IDs per run (a1...), because keychain items outlive an
+uninstall: the B227 probe's ID found its own 2026-11-20 items in `TEAM.com.ryha.ifizbox.probe` and read those
+instead of the newer ones in the shared group (a stale login is a sign-out too).
+
+**Cause found: suspect 1, worse than the brief's version.** Before the fix (main's dylib):
+1. a1, a fresh app signed by our native signer (own group first), read `probe.plain` group-less and found the one an
+   earlier app (another bundle ID) had left in `TEAM.com.ryha.sideload`: status OTHER. It never wrote its own, so it
+   lived on another app's item in the shared group (and kept it there: an update doesn't move an item).
+2. Re-signing a1 kept everything (data folder, prefs, Library/AppGroups, suite, keychain).
+3. w1, another fresh app, deleted `probe.*` without naming a group on its first launch (as apps that clear the
+   keychain on a fresh install do). Its deletes reach every group it has, `TEAM.com.ryha.sideload` included.
+4. a1 relaunched: data folder, prefs, AppGroups, suite kept; **its keychain passwords gone** (kc-plain, kc-afu NEW).
+So any app under SideDrop's App ID whose items sit in `TEAM.<App ID>` (written before B227, adopted from there, or
+changed only with SecItemUpdate since) is signed out the moment any other app under that App ID clears its keychain:
+installing a new app (after an invite link, or at any time) does it, with no re-sign of the victim. The group fix
+makes it more likely: it strips the group from every delete an app makes, so even a delete aimed at an app's own
+named group goes group-less. The data container never moved in any run: settings lost with the login fit an app
+that clears its settings on sign-out (not shown for YouTube/RyukGram themselves).
+
+**Fix: `isolate`.** Both signers now give every app whose signed keychain groups are `[TEAM.<its ID>, TEAM.<App ID>]`
+the group fix with `isolate: TEAM.<its ID>` (also apps whose original names no groups). The dylib:
+- names that group on every generic and internet password call (add, read, update, delete; update attributes lose
+  their group), so no other app's call reaches its passwords and it never sees theirs;
+- first launch with it: an app that had run before (preferences not empty) copies every password it can see outside
+  its own group into it (never over one it has; protected items skipped) and marks `ifizbox.groupfix.isolated`; a
+  fresh install copies nothing. If an item couldn't be read (before the first unlock), calls stay as before and the
+  next launch tries again;
+- keys and certificates keep the old stripping.
+SignerStamp and WEB_SIGNER_VERSION go to 2, so every installed app shows under Needs Re-sign and gets it.
+Log line: `Group fix: ...; passwords kept in TEAM.<its ID>, the shared groups' copied in once if the app ran before`.
+
+After the fix (this branch's dylib, on the 15 Pro):
+- a3 signed the old SideDrop way (items in the shared group), then by our native signer: passwords copied into
+  `TEAM.com.ryha.ifizbox.probe.a3`, reads see only that group; w3 (old SideDrop way, so its deletes do reach the
+  shared group) wiped `probe.*`; a3 relaunched: **everything kept**. Re-signed again: kept.
+- a4, a fresh app with the fix: NEW everywhere, didn't take w3's items from the shared group.
+- a5 signed by the website's signer (websign-job + zsign WASM): config carries `isolate`, kept across a re-sign.
+- Data folder, prefs, Library/AppGroups and the suite were kept on every re-sign in every run, SideDrop's signing to
+  ours included. Once (a3, sidedrop -> native 5 s after the first launch) the standard prefs' marker was NEW while
+  the launch counter in the same prefs was kept: not reproduced (a6, the same steps with 8 s between: kept); taken
+  as the probe being replaced before cfprefsd wrote its first launch's last key.
+- Tests that fail without the fix: `web/app/core/b327-sign-log.test.js` (isolate in the plan, also with no original
+  groups; in the config), `native/sign/tests/main.swift` B211 test (the same for GroupFix.swift).
+- Phone left as found: probes a1-a6, w1, w3 uninstalled; `com.ryha.ifizbox.probe` (there before) reinstalled; their
+  keychain items stay (iOS keeps them after an uninstall). iFizBox 0.20.1 untouched. Lock given back.
+
 ## Not verified
 
-- The whole device reproduction: no path was run on the iPhone 15 Pro (not plugged in). So the cause is not found,
-  no fix for it is in this commit, and there is no test that fails on it yet. B327 is blocked until the phone is
-  back on USB.
-- Suspect 1 (shared-group deletes) is from reading Apple's documented keychain behaviour, not seen on a phone.
-- The new log lines on a phone's Console Logs: only checked through the Swift tests on Linux and node tests.
+- The re-sign paths inside iFizBox on the phone (Re-sign, Re-sign All, sign-ahead/Confirm, F343 kept IPA, a source
+  update, Needs Re-sign, self-update): not run through the app's UI this session; they all go through
+  `IPASigner.sign` (read in session 1), which the native signer runs used (signbench-linux, the same Swift code).
+  B227 ran Install and Re-sign through the app on this phone: kept.
+- YouTube and RyukGram themselves: no account on the test phone; the cause is shown with the probe, not with them.
+  Whether they clear their settings on sign-out is not checked.
+- The copy-in for items with access control (biometry) and before the first unlock: the 15 Pro has no passcode.
+- Apps the user already has: they get the isolation only when re-signed (Needs Re-sign after the stamp bump); items
+  another app deleted from the shared group before that are gone.
+- SideDrop still signs without `isolate` (its own dylib): apps it signs stay exposed; a follow-up for SideDrop.
+

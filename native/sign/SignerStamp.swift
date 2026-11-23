@@ -14,7 +14,8 @@ import Foundation
 
 struct SignerStamp: Codable, Equatable {
     // 1: own keychain group first and the group fix's own folders (B227, B233). Records with no stamp are older.
-    static let version = 1
+    // 2: every app with a keychain group of its own gets the group fix's isolate, its passwords kept there (B327).
+    static let version = 2
 
     var version: Int
     var groupFix: String?

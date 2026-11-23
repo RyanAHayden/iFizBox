@@ -9,9 +9,16 @@
 //   - maps -[NSUserDefaults initWithSuiteName:] for them to a suite of the app's own (ifizbox.appgroup.<group>, kept
 //     in its own Library/Preferences);
 //   - strips kSecAttrAccessGroup from SecItemAdd/CopyMatching/Update/Delete, so keychain items land in the app's
-//     default group (its application-identifier, the same on every re-sign with the same team and App ID).
+//     default group (its application-identifier, the same on every re-sign with the same team and App ID);
+//   - B327 (isolate): keeps the app's passwords (generic and internet) in its own keychain group. Every app signed
+//     under one App ID can also reach TEAM.<App ID>, where apps signed before B227 left their items and where a
+//     group-less read finds another app's; a group-less delete by any of them (a fresh install clearing its keychain,
+//     a logout) wiped every app's items there, which signed them out. The first launch with it copies what the app
+//     could see in those shared groups into its own once (an app that ran before only), then every password call
+//     names the app's own group.
 // What to map comes from ifizbox-groupfix.plist beside this dylib: { groups: [original IDs], target: "" (or a profile
-// group an earlier sign chose), keychain: bool, legacy: the profile group older signs mapped to, copied in once }.
+// group an earlier sign chose), keychain: bool, legacy: the profile group older signs mapped to, copied in once,
+// isolate: the app's own keychain group (the first of its keychain-access-groups) }.
 // The same folder and suite on every re-sign, under any profile, so the data survives.
 // Built by native/groupfix/build.sh into web/app/vendor/groupfix/.
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -26,12 +33,18 @@
 #include <string.h>
 
 static NSSet<NSString *> *groups;
+// The original named keychain groups: strip kSecAttrAccessGroup from every call (passwords are pinned instead once isolated).
+static BOOL keychainStrip;
 static NSString *target;
 // B227: the profile group an older fix mapped these groups to (its first one), whose folder and suite are copied into
 // the app's own the first time, so an app signed that way keeps its data; nil for none. Only for an app that ran
 // before this fix (its own preferences weren't empty at its first launch with it): a fresh install has nothing to
 // bring, and must not take in what other apps left in that shared group.
 static NSString *legacy;
+
+// B327: the app's own keychain group (TEAM.<its bundle ID>), its passwords' only group once `pinned`; nil for none.
+static CFStringRef isolate;
+static BOOL pinned;
 
 static NSURL *(*origContainer)(id, SEL, NSString *);
 static id (*origSuite)(id, SEL, NSString *);
@@ -104,39 +117,93 @@ static void swizzle(Class c, SEL sel, IMP imp, IMP *orig) {
     if (m) *orig = method_setImplementation(m, imp);
 }
 
-// ---- keychain: the query without kSecAttrAccessGroup ----
+// ---- keychain: the query without kSecAttrAccessGroup, or (isolate) a password query in the app's own group ----
 
-static CFDictionaryRef stripped(CFDictionaryRef q) {
-    if (!q || CFGetTypeID(q) != CFDictionaryGetTypeID() || !CFDictionaryContainsKey(q, kSecAttrAccessGroup)) return NULL;
+static BOOL isPassword(CFDictionaryRef q) {
+    CFTypeRef c = CFDictionaryGetValue(q, kSecClass);
+    return c && (CFEqual(c, kSecClassGenericPassword) || CFEqual(c, kSecClassInternetPassword));
+}
+
+// The query to pass on (a copy the caller releases), or NULL for q itself. own: pin a password query to the app's group.
+static CFDictionaryRef fixed(CFDictionaryRef q, BOOL own) {
+    if (!q || CFGetTypeID(q) != CFDictionaryGetTypeID()) return NULL;
+    BOOL pin = own && pinned && isPassword(q);
+    if (!pin && !CFDictionaryContainsKey(q, kSecAttrAccessGroup)) return NULL;
+    if (!pin && !keychainStrip) return NULL;
     CFMutableDictionaryRef m = CFDictionaryCreateMutableCopy(NULL, 0, q);
-    CFDictionaryRemoveValue(m, kSecAttrAccessGroup);
+    if (pin) CFDictionarySetValue(m, kSecAttrAccessGroup, isolate);
+    else CFDictionaryRemoveValue(m, kSecAttrAccessGroup);
     return m;
 }
 
 static OSStatus fixAdd(CFDictionaryRef a, CFTypeRef *r) {
-    CFDictionaryRef s = stripped(a);
+    CFDictionaryRef s = fixed(a, YES);
     OSStatus st = SecItemAdd(s ? s : a, r);
     if (s) CFRelease(s);
     return st;
 }
 static OSStatus fixCopyMatching(CFDictionaryRef q, CFTypeRef *r) {
-    CFDictionaryRef s = stripped(q);
+    CFDictionaryRef s = fixed(q, YES);
     OSStatus st = SecItemCopyMatching(s ? s : q, r);
     if (s) CFRelease(s);
     return st;
 }
 static OSStatus fixUpdate(CFDictionaryRef q, CFDictionaryRef a) {
-    CFDictionaryRef s = stripped(q), t = stripped(a);
+    // the attributes never move an item to another group: strip theirs whenever the query is fixed
+    CFDictionaryRef s = fixed(q, YES), t = NULL;
+    if ((s || keychainStrip) && a && CFGetTypeID(a) == CFDictionaryGetTypeID() && CFDictionaryContainsKey(a, kSecAttrAccessGroup)) {
+        CFMutableDictionaryRef m = CFDictionaryCreateMutableCopy(NULL, 0, a);
+        CFDictionaryRemoveValue(m, kSecAttrAccessGroup);
+        t = m;
+    }
     OSStatus st = SecItemUpdate(s ? s : q, t ? t : a);
     if (s) CFRelease(s);
     if (t) CFRelease(t);
     return st;
 }
 static OSStatus fixDelete(CFDictionaryRef q) {
-    CFDictionaryRef s = stripped(q);
+    CFDictionaryRef s = fixed(q, YES);
     OSStatus st = SecItemDelete(s ? s : q);
     if (s) CFRelease(s);
     return st;
+}
+
+// B327: copies every password the app can see outside its own group (TEAM.<App ID>, app groups) into its own group,
+// never over one it has there. YES when every item was read (none locked away, as before the first unlock).
+static BOOL copySharedPasswords(void) {
+    static const CFStringRef *keep[] = { &kSecClass, &kSecAttrService, &kSecAttrAccount, &kSecAttrGeneric, &kSecAttrLabel,
+        &kSecAttrDescription, &kSecAttrComment, &kSecAttrCreator, &kSecAttrType, &kSecAttrIsInvisible, &kSecAttrIsNegative,
+        &kSecAttrAccessible, &kSecAttrAccessControl, &kSecAttrSynchronizable, &kSecAttrServer, &kSecAttrProtocol,
+        &kSecAttrAuthenticationType, &kSecAttrPort, &kSecAttrPath, &kSecAttrSecurityDomain, &kSecValueData };
+    BOOL ok = YES;
+    for (int k = 0; k < 2; k++) {
+        CFStringRef cls = k ? kSecClassInternetPassword : kSecClassGenericPassword;
+        NSDictionary *q = @{ (__bridge id)kSecClass: (__bridge id)cls, (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitAll,
+                             (__bridge id)kSecReturnAttributes: @YES, (__bridge id)kSecReturnData: @YES,
+                             (__bridge id)kSecAttrSynchronizable: (__bridge id)kSecAttrSynchronizableAny,
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+                             (__bridge id)kSecUseAuthenticationUI: (__bridge id)kSecUseAuthenticationUISkip };
+#pragma clang diagnostic pop
+        CFTypeRef out = NULL;
+        OSStatus st = SecItemCopyMatching((__bridge CFDictionaryRef)q, &out);
+        if (st == errSecItemNotFound) continue;
+        if (st != errSecSuccess) { ok = NO; continue; }
+        for (NSDictionary *item in (__bridge_transfer NSArray *)out) {
+            if (![item isKindOfClass:[NSDictionary class]] || [item[(__bridge id)kSecAttrAccessGroup] isEqual:(__bridge id)isolate]) continue;
+            NSMutableDictionary *add = [NSMutableDictionary dictionary];
+            for (size_t i = 0; i < sizeof(keep) / sizeof(keep[0]); i++) {
+                id v = item[(__bridge id)*keep[i]];
+                if (v) add[(__bridge id)*keep[i]] = v;
+            }
+            add[(__bridge id)kSecClass] = (__bridge id)cls;
+            if (add[(__bridge id)kSecAttrAccessControl]) [add removeObjectForKey:(__bridge id)kSecAttrAccessible];
+            add[(__bridge id)kSecAttrAccessGroup] = (__bridge id)isolate;
+            OSStatus as = SecItemAdd((__bridge CFDictionaryRef)add, NULL);
+            if (as != errSecSuccess && as != errSecDuplicateItem) ok = NO;
+        }
+    }
+    return ok;
 }
 
 static const struct { const char *name; void *to; } hooks[] = {
@@ -207,24 +274,42 @@ __attribute__((constructor)) static void groupfixInit(void) {
         groups = [NSSet setWithArray:g];
         NSString *t = c[@"target"];
         target = [t isKindOfClass:[NSString class]] && t.length ? t : nil;
+        // Whether the app ran before (its preferences weren't empty), read before anything below writes one.
+        CFArrayRef keys = CFPreferencesCopyKeyList(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+        BOOL ranBefore = keys && CFArrayGetCount(keys) > 0;
+        if (keys) CFRelease(keys);
         NSString *l = c[@"legacy"];
         if (!target && [l isKindOfClass:[NSString class]] && l.length) {
             // A fresh install (no preferences yet) is marked at once, so it never copies the shared group in later.
             CFStringRef fresh = CFSTR("ifizbox.groupfix.fresh");
             CFPropertyListRef was = CFPreferencesCopyValue(fresh, kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
-            CFArrayRef keys = CFPreferencesCopyKeyList(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
             if (was) CFRelease(was);
-            else if (keys && CFArrayGetCount(keys) > 0) legacy = l;
+            else if (ranBefore) legacy = l;
             else {
                 CFPreferencesSetValue(fresh, kCFBooleanTrue, kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
                 CFPreferencesSynchronize(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
             }
-            if (keys) CFRelease(keys);
+        }
+        keychainStrip = [c[@"keychain"] boolValue];
+        NSString *iso = c[@"isolate"];
+        if ([iso isKindOfClass:[NSString class]] && iso.length) {
+            isolate = CFBridgingRetain(iso);
+            // Once: an app that ran before brings what it could see in the shared groups; a fresh install brings
+            // nothing (what's there is other apps'). Until every item could be read (locked before the first
+            // unlock), calls stay as before and the next launch tries again.
+            CFStringRef mark = CFSTR("ifizbox.groupfix.isolated");
+            CFPropertyListRef done = CFPreferencesCopyValue(mark, kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+            if (done) { CFRelease(done); pinned = YES; }
+            else if (!ranBefore || copySharedPasswords()) {
+                CFPreferencesSetValue(mark, kCFBooleanTrue, kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+                CFPreferencesSynchronize(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+                pinned = YES;
+            }
         }
         if (groups.count) {
             swizzle([NSFileManager class], @selector(containerURLForSecurityApplicationGroupIdentifier:), (IMP)fixContainer, (IMP *)&origContainer);
             swizzle([NSUserDefaults class], @selector(initWithSuiteName:), (IMP)fixSuite, (IMP *)&origSuite);
         }
-        if ([c[@"keychain"] boolValue]) _dyld_register_func_for_add_image(rebindImage);
+        if (keychainStrip || pinned) _dyld_register_func_for_add_image(rebindImage);
     }
 }
