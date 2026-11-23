@@ -34,6 +34,7 @@ import { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, 
 import { builtinVPN, shortcutsAdded, setupFooter, iphoneSetUp, HOW_STEPS, SHORTCUT_NAMES, vpnTestResult } from "../core/installroute.js"; // F372
 import { shortcutFileURL, shortcutDidntRun, shortcutDidntOpen } from "../core/installroute.js"; // B359
 import { switchAdded, switchTestResult, BUILTIN_VPN } from "../core/installroute.js"; // F386
+import { switchWouldRun } from "../core/installroute.js"; // B381
 import { loadStyle } from "../nav/motion.js";
 import { NAME, DOMAIN } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
@@ -1418,6 +1419,9 @@ async function checkOnce(native, alert, redraw, store, mark = null, { quiet = fa
   try {
     st = await status(native);
     rememberStatus(st);
+    // B381: coming back to this page redraws it and checks by itself; that must never open Shortcuts. Check Connection
+    // (tapped) still does.
+    if (quiet && switchWouldRun(st)) { stop(); return undefined; }
     if (st && !vpnOn(st)) { stop(); throw Object.assign(new Error("connect_failed: neither LocalDevVPN nor Tailscale is on"), { code: "connect_failed" }); }
     try { await within(call(native, "idevice.verify"), TIMEOUTS.verify); } finally { stop(); }
     clearRouteFailure(); // B316
