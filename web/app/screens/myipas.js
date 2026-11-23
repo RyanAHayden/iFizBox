@@ -1315,6 +1315,15 @@ export async function queueLibraryInstall(entry, { reachable = serverReachable, 
   return true;
 }
 
+// F401: the job an IPA's Install queues (its questions included), without queuing it; null: nothing to queue.
+export async function libraryInstallJob(file) {
+  const { entry } = await entryOf(file);
+  if (!entry) return null;
+  let job = null;
+  await queueLibraryInstall(entry, { add: (j) => { job = j; } });
+  return job;
+}
+
 // B277: the installed version of the app with bundle ID `id`: Installed's record, else the shell's record of signing
 // it (signing.installed: on iOS 27 Installed's record may never be written, B229), else null (not known).
 export async function installedVersionOf(id, { records = async () => (await apps()).all(), native = nativeBridge(),

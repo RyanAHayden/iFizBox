@@ -578,3 +578,29 @@ test("B337: a Signing Server Fallback row whose signed IPA the shell no longer k
   assert.ok(page.lines.some((x) => x.text === "The signed copy of Alpha is gone; signing it again"));
   assert.equal(r.rows[0].state, "installed");
 }));
+
+test("B395: the Install Switch didn't run: one alert for the run with Cancel, Update and Use Server", () => withDom(async () => {
+  const { serverFallback } = await import("../core/installroute.js");
+  for (const pick of [0, 1, 2]) {
+    const asked = [], fixed = [], server = [];
+    const sc = {
+      prepareOnDevice: async (job) => ({ token: `t-${job.id}`, bundleId: job.id }),
+      openPrepared: async (r, o) => {
+        if (o.server) { server.push(r.id); return { installed: true }; }
+        throw Object.assign(new Error("no"), { fallback: serverFallback(Object.assign(new Error("switch_failed: no"), { code: "switch_failed" })) });
+      },
+      runFix: (f) => fixed.push(f),
+      discardPrepared() {},
+    };
+    const l = phoneLanes(sc, { native: { call: async () => null } });
+    const queue = createAppQueue();
+    queue.add(app("a", "Alpha"));
+    queue.add(app("b", "Beta"));
+    const page = fakePage();
+    await runAppRun(queue.list(), { queue, lanes: { ...l, local: () => !l.serverRoute() }, open: () => page, alert: async (a) => { asked.push(a.buttons); return { index: pick }; } });
+    await settle(20);
+    assert.deepEqual(asked, [["Cancel", "Update", "Use Server"]]);
+    assert.deepEqual(fixed, pick === 1 ? ["shortcuts"] : []);
+    assert.deepEqual(server, pick === 2 ? ["a", "b"] : []);
+  }
+}));

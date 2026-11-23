@@ -85,7 +85,7 @@ import { showActionSheet } from "../nav/actionsheet.js";
 import { longPress } from "../nav/menu.js";
 import { guarded } from "../nav/tapguard.js";
 import { libraryCall } from "../signing/library.js";
-import { resignJob, appJob, markedResignJob, markedVersionOnSource, markedResignProblem } from "../core/appqueue.js";
+import { resignJob, appJob, listedOf, markedResignJob, markedVersionOnSource, markedResignProblem } from "../core/appqueue.js";
 import { hudLine } from "../core/progress.js";
 import { deviceError } from "../core/signing.js";
 import { getBackend } from "../backend.js";
@@ -1741,7 +1741,7 @@ export async function manageInstall(job, { verb, i, n, hud = null, sc = null, re
     resign ??= (await import("./queue.js")).resignApp;
     return resign(job, { sc, hud: h, deps: { hud: h } });
   }
-  if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "" }, { hud: h });
+  if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "", ...listedOf(job) }, { hud: h });
   return sc.signAndInstall((await import("./queue.js")).siteInstallArgs(job)); // F262: with the app's bundle ID
 }
 

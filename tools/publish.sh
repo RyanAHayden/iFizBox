@@ -4,8 +4,9 @@
 #   tools/publish.sh X.Y.Z [--notes FILE] [--minimum X.Y.Z] [--dry-run]
 #
 #   1. checks: on main, no uncommitted changes, up to date with origin, X.Y.Z newer than the last v* tag
-#   2. writes native/VERSION, deletes release-notes/*.md (README.md stays; a copy is the default notes), commits
-#      "Version X.Y.Z" and pushes it
+#   2. writes native/VERSION and the Tweak Index file (web/app/tweak-index.json from the live index, tools/
+#      tweak-index.mjs; the last one stays when that fails), deletes release-notes/*.md (README.md stays; a copy is the
+#      default notes), commits "Version X.Y.Z" and pushes it
 #   3. builds that commit in a clean temporary worktree and publishes it with tools/release.sh --tag-source:
 #      iFizBox.ipa, the .debs and iFizBox's own APT repo, as the repo owner's GitHub account, under tag vX.Y.Z on a
 #      commit that adds the updated AltStore source (web/app/source.json, the built-in source) to the built one
@@ -67,10 +68,12 @@ echo "publish: ${#notefiles[@]} release note(s) in release-notes/"
 # 2. the version commit (with the release notes deleted)
 [ "$(cat native/VERSION)" = "$version" ] || echo "$version" > native/VERSION
 if [ $dry = 0 ]; then
-  git add native/VERSION
+  # F398: the Tweak Index the app and the site ship with; a failed read keeps the committed file
+  timeout 600 node tools/tweak-index.mjs || echo "publish: the Tweak Index couldn't be read: the last file stays" >&2
+  git add native/VERSION web/app/tweak-index.json
   [ ${#notefiles[@]} = 0 ] || git rm -q -- "${notefiles[@]}"
-  if ! git diff --cached --quiet -- native/VERSION release-notes; then
-    git commit -q -m "Version $version" -- native/VERSION release-notes
+  if ! git diff --cached --quiet -- native/VERSION release-notes web/app/tweak-index.json; then
+    git commit -q -m "Version $version" -- native/VERSION release-notes web/app/tweak-index.json
     git push -q origin main
   fi
 fi

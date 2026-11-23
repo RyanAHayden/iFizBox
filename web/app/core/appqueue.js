@@ -22,6 +22,9 @@
 //                        essential, download }, so Confirm draws apps with the jailbreak queue's own groups
 //   jobDownloads(job) -> B282: whether the run downloads it (it has a url and is not a My IPAs file):
 //                        only those count toward download
+//   listedOf(job)     -> F400: { listed: { version, size } }, what the source lists for the job's url, for the shell's
+//                        downloading calls (an IPA kept from a failed install is used only when it still matches);
+//                        {} when neither is known or nothing is downloaded
 //   runOrder(jobs)    -> the order Confirm installs in: as queued, iFizBox itself last (installing it closes the app)
 //   appNavLabel({ queued, installed, newest }) -> the app page's nav button: Modify while the app is queued (Cydia),
 //                        else Install, Upgrade or Reinstall
@@ -44,6 +47,11 @@
 //   MARK_NOT_INSTALLED, destructiveOf(buttons) -> that button's index for showActionSheet's `destructive` (red), or -1
 // F379: a Custom Install saves its IPA in My IPAs (customInstallSave), and a Re-sign signs that saved IPA
 //   (savedResignJob, withSavedIpa; the queue keeps a resign job's `library` and options)
+// F401: tweaks queued with the app from its Add Tweaks page (screens/addtweaks-queue.js):
+//   job.tweaks: [{ id, name }] (Confirm names them under the app), job.tweaksOf: the bundle ID whose kept tweaks the
+//   run signs in, job.forTweaks: the tweaks are the only reason it is queued, job.noTweaks: the last one was taken out
+//   q.setTweaks(id, { tweaks, tweaksOf, noTweaks }) -> changes them on a queued job (event "tweaks"); a Custom Install's
+//   own tweak list gives way to the kept ones. Queuing the app again keeps its tweaks, and then it isn't only for them.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { modeOf } from "./queue.js";
 import { compareVersions } from "./apt.js";
@@ -66,10 +74,25 @@ export function createAppQueue() {
   return {
     // An app is queued once: queuing it again replaces it (Cydia's marks work the same).
     // B71a: `quiet` (a row's swipe in the jailbreak app) tells listeners not to open Confirm for it.
-    add({ id, op = null, app = null, name = null, version = null, installed = null, url, library = null, size = null, icon = null, key = null, source = null, sourceName = null, deps = [], options = null, mode = null },
+    add({ id, op = null, app = null, name = null, version = null, installed = null, url, library = null, size = null, icon = null, key = null, source = null, sourceName = null, deps = [], options = null, mode = null,
+      tweaks = null, tweaksOf = null, forTweaks = false },
       { quiet = false } = {}) {
       if (!id) throw new Error("no app id");
       const emit1 = (job) => emit(quiet ? { type: "add", job, quiet } : { type: "add", job });
+      // F401: the tweaks queued with it, its own or those of the job it replaces
+      const withTweaks = (job) => {
+        const prev = jobs.get(id);
+        if (tweaks?.length) { job.tweaks = [...tweaks]; if (forTweaks) job.forTweaks = true; }
+        else if (prev?.tweaks?.length) {
+          const own = job.options?.edits?.tweaks?.names; // a Custom Install's own list: only those it has go in
+          const left = Array.isArray(own) ? prev.tweaks.filter((t) => own.some((n) => String(n).startsWith(`${t.id}_`))) : prev.tweaks;
+          if (left.length) job.tweaks = left;
+        }
+        const of = tweaksOf ?? prev?.tweaksOf;
+        if (of) job.tweaksOf = of;
+        if (!tweaks?.length && prev?.noTweaks) job.noTweaks = true;
+        return job;
+      };
       if (op === "remove" || app === "remove" || mode === "remove") { // B71a: the jailbreak app's helper uninstalls it
         const job = { op: "remove", id, name: name || null, version: null, installed: installed ?? null, mode: "remove", url: null, size: null,
           icon, key, source, sourceName, deps: [], options: null };
@@ -86,7 +109,7 @@ export function createAppQueue() {
           job.library = library;
           job.options = options && typeof options === "object" ? options : null;
         }
-        jobs.set(id, job);
+        jobs.set(id, withTweaks(job));
         emit1(job);
         return job;
       }
@@ -97,13 +120,26 @@ export function createAppQueue() {
         mode: modeOf({ op: "install", version, installed }), url: file ? null : url, size: Number(size) || null, icon, key, source, sourceName,
         deps: Array.isArray(deps) ? deps : [], options: options && typeof options === "object" ? options : null };
       if (file) job.library = file;
-      jobs.set(id, job);
+      jobs.set(id, withTweaks(job));
       emit1(job);
       return job;
     },
     get: (id) => jobs.get(id) ?? null,
     list: () => [...jobs.values()],
     get size() { return jobs.size; },
+    setTweaks(id, { tweaks = [], tweaksOf = null, noTweaks = false } = {}) { // F401: the same object, so a run's row sees it
+      const job = jobs.get(id);
+      if (!job) return null;
+      job.tweaks = [...tweaks];
+      if (tweaksOf) job.tweaksOf = tweaksOf;
+      if (noTweaks) job.noTweaks = true; else delete job.noTweaks;
+      if (job.options?.edits?.tweaks !== undefined) {
+        job.options = { ...job.options, edits: { ...job.options.edits } };
+        delete job.options.edits.tweaks;
+      }
+      emit({ type: "tweaks", id });
+      return job;
+    },
     clear(id) { if (jobs.delete(id)) emit({ type: "clear", id }); },
     clearAll() { if (!jobs.size) return; jobs.clear(); emit({ type: "clearAll" }); },
     subscribe(f) { listeners.add(f); return () => listeners.delete(f); },
@@ -297,6 +333,13 @@ export function customParams(job, now = Date.now()) {
 //                        Sign Options, as libraryJob's); else the job
 //   await withSavedIpa(job, { call }) -> savedResignJob over library.list (the job as it is when the list fails);
 //                        core/myipas.js is loaded only then, so it stays out of the app's startup modules
+export function listedOf(job) {
+  if (!job?.url || job.library) return {};
+  const version = job.version ? String(job.version) : null;
+  const size = Number(job.size) > 0 ? Number(job.size) : null;
+  return version || size ? { listed: { ...(version ? { version } : {}), ...(size ? { size } : {}) } } : {};
+}
+
 export function customInstallSave(job) {
   if (!job || job.op === "remove" || job.library || job.id === SELF_ID || !job.url || !job.options) return null;
   const edits = { ...(job.options.edits ?? {}) };

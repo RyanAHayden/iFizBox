@@ -34,8 +34,8 @@ export const builtinVPN = (st) => Boolean(st?.vpn?.available);
 export const SHORTCUT_NAMES = { off: "Cellular Data Off", on: "Cellular Data On", switch: "Install Switch" };
 export const switchAdded = (st) => Boolean(st?.vpn?.shortcuts?.switch);
 // F394: an Install Switch added before the one-trip one, on an app that can use it (`trips`): it works as before, and
-// its page offers Update. `vpn` is vpn.status.
-export const switchOld = (vpn) => Boolean(vpn?.trips && vpn.shortcuts?.switch && !vpn.shortcuts?.trip);
+// its page offers Update. F389: or one that can't bring an idle On Demand VPN back (`idle`). `vpn` is vpn.status.
+export const switchOld = (vpn) => Boolean(vpn?.trips && vpn.shortcuts?.switch && !(vpn.shortcuts?.trip && vpn.shortcuts?.idle));
 // Installs on cellular are covered: the Install Switch, or both Cellular Shortcuts.
 export const shortcutsAdded = (st) => switchAdded(st) || Boolean(st?.vpn?.shortcuts?.off && st?.vpn?.shortcuts?.on);
 // B359: our signed Shortcut on the site (web/app/shortcuts/, signed by tools/shortcuts/sign.sh). The app shares its
@@ -52,8 +52,8 @@ export const shortcutDidntOpen = (k, err) => `"${SHORTCUT_NAMES[k]}" couldn't be
 // This iPhone is set up: paired, and with the built-in VPN tested once (vpn.test). Using it waits for that.
 export const iphoneSetUp = (st) => Boolean(st?.paired) && (!builtinVPN(st) || Boolean(st.vpn.tested));
 // F394 (user 2026-11-23): the app asks for the Install Switch only when a connect now would need it and it isn't there:
-// LocalVPN.switchNeeded, on cellular or with another VPN up. The old two Cellular Shortcuts cover cellular, not the VPN.
-export const switchWanted = (st) => builtinVPN(st) && ((Boolean(st.vpn.cellular) && !shortcutsAdded(st)) || (Boolean(st.vpn.otherVPN) && !switchAdded(st)));
+// LocalVPN.switchNeeded, on cellular or with another VPN up or (F389) selected in Settings > VPN. The old two Cellular Shortcuts cover cellular, not the VPN.
+export const switchWanted = (st) => builtinVPN(st) && ((Boolean(st.vpn.cellular) && !shortcutsAdded(st)) || (Boolean(st.vpn.otherVPN || st.vpn.otherVPNSelected) && !switchAdded(st)));
 // Set Up's footer: the next step, or what is set up.
 export function setupFooter(st) {
   if (!st?.paired) return "Pair this iPhone once to install straight onto it.";
@@ -64,7 +64,7 @@ export function setupFooter(st) {
 }
 // B381: a connect now would run the Install Switch (LocalVPN.switchNeeded: on cellular, or with another VPN up), so
 // iOS would flip to Shortcuts. The checks nobody tapped (autoCheck) stay away then.
-export const switchWouldRun = (st) => builtinVPN(st) && Boolean(st.vpn.shortcuts?.switch) && Boolean(st.vpn.cellular || st.otherVPN || (!st.vpn.on && st.tunnels?.length)); // otherVPN is false when another VPN routes 10.7.0.1
+export const switchWouldRun = (st) => builtinVPN(st) && Boolean(st.vpn.shortcuts?.switch) && Boolean(st.vpn.cellular || st.otherVPN || st.vpn.otherVPNSelected || (!st.vpn.on && st.tunnels?.length)); // otherVPN is false when another VPN routes 10.7.0.1
 // User 2026-11-22: This iPhone in use, the phone on cellular (no Wi-Fi), and the Install Switch not added: iOS
 // refuses the connection, so Home, Installation & Signing's status and an install that starts say so, with a button
 // to the Install Switch's page.
@@ -88,6 +88,7 @@ export const HOW_STEPS = [
 export function vpnTestResult(r, err = null) {
   if (r?.ok) return { title: "Connected", message: `${BUILTIN_VPN} reached this iPhone${r.ms ? ` in ${r.ms} ms` : ""}, then turned off again.` };
   const raw = String(err?.message ?? err ?? "");
+  if (/^switch_failed:/.test(raw)) { const f = switchFailed(raw); return { title: f.title, message: f.message }; } // B395
   if (/^vpn_failed:/.test(raw)) return { title: `${BUILTIN_VPN} Didn't Start`, message: `${raw.replace(/^vpn_failed:\s*/, "")}.` };
   const why = verifyFailure(err, { paired: true, vpn: { available: true } });
   return { title: why.title, message: why.message, again: why.again };
@@ -123,7 +124,8 @@ export function decideRoute(choice, status) {
   if (!status.paired) return { route: "server", alert: "notPaired" };
   if (builtinVPN(status)) {
     if (cellularWarning(choice, status)) return { route: "idevice", alert: "cellular" }; // F372
-    return switchWanted(status) ? { route: "idevice", alert: "vpnStaysOff" } : { route: "idevice" }; // F394: another VPN is on
+    if (!switchWanted(status)) return { route: "idevice" };
+    return { route: "idevice", alert: status.vpn.otherVPN ? "vpnStaysOff" : "vpnIdle" }; // F394: another VPN is on; F389: or selected
   }
   const ts = status.tailscale;
   if (ts?.use) return { route: "idevice" };
@@ -164,6 +166,8 @@ export const ALERTS = {
   cellular: { title: CELLULAR.title, message: CELLULAR.message, buttons: ["Use Server", CELLULAR.button], setup: 1 },
   // F394: another VPN is on and nothing would bring it back; the first button goes on through This iPhone without it
   vpnStaysOff: { title: "Your VPN Stays Off", message: `This install turns your VPN off, and it stays off after. Add the Install Switch, and ${NAME} brings it back.`, buttons: ["Install", CELLULAR.button], setup: 1, goes: true },
+  // F389: selected, not connected: iOS tells an app nothing of its On Demand, so the words say "if"
+  vpnIdle: { title: "Your VPN May Stay Off", message: `If your VPN connects on demand, it stays off after this install. Add the Install Switch, and ${NAME} brings it back.`, buttons: ["Install", CELLULAR.button], setup: 1, goes: true },
 };
 
 // F284: the Tailscale app's VPN is on: idevice.status's tailscale.address is this phone's own tailnet address, there
@@ -565,7 +569,7 @@ export function routeRefused(vpn = VPNS[0], st = null) {
 // { title, message, short, fix, button }, or null when the error isn't about reaching this iPhone (Developer Mode,
 // signing, a download): those don't make the route broken.
 // B378: vpn_failed: the built-in VPN didn't start and no other way in was on (the shell says why, e.g. no network)
-const ROUTE_CODES = new Set([...CONNECT_CODES, "route_refused", "tailscale_signed_out", "needs_login", "expired", "not_paired", "vpn_failed"]);
+const ROUTE_CODES = new Set([...CONNECT_CODES, "route_refused", "tailscale_signed_out", "needs_login", "expired", "not_paired", "vpn_failed", "switch_failed"]);
 export function routeFailureOf(err, st = null) {
   const raw = String(err?.message ?? err ?? "");
   const code = err?.code ?? raw.split(":")[0];
@@ -575,7 +579,7 @@ export function routeFailureOf(err, st = null) {
   const fix = why.fix ?? (why.again ? "pair" : /^Turn On/.test(why.title) ? (why.title.includes(VPNS[1]) ? "openTailscale" : "openVPN") : "check");
   const short = why.short ?? (why.again ? "Installs are refused. Pair again." : "Installs can't reach this iPhone.");
   const button = why.button ?? (fix === "pair" ? "Pair Again" : fix === "openVPN" ? `Open ${VPNS[0]}` : fix === "openTailscale" ? "Open Tailscale" : "Check Again");
-  return { title: why.title, message: why.message, short, fix, button };
+  return { title: why.title, message: why.message, short, fix, button, ...(code === "switch_failed" ? { code } : {}) };
 }
 
 // Kept in this browser's storage (it outlives a relaunch: the route stays broken until a check passes), and told to
@@ -618,6 +622,23 @@ export function vpnFailed(raw) {
   return { title: `${BUILTIN_VPN} Didn't Start`, message: `${first || `${BUILTIN_VPN} didn't start`}.`,
     short: noNetwork ? `${BUILTIN_VPN} needs Wi-Fi or cellular data to start.` : `${BUILTIN_VPN} didn't start.`, fix: "check", button: "Check Again", again: false };
 }
+// B395: the Install Switch didn't run and the install couldn't go on without it (on cellular, or the VPN didn't start
+// either). The shell ran it once and stopped.
+export function switchFailed(raw) {
+  const why = String(raw ?? "").replace(/^switch_failed:\s*/, "").trim().replace(/[.\s]+$/, "");
+  return { title: "Install Switch Didn't Run", again: false, fix: "shortcuts", button: "Update",
+    message: `The install stopped${why ? `: ${why}` : ""}. Delete Install Switch in Shortcuts and tap Update, or install through the Signing Server this time.`,
+    short: "Update the Install Switch, or use the Signing Server." };
+}
+// One alert for it: Update (the Install Switch's page) and Use Server, Cancel always there.
+export const switchFailedAlert = (f) => ({ title: f.title, message: f.message, buttons: ["Cancel", f.button, "Use Server"], cancel: 0 });
+// B395: what stayed off after a queue (vpn.leftOff's {vpn, cellular}) as an alert, or null when nothing did.
+export function leftOffAlert(off) {
+  if (!off?.vpn && !off?.cellular) return null;
+  const what = off.vpn && off.cellular ? "cellular data and your VPN" : off.vpn ? "your VPN" : "cellular data";
+  const title = off.vpn && off.cellular ? "Data and VPN Are Off" : off.vpn ? "Your VPN Is Off" : "Cellular Data Is Off";
+  return { title, message: `${NAME} couldn't turn ${what} back on after installing. ${off.cellular ? "Turn cellular data on in Settings. " : ""}${off.vpn ? "Choose your VPN in Settings > VPN and turn it on." : ""}`.trim(), buttons: ["OK"] };
+}
 // What a failed idevice.verify means: { title, message, again } (`again`: offer Pair Again). `st` is the
 // idevice.status read for the check (null or left out: not known), which names the VPN the check went through.
 export function verifyFailure(err, st = null) {
@@ -627,6 +648,7 @@ export function verifyFailure(err, st = null) {
   // while Tailscale is the way in and iFizBox isn't signed in to it (or its VPN is off): the fix is Tailscale's.
   if (code === "tailscale_signed_out" || code === "needs_login" || code === "expired") return TAILSCALE_SIGNED_OUT;
   if (code === "vpn_failed") return vpnFailed(raw); // B378
+  if (code === "switch_failed") return switchFailed(raw); // B395
   if (code === "route_refused") return routeRefused(builtinVPN(st) ? BUILTIN_VPN : /Tailscale/i.test(raw) ? VPNS[1] : VPNS[0], st);
   if (CONNECT_CODES.has(code)) {
     const t = tailscaleProblem(st);

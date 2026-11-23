@@ -112,8 +112,8 @@ class App(unittest.TestCase):
         is off after the last; the plist reads JSON flags with "has any value" only (B359: "contains" loses its text)."""
         import plistlib
         src = read("App", "LocalVPN.swift")
-        self.assertIn('runShortcut("switch", input: switchInput("start"))', src)
-        self.assertIn("if stop { down(); endTrip(gen); endSwitch() }", src)
+        self.assertIn('runShortcut("switch", input: switchInput("start", selected: selected))', src)
+        self.assertIn("if stop { down(); endTrip(gen); endSwitch(); sayLost() }", src)
         self.assertIn("UIApplication.didBecomeActiveNotification", src)  # an end found in the background runs later
         self.assertIn('b.on("vpn.testSwitch")', src)
         repo = os.path.dirname(NATIVE)
@@ -125,7 +125,7 @@ class App(unittest.TestCase):
             self.assertIn(want, ids)
         self.assertEqual(ids[-1], "nothing")
         keys = [a["WFWorkflowActionParameters"].get("WFDictionaryKey") for a in acts if ids[acts.index(a)] == "getvalueforkey"]
-        self.assertEqual(keys, ["start", "end", "cellular", "dataOff", "trip", "actions"])
+        self.assertEqual(keys, ["start", "end", "cellular", "dataOff", "trip", "actions", "selected"])
         groups = {}
         for a in acts:
             p = a["WFWorkflowActionParameters"]
@@ -137,13 +137,15 @@ class App(unittest.TestCase):
             self.assertEqual(modes[0], 0, g)
             self.assertEqual(modes[-1], 2, g)
         sets = [a["WFWorkflowActionParameters"] for a in acts if a["WFWorkflowActionIdentifier"].endswith("vpn.set")]
-        self.assertEqual([s["WFVPNOperation"] for s in sets], ["Connect", "Connect", "Connect"])
+        self.assertTrue(all(s["WFOnDemandValue"] is True for s in sets if s["WFVPNOperation"] == "Set On Demand"))  # F389
+        self.assertEqual([s["WFVPNOperation"] for s in sets], ["Connect", "Connect", "Set On Demand", "Connect", "Set On Demand"])
         last_set = [i for i, x in enumerate(ids) if x == "vpn.set"][1]  # the end forgets before Set VPN's error 2 ends the run
         self.assertEqual(ids[last_set - 1], "deletestoredcontent")
-        flt = next(a for a in acts if ids[acts.index(a)] == "filter.vpns")["WFWorkflowActionParameters"]
-        tpl = flt["WFContentItemFilter"]["Value"]["WFActionParameterFilterTemplates"][0]
-        self.assertEqual((tpl["Property"], tpl["Values"]["String"]), ("Server Address", "10.7.0.1"))
         self.assertIn('static let peer = "10.7.0.1"', src)  # the address Find VPNs looks for
+        params = [a["WFWorkflowActionParameters"] for a in acts]
+        finds = [p["WFContentItemFilter"]["Value"]["WFActionParameterFilterTemplates"][0] for p in params if "WFContentItemFilter" in p]
+        self.assertEqual([t["Values"].get("String") for t in finds if t["Property"] == "Server Address"], ["10.7.0.1"])
+        self.assertEqual([(t["Property"], t["Values"].get("Bool")) for t in finds if t["Property"] != "Server Address"], [("Is On Demand Enabled", True)] * 2)  # F389: an idle VPN
 
     def test_install_switch_vpn_before_data_off(self):
         """B375: iOS starts no VPN without a network ("No network available"), so Cellular Data goes off only after
@@ -210,9 +212,10 @@ class App(unittest.TestCase):
         last = max(i for i, p in enumerate(params) if p.get("GroupingIdentifier") == params[first]["GroupingIdentifier"])
         me = "com.ryha.ifizbox."
         steps = [i for i in ids[first:last] if i not in ("conditional",)]
-        self.assertEqual(steps, ["vpn.get", "setstoredcontent", "deletestoredcontent", me + "ConnectVPNIntent", "cellulardata.set",
+        self.assertEqual(steps, ["deletestoredcontent", "vpn.get", "setstoredcontent", "deletestoredcontent", "filter.vpns", "setstoredcontent", me + "ConnectVPNIntent", "cellulardata.set",
                                  me + "OpenForInstallIntent", "repeat.count", me + "WaitForInstallIntent", "repeat.count",
-                                 "cellulardata.set", "delay", "getstoredcontent", "vpn.set"])
+                                 "cellulardata.set", "delay", "getstoredcontent", "vpn.set",
+                                 "getstoredcontent", "vpn.set", me + "WaitForInstallIntent"])
         data = [p["OnValue"] for i, p in list(zip(ids, params))[first:last] if i == "cellulardata.set"]
         self.assertEqual(data, [False, True])
         loop = next(p for i, p in zip(ids, params) if i == "repeat.count")
@@ -224,11 +227,33 @@ class App(unittest.TestCase):
             if i.startswith(me):
                 self.assertEqual(p["AppIntentDescriptor"]["BundleIdentifier"] + "." + p["AppIntentDescriptor"]["AppIntentIdentifier"], i)
         begin = src[src.index("static func begin("):src.index("static func waitOffCellular(")]
-        self.assertIn("let trip = start && tripReady() && takeTrip(", begin)
+        self.assertIn("opens.take(ready ? .trip : .start)", begin)
         self.assertLess(begin.index("if start { savePending("), begin.index("takeTrip("))
         self.assertIn("LocalVPN.restorePending()", src[src.index("static func register("):])
         self.assertIn("guard #available(iOS 16.0, *)", src)
         self.assertIn("switchEndDue = switchedOn && !tripOn", src)  # the trip's own end goes first
+
+    def test_shortcuts_opens_are_capped(self):
+        """B395: every run of the Install Switch around a queue goes through SwitchOpens (its rules are tested in
+        native/sign/tests/sideload), a queue holds through an install's reconnects, and one check runs it twice at most."""
+        src = read("App", "LocalVPN.swift")
+        begin = src[src.index("static func begin("):src.index("static func waitOffCellular(")]
+        self.assertEqual(begin.count("runShortcut("), 3)  # start, dataOff, the old Cellular Data Off
+        self.assertEqual(begin.count("takeTrip("), 1)
+        self.assertLess(begin.index("opens.take(ready ? .trip : .start)"), begin.index("takeTrip("))
+        self.assertLess(begin.index("opens.take(.dataOff)"), begin.index('switchInput("dataOff")'))
+        self.assertLess(begin.index('"switch_failed"'), begin.index("try up(step)"))  # before our VPN takes another's place
+        end = src[src.index("static func endSwitch()"):src.index("// ---- B395")]
+        self.assertEqual(end.count("runShortcut("), 1)
+        self.assertLess(end.index("opens.take(.end)"), end.index("runShortcut("))
+        self.assertLess(end.index("clearPending() // B395"), end.index("runShortcut("))  # a kill during the end: not again
+        self.assertIn('failure.code == "switch_failed" && LocalVPN.Path.now().cellular', read("idevice", "IDevice.swift", base=os.path.dirname(HERE)))  # Wi-Fi keeps the other ways in
+        check = src[src.index("static func checkShortcut("):src.index("static func switchEnded(")]
+        self.assertNotRegex(check, r"\b(for|while)\b.*\{")
+        self.assertIn("installs == 0", src[src.index("static func stopLater("):])
+        idev = read("idevice", "IDevice.swift", base=os.path.dirname(HERE))
+        self.assertIn("LocalVPN.installBegan()", idev)
+        self.assertIn("defer { LocalVPN.installEnded() }", idev)
 
 
 if __name__ == "__main__":

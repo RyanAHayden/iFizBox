@@ -399,6 +399,21 @@ where WebKit has no `DecompressionStream` (before iOS 16.4).
 
 Nothing listens on Wi-Fi or cellular; every path has a random 128-bit token.
 
+A download that ends is kept whole and unsigned, one per app, in the app's Caches (`WaitingIPA` in
+`native/sign/OriginalIPA.swift`, `Caches/com.ryha.ifizbox/waiting`), so an install that then fails (signing, the route
+check, the copy, the iOS prompt, a killed app) doesn't download it again: the next install of that URL and version
+takes the kept file. `IPAFetch.run` (`native/Sources/IPAFetch.swift`) is the one fetch behind `signing.install`,
+`signing.prepare`, `signing.inspect` and Re-sign; the jailbreak app's `ipa.install` uses the same kept file, as a copy
+since its helper takes no IPA with two names. Before a kept file is used, a HEAD (5 s) asks the server: an ETag,
+Last-Modified or length that says it is another file downloads it again; offline or no answer, the kept file is used.
+A size the source lists is compared with the size it listed at download time, since listed sizes are often wrong.
+The file goes once an install of that same file (SHA-256) succeeds, on `signing.forget` or the jailbreak app's uninstall,
+when the signer says the IPA is damaged (`bad_ipa`, or `bad_macho` unless injected tweaks are the cause), or when the
+helper exits 64 and the file really doesn't read. A file over 7 days old or incomplete goes at launch and whenever another
+file is kept. `library.add` downloads are not kept. On the
+Signing Server route iOS 27 can't confirm an install, so that file stays until it expires; it takes no extra space,
+as Re-sign's kept IPA is the same file.
+
 ### Plain http IPA links
 
 App Transport Security keeps URLSession off plain http, and the app has no ATS exception (the WKWebView must never
@@ -660,6 +675,18 @@ An app keeps its data in three places, and a re-sign must leave each where the a
   sign mapped onto the profile's first group gets that folder and suite copied into its own once (`legacy` in
   `ifizbox-groupfix.plist`; only for an app that had run before it got this fix (as defined below), never a fresh install, which would
   take in what other apps left in that shared group).
+  At the first launch with the fix for a group (its `Library/AppGroups/<group>/` doesn't exist yet), an app that ran
+  before and has no `target` brings in what it kept for that group without the fix: the folder the container call
+  gave then (a tweak's own shim such as zxPluginsInject, which uses a subfolder of a profile group; nil without one)
+  and the suite's file `Library/Preferences/<group>.plist` in the app's own container (only when its own suite is
+  still empty). Nothing is copied over what's there, and this comes before the `legacy` copy, so it wins over it.
+  `Library/Caches` and top-level folders named after the original groups are left behind. It is done at launch for
+  every group, whether or not the app asks, and the folder is made then, so a fresh install never brings in what an
+  earlier install left. While a copy isn't complete (launch cut short, or files unreadable before first unlock)
+  `Library/AppGroups/.<group>.copying` stays and the next launch tries again. The fix's log
+  (`Library/ifizbox-groupfix.log`) gets one extra line then: `<time> brought in from before the group fix: <group>
+  folder <files>, suite <keys>` (the files and keys found there). Extensions don't get the dylib, so they keep the
+  old place.
 - **Keeping an app's passwords to itself**: `TEAM.<App ID>` (and the profile's app groups) stay keychain groups every
   app under that App ID can reach, and a read that names no group finds what is there: a fresh app took over another
   app's item, and one app's delete that named no group (a fresh install clearing its keychain, a logout, any app the

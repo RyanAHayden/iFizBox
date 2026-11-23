@@ -25,6 +25,7 @@ test("jailbreak build: a Tweak or Tweaks section shows as Tweaks under All Sourc
 test("sideload build: All Sources gets an App Tweaks section of the Tweak Sources' injectable tweaks", () => {
   const c = createCatalog();
   c.setDevice({ ios: "17.0", jailbreak: "none" });
+  c.setTweakKnown({ worked: ["com.x.yt", "com.x.ig", "com.z.new"] }); // B391: checked here, they work
   c.load(TWEAK_KEY, TWEAKS, "https://repo.x/", "iphoneos-arm64", { tweaks: true });
   assert.deepEqual(c.sections(ALL), { total: 0, sections: [{ name: APP_TWEAKS, count: 2 }] });
   assert.deepEqual(c.sections(TWEAK_KEY).sections.map((s) => s.name), ["Tweaks"], "the source's own page keeps its sections");
@@ -43,6 +44,7 @@ test("sideload build: All Sources gets an App Tweaks section of the Tweak Source
 test("sideload build: App Tweaks follows Section Visibility, Block and the newest version", () => {
   const c = createCatalog();
   c.setDevice({ ios: "17.0", jailbreak: "none" });
+  c.setTweakKnown({ worked: ["com.x.yt", "com.x.ig", "com.z.new"] }); // B391: checked here, they work
   c.load(TWEAK_KEY, TWEAKS, "https://repo.x/", "iphoneos-arm64", { tweaks: true });
   c.load("deb:https://repo.y/:./", TWEAKS.replace("Version: 1\nDepends", "Version: 9\nDepends"), "https://repo.y/", "iphoneos-arm64", { tweaks: true });
   assert.equal(c.list(ALL, APP_TWEAKS).find((r) => r.id === "com.x.yt").version, "9");

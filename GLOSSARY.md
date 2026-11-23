@@ -7,10 +7,10 @@ detail. (Format after mattpocock/skills domain-modeling, MIT.)
 ## Language
 
 **Tweak Index**:
-ifizbox.com's list of which app each tweak of a Tweak Source works in, read from the tweak's own files before anyone opens it
+ifizbox.com's list of which app each tweak of a Tweak Source works in, read from the tweak's own files before anyone opens it. The app and the site carry a copy of the whole index (web/app/tweak-index.json), so a phone reads it without saying which sources it has
 _Said_: shared tweak index
-_On screen_: Works in: <app>
-_In code_: core/tweakindex.js, worker/src/tweakindex.js, GET /api/tweaks, loadTweakIndex
+_On screen_: Works in: <app>; Update Tweak Index
+_In code_: core/tweakindex.js, core/tweakindexfile.js, worker/src/tweakindex.js, GET /api/tweaks, GET /api/tweaks.json, web/app/tweak-index.json, loadTweakIndex
 _Avoid_: tweak database, tweak cache
 
 **Details**:
@@ -28,10 +28,10 @@ _In code_: PREVIEW_HEADER, previewSlot, galleryGroup
 _Avoid_: Screenshots
 
 **Add Tweaks**:
-The page under an app's Details that lists the tweaks from your Tweak Sources that work in that app, each with ADD, and More Tweaks for the rest
+The page under an app's Details that lists the tweaks from your Tweak Sources that work in that app, each with ADD, and More Tweaks for the rest; a tweak with no verdict yet is listed under Made for as a guess, and left out of the app's tweak count
 _Said_: add tweaks page, add tweaks sheet
 _On screen_: Add Tweaks
-_In code_: renderAddTweaks, addtweaks:<bundle id>, addTweaksItems, addTweakButton, addTweaksGroup
+_In code_: renderAddTweaks, addtweaks:<bundle id>, addTweaksItems, addTweakButton, addTweaksGroup, addTweaksContext, queueHooks, addToThisApp
 _Avoid_: tweak picker, inject tweaks page
 
 **Console Log**:
@@ -214,3 +214,17 @@ _Said_: one trip to Shortcuts
 _On screen_: (none)
 _In code_: LocalVPN.takeTrip, tripReady, endTrip, switchOld, {"trip":1}
 _Avoid_: flip, hop
+
+**Waiting IPA**:
+An IPA fully downloaded for an install that hasn't gone through, kept unsigned on the iPhone for up to a week so a retry signs it again instead of downloading it
+_Said_: the cached local IPA
+_On screen_: Using the IPA already downloaded
+_In code_: WaitingIPA, IPAFetch, listedOf
+_Avoid_: cached IPA, pending IPA
+
+**Idle VPN**:
+Another app's VPN that is selected in Settings > VPN with Connect On Demand on, but not connected right now
+_Said_: selected but idle On Demand VPN
+_On screen_: idle VPN
+_In code_: LocalVPN.otherVPNSelected, shortcuts.idle, vpnIdle
+_Avoid_: sleeping VPN, inactive VPN

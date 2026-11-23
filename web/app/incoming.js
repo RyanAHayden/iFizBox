@@ -33,6 +33,20 @@ import { packageIdOf } from "./websign-gate.js";
 import { NAME } from "./brand.js";
 import { markHandoff } from "./handoffclock.js";
 import { nativeBridge } from "./native.js";
+import { leftOffAlert } from "./core/installroute.js"; // B395
+
+// B395: the shell's word that cellular data or the user's VPN stayed off after an install (vpn.leftOff answers once
+// something did, however long that takes), as an alert; then it waits for the next. Ends on a shell without the call.
+export async function watchLeftOff({ native = nativeBridge(), alert = showAlert } = {}) {
+  if (!native?.call) return;
+  for (;;) {
+    let off = null;
+    try { off = await native.call("vpn.leftOff", {}); } catch { return; }
+    const a = leftOffAlert(off);
+    if (!a) return;
+    await alert(a);
+  }
+}
 
 export function startIncoming({ native = nativeBridge(), events = globalThis, doc = globalThis.document,
   runPage = defaultRunPage, alert = showAlert } = {}) {

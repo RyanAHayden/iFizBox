@@ -33,7 +33,7 @@ import { openIpaInstall, markIpaNeeds } from "./ipa-install.js";
 import { ipaInstallAvailable } from "../ipa-install.js";
 import { IPA_FOOTER } from "../core/ipainstall.js";
 import { appQueue } from "../app-queue.js";
-import { appJob, appNavLabel, modifyActions, resignJob, MARK_NOT_INSTALLED, destructiveOf, sizeText as formatSize } from "../core/appqueue.js";
+import { appJob, listedOf, appNavLabel, modifyActions, resignJob, MARK_NOT_INSTALLED, destructiveOf, sizeText as formatSize } from "../core/appqueue.js";
 import { markedVersionOnSource, markedResignJob } from "../core/appqueue.js"; // F221
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
 import { deviceError } from "../core/signing.js"; // B338
@@ -134,7 +134,7 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
   if (o.download && jailbreak) {
     // F88: the helper says whether it installed, so the record waits for its success (openIpaInstall's onInstalled)
     rows.push({ label: o.itms ? "Install IPA" : "Install", subtitle: "With the jailbreak",
-      onClick: () => ipaInstall({ url: o.download, name, onInstalled: () => onInstall() }) });
+      onClick: () => ipaInstall({ url: o.download, name, ...listedOf({ url: o.download, version: own.version, size: own.size }), onInstalled: () => onInstall() }) });
   } else if (o.itms) {
     rows.push({ label: "Install", subtitle: "Signed by the source", onClick: () => { onInstall(); location.href = o.itms; } });
   } else if (o.download && site && !isSelfIpa(o.download)) {
@@ -154,7 +154,7 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
   if (o.download && custom) {
     const run = customize ?? (async (opts) => (await import("../signing-sheet.js")).customInstall(opts));
     rows.push({ label: "Custom Install", subtitle: "Bundle ID, name, icon, extensions",
-      onClick: () => run({ url: o.download, name, onInstalled: () => onInstall() }) });
+      onClick: () => run({ url: o.download, name, ...listedOf({ url: o.download, version: own.version, size: own.size }), onInstalled: () => onInstall() }) });
   }
   if (o.download) rows.push(downloadRow(o.download, opener));
   return { rows: tapOnly(rows), options: o };
@@ -733,6 +733,21 @@ export async function queueOriginalCheck(job, warn = originalWarning) {
   return { ...job, options: { ...(job.options ?? {}), edits } };
 }
 
+// F401: the job the app page's Install / Upgrade / Reinstall queues for an app not signed here, without queuing it
+// (appPageAction's, F243's question included: Cancel gives null). null: nothing to queue.
+export async function appPageJob(pkg, source, { mode = detectMode(), store = apps, warn = originalWarning } = {}) {
+  const app = pkg?.stanza?.ipa;
+  if (mode !== "sideload" || !app) return null;
+  const held = forgetHeld(app.bundleIdentifier);
+  let rec = null;
+  if (!held) try { rec = recordOf(await (await store()).all(), app.bundleIdentifier, null); } catch { /* no store */ }
+  const job = appJob(pkg, { installed: rec ? rec.version || null : null, source: source ? displayName(source) : null });
+  if (!job) return null;
+  const j = rec ? job : await queueOriginalCheck(job, warn);
+  if (j && held) cancelHeldForget(app.bundleIdentifier); // B372
+  return j;
+}
+
 // B69: the jailbreak app's Modify for an installed app (a record in core/installed.js, as the nav label reads it):
 // Cydia's sheet instead of installing at once. Upgrade or Reinstall, Ignore Upgrades (Settings' Ignored Upgrades,
 // kept on the device: no dpkg hold for an app) while a newer version is out or once it's ignored, Remove (red: the
@@ -858,7 +873,7 @@ export async function appPageCustom(pkg, source, opts, { queue = appQueue, add =
     job = appJob(pkg, { installed: rec ? rec.version || null : null, version, source: source ? displayName(source) : null });
   }
   if (!job) return custom(opts);
-  return custom({ url: job.url, name: opts?.name || job.name || "", queue: (options) => add({ ...job, options }, { queue }) });
+  return custom({ url: job.url, name: opts?.name || job.name || "", ...listedOf(job), queue: (options) => add({ ...job, options }, { queue }) });
 }
 
 // The website's Install group (F93: it signs in the browser; F92: only Install and Download IPA).

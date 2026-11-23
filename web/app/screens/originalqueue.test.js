@@ -41,7 +41,7 @@ test("Install a Copy queues the job with keepBundleId: false, and both runs sign
   const job = q.get("com.x.a");
   assert.deepEqual(job.options, { edits: { keepBundleId: false } });
   const credit = { name: "App", source: "https://s/", sourceName: null, key: "alt:k" }; // B247
-  assert.deepEqual(prepareParams(job), { url: "https://s/com.x.a-2.ipa", keepBundleId: false, credit });
+  assert.deepEqual(prepareParams(job), { url: "https://s/com.x.a-2.ipa", listed: { version: "2", size: 2048 }, keepBundleId: false, credit });
   let got = null;
   const sc = { isSelfIpa: () => false, installOnDevice: async (o) => { got = o; return true; } };
   await installCustom(job, { sc, follow: () => {} });

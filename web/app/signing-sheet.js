@@ -44,12 +44,12 @@ function style() { loadStyle("signsheet.css"); }
 // An older shell answers "unknown method signing.inspect" (Bridge.swift).
 const unknownMethod = (e) => /unknown method/i.test(String(e?.message ?? e ?? ""));
 
-export async function inspectAndInstall({ url, name = "", onInstalled = () => {} },
+export async function inspectAndInstall({ url, name = "", onInstalled = () => {}, listed = null },
   { native = nativeBridge(), hud = liveHUD, alert = showAlert, install = installOnDevice, sheet = openSignSheet, later = setTimeout } = {}) {
   const h = hud("Downloading");
   let info;
   try {
-    info = await askInsecure((extra) => native.call("signing.inspect", withKeep({ url, ...extra }), (ev) => { const t = phaseLabel(ev); if (t) h.set(t); }), { alert, url });
+    info = await askInsecure((extra) => native.call("signing.inspect", withKeep({ url, ...(listed ? { listed } : {}), ...extra }), (ev) => { const t = phaseLabel(ev); if (t) h.set(t); }), { alert, url });
   } catch (e) {
     h.hide();
     if (e?.code === "cancelled") return false; // B104: Cancel on This Download Is Not Secure
@@ -75,7 +75,7 @@ export async function inspectAndInstall({ url, name = "", onInstalled = () => {}
         started = true;
         close();
         const shown = params.name || info.app?.name || name;
-        resolve(await install({ url, name: shown, onInstalled, params,
+        resolve(await install({ url, name: shown, onInstalled, params, ...(listed ? { listed } : {}),
           after: (result, hh) => followInstall(native, installedId(result, params, info), hh, { later, name: shown, device: result?.device }) }));
       },
       onClose: () => { if (!started) resolve(false); },
@@ -94,12 +94,12 @@ export async function customInstall(opts, { check = null, inspect = inspectAndIn
 // F84: look first, then the sheet; its Install hands `queue` the job's options (core/appqueue.js: token and when it
 // was looked at, the edits, the name to show, the ID iOS will know it by) and closes. True once queued, false on
 // Cancel or an error (shown). An older shell without signing.inspect queues it plain (queue(null)), as Install would.
-export async function inspectToQueue({ url, name = "", queue },
+export async function inspectToQueue({ url, name = "", queue, listed = null },
   { native = nativeBridge(), hud = liveHUD, alert = showAlert, sheet = openSignSheet, now = Date.now } = {}) {
   const h = hud("Downloading");
   let info;
   try {
-    info = await askInsecure((extra) => native.call("signing.inspect", withKeep({ url, ...extra }), (ev) => { const t = phaseLabel(ev); if (t) h.set(t); }), { alert, url });
+    info = await askInsecure((extra) => native.call("signing.inspect", withKeep({ url, ...(listed ? { listed } : {}), ...extra }), (ev) => { const t = phaseLabel(ev); if (t) h.set(t); }), { alert, url });
   } catch (e) {
     h.hide();
     if (e?.code === "cancelled") return false; // B104: Cancel on This Download Is Not Secure

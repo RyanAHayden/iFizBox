@@ -13,7 +13,7 @@
 import { grouped, placeholder, el, segments, note, buttonZone } from "../nav/ui.js";
 import { createVList, withLetterHeaders } from "../nav/vlist.js";
 import { createSectionIndex } from "../nav/sectionindex.js";
-import { onPageOpen } from "../nav/pagestate.js";
+import { onPageOpen, onPageShow } from "../nav/pagestate.js";
 import { showSheet } from "../nav/sheet.js";
 import { format, settingsRoute } from "../router.js";
 import { getBackend } from "../backend.js";
@@ -69,7 +69,7 @@ import { dailyPick, browseKind, collectionsFor, dayKey } from "../core/catalog.j
 import { readSpins, currentStreak, rouletteRow } from "./roulette-row.js"; // C38: not roulette.js, which imports browse.js
 import { NAME } from "../brand.js";
 import { PACKAGE } from "../brand.js"; // B71: iFizBox's own row never queues its Remove
-import { appJob } from "../core/appqueue.js"; // B71
+import { appJob, listedOf } from "../core/appqueue.js"; // B71
 import { showMenu, longPress, copyText } from "../nav/menu.js";
 const showRowMenu = (...a) => showMenu(...a); // B358: attachRowMenu adds a list's own items
 import { showShareSheet } from "../nav/sharesheet.js";
@@ -86,17 +86,14 @@ import { APP_MODE_LABEL } from "../core/appqueue.js";
 import { rowAppJob, queueOriginalCheck } from "./altstore.js";
 import { signedRecordOf, forgetHeld, cancelHeldForget, appVersionInstalled } from "./altstore.js"; // F392
 import { queueApp } from "./queue.js";
-import { worksInGroup, addToApp, addableTweakRows, checkTweakRows } from "./tweaks.js"; // F302
-import { loadRowsIndex } from "./tweaks.js"; // F344
+import { fileOfToken } from "../core/myipas.js"; // F401
+import { worksInGroup, addToApp, addTweaksAppName, appsWith } from "./tweaks.js"; // F302, F401
 import { DETAILS_TITLE, packageRows, moreInfoShown, detailRows, descGroup, footerGroup,
   detailsFooter, MORE_INFO_LABEL } from "./details.js"; // F350
 import { rowIcon } from "../icons/rowicons.js";
 import { appInfoNodes } from "./altstore.js"; // F350: an app's More Information
 import { loadStyle } from "../nav/motion.js"; // F352: Add Tweaks' price button (myipas.css)
-import { liteTweaks } from "../core/tweakindex.js"; // F352: Add Tweaks' background check
 
-// B269: in the sideload build a Tweak Source's list leaves out the tweaks already checked and refused on this device.
-export const sideloadListRows = (rows, mode = detectMode()) => (mode === "sideload" ? addableTweakRows(rows) : rows);
 
 const ROW_HEIGHT = 58;
 // F348: Cydia's tall package cell (Installed and a source's section lists): name, 'from <Author> (<Section>)', then the
@@ -210,8 +207,7 @@ export function render(body, route, ctx) {
   const p = pageOf(route);
   switch (p.page) {
     case "sections": return isAltKey(p.key) ? renderAltSource(body, route, p.key, ctx) : renderSections(body, route, p.key, ctx);
-    case "section": return renderList(body, route, async () => sideloadListRows(await catalog.list(p.key, p.value)), true,
-      detectMode() === "sideload" && !isAltKey(p.key) ? dropRefusedTweaks : null);
+    case "section": return renderList(body, route, () => catalog.list(p.key, p.value), true);
     case "author": return renderAuthor(body, route, p.value);
     case "package": return renderPackage(body, route, p.key, p.value, ctx);
     case "info": return renderInfo(body, p.key, p.value);
@@ -912,14 +908,7 @@ function maybeHint(listEl, queued = () => installQueue.size, apps = false, actio
 }
 
 // Exported for Home's Browse (F46).
-// B269: a sideload Tweak Source's list checks the tweaks not checked yet (screens/tweaks.js checkTweakRows) and
-// drops each refused one, so no row is left that only leads to "can't go into an app".
-function dropRefusedTweaks(body, list, rows) {
-  checkTweakRows(rows, { stop: () => !list.el.isConnected, index: loadRowsIndex, // F344: the shared index first
-    onRefused: (ids) => { const out = new Set(ids); list.setItems(withLetterHeaders(rows.filter((r) => !out.has(r.id)), (r) => indexLetter(r.name))); } });
-}
-
-async function renderList(body, route, fetchRows, letters, after = null) {
+async function renderList(body, route, fetchRows, letters) {
   body.append(placeholder("list"));
   let rows;
   try {
@@ -933,7 +922,6 @@ async function renderList(body, route, fetchRows, letters, after = null) {
   if (!rows.length) { body.append(note("No packages.")); return; }
   const list = packageList(body, route, rows, { letters, wide: true }); // F348: a source's section lists, Cydia's tall rows
   body.append(list.el);
-  after?.(body, list, rows);
 }
 
 // F124: Browse's lists (New, Recently Updated, Popular, Featured, Free..., a category): the grey search bar, then the
@@ -978,6 +966,8 @@ export async function renderSearchableList(body, route, fetchRows, { letters = f
 // (tweaks.js addTweakButton: ADD checks and keeps the .deb, ADDED offers Remove, a paid one Sign In / Buy), grouped
 // Added / Made for <app> / Works in Any App (tweaks.js addTweaksItems). A row opens the tweak's page in its Tweak
 // Source; back comes here. Then More Tweaks: Browse Tweak Sources, Search All Repos, From Files, one footer.
+// F401: ADD also queues the app with the tweak (screens/addtweaks-queue.js), without opening Confirm; a tweak's page
+// above this one adds to this app (addTweaksContext).
 async function renderAddTweaks(body, route, bundleId) {
   const tw = await import("./tweaks.js");
   const appName = tw.addTweaksAppName(bundleId) || names.get(bundleId) || "";
@@ -987,9 +977,11 @@ async function renderAddTweaks(body, route, bundleId) {
   const ph = placeholder("list");
   body.append(bar.el, none, ph);
   loadStyle("myipas.css"); // the price button
-  let made = [], any = [], kept = [], list = null, checking = null;
-  const l = await tw.appTweakRows(bundleId).catch(() => ({ made: [], any: [], rows: [], infoOf: () => null }));
-  ({ made, any } = l);
+  let made = [], any = [], kept = [], list = null;
+  const target = addTweaksContext(route);
+  const queue = target && detectMode() === "sideload" ? (await import("./addtweaks-queue.js")).queueHooks(target) : null;
+  addTweaksPages.set(body, () => reload()); // F401: back from a tweak's page: its row's ADDED
+  ({ made, any } = await tw.appTweakRows(bundleId, { name: appName }).catch(() => ({ made: [], any: [] })));
   const reload = async () => { kept = await tw.savedTweaks(bundleId).catch(() => []); draw(bar.input.value); };
   const decorate = (row, item) => {
     row._.add?.remove();
@@ -997,13 +989,13 @@ async function renderAddTweaks(body, route, bundleId) {
     if (item.file) a.removeAttribute("href"); // from Files: no page of its own
     else a.href = deeper(route, keyedToken(item.id, item.key));
     const b = tw.addTweakButton(item, { bundleId, on: Boolean(item.added), cls: "price-btn tw-row-add", onCls: "added", busyCls: "adding",
-      onChange: reload });
+      onChange: reload, queue });
     buttonZone(row, b);
     row._.add = b;
   };
   const more = tw.moreTweaksGroup({ bundleId, name: appName, onChange: reload });
   const draw = (q) => {
-    if (!body.isConnected && list) { checking?.stop(); return; }
+    if (!body.isConnected && list) return;
     const items = tw.addTweaksItems({ made, any, kept, query: q, appName });
     none.textContent = items.length ? "" : q.trim() ? "No tweaks match your search." : `No tweaks for ${appName || "this app"} in your Tweak Sources yet.`;
     none.hidden = items.length > 0;
@@ -1016,14 +1008,28 @@ async function renderAddTweaks(body, route, bundleId) {
   kept = await tw.savedTweaks(bundleId).catch(() => []);
   draw("");
   bar.onQuery(draw);
-  // the tweaks no index or earlier look has checked: checked here in the background, listed as they pass (F344)
-  if (l.rows?.length) {
-    checking = tw.checkForApp(l.rows, bundleId, { name: appName, onChecked: (r, info) => {
-      if (!info?.ok) return;
-      const next = liteTweaks(l.rows, bundleId, l.infoOf);
-      if (next.made.length !== made.length || next.any.length !== any.length) { ({ made, any } = next); draw(bar.input.value); }
-    } });
-  }
+}
+
+const addTweaksPages = new WeakMap(); // an Add Tweaks page's body -> its reload
+onPageShow((route) => parseToken(route.path.at(-1)).kind === "addtweaks", (route, body) => addTweaksPages.get(body)?.());
+
+// F401: the app whose Add Tweaks page this route is, or stands on (a tweak's page opened from it): { bundleId, name,
+// id, key } for an app's page, { bundleId, name, file } for an IPA's in My IPAs; null when it stands on none.
+export function addTweaksContext(route) {
+  const path = route?.path ?? [];
+  const at = path.map((s) => parseToken(s).kind).lastIndexOf("addtweaks");
+  if (at < 0) return null;
+  const bundleId = parseToken(path[at]).value;
+  const page = at > 0 ? pageOf({ tab: route.tab, path: path.slice(0, at) }) : null;
+  const file = at > 0 ? fileOfToken(path[at - 1]) : null;
+  const of = file ? { file } : page?.page === "package" ? { id: page.value, key: page.key } : {};
+  return { bundleId, name: addTweaksAppName(bundleId) || names.get(of.id) || names.get(bundleId) || bundleId, ...of };
+}
+
+// Add to App on a sideload tweak's page: to that app when it was opened from its Add Tweaks page, else to a picked one.
+async function tapAddToApp(route, st) {
+  const target = addTweaksContext(route);
+  return target ? (await import("./addtweaks-queue.js")).addToThisApp(st, target) : addToApp(st);
 }
 
 // The grey search bar alone (Changes' and Search's look, packages.css), for a list's own filter.
@@ -1292,7 +1298,9 @@ async function renderPackage(body, route, key, id, ctx) {
     // B296: a tweak that can't go into an app (or a library) loses the nav bar's Add to App, which only led to an
     // alert; every check tells it, the one after Sign In / Buy too. The first check's result always comes after
     // rememberPackage below has set the label (no await in between).
-    details.append(worksInGroup(st, { onCheck: (info) => addToAppFollowsCheck(body, info) }).el);
+    const target = addTweaksContext(route); // F401
+    details.append(worksInGroup(st, { onCheck: (info) => addToAppFollowsCheck(body, info), onAdd: () => tapAddToApp(route, st),
+      ...(target ? { apps: () => appsWith(target) } : {}) }).el);
   }
   // F20: price; in the app Sign In, Buy, Install. B11: in the app its state also drives the nav bar button.
   // F308: a paid sideload tweak's Price, Sign In and Buy are in its Add to an App group (worksInGroup) instead.
@@ -1709,7 +1717,7 @@ async function packageActions(route, button) {
   if (!page || !page.body.isConnected) return;
   const { id, pkg, source, history } = page;
   const st = pkg.stanza;
-  if (isSideloadTweak(st)) return addToApp(st); // F302
+  if (isSideloadTweak(st)) return tapAddToApp(route, st); // F302, F401
   const many = (history?.versions.length ?? 0) > 1;
   const actions = [];
   if (st.kind === "ipa" && st.ipa) {
@@ -1845,7 +1853,7 @@ async function signIfReady(app, v, record) {
   // F75: Install goes straight to signAndInstall, which opens the Signing walkthrough at the missing step when the
   // certificate or the server isn't there yet (no sheet first, no alert)
   if (!url || !localSigning()) return false;
-  await signAndInstall({ url, name: app.name, bundleId: app.bundleIdentifier || null, onInstalled: () => record?.() }); // F243: the original-app check
+  await signAndInstall({ url, name: app.name, bundleId: app.bundleIdentifier || null, ...listedOf({ url, version: v?.version, size: v?.size }), onInstalled: () => record?.() }); // F400; F243: the original-app check
   return true;
 }
 

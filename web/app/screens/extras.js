@@ -87,10 +87,11 @@ function bannerRow(banners, { itemSize = { width: 263, height: 148 }, radius = 1
 // The source page: nothing until the file lands (most repos have none), then the strip.
 // B182: only banners whose package the catalog has for this source (core/featured.js bannersInCatalog): the sideload
 // app loads a Tweak Source's injectable tweaks only, so most of Chariz's banners would open "Package not found".
+// B391: nor a tweak its lists leave out (core/catalog.js shows).
 // `get` and `has(id)` are seams for the tests.
 const catalogHas = (key) => async (id) => {
   const { catalog } = await import("../catalog.js"); // late: catalog.js pulls in the parse worker
-  return catalog.package(id, key);
+  return catalog.shows(id, key);
 };
 export function featuredStrip(source, { get = (s) => featuredStore().get(s), has = source ? catalogHas(source.key) : null } = {}) {
   const box = el("div", "featured-box");

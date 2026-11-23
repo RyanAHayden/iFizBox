@@ -58,6 +58,7 @@ enum SignBridge {
         b.on("signing.install") { c in Sideload.install(c) } // F14: with the user's edits, keep-alive and a record
         b.on("signing.cancel") { c in Sideload.cancel(c) } // F196: the progress page's Cancel
         b.on("signing.hold") { c in Sideload.hold(c) } // B252: KeepAlive from Confirm until signing.install answers
+        IPAFetch.sweep() // F400
         Sideload.register(b) // F14: inspect, progress, installed, forget, resignAll, checkCertificate, remind
         MyIPAs.register(b) // F77: library.*, My IPAs under Installed (MyIPAs.swift)
         InstalledApps.register(b) // F374: apps.icon, library.decrypt / addTweaks / share (InstalledApps.swift)
@@ -239,6 +240,7 @@ final class Download: NSObject, URLSessionDownloadDelegate {
     private let progress: (Double) -> Void
     private let done: (String?) -> Void
     var bytes: ((Int64, Int64) -> Void)? // B262: (written, expected; 0 when unknown), each write, for DownloadMeter
+    var answer: (([String: String]) -> Void)? // F400: the final answer's headers (lower-cased), before `done`
     private var finished = false
     private var session: URLSession?
 
@@ -248,9 +250,11 @@ final class Download: NSObject, URLSessionDownloadDelegate {
 
     @discardableResult
     static func start(_ url: URL, to dest: URL, max: Int64, timeout: TimeInterval = 60, progress: @escaping (Double) -> Void,
-                      bytes: ((Int64, Int64) -> Void)? = nil, done: @escaping (String?) -> Void) -> Download {
+                      bytes: ((Int64, Int64) -> Void)? = nil, answer: (([String: String]) -> Void)? = nil,
+                      done: @escaping (String?) -> Void) -> Download {
         let d = Download(dest, max, progress, done)
         d.bytes = bytes
+        d.answer = answer
         let cfg = URLSessionConfiguration.default
         cfg.timeoutIntervalForRequest = timeout
         cfg.timeoutIntervalForResource = 60 * 60
@@ -293,6 +297,7 @@ final class Download: NSObject, URLSessionDownloadDelegate {
         do {
             try? FileManager.default.removeItem(at: dest)
             try FileManager.default.moveItem(at: location, to: dest)
+            answer?(IPAFetch.headers(downloadTask.response))
             finish(nil)
         } catch { finish("network: \(error.localizedDescription)") }
     }

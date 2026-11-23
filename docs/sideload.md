@@ -10,10 +10,19 @@ sideload app reads APT repos as Tweak Sources and lists only the tweaks it can i
 A tweak's page says which apps it works in and has Add to App; Sign Options' Inject Tweaks also takes a tweak from a
 source or your own `.deb`, `.dylib` or zipped `.framework`. ElleKit is bundled for tweaks that link CydiaSubstrate,
 and an app's tweaks are kept for its re-signs. How it's done: docs/signing.md "Tweak injection".
+Which tweaks a list shows (App Tweaks, Search, the sections, a source's own list and count, Add Tweaks and a source's
+featured banners): the Source Filters first; then a verdict, from the shipped Tweak Index or a check kept on this phone,
+decides. With no verdict (a free or paid tweak, or a source the index lacks), a tweak is listed only when its name or
+description mentions an app iFizBox knows or one of your apps. A tweak already in an app is always listed, and one this
+phone found to work stays listed while a newer version has no verdict. The phone does not download tweak `.deb`s in the
+background to check them; opening a tweak or Add to App checks that one `.deb`.
 A new install starts with app-tweak sources only: GitHub repos whose releases carry the tweak's `.deb` (YTLite,
 YTMusicUltimate, SCInsta; `web/app/tweak-sources.json` entries with `github` and `"inject": true`). The Sources tab
 leaves out a Tweak Source the Tweak Index has fully checked with no tweak for the user's apps (or for any app);
 searching and Manage still list it.
+The Tweak Index is read from the copy shipped with the app (`web/app/tweak-index.json`, written at each release, see
+docs/release.md), so it works offline. A newer copy is fetched in the background (Settings > General > Update Tweak
+Index); no request says which sources the phone has.
 
 The notes on the other projects come from their source, not from runs on a phone. Sources, at these commits:
 
@@ -283,7 +292,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   `networkextension` entitlement); when the app's embedded profile lacks `packet-tunnel-provider`, This iPhone keeps
   using LocalDevVPN or Tailscale. `IDevice.Session` turns the VPN on just before it connects to iOS (`LocalVPN.begin`,
   saving the configuration the first time: iOS asks to allow it) and off 3 seconds after the last connection ends,
-  so a queue of installs or a reconnect finds it on. The configuration is never On Demand and never removed: it
+  so a queue of installs or a reconnect finds it on. A queue holds through an install's reconnects, however long the pauses between them (`installBegan` and `installEnded` in `IDevice.install`). The configuration is never On Demand and never removed: it
   stays in Settings > VPN, only connected during installs, so iOS's "Add VPN Configurations" Allow comes once.
   Setting up asks it: right after pairing (or importing a pairing file), the pairing page runs the same test as
   Test Connection (`vpn.test`) before it says Paired. iOS runs one VPN at a time, so the user's own VPN pauses for
@@ -303,6 +312,8 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   runs by name), Set Up's row and the Install Switch page show Update. The app uses a trip only
   when the check run `{"check":1,"actions":1}` reached Wait for Install (`vpn.status`'s `shortcuts.trip`; `trips` says
   this build can: iOS 16+ and the bundle ID `com.ryha.ifizbox`). That check is also when iOS asks its one-time Allow.
+  An Install Switch that can also bring back an idle VPN (`shortcuts.idle`) reaches Wait for Install twice with the
+  check run `{"check":1,"actions":1,"selected":1}`; an older one shows Update.
   Otherwise (an older Install Switch, iOS 15, a renamed app, Allow denied) the start, dataOff and end runs below stay as
   they are. A trip is one run with `{"trip":1}`, plus `"cellular":1` on cellular: it remembers the VPN that is on, runs
   Connect VPN (the app's own action, in the background; an error ends the run before data goes off), turns Cellular Data
@@ -318,17 +329,43 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   second wait follow, then the remembered VPN is set back. The trip's end keeps the remembered VPN: it isn't forgotten
   before Set VPN, and the next start replaces it. The app waits for that (up to 50 seconds) before a new connect. What
   the run took out is kept in UserDefaults (`ifizbox.vpn.switch.pending`) until it is back, so after the app is killed
-  (self-update included) the next launch runs the end. If things aren't back 25 seconds after the queue (or 10 seconds
+  (self-update included) the next launch runs the end, unless an end already opened Shortcuts. If things aren't back 25 seconds after the queue (or 10 seconds
   after the waits ran out, whichever comes first), the app runs the separate `{"end":1}` run described below as a retry,
   once the app is in front. The rules for when a start or an end is needed are unchanged.
   `vpn.testSwitch` does one trip when ready.
-  The first connect of a queue of installs runs it only on cellular, or when another VPN is up (only the Shortcut's
+  Shortcuts opens are capped per queue (`SwitchOpens`, native/sign/SwitchOpens.swift, tested on Linux). A queue takes
+  one trip and then its end, or an older Install Switch's start, dataOff and end, each once; after a failed run,
+  nothing but the end. A failed start or trip rests the queue's starts for 5 minutes, except an older Install Switch's
+  trip that it ignored (the next app of a run is often a queue of its own); a passed check or a tapped Test Install
+  Switch ends the rest. When Shortcuts can't find the Shortcut ("could not find the shortcut"), no end is opened at
+  all. The end runs once: an end that opened Shortcuts isn't tried again at the next launch; one that never opened it waits until the app is in front again. A VPN or cellular data still off after it rests the starts too.
+  A run that failed on Wi-Fi doesn't stop the install: it goes on, and the built-in VPN connects by itself. On cellular
+  the install stops with `switch_failed` before this VPN starts, because iOS refuses the connect while cellular data
+  is on and nothing else would turn it off. The same happens on either network when this VPN then fails to start after
+  a failed run. The install's alert, and a queue run's once, offers Cancel, Update (the Install Switch page's row) and
+  Use the Signing Server.
+  What stays off is said in words. After a queue's end, the VPN's address and cellular data are checked for up to 8 s;
+  whatever is still off is kept in `ifizbox.vpn.lost` until it is said (so a relaunch after a killed app says it too),
+  and `vpn.leftOff` answers `{vpn, cellular}` once something stayed off (kept in `ifizbox.vpn.leftOff` until the page
+  takes it). The page's `watchLeftOff` (`web/app/incoming.js`) shows the alert, "Your VPN Is Off", "Cellular Data Is
+  Off" or "Data and VPN Are Off", and asks again, so the next one waits.
+  A VPN selected in Settings > VPN counts as another VPN even when it has no tunnel address, as an idle VPN has none:
+  iOS tells an app nothing of another app's VPN, so the app reads its own saved configuration instead, which is not
+  enabled while another VPN is selected (`LocalVPN.otherVPNSelected`, `vpn.status`'s `otherVPNSelected`; false with no
+  saved configuration of ours). The run's input then carries `"selected":1`. With no VPN connected, the Shortcut finds
+  the idle VPN with Connect On Demand on (Find VPNs, limit 1), stores it, and at the end runs Set VPN > Set On Demand
+  on it, which selects it without connecting, so the user's rules still decide. A selected VPN that is off without On
+  Demand isn't turned on. When the trip stored no idle VPN, it ends with one more Wait for Install (a 46th, after the
+  45), which tells the app there is nothing more to put back, so it runs no second trip. Without that signal, and with
+  the VPN not back, the end runs as a retry. With an older Install Switch (`shortcuts.idle` false), the app stops
+  waiting after 9 seconds (`nothingLimit`) and runs no end.
+  The first connect of a queue of installs runs it only on cellular, or when another VPN is up or selected (only the
+  Shortcut's
   Set VPN can bring that one back). On Wi-Fi with no other VPN, the app connects and disconnects the built-in VPN by
   itself, and Shortcuts never opens. When it runs, it goes through `shortcuts://x-callback-url/run-shortcut` (Shortcuts
   comes back to `ifizbox://vpn-shortcut`) with the input `{"start":1}`: it stores the VPN connected now (Get Current
   VPN, as "previous VPN") and connects the built-in VPN (found with Find VPNs by its server address, 10.7.0.1) with
-  Set VPN, which iOS runs without a prompt. The app then connects its tunnel as before. A start that didn't run, or
-  whose Set VPN ended with NEVPNErrorDomain error 2, is not fatal: on the iPhone 15 Pro (iOS 27) Set VPN often ends
+  Set VPN, which iOS runs without a prompt. The app then connects its tunnel as before. A start whose Set VPN ended with NEVPNErrorDomain error 2 is not fatal, and one that didn't run is not fatal on Wi-Fi (see the failed run below): on the iPhone 15 Pro (iOS 27) Set VPN often ends
   with error 2 while iOS is still enabling the configuration, and the app's own connect covers it. On cellular, once
   the built-in VPN is connected, the app runs the Install Switch again with `{"dataOff":1}`: Cellular Data Off. A trip
   whose Connect VPN began and didn't fail turns data off in the Shortcut itself (before Open), so this run is skipped
@@ -342,26 +379,25 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   Tailscale back) disables ours silently, and a start on the old copy gives no error and never connects. After
   the last connect, once the VPN goes off and the queue is over (the 3 second linger has passed, so a queue shares one
   start and one end), the end runs only when the start ran and there is something to put back: cellular data that the
-  run turned off and that isn't on again, or another VPN that was up before the start and isn't up again (its
-  address isn't back). It runs
+  run turned off and that isn't on again, or another VPN, or an idle one, that was up or selected before the start and
+  isn't up again (its address isn't back). It runs
   with `{"end":1}`, plus `"cellular":1` only when Cellular Data Off ran: cellular data goes back on, then the stored VPN
   (Tailscale, say) connects and is forgotten. Shortcuts opens only from the front, so an end due while the app is in
-  the background waits until the app is next in front; with nothing to put back, the end doesn't open Shortcuts at all. The
-  automatic check that Installation & Signing's pages run after a failure is skipped while a connect would run the
-  Install Switch (it is added, and cellular or another VPN is up), so returning to a page can't open Shortcuts; a
-  tapped Check Connection still runs it. The Shortcut reads its input as a dictionary and tests its flags with "has any
+  the background waits until the app is next in front; with nothing to put back, the end doesn't open Shortcuts at all, and nor does one after Shortcuts couldn't find the Shortcut. The
+  automatic check that Installation & Signing's pages run after a failure asks `idevice.verify` with `{"quiet":true}`. The page skips it while a connect would run the Install Switch (it is added, and cellular or another VPN is up or selected), and the shell answers `switch_needed` instead of opening Shortcuts, so returning to a page can't open Shortcuts; a tapped Check Connection still runs it. The Shortcut reads its input as a dictionary and tests its flags with "has any
   value". Without the Install Switch the built-in VPN connects by itself and the user's VPN stays off after. Phones
   that added the two older Shortcuts, "Cellular Data Off" and "Cellular Data On", still run them (data off before
   the connect, on once connected), but Set Up no longer offers them. The app asks for the Install Switch only when a
   connect would need it and it isn't added (`switchWanted` in `web/app/core/installroute.js`, the same rule as
   `LocalVPN.switchNeeded`): on cellular without the Install Switch (or without both Cellular Shortcuts), or with another
-  VPN up (`vpn.status`'s `otherVPN`) without it. On cellular, an install that starts without it asks first (Use Server or
+  VPN up or selected (`vpn.status`'s `otherVPN`, `otherVPNSelected`) without it. On cellular, an install that starts without it asks first (Use Server or
   Set Up), and Home's status slot and Installation & Signing's status cell say Add the Install Switch. On Wi-Fi with no
   other VPN nothing asks, and Set Up's footer says Set up. With another VPN on, the install alert "Your VPN Stays Off"
   offers Install (it goes on through This iPhone) or Set Up; iPhone's Refused and Couldn't Connect messages mention the
-  Install Switch only then. Bridge calls: `vpn.status` (also `idevice.status`'s `vpn`; its `shortcuts` is
-  `{off, on, switch, trip}`), `vpn.test`, `vpn.testSwitch` (one trip when ready; otherwise runs start, waits for the VPN,
-  runs dataOff on cellular, then end; answers `{ok, start, end, cellular, wentOff, vpnOn}`), `vpn.checkShortcut`, `vpn.openShortcuts` (takes the optional `link` above).
+  Install Switch only then. With an idle VPN selected but not connected and no Install Switch, the alert is "Your VPN
+  May Stay Off" (`vpnIdle`), worded with "if" because iOS doesn't say whether the VPN connects on demand. Bridge calls: `vpn.status` (also `idevice.status`'s `vpn`; its `shortcuts` is
+  `{off, on, switch, trip, idle}`; `otherVPNSelected` is there too), `vpn.test`, `vpn.testSwitch` (one trip when ready; otherwise runs start, waits for the VPN,
+  runs dataOff on cellular, then end; answers `{ok, start, end, cellular, wentOff, vpnOn}`), `vpn.checkShortcut` (`{which}`: at most two runs, see above), `vpn.openShortcuts` (takes the optional `link` above), `vpn.leftOff` (`{vpn, cellular}`, see above).
 - **This iPhone over Tailscale** (`native/sideload/tailscale/`, its README): for Tailscale users, who can't run
   LocalDevVPN at the same time. The sideload app embeds tsnet (tailscale.com, BSD-3-Clause, a Go c-archive built on
   Linux with a pinned Go; not in the jailbreak executable) and joins the tailnet as its own device ("iFizBox on

@@ -121,6 +121,7 @@ test("Lite: App Tweaks Only drops rootful-only tweaks from a Tweak Source; the s
   );
   const c = createCatalog();
   c.setDevice({ ios: "17.0", jailbreak: "none" });
+  c.setTweakKnown({ worked: ["com.x.yt", "com.x.ig", "com.x.sb", "com.bb.t"] }); // B391: checked here, they work
   c.setFilters({}, { lite: true });
   c.load(OTHER, tweaks, "https://repo.example/", "iphoneos-arm64", { tweaks: true });
   assert.deepEqual(ids(c.list(ALL, APP_TWEAKS)), ["com.x.ig", "com.x.yt"]);

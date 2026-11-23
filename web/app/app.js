@@ -38,7 +38,7 @@ import { showReloadBar } from "./nav/reloadbar.js";
 import { catalog } from "./catalog.js";
 import { createUpgradeNotices } from "./settings.js";
 import { createPrefsMirror } from "./settings.js";
-import { keepRoute } from "./core/installroute.js"; // B218
+import { keepRoute, ROUTE_KEY } from "./core/installroute.js"; // B218
 import { nativeBridge } from "./native.js";
 import { NAME } from "./brand.js";
 import { takeInstallParam, askFromInstallLink, launchRefresh } from "./websign-gate.js";
@@ -571,6 +571,7 @@ if (nativeBridge()) {
 }
 upgradeNotices.start();
 createPrefsMirror({ settings: settingsScreen.settings }).start(); // F70: N7's settings to the daemon
+if (settingsScreen.settings.isShown(ROUTE_KEY)) import("./incoming.js").then((m) => m.watchLeftOff()).catch(() => {}); // B395 (sideload)
 keepRoute({ settings: settingsScreen.settings, native: nativeBridge() }); // B218: Install Apps With kept in the Keychain (sideload)
 if (addFrom) requestAnimationFrame(() => load("manage").then((m) => m.addSource({ showHUD: ctx.showHUD, fromLink: true }, addFrom)).catch(() => {}));
 
@@ -583,6 +584,9 @@ const refreshSetting = () => settingsScreen.settings.isShown("refreshOnLaunch") 
 const refreshAtOpen = () => launchRefresh({ mode: detectMode(), settingOn: refreshSetting,
   background: () => loadTabs(["sources"]).then(() => loaded("sources").refreshInBackground?.(ctx)).catch(() => {}) });
 refreshAtOpen();
+// B399: an update alert was tapped (Notifications.swift): what it told of is newer than the last refresh, whatever the
+// setting says. A refresh already running (the launch's) is the one.
+addEventListener("ifizbox:update-alert", () => loadTabs(["sources"]).then(() => loaded("sources").refreshInBackground?.(ctx)).catch(() => {}));
 
 // F313: once the first page is up, the other tabs (their init: Changes' badge), queue.js and ipa-install.js's
 // listeners, then every other lazily loaded module, in the background, so a later tap never waits for one. After a

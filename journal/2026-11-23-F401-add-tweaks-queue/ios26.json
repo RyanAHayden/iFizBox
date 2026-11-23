@@ -1,0 +1,105 @@
+[
+ {
+  "wait": 1500
+ },
+ {
+  "eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.tweakInfo', JSON.stringify({'com.example.fixture@1.0': {ok: true, bundles: ['com.me.fixture']}})); import('./settings-store.js').then(m=>{ (m.settings??m.default).set('style', \"ios26\"); return 'ok'},e=>'err '+e.message)"
+ },
+ {
+  "nav": "#/sources",
+  "ms": 5000
+ },
+ {
+  "eval": "import('./backend.js').then(m=>m.getBackend().addSource('http://127.0.0.1:8861/')).then(r=>'added', e=>'err '+e.message)"
+ },
+ {
+  "nav": "#/installed/myipas",
+  "ms": 6000
+ },
+ {
+  "eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); document.documentElement.dataset.style"
+ },
+ {
+  "tap": "text:Delta",
+  "ms": 3000
+ },
+ {
+  "tap": "text:Add Tweaks",
+  "ms": 3500
+ },
+ {
+  "tap": ".tw-row-add",
+  "ms": 3000
+ },
+ {
+  "eval": "'badge: ' + [...document.querySelectorAll('#tabbar .badge')].map(b=>b.textContent+(b.hidden?'(hidden)':'')).join('|') + ' | sheets: ' + document.querySelectorAll('.confirm-sheet').length + ' | ' + document.querySelector('.page.is-top')?.innerText.slice(0,260)"
+ },
+ {
+  "shot": "ios26-1-added"
+ },
+ {
+  "tap": "text:Fixture Tweak",
+  "ms": 3500
+ },
+ {
+  "eval": "document.querySelector('.nav-item.is-top')?.innerText + '|' + document.querySelector('.page.is-top .tweak-works')?.innerText"
+ },
+ {
+  "tap": "text:Add to App\u2026",
+  "ms": 2500
+ },
+ {
+  "eval": "'confirm: ' + document.querySelector('.confirm-sheet')?.innerText"
+ },
+ {
+  "shot": "ios26-2-confirm"
+ },
+ {
+  "eval": "import('./app-queue.js').then(m=>JSON.stringify(m.appQueue.list()))"
+ },
+ {
+  "clicktext": "Continue Queuing",
+  "ms": 1500
+ },
+ {
+  "eval": "import('./app-queue.js').then(m=>{m.appQueue.clearAll(); return import('./screens/tweaks.js')}).then(t=>t.saveTweaks('com.me.fixture',[])).then(()=>'cleared')"
+ },
+ {
+  "tap": ".nav-item.is-top .nav-right .bar-button",
+  "ms": 3000
+ },
+ {
+  "eval": "'confirm: ' + document.querySelector('.confirm-sheet')?.innerText"
+ },
+ {
+  "clicktext": "Continue Queuing",
+  "ms": 1500
+ },
+ {
+  "swipe": true,
+  "ms": 2500
+ },
+ {
+  "eval": "'badge: ' + [...document.querySelectorAll('#tabbar .badge')].map(b=>b.textContent+(b.hidden?'(hidden)':'')).join('|') + ' | sheets: ' + document.querySelectorAll('.confirm-sheet').length + ' | ' + document.querySelector('.page.is-top')?.innerText.slice(0,260)"
+ },
+ {
+  "shot": "ios26-3-back"
+ },
+ {
+  "tap": ".tw-row-add",
+  "ms": 1500
+ },
+ {
+  "eval": "document.querySelector('.action-sheet,[role=dialog]')?.innerText ?? [...document.body.children].map(e=>e.className+':'+(e.innerText??'').slice(0,80)).join(' ## ')"
+ },
+ {
+  "shot": "ios26-4-remove"
+ },
+ {
+  "clicktext": "Remove",
+  "ms": 2500
+ },
+ {
+  "eval": "'badge: ' + [...document.querySelectorAll('#tabbar .badge')].map(b=>b.textContent+(b.hidden?'(hidden)':'')).join('|') + ' | sheets: ' + document.querySelectorAll('.confirm-sheet').length + ' | ' + document.querySelector('.page.is-top')?.innerText.slice(0,260)"
+ }
+]

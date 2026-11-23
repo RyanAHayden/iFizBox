@@ -64,9 +64,17 @@
 //                                             merged into what is kept, and apps whose candidate is one of them are
 //                                             judged with it (the source's own range wins, unless the IPA's own
 //                                             MinimumOSVersion is higher: ipainfo.js ipaRaises). Returns how many are kept
-//   c.setTweakVerdicts(map)                -> B377: { "id@version": true|false }, merged: true drops that Tweak Source
-//                                             tweak (for iOS itself, or refused) from App Tweaks, Search, Sections'
-//                                             counts and its source's list; false brings it back. -> how many dropped
+//   c.setTweakVerdicts(map)                -> B377: { "id@version": true|false|null }, merged: true drops that Tweak
+//                                             Source tweak (for iOS itself, or refused) from App Tweaks, Search,
+//                                             Sections' counts and its source's list; false (it works) lists it; null
+//                                             takes the verdict back. -> how many dropped. B391: one with no verdict is
+//                                             listed only when its name or description mentions a known app or one of
+//                                             the user's
+//   c.setTweakKnown({ apps, held, worked }) -> B391: the user's apps { bundleId: name }, the package ids an app already
+//                                             has (always listed) and those this phone found to work (listed while
+//                                             their version has no verdict of its own)
+//   c.shows(id, key)                       -> whether a Tweak Source's list has it (its banner shows then); any other
+//                                             source: whether it has the package
 //
 // A row is the slim record lists draw: { id, name, short, version, section, icon, key, author, compat, purpose }.
 import { parseControl, description, resolveFilename, resolveIcon, matchesArch, compareVersions, DEFAULT_ARCH, parseRelations } from "./apt.js";
@@ -77,7 +85,7 @@ import { depIndex, explain, explainApt } from "./deps.js";
 import { withIpaInfo } from "./ipainfo.js";
 import { needsRestart } from "./queue.js";
 import { packageKind } from "./progress.js";
-import { injectableFromFields } from "./tweakfields.js"; // F302; C32: not tweaks.js, which pulls unpack.js in
+import { injectableFromFields, hintMatcher } from "./tweakfields.js"; // F302; C32: not tweaks.js, which pulls unpack.js in
 import { NO_SECTION, sectionName, simpleSection, parseAuthor, compareNames, SECTION_GROUPS, sectionGroup, APP_TWEAKS } from "./sections.js";
 import { normalizeFilters, resolveFilters, filterOn, ALL_SOURCES, isOldPackage, isUnknownIos, isAppTweak } from "./sourcefilters.js"; // F382
 
@@ -126,7 +134,9 @@ function makeRow(st, key) {
 // F126: Cydia's primaryPurpose (the first purpose:: tag), for the corner badge (core/sectionicons.js).
 const purposeOf = (st) => tagsOf(st).find((t) => t.startsWith("purpose::"))?.slice(9) || null;
 
-const slim = ({ id, name, short, version, section, icon, key, author, compat, paid, kind, purpose }) => ({ id, name, short, version, section, icon, key, author, compat, paid, kind, purpose });
+// `guess` (B391): the apps a Tweak Source's tweak with no verdict mentions, there only when it mentions one.
+const slim = ({ id, name, short, version, section, icon, key, author, compat, paid, kind, purpose, _guess }) => ({ id, name, short, version, section, icon, key, author, compat, paid, kind, purpose,
+  ...(_guess?.length ? { guess: _guess } : {}) });
 
 // A section filter value -> a row test: "group:Tweaks" (sectionGroup), a section's name, or null/"*" for any.
 function sectionTest(section) {
@@ -489,23 +499,46 @@ export function createCatalog() {
     return filterStore ? Object.keys(filterStore).length : 0;
   }
   // B377: the Tweak Index's (or this device's) verdicts: "id@version" -> true when that tweak can't go into an app
-  // (systemOnly, or refused: core/tweakindex.js dropsFromCatalog). A Tweak Source's row with such a verdict drops out
-  // of App Tweaks, Search, Sections' counts and its source's list; unchecked rows stay. package() still opens it.
-  const systemTweaks = new Set();
-  const systemTweak = (r) => systemTweaks.size > 0 && tweakKeys.has(r.key) && systemTweaks.has(`${r.id}@${r.version}`);
+  // (systemOnly, or refused: core/tweakindex.js dropsFromCatalog), false when it can. B391: a Tweak Source's row is
+  // listed (App Tweaks, Search, Sections' counts, its source's list) by its verdict; with none, only when its name or
+  // description mentions a known app or one of the user's, or this phone found it to work. One an app already has is
+  // always listed. Nothing is downloaded to find out. package() still opens what isn't listed.
+  const tweakVerdicts = new Map();
+  let tweakKnown = { apps: {}, held: new Set(), worked: new Set() };
+  let mentions = hintMatcher();
+  function systemTweak(r) {
+    if (!tweakKeys.has(r.key)) return false;
+    const drop = tweakVerdicts.get(`${r.id}@${r.version}`);
+    if (drop !== undefined) {
+      r._guess = undefined;
+      return drop && !tweakKnown.held.has(r.id);
+    }
+    r._guess ??= mentions({ name: r.name, description: sources.get(r.key)?.byId.get(r.id)?.stanza.description });
+    return !r._guess.length && !tweakKnown.worked.has(r.id) && !tweakKnown.held.has(r.id);
+  }
+  function tweaksChanged() {
+    filterGen++;
+    sorted.clear();
+    shown.clear();
+    fitting.clear();
+  }
   function setTweakVerdicts(map) {
     let changed = false;
     for (const [k, drop] of Object.entries(map && typeof map === "object" ? map : {})) {
-      if (drop === true && !systemTweaks.has(k)) { systemTweaks.add(k); changed = true; }
-      else if (drop === false && systemTweaks.delete(k)) changed = true;
+      if (typeof drop === "boolean") {
+        if (tweakVerdicts.get(k) !== drop) { tweakVerdicts.set(k, drop); changed = true; }
+      } else if (drop === null && tweakVerdicts.delete(k)) changed = true;
     }
-    if (changed) {
-      filterGen++;
-      sorted.clear();
-      shown.clear();
-      fitting.clear();
-    }
-    return systemTweaks.size;
+    if (changed) tweaksChanged();
+    let dropped = 0;
+    for (const drop of tweakVerdicts.values()) if (drop) dropped++;
+    return dropped;
+  }
+  function setTweakKnown({ apps = {}, held = [], worked = [] } = {}) {
+    tweakKnown = { apps: apps ?? {}, held: new Set(held), worked: new Set(worked) };
+    mentions = hintMatcher(tweakKnown.apps);
+    for (const k of tweakKeys) for (const e of sources.get(k)?.byId.values() ?? []) e.row._guess = undefined;
+    tweaksChanged();
   }
   // F382: the newest version of each id across the counted sources, unfiltered rows only (Newest Copy Only), and All
   // Sources' merge without filtered rows (an id whose newest copy is filtered out falls back to the next one).
@@ -518,7 +551,7 @@ export function createCatalog() {
     for (const [k, { byId }] of sources) {
       if (!counts(k)) continue;
       for (const [id, e] of byId) {
-        if (filteredOut(e.row) || !listed(e.row)) continue;
+        if (filteredOut(e.row) || systemTweak(e.row) || !listed(e.row)) continue;
         const v = newestCopy.get(id);
         if (v == null || compareVersions(v, e.stanza.version) < 0) newestCopy.set(id, e.stanza.version);
         if (!inAll(k)) continue;
@@ -884,6 +917,11 @@ export function createCatalog() {
     return { stanza: e.stanza, key: e.row.key, row: slim(e.row), others };
   }
 
+  // B391: what a source's featured banners may show (screens/extras.js): a hidden tweak's banner stays away too.
+  function shows(id, key) {
+    return tweakKeys.has(key) ? visibleOf(key).some((r) => r.id === id) : Boolean(pkg(id, key));
+  }
+
   // Version History (F29): every version of `id` on offer. APT: each version any source carries (the candidate
   // and the older ones a Packages file also lists), merged by version (aptVersionList); AltStore: every versions[]
   // entry of the app in the source of the page (altVersionList). Null when the package isn't in the catalog.
@@ -940,7 +978,7 @@ export function createCatalog() {
       const id = ref?.id;
       if (typeof id !== "string" || seen.has(id)) continue;
       const e = (ref.key !== ALL && counts(ref.key) && sources.get(ref.key)?.byId.get(id)) || entries(ALL).get(id);
-      if (!e || isHidden(e.row) || !listed(e.row) || misfit(e.row) || filteredOut(e.row)) continue;
+      if (!e || isHidden(e.row) || !listed(e.row) || misfit(e.row) || filteredOut(e.row) || systemTweak(e.row)) continue;
       seen.add(id);
       out.push(slim(e.row));
     }
@@ -1099,7 +1137,7 @@ export function createCatalog() {
 
   return { load, loadAlt, altSource, remove, setHidden, setHiddenAuthors, setBlocked, sections, list, search, author, package: pkg, history, has, versions, keys: () => [...sources.keys()],
     categories, browse, popular, free, featured, collection: collectionRows, roulette,
-    setInstalled, installed, upgrades, setDevice, setIpaInfo, setFilters, setTweakVerdicts,
+    setInstalled, installed, upgrades, setDevice, setIpaInfo, setFilters, setTweakVerdicts, setTweakKnown, shows,
     deps, aptProblems, queueInfo, runInfo };
 }
 
@@ -1115,7 +1153,7 @@ export function runCatalog(catalog, op, args = []) {
     search: catalog.search, author: catalog.author, package: catalog.package, history: catalog.history, has: catalog.has, keys: catalog.keys,
     versions: catalog.versions, setHidden: catalog.setHidden, setHiddenAuthors: catalog.setHiddenAuthors, setBlocked: catalog.setBlocked, setInstalled: catalog.setInstalled,
     installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice, setIpaInfo: catalog.setIpaInfo, setFilters: catalog.setFilters,
-    setTweakVerdicts: catalog.setTweakVerdicts,
+    setTweakVerdicts: catalog.setTweakVerdicts, setTweakKnown: catalog.setTweakKnown, shows: catalog.shows,
     categories: catalog.categories, browse: catalog.browse, popular: catalog.popular, free: catalog.free, featured: catalog.featured,
     collection: catalog.collection, roulette: catalog.roulette,
     deps: catalog.deps, aptProblems: catalog.aptProblems, queueInfo: catalog.queueInfo, runInfo: catalog.runInfo }[op];

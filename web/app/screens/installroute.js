@@ -271,7 +271,7 @@ export function shortcutGroups(st, { add = () => {}, test = () => {}, testing = 
   const f = failed[k];
   const groups = [{ rows: [row], ...(!sc[k] && f && checking !== k
     ? { footer: f.open ? shortcutDidntOpen(k, f.open) : shortcutDidntRun(k, f), warn: true }
-    : switchOld(st) ? { footer: "To open Shortcuts once per install, delete Install Switch in Shortcuts, then tap Update." }
+    : switchOld(st) ? { footer: `To ${sc.trip ? "get an idle VPN back" : "open Shortcuts once per install"}, delete Install Switch in Shortcuts, then tap Update.` } // F389: idle
     : { footer: `${sc[k] ? "" : direct ? "Add opens Shortcuts: tap Add Shortcut, and come back. " : "Tap Shortcuts, then Add Shortcut, and come back. "}It opens Shortcuts only when needed: on cellular, to turn data off and on, or to bring back your VPN.` }) }];
   // F392: the share sheet is the way left when Shortcuts doesn't open from Add or Update
   if (direct && !reading && checking !== k && (!sc[k] || switchOld(st))) groups.push({ rows: [{ label: SHARE_SHORTCUT, icon: rowIcon("share"), onClick: () => add(k, "share"), chevron: true }],
@@ -333,24 +333,30 @@ export function backInApp(doc = globalThis.document, { leaveMs = 4000, limit = 1
     t = setTimeout(() => (left ? end(false) : end(true)), left ? limit : leaveMs);
   });
 }
-// vpn.checkShortcut: up to four runs through Shortcuts and back with 9.5 s of waits between; a run that times out
-// (native shortcutLimit, 25 s) isn't tried again, so the worst case stays well inside this
+// vpn.checkShortcut: two runs through Shortcuts and back at most (B395, the shell's SwitchOpens.checkLimit) with 5 s
+// between; a run that times out (native shortcutLimit, 25 s) isn't tried again, so the worst case stays well inside this
 export const CHECK_MS = 100000;
 
 // B359: Add on the Install Switch. vpn.openShortcuts opens our Shortcut in Shortcuts by its iCloud link (F392, core
 // SHORTCUT_LINKS), or shares our signed file (no link, or `via` "share"); Shortcuts never says it was added,
 // so once the user is back the app runs it (vpn.checkShortcut, input "check": it does nothing) and only a run that
 // passed marks it added. `checking(true)` while it runs. Answers {opened, ok, error, status} (status: vpn.status).
+let shortcutRunning = null; // B395: the Shortcut whose check runs: coming back redraws the page, and a tap there starts no second one
 export async function addShortcut(native, k, { whenBack = backInApp, checking = () => {}, via = "shortcuts", link = SHORTCUT_LINKS[k] } = {}) {
+  if (shortcutRunning) return { opened: false, ok: false, error: null };
   let o;
   const params = { which: k, url: shortcutFileURL(k), ...(via !== "share" && link ? { link } : {}) };
   try { o = await call(native, "vpn.openShortcuts", params); } catch (e) { return { opened: false, ok: false, error: e?.message || "Shortcuts didn't open" }; }
   if (!o?.opened) return { opened: false, ok: false, error: null }; // the share sheet was closed: nothing to say
   if (await whenBack() === false) return { opened: true, ok: false, error: null }; // still away: the row stays Add
+  if (shortcutRunning) return { opened: true, ok: false, error: null };
+  shortcutRunning = k;
   checking(true);
   let r;
   try { r = await within(call(native, "vpn.checkShortcut", { which: k }), CHECK_MS); } catch (e) { r = { ok: false, error: e?.message }; }
+  shortcutRunning = null;
   checking(false);
+  if (r?.ok && routeFailure()?.fix === "shortcuts") clearRouteFailure(); // B395: Update was its fix
   return { opened: true, ok: Boolean(r?.ok), error: r?.ok ? null : (r?.error || "it didn't run"), status: r?.status ?? null };
 }
 
@@ -373,16 +379,21 @@ export async function addSwitch(native, alert, { whenBack = backInApp, checking 
 // An Add that failed: why, and Share File, the share sheet, as the way left when Shortcuts didn't take it.
 const addFailedAlert = (k, r) => ({ title: "Shortcut Not Added", buttons: ["Cancel", "Share File"], cancel: 0,
   message: r.opened ? shortcutDidntRun(k, r.error) : shortcutDidntOpen(k, r.error) });
+let shortcutsShown = null; // B395: the page's latest drawing (a check's hop to Shortcuts redraws it): its { paint, set }
 async function drawShortcuts(box, { native, alert, whenBack = backInApp }) {
   let st = lastStatus?.vpn ?? null;
-  let reading = !st, checking = null;
+  let reading = !st;
+  const live = { paint: () => paint(), set: (v) => { st = v; } };
+  shortcutsShown = live;
+  const repaint = () => (shortcutsShown ?? live).paint();
   const add = async (k, via = "shortcuts") => {
-    if (checking) return;
-    const r = await addShortcut(native, k, { whenBack, via, checking: (on) => { checking = on ? k : null; paint(); } });
+    if (shortcutRunning || shortcutsTesting) return;
+    const r = await addShortcut(native, k, { whenBack, via, checking: repaint });
     if (r.opened || r.error) shortcutsFailed[k] = r.ok ? null : r.opened ? r.error : { open: r.error };
     st = r.status ?? { ...(st ?? {}), shortcuts: { ...(st?.shortcuts ?? {}), [k]: r.ok ? true : Boolean(st?.shortcuts?.[k]) } };
     if (lastStatus) lastStatus = { ...lastStatus, vpn: { ...(lastStatus.vpn ?? {}), ...st } };
-    paint();
+    shortcutsShown?.set(st);
+    repaint();
     if (!r.ok && r.error) { // F392: as Set Up's Add (addSwitch)
       const { index } = await alert(addFailedAlert(k, r)) || {};
       if (index === 1) return add(k, "share");
@@ -390,17 +401,17 @@ async function drawShortcuts(box, { native, alert, whenBack = backInApp }) {
   };
   const paint = () => {
     const groups = shortcutGroups(st, {
-      reading, testing: shortcutsTesting, checking, failed: shortcutsFailed,
+      reading, testing: shortcutsTesting, checking: shortcutRunning, failed: shortcutsFailed,
       add,
       test: async () => {
-        if (shortcutsTesting) return;
-        shortcutsTesting = true; paint();
+        if (shortcutsTesting || shortcutRunning) return;
+        shortcutsTesting = true; repaint();
         let r = null;
         // F386: two runs through Shortcuts (25 s each at most) and up to 10 s for the VPN between
         try { r = await within(call(native, "vpn.testSwitch"), SWITCH_TEST_MS); } catch (e) { r = { ok: false, start: { ok: false, error: e?.message } }; }
         shortcutsTesting = false;
-        try { st = await call(native, "vpn.status"); } catch { /* keeps the last */ }
-        paint();
+        try { st = await call(native, "vpn.status"); shortcutsShown?.set(st); } catch { /* keeps the last */ }
+        repaint();
         const why = switchTestResult(r);
         await alert({ title: why.title, message: why.message, buttons: ["OK"] });
       },
@@ -1438,12 +1449,13 @@ async function checkOnce(native, alert, redraw, store, mark = null, { quiet = fa
     // (tapped) still does.
     if (quiet && switchWouldRun(st)) { stop(); return undefined; }
     if (st && !vpnOn(st)) { stop(); throw Object.assign(new Error("connect_failed: neither LocalDevVPN nor Tailscale is on"), { code: "connect_failed" }); }
-    try { await within(call(native, "idevice.verify"), TIMEOUTS.verify); } finally { stop(); }
+    try { await within(call(native, "idevice.verify", ...(quiet ? [{ quiet: true }] : [])), TIMEOUTS.verify); } finally { stop(); }
     clearRouteFailure(); // B316
     if (store.get(ROUTE_KEY) !== "iphone") store.set(ROUTE_KEY, "iphone"); // a set redraws Settings' pages, and the mark with them
     mark?.show(true);
     if (quiet) redraw();
   } catch (e) {
+    if (quiet && (e?.code ?? String(e?.message ?? e).split(":")[0]) === "switch_needed") return undefined; // B395: it would open Shortcuts
     const why = isLate(e)
       ? { title: NOT_RESPONDING, message: `This iPhone didn't answer in ${TIMEOUTS.verify / 1000} seconds. Check that ${st ? verifyVPN(st) : `${VPN} (or Tailscale)`} is on, then check again.`, again: false }
       : verifyFailure(e, st);

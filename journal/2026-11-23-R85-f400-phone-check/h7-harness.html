@@ -1,0 +1,24 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{font:11px monospace;background:#fff;color:#000;margin:0;padding:24px 4px;word-break:break-all}</style></head>
+<body><pre id="o">start</pre>
+<script>
+var o = document.getElementById("o"), n = 0;
+function out(s) { o.textContent += "\n" + s; }
+function run(label, url) {
+  var lines = [];
+  out("== " + label);
+  return new Promise(function (res) {
+    try {
+      ifizboxNative.call("ipa.install", { url: url, insecure: true, stream: true, listed: { version: "1.1.0" } }, function (e) {
+        var l = e && (e.line || e.log || (e.lines && JSON.stringify(e.lines)) || JSON.stringify(e));
+        if (!/dlstatus/.test(l)) out("  " + String(l).slice(0, 110));
+        else if (!lines.dl) { lines.dl = 1; out("  (dlstatus Downloading seen)"); }
+      }).then(function (r) { out("-> ok " + JSON.stringify(r).slice(0, 150)); res(); },
+        function (e) { out("-> err " + String(e && e.message || e).slice(0, 200)); res(); });
+    } catch (e) { out("throw " + e); res(); }
+  });
+}
+var U = "http://127.0.0.1:8765/fail.ipa";
+run("1 first (installd should refuse)", U).then(function () { return run("2 retry", U); }).then(function () { out("DONE"); });
+</script></body></html>

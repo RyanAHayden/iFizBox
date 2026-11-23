@@ -1,0 +1,110 @@
+version OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148
+ 
+waiting: c3892788c3af3baf6090a000d31101e5ad1bb663.ipa c3892788c3af3baf6090a000d31101e5ad1bb663.json
+
+== 3 retry with corrupt file
+The IPA already downloaded is gone or damaged: downloading it again
+Downloading https://github.com/RyanAHayden/iFizBox/releases/download/test-fixtures/alpha-1.1.0.ipa
+downloading 1
+Downloaded 2.3 MB in 0.3 s, 7.9 MB/s
+IPA SHA-256: 689eff7b2fa03c0ee8a80be2bcb01627f43ca5e36ae121142d5627e9c65459d5
+Certificate: Apple Distribution: Ian Smith (S8NFX3A2LT) (team S8NFX3A2LT)
+Profile: sidedrop adhoc, Ad Hoc, app ID com.ryha.*, expires 2027-10-29T03:13:50Z
+This iPhone in the profile: in (2 devices listed)
+App Cydian.app: com.ryha.test.alpha, 165 files
+reading 1
+Read 165 files (3.5 MB), 1 Mach-O, 1 bundles to sign
+Keychain: S8NFX3A2LT.com.ryha.test.alpha (application-identifier S8NFX3A2LT.com.ryha.test.alpha)
+Group fix: none (the original signature names no app groups or keychain groups)
+Signed Cydian.app (com.ryha.test.alpha), with the profile's entitlements
+PHASES downloading,reading,signing,installing
+-> {"err":"Couldn't reach f400.invalid: A server with the specified hostname could not be found. iOS can't show Install without it."}
+
+== 4 retry after that
+Using the IPA already downloaded (2.3 MB)
+reading 0
+IPA SHA-256: 689eff7b2fa03c0ee8a80be2bcb01627f43ca5e36ae121142d5627e9c65459d5
+Certificate: Apple Distribution: Ian Smith (S8NFX3A2LT) (team S8NFX3A2LT)
+Profile: sidedrop adhoc, Ad Hoc, app ID com.ryha.*, expires 2027-10-29T03:13:50Z
+This iPhone in the profile: in (2 devices listed)
+App Cydian.app: com.ryha.test.alpha, 165 files
+reading 1
+Read 165 files (3.5 MB), 1 Mach-O, 1 bundles to sign
+Keychain: S8NFX3A2LT.com.ryha.test.alpha (application-identifier S8NFX3A2LT.com.ryha.test.alpha)
+Group fix: none (the original signature names no app groups or keychain groups)
+Signed Cydian.app (com.ryha.test.alpha), with the profile's entitlements
+signing 1
+Signed Test Alpha 1.1.0 as com.ryha.test.alpha, 2.4 MB
+PHASES reading,signing,installing
+-> {"err":"Couldn't reach f400.invalid: A server with the specified hostname could not be found. iOS can't show Install without it."}
+
+== 5 source lists 1.2
+Downloading https://github.com/RyanAHayden/iFizBox/releases/download/test-fixtures/alpha-1.1.0.ipa
+downloading 1
+Downloaded 2.3 MB in 0.3 s, 8.6 MB/s
+IPA SHA-256: 689eff7b2fa03c0ee8a80be2bcb01627f43ca5e36ae121142d5627e9c65459d5
+Certificate: Apple Distribution: Ian Smith (S8NFX3A2LT) (team S8NFX3A2LT)
+Profile: sidedrop adhoc, Ad Hoc, app ID com.ryha.*, expires 2027-10-29T03:13:50Z
+This iPhone in the profile: in (2 devices listed)
+App Cydian.app: com.ryha.test.alpha, 165 files
+reading 1
+Read 165 files (3.5 MB), 1 Mach-O, 1 bundles to sign
+Keychain: S8NFX3A2LT.com.ryha.test.alpha (application-identifier S8NFX3A2LT.com.ryha.test.alpha)
+Group fix: none (the original signature names no app groups or keychain groups)
+Signed Cydian.app (com.ryha.test.alpha), with the profile's entitlements
+signing 1
+PHASES downloading,reading,signing,installing
+-> {"err":"Couldn't reach f400.invalid: A server with the specified hostname could not be found. iOS can't show Install without it."}
+
+== 6 killed after the download
+Downloading https://github.com/RyanAHayden/iFizBox/releases/download/v0.20.0/iFizBox.ipa
+downloading 1
+Downloaded 39 MB in 1.2 s, 33.8 MB/s
+IPA SHA-256: 4a8394e6b7127070bfdf92d60a6a44851ad971e2228c40c287993810072ea475
+Certificate: Apple Distribution: Ian Smith (S8NFX3A2LT) (team S8NFX3A2LT)
+Installed under App ID S8NFX3A2LT.com.ryha.sideload: signed with that (profile sidedrop adhoc)
+App iFizBox.app: com.ryha.ifizbox, 777 files
+Kept its bundle ID; App ID S8NFX3A2LT.com.ryha.sideload in the entitlements
+PHASES downloading,reading
+-> null
+{"time":"2026-11-23T16:18:50.311992535-05:00","level":"INFO","msg":"killed","bundleID":"com.ryha.ifizbox","pid":1587}
+
+waiting: c3892788c3af3baf6090a000d31101e5ad1bb663.ipa c3892788c3af3baf6090a000d31101e5ad1bb663.json b701521504dbef489bc290e26e486269117b8526.json b701521504dbef489bc290e26e486269117b8526.ipa
+
+== 6b retry after the kill
+Using the IPA already downloaded (39 MB)
+reading 0
+IPA SHA-256: 4a8394e6b7127070bfdf92d60a6a44851ad971e2228c40c287993810072ea475
+Certificate: Apple Distribution: Ian Smith (S8NFX3A2LT) (team S8NFX3A2LT)
+Installed under App ID S8NFX3A2LT.com.ryha.sideload: signed with that (profile sidedrop adhoc)
+App iFizBox.app: com.ryha.ifizbox, 777 files
+Kept its bundle ID; App ID S8NFX3A2LT.com.ryha.sideload in the entitlements
+reading 1
+Read 777 files (62.3 MB), 4 Mach-O, 3 bundles to sign
+Keychain: S8NFX3A2LT.com.ryha.ifizbox, S8NFX3A2LT.com.ryha.sideload (application-identifier S8NFX3A2LT.com.ryha.sideload)
+Group fix: none (iFizBox's own IPA)
+Signed PlugIns/iFizBoxShare.appex (com.ryha.ifizbox.share), with the profile's entitlements
+Signed PlugIns/iFizBoxWidget.appex (com.ryha.ifizbox.widget), with the profile's entitlements
+Signed iFizBox.app (com.ryha.ifizbox), with the profile's entitlements
+PHASES reading,signing
+-> {"ok":{"originalBundleId":"com.ryha.ifizbox","device":{"state":"in","shared":1,"count":2,"udid":"00008130-0018450C3661001C"},"name":"iFizBox","expires":"2027-10-29T03:13:50Z","sha256":"4a8394e6b7127070bfdf92d60a6a44851ad971e2228c40c287993810072ea475","version":"0.20.0","token":"4e5cbdeb7ca9dc9204994
+waiting: c3892788c3af3baf6090a000d31101e5ad1bb663.ipa c3892788c3af3baf6090a000d31101e5ad1bb663.json b701521504dbef489bc290e26e486269117b8526.json b701521504dbef489bc290e26e486269117b8526.ipa
+
+== 7 idevice route, Alpha
+Downloading https://github.com/RyanAHayden/iFizBox/releases/download/test-fixtures/alpha-1.1.0.ipa
+downloading 1
+Downloaded 2.3 MB in 0.3 s, 8.8 MB/s
+IPA SHA-256: 689eff7b2fa03c0ee8a80be2bcb01627f43ca5e36ae121142d5627e9c65459d5
+Certificate: Apple Distribution: Ian Smith (S8NFX3A2LT) (team S8NFX3A2LT)
+Profile: sidedrop adhoc, Ad Hoc, app ID com.ryha.*, expires 2027-10-29T03:13:50Z
+This iPhone in the profile: in (2 devices listed)
+App Cydian.app: com.ryha.test.alpha, 165 files
+reading 1
+Read 165 files (3.5 MB), 1 Mach-O, 1 bundles to sign
+Keychain: S8NFX3A2LT.com.ryha.test.alpha (application-identifier S8NFX3A2LT.com.ryha.test.alpha)
+Group fix: none (the original signature names no app groups or keychain groups)
+Signed Cydian.app (com.ryha.test.alpha), with the profile's entitlements
+signing 1
+PHASES downloading,reading,signing,here
+-> {"ok":{"fixedArm64e":[],"expires":"2027-10-29T03:13:50Z","version":"1.1.0","device":{"count":2,"shared":1,"state":"in","udid":"00008130-0018450C3661001C"},"sha256":"689eff7b2fa03c0ee8a80be2bcb01627f43ca5e36ae121142d5627e9c65459d5","originalBundleId":"com.ryha.test.alpha","name":"Test Alpha","removed
+waiting: b701521504dbef489bc290e26e486269117b8526.json b701521504dbef489bc290e26e486269117b8526.ipa

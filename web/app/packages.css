@@ -899,9 +899,14 @@ html[data-theme="dark"] .desc-link { color: var(--dk-link); }
 .store-head-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .store-head-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .store-head-author { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.store-head-rating { margin-top: 3px; display: flex; align-items: center; gap: 4px; }
-/* F206: the row is there from the first paint (grey empty stars), the same height filled, empty or "No Ratings". */
-.store-head-rating { height: 15px; white-space: nowrap; }
+/* The stars and the count are one run of text: a long one ("(29,740,392) on the App Store") wraps in the text column,
+   short of Share. */
+.store-head-rating { margin-top: 3px; display: block; overflow-wrap: anywhere; }
+.store-head-rating > .store-stars { margin: -1px 4px 1px 0; }
+/* F206: the row is there from the first paint (grey empty stars), the same height filled, empty or "No Ratings". A
+   second line goes into the header's bottom padding, so the page below stays where it was. */
+.store-head-rating { min-height: 15px; }
+.store-head-text:has(> .store-head-rating) { margin-bottom: -16px; } /* not a local IPA's header, which has no stars */
 .store-head-rating[hidden] { display: none; }
 /* ==== look-only { ==== the package page as the iOS 6 App Store's */
 .store-head {

@@ -33,6 +33,10 @@ class Notifications(unittest.TestCase):
         self.assertIn('userInfo["url"]', self.src)
         self.assertIn('c.userInfo = @{@"url": @"#/changes"}', read("daemon", "main.m"))
         self.assertIn('location.hash = route', self.src)
+        self.assertIn("'ifizbox:update-alert'", self.src)  # B399: Changes refreshes the sources
+        with open(os.path.join(HERE, "..", "web", "app", "app.js"), encoding="utf-8") as f:
+            self.assertIn('addEventListener("ifizbox:update-alert"', f.read())
+        self.assertIn("cfg.requestCachePolicy = .reloadIgnoringLocalCacheData", read("Sources", "Apt.swift"))
         self.assertIn('arguments: ["route": route]', self.src)  # passed as data, never pasted into the script
         self.assertIn('upgradesID = "ifizbox-upgrades"', self.src)
         self.assertIn('#define NOTE_ID @"ifizbox-upgrades"', read("daemon", "main.m"))

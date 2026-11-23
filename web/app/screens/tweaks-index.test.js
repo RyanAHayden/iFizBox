@@ -1,10 +1,12 @@
-// F344: the app side of the shared tweak index (screens/tweaks.js): verdicts read from GET /api/tweaks join the
+// F344: the app side of the shared tweak index (screens/tweaks.js): the verdicts of the index file join the
 // device's checks, Add Tweaks for an app lists only that app's tweaks then every-app ones with "Works in", paid
-// tweaks only from a source that names a seller, and the phone checks the unchecked ones (the app's name first).
+// tweaks only from a source that names a seller. B391: what no verdict covers is listed by what it mentions.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadTweakIndex, cachedTweakInfo, rowInfo, appTweakRows, checkForApp, madeForRows, sellerKeys,
-  tweakInfo, checkTweakRows } from "./tweaks.js";
+import { loadTweakIndex, cachedTweakInfo, rowInfo, appTweakRows, madeForRows, sellerKeys,
+  tweakInfo, tweaksKnown, saveTweaks, onTweakVerdicts } from "./tweaks.js";
+import { packIndexFile } from "../core/tweakindexfile.js";
+import { indexSource } from "../core/tweakindex.js";
 import { memoryIpaStore } from "../core/myipas.js";
 import { DEBS } from "../core/fixtures/tweaks/index-debs.test-helper.js";
 import { fakeDocument, tick, withDocument } from "../fakes.test-helper.js";
@@ -29,25 +31,50 @@ const rows = [
   { id: "com.i.new", name: "New", version: "1", key: "repo-a" },
 ];
 
-test("loadTweakIndex reads each source's verdicts once; cachedTweakInfo and tweakInfo use them", async () => {
-  const asked = [];
-  const fetch = async (u) => { asked.push(u); return { ok: true, json: async () => ({ enabled: true, tweaks: entries }) }; };
-  assert.equal(await loadTweakIndex([SRC], { fetch, base: "https://ifizbox.example/api/tweaks" }), 4);
-  assert.equal(asked.length, 1);
-  assert.match(asked[0], /^https:\/\/ifizbox\.example\/api\/tweaks\?source=https%3A%2F%2Findex-test\.example%2F&dist=\.%2F$/);
-  await loadTweakIndex([SRC], { fetch, base: "https://ifizbox.example/api/tweaks" });
-  assert.equal(asked.length, 1, "kept for the session");
+const packed = (list, { src = SRC, at = 5 } = {}) => {
+  const { key } = indexSource(src);
+  return [{ key, refreshed: at, pending: 0 }, list.map((e) => ({ source: key, checked: at, entry: JSON.stringify(e) }))];
+};
+const fileOf = (...ps) => packIndexFile(ps.map((p) => p[0]), ps.flatMap((p) => p[1]));
+
+test("loadTweakIndex takes the file's verdicts of these sources; cachedTweakInfo and tweakInfo use them", async () => {
+  const file = fileOf(packed(entries));
+  assert.equal(await loadTweakIndex([SRC], { file: { read: async () => file } }), 3, "the free tweaks");
+  assert.equal(await loadTweakIndex([SRC], { file: { read: async () => file } }), 3);
   const s = storage();
   assert.deepEqual(cachedTweakInfo({ package: "com.i.yt", version: "1.0" }, { storage: s }).bundles, ["com.google.ios.youtube"]);
   assert.equal(cachedTweakInfo({ package: "com.i.yt", version: "0.9" }, { storage: s }), null, "another version isn't known");
+  assert.equal(cachedTweakInfo({ package: "com.i.ig", version: "3.0" }, { storage: s }), null, "a paid tweak has no verdict");
   // the index refused it: no download
   const info = await tweakInfo({ package: "com.i.sb", version: "2.0", debUrl: "https://x/sb.deb" }, { storage: s,
     fetchDeb: async () => { throw new Error("downloaded"); } });
   assert.equal(info.ok, false);
-  // a source the index doesn't know (or no index): nothing, asked again next time
-  const off = async () => ({ ok: true, json: async () => ({ enabled: false, tweaks: [] }) });
-  assert.equal(await loadTweakIndex([{ key: "b", uri: "https://other-index.example/", dist: "./" }], { fetch: off, base: "https://x/api/tweaks" }), 0);
-  assert.equal(await loadTweakIndex([{ key: "c", uri: "https://down-index.example/", dist: "./" }], { fetch: async () => { throw new Error("offline"); }, base: "https://x/api/tweaks" }), 0);
+  // a source the file doesn't have, or no file at all: nothing
+  assert.equal(await loadTweakIndex([{ key: "b", uri: "https://other-index.example/", dist: "./" }], { file: { read: async () => file } }), 0);
+  assert.equal(await loadTweakIndex([SRC], { file: { read: async () => null } }), 0);
+});
+
+test("F398: a newer file's verdicts reach what's loaded; the same package in two sources: the one that works wins", async () => {
+  const s = storage();
+  const A = { uri: "https://two-a.example/", dist: "./" }, B = { uri: "https://two-b.example/", dist: "./" };
+  const no = { package: "com.two", version: "1", ok: false, why: "It's for iOS itself", bundles: [], systemOnly: true };
+  const yes = { package: "com.two", version: "1", ok: true, bundles: ["com.b.app"] };
+  const get = () => cachedTweakInfo({ package: "com.two", version: "1" }, { storage: s });
+  const first = fileOf(packed([no], { src: A }), packed([no], { src: B }));
+  let told = null;
+  const told2 = [];
+  const off = onTweakVerdicts((m) => told2.push(m));
+  const file = { read: async () => first, onChange: (f) => { told = f; } };
+  await loadTweakIndex([A, B], { file });
+  assert.equal(get().ok, false);
+  told(fileOf(packed([no], { src: A, at: 9 }), packed([yes], { src: B, at: 9 })));
+  assert.deepEqual(get().bundles, ["com.b.app"]);
+  assert.deepEqual(told2.map((m) => m["com.two@1"]), [true, false]);
+  told(fileOf(packed([{ ...yes, package: "com.else" }], { src: A, at: 12 })));
+  assert.equal(get(), null);
+  assert.equal(told2.at(-1)["com.two@1"], null, "a verdict the newer file dropped is taken back");
+  off();
+  await loadTweakIndex([SRC], { file: { read: async () => fileOf(packed(entries)) } });
 });
 
 test("Add Tweaks for an app: its tweaks, then every-app ones; no SpringBoard, no paid guess without a seller", async () => {
@@ -72,15 +99,6 @@ test("Add Tweaks for an app: its tweaks, then every-app ones; no SpringBoard, no
   assert.deepEqual([...keys], ["repo-a"]);
 });
 
-test("checkTweakRows (a Tweak Source's list): the index's refusals dropped at once, no download for them", async () => {
-  const refusedSeen = [], checked = [];
-  const out = await checkTweakRows(rows, { storage: storage(), index: async () => 0, onRefused: (ids) => refusedSeen.push(ids),
-    pkg: async (r) => ({ package: r.id, version: r.version }), check: async (st) => { checked.push(st.package); return { ok: true }; } });
-  assert.deepEqual(refusedSeen[0], ["com.i.sb"]);
-  assert.deepEqual(out, ["com.i.sb"]);
-  assert.deepEqual(checked, ["com.i.new"], "only the row nobody checked; the paid guess isn't a verdict but is indexed");
-});
-
 test("tweakInfo: two checks side by side keep both verdicts (found on the iPhone 15 Pro)", async () => {
   const s = storage();
   let release;
@@ -94,22 +112,45 @@ test("tweakInfo: two checks side by side keep both verdicts (found on the iPhone
   assert.deepEqual(Object.keys(kept).sort(), ["com.r.fast@1", "com.r.slow@1"]);
 });
 
-test("checkForApp: unchecked rows only, the app's name first, capped; onChecked for each", async () => {
+test("B391: with no verdict, free or paid, Add Tweaks lists what mentions the app; nothing is downloaded", async () => {
   const s = storage();
-  const list = [{ id: "a.other", name: "Other", version: "1" }, { id: "a.yt", name: "YouTube Plus", version: "1" },
-    { id: "a.paid", name: "Paid", version: "1", paid: true }, { id: "com.i.yt", name: "YTPlus", version: "1.0" }];
-  const order = [], seen = [];
-  const c = checkForApp(list, "com.google.ios.youtube", { storage: s, max: 5, onChecked: (r) => seen.push(r.id),
-    pkg: async (r) => ({ package: r.id, version: r.version }), check: async (st) => { order.push(st.package); return { ok: true, bundles: [] }; } });
-  await c.done;
-  assert.deepEqual(order, ["a.yt", "a.other"], "indexed and paid rows aren't checked here; the YouTube one first");
-  assert.deepEqual(seen, ["a.yt", "a.other"]);
-  // an app KNOWN_APPS doesn't list: its own name puts its tweaks first
-  const own = [];
-  await checkForApp([{ id: "b.x", name: "Other", version: "1" }, { id: "b.apollo", name: "Apollo Plus", version: "1" }], "com.c.Apollo",
-    { storage: s, name: "Apollo", pkg: async (r) => ({ package: r.id }), check: async (st) => { own.push(st.package); return null; } }).done;
-  assert.deepEqual(own, ["b.apollo", "b.x"]);
-  const capped = checkForApp(list, "x", { storage: s, max: 1, pkg: async (r) => ({ package: r.id }), check: async (st) => { order.push(st.package); return null; } });
-  await capped.done;
-  assert.equal(order.length, 3);
+  const list = [
+    { id: "n.yt", name: "Tube Plus", version: "1", key: "k", short: "More for YouTube" },
+    { id: "n.long", name: "Long", version: "1", key: "k", short: "Nothing here", guess: ["com.google.ios.youtube"] },
+    { id: "n.sb", name: "Glint", version: "1", key: "k", short: "Status bar shine" },
+    { id: "n.apollo", name: "Apollo Plus", version: "1", key: "k" },
+    { id: "n.paid", name: "Paid", version: "1", key: "k", paid: true, short: "YouTube extras" },
+  ];
+  const opts = { rows: async () => list, storage: s };
+  const of = async (id, o = {}) => (await appTweakRows(id, { ...opts, ...o })).made.map((r) => r.id);
+  const savedFetch = globalThis.fetch;
+  globalThis.fetch = async () => { throw new Error("fetched"); };
+  try {
+    assert.deepEqual(await of("com.google.ios.youtube"), ["n.yt", "n.long"]);
+    assert.deepEqual(await of("com.google.ios.youtube", { sellers: async () => new Set(["k"]) }), ["n.yt", "n.long", "n.paid"]);
+    assert.deepEqual(await of("com.c.Apollo"), []);
+    assert.deepEqual(await of("com.c.Apollo", { name: "Apollo" }), ["n.apollo"]);
+    assert.deepEqual(await of("com.c.Apollo", { apps: async () => [{ bundleId: "com.c.Apollo", name: "Apollo" }] }), ["n.apollo"]);
+    const info = rowInfo(list[0], { storage: s });
+    assert.equal(info.unverified, true);
+    assert.equal(info.paid, undefined);
+    assert.equal(rowInfo(list[2], { storage: s }), null);
+    // a version with no verdict of a tweak this phone found to work (bought: an earlier one was checked) stays
+    s.setItem("ifizbox.tweakInfo", JSON.stringify({ "n.sb@0.9": { v: 2, ok: true, bundles: ["com.google.ios.youtube"], anyApp: false } }));
+    assert.deepEqual(await of("com.google.ios.youtube"), ["n.yt", "n.long", "n.sb"]);
+  } finally { globalThis.fetch = savedFetch; }
+});
+
+test("B391 tweaksKnown: the user's apps, the tweaks in them, and what this phone found to work", async () => {
+  const s = storage();
+  s.setItem("ifizbox.tweakInfo", JSON.stringify({
+    "com.k.bought@2": { v: 2, ok: true, bundles: [], anyApp: true }, "com.k.no@1": { v: 2, ok: false, why: "daemon" },
+  }));
+  const store = memStore();
+  await saveTweaks("com.k.app", [{ name: "com.k.kept_1.0.deb", data: new Uint8Array([1]) }], { store });
+  const opts = { storage: s, store, apps: async () => [{ bundleId: "com.k.app", name: "Apollo" }],
+    records: async () => [{ bundleId: "com.k.copy", originalBundleId: "com.k.orig", tweaks: ["com.k.signed_2.deb", "com.k.dy_1.dylib", "odd.zip"] }] };
+  assert.deepEqual(await tweaksKnown(opts), { apps: { "com.k.app": "Apollo" }, held: ["com.k.dy", "com.k.kept", "com.k.signed"], worked: ["com.k.bought"] });
+  await saveTweaks("com.k.app", [], { store });
+  assert.deepEqual((await tweaksKnown(opts)).held, ["com.k.dy", "com.k.signed"], "a removed one goes");
 });

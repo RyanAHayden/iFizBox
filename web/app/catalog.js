@@ -307,7 +307,8 @@ function setIpaInfo(map) {
 
 // B377: the sideload build's Tweak Sources: what the Tweak Index (and this device's checks) found can't go into an app
 // (screens/tweaks.js catalogVerdicts / onTweakVerdicts) is sent to the worker with the next question, so App Tweaks,
-// Search and Sections leave it out (core/catalog.js setTweakVerdicts). The index is asked after each load, not awaited.
+// Search and Sections leave it out (core/catalog.js setTweakVerdicts). B391: both, and what the user has (tweaksKnown: their
+// apps, the tweaks in them, what this phone found to work), are there before the first list is drawn.
 let verdictsPending = {};
 let verdictsHooked = null;
 function setTweakVerdicts(map) {
@@ -324,13 +325,19 @@ async function watchTweakIndex(tweakSources) {
       return m;
     }));
   } catch { verdictsHooked = null; return; }
-  if (!tweakSources.length) return;
-  // Lists drawn before the answer keep the tweak until they are drawn again: wait a little for it (it comes on
-  // anyway, through onTweakVerdicts, if it is slower).
-  const asked = mod.loadTweakIndex(tweakSources).catch(() => 0);
-  await Promise.race([asked, new Promise((r) => setTimeout(r, INDEX_WAIT_MS)?.unref?.())]);
+  // Both come from this phone (the index is a shipped file), so this is quick; the limit only keeps a stuck store or
+  // shell from holding the lists for ever (a late answer still counts for the next list).
+  const asked = [mod.tweaksKnown().then(setTweakKnown)];
+  if (tweakSources.length) asked.push(mod.loadTweakIndex(tweakSources));
+  await Promise.race([Promise.allSettled(asked), new Promise((r) => setTimeout(r, INDEX_WAIT_MS)?.unref?.())]);
 }
-const INDEX_WAIT_MS = 1500;
+const INDEX_WAIT_MS = 5000;
+let tweakKnown = null, tweakKnownSent = true;
+function setTweakKnown(next) {
+  if (JSON.stringify(next) === JSON.stringify(tweakKnown)) return;
+  tweakKnown = next;
+  tweakKnownSent = false; // Changes (All Sources' apps) lists no Tweak Source's tweak: nothing to tell it
+}
 
 // ---- Installed (F7): dpkg's status file, parsed in the worker beside the catalog. In the app the native
 // backend reads it (N3: `ifizboxNative.dpkgStatus()` resolves to the text of /var/lib/dpkg/status, or
@@ -410,6 +417,10 @@ const ask = async (op, args) => {
     verdictsPending = {};
     await getParser().catalog("setTweakVerdicts", [m]);
   }
+  if (!tweakKnownSent) {
+    tweakKnownSent = true;
+    await getParser().catalog("setTweakKnown", [tweakKnown]);
+  }
   return getParser().catalog(op, args);
 };
 
@@ -447,6 +458,7 @@ export const catalog = {
     return freshLists(records, rows, { now })[kind] ?? [];
   },
   package: (id, key = ALL) => ask("package", [id, key]),
+  shows: (id, key) => ask("shows", [id, key]), // B391: a source's featured banners
   history: (id, key = ALL) => ask("history", [id, key]), // F29: Version History (core/catalog.js history)
   altSource: (key) => ask("altSource", [key]),
   has: (names) => ask("has", [names]),

@@ -1,0 +1,84 @@
+version OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148
+
+== status
+
+PHASES 
+-> {"ok":{"mode":"sideload","identity":{"serial":"46890BB0197A9E5D125BBA82280DAD56","profile":{"kind":"Ad Hoc","devices":2,"appId":"com.ryha.*","push":null,"wildcard":true,"expires":"2027-10-29T03:13:50Z","device":{"shared":1,"count":2,"udid":"00008130-0018450C3661001C","state":"in"},"team":"S8NFX3A2LT
+
+== idevice
+
+PHASES 
+-> {"ok":{"pairOnPhone":true,"tailscale":{"keyExpiry":"2027-05-21T00:34:40Z","connect":"tailscale","signedIn":true,"name":"ifizbox-on-iphone-15-pro.beetal-ling.ts.net","use":true,"address":"100.109.186.91","hostname":"iFizBox on iPhone 15 Pro"},"otherVPN":true,"route":"en0","paired":"rp","ios":"27.0","
+
+== 1 first, install step fails (no such Signing Server)
+Downloading https://github.com/RyanAHayden/iFizBox/releases/download/test-fixtures/alpha-1.1.0.ipa
+downloading 1
+Downloaded 2.3 MB in 0.4 s, 5.7 MB/s
+IPA SHA-256: 689eff7b2fa03c0ee8a80be2bcb01627f43ca5e36ae121142d5627e9c65459d5
+Certificate: Apple Distribution: Ian Smith (S8NFX3A2LT) (team S8NFX3A2LT)
+Profile: sidedrop adhoc, Ad Hoc, app ID com.ryha.*, expires 2027-10-29T03:13:50Z
+This iPhone in the profile: in (2 devices listed)
+App Cydian.app: com.ryha.test.alpha, 165 files
+reading 1
+Read 165 files (3.5 MB), 1 Mach-O, 1 bundles to sign
+Keychain: S8NFX3A2LT.com.ryha.test.alpha (application-identifier S8NFX3A2LT.com.ryha.test.alpha)
+Group fix: none (the original signature names no app groups or keychain groups)
+Signed Cydian.app (com.ryha.test.alpha), with the profile's entitlements
+signing 1
+PHASES downloading,reading,signing,installing
+-> {"err":"Couldn't reach f400.invalid: A server with the specified hostname could not be found. iOS can't show Install without it."}
+waiting: c3892788c3af3baf6090a000d31101e5ad1bb663.ipa c3892788c3af3baf6090a000d31101e5ad1bb663.json
+
+== 2 retry
+Using the IPA already downloaded (2.3 MB)
+reading 0
+IPA SHA-256: 689eff7b2fa03c0ee8a80be2bcb01627f43ca5e36ae121142d5627e9c65459d5
+Certificate: Apple Distribution: Ian Smith (S8NFX3A2LT) (team S8NFX3A2LT)
+Profile: sidedrop adhoc, Ad Hoc, app ID com.ryha.*, expires 2027-10-29T03:13:50Z
+This iPhone in the profile: in (2 devices listed)
+App Cydian.app: com.ryha.test.alpha, 165 files
+reading 1
+Read 165 files (3.5 MB), 1 Mach-O, 1 bundles to sign
+Keychain: S8NFX3A2LT.com.ryha.test.alpha (application-identifier S8NFX3A2LT.com.ryha.test.alpha)
+Group fix: none (the original signature names no app groups or keychain groups)
+Signed Cydian.app (com.ryha.test.alpha), with the profile's entitlements
+signing 1
+Signed Test Alpha 1.1.0 as com.ryha.test.alpha, 2.4 MB
+PHASES reading,signing,installing
+-> {"err":"Couldn't reach f400.invalid: A server with the specified hostname could not be found. iOS can't show Install without it."}
+waiting: c3892788c3af3baf6090a000d31101e5ad1bb663.ipa c3892788c3af3baf6090a000d31101e5ad1bb663.json
+
+== 2b signing.prepare
+Using the IPA already downloaded (2.3 MB)
+reading 0
+IPA SHA-256: 689eff7b2fa03c0ee8a80be2bcb01627f43ca5e36ae121142d5627e9c65459d5
+Certificate: Apple Distribution: Ian Smith (S8NFX3A2LT) (team S8NFX3A2LT)
+App Cydian.app: com.ryha.test.alpha, 165 files
+reading 1
+Read 165 files (3.5 MB), 1 Mach-O, 1 bundles to sign
+Keychain: S8NFX3A2LT.com.ryha.test.alpha (application-identifier S8NFX3A2LT.com.ryha.test.alpha)
+Group fix: none (the original signature names no app groups or keychain groups)
+Signed Cydian.app (com.ryha.test.alpha), with the profile's entitlements
+signing 1
+Signed Test Alpha 1.1.0 as com.ryha.test.alpha, 2.4 MB
+Keeping the IPA for Re-sign once it is installed (Caches/com.ryha.test.alpha.ipa)
+PHASES reading,signing
+-> {"ok":{"device":{"count":2,"udid":"00008130-0018450C3661001C","shared":1,"state":"in"},"originalBundleId":"com.ryha.test.alpha","bundleId":"com.ryha.test.alpha","name":"Test Alpha","token":"15e55f4d3b7b3fb0f074c7a6136c8851","version":"1.1.0","expires":"2027-10-29T03:13:50Z","sha256":"689eff7b2fa03c0
+waiting: c3892788c3af3baf6090a000d31101e5ad1bb663.ipa c3892788c3af3baf6090a000d31101e5ad1bb663.json
+Error: Failed to open file '/Library/Caches/com.ryha.ifizbox/waiting/c3892788c3af3baf6090a000d31101e5ad1bb663.ipa': Unknown Error (1)
+
+node:fs:782
+  return binding.open(
+                 ^
+
+Error: ENOENT: no such file or directory, open '/home/ryha/.cache/claude-tmp/claude-1000/-home-ryha-runs-iFizBox-s2/2789f5ec-c584-4947-b290-ac9bda242804/scratchpad/w/kept.ipa'
+    at Object.openSync (node:fs:782:18)
+    at readFileSync (node:fs:628:35)
+    at file:///home/ryha/.cache/claude-tmp/claude-1000/-home-ryha-runs-iFizBox-s2/2789f5ec-c584-4947-b290-ac9bda242804/scratchpad/phone.mjs:50:11 {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/home/ryha/.cache/claude-tmp/claude-1000/-home-ryha-runs-iFizBox-s2/2789f5ec-c584-4947-b290-ac9bda242804/scratchpad/w/kept.ipa'
+}
+
+Node.js v26.12.0

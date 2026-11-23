@@ -16,7 +16,7 @@ final class PlainFetch {
     static let total: TimeInterval = 120
     static let maxRedirects = 5
 
-    private let url: URL, redirects: Int
+    private let url: URL, redirects: Int, head: Bool // head: F400, a HEAD: the status and headers, no body
     private var done: Done?
     private let queue = DispatchQueue(label: "ifizbox.fetch.http")
     private var conn: NWConnection?
@@ -27,10 +27,13 @@ final class PlainFetch {
     private var timer: DispatchSourceTimer?
     private var keep: PlainFetch? // itself until done: the connection's handlers hold it weakly
 
-    private init(_ url: URL, _ redirects: Int, _ done: @escaping Done) { self.url = url; self.redirects = redirects; self.done = done }
+    private init(_ url: URL, _ redirects: Int, _ head: Bool, _ done: @escaping Done) {
+        self.url = url; self.redirects = redirects; self.head = head; self.done = done
+    }
 
-    static func get(_ url: URL, redirects: Int = maxRedirects, done: @escaping Done) {
-        let f = PlainFetch(url, redirects, done)
+    // With `head`, a redirect to https is answered as it is (its 3xx and Location) for the caller to follow.
+    static func get(_ url: URL, redirects: Int = maxRedirects, head: Bool = false, done: @escaping Done) {
+        let f = PlainFetch(url, redirects, head, done)
         f.keep = f
         f.queue.async { f.begin() }
     }
@@ -84,7 +87,7 @@ final class PlainFetch {
         if let q = comps?.percentEncodedQuery { path += "?" + q }
         let hostHeader = url.port.map { "\(host):\($0)" } ?? host
         let ua = Apt.session.configuration.httpAdditionalHeaders?["User-Agent"] as? String ?? SourceIcon.userAgent
-        let req = "GET \(path) HTTP/1.1\r\nHost: \(hostHeader)\r\nUser-Agent: \(ua)\r\n"
+        let req = "\(head ? "HEAD" : "GET") \(path) HTTP/1.1\r\nHost: \(hostHeader)\r\nUser-Agent: \(ua)\r\n"
             + "Accept: */*\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n"
         conn?.send(content: Data(req.utf8), completion: .contentProcessed { [weak self] e in
             guard let self = self else { return }
@@ -104,7 +107,7 @@ final class PlainFetch {
                         return self.finish(.failure(BridgeError("too_large", "more than \(Apt.maxBody >> 20) MB")))
                     }
                 }
-                if self.stream.finished { return self.answered() }
+                if self.stream.finished || (self.head && self.stream.headed) { return self.answered() }
                 if let e = error { return self.finish(.failure(BridgeError("network", e.localizedDescription))) }
                 if isComplete {
                     try self.stream.end()
@@ -128,10 +131,11 @@ final class PlainFetch {
             guard let n = URL(string: loc, relativeTo: url)?.absoluteURL, let to = Apt.httpURL(n.absoluteString) else {
                 return finish(.failure(BridgeError("network", "a redirect to a non-http(s) URL")))
             }
+            if head, to.scheme?.lowercased() == "https" { return finish(.success((st, stream.headers, Data()))) }
             guard let d = done else { return }
             done = nil
             finish(.success((0, [:], Data()))) // stops the connection and timer; nobody hears it (done taken)
-            if to.scheme?.lowercased() == "https" { Apt.get(to, done: d) } else { PlainFetch.get(to, redirects: redirects - 1, done: d) }
+            if to.scheme?.lowercased() == "https" { Apt.get(to, done: d) } else { PlainFetch.get(to, redirects: redirects - 1, head: head, done: d) }
             return
         }
         finish(.success((st, stream.headers, body)))

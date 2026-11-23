@@ -40,7 +40,7 @@ import { installQueue, runLogs } from "../queue.js";
 import { MODES, MODE_LABEL, changeCount, runTitle, createRepeatFilter, CONFFILE_TITLE,
   CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine, debUrlOf, debLinkOf, mergePlans, runStatusText } from "../core/queue.js";
 import { appQueue } from "../app-queue.js";
-import { appPlan, runOrder, sizeText, SELF_ID, customParams, APP_MODES, APP_MODE_LABEL } from "../core/appqueue.js";
+import { appPlan, runOrder, sizeText, SELF_ID, customParams, listedOf, APP_MODES, APP_MODE_LABEL } from "../core/appqueue.js";
 import { NAME } from "../brand.js";
 import { storedRoute } from "../core/installroute.js"; // B137
 import { rowIcon } from "../icons/rowicons.js";
@@ -305,7 +305,8 @@ function statistics(plan) {
 
 // Cydia's Modifications: one row per non-empty list, its names one per line.
 // F91: the app queue's Confirm passes its own modes (core/appqueue.js APP_MODES: Re-sign among them).
-function modifications(plan, names, modes = MODES, labels = MODE_LABEL) {
+// F401: `tweaks` { app id: [name] }, the tweaks queued with an app, small and grey under its name.
+function modifications(plan, names, modes = MODES, labels = MODE_LABEL, tweaks = {}) {
   const rows = [];
   for (const mode of modes) {
     const list = plan[`${mode}s`] ?? [];
@@ -314,6 +315,17 @@ function modifications(plan, names, modes = MODES, labels = MODE_LABEL) {
   }
   const frag = grouped([{ header: "Modifications", rows }]);
   frag.querySelectorAll(".cell").forEach((c) => c.classList.add("confirm-mods"));
+  if (Object.keys(tweaks).length) {
+    const lists = modes.map((m) => plan[`${m}s`] ?? []).filter((l) => l.length);
+    [...frag.querySelectorAll(".cell-detail")].forEach((d, i) => {
+      if (!lists[i]?.some((e) => tweaks[e.id])) return;
+      d.replaceChildren(...lists[i].map((e) => {
+        const n = el("span", "confirm-name", names[e.id] || e.id);
+        if (tweaks[e.id]) n.append(el("span", "confirm-needed", `with ${tweaks[e.id].join(", ")}`));
+        return n;
+      }));
+    });
+  }
   return frag;
 }
 
@@ -505,13 +517,14 @@ export function openAppConfirm(queue = appQueue, { footer = null, run = null } =
   function refresh() {
     const jobs = queue.list();
     if (!jobs.length) { close(); return; }
-    const names = {};
+    const names = {}, tweaks = {};
     for (const j of jobs) {
       if (j.name) names[j.id] = j.name;
       for (const d of j.deps ?? []) if (d?.name) names[d.id] = d.name;
+      if (j.tweaks?.length) tweaks[j.id] = j.tweaks.map((t) => t.name); // F401
     }
     // As Cydia's (ref/4s/screens/queue-81.png): Continue Queuing first, then Statistics and Modifications.
-    m.scroll.replaceChildren(continueGroup(close), statistics(appPlan(jobs)), modifications(appPlan(jobs), names, APP_MODES, APP_MODE_LABEL));
+    m.scroll.replaceChildren(continueGroup(close), statistics(appPlan(jobs)), modifications(appPlan(jobs), names, APP_MODES, APP_MODE_LABEL, tweaks));
     if (footer) m.scroll.append(el("p", "group-footer confirm-stopped", footer));
   }
   const sheet = { refresh, close };
@@ -527,7 +540,7 @@ async function installApp(job) {
   const sc = await import("../signing-client.js");
   if (job.mode === "resign") return resignApp(job, { sc });
   if (job.options && sc.localSigning()) return installCustom(job, { sc });
-  if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "" });
+  if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "", ...listedOf(job) });
   return sc.signAndInstall(siteInstallArgs(job));
 }
 
@@ -554,7 +567,7 @@ export async function installCustom(job, { sc, follow = null, now = Date.now(), 
   if (params.token) job.options.token = null;
   const after = follow ?? (async (result, h) => (await import("../signing-sheet.js")).followInstall(native, result?.bundleId || job.options.signsAs || "", h));
   return sc.installOnDevice({ url: job.url, name: job.options.name || job.name || "", params,
-    after, ...(sc.isSelfIpa(job.url) ? { host: true } : {}) });
+    after, ...listedOf(job), ...(sc.isSelfIpa(job.url) ? { host: true } : {}) });
 }
 
 // F91: a "resign" job: signing.resign {bundleId} signs the app again from the phone's record (Re-sign All's path,
@@ -566,7 +579,7 @@ export async function installCustom(job, { sc, follow = null, now = Date.now(), 
 export async function resignApp(job, { sc, native = nativeBridge(), hud = null, alert = showAlert, deps, stallOpts = null } = {}) {
   sc ??= await import("../signing-client.js");
   if (job.url) {
-    if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "" }, deps);
+    if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "", ...listedOf(job) }, deps);
     return sc.signAndInstall(siteInstallArgs(job));
   }
   const { resignLabel, deviceError, callWithStall } = await import("../core/signing.js");

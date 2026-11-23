@@ -10,6 +10,10 @@
 //     that bundle ID, every-app ones and unverified paid guesses for it. A source not seen before is added (up to
 //     MAX_SOURCES) and a first pass of ON_DEMAND .debs runs after the answer (ctx.waitUntil); the cron does the rest.
 //     Without the TWEAKS binding: { enabled: false } and the app checks tweaks on the phone, as before.
+//   GET /api/tweaks.json   F398: the whole index as one file (web/app/core/tweakindexfile.js), the same for everyone:
+//     made from D1 at most every FILE_FRESH_S (env.LOOKUP_CACHE, else Cloudflare's cache). Without TWEAKS, or when D1
+//     fails or holds nothing, the copy the site was deployed with (/tweak-index.json, ASSETS); a self-hosted server
+//     (node.mjs) always serves its own copy. The apps of F398 on read only this; GET /api/tweaks is for older builds.
 //   scheduled(): the cron (wrangler.toml [triggers]) seeds tweak-sources.json's "inject" sources (from ASSETS), then
 //     works through the sources with the most left to check, PER_RUN .debs in all (TWEAK_INDEX_PER_RUN).
 //
@@ -22,9 +26,12 @@ import { repoLayout, resolveFilename } from "../../web/app/core/apt.js";
 import { inspectTweakDeb } from "../../web/app/core/tweaks.js";
 import { decompress, UnpackError } from "../../web/app/core/unpack.js";
 import { INDEX_PATH, sourceFromQuery, indexSource, indexTweaks, indexEntry, paidEntry, isPaidStanza } from "../../web/app/core/tweakindex.js";
+import { FILE_PATH, FILE_NAME, packIndexFile, parseIndexFile } from "../../web/app/core/tweakindexfile.js"; // F398
 import { blockedHost } from "./ssrf.js";
 
 export const isTweakIndexPath = (p) => p === INDEX_PATH;
+export const isTweakIndexFilePath = (p) => p === FILE_PATH; // F398
+export const FILE_FRESH_S = 30 * 60;
 export const PER_RUN = 20, ON_DEMAND = 4, MAX_SOURCES = 300, TRIES = 3, REFRESH_S = 6 * 3600, HEADERS_MS = 30000;
 export const DEB_MAX = 16 * 1024 * 1024, PACKAGES_MAX = 48 * 1024 * 1024, PACKAGES_DOWNLOAD_MAX = 16 * 1024 * 1024;
 
@@ -240,6 +247,44 @@ export async function tweakIndex(req, env, ctx = null, { fetcher } = {}) {
   return json({ enabled: true, source: src.key, known: Boolean(fresh), refreshed: fresh?.refreshed ?? 0, pending: fresh?.pending ?? 0,
     // still being read (a first answer, or .debs left): not cached, so the next ask sees what the pass found
     ...(fresh?.error ? { error: fresh.error } : {}), tweaks }, 200, !fresh?.refreshed || fresh?.pending ? "no-store" : "public, max-age=300");
+}
+
+// F398: GET /api/tweaks.json. -> the file's response, or a 404 when there is none.
+async function indexFileText(env) {
+  const db = env.TWEAKS;
+  if (db) {
+    try {
+      await schema(db);
+      const sources = (await db.prepare("SELECT key, refreshed, pending, error FROM tweak_sources ORDER BY added, key").all()).results ?? [];
+      const entries = (await db.prepare("SELECT source, entry, checked FROM tweak_entries WHERE entry IS NOT NULL ORDER BY rowid").all()).results ?? [];
+      const file = packIndexFile(sources, entries);
+      if (file) return { text: JSON.stringify(file), live: true };
+    } catch (e) { console.log(`tweak index file: ${e?.message ?? e}`); }
+  }
+  try {
+    const r = env.ASSETS ? await env.ASSETS.fetch(new Request(`https://assets.local/${FILE_NAME}`)) : null;
+    const text = r?.ok ? await r.text() : "";
+    if (parseIndexFile(text)) return { text, live: false }; // the single-page fallback answers HTML
+  } catch { /* no copy */ }
+  return null;
+}
+
+export async function tweakIndexFile(req, env, ctx = null, { cache = env.LOOKUP_CACHE ?? globalThis.caches?.default ?? null } = {}) {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+  if (req.method !== "GET") return json({ code: "bad_method", error: "GET only." }, 405);
+  const key = new Request(new URL(FILE_PATH, req.url).href); // no query: one entry whatever is appended
+  const hit = env.TWEAKS ? await cache?.match(key).catch(() => null) : null;
+  if (hit) return hit;
+  const file = await indexFileText(env);
+  if (!file) return json({ code: "no_index", error: "This server has no Tweak Index." }, 404);
+  const res = new Response(file.text, { headers: { "Content-Type": "application/json", "X-Content-Type-Options": "nosniff",
+    // the deployed copy only stands in while D1 fails: not kept long
+    "Cache-Control": `public, max-age=${file.live || !env.TWEAKS ? FILE_FRESH_S : 60}`, ...CORS } });
+  if (cache && file.live) {
+    const put = Promise.resolve(cache.put(key, res.clone())).catch(() => {});
+    if (ctx?.waitUntil) ctx.waitUntil(put); else await put;
+  }
+  return res;
 }
 
 // The cron: the bundled inject sources seeded, then the sources with the most left (or the stalest) worked through.

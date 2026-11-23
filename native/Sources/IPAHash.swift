@@ -37,7 +37,7 @@ enum IPAHash {
     static func check(_ file: URL, refuse: Set<String>, log: ((String) -> Void)? = nil) throws -> String? {
         guard let sha = of(file) else { return nil }
         log?("IPA SHA-256: \(sha)")
-        if refuse.contains(sha) { throw Sideload.Failed(text: refused) }
+        if refuse.contains(sha) { WaitingIPA.remove(sha256: sha); throw Sideload.Failed(text: refused) }
         return sha
     }
 }

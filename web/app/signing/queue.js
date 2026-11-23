@@ -28,7 +28,7 @@ import { askInsecure, bridge, keepIpaHash, refusing, storageOf } from "./common.
 import { getServer, defaultServer } from "./identity.js";
 import { serverFallback } from "../core/installroute.js"; // F366
 import { chooseRoute, holdApp } from "./route.js";
-import { withSavedIpa, customInstallSave } from "../core/appqueue.js"; // F379
+import { withSavedIpa, customInstallSave, listedOf } from "../core/appqueue.js"; // F379
 export { hereLabel, shownName, finishHere } from "./common.js";
 
 export const ASK_WAIT = 600; // seconds the queue waits for Install on iOS's prompt before the row fails
@@ -43,7 +43,7 @@ export function prepareParams(job) {
   // F237: Keep Bundle IDs off goes with the job, unless its Custom Install chose (edits.keepBundleId)
   if (job.library) return withKeep({ library: job.library, ...edits });
   const credit = sourceCredit(job); // B247: the source's app it is, kept on the shell's signed record
-  return withKeep({ url: job.url, ...edits, ...(credit ? { credit } : {}) });
+  return withKeep({ url: job.url, ...listedOf(job), ...edits, ...(credit ? { credit } : {}) });
 }
 
 // native.call that rejects with code "cancelled" the moment `signal` aborts, after asking the shell to stop `tag`.
