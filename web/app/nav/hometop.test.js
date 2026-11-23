@@ -249,7 +249,7 @@ test("B406: userTouch: what counts, and that going hidden starts over", async ()
   await p;
 });
 
-test("B406: untilNotTyping waits for the field to lose the focus", async () => {
+test("B406: untilNotTyping waits until no field has the focus", async () => {
   const doc = fakeDoc();
   await untilNotTyping(doc);
   doc.activeElement = field();
@@ -257,8 +257,7 @@ test("B406: untilNotTyping waits for the field to lose the focus", async () => {
   const p = untilNotTyping(doc).then(() => { done = true; });
   await Promise.resolve();
   assert.equal(done, false);
-  doc.activeElement = null;
-  doc.fire("focusout");
+  doc.activeElement = null; // removed from the page: no focusout
   await p;
 });
 

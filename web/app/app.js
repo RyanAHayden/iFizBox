@@ -678,9 +678,10 @@ if (nativeBridge()) {
   // user turned it off (core/push.js autoEnablePush). iOS's permission prompt shows here the first time; each launch
   // tries until it's on.
   if (detectMode() === "sideload") {
-    setTimeout(() => untilNotTyping() // B406: iOS's prompt would put the keyboard away
-      .then(() => Promise.all([import("./core/push.js"), import("./signing/identity.js")]))
-      .then(([p, s]) => p.autoEnablePush({ server: s.getServer() })).catch(() => {}), 3000);
+    // B406: push.register may show iOS's prompt, which would put the keyboard away: it waits until no one is typing
+    const native = { call: (m, p) => (m === "push.register" ? untilNotTyping() : Promise.resolve()).then(() => nativeBridge().call(m, p)) };
+    setTimeout(() => Promise.all([import("./core/push.js"), import("./signing/identity.js")])
+      .then(([p, s]) => p.autoEnablePush({ native, server: s.getServer() })).catch(() => {}), 3000);
   }
   // The first launch after iFizBox updated itself (iOS closed the old one as it installed this one). F183: no note
   // pops up (the banner went with the update popups); the version line at the bottom of Home and Settings shows it.

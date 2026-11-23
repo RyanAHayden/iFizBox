@@ -23,7 +23,7 @@ Headless Chromium at 375x667, CPU x6, with a fake jailbreak bridge. Visibility s
 - `onRoute` moved from `web/app/app.js` to `web/app/nav/stack.js` as `newestRoute`, so a slow mount loses to a newer tab.
 - The same rule now applies to: the website's new-build reload (waits until the user leaves), finished-run page dismissal in `web/app/incoming.js`, the settings redraw on return while typing in `web/app/screens/settings.js`, and the Security Patch alert and push permission prompt (both wait until the user is not typing).
 
-After the fix, case (a) stays on Search with the typed text. An untouched return still goes Home.
+After the fix, case (a) stays on Search with the typed text and case (b) stays on Search. An untouched return still goes Home.
 
 ## Checked
 
@@ -36,6 +36,8 @@ Nothing notable.
 
 ## Not verified
 
+- The website's new-build reload if iOS suspends the page between its hidden event and the reload.
+- The waits for the push prompt, Security Patch alert, settings redraw and finished-run page: no test of their own beyond `untilNotTyping` and `userTouch`.
 - The real iPhone 7. Chromium reproduced the bug, so the phone was not used, as the task asked.
 - The real iOS event order of a tap against `visible`.
 - A real WebKit content-process crash.

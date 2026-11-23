@@ -67,16 +67,15 @@ export const userTouch = createUserTouch(); // the page's one, from startup on
 
 // Whether the user is in a text field (its keyboard up).
 export const typing = (doc = globalThis.document) => Boolean(doc?.activeElement?.matches?.(EDITABLE));
-// Resolves once no text field has the focus, checked again a moment after it left one (moving to another field).
+// Resolves once no text field has the focus. Polled: a field taken off the page may send no focusout.
 export function untilNotTyping(doc = globalThis.document) {
   if (!typing(doc)) return Promise.resolve();
   return new Promise((resolve) => {
-    const check = () => setTimeout(() => {
+    const timer = setInterval(() => {
       if (typing(doc)) return;
-      doc.removeEventListener("focusout", check);
+      clearInterval(timer);
       resolve();
     }, 300);
-    doc.addEventListener("focusout", check);
   });
 }
 
