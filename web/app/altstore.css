@@ -136,3 +136,10 @@ html[data-theme="dark"] .perm-more .cell-label { color: var(--dk-link); }
 .alert-button.blue:active, .alert-button.blue.is-pressed {
   background: var(--alert-btn-blue-pressed); background-origin: border-box; }
 /* ==== } look-only ==== */
+
+/* F384: an APT repo's header card (screens/sourcepage.js): the Sources row's letter tile, CydiaIcon over it */
+.source-head { margin-bottom: 10px; }
+.source-head-icon { position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden;
+  font-size: 28px; font-weight: bold; color: #fff; background: rgba(0,0,0,.25); }
+.source-head-icon img { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; }
+.source-head-icon img.loaded { opacity: 1; }

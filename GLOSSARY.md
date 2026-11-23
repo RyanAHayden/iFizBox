@@ -165,3 +165,10 @@ _Said_: saves the IPA into My IPAs automatically
 _On screen_: My IPAs
 _In code_: saveInstalledIpa, savedIpa, savedResignJob, saveIpaCopy, saveCustomIpa
 _Avoid_: cached IPA, autosave copy
+
+**Information group**:
+The group at the bottom of a source page listing its status: Trust, Website, Updated or Not Responding, Last Release, HTTPS and Signed Releases
+_Said_: Information
+_On screen_: Information
+_In code_: screens/sourcepage.js infoGroup, .source-info
+_Avoid_: status footer, facts group, Trust group
