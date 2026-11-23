@@ -64,6 +64,9 @@
 //                                             merged into what is kept, and apps whose candidate is one of them are
 //                                             judged with it (the source's own range wins, unless the IPA's own
 //                                             MinimumOSVersion is higher: ipainfo.js ipaRaises). Returns how many are kept
+//   c.setTweakVerdicts(map)                -> B377: { "id@version": true|false }, merged: true drops that Tweak Source
+//                                             tweak (for iOS itself, or refused) from App Tweaks, Search, Sections'
+//                                             counts and its source's list; false brings it back. -> how many dropped
 //
 // A row is the slim record lists draw: { id, name, short, version, section, icon, key, author, compat, purpose }.
 import { parseControl, description, resolveFilename, resolveIcon, matchesArch, compareVersions, DEFAULT_ARCH, parseRelations } from "./apt.js";
@@ -485,6 +488,25 @@ export function createCatalog() {
     fitting.clear();
     return filterStore ? Object.keys(filterStore).length : 0;
   }
+  // B377: the Tweak Index's (or this device's) verdicts: "id@version" -> true when that tweak can't go into an app
+  // (systemOnly, or refused: core/tweakindex.js dropsFromCatalog). A Tweak Source's row with such a verdict drops out
+  // of App Tweaks, Search, Sections' counts and its source's list; unchecked rows stay. package() still opens it.
+  const systemTweaks = new Set();
+  const systemTweak = (r) => systemTweaks.size > 0 && tweakKeys.has(r.key) && systemTweaks.has(`${r.id}@${r.version}`);
+  function setTweakVerdicts(map) {
+    let changed = false;
+    for (const [k, drop] of Object.entries(map && typeof map === "object" ? map : {})) {
+      if (drop === true && !systemTweaks.has(k)) { systemTweaks.add(k); changed = true; }
+      else if (drop === false && systemTweaks.delete(k)) changed = true;
+    }
+    if (changed) {
+      filterGen++;
+      sorted.clear();
+      shown.clear();
+      fitting.clear();
+    }
+    return systemTweaks.size;
+  }
   // F382: the newest version of each id across the counted sources, unfiltered rows only (Newest Copy Only), and All
   // Sources' merge without filtered rows (an id whose newest copy is filtered out falls back to the next one).
   let listCacheOf = [null, -1], newestCopy = new Map(), listMerged = new Map();
@@ -672,7 +694,7 @@ export function createCatalog() {
       for (const [id, e] of sources.get(k)?.byId ?? []) {
         const cur = tweakMerged.get(id);
         if (!cur || compareVersions(cur.stanza.version, e.stanza.version) < 0) tweakMerged.set(id, e);
-        if (filteredOut(e.row)) continue;
+        if (filteredOut(e.row) || systemTweak(e.row)) continue;
         const was = kept.get(id);
         if (!was || compareVersions(was.stanza.version, e.stanza.version) < 0) kept.set(id, e);
       }
@@ -697,7 +719,7 @@ export function createCatalog() {
       // list without what another source has newer (Newest Copy Only).
       const from = filterStore ? (listMerges(), key === ALL ? listMerged : entries(key)) : entries(key);
       const dupes = key !== ALL && dupesOn();
-      rows = [...from.values()].filter((e) => listed(e.row) && !filteredOut(e.row) && !(dupes && olderCopy(e)))
+      rows = [...from.values()].filter((e) => listed(e.row) && !filteredOut(e.row) && !systemTweak(e.row) && !(dupes && olderCopy(e)))
         .map((e) => e.row).sort(compareNames);
       sorted.set(key, rows);
     }
@@ -1077,7 +1099,7 @@ export function createCatalog() {
 
   return { load, loadAlt, altSource, remove, setHidden, setHiddenAuthors, setBlocked, sections, list, search, author, package: pkg, history, has, versions, keys: () => [...sources.keys()],
     categories, browse, popular, free, featured, collection: collectionRows, roulette,
-    setInstalled, installed, upgrades, setDevice, setIpaInfo, setFilters,
+    setInstalled, installed, upgrades, setDevice, setIpaInfo, setFilters, setTweakVerdicts,
     deps, aptProblems, queueInfo, runInfo };
 }
 
@@ -1093,6 +1115,7 @@ export function runCatalog(catalog, op, args = []) {
     search: catalog.search, author: catalog.author, package: catalog.package, history: catalog.history, has: catalog.has, keys: catalog.keys,
     versions: catalog.versions, setHidden: catalog.setHidden, setHiddenAuthors: catalog.setHiddenAuthors, setBlocked: catalog.setBlocked, setInstalled: catalog.setInstalled,
     installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice, setIpaInfo: catalog.setIpaInfo, setFilters: catalog.setFilters,
+    setTweakVerdicts: catalog.setTweakVerdicts,
     categories: catalog.categories, browse: catalog.browse, popular: catalog.popular, free: catalog.free, featured: catalog.featured,
     collection: catalog.collection, roulette: catalog.roulette,
     deps: catalog.deps, aptProblems: catalog.aptProblems, queueInfo: catalog.queueInfo, runInfo: catalog.runInfo }[op];

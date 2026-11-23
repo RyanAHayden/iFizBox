@@ -1,0 +1,14 @@
+[
+ {"wait": 2000},
+ {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"},
+ {"nav": "#/sources", "ms": 6000},
+ {"eval": "import('./backend.js').then(m=>m.getBackend().addSource('http://127.0.0.1:8737/')).then(r=>'added '+r.key, e=>'err '+e.message)"},
+ {"nav": "#/sources", "ms": 10000},
+ {"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"},
+ {"tap": "text:All Sources", "ms": 4000},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,900)"},
+ {"tap": "text:App Tweaks", "ms": 3000},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,900)"},
+ {"shot": "app-tweaks"},
+ {"eval": "import('./catalog.js').then(m=>m.catalog.search('aerial')).then(r=>r.map(x=>x.id))"}
+]

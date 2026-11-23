@@ -186,6 +186,7 @@ async function run() {
     reloaded = true;
     return loadSource(s, arch, sig, { tweaks });
   }));
+  if (tweakSources) await watchTweakIndex(reloaded ? sources.filter((s) => !isAltKey(s.key)) : []); // B377
   if (reloaded) await recordSeen();
   if (reloaded) fireLoaded();
   return sources;
@@ -304,6 +305,28 @@ function setIpaInfo(map) {
   for (const f of changeListeners) f();
 }
 
+// B377: the sideload build's Tweak Sources: what the Tweak Index (and this device's checks) found can't go into an app
+// (screens/tweaks.js catalogVerdicts / onTweakVerdicts) is sent to the worker with the next question, so App Tweaks,
+// Search and Sections leave it out (core/catalog.js setTweakVerdicts). The index is asked after each load, not awaited.
+let verdictsPending = {};
+let verdictsHooked = null;
+function setTweakVerdicts(map) {
+  if (!map || !Object.keys(map).length) return;
+  verdictsPending = { ...verdictsPending, ...map };
+  for (const f of changeListeners) f();
+}
+async function watchTweakIndex(tweakSources) {
+  let mod;
+  try {
+    mod = await (verdictsHooked ??= import("./screens/tweaks.js").then((m) => {
+      m.onTweakVerdicts(setTweakVerdicts);
+      setTweakVerdicts(m.catalogVerdicts());
+      return m;
+    }));
+  } catch { verdictsHooked = null; return; }
+  if (tweakSources.length) mod.loadTweakIndex(tweakSources).catch(() => 0);
+}
+
 // ---- Installed (F7): dpkg's status file, parsed in the worker beside the catalog. In the app the native
 // backend reads it (N3: `ifizboxNative.dpkgStatus()` resolves to the text of /var/lib/dpkg/status, or
 // /var/jb/var/lib/dpkg/status rootless; core/installed.js STATUS_PATHS); on the site the visitor uploads it and
@@ -376,6 +399,11 @@ const ask = async (op, args) => {
     const m = ipaPending;
     ipaPending = {};
     await getParser().catalog("setIpaInfo", [m]);
+  }
+  if (Object.keys(verdictsPending).length) {
+    const m = verdictsPending;
+    verdictsPending = {};
+    await getParser().catalog("setTweakVerdicts", [m]);
   }
   return getParser().catalog(op, args);
 };

@@ -1,0 +1,4 @@
+{"enabled": true, "tweaks": [
+ {"package": "jp.uzra.aerial", "version": "1.2.0", "ok": false, "why": "It's for iOS itself (SpringBoard or a system app), not an app you can sign.", "bundles": [], "executables": [], "anyApp": false, "systemOnly": true, "dylibs": ["Aerial.dylib"], "needs": ["mobilesubstrate"]},
+ {"package": "com.b377.anyfont", "version": "1.1", "ok": true, "why": null, "bundles": [], "executables": [], "anyApp": true, "systemOnly": false, "dylibs": ["AnyFont.dylib"], "needs": ["mobilesubstrate"]}
+]}

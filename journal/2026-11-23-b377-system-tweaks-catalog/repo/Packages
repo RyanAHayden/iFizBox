@@ -1,0 +1,29 @@
+Package: jp.uzra.aerial
+Name: Aerial
+Version: 1.2.0
+Architecture: iphoneos-arm64
+Section: Tweaks
+Author: uzra
+Depends: mobilesubstrate, firmware (>= 15.0)
+Description: Wallpaper effects for the Home Screen
+Filename: debs/jp.uzra.aerial_1.2.0_iphoneos-arm64.deb
+
+Package: com.b377.anyfont
+Name: AnyFont
+Version: 1.1
+Architecture: iphoneos-arm64
+Section: Tweaks
+Author: Test
+Depends: mobilesubstrate
+Description: A font for every app
+Filename: debs/com.b377.anyfont_1.1_iphoneos-arm64.deb
+
+Package: com.b377.aerialfresh
+Name: Aerial Fresh
+Version: 0.9
+Architecture: iphoneos-arm64
+Section: Tweaks
+Author: Test
+Depends: mobilesubstrate
+Description: Not checked yet
+Filename: debs/com.b377.aerialfresh_0.9_iphoneos-arm64.deb
