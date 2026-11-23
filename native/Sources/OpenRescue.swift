@@ -3,7 +3,7 @@
 // resolves before it calls scene(_:openURLContexts:) (or puts it in the launch's URL contexts). fileproviderd refuses
 // that bookmark ("surprising bundle identifier", Cocoa error 257) when the app's signature names another App ID than
 // its bundle ID: the usual case for a kept bundle ID signed with an explicit profile (the iPhone 15 Pro's
-// com.ryha.sideload). UIKit then logs "Error resolving bookmark" and drops the open: no delegate call, no trail line,
+// test builds). UIKit then logs "Error resolving bookmark" and drops the open: no delegate call, no trail line,
 // iFizBox comes up on whatever page it showed.
 // The open action itself still carries the file's URL (UISOpenURLAction's url, read by UIKit as it handles the
 // action). This reads it there: a file URL the delegate doesn't deliver within `grace` goes to Incoming.receive as if
