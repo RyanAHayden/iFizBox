@@ -259,6 +259,7 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
         ...refusing() },
       { onProgress: (t) => h.set(t), ...(signal ? { signal } : {}) }));
     noteSigned(storage, ipaSize); // F261
+    for (const line of signed.signLog ?? []) console.info(line); // B327: the keychain groups and group fix it signed with
     keepIpaHash(storage, signed, { bundleId, version }); // F292: Report as Malicious sends it
     // F334: the job's warnings (B227: a group folder this profile lost), and the other-ID warning for an app whose ID
     // only the IPA knew, before anything goes to iOS

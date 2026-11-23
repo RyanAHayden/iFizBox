@@ -4,7 +4,8 @@
 //   await runSignJob(createZsign, { ipa, p12, password, profile, bring, appBundleId, keepBundleId, tweaks, groupFix, refuseSha256 }, { progress })
 //     -> { ipa: Uint8Array (signed), bundleId (signed as), originalId, name, version, sha256 (of the IPA as it came),
 //          injected?, warnings? (B227: data iOS keeps from the app after this signature, in words),
-//          signer (F342: core/websign.js webSignerStamp), expires? (F342: ISO, core/websign.js signatureEnd) }
+//          signer (F342: core/websign.js webSignerStamp), expires? (F342: ISO, core/websign.js signatureEnd),
+//          signLog (B327: the keychain groups and group fix config it signed with, in the app's sign log's words) }
 //   Throws Error with .code: bad_ipa (not an IPA, no app inside), bad_profile, sign_failed (zsign's own reason),
 //   malware (F292: the IPA's SHA-256 is in refuseSha256, core/malicious.js malwareHashes).
 //
@@ -21,7 +22,9 @@ import { isZip, profileInfo, signingIds, appEntitlements, plistXml, identityPlis
   IFIZBOX_ID, IDENTITY_FILE, TRANSFER_FILE } from "./core/websign.js";
 import { webSignerStamp, groupFixHash, signatureEnd } from "./core/websign.js"; // F342
 import { injectInto } from "./core/tweaks.js";
-import { entitlementsRead, groupFixPlan, withGroupFix, readConfig, GROUPFIX } from "./core/groupfix.js";
+import { entitlementsRead, groupFixPlan, withGroupFix, readConfig, GROUPFIX, groupFixLogLine } from "./core/groupfix.js";
+import { keychainLogLine } from "./core/websign.js"; // B327
+import { NAME } from "./brand.js";
 import { MALWARE_REFUSED } from "./core/malicious.js";
 
 const fail = (code, message) => Object.assign(new Error(message), { code });
@@ -98,7 +101,8 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
 
   FS.writeFile("/w/key.p12", new Uint8Array(p12));
   FS.writeFile("/w/app.mobileprovision", new Uint8Array(profile));
-  FS.writeFile("/w/ents.plist", plistXml(appEntitlements(prof, entitlementsId, bundleId)));
+  const ents = appEntitlements(prof, entitlementsId, bundleId);
+  FS.writeFile("/w/ents.plist", plistXml(ents));
   if (bring && own === IFIZBOX_ID) {
     if (bring.identity) FS.writeFile(`${appDir}/${IDENTITY_FILE}`, identityPlist({ p12, password, profile }));
     if (typeof bring.transfer === "string" && bring.transfer.startsWith("ifizbox://import?")) {
@@ -113,6 +117,12 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   const plan = groupFix?.length && own !== IFIZBOX_ID
     ? groupFixPlan(fileEntitlements(FS, `${appDir}/${plist.CFBundleExecutable || ""}`), prof.entitlements, previous) : null;
   const all = withGroupFix(tweaks, plan, groupFix);
+  // B327: the keychain groups and the group fix this sign used (or why none), the app's signer's words
+  // (a plan made without the dylib only to tell "nothing to fix" from "left unmapped", as the app's signer does)
+  const wanted = plan ?? (own !== IFIZBOX_ID && !groupFix?.length
+    ? groupFixPlan(fileEntitlements(FS, `${appDir}/${plist.CFBundleExecutable || ""}`), prof.entitlements, previous) : null);
+  const signLog = [keychainLogLine(ents), groupFixLogLine(plan,
+    own === IFIZBOX_ID ? `${NAME}'s own IPA` : wanted ? "no fix dylib was loaded, the app's groups go unmapped" : undefined)];
   // F288: tweaks (core/tweaks.js prepareTweaks, done on the page): their files into the app, and the weak load commands
   // into the main executable, before zsign signs it all (it signs Frameworks/' dylibs and frameworks as any other).
   const injected = all?.files?.length ? putTweaks(FS, appDir, plist, all) : [];
@@ -133,7 +143,7 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   const signer = webSignerStamp(injected.includes(GROUPFIX.inject) ? await groupFixHash(groupFix) : null);
   const expires = signatureEnd(profile);
   return { ipa: out, bundleId, originalId: info.bundleId, name: info.name, version: info.version, ...(sha256 ? { sha256 } : {}),
-    signer, ...(expires ? { expires } : {}),
+    signer, signLog, ...(expires ? { expires } : {}),
     ...(injected.length ? { injected } : {}), ...(warnings.length ? { warnings } : {}) };
 }
 

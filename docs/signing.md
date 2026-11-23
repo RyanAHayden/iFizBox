@@ -659,7 +659,16 @@ An app keeps its data in three places, and a re-sign must leave each where the a
   same under any profile, whatever groups it has or in what order, and no other app shares it. An app an earlier
   sign mapped onto the profile's first group gets that folder and suite copied into its own once (`legacy` in
   `ifizbox-groupfix.plist`; only for an app that had run before it got this fix, never a fresh install, which would
-  take in what other apps left in that shared group). The signer's log says `Group fix: ...`.
+  take in what other apps left in that shared group).
+
+Every sign logs what it gave the app, so a report of an app that lost its sign-in or settings can be read from
+Console Logs (the run's log): `Keychain: TEAM.<its ID>, TEAM.<App ID> (application-identifier TEAM.<App ID>)`, the
+groups in their order (new items go to the first), and `Group fix: <groups> -> the app's own folder; keychain groups
+stripped; <group> copied in once if the app ran before` (every part of `ifizbox-groupfix.plist`), or `Group fix:
+none (<why>)`: the original names no groups, iFizBox's own IPA, or no fix dylib in the build (the app's groups then
+go unmapped). The app's signer writes them to the log (`Profile.keychainLine`, `GroupFix.logLine`); the website's
+job returns them as `signLog` (`core/websign.js keychainLogLine`, `core/groupfix.js groupFixLogLine`), which the
+page writes to the browser console.
 
 What iOS doesn't let a re-sign keep:
 

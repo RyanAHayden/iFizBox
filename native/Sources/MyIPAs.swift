@@ -133,7 +133,7 @@ enum MyIPAs {
     // The signed copy, signed now when there is none that fits. Runs on SignBridge.queue.
     // F196: `job` stops the signer at its next step (SignJob).
     static func signIfNeeded(_ file: String, id: SecIdentity, profile: Profile, emit: @escaping (String, Double) -> Void,
-                             job: SignJob? = nil, keep: Bool? = nil) throws -> IPALibrary.Signed {
+                             job: SignJob? = nil, keep: Bool? = nil, log: ((String) -> Void)? = nil) throws -> IPALibrary.Signed {
         let identity = try KeychainIdentity(id)
         if let p = DeviceCheck.problem(PhoneID.check(profile)) { throw p } // F236: before iOS's "integrity" alert
         if let s = library.signed(file, certificate: identity.certificate, keep: keep) { return s }
@@ -142,6 +142,7 @@ enum MyIPAs {
         try job?.check()
         let signer = IPASigner(profile: profile, identity: identity)
         if let job = job { signer.stop = { job.cancelled } }
+        if let log = log { let nslog = signer.log; signer.log = { nslog($0); log($0) } } // B327: Keychain:/Group fix: lines in the run's log
         return try library.sign(file, signer: signer, certificate: identity.certificate,
                                 expires: profile.signatureExpiry(certificate: identity.certificate), work: SignBridge.work,
                                 progress: { emit($0, $1) }, keep: keep)
@@ -253,7 +254,7 @@ enum MyIPAs {
         let job = SignJob.begin() // F196: until iOS has the IPA (serveAndOpen ends it)
         SignBridge.queue.async {
             let s: IPALibrary.Signed
-            do { s = try signIfNeeded(file, id: id, profile: profile, emit: emit, job: job, keep: keep(c)); try job.check() } catch {
+            do { s = try signIfNeeded(file, id: id, profile: profile, emit: emit, job: job, keep: keep(c), log: { c.emitOnMain([["log": $0]]) }); try job.check() } catch {
                 job.end()
                 return Apt.reply(c, nil, SignBridge.text(job.cancelled ? SignJob.cancelledError : error))
             }

@@ -84,6 +84,11 @@ test("B211: an app whose original signature names keychain groups gets the group
   assert.ok(loadCommands(seen.exe).some((c) => c.cmd === LC.LOAD_WEAK_DYLIB && c.name === GROUPFIX.inject));
   assert.ok(Buffer.from(seen.dylib).includes(CSMAGIC_EMBEDDED_SIGNATURE), "zsign signed the fix");
   assert.match(new TextDecoder().decode(seen.config), /<key>keychain<\/key><true\/>/);
+  // B327: the sign log names the fix it got, and says when an app that needs one went without (no dylib loaded)
+  assert.equal(first.signLog[1], "Group fix: none (the original signature names no app groups or keychain groups)");
+  assert.match(r.signLog[1], /^Group fix: no app groups -> the app's own folder; keychain groups stripped/);
+  const bare = await runSignJob(createZsign, { ...base, groupFix: null, ipa: first.ipa, appBundleId: "com.example.box" });
+  assert.equal(bare.signLog[1], "Group fix: none (no fix dylib was loaded, the app's groups go unmapped)");
   const cr = readZip(r.ipa).find((e) => e.path === "Payload/Tiny.app/_CodeSignature/CodeResources");
   assert.ok(Buffer.from(cr.data).includes(Buffer.from(GROUPFIX.config)), "its config sealed by the app");
   // iFizBox's own IPA keeps its own groups: no fix

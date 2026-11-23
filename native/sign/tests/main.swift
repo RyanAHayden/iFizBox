@@ -848,6 +848,14 @@ test("B211: group fix") {
     check(GroupFix.plan(original: insta, profile: ["com.apple.security.application-groups": ["group.com.burbn.instagram"]])?.groups == [], "a group the profile has stays")
     check(GroupFix.plan(original: ["application-identifier": "OLD.x"], profile: mine) == nil, "nothing to fix")
     check(GroupFix.plan(original: nil, profile: mine) == nil, "unsigned")
+    // B327: the sign log names the whole config, or why there is none
+    check(GroupFix.logLine(GroupFix.plan(original: insta, profile: mine))
+          == "Group fix: group.com.burbn.instagram -> the app's own folder; keychain groups stripped; group.com.me.box copied in once if the app ran before",
+          "\(GroupFix.logLine(GroupFix.plan(original: insta, profile: mine)))")
+    check(GroupFix.logLine(nil) == "Group fix: none (the original signature names no app groups or keychain groups)", "no fix")
+    check(Profile.keychainLine(["application-identifier": "T.com.me.sideload", "keychain-access-groups": ["T.com.burbn.instagram", "T.com.me.sideload"]])
+          == "Keychain: T.com.burbn.instagram, T.com.me.sideload (application-identifier T.com.me.sideload)", "keychain line")
+    check(Profile.keychainLine([:]) == "Keychain: no keychain groups (application-identifier none)", "empty keychain line")
     let prev = try GroupFix.adding(GroupFix.plan(original: insta, profile: [:])!, dylib: Data(), to: nil).files[1].data
     check(GroupFix.plan(original: ["keychain-access-groups": ["T.x"]], profile: mine, previous: prev)?.groups == ["group.com.burbn.instagram"],
           "signed again: the earlier config's groups still count")
@@ -885,6 +893,8 @@ test("B211: group fix") {
     let app = try signer.sign(try ipa("insta.ipa", id: nil), to: out)
     check(app.injected == [GroupFix.inject], "\(app.injected)")
     check(logged.contains("Group fix: group.com.burbn.instagram -> the app's own folder; keychain groups stripped"), "\(logged)")
+    // B327: every sign logs the keychain groups (in order) and the application-identifier it signed with
+    check(logged.contains("Keychain: \(team).\(app.bundleID) (application-identifier \(app.appID ?? ""))"), "\(logged)")
     let f = try entries(out)
     let a = "Payload/Fixture.app/"
     check(MachOEdit.dylibs(f[a + "Fixture"]!).last == GroupFix.inject, "\(MachOEdit.dylibs(f[a + "Fixture"]!))")
@@ -893,8 +903,12 @@ test("B211: group fix") {
     check(config?["groups"] as? [String] == ["group.com.burbn.instagram"] && config?["target"] as? String == "" && config?["keychain"] as? Bool == true, "\(String(describing: config))")
     check(signer.options.tweaks == nil, "the user's options stay without it")
 
-    let own = try IPASigner(profile: p, identity: identity).sign(try ipa("own.ipa", id: SignOptions.selfBundleID), to: work.appendingPathComponent("own-signed.ipa"))
+    let ownSigner = IPASigner(profile: p, identity: identity)
+    var ownLogged = [String]()
+    ownSigner.log = { ownLogged.append($0) }
+    let own = try ownSigner.sign(try ipa("own.ipa", id: SignOptions.selfBundleID), to: work.appendingPathComponent("own-signed.ipa"))
     check(own.injected.isEmpty, "iFizBox's own IPA: \(own.injected)")
+    check(ownLogged.contains("Group fix: none (\(Brand.name)'s own IPA)"), "B327: why no fix: \(ownLogged)")
     // B259: the stamp names the dylib the app got; another dylib build makes only such apps stale
     check(app.groupFix == SignerStamp.hash(dylib) && app.stamp == SignerStamp.now && !app.stamp.isStale(), "stamp \(app.stamp)")
     check(own.groupFix == nil && own.stamp.groupFix == nil, "no fix, no hash")

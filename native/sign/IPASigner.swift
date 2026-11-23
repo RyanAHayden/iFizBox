@@ -246,16 +246,25 @@ final class IPASigner {
         // gets the group fix (GroupFix.swift) beside the user's tweaks; never iFizBox's own IPA.
         var tweaks = options.tweaks
         var groupFix: String? = nil // B259: kept in the record's SignerStamp
-        if oldID != SignOptions.selfBundleID, let exe = main.plist["CFBundleExecutable"] as? String, files[appDir + exe] != nil,
-           let plan = GroupFix.plan(original: Inspect.entitlements(try contents(appDir + exe, files, zip)),
-                                    profile: profile.entitlements(for: entID, keptID: keep ? newID : nil),
-                                    previous: files[appDir + GroupFix.configPath] == nil ? nil : try? contents(appDir + GroupFix.configPath, files, zip)),
-           let dylib = GroupFix.dylib() {
-            tweaks = try GroupFix.adding(plan, dylib: dylib, to: tweaks)
-            groupFix = SignerStamp.hash(dylib)
-            log("Group fix: \(plan.groups.isEmpty ? "no app groups" : plan.groups.joined(separator: ", ")) -> "
-                + (plan.target.isEmpty ? "the app's own folder" : plan.target) + (plan.keychain ? "; keychain groups stripped" : ""))
-            if let lost = plan.lost { log("Warning: this profile has no \(lost), where the app kept its shared data until now; iOS keeps that folder from it") }
+        // B327: every sign logs the keychain groups the app gets and the group fix it got (or why none), so a report of
+        // an app that lost its data can be read from Console Logs
+        let appEnts = profile.entitlements(for: entID, keptID: keep ? newID : nil)
+        log(Profile.keychainLine(appEnts))
+        if oldID == SignOptions.selfBundleID {
+            log(GroupFix.logLine(nil, none: "\(Brand.name)'s own IPA"))
+        } else if let exe = main.plist["CFBundleExecutable"] as? String, files[appDir + exe] != nil {
+            let plan = GroupFix.plan(original: Inspect.entitlements(try contents(appDir + exe, files, zip)), profile: appEnts,
+                                     previous: files[appDir + GroupFix.configPath] == nil ? nil : try? contents(appDir + GroupFix.configPath, files, zip))
+            if let plan = plan, let dylib = GroupFix.dylib() {
+                tweaks = try GroupFix.adding(plan, dylib: dylib, to: tweaks)
+                groupFix = SignerStamp.hash(dylib)
+                log(GroupFix.logLine(plan))
+                if let lost = plan.lost { log("Warning: this profile has no \(lost), where the app kept its shared data until now; iOS keeps that folder from it") }
+            } else {
+                log(GroupFix.logLine(nil, none: plan == nil ? GroupFix.notNeeded : "this build has no fix dylib, the app's groups go unmapped"))
+            }
+        } else {
+            log(GroupFix.logLine(nil, none: "the app's executable is missing"))
         }
         // F288: the tweaks' files go in (over any the app has at those paths); their frameworks are bundles to sign
         if let t = tweaks {

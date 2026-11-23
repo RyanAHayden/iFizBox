@@ -91,6 +91,15 @@ struct Profile {
         return own != app && ok ? [own, app] : [app]
     }
 
+    // B327: the sign log's keychain line for entitlements(for:keptID:): the groups in order (new items go to the
+    // first) and the application-identifier (installd keeps an update to it). The same words as core/websign.js
+    // keychainLogLine.
+    static func keychainLine(_ ents: [String: Any]) -> String {
+        let groups = (ents["keychain-access-groups"] as? [Any] ?? []).compactMap { $0 as? String }
+        return "Keychain: " + (groups.isEmpty ? "no keychain groups" : groups.joined(separator: ", "))
+            + " (application-identifier \(ents["application-identifier"] as? String ?? "none"))"
+    }
+
     // Why this certificate can't sign with this profile, or nil when it can.
     func problem(with cert: Data, now: Date = Date()) -> SignError? {
         if let x = expires, x < now { return SignError("profile_expired", "The provisioning profile \"\(name)\" expired.") }
