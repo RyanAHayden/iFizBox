@@ -23,9 +23,10 @@ current era's theme like the other bar buttons.
   labels). Redrawing it for each era (iOS 7, 13 and 26 activity sheets) is new design work for three eras, so it was
   filed as concept task K5 and not built here.
 - `journal/2026-11-23-b371-share-button-eras/`: this file, `capture.mjs` (copied from the F382 journal, `--mode
-  sideload`), the scripts `eras.json`, `app.json`, `dark.json`, `sheet.json`, and `shots/`. `shots/share-button-eras.png`
-  is a montage of the top-right corner of each shot. `shots/sheet-ios7.png` and `shots/sheet-ios26.png` show the
-  share sheet.
+  sideload`), the scripts `eras.json` (both pages, every era, Light and Dark) and `sheet.json` (the share sheet), and
+  `shots/`. `shots/eras/` holds every page shot at 1x. `shots/share-button-eras.png` is a montage, one column per
+  era; rows: Light nav bar button, Light header button, Dark nav bar button, Dark header button.
+  `shots/sheet-ios7.png` and `shots/sheet-ios26.png` show the share sheet.
 
 ## How it was checked
 
@@ -38,6 +39,10 @@ current era's theme like the other bar buttons.
 
 - The button on a real phone. The shell draws the page with the same CSS, and AGENTS.md says web checks stay in
   Chromium.
+- The iOS 26 native glass bar was not rendered: it only runs in the shell with native controls on, an iPhone with
+  WebKit 26. `iconOf` takes the `::before` mask as a template image, so it gets the same glyph.
+- What the person who filed this saw. The buttons were already right on main, so the most likely leftover iOS 6
+  look is the share sheet, filed as K5. If they meant something else, it was not found here.
 - The jailbreak build's tweak page header Share button was not shot. It needs a copy of the iPhone 7's apt state for
   the fake bridge. It is the same `shareHeadButton` element and classes as the app page's.
 

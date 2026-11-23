@@ -10,7 +10,7 @@
 "ms": 8000
 },
 {
-"eval": "localStorage.setItem('ifizbox.style','ios6'); 'ok'"
+"eval": "localStorage.setItem('ifizbox.style','ios6'); localStorage.setItem('ifizbox.appearance','light'); 'ok'"
 },
 {
 "nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json",
@@ -23,23 +23,23 @@
 "wait": 500
 },
 {
-"shot": "ios6-source"
+"shot": "light-ios6-source"
 },
 {
-"eval": "[...document.querySelectorAll('.page.is-top a')].map(a=>a.getAttribute('href')).slice(0,8)"
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+"ms": 5000
 },
 {
-"tap": ".page.is-top a[href*='app']",
-"ms": 3000
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
 },
 {
-"eval": "location.hash"
+"wait": 800
 },
 {
-"shot": "ios6-app"
+"shot": "light-ios6-app"
 },
 {
-"eval": "localStorage.setItem('ifizbox.style','ios7'); 'ok'"
+"eval": "localStorage.setItem('ifizbox.style','ios7'); localStorage.setItem('ifizbox.appearance','light'); 'ok'"
 },
 {
 "nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json",
@@ -52,23 +52,23 @@
 "wait": 500
 },
 {
-"shot": "ios7-source"
+"shot": "light-ios7-source"
 },
 {
-"eval": "[...document.querySelectorAll('.page.is-top a')].map(a=>a.getAttribute('href')).slice(0,8)"
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+"ms": 5000
 },
 {
-"tap": ".page.is-top a[href*='app']",
-"ms": 3000
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
 },
 {
-"eval": "location.hash"
+"wait": 800
 },
 {
-"shot": "ios7-app"
+"shot": "light-ios7-app"
 },
 {
-"eval": "localStorage.setItem('ifizbox.style','ios13'); 'ok'"
+"eval": "localStorage.setItem('ifizbox.style','ios13'); localStorage.setItem('ifizbox.appearance','light'); 'ok'"
 },
 {
 "nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json",
@@ -81,23 +81,23 @@
 "wait": 500
 },
 {
-"shot": "ios13-source"
+"shot": "light-ios13-source"
 },
 {
-"eval": "[...document.querySelectorAll('.page.is-top a')].map(a=>a.getAttribute('href')).slice(0,8)"
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+"ms": 5000
 },
 {
-"tap": ".page.is-top a[href*='app']",
-"ms": 3000
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
 },
 {
-"eval": "location.hash"
+"wait": 800
 },
 {
-"shot": "ios13-app"
+"shot": "light-ios13-app"
 },
 {
-"eval": "localStorage.setItem('ifizbox.style','ios26'); 'ok'"
+"eval": "localStorage.setItem('ifizbox.style','ios26'); localStorage.setItem('ifizbox.appearance','light'); 'ok'"
 },
 {
 "nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json",
@@ -110,19 +110,135 @@
 "wait": 500
 },
 {
-"shot": "ios26-source"
+"shot": "light-ios26-source"
 },
 {
-"eval": "[...document.querySelectorAll('.page.is-top a')].map(a=>a.getAttribute('href')).slice(0,8)"
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+"ms": 5000
 },
 {
-"tap": ".page.is-top a[href*='app']",
-"ms": 3000
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
 },
 {
-"eval": "location.hash"
+"wait": 800
 },
 {
-"shot": "ios26-app"
+"shot": "light-ios26-app"
+},
+{
+"eval": "localStorage.setItem('ifizbox.style','ios6'); localStorage.setItem('ifizbox.appearance','dark'); 'ok'"
+},
+{
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json",
+"ms": 5000
+},
+{
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
+},
+{
+"wait": 500
+},
+{
+"shot": "dark-ios6-source"
+},
+{
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+"ms": 5000
+},
+{
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
+},
+{
+"wait": 800
+},
+{
+"shot": "dark-ios6-app"
+},
+{
+"eval": "localStorage.setItem('ifizbox.style','ios7'); localStorage.setItem('ifizbox.appearance','dark'); 'ok'"
+},
+{
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json",
+"ms": 5000
+},
+{
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
+},
+{
+"wait": 500
+},
+{
+"shot": "dark-ios7-source"
+},
+{
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+"ms": 5000
+},
+{
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
+},
+{
+"wait": 800
+},
+{
+"shot": "dark-ios7-app"
+},
+{
+"eval": "localStorage.setItem('ifizbox.style','ios13'); localStorage.setItem('ifizbox.appearance','dark'); 'ok'"
+},
+{
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json",
+"ms": 5000
+},
+{
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
+},
+{
+"wait": 500
+},
+{
+"shot": "dark-ios13-source"
+},
+{
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+"ms": 5000
+},
+{
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
+},
+{
+"wait": 800
+},
+{
+"shot": "dark-ios13-app"
+},
+{
+"eval": "localStorage.setItem('ifizbox.style','ios26'); localStorage.setItem('ifizbox.appearance','dark'); 'ok'"
+},
+{
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json",
+"ms": 5000
+},
+{
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
+},
+{
+"wait": 500
+},
+{
+"shot": "dark-ios26-source"
+},
+{
+"nav": "#/sources/alt%3Ahttps%3A%2F%2Fifizbox.com%2Frepo%2Fsource.json/package%3Acom.ryha.ifizbox",
+"ms": 5000
+},
+{
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"
+},
+{
+"wait": 800
+},
+{
+"shot": "dark-ios26-app"
 }
 ]

@@ -1,7 +1,0 @@
-[
- {"wait": 1000},
- {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"},
- {"nav": "#/sources", "ms": 8000},
- {"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); document.querySelector('.page.is-top')?.innerText.slice(0,600)"},
- {"eval": "[...document.querySelectorAll('.page.is-top a')].map(a=>a.getAttribute('href')).slice(0,20)"}
-]
