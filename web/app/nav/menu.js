@@ -46,7 +46,7 @@ export function showMenu(anchor, items, opts = {}) {
   }, () => {
     if (open !== ctl) return;
     close();
-    cssMenu(anchor, items, opts); // an older shell ("unknown method ui.menu"), or no menu opened
+    cssMenu(anchor, items, opts); // no menu opened (the concept frame has no shell)
   });
   return close;
 }

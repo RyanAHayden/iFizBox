@@ -103,7 +103,7 @@ export const SETTINGS = [
     // F202: iOS 13 (ios13.css), inset grouped with large titles and card sheets (STYLE_HOOKS)
     options: [{ value: "ios6", label: "iOS 6" }, { value: "ios7", label: "iOS 7" }, { value: "ios13", label: "iOS 13" },
       { value: "ios26", label: "iOS 26" }], // F203: Liquid Glass (ios26.css), large titles, card sheets, floating tab bar
-    footer: "iOS 7, iOS 13 and iOS 26 have two themes of their own: White, and OLED Black in Dark mode.",
+    footer: "iOS 7 and iOS 13 (and iOS 26, on iOS 26 or later) have two themes of their own: White, and OLED Black in Dark mode.",
   },
   {
     // F199: Theme's Mode, drawn as an iOS 6 segmented control. Kept under its old key (ifizbox.appearance) so a

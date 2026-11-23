@@ -52,8 +52,8 @@ The controls outside the phone are plain page UI; leave them as the tool draws t
    read from `core/settings.js` (the style setting's options and `STYLE_PALETTES`), so an era added to the app
    shows up with no change to the tool. The build fails loudly if a module can't be bundled or an import
    names something that isn't exported.
-   The iOS 26 style in the frame is an approximation: it has no native bars, menus, alerts or switch, since the fake
-   bridge reports `app.info` ios "26.0" so the style is offered and the look-alikes draw instead.
+   The iOS 26 style in the frame is an approximation: it has no native bars, menus, alerts or switch, because Chromium has no shell;
+   the fake bridge reports `app.info` ios "26.0" so the style is offered, and the look-alikes stand in.
 4. Check it in headless Chromium (needs `chromium`; about a minute):
 
        python3 tools/concept/build.py ... --standalone -o "$SCRATCH/check.html"

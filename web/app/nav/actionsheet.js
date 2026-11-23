@@ -66,7 +66,7 @@ export function showActionSheet(opts = {}) {
   };
   const alone = () => native.call("ui.actionSheet", { title: String(title ?? ""), buttons: labels,
     cancel: cancel ? String(cancel) : "", destructive: red, ...(rect ? { rect } : {}) })
-    .then(answer, () => bottomSheet(opts)); // an older shell ("unknown method ui.actionSheet") or no window to show it in
+    .then(answer, () => bottomSheet(opts)); // no window to show it in (the concept frame has no shell)
   if (!rect || !labels.length) return alone();
   const params = { sheet: true, title: String(title ?? ""), items: labels, destructive: red, rect };
   if (hasIcons) params.icons = labels.map((_, i) => opts.nativeIcons[i] ?? null);
