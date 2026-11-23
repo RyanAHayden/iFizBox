@@ -183,3 +183,34 @@ tcp 10.7.0.1 62078: connected
 nw: ready satisfied (Path is satisfied), viable, interface: utun4, ipv4 expensive=false wifi=false cell=false other=true ifs=utun4:other
 vpn.test PASS 130 ms, rp
 down
+
+=== From the syslog: per run block (all runs, first failed ones included) ===
+kernel = "tcp connect incoming" lines to 49152/62078, by interface; log lines are nesessionmanager's
+[V5] current 2026-11-23 16:17:24 +0000 | kernel: utun4 x5 | remote: 10.7.0.1 | excludedRoutes lines: 2 | delegate set: en0
+[V1] remote 127.0.0.1 2026-11-23 16:17:28 +0000 | kernel: none | remote: 127.0.0.1 | excludedRoutes lines: 2 | delegate set: en0
+[V1b] remote + server 127.0.0.1 2026-11-23 16:17:30 +0000 | kernel: utun4 x5 | remote: 127.0.0.1 | excludedRoutes lines: 2 | delegate set: en0
+[V2] 192.0.2.x pair 2026-11-23 16:17:34 +0000 | kernel: none | remote: 192.0.2.11 | excludedRoutes lines: 2 | delegate set: en0
+[V3] IPv6 pair 2026-11-23 16:17:35 +0000 | kernel: utun4 x5 | remote: fd00:a7::2 | excludedRoutes lines: 2 | delegate set: en0
+[V4] no excluded default 2026-11-23 16:17:40 +0000 | kernel: none | remote: 10.7.0.1 | excludedRoutes lines: 0 | delegate set: en0
+[V4b] default route included 2026-11-23 16:17:41 +0000 | kernel: utun4 x5 | remote: 10.7.0.1 | excludedRoutes lines: 0 | delegate set: en0
+[V5] current 2026-11-23 16:20:01 +0000 | kernel: utun4 x5 | remote: 10.7.0.1 | excludedRoutes lines: 2 | delegate set: en0
+[V1] remote 127.0.0.1 2026-11-23 16:20:05 +0000 | kernel: utun4 x5 | remote: 127.0.0.1 | excludedRoutes lines: 2 | delegate set: en0
+[V1b] remote + server 127.0.0.1 2026-11-23 16:20:10 +0000 | kernel: utun4 x5 | remote: 127.0.0.1 | excludedRoutes lines: 2 | delegate set: en0
+[V2] 192.0.2.x pair 2026-11-23 16:20:14 +0000 | kernel: utun4 x5 | remote: 192.0.2.11 | excludedRoutes lines: 2 | delegate set: en0
+[V3] IPv6 pair 2026-11-23 16:20:19 +0000 | kernel: utun4 x5 | remote: fd00:a7::2 | excludedRoutes lines: 2 | delegate set: en0
+[V4] no excluded default 2026-11-23 16:20:23 +0000 | kernel: utun4 x1 | remote: 10.7.0.1 | excludedRoutes lines: 0 | delegate set: en0
+[V4b] default route included 2026-11-23 16:20:28 +0000 | kernel: none | remote: 10.7.0.1 | excludedRoutes lines: 0 | delegate set: en0
+[V5] current 2026-11-23 16:21:20 +0000 | kernel: utun4 x5 | remote: 10.7.0.1 | excludedRoutes lines: 2 | delegate set: en0 (null) (null)
+[V5] current 2026-11-23 16:21:36 +0000 | kernel: utun4 x5 | remote: | excludedRoutes lines: 0 | delegate set: en0 en0
+[V1] remote 127.0.0.1 2026-11-23 16:22:11 +0000 | kernel: utun4 x5 | remote: 127.0.0.1 | excludedRoutes lines: 2 | delegate set: en0 (null) (null)
+[V1] remote 127.0.0.1 2026-11-23 16:22:27 +0000 | kernel: utun4 x5 | remote: | excludedRoutes lines: 0 | delegate set: en0 en0
+[V1b] remote + server 127.0.0.1 2026-11-23 16:22:55 +0000 | kernel: utun4 x5 | remote: 127.0.0.1 | excludedRoutes lines: 2 | delegate set: en0 (null) (null)
+[V1b] remote + server 127.0.0.1 2026-11-23 16:23:11 +0000 | kernel: utun4 x5 | remote: | excludedRoutes lines: 0 | delegate set: en0 en0
+[V2] 192.0.2.x pair 2026-11-23 16:23:39 +0000 | kernel: utun4 x5 | remote: 192.0.2.11 | excludedRoutes lines: 2 | delegate set: en0 (null) (null)
+[V2] 192.0.2.x pair 2026-11-23 16:23:55 +0000 | kernel: utun4 x5 | remote: | excludedRoutes lines: 0 | delegate set: en0 en0
+[V3] IPv6 pair 2026-11-23 16:24:23 +0000 | kernel: utun4 x5 | remote: fd00:a7::2 | excludedRoutes lines: 2 | delegate set: en0 (null) (null)
+[V3] IPv6 pair 2026-11-23 16:24:39 +0000 | kernel: utun4 x5 | remote: | excludedRoutes lines: 0 | delegate set: en0 en0
+[V4] no excluded default 2026-11-23 16:25:07 +0000 | kernel: utun4 x5 | remote: 10.7.0.1 | excludedRoutes lines: 0 | delegate set: en0 (null) (null)
+[V4] no excluded default 2026-11-23 16:25:23 +0000 | kernel: utun4 x5 | remote: | excludedRoutes lines: 0 | delegate set: en0 en0
+[V4b] default route included 2026-11-23 16:25:52 +0000 | kernel: utun4 x5 | remote: 10.7.0.1 | excludedRoutes lines: 0 | delegate set: en0 (null) (null)
+[V4b] default route included 2026-11-23 16:26:08 +0000 | kernel: utun4 x5 | remote: | excludedRoutes lines: 0 | delegate set: en0 en0
