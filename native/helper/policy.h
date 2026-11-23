@@ -224,9 +224,9 @@ int helper_caller_ok(uid_t uid, uid_t euid, uid_t root_uid, const char *parent_e
  * byte that isn't blank is '<': a repo that answered an index URL with its web page (HTTP 200, unsigned or with no
  * hash to catch it) left a file apt can't parse, which breaks every apt command after. Each one deleted is named on
  * `out` as apt names a failed fetch, "E: Failed to fetch <url>  <reason>", with the URL rebuilt from the file's name
- * and the source URIs in <prefix>/etc/apt/sources.list(.d) plus `source_line` (update-source's "deb <uri> ..." line;
- * may be NULL); a file no source has gets a "W:" line naming the file instead. Returns 1 when a source was named for
- * a file other than a Translation file (main.c then exits 100, as apt does when a fetch failed), else 0. */
+ * and the source URIs in <prefix>/etc/apt/sources.list(.d), or for update-source only its own `source_line`
+ * ("deb <uri> ..."; NULL for update); a file no source has gets a "W:" line naming the file instead (a file that
+ * can't be deleted also gets one, and its source is still named). Returns the number of files deleted. */
 int helper_drop_web_lists(const char *prefix, const char *source_line, FILE *out);
 
 #endif

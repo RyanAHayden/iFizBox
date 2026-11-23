@@ -1201,12 +1201,12 @@ int helper_drop_web_lists(const char *prefix, const char *source_line, FILE *out
     if (source_line) {
         static char line[sizeof ((struct helper_plan *)0)->source_line];
         snprintf(line, sizeof line, "%s", source_line);
-        web_read_line(line);
+        web_read_line(line); /* update-source names its own source only; another's page is deleted, not named */
     }
     snprintf(path, sizeof path, "%s/etc/apt/sources.list", prefix);
-    web_read_sources(path);
+    if (!source_line) web_read_sources(path);
     snprintf(path, sizeof path, "%s/etc/apt/sources.list.d", prefix);
-    DIR *d = opendir(path);
+    DIR *d = source_line ? NULL : opendir(path);
     if (d) {
         struct dirent *e;
         while ((e = readdir(d))) {
@@ -1221,26 +1221,24 @@ int helper_drop_web_lists(const char *prefix, const char *source_line, FILE *out
     snprintf(path, sizeof path, "%s/var/lib/apt/lists", prefix);
     d = opendir(path);
     if (!d) return 0;
-    int named = 0;
+    int dropped = 0;
     struct dirent *e;
     while ((e = readdir(d))) {
         if (e->d_name[0] == '.' || !strcmp(e->d_name, "lock") || !web_page_file(dirfd(d), e->d_name)) continue;
-        if (unlinkat(dirfd(d), e->d_name, 0)) {
+        int gone = !unlinkat(dirfd(d), e->d_name, 0);
+        if (!gone)
             fprintf(out, "W: ifizbox-helper: can't delete %s/%s, a web page in apt's lists: %s\n", path, e->d_name,
                     strerror(errno));
-            continue;
-        }
+        dropped += gone;
         char url[HELPER_URI_MAX + PATH_MAX];
         if (web_list_url(e->d_name, url, sizeof url)) {
-            fprintf(out, "W: ifizbox-helper: deleted %s/%s: a web page, not an apt index\n", path, e->d_name);
+            if (gone) fprintf(out, "W: ifizbox-helper: deleted %s/%s: a web page, not an apt index\n", path, e->d_name);
             continue;
         }
-        /* core/aptupdate.js reads this line (as apt's own) and turns the source red; a Translation file counts for
-         * nothing there, so it leaves the exit alone too. */
+        /* core/aptupdate.js reads this line (as apt's own) and turns the source red, deleted or not. */
         fprintf(out, "E: Failed to fetch %s  the repo answered with a web page, not an apt index\n", url);
-        if (!strstr(e->d_name, "_Translation-")) named = 1;
     }
     closedir(d);
     fflush(out);
-    return named;
+    return dropped;
 }

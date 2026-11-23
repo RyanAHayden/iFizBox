@@ -328,7 +328,7 @@ static int remove_malware(int argc, char *const argv[], const char *prefix, char
  * file deleted whatever apt did. Exit: 74 the file couldn't be made, 126 apt-get couldn't be run, else apt's
  * status (128 + signal).
  * B348: update runs here too (as a child, no temp file), and after either one helper_drop_web_lists deletes the
- * web pages apt saved as lists and names their sources on stderr; apt's 0 then becomes 100, as for a failed fetch. */
+ * web pages apt saved as lists and names their sources on stderr; the exit stays apt's. */
 static int update_source(struct helper_plan *plan, char *const env[], const char *prefix) {
     const char *err = NULL;
     errno = 0;
@@ -354,10 +354,9 @@ static int update_source(struct helper_plan *plan, char *const env[], const char
     while ((w = waitpid(pid, &st, 0)) < 0 && errno == EINTR) {}
     if (one && unlink(plan->source_tmp))
         fprintf(stderr, "ifizbox-helper: can't delete %s: %s\n", plan->source_tmp, strerror(errno));
-    int named = helper_drop_web_lists(prefix, one ? plan->source_line : NULL, stderr);
+    helper_drop_web_lists(prefix, one ? plan->source_line : NULL, stderr);
     if (w < 0) { perror("ifizbox-helper: waitpid"); return HELPER_EX_EXEC; }
-    int rc = WIFEXITED(st) ? WEXITSTATUS(st) : 128 + WTERMSIG(st);
-    return rc == 0 && named ? 100 : rc;
+    return WIFEXITED(st) ? WEXITSTATUS(st) : 128 + WTERMSIG(st);
 }
 
 /* B84: the verbs that may run dpkg (install, configure or remove packages, iFizBox's own one among them). */

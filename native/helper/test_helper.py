@@ -860,7 +860,7 @@ class Helper(unittest.TestCase):
         """B348: a repo that answers an index URL with its web page (HTTP 200, unsigned, no hash to catch it) leaves a
         list file apt can't parse, which broke every apt command after. update and update-source delete such files
         (first non-blank byte '<') once apt-get is done and name their sources as apt names a failed fetch, so the
-        Sources tab turns them red (core/aptupdate.js); apt's 0 becomes its 100 for a failed fetch."""
+        Sources tab turns them red (core/aptupdate.js); the exit stays apt's."""
         p, app, helper = self.chain_prefix()
         etc, lists = os.path.join(p, "etc/apt"), os.path.join(p, "var/lib/apt/lists")
         os.makedirs(os.path.join(etc, "sources.list.d"))
@@ -894,38 +894,46 @@ class Helper(unittest.TestCase):
         kept = {"blank.test_._Packages", "good.test_._Packages", "good.test_._Release", "partial"}
         self.assertEqual(set(files) & set(os.listdir(lists)), kept - {"partial"})
         self.assertIn("partial", os.listdir(lists))
-        self.assertEqual(out[-1], "exit: 100")
+        self.assertEqual(out[-1], "exit: 0")  # apt's own exit: the app reads the failures beside a 0 or a 100
 
-        # nothing left to drop: apt's 0 stays 0; apt's own failure stays apt's
-        out = self.run_driver("spawn", helper, "update", driver=app)
-        self.assertEqual(out[-1], "exit: 100")  # the stand-in wrote the pages again
+        # no web page: nothing on stderr; apt's own failure stays apt's
         with open(apt, "w") as f:
             f.write(f"#!/bin/sh\nprintf 'Package: a\\n' > '{lists}/good.test_._Packages'\nexit ${{CODE:-0}}\n")
         out = self.run_driver("spawn", helper, "update", driver=app)
         self.assertFalse([l for l in out if l.startswith("2: ")], out)
         self.assertEqual(out[-1], "exit: 0")
         with open(apt, "w") as f:
-            f.write(f"#!/bin/sh\nprintf '<html>' > '{lists}/repo.twickd.com_._Packages'\n"
-                    f"printf '<html>' > '{lists}/repo.twickd.com_._Translation-en'\nexit 3\n")
+            f.write(f"#!/bin/sh\nprintf '<html>' > '{lists}/repo.twickd.com_._Packages'\nexit 100\n")
         out = self.run_driver("spawn", helper, "update", driver=app)
-        self.assertEqual(out[-1], "exit: 3")
+        self.assertEqual(out[-1], "exit: 100")
         self.assertNotIn("repo.twickd.com_._Packages", os.listdir(lists))
 
-        # a Translation file is dropped and named, but names nothing the app counts: the exit stays apt's
+        # a page that can't be deleted still names its source
         with open(apt, "w") as f:
-            f.write(f"#!/bin/sh\nprintf '<html>' > '{lists}/repo.twickd.com_._Translation-en'\n")
-        out = self.run_driver("spawn", helper, "update", driver=app)
-        self.assertIn("2: E: Failed to fetch https://repo.twickd.com/./Translation-en  the repo answered with a web "
-                      "page, not an apt index", out)
-        self.assertEqual(out[-1], "exit: 0")
+            f.write(f"#!/bin/sh\nprintf '<html>' > '{lists}/repo.twickd.com_._Packages'\nchmod 555 '{lists}'\n")
+        try:
+            out = self.run_driver("spawn", helper, "update", driver=app)
+        finally:
+            os.chmod(lists, 0o755)
+        if os.getuid() != 0:
+            self.assertTrue(any(l.startswith(f"2: W: ifizbox-helper: can't delete {lists}/repo.twickd.com_._Packages")
+                                for l in out), out)
+            self.assertIn("2: E: Failed to fetch https://repo.twickd.com/./Packages  the repo answered with a web page, "
+                          "not an apt index", out)
+            os.remove(os.path.join(lists, "repo.twickd.com_._Packages"))
 
-        # update-source: its own URI names the file even when no sources file has it
+        # update-source: its own URI names the file even when no sources file has it; another source's page is
+        # deleted (it breaks apt all the same) but only named by file, so the app turns no other row red
         with open(apt, "w") as f:
-            f.write(f"#!/bin/sh\nprintf '\\n<html>' > '{lists}/new.test_deb_dists_stable_main_binary-iphoneos-arm64_Packages'\n")
+            f.write(f"#!/bin/sh\nprintf '\\n<html>' > '{lists}/new.test_deb_dists_stable_main_binary-iphoneos-arm64_Packages'\n"
+                    f"printf '<html>' > '{lists}/repo.twickd.com_._Packages'\n")
         out = self.run_driver("spawn", helper, "update-source", "https://new.test/deb/", "stable", "main", driver=app)
-        self.assertIn("2: E: Failed to fetch https://new.test/deb/dists/stable/main/binary-iphoneos-arm64/Packages  "
-                      "the repo answered with a web page, not an apt index", out)
-        self.assertEqual(out[-1], "exit: 100")
+        err = [l[3:] for l in out if l.startswith("2: ")]
+        self.assertEqual(sorted(err), ["E: Failed to fetch https://new.test/deb/dists/stable/main/binary-iphoneos-arm64/"
+                                       "Packages  the repo answered with a web page, not an apt index",
+                                       f"W: ifizbox-helper: deleted {lists}/repo.twickd.com_._Packages: a web page, not "
+                                       "an apt index"])
+        self.assertEqual(out[-1], "exit: 0")
         self.assertEqual(sorted(os.listdir(etc)), ["sources.list", "sources.list.d"])  # the temp file is deleted
         self.assertFalse([n for n in os.listdir(lists) if n.startswith(("new.test", "repo.twickd", "gone.", "apt.dist"))])
         self.assertTrue(kept <= set(os.listdir(lists)))
