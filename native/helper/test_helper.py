@@ -139,8 +139,9 @@ class Helper(unittest.TestCase):
     # --- package names
 
     def test_names(self):
-        good = ["ab", "com.foo.bar", "libstdc++", "a0", "0ad", "x-y", "1.2+3-4", "a" * 255]
-        bad = ["", "a", "-y", "--option", ".x", "+x", "Foo", "a b", "a/b", "a:arm64", "a=1.0", "a_b", "a*",
+        good = ["ab", "com.foo.bar", "libstdc++", "a0", "0ad", "x-y", "1.2+3-4", "a" * 255,
+                "Oreo", "OreoDark", "CleanClock.hende.widget", "co.xRepo.ATJ-Player++Orange", "a_b"]
+        bad = ["", "a", "O", "-y", "--option", ".x", "+x", "_x", "-Oreo", "Oreo Dark", "Oreo\tDark", "Oreo/Dark", "É", "a b", "a/b", "a:arm64", "a=1.0", "a*",
                "a\n", "a;rm", "$(x)", "é1", "a" * 256, "../x"]
         self.assertEqual(self.run_driver("name", *good), ["ok"] * len(good))
         self.assertEqual(self.run_driver("name", *bad), ["bad"] * len(bad))
@@ -429,15 +430,37 @@ class Helper(unittest.TestCase):
                          ["/var/jb/usr/bin/apt-get", "apt-get", *NOLANG, "-y", "--reinstall", "--allow-downgrades",
                           "--allow-unauthenticated", "-o", "APT::Keep-Fds::=3", "-o", "APT::Status-Fd=3", "install", "com.a.b", "com.d-"])
         self.assertEqual(self.plan("apply-ask", "com.a.b", fd="-1"), ["error: apply-ask needs the status fd (3) to ask on"])
-        self.assertEqual(self.plan("apply-ask", "ab-"), ["error: bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"])
+        self.assertEqual(self.plan("apply-ask", "ab-"), ["error: bad package name (allowed: [A-Za-z0-9][A-Za-z0-9._+-]+)"])
         self.assertEqual(self.plan("apply-ask"), ["error: no packages"])
+
+    def test_plan_names_in_lower_case(self):
+        """B405: apt-get finds Oreo (another architecture's) only as oreo, and dpkg's status names it so."""
+        apply = self.plan("apply", "Oreo=1.4", "-com.Foo_Bar", "libdb18.1++", "AB+=1.0")
+        self.assertEqual(apply[-5:], ["install", "oreo=1.4", "com.foo_bar-", "libdb18.1++", "ab+=1.0"])
+        self.assertEqual(self.plan("simulate", "OreoDark")[-1], "oreodark")
+        for verb in ("install", "remove", "hold", "unhold", "auto"):
+            self.assertEqual(self.plan(verb, "OreoDark", "xy")[-2:], ["oreodark", "xy"])
+        p = tempfile.mkdtemp(dir=self.tmp)
+        for d in ("var/lib/dpkg", "var/lib/apt/lists"):
+            os.makedirs(os.path.join(p, d))
+        with open(os.path.join(p, "var/lib/dpkg/status"), "w") as f:
+            f.write("Package: oreo\nStatus: install ok installed\n")
+        with open(os.path.join(p, "var/lib/apt/lists/r_Packages"), "w") as f:
+            f.write("Package: OreoDark\n")
+        k = lambda *w: self.run_driver("known", p, *w)[0]
+        self.assertEqual(k("simulate", "OreoDark", "-Oreo"), "all known")
+        self.assertEqual(k("install", "oreodark", "OREO"), "all known")
+        self.assertEqual(k("remove", "Oreo"), "all known")
+        self.assertEqual(k("simulate", "-OreoDark"), "oreodark")  # not installed
+        self.assertEqual(k("simulate", "OreoDar"), "oreodar")
 
     def test_queue_refusals(self):
         cases = {
             ("apply",): "no packages",
             ("simulate",): "no packages",
             ("apply", "ab-"): "bad package name",  # apt would read it as a removal
-            ("apply", "ab+"): "bad package name",
+            ("apply", "Oreo-"): "bad package name",
+            ("apply", "ab-=1.0"): "bad package name",
             ("apply", "--purge"): "bad package name",
             ("apply", "-"): "bad package name",
             ("apply", "--ab"): "bad package name",
@@ -449,7 +472,11 @@ class Helper(unittest.TestCase):
             ("apply", "ab=1/2"): "bad version",
             ("apply", "ab=1=2"): "bad version",
             ("apply", "ab=" + "1" * 256): "bad version",
-            ("apply", "Ab=1"): "bad package name",
+            ("apply", "Oreo Dark=1"): "bad package name",
+            ("apply", "--Oreo"): "bad package name",
+            ("apply", "ab=beta1"): "bad version",  # dpkg refuses these two
+            ("apply", "ab=1.0-"): "bad version",
+            ("apply", "Oreo", "oreo"): "named twice",  # one package to dpkg and apt
             ("apply", "ab:arm64"): "bad package name",
             ("apply", "ab", "-ab"): "named twice",
             ("apply", "ab=1", "ab=2"): "named twice",
@@ -1429,6 +1456,12 @@ class Rollback(unittest.TestCase):
                "com.a_1.0_arm64.deb.part", ".com.a_1.0_arm64.deb", "com.a_" + "1" * 256 + "_arm64.deb"]
         self.assertEqual(self.run_driver("debname", "com.a", *good), list(good.values()))
         self.assertEqual(self.run_driver("debname", "com.a", *bad), ["bad"] * len(bad))
+
+    def test_deb_names_underscore(self):
+        """B405: apt's archive names write an id's "_" as %5f."""
+        self.assertEqual(self.run_driver("debname", "com.a_b", "com.a%5fb_1.0_arm64.deb", "com.a%5Fb_1.0_arm64.deb",
+                                         "com.a_b_1.0_arm64.deb", "com.a%5f_1.0_arm64.deb", "com.a_b.deb", "com.a"),
+                         ["1.0", "1.0", "1.0", "bad", "bad", "bad"])
 
     def test_control(self):
         c = lambda text, pkg="com.a", ver="1:1.0": self.run_driver("control", pkg, ver, text)[0]

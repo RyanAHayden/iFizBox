@@ -130,7 +130,7 @@ long auto_state_respring(const char *state);
 /* 1 if state lists an upgrade ("<id>=<to>") that hasn't failed: something may be waiting to install. */
 int auto_state_waiting(const char *state);
 
-/* 1 if id is safe as a folder name (the helper's package-name rule: [a-z0-9][a-z0-9.+-]*, at most 255 bytes). */
+/* 1 if id is safe as a folder name (the helper's package-name rule: [A-Za-z0-9][A-Za-z0-9._+-]*, at most 255 bytes). */
 int auto_safe_id(const char *id);
 
 /* Copy <cache>/<id>_<version>_<arch>.deb (apt's archive cache) into <rollback>/<id>/, mtime now. An existing copy

@@ -42,6 +42,7 @@ prefix=${IFIZBOX_PREFIX:?}
 lists=$prefix/var/lib/apt/lists
 status=$prefix/var/lib/dpkg/status
 st() { { printf '%s\n' "$1" >&3; } 2>/dev/null || true; }
+lower() { printf '%s' "$1" | tr A-Z a-z; }
 refuse() { echo "ifizbox-helper: $1" >&2; exit 64; }
 verb=${1:-}
 VERBS="update, install, remove, upgrade, configure, hold, unhold, showhold, addsource, removesource, simulate, apply, apply-ask, respring, install-ipa, selfupdate, rollbacks, rollback, install-paid, userspace-reboot, simulate-deb, install-deb, app-versions, update-source"
@@ -233,15 +234,16 @@ print(v)' "$1")
     # F71: policy.c's rollback_plan, helper_rollback_file/list and helper_rollback_verify.
     if [ "$verb" = rollbacks ]; then [ $# -eq 1 ] || refuse "rollbacks takes a package name"
     else [ $# -eq 2 ] || refuse "rollback takes a package name and a version"; fi
-    { one_line "$1" && printf '%s' "$1" | grep -Eqx '[a-z0-9][a-z0-9.+-]{1,254}'; } || refuse "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"
+    { one_line "$1" && printf '%s' "$1" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._+-]{1,254}'; } || refuse "bad package name (allowed: [A-Za-z0-9][A-Za-z0-9._+-]+)"
     if [ "$verb" = rollback ]; then
-      { one_line "$2" && printf '%s' "$2" | grep -Eqx '[0-9][A-Za-z0-9.+~:-]{0,254}'; } || refuse "bad version (a digit, then [A-Za-z0-9.+~:-])"
+      { one_line "$2" && printf '%s' "$2" | grep -Eqx '[0-9]([A-Za-z0-9.+~:-]{0,253}[A-Za-z0-9.+~:])?'; } || refuse "bad version (a digit, then [A-Za-z0-9.+~:-], not ending in -)"
     fi
-    store=$prefix/var/cache/ifizbox/rollback/$1
+    id=$(lower "$1")
+    store=$prefix/var/cache/ifizbox/rollback/$id
     found=
-    for f in "$store/$1"_*_*.deb; do
+    for f in "$store/$id"_*_*.deb; do
       [ -f "$f" ] && [ ! -L "$f" ] || continue
-      rest=${f##*/}; rest=${rest#"$1"_}; arch=${rest##*_}; ver=${rest%_*}
+      rest=${f##*/}; rest=${rest#"$id"_}; arch=${rest##*_}; ver=${rest%_*}
       printf '%s' "$ver" | grep -Eqx '[0-9][A-Za-z0-9.+~%-]*' && printf '%s' "${arch%.deb}" | grep -Eqx '[a-z0-9-]+' || continue
       case $ver in *_*) continue ;; esac
       ver=$(printf '%s' "$ver" | sed 's/%3[aA]/:/g')
@@ -250,7 +252,7 @@ print(v)' "$1")
     done
     [ "$verb" = rollbacks ] && exit 0
     [ -n "$found" ] || refuse "no stored .deb of that version (Roll Back keeps only what automatic updates replaced)"
-    { grep -qxF "Package: $1" "$found" && grep -qxF "Version: $2" "$found" &&
+    { grep -qixF "Package: $1" "$found" && grep -qxF "Version: $2" "$found" &&
       [ "$(grep -c '^Package:' "$found")" = 1 ] && [ "$(grep -c '^Version:' "$found")" = 1 ]; } ||
       refuse "the stored .deb's control isn't that package and version"
     [ -n "${FAKE_SLOW:-}" ] && sleep "$FAKE_SLOW"
@@ -282,11 +284,11 @@ print(v)' "$1")
     case $1 in "$dir"/*) name=${1#"$dir"/} ;; *) name= ;; esac
     { one_line "$1" && [ ${#name} -le 255 ] && printf '%s' "$name" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._-]*\.deb' &&
       case $name in *..*) false ;; esac; } || refuse "bad .deb path (only $dir/<name>.deb)"
-    { one_line "$2" && printf '%s' "$2" | grep -Eqx '[a-z0-9][a-z0-9.+-]{1,254}'; } || refuse "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"
-    { one_line "$3" && printf '%s' "$3" | grep -Eqx '[0-9][A-Za-z0-9.+~:-]{0,254}'; } || refuse "bad version (a digit, then [A-Za-z0-9.+~:-])"
+    { one_line "$2" && printf '%s' "$2" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._+-]{1,254}'; } || refuse "bad package name (allowed: [A-Za-z0-9][A-Za-z0-9._+-]+)"
+    { one_line "$3" && printf '%s' "$3" | grep -Eqx '[0-9]([A-Za-z0-9.+~:-]{0,253}[A-Za-z0-9.+~:])?'; } || refuse "bad version (a digit, then [A-Za-z0-9.+~:-], not ending in -)"
     { [ -f "$1" ] && [ ! -L "$1" ] && [ -s "$1" ]; } || refuse "can't open the .deb (missing, or a link)"
     deb=$(sed '1{/^!<arch>$/d}' "$1")
-    { printf '%s\n' "$deb" | grep -qxF "Package: $2" && printf '%s\n' "$deb" | grep -qxF "Version: $3" &&
+    { printf '%s\n' "$deb" | grep -qixF "Package: $2" && printf '%s\n' "$deb" | grep -qxF "Version: $3" &&
       [ "$(printf '%s\n' "$deb" | grep -c '^Package:')" = 1 ] && [ "$(printf '%s\n' "$deb" | grep -c '^Version:')" = 1 ]; } ||
       refuse "the downloaded .deb isn't that package and version"
     echo "Reading package lists..."
@@ -377,7 +379,7 @@ versions_in() {
       if (l[i] ~ /^Version:/) { v = l[i]; sub(/^Version:[ \t]*/, "", v) }
       if (l[i] ~ /^Status:/) st = l[i]
     }
-    if (name == p && v != "" && (st == "" || st ~ / installed$/)) print v
+    if (tolower(name) == tolower(p) && v != "" && (st == "" || st ~ / installed$/)) print v
   }' "$@" 2>/dev/null
 }
 installed_version() { versions_in "$1" "$status" | head -n 1; }
@@ -385,7 +387,7 @@ installed_version() { versions_in "$1" "$status" | head -n 1; }
 FIELDS='function field(f,   n, l, i, v) { n = split($0, l, "\n"); for (i = 1; i <= n; i++) if (index(l[i], f ":") == 1) { v = substr(l[i], length(f) + 2); sub(/^[ \t]*/, "", v); sub(/[ \t\r]*$/, "", v); return v } return "" }'
 # The stanza of package $1 at version $2 from apt's lists (for apply's new status entry).
 stanza_of() {
-  awk -v p="$1" -v v="$2" "$FIELDS"' BEGIN { RS = "" } field("Package") == p && field("Version") == v { print; exit }' "$lists"/*_Packages 2>/dev/null
+  awk -v p="$1" -v v="$2" "$FIELDS"' BEGIN { RS = "" } tolower(field("Package")) == p && field("Version") == v { print; exit }' "$lists"/*_Packages 2>/dev/null
 }
 # dpkg's status without package $1.
 drop_pkg() { awk -v p="$1" "$FIELDS"' BEGIN { RS = ""; ORS = "\n\n" } field("Package") != p' "$status"; }
@@ -425,20 +427,21 @@ if [ "$verb" = simulate ] || [ "$verb" = apply ] || [ "$verb" = apply-ask ]; the
   [ "$verb" != apply-ask ] || { : >&3; } 2>/dev/null || refuse "apply-ask needs the status fd (3) to ask on"
   seen=" "
   for w in "$@"; do
-    one_line "$w" || refuse "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"
+    one_line "$w" || refuse "bad package name (allowed: [A-Za-z0-9][A-Za-z0-9._+-]+)"
     case $w in
       -*) name=${w#-} ver= ;;
       *=*) name=${w%%=*} ver=${w#*=}
-        printf '%s' "$ver" | grep -Eqx '[0-9][A-Za-z0-9.+~:-]{0,254}' || refuse "bad version (a digit, then [A-Za-z0-9.+~:-])" ;;
+        printf '%s' "$ver" | grep -Eqx '[0-9]([A-Za-z0-9.+~:-]{0,253}[A-Za-z0-9.+~:])?' || refuse "bad version (a digit, then [A-Za-z0-9.+~:-], not ending in -)" ;;
       *) name=$w ver= ;;
     esac
-    printf '%s' "$name" | grep -Eqx '[a-z0-9][a-z0-9.+-]+' || refuse "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"
-    case $w in -*) ;; *[-+]|*[-+]=*) refuse "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)" ;; esac
+    printf '%s' "$name" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._+-]+' || refuse "bad package name (allowed: [A-Za-z0-9][A-Za-z0-9._+-]+)"
+    case $w in -*) ;; *-|*-=*) refuse "bad package name (allowed: [A-Za-z0-9][A-Za-z0-9._+-]+)" ;; esac
+    name=$(lower "$name") # as the real one: dpkg and apt know every name in lower case
     case $seen in *" $name "*) refuse "a package is named twice" ;; esac
     seen="$seen$name "
     case $w in
-      -*) grep -qx "Package: $name" "$status" 2>/dev/null || refuse "unknown package: $name" ;;
-      *) cat "$status" "$lists"/*_Packages 2>/dev/null | grep -qx "Package: $name" || refuse "unknown package: $name" ;;
+      -*) grep -qix "Package: $name" "$status" 2>/dev/null || refuse "unknown package: $name" ;;
+      *) cat "$status" "$lists"/*_Packages 2>/dev/null | grep -qix "Package: $name" || refuse "unknown package: $name" ;;
     esac
   done
   if [ "${FAKE_FAIL:-}" = simulate ] && [ "$verb" = simulate ]; then
@@ -457,11 +460,11 @@ if [ "$verb" = simulate ] || [ "$verb" = apply ] || [ "$verb" = apply-ask ]; the
   plan=
   for w in "$@"; do
     case $w in
-      -*) name=${w#-}; old=$(installed_version "$name")
+      -*) name=$(lower "${w#-}"); old=$(installed_version "$name")
         [ -n "$old" ] || { echo "Package '$name' is not installed, so not removed"; continue; }
         plan="$plan
 R $name $old" ;;
-      *) name=${w%%=*}; ver=; case $w in *=*) ver=${w#*=} ;; esac
+      *) name=$(lower "${w%%=*}"); ver=; case $w in *=*) ver=${w#*=} ;; esac
         old=$(installed_version "$name")
         if [ -n "$ver" ]; then
           versions_in "$name" "$lists"/*_Packages | grep -qxF "$ver" || { echo "E: Version '$ver' for '$name' was not found" >&2; exit 100; }
@@ -533,10 +536,10 @@ I $name $ver $old" ;;
 fi
 for p in "$@"; do
   # B5: grep -x matches a line, so "ab\n--force-yes" would pass; the real helper refuses it, so refuse it first.
-  one_line "$p" && printf '%s' "$p" | grep -Eqx '[a-z0-9][a-z0-9.+-]+' || refuse "bad package name (allowed: [a-z0-9][a-z0-9.+-]+)"
+  one_line "$p" && printf '%s' "$p" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._+-]+' || refuse "bad package name (allowed: [A-Za-z0-9][A-Za-z0-9._+-]+)"
   case $verb in
-    install) cat "$status" "$lists"/*_Packages 2>/dev/null | grep -qx "Package: $p" || refuse "unknown package: $p" ;;
-    remove|hold|unhold) grep -qx "Package: $p" "$status" 2>/dev/null || refuse "unknown package: $p" ;;
+    install) cat "$status" "$lists"/*_Packages 2>/dev/null | grep -qix "Package: $p" || refuse "unknown package: $p" ;;
+    remove|hold|unhold) grep -qix "Package: $p" "$status" 2>/dev/null || refuse "unknown package: $p" ;;
   esac
 done
 if [ "${FAKE_FAIL:-}" = "$verb" ]; then

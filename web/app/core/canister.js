@@ -30,7 +30,7 @@ import { plainText } from "./plaintext.js";
 export const CANISTER = "https://api.canister.me/v2/jailbreak";
 const SEARCH_LIMIT = 50;
 const TTL = 10 * 60 * 1000;
-const PKG = /^[a-z0-9][a-z0-9+.-]*$/i;
+const PKG = /^[a-z0-9][a-z0-9+._-]*$/i;
 
 export function askable(q) {
   return [...String(q ?? "").trim()].length >= 2;

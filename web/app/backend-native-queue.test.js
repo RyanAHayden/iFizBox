@@ -73,6 +73,25 @@ test("simulate: apt's refusal comes back with its output, and F18 explains it ab
   assert.deepEqual(problems[0].action, { kind: "add-source", name: "ElleKit", url: "https://ellekit.space/", label: "Add ElleKit" });
 });
 
+test("B405: names with capitals: helper words, the plan's ids are the queue's own, plain words for the rest", async (t) => {
+  const { backend, fx, native } = setup(t);
+  writeFileSync(join(fx.prefix, "var/lib/apt/lists", "caps.example_._Packages"),
+    "Package: OreoDark\nVersion: 1.4\nArchitecture: iphoneos-arm64\nFilename: o.deb\nSize: 9\nDescription: a theme\n");
+  const job = (id, version = null, op = "install") => ({ op, id, version, name: id === "OreoDark" ? "Oreo Dark" : null });
+  const r = await backend.simulate([job("OreoDark", "1.4"), job("bash")]);
+  assert.deepEqual([r.ok, r.plan.installs.map((e) => e.id)], [true, ["OreoDark", "bash"]]);
+  assert.deepEqual(native.calls.at(-1).params.words, ["simulate", "OreoDark=1.4", "bash"]);
+
+  const calls = native.calls.length;
+  const refused = async (...jobs) => { const x = await backend.simulate(jobs); assert.equal(x.ok, false); return x.issues.join("\n"); };
+  assert.match(await refused(job("OreoDark", "beta1")), /Oreo Dark can't be installed.*version dpkg doesn't take \(beta1\)/);
+  assert.match(await refused(job("bash", "1.0-")), /version/);
+  for (const id of ["-y", "a b", "a/b", "ab-"]) assert.match(await refused(job(id)), /name dpkg doesn't take/);
+  assert.match(await refused(job("OreoDark"), job("oreodark")), /queued twice/);
+  assert.equal(native.calls.length, calls); // the helper was never asked
+  assert.match(await refused(job("Not.There")), /apt doesn't know Not\.There yet/);
+});
+
 test("a refused item (unknown package) is an error with the helper's words, never silent", async (t) => {
   const { backend } = setup(t);
   await assert.rejects(backend.simulate([{ op: "remove", id: "bash" }]), (e) => e.code === "helper" && /unknown package: bash/.test(e.message));

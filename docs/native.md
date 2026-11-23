@@ -237,7 +237,7 @@ folder in the Files app. Paste the table here when it exists.
 - The helper keeps an allowlist of verbs, each mapped to a fixed command: `apt-get update|install|remove|upgrade`,
   `dpkg --configure -a`, the queue's `simulate`/`apply` (one `apt-get [-s] install` over `name`, `name=version` and
   `-name` items), holds, sources, IPA installs and uninstalls, rollbacks, paid downloads, respring, userspace reboot
-  and a few more (the full table: native/helper/README.md). Package names must match `[a-z0-9.+-]+`, and the caller
+  and a few more (the full table: native/helper/README.md). Package names must match dpkg's own `[A-Za-z0-9][A-Za-z0-9._+-]+` (apt gets them in lower case), and the caller
   passes no options. Then it `execv`s from the resolved prefix. So all root work goes through one checked place even
   though the app could spawn anything.
 - **Caller check:** without a setuid bit the helper can't become root unless an entitled process spawns it. Any other
