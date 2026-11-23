@@ -118,6 +118,17 @@ test("count: a package listed in several versions counts once, inline and in the
   assert.equal(again.count, 2);
   assert.equal(again.unchanged, undefined);
   assert.equal((await refreshSource(d, { ...old, count: 2, countBy: "id" })).unchanged, true);
+  // a package two components carry counts once
+  const two = fakeBackend({
+    "https://t.example/dists/stable/Release": "Origin: T\nArchitectures: iphoneos-arm64\nComponents: main extra\n",
+    "https://t.example/dists/stable/main/binary-iphoneos-arm64/Packages": multi,
+    "https://t.example/dists/stable/extra/binary-iphoneos-arm64/Packages": multi + "\nPackage: com.d.new\nArchitecture: all\n",
+  });
+  assert.equal((await refreshSource(two, { uri: "https://t.example/", dist: "stable", components: ["main", "extra"] })).count, 3);
+  // a refresh that fails saves no countBy
+  const failed = await refreshSource(fakeBackend({}), { uri: "https://x.example/", dist: "stable", components: ["main"] });
+  assert.ok(failed.error);
+  assert.equal(failed.countBy, undefined);
 });
 
 test("add: repos Cydia's check misses (Release only, .zst only) still pass", async () => {

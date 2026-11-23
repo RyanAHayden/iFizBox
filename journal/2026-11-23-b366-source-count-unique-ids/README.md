@@ -22,8 +22,9 @@
 Stored counts are reused while a source's Release is unchanged (F19), so an old stanza count would never be replaced
 on its own. Every count saved before this change has no `countBy`, so each one is recounted once on the next refresh.
 
-A dist repo still adds up its components. A package listed in two components counts twice. This is left as it is:
-it is rare, and it was not asked for.
+A dist repo's components are counted as one list (their Packages texts joined), so a package two components carry
+counts once; before, each component's count was added up. `countBy` is saved only beside a count, so a failed
+refresh saves none. Both came from the spec review and are in the node test.
 
 ## Checks
 

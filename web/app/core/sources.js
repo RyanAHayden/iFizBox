@@ -525,23 +525,22 @@ export async function refreshSource(backend, source, { arch = DEFAULT_ARCH, coun
       out.releaseHash = fingerprint(release.raw);
     }
     out.countArch = arch;
-    out.countBy = COUNT_BY;
     if (release && out.releaseHash === source?.releaseHash && source?.countArch === arch
         && source?.countBy === COUNT_BY && typeof source?.count === "number" && !source?.error) {
-      out.count = source.count;
-      out.unchanged = true;
+      Object.assign(out, { count: source.count, countBy: COUNT_BY, unchanged: true });
       return out;
     }
     if (!layout.flat && release?.architectures.length && !release.architectures.includes(arch)) {
-      out.count = 0;
+      Object.assign(out, { count: 0, countBy: COUNT_BY });
       return out;
     }
-    let total = 0;
+    // Every component's Packages counted as one list, so a package two components carry counts once (B366).
+    const texts = [];
     for (const file of layout.packages) {
       const dir = file.slice(0, -"Packages".length);
-      total += await count((await backend.packages(dir)).text, arch);
+      texts.push((await backend.packages(dir)).text);
     }
-    out.count = total;
+    Object.assign(out, { count: await count(texts.join("\n\n"), arch), countBy: COUNT_BY });
   } catch (e) {
     out.error = e?.message || String(e);
   }
