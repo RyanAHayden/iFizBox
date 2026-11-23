@@ -351,12 +351,18 @@ function continueGroup(close) {
 // B404: Cannot Comply when ifizbox-helper couldn't ask apt: which package and why in plain words, wrapped whole.
 function refusedGroups(err, jobs, names) {
   const why = helperRefusal(err.message || String(err), jobs, names);
+  const frag = refusedBlock(why);
+  frag.append(unqueueGroup(why.ids, jobs, names));
+  return frag;
+}
+
+// Its red block of whole sentences (helperRefusal's answer); B409: the shared .deb's sheet (screens/sharedeb.js) too.
+export function refusedBlock(why, footer = null) {
   const frag = grouped([{ header: "Couldn't Ask apt", rows: why.sentences.map(() => ({ label: "" })),
-    footer: why.missing ? `Reinstalling ${NAME} puts it back.` : null }]);
+    footer: why.missing ? `Reinstalling ${NAME} puts it back.` : footer }]);
   const g = frag.querySelector(".group");
   g.classList.add("confirm-problem", "confirm-issues");
   [...g.querySelectorAll(".cell")].forEach((li, i) => li.replaceChildren(el("div", "pkg-description", why.sentences[i])));
-  frag.append(unqueueGroup(why.ids, jobs, names));
   return frag;
 }
 
