@@ -733,6 +733,21 @@ export async function queueOriginalCheck(job, warn = originalWarning) {
   return { ...job, options: { ...(job.options ?? {}), edits } };
 }
 
+// F401: the job the app page's Install / Upgrade / Reinstall queues for an app not signed here, without queuing it
+// (appPageAction's, F243's question included: Cancel gives null). null: nothing to queue.
+export async function appPageJob(pkg, source, { mode = detectMode(), store = apps, warn = originalWarning } = {}) {
+  const app = pkg?.stanza?.ipa;
+  if (mode !== "sideload" || !app) return null;
+  const held = forgetHeld(app.bundleIdentifier);
+  let rec = null;
+  if (!held) try { rec = recordOf(await (await store()).all(), app.bundleIdentifier, null); } catch { /* no store */ }
+  const job = appJob(pkg, { installed: rec ? rec.version || null : null, source: source ? displayName(source) : null });
+  if (!job) return null;
+  const j = rec ? job : await queueOriginalCheck(job, warn);
+  if (j && held) cancelHeldForget(app.bundleIdentifier); // B372
+  return j;
+}
+
 // B69: the jailbreak app's Modify for an installed app (a record in core/installed.js, as the nav label reads it):
 // Cydia's sheet instead of installing at once. Upgrade or Reinstall, Ignore Upgrades (Settings' Ignored Upgrades,
 // kept on the device: no dpkg hold for an app) while a newer version is out or once it's ignored, Remove (red: the

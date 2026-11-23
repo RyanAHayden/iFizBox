@@ -13,7 +13,7 @@
 import { grouped, placeholder, el, segments, note, buttonZone } from "../nav/ui.js";
 import { createVList, withLetterHeaders } from "../nav/vlist.js";
 import { createSectionIndex } from "../nav/sectionindex.js";
-import { onPageOpen } from "../nav/pagestate.js";
+import { onPageOpen, onPageShow } from "../nav/pagestate.js";
 import { showSheet } from "../nav/sheet.js";
 import { format, settingsRoute } from "../router.js";
 import { getBackend } from "../backend.js";
@@ -86,7 +86,8 @@ import { APP_MODE_LABEL } from "../core/appqueue.js";
 import { rowAppJob, queueOriginalCheck } from "./altstore.js";
 import { signedRecordOf, forgetHeld, cancelHeldForget, appVersionInstalled } from "./altstore.js"; // F392
 import { queueApp } from "./queue.js";
-import { worksInGroup, addToApp } from "./tweaks.js"; // F302
+import { fileOfToken } from "../core/myipas.js"; // F401
+import { worksInGroup, addToApp, addTweaksAppName, appsWith } from "./tweaks.js"; // F302, F401
 import { DETAILS_TITLE, packageRows, moreInfoShown, detailRows, descGroup, footerGroup,
   detailsFooter, MORE_INFO_LABEL } from "./details.js"; // F350
 import { rowIcon } from "../icons/rowicons.js";
@@ -965,6 +966,8 @@ export async function renderSearchableList(body, route, fetchRows, { letters = f
 // (tweaks.js addTweakButton: ADD checks and keeps the .deb, ADDED offers Remove, a paid one Sign In / Buy), grouped
 // Added / Made for <app> / Works in Any App (tweaks.js addTweaksItems). A row opens the tweak's page in its Tweak
 // Source; back comes here. Then More Tweaks: Browse Tweak Sources, Search All Repos, From Files, one footer.
+// F401: ADD also queues the app with the tweak (screens/addtweaks-queue.js), without opening Confirm; a tweak's page
+// above this one adds to this app (addTweaksContext).
 async function renderAddTweaks(body, route, bundleId) {
   const tw = await import("./tweaks.js");
   const appName = tw.addTweaksAppName(bundleId) || names.get(bundleId) || "";
@@ -975,6 +978,9 @@ async function renderAddTweaks(body, route, bundleId) {
   body.append(bar.el, none, ph);
   loadStyle("myipas.css"); // the price button
   let made = [], any = [], kept = [], list = null;
+  const target = addTweaksContext(route);
+  const queue = target && detectMode() === "sideload" ? (await import("./addtweaks-queue.js")).queueHooks(target) : null;
+  addTweaksPages.set(body, () => reload()); // F401: back from a tweak's page: its row's ADDED
   ({ made, any } = await tw.appTweakRows(bundleId, { name: appName }).catch(() => ({ made: [], any: [] })));
   const reload = async () => { kept = await tw.savedTweaks(bundleId).catch(() => []); draw(bar.input.value); };
   const decorate = (row, item) => {
@@ -983,7 +989,7 @@ async function renderAddTweaks(body, route, bundleId) {
     if (item.file) a.removeAttribute("href"); // from Files: no page of its own
     else a.href = deeper(route, keyedToken(item.id, item.key));
     const b = tw.addTweakButton(item, { bundleId, on: Boolean(item.added), cls: "price-btn tw-row-add", onCls: "added", busyCls: "adding",
-      onChange: reload });
+      onChange: reload, queue });
     buttonZone(row, b);
     row._.add = b;
   };
@@ -1002,6 +1008,28 @@ async function renderAddTweaks(body, route, bundleId) {
   kept = await tw.savedTweaks(bundleId).catch(() => []);
   draw("");
   bar.onQuery(draw);
+}
+
+const addTweaksPages = new WeakMap(); // an Add Tweaks page's body -> its reload
+onPageShow((route) => parseToken(route.path.at(-1)).kind === "addtweaks", (route, body) => addTweaksPages.get(body)?.());
+
+// F401: the app whose Add Tweaks page this route is, or stands on (a tweak's page opened from it): { bundleId, name,
+// id, key } for an app's page, { bundleId, name, file } for an IPA's in My IPAs; null when it stands on none.
+export function addTweaksContext(route) {
+  const path = route?.path ?? [];
+  const at = path.map((s) => parseToken(s).kind).lastIndexOf("addtweaks");
+  if (at < 0) return null;
+  const bundleId = parseToken(path[at]).value;
+  const page = at > 0 ? pageOf({ tab: route.tab, path: path.slice(0, at) }) : null;
+  const file = at > 0 ? fileOfToken(path[at - 1]) : null;
+  const of = file ? { file } : page?.page === "package" ? { id: page.value, key: page.key } : {};
+  return { bundleId, name: addTweaksAppName(bundleId) || names.get(of.id) || names.get(bundleId) || bundleId, ...of };
+}
+
+// Add to App on a sideload tweak's page: to that app when it was opened from its Add Tweaks page, else to a picked one.
+async function tapAddToApp(route, st) {
+  const target = addTweaksContext(route);
+  return target ? (await import("./addtweaks-queue.js")).addToThisApp(st, target) : addToApp(st);
 }
 
 // The grey search bar alone (Changes' and Search's look, packages.css), for a list's own filter.
@@ -1270,7 +1298,9 @@ async function renderPackage(body, route, key, id, ctx) {
     // B296: a tweak that can't go into an app (or a library) loses the nav bar's Add to App, which only led to an
     // alert; every check tells it, the one after Sign In / Buy too. The first check's result always comes after
     // rememberPackage below has set the label (no await in between).
-    details.append(worksInGroup(st, { onCheck: (info) => addToAppFollowsCheck(body, info) }).el);
+    const target = addTweaksContext(route); // F401
+    details.append(worksInGroup(st, { onCheck: (info) => addToAppFollowsCheck(body, info), onAdd: () => tapAddToApp(route, st),
+      ...(target ? { apps: () => appsWith(target) } : {}) }).el);
   }
   // F20: price; in the app Sign In, Buy, Install. B11: in the app its state also drives the nav bar button.
   // F308: a paid sideload tweak's Price, Sign In and Buy are in its Add to an App group (worksInGroup) instead.
@@ -1687,7 +1717,7 @@ async function packageActions(route, button) {
   if (!page || !page.body.isConnected) return;
   const { id, pkg, source, history } = page;
   const st = pkg.stanza;
-  if (isSideloadTweak(st)) return addToApp(st); // F302
+  if (isSideloadTweak(st)) return tapAddToApp(route, st); // F302, F401
   const many = (history?.versions.length ?? 0) > 1;
   const actions = [];
   if (st.kind === "ipa" && st.ipa) {

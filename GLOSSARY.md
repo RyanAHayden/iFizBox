@@ -31,7 +31,7 @@ _Avoid_: Screenshots
 The page under an app's Details that lists the tweaks from your Tweak Sources that work in that app, each with ADD, and More Tweaks for the rest; a tweak with no verdict yet is listed under Made for as a guess, and left out of the app's tweak count
 _Said_: add tweaks page, add tweaks sheet
 _On screen_: Add Tweaks
-_In code_: renderAddTweaks, addtweaks:<bundle id>, addTweaksItems, addTweakButton, addTweaksGroup
+_In code_: renderAddTweaks, addtweaks:<bundle id>, addTweaksItems, addTweakButton, addTweaksGroup, addTweaksContext, queueHooks, addToThisApp
 _Avoid_: tweak picker, inject tweaks page
 
 **Console Log**:
