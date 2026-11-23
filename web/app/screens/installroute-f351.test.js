@@ -34,39 +34,55 @@ test("the new Signing Server tile is a purple cloud, drawn in every icon set", (
   for (const style of ["ios6", "ios7", "ios13", "ios26"]) assert.match(tileSvg("signingServer", style), /<svg/);
 });
 
-test("main page: every row below the status has its row icon; Install Apps With is the chosen route", async () => {
+// F372: Install Apps With lists both ways, each row opening its page, with USE beside it and ACTIVE on the one in use
+const rowOf = (cell) => cell.parentElement;
+const classesOf = (n) => n?.className ?? "";
+test("main page: every row below the status has its row icon; both ways listed, the one in use ACTIVE", async () => {
   forgetStatus();
   const page = mainPage({ store: store("server"), native: bridge({}), links: LINKS, signing: async () => null });
   await page.refresh();
-  const [, , route, cert, apps, help] = cellsOf(page);
-  assert.equal(text(route, ".cell-label"), "Signing Server");
-  assert.equal(text(route, ".cell-subtitle"), `iOS installs each app from ${DOMAIN}`);
-  assert.equal(iconSrc(route), rowIcon("signingServer").src);
+  const [, , iphone, server, cert, apps, help] = cellsOf(page);
+  assert.equal(text(iphone, ".cell-label"), "This iPhone");
+  assert.equal(text(iphone, ".cell-subtitle"), "Works offline - no install popup");
+  assert.equal(text(server, ".cell-label"), "Signing Server");
+  assert.equal(text(server, ".cell-subtitle"), `Default - Uses ${DOMAIN}`);
+  assert.equal(iconSrc(iphone), rowIcon("installation").src);
+  assert.equal(iconSrc(server), rowIcon("signingServer").src);
   assert.equal(iconSrc(cert), rowIcon("signing").src);
   assert.equal(iconSrc(apps), rowIcon("websiteApps").src);
   assert.equal(iconSrc(help), rowIcon("help").src);
-  assert.equal(text(route, ".slot-value"), "");
-  assert.ok(page.el.textContent.includes("Tap to choose how signed apps reach iOS."));
-  assert.ok(!page.el.textContent.includes("Installation"), "the old Installation header is gone");
+  assert.ok(page.el.textContent.includes("Tap USE to install that way."));
+  assert.ok(rowOf(server).classList.contains("route-on"), "the Signing Server is ACTIVE");
+  assert.ok(!rowOf(iphone).classList.contains("route-on"));
+  for (const c of [iphone, server]) {
+    const use = rowOf(c).querySelector(".route-use-btn");
+    assert.equal(use?.textContent, "USE");
+    assert.equal(rowOf(c).querySelector(".route-active")?.textContent, "ACTIVE");
+    assert.ok(!c.contains?.(use), "USE sits beside the row's link, not inside it");
+  }
+  assert.ok(!classesOf(cellsOf(page)[2]).includes("route-on"));
 });
 
-test("main page: a change of route redraws the row in place, This iPhone with Paired as its detail", async () => {
+test("main page: USE on the Signing Server makes it ACTIVE; USE on This iPhone not set up opens its setup", async () => {
   forgetStatus();
-  const s = store("server");
-  const page = mainPage({ store: s, native: bridge({ "idevice.status": PAIRED_ON }), links: LINKS, signing: async () => null });
+  const s = store("iphone");
+  const page = mainPage({ store: s, native: bridge({ "idevice.status": { ...PAIRED_ON, vpn: { available: true, tested: false } } }), links: LINKS, signing: async () => null });
   await page.refresh();
-  const route = cellsOf(page)[2];
-  s.set("installRoute", "iphone");
-  await page.refresh();
-  assert.equal(cellsOf(page)[2], route, "the same row, not a new one");
-  assert.equal(text(route, ".cell-label"), "This iPhone");
-  assert.equal(text(route, ".cell-subtitle"), "Straight onto this iPhone, no popup");
-  assert.equal(iconSrc(route), rowIcon("installation").src);
-  assert.equal(text(route, ".slot-value"), "Paired");
-  s.set("installRoute", "server");
-  await page.refresh();
-  assert.equal(text(route, ".cell-label"), "Signing Server");
-  assert.equal(iconSrc(route), rowIcon("signingServer").src);
+  const [, , iphone, server] = cellsOf(page);
+  assert.ok(rowOf(iphone).classList.contains("route-on"));
+  const click = (cell) => rowOf(cell).querySelector(".route-use-btn").listeners.click[0]({ preventDefault() {}, stopPropagation() {} });
+  click(server);
+  assert.ok(rowOf(server).classList.contains("route-on"), "ACTIVE at once (the reveal)");
+  assert.ok(!rowOf(iphone).classList.contains("route-on"));
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(s.get("installRoute"), "server", "used once the reveal ends");
+  const was = globalThis.location;
+  globalThis.location = { hash: "" };
+  try {
+    click(iphone); // paired but not tested: setup first
+    assert.equal(s.get("installRoute"), "server", "not used until set up");
+    assert.ok(!rowOf(iphone).classList.contains("route-on"));
+  } finally { globalThis.location = was; }
 });
 
 test("Install Apps With page: both choices carry the same icons as the main page's row", () => {

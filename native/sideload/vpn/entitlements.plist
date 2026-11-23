@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The built-in VPN's packet tunnel (sideload build only). The user's signer swaps in its own profile's entitlements:
+     the App ID needs the Network Extensions capability (iFizBox's own App IDs get it, core/asc.js APP_ID_CAPS). -->
+<plist version="1.0">
+<dict>
+	<key>get-task-allow</key><true/>
+	<key>com.apple.developer.networking.networkextension</key><array><string>packet-tunnel-provider</string></array>
+</dict>
+</plist>

@@ -693,12 +693,25 @@ enum IDevice {
         private let pinnedTailscale: Bool? // B246: the route a reconnect must use (nil: Tailscale.useForInstall)
         private let second: Bool // B251: a second look beside the install's own session: shares its Tailscale relay
         let kind: Kind
-        var via: String { viaTailscale ? "Tailscale" : "LocalDevVPN" }
+        private var builtIn = false // F372: through the built-in VPN, held (LocalVPN.begin) until deinit
+        private var dataOff = false // F372: Cellular Data Off ran for this connect; On runs once connected
+        var via: String { builtIn ? LocalVPN.name : viaTailscale ? "Tailscale" : "LocalDevVPN" }
         var tailnet: Bool { viaTailscale }
 
         /// Where to connect for `port`: LocalDevVPN's 10.7.0.1, or (Tailscale.useForInstall) a 127.0.0.1 relay that
         /// reaches this phone's own Tailscale address over the app's tailnet node (native/sideload/tailscale).
+        /// F372: the built-in VPN first, whenever this app can run it (LocalVPN.available): it turns on here and the
+        /// connect goes to the same 10.7.0.1; Tailscale and LocalDevVPN are left for an app signed without it.
         private func endpoint(_ port: UInt16) throws -> (String, UInt16) {
+            if LocalVPN.available && pinnedTailscale != true {
+                if !second && !builtIn {
+                    watch.begin("turning on \(LocalVPN.name)", Limit.tunnel)
+                    let w = watch
+                    dataOff = try LocalVPN.begin { w.alive($0) }
+                    builtIn = true
+                }
+                return (address, port) // a second look rides on the install's own session's VPN
+            }
             let tailnet = Tailscale.useForInstall()
             // B246: connecting again after a drop keeps the first connection's route. Automatic chose LocalDevVPN
             // while Tailscale's VPN was coming back (the 15 Pro), and that connect could only fail.
@@ -780,6 +793,8 @@ enum IDevice {
                 ilog("lockdown connected, heartbeat on")
                 startHeartbeat()
             }
+            // F372: connected: Cellular Data back on (an open connection keeps going, R72)
+            if dataOff { LocalVPN.connected(dataOff: true); dataOff = false }
         }
 
         /// "RSD <uuid>, 63 services; AFC on 52012, installation_proxy on 52040", for the log.
@@ -864,6 +879,7 @@ enum IDevice {
             if let a = adapter { adapter_free(a) }
             if let p = provider { idevice_provider_free(p) }
             if viaTailscale && !second { Tailscale.endInstall() }
+            if builtIn { LocalVPN.connected(dataOff: dataOff); LocalVPN.end() } // F372: data back on if a connect failed
         }
     }
 
@@ -963,7 +979,7 @@ enum IDevice {
                 return
             } catch let f as Failure where !run.connected && isEarlyEOF(f) && IDevice.pairing()?.kind == .remotePairing {
                 // B274: Pair Again, not the socket error (the row and its log say what to do)
-                let via = Tailscale.useForInstall() ? "Tailscale" : "LocalDevVPN"
+                let via = LocalVPN.available ? LocalVPN.name : Tailscale.useForInstall() ? "Tailscale" : "LocalDevVPN"
                 ilog("first connect reset during pair-verify through \(via): \(f.text); the pairing is stale")
                 throw pairAgain(f, via: via)
             } catch let f as Failure where run.connected && HereRecheck.shouldReconnect(code: f.code, lib: f.lib, reconnecting: firstDrop != nil) {

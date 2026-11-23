@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The built-in VPN's packet tunnel extension (sideload build only; build.sh fills in the version, build and minimum
+     iOS). The app finds it by its CFBundleIdentifier at run time (a signer may rename it), LocalVPN.swift. -->
+<plist version="1.0">
+<dict>
+	<key>CFBundleExecutable</key><string>$(BRAND_NAME)VPN</string>
+	<key>CFBundleIdentifier</key><string>com.ryha.ifizbox.vpn</string>
+	<key>CFBundleName</key><string>$(BRAND_NAME)VPN</string>
+	<key>CFBundleDisplayName</key><string>$(BRAND_NAME) VPN</string>
+	<key>CFBundlePackageType</key><string>XPC!</string>
+	<key>CFBundleShortVersionString</key><string>@VERSION@</string>
+	<key>CFBundleVersion</key><string>@BUILD@</string>
+	<key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+	<key>CFBundleDevelopmentRegion</key><string>en</string>
+	<key>CFBundleSupportedPlatforms</key><array><string>iPhoneOS</string></array>
+	<key>DTPlatformName</key><string>iphoneos</string>
+	<key>MinimumOSVersion</key><string>@MIN@</string>
+	<key>UIDeviceFamily</key><array><integer>1</integer></array>
+	<key>NSExtension</key><dict>
+		<key>NSExtensionPointIdentifier</key><string>com.apple.networkextension.packet-tunnel</string>
+		<key>NSExtensionPrincipalClass</key><string>$(BRAND_NAME)VPN.PacketTunnelProvider</string>
+	</dict>
+</dict>
+</plist>
