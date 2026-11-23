@@ -15,6 +15,7 @@ import gzip
 import json
 import os
 import plistlib
+import re
 import shutil
 import subprocess
 import sys

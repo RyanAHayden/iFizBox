@@ -295,6 +295,21 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   shipped in `web/app/shortcuts/`). Add shares it to Shortcuts' Add Shortcut sheet; back in the app it runs once
   with the input `{"check":1}` (it does nothing) and shows Done only if it ran. Once added, the page
   `installation/shortcuts` (Install Switch) shows an Added row and Test Install Switch (`vpn.testSwitch`).
+  On iOS 16 and later the added Install Switch takes one trip to Shortcuts per queue of installs. Until it is replaced
+  (Add again, then Replace in Shortcuts), Set Up's row and the Install Switch page show Update. The app uses a trip only
+  when the check run `{"check":1,"actions":1}` reached Wait for Install (`vpn.status`'s `shortcuts.trip`; `trips` says
+  this build can: iOS 16+ and the bundle ID `com.ryha.ifizbox`). That check is also when iOS asks its one-time Allow.
+  Otherwise (an older Install Switch, iOS 15, a renamed app, Allow denied) the start, dataOff and end runs below stay as
+  they are. A trip is one run with `{"trip":1}`, plus `"cellular":1` on cellular: it remembers the VPN that is on, runs
+  Connect VPN (the app's own action, in the background; an error ends the run before data goes off), turns Cellular Data
+  Off when cellular, then Open for Install (the app comes to the front, and the install goes on). Then it runs 45 Wait
+  for Install actions of 20 seconds each, since Shortcuts cuts one action off at about 30 seconds. Each returns at once
+  when the queue is over, so the rest run through quickly; the 15 minute limit is these 45 together. On cellular, Cellular
+  Data On and a 3 second wait follow, then the remembered VPN is set back. The app waits for that (up to 50 seconds)
+  before a new connect. What the run took out is kept in UserDefaults (`ifizbox.vpn.switch.pending`) until it is back, so
+  after the app is killed (self-update included) the next launch runs the end. If the run didn't put things back, the app
+  runs the separate `{"end":1}` run described below. The rules for when a start or an end is needed are unchanged.
+  `vpn.testSwitch` does one trip when ready.
   The first connect of a queue of installs runs it only on cellular, or when another VPN is up (only the Shortcut's
   Set VPN can bring that one back). On Wi-Fi with no other VPN, the app connects and disconnects the built-in VPN by
   itself, and Shortcuts never opens. When it runs, it goes through `shortcuts://x-callback-url/run-shortcut` (Shortcuts
@@ -325,8 +340,8 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   the connect, on once connected), but Set Up no longer offers them. An install that starts on cellular without the
   Install Switch asks first (Use Server or Set Up), and Home's status slot and Installation & Signing's status cell
   say Add the Install Switch. Bridge calls: `vpn.status` (also `idevice.status`'s `vpn`; its `shortcuts` is
-  `{off, on, switch}`), `vpn.test`, `vpn.testSwitch` (runs start, waits for the VPN, runs dataOff on cellular, then
-  end; answers `{ok, start, end, cellular, wentOff, vpnOn}`), `vpn.checkShortcut`, `vpn.openShortcuts`.
+  `{off, on, switch, trip}`), `vpn.test`, `vpn.testSwitch` (one trip when ready; otherwise runs start, waits for the VPN,
+  runs dataOff on cellular, then end; answers `{ok, start, end, cellular, wentOff, vpnOn}`), `vpn.checkShortcut`, `vpn.openShortcuts`.
 - **This iPhone over Tailscale** (`native/sideload/tailscale/`, its README): for Tailscale users, who can't run
   LocalDevVPN at the same time. The sideload app embeds tsnet (tailscale.com, BSD-3-Clause, a Go c-archive built on
   Linux with a pinned Go; not in the jailbreak executable) and joins the tailnet as its own device ("iFizBox on

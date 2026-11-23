@@ -12,10 +12,16 @@ iFizBox's actions for Shortcuts, Siri, Spotlight and the Action button, with not
 | Respring | jailbreak | `ifizbox-helper respring` | – |
 | Userspace Reboot | jailbreak | `ifizbox-helper userspace-reboot` (`launchctl reboot userspace`) | – |
 | Export My Packages | jailbreak | sources (sources.list, `*.list`, `*.sources`), packages not Auto-Installed (apt's extended_states), holds | a JSON file, `ifizbox-backup` version 1 |
+| Connect VPN | sideload | the Install Switch's action: connects the built-in VPN for a queue of installs (`LocalVPN.tripConnect`); an error ends the run | – |
+| Open for Install | sideload | the Install Switch's action: opens iFizBox (`openAppWhenRun`) so the install goes on (`LocalVPN.tripOpened`) | – |
+| Wait for Install | sideload | the Install Switch's action: returns at once when the queue is over, else after 20 s (`LocalVPN.tripWaiting`) | – |
 
 - `Core.swift`: what each does, Foundation only, tested on Linux (`test_intents.py` builds `tests/main.swift` with it
   and `../sign/Updates.swift`, against `../fake/ifizbox-helper`). Also `WidgetShare`, the App Group snapshot the widget
   reads. `IntentHost` is the phone (helper, files under the prefix, sideload update fetch).
+- `App/InstallSwitch.swift`: the three Install Switch actions above, `@available(iOS 16)`, in the sideload IPA's metadata
+  only. What they do is `../sideload/vpn/App/LocalVPN.swift`'s. They return nothing, so the Shortcut's last action
+  has no output for iOS to ask about. Shortcuts runs them, not the page; `tools/shortcuts/install-switch.plist` uses them.
 - `App/Intents.swift`: the `AppIntent` structs and the `AppShortcutsProvider`, `@available(iOS 16)`; `App/Host.swift`:
   `PhoneHost` (spawns the real helper through `../helper/spawn.c`; the widget builds it too); `App/WidgetStore.swift`:
   writes the count for the widget (also from the page's `app.badge`). Intents.swift imports neither UIKit nor
@@ -29,8 +35,9 @@ iOS reads an app's intents from `iFizBox.app/Metadata.appintents/` (`extract.act
 Xcode's macOS-only `appintentsmetadataprocessor` writes. On Linux: `build.sh` compiles with
 `-emit-const-values-path build/iFizBox.swiftconstvalues` and `-const-gather-protocols-file intents/protocols.json`
 (the swift.org toolchain has both), and `metadata.py build` turns that JSON into the two files. The sideload IPA gets
-`--only CheckForUpdatesIntent,AddSourceIntent,RestorePackagesIntent` (`build.sh` `SIDELOAD_INTENTS`), so the
-jailbreak-only intents and their App Shortcuts never show there; `mkipa.py check` refuses an IPA with another set.
+`--only CheckForUpdatesIntent,AddSourceIntent,RestorePackagesIntent,ConnectVPNIntent,OpenForInstallIntent,WaitForInstallIntent`
+(`build.sh` `SIDELOAD_INTENTS`), so the jailbreak-only intents and their App Shortcuts never show there, and the jailbreak
+app gets `JAILBREAK_INTENTS` (no Install Switch action); `mkipa.py check` refuses an IPA with another set.
 
 The format follows Xcode's own output: sweetpad's capture from Xcode 27B52 (`fixtures/`, MIT; `test_intents.py`
 checks byte-for-byte equality after sorting) and the llios sample from Xcode 17F113
