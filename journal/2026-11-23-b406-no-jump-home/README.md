@@ -19,7 +19,7 @@ Headless Chromium at 375x667, CPU x6, with a fake jailbreak bridge. Visibility s
 
 - `web/app/nav/hometop.js`, `createUserTouch`: reset on hidden. A field that iOS refocuses does not count as a touch.
 - `web/app/nav/hometop.js`, `createReturnHome`: synchronous through `router.goNow`, no slide. `hiddenAt` is used up by every return. A touched app only refreshes.
-- `homeTop.opened` skips the Home return when the user has touched the app.
+- `homeTop.opened` does not scroll Home to its top once the user has touched the app.
 - `onRoute` moved from `web/app/app.js` to `web/app/nav/stack.js` as `newestRoute`, so a slow mount loses to a newer tab.
 - The same rule now applies to: the website's new-build reload (waits until the user leaves), finished-run page dismissal in `web/app/incoming.js`, the settings redraw on return while typing in `web/app/screens/settings.js`, and the Security Patch alert and push permission prompt (both wait until the user is not typing).
 
