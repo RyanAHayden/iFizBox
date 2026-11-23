@@ -161,3 +161,87 @@ test("F203: Theme > Style picks iOS 26: data-style, its two themes, card sheets,
   }
 });
 
+
+// B401: a black page over the status bar (the run page) gets light status-bar text in the styles whose White theme
+// asks for dark; the theme's own comes back when it closes. Only statusBar changes: the rest (what the shell saves for
+// the next launch) is the same. Dark themes and iOS 6 send nothing, their text is light already.
+test("app.theme with the run page and a sheet open and closed, per style", async () => {
+  const { openProgress } = await import("../nav/progress.js");
+  const { showSheet } = await import("../nav/sheet.js");
+  const was = [settings.get("style"), settings.get("appearance")];
+  const doc = globalThis.document;
+  try {
+    for (const style of ["ios6", "ios7", "ios13", "ios26"]) {
+      for (const appearance of ["light", "dark"]) {
+        const at = `${style} ${appearance}`;
+        const { sent, win } = bridgeWin();
+        settings.set("style", style);
+        settings.set("appearance", appearance);
+        applyTheme(doc, win);
+        const own = sent.at(-1).params;
+        const { statusBar, ...saved } = own;
+        const dark = style !== "ios6" && appearance === "light";
+        assert.equal(statusBar, dark ? "dark" : undefined, at);
+
+        let n = sent.length;
+        const page = openProgress();
+        assert.equal(sent.length, n + (dark ? 1 : 0), at);
+        assert.deepEqual(sent.at(-1).params, saved, `${at}: light text over the black page`);
+        n = sent.length;
+        applyTheme(doc, win); // Mode following the iPhone, a route change: nothing more to say
+        assert.equal(sent.length, n, at);
+        await page.close();
+        assert.deepEqual(sent.at(-1).params, own, `${at}: the theme's own again`);
+        assert.equal(sent.length, n + (dark ? 1 : 0), at);
+
+        // A plain sheet follows the theme and keeps its text in iOS 7; in a card style (iOS 13, 26) the status bar is
+        // over the black ground the page behind sinks onto.
+        n = sent.length;
+        const close = showSheet({ title: "Sheet" });
+        const card = dark && style !== "ios7";
+        assert.equal(sent.length, n + (card ? 1 : 0), at);
+        assert.equal(sent.at(-1).params.statusBar, dark && !card ? "dark" : undefined, at);
+        await close();
+        assert.deepEqual(sent.at(-1).params, own, at);
+      }
+    }
+  } finally { settings.set("style", was[0]); settings.set("appearance", was[1]); }
+});
+
+test("app.theme with a theme change while the black page is up: the new theme's text once it closes", async () => {
+  const { openProgress } = await import("../nav/progress.js");
+  const was = [settings.get("style"), settings.get("appearance")];
+  const doc = globalThis.document;
+  const { sent, win } = bridgeWin();
+  try {
+    settings.set("style", "ios7");
+    settings.set("appearance", "dark");
+    applyTheme(doc, win);
+    const page = openProgress();
+    settings.set("appearance", "light");
+    applyTheme(doc, win);
+    assert.equal(sent.at(-1).params.statusBar, undefined);
+    assert.equal(sent.at(-1).params.theme, "light");
+    await page.close();
+    assert.equal(sent.at(-1).params.statusBar, "dark");
+  } finally { settings.set("style", was[0]); settings.set("appearance", was[1]); }
+});
+
+test("app.theme with a photo full screen: light text until it closes", async () => {
+  const { zoomShots } = await import("./altstore.js");
+  const was = [settings.get("style"), settings.get("appearance")];
+  const doc = globalThis.document;
+  const { sent, win } = bridgeWin();
+  try {
+    settings.set("style", "ios7");
+    settings.set("appearance", "dark"); // a change, so the next one is sent whatever the last test left
+    applyTheme(doc, win);
+    settings.set("appearance", "light");
+    applyTheme(doc, win);
+    assert.equal(sent.at(-1).params.statusBar, "dark");
+    const z = zoomShots([fakeElement("img")]);
+    assert.equal(sent.at(-1).params.statusBar, undefined);
+    z.close();
+    assert.equal(sent.at(-1).params.statusBar, "dark");
+  } finally { settings.set("style", was[0]); settings.set("appearance", was[1]); }
+});
