@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createHomeTop, homeRootOf, isHomeRoot } from "./hometop.js";
-import { createStacks } from "./stack.js";
+import { createHomeTop, homeRootOf, isHomeRoot, createReturnHome, createUserTouch, untilNotTyping } from "./hometop.js";
+import { createStacks, newestRoute } from "./stack.js";
 import { tapTab, scrollToTop } from "./tabbar.js";
 import { createRouter, BAR_TABS } from "../router.js";
 
@@ -128,4 +128,169 @@ test("app.js wires it: tabTapped before tapTab, opened at launch, on visibilityc
   assert.match(src, /\nhomeTop\.opened\(\);/);
   assert.match(src, /visibilitychange", \(\) => \{ if \(document\.visibilityState === "visible"\) homeTop\.opened\(\)/);
   assert.match(src, /pageshow", \(e\) => \{ if \(e\.persisted\) homeTop\.opened\(\)/);
+});
+
+// B406: once the user touched anything after the app opens or comes back, nothing moves them.
+function fakeDoc() {
+  const on = new Map();
+  const doc = {
+    visibilityState: "visible", activeElement: null,
+    addEventListener(t, f) { (on.get(t) ?? on.set(t, new Set()).get(t)).add(f); },
+    removeEventListener(t, f) { on.get(t)?.delete(f); },
+    fire(t, e = {}) { for (const f of [...(on.get(t) ?? [])]) f(e); },
+    show(state) { doc.visibilityState = state; doc.fire("visibilitychange"); },
+  };
+  return doc;
+}
+const field = () => ({ matches: (q) => q.includes("input") });
+
+function returning({ after = 2 * 60_000, deferred = false } = {}) {
+  const win = fakeWindow("#/home");
+  // Browsers send hashchange in a later task: `late` holds it until flush().
+  const late = [];
+  const add = win.addEventListener;
+  if (deferred) win.addEventListener = (t, f) => add(t, () => late.push(f));
+  const stacks = createStacks({ tabs: BAR_TABS, create: () => ({ body: { scrollTop: 0 } }) });
+  const router = createRouter({ win, onRoute: (r) => stacks.sync(r) });
+  router.start();
+  const doc = fakeDoc();
+  const touch = createUserTouch(doc);
+  const homeTop = createHomeTop({ homeRoot: homeRootOf(stacks), current: () => router.current(), touched: touch.touched });
+  let time = 1000, refreshes = 0, blocked = false;
+  const rh = createReturnHome({ afterMs: () => after, touched: touch.touched, blocked: () => blocked,
+    goHome: () => router.goNow({ tab: "home", path: [] }), refresh: () => refreshes++, now: () => time });
+  doc.addEventListener("visibilitychange", () => (doc.visibilityState === "hidden" ? rh.hidden() : rh.visible()));
+  doc.addEventListener("visibilitychange", () => { if (doc.visibilityState === "visible") homeTop.opened(); });
+  return { router, stacks, doc, touch, wait: (ms) => { time += ms; }, refreshes: () => refreshes,
+    block: (v) => { blocked = v; }, flush: () => { for (const f of late.splice(0)) f(); },
+    tap: (tab) => { doc.fire("pointerdown"); doc.fire("click"); router.selectTab(tab); } };
+}
+
+test("B406: a late visible event after a tap keeps the tab, and still refreshes", () => {
+  const a = returning();
+  a.doc.show("hidden");
+  a.wait(10 * 60_000);
+  a.tap("search"); // iOS: the tap lands while the page still says hidden
+  a.doc.show("visible");
+  assert.deepEqual(a.router.current(), { tab: "search", path: [] });
+  assert.equal(a.refreshes(), 1);
+  a.wait(10 * 60_000);
+  a.doc.show("visible"); // a second, later event moves nobody either
+  assert.equal(a.router.current().tab, "search");
+  assert.equal(a.refreshes(), 1);
+});
+
+test("B406: without a touch Return to Home goes Home at once, in the same event", () => {
+  const a = returning({ deferred: true });
+  a.router.goNow({ tab: "search", path: [] });
+  a.flush();
+  a.doc.fire("pointerdown"); // used before it was left: not a touch of the coming return
+  a.doc.show("hidden");
+  a.wait(10 * 60_000);
+  a.doc.show("visible");
+  assert.deepEqual(a.router.current(), { tab: "home", path: [] });
+  assert.equal(a.refreshes(), 1);
+  a.tap("search"); // before the move's hashchange: that one finds nothing left to do
+  a.flush();
+  assert.deepEqual(a.router.current(), { tab: "search", path: [] });
+});
+
+test("B406: not away long enough, Never, or a popup up: nothing, and not later either", () => {
+  for (const [after, ms, blocked] of [[120_000, 60_000, false], [0, 1e9, false], [120_000, 1e6, true]]) {
+    const a = returning({ after });
+    a.router.selectTab("search");
+    a.block(blocked);
+    a.doc.show("hidden");
+    a.wait(ms);
+    a.doc.show("visible");
+    a.block(false);
+    a.wait(1e6);
+    a.doc.show("visible");
+    assert.equal(a.router.current().tab, "search");
+    assert.equal(a.refreshes(), 0);
+  }
+});
+
+test("B406: the visible event doesn't scroll Home under a finger already on it", () => {
+  const a = returning({ after: 0 });
+  const body = a.stacks.stack("home")[0].page.body;
+  a.doc.show("hidden");
+  a.doc.fire("touchstart");
+  body.scrollTop = 200;
+  a.doc.show("visible");
+  assert.equal(body.scrollTop, 200);
+});
+
+test("B406: userTouch: what counts, and that going hidden starts over", async () => {
+  const doc = fakeDoc();
+  const u = createUserTouch(doc);
+  assert.equal(u.touched(), false);
+  await u.untilAway();
+  for (const t of ["pointerdown", "touchstart", "click", "keydown", "input", "wheel"]) {
+    doc.fire(t);
+    assert.equal(u.touched(), true, t);
+    doc.show("hidden");
+    assert.equal(u.touched(), false);
+    doc.show("visible");
+  }
+  const f = field();
+  doc.activeElement = f;
+  doc.show("hidden");
+  doc.show("visible");
+  doc.fire("focusin", { target: f }); // iOS gives the field its focus back
+  assert.equal(u.touched(), false);
+  doc.fire("focusin", { target: field() });
+  assert.equal(u.touched(), true);
+  let away = false;
+  const p = u.untilAway().then(() => { away = true; });
+  await Promise.resolve();
+  assert.equal(away, false);
+  doc.show("hidden");
+  await p;
+});
+
+test("B406: untilNotTyping waits for the field to lose the focus", async () => {
+  const doc = fakeDoc();
+  await untilNotTyping(doc);
+  doc.activeElement = field();
+  let done = false;
+  const p = untilNotTyping(doc).then(() => { done = true; });
+  await Promise.resolve();
+  assert.equal(done, false);
+  doc.activeElement = null;
+  doc.fire("focusout");
+  await p;
+});
+
+test("B406: a slow first mount doesn't override a tab tapped meanwhile", async () => {
+  const ends = {}; // tab -> end of its load
+  const shown = [];
+  let ready = 0;
+  const onRoute = newestRoute({ need: (r) => (r.tab === "home" ? [] : [r.tab]), load: ([n]) => new Promise((ok, no) => { ends[n] = { ok, no }; }),
+    loaded: () => { ready++; }, show: (r) => shown.push(r.tab) });
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+  onRoute({ tab: "changes", path: [] }); // the launch's own route, still loading
+  onRoute({ tab: "search", path: [] }); // tapped
+  ends.search.ok();
+  await settle();
+  ends.changes.ok();
+  await settle();
+  assert.deepEqual(shown, ["search"]);
+  assert.equal(ready, 2);
+  onRoute({ tab: "sources", path: [] });
+  onRoute({ tab: "home", path: [] });
+  ends.sources.no(new Error("offline"));
+  await settle();
+  assert.deepEqual(shown, ["search", "home"]);
+  onRoute({ tab: "installed", path: [] });
+  ends.installed.no(new Error("offline"));
+  await settle();
+  assert.equal(shown.at(-1), "installed"); // a failed load still shows
+});
+
+test("B406: app.js wires Return to Home through goNow, never the async go", () => {
+  const src = readFileSync(new URL("../app.js", import.meta.url), "utf8");
+  assert.match(src, /router\.goNow\(\{ tab: "home", path: \[\] \}\)/);
+  assert.doesNotMatch(src, /router\.go\(\{ tab: "home"/);
+  assert.match(src, /touched: userTouch\.touched/);
 });

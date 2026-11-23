@@ -65,6 +65,20 @@ export function createStacks({ tabs, create }) {
   };
 }
 
+// The router's onRoute: a route shows once the modules it draws with are in (need(route): the missing ones, load() gets
+// them, loaded() runs after). A newer route meanwhile wins, so a slow mount never takes the user off a tab tapped
+// since. A failed load shows its route anyway.
+export function newestRoute({ need, load, loaded, show }) {
+  let seq = 0;
+  return (route) => {
+    const mine = ++seq;
+    const names = need(route);
+    if (!names.length) { show(route); return; }
+    const done = () => { loaded(); if (mine === seq) show(route); };
+    load(names).then(done, done);
+  };
+}
+
 // Edge-swipe back: does letting go here finish the pop? Past half the width, or flicked rightwards; a flick back
 // to the left cancels even past half, as on iOS. dx in px, vx in px/ms, width in px.
 export function swipeCommits(dx, vx, width) {

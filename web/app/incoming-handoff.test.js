@@ -59,7 +59,6 @@ test("the shell's receiving and url events mark a hand-off", async () => {
 
 test("Return Home After leaves a hand-off's page alone (app.js)", () => {
   const app = readFileSync(new URL("./app.js", import.meta.url), "utf8");
-  const block = app.slice(app.indexOf("let hiddenAt = 0;"), app.indexOf("refreshAtOpen();", app.indexOf("let hiddenAt = 0;")));
-  assert.match(block, /handoffRecent\(\)/);
-  assert.ok(block.indexOf("handoffRecent()") < block.indexOf("router.go({ tab: \"home\""), "checked before going Home");
+  // nav/hometop.js createReturnHome asks blocked() before going Home (hometop.test.js)
+  assert.match(app, /blocked: \(\) => [^\n]*handoffRecent\(\)/);
 });

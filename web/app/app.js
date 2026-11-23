@@ -12,7 +12,7 @@ import { detectMode } from "./core/settings.js";
 import { TABS, BAR_TABS, createRouter, format, parent, mounted, parse, mountLink, lazyFor, LAZY_TABS, TAB_TITLES } from "./router.js";
 import { load, loaded, mod, missing, loadAll, NotLoaded } from "./lazy.js";
 import { grouped, placeholder } from "./nav/ui.js";
-import { createStacks, swipeCommits } from "./nav/stack.js";
+import { createStacks, swipeCommits, newestRoute } from "./nav/stack.js";
 import { animate, setProgress, clear, DURATION, EASE, EASE_OUT } from "./nav/transition.js";
 import { attachEdgeSwipe, attachPageSwipe, attachTabSwipe, lockScroll, pageSwipeBlocked, tabSwipeTakesBack } from "./nav/swipe.js";
 import { keepRow, ghostFor } from "./nav/selection.js";
@@ -23,11 +23,11 @@ import { showAlert } from "./nav/alert.js";
 import { initScroller } from "./nav/scroller.js";
 import { makeScrollToTop } from "./nav/statusbar.js";
 import { pageOpened, pageShown } from "./nav/pagestate.js";
-import { createHomeTop, homeRootOf } from "./nav/hometop.js";
+import { createHomeTop, homeRootOf, createReturnHome, userTouch, untilNotTyping } from "./nav/hometop.js";
 import * as home from "./screens/home.js";
 import * as settingsScreen from "./screens/settings.js";
 import { pendingStep, askLeave, guardHooks } from "./screens/installroute.js"; // F373: settings.js loads it at startup already
-import { popupOpen } from "./nav/popups.js"; // F373
+import { popupOpen, whenNoPopup } from "./nav/popups.js"; // F373
 import { sourceFilter } from "./core/sources.js";
 import { getBackend } from "./backend.js";
 import { appSchemeFor, openOutside } from "./core/applinks.js";
@@ -276,15 +276,9 @@ function slide(top, below, p0, p1, cleanup, { withSelect = false, ...opts } = {}
 
 // F313: a route whose pages draw with modules not loaded yet (router.js lazyFor) shows once they're in, so a push
 // still slides in drawn; a newer route meanwhile wins. A failed load shows it anyway (drawPage draws what it can).
-let routeSeq = 0;
 let firstShown = false;
-function onRoute(route) {
-  const seq = ++routeSeq;
-  const need = missing(lazyFor(route));
-  if (!need.length) return showRoute(route);
-  const show = () => { initLoadedTabs(); if (seq === routeSeq) showRoute(router.current()); };
-  loadAll(need).then(show, show);
-}
+const onRoute = newestRoute({ need: (route) => missing(lazyFor(route)), load: loadAll, loaded: initLoadedTabs,
+  show: (route) => showRoute(route) });
 
 const router = createRouter({ win: window, onRoute });
 // Screens' go()/back() (nav/go.js): the router's go and the nav bar's Back.
@@ -619,29 +613,32 @@ document.addEventListener("pointerdown", (e) => {
 // Never while something is up (user 2026-11-18): an alert, action sheet, HUD, share sheet or any sheet (Confirm,
 // the install console and progress page, signing), so a popup or an install in progress is where the user left it.
 const OVERLAYS = ".alert-scrim, .action-scrim, .hud-scrim, .share-scrim, .sheet, .filter-drop, .menu";
+// B406: never once the user touched anything since the return (nav/hometop.js): then only the refresh runs.
 {
-  let hiddenAt = 0;
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") { hiddenAt = Date.now(); return; }
-    const after = Number(settingsScreen.settings.get("returnHome")) * 60 * 1000;
-    if (!hiddenAt || !after || Date.now() - hiddenAt < after) return;
-    if (document.querySelector(OVERLAYS)) { hiddenAt = 0; return; }
+  const returnHome = createReturnHome({
+    afterMs: () => Number(settingsScreen.settings.get("returnHome")) * 60 * 1000,
+    touched: userTouch.touched,
     // B174: nor when another app brought iFizBox forward with a file or link (an .ipa from Files): its page wins.
-    if (handoffRecent()) { hiddenAt = 0; return; }
-    hiddenAt = 0;
-    // Home's root at its top, not where it was scrolled (user 2026-11-18). go's hashchange is async: scroll after it.
-    const toTop = () => { const b = stacks.top()?.page.body; if (b) b.scrollTop = 0; };
-    if (location.hash === format({ tab: "home", path: [] })) toTop();
-    else addEventListener("hashchange", toTop, { once: true });
-    router.go({ tab: "home", path: [] });
-    refreshAtOpen();
+    blocked: () => Boolean(document.querySelector(OVERLAYS)) || handoffRecent(),
+    goHome: () => {
+      router.goNow({ tab: "home", path: [] });
+      running?.finish(); // no pop slide: it would take the first tap
+      // Home's root at its top, not where it was scrolled (user 2026-11-18).
+      const b = stacks.top()?.page.body;
+      if (b) b.scrollTop = 0;
+    },
+    refresh: () => refreshAtOpen(),
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") returnHome.hidden();
+    else returnHome.visible();
   });
 }
 
 // F211: the app opening on Home (launch, back from the background at any time, a Home Screen web app out of the
 // back/forward cache) shows Home at its top; the tab bar's click handler calls tabTapped (nav/hometop.js).
 const homeTop = createHomeTop({ homeRoot: homeRootOf(stacks), current: () => router.current(),
-  overlayUp: () => !!document.querySelector(OVERLAYS) });
+  overlayUp: () => !!document.querySelector(OVERLAYS), touched: userTouch.touched });
 homeTop.opened();
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") homeTop.opened(); });
 addEventListener("pageshow", (e) => { if (e.persisted) homeTop.opened(); });
@@ -672,7 +669,7 @@ if (nativeBridge()) {
   // F291: the jailbreak build offers a listed security patch for this iOS at launch (Install Patch / Later), like
   // Cydia's Essential upgrade; once dpkg's status is in (screens/safety.js lookForPatch), never installing by itself.
   if (detectMode() === "jailbreak") {
-    const lookForPatch = () => import("./screens/safety.js").then((m) => m.lookForPatch()).catch(() => {});
+    const lookForPatch = () => import("./screens/safety.js").then((m) => m.lookForPatch({ alert: (a) => untilNotTyping().then(() => showAlert(a)) })).catch(() => {});
     setTimeout(lookForPatch, 6000);
     globalThis.addEventListener("ifizbox:reloaded", lookForPatch); // asked once a launch; this catches a late dpkg read
   }
@@ -681,7 +678,8 @@ if (nativeBridge()) {
   // user turned it off (core/push.js autoEnablePush). iOS's permission prompt shows here the first time; each launch
   // tries until it's on.
   if (detectMode() === "sideload") {
-    setTimeout(() => Promise.all([import("./core/push.js"), import("./signing/identity.js")])
+    setTimeout(() => untilNotTyping() // B406: iOS's prompt would put the keyboard away
+      .then(() => Promise.all([import("./core/push.js"), import("./signing/identity.js")]))
       .then(([p, s]) => p.autoEnablePush({ server: s.getServer() })).catch(() => {}), 3000);
   }
   // The first launch after iFizBox updated itself (iOS closed the old one as it installed this one). F183: no note
@@ -711,11 +709,14 @@ if (nativeBridge()) {
 if (!nativeBridge()) {
   // A new build on the site: get every file again and reload (screens/home.js refreshIfNewBuild), on open and on
   // each return to the foreground (a Home Screen web app rarely cold-launches), once a minute at most.
+  // B406: the page load waits while a popup is up (B56), and once the user touched anything until they next leave.
+  const busy = () => popupOpen() || userTouch.touched();
+  const hold = async () => { while (busy()) { await whenNoPopup(); await userTouch.untilAway(); } };
   let lastBuildCheck = 0;
   const checkBuild = () => {
     if (document.visibilityState === "hidden" || Date.now() - lastBuildCheck < 60 * 1000) return;
     lastBuildCheck = Date.now();
-    home.refreshIfNewBuild().catch(() => {});
+    home.refreshIfNewBuild({ busy, hold }).catch(() => {});
   };
   checkBuild();
   document.addEventListener("visibilitychange", checkBuild);
