@@ -11,7 +11,13 @@
 //     prepare(row) -> Promise<action | null>,  // what a swipe of this row does (null: nothing; the row doesn't move)
 //     commit(row, action),            // let go armed
 //     kindOf(action) -> "add" | "remove" | "cancel",  // the control drawn
+//     full(row, action) -> bool,      // B332, optional: a full-row swipe (Mail's delete) instead of the spring back
 //   });
+//
+// B332: a full-row swipe follows the finger 1:1 with no rubber band; past FULL_ARM of the width it is armed, and
+// letting go armed slides the content off the row's left edge and runs commit(row, action), which may return (or
+// resolve to) false when nothing went (a sheet's Cancel, an error): the row then springs back. Removing the row is
+// commit's job (nav/ui.js collapse). The strip says it with data-full="1" (packages.css).
 //   s.reset(row)                      // a recycled row (vlist.js rebinds it): drop any drag at once
 //   playHint(row, { distance, duration })  // the first-run hint: eases left once and back (WAAPI, transform only)
 import { haptic } from "./haptic.js";
@@ -46,6 +52,19 @@ export function swipeOffset(dx, width) {
 
 export const swipeArmed = (dx, width) => width > 0 && -dx >= width * ARM;
 
+// B332: a full-row swipe's offset (the finger, 1:1, between the row's left edge and rest) and its armed point.
+export const FULL_ARM = 0.5;
+export const swipeOffsetFull = (dx, width) => -Math.min(Math.max(0, -dx), Math.max(0, width));
+export const swipeArmedFull = (dx, width) => width > 0 && -dx >= width * FULL_ARM;
+const OFF = `transform .25s ${EASE}`;
+
+// B332: whether the page's era deletes a row with a full-row swipe. iOS 6 keeps its swipe-then-red-Delete (iOS 6
+// Mail's own: the kit's "Email Delete" button); iOS 7, 13 and 26 (<html data-style>) swipe the row off.
+export const fullSwipeEra = (doc = globalThis.document) => {
+  const style = doc?.documentElement?.getAttribute?.("data-style");
+  return !!style && style !== "ios6";
+};
+
 // The strip behind a row, made once per pooled row: the pinstripes and the control.
 function backOf(row) {
   if (row._swipeBack) return row._swipeBack;
@@ -62,9 +81,10 @@ function backOf(row) {
 
 const innerOf = (row) => row.querySelector(":scope > .cell-inner");
 
-function show(row, kind) {
+function show(row, kind, full = false) {
   const back = backOf(row);
   back.dataset.kind = kind || "";
+  back.dataset.full = full ? "1" : "";
   back.classList.remove("armed");
   row.classList.add("swiping");
   return back;
@@ -77,11 +97,14 @@ function hide(row) {
   if (inner) { inner.style.transition = ""; inner.style.transform = ""; }
 }
 
-export function attachRowSwipe(listEl, { rowSelector = ".pkg-row", canStart = () => true, prepare, commit, kindOf }) {
+export function attachRowSwipe(listEl, { rowSelector = ".pkg-row", canStart = () => true, prepare, commit, kindOf, full = null }) {
   let t = null;        // { row, id, x0, y0, state: "wait" | "drag", width, dx, action, pending, armed, frame }
   let eatClick = false;
 
   const kindFor = (tt) => (tt.action ? kindOf(tt.action) : "");
+  const fullFor = (tt) => !!(full && tt.action && full(tt.row, tt.action));
+  const offsetFor = (tt, dx) => (fullFor(tt) ? swipeOffsetFull : swipeOffset)(dx, tt.width);
+  const armedFor = (tt, dx) => (fullFor(tt) ? swipeArmedFull : swipeArmed)(dx, tt.width);
 
   listEl.addEventListener("pointerdown", (e) => {
     if (t) cancel(); // the last touch never ended
@@ -112,7 +135,7 @@ export function attachRowSwipe(listEl, { rowSelector = ".pkg-row", canStart = ()
       t.x0 = e.clientX; // start from here, so the row doesn't jump by the slop
       const inner = innerOf(t.row);
       if (inner) { inner.style.transition = "none"; inner.classList.remove("is-pressed"); } // a swipe isn't a tap: no blue
-      show(t.row, kindFor(t));
+      show(t.row, kindFor(t), fullFor(t));
     }
     t.dx = Math.min(0, e.clientX - t.x0);
     if (!t.frame) {
@@ -123,12 +146,14 @@ export function attachRowSwipe(listEl, { rowSelector = ".pkg-row", canStart = ()
 
   function paint(tt) {
     const inner = innerOf(tt.row);
-    if (inner) inner.style.transform = `translate3d(${swipeOffset(tt.dx, tt.width)}px,0,0)`;
+    if (inner) inner.style.transform = `translate3d(${offsetFor(tt, tt.dx)}px,0,0)`;
     const back = tt.row._swipeBack;
     if (!back) return;
     const kind = kindFor(tt);
     if (back.dataset.kind !== kind) back.dataset.kind = kind;
-    const armed = !!tt.action && swipeArmed(tt.dx, tt.width);
+    const isFull = fullFor(tt) ? "1" : "";
+    if (back.dataset.full !== isFull) back.dataset.full = isFull;
+    const armed = !!tt.action && armedFor(tt, tt.dx);
     if (armed !== tt.armed) {
       tt.armed = armed;
       back.classList.toggle("armed", armed);
@@ -157,11 +182,31 @@ export function attachRowSwipe(listEl, { rowSelector = ".pkg-row", canStart = ()
     eatClick = true; // the lift that ends a drag isn't a tap on the row
     setTimeout(() => { eatClick = false; }, 400);
     const x = e.clientX ?? tt.x0 + tt.dx;
-    const armed = !cancelled && swipeArmed(Math.min(0, x - tt.x0), tt.width);
+    const armed = !cancelled && armedFor(tt, Math.min(0, x - tt.x0));
+    if (armed && fullFor(tt)) return slideOff(tt);
     springBack(tt.row);
     if (!armed) return;
     const item = tt.row._item;
     tt.pending.then((a) => { if (a && tt.row._item === item) commit(tt.row, a); });
+  }
+
+  // B332: the full-row swipe's lift: the content goes off the left edge, then commit; false back from it springs back.
+  function slideOff(tt) {
+    const { row } = tt;
+    const inner = innerOf(row);
+    const item = row._item;
+    // commit once the content is off (transitionend, or OFF's time if that never comes), so the slide shows first
+    const off = new Promise((resolve) => {
+      if (!inner) return resolve();
+      const done = () => { inner.removeEventListener("transitionend", done); clearTimeout(timer); resolve(); };
+      const timer = setTimeout(done, 300);
+      inner.addEventListener("transitionend", done);
+      inner.style.transition = OFF;
+      inner.style.transform = `translate3d(${-tt.width}px,0,0)`;
+    });
+    off.then(() => (tt.action && row._item === item ? commit(row, tt.action) : false))
+      .catch(() => false)
+      .then((ok) => { if (ok === false && t?.row !== row) springBack(row); });
   }
 
   function cancel() {
