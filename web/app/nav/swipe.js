@@ -64,3 +64,108 @@ function velocity(samples, now) {
   const [t1, x1] = recent[recent.length - 1];
   return t1 > t0 ? (x1 - x0) / (t1 - t0) : 0;
 }
+
+// ---- F373: the page swipe back --------------------------------------------------------------------------------
+// As on iOS 26, a rightward drag that starts anywhere on a pushed page (not only on the edge strip) runs the same
+// interactive pop: the caller's begin/move/end are the edge swipe's. It never takes the touch over: it listens to
+// passive touch events on the screens (no non-passive touchmove, no touch-action change, so vertical scrolling is
+// the browser's as before) and decides only after SLOP px of movement: clearly rightward and more sideways than
+// down (pageSwipeDecide). Touch events, not pointer events: the browser keeps sending touchmoves after it has taken a
+// drag for its own pan (a sideways gallery at its start), where a pointer stream would end in pointercancel.
+// It steps aside for a touch that starts where a drag means something else (pageSwipeBlocked).
+
+// What a move of (dx, dy) from the touch means so far: "wait" (inside the slop or not clear yet), "swipe" (rightward
+// and more sideways than vertical) or "none" (a scroll or a leftward drag: never ours, for the rest of this touch).
+export function pageSwipeDecide(dx, dy) {
+  const ax = Math.abs(dx), ay = Math.abs(dy);
+  if (ay > SLOP && ay >= ax) return "none";
+  if (-dx > SLOP && ax > ay) return "none";
+  if (dx > SLOP && dx > ay) return "swipe";
+  return "wait";
+}
+
+// Places whose drags are their own: text fields and sliders, the custom drag handlers (switch knob, roulette wheel,
+// section index, Settings' theme split, the icon crop), the edge strip, and full-screen layers (zoomed screenshots,
+// popups). Most of them also have `touch-action: none`, which pageSwipeBlocked checks too.
+export const PAGE_SWIPE_SKIP = [
+  "input:not([type=button]):not([type=submit]):not([type=reset]):not([type=checkbox]):not([type=radio]):not([type=file])",
+  "textarea", "select", "[contenteditable]:not([contenteditable=false])",
+  ".edge-swipe", ".switch", ".roulette-wheel", ".section-index", ".theme-preview-grip", ".theme-preview-top",
+  ".crop-stage", ".shot-zoom", '[aria-modal="true"]', '[role="dialog"]', '[role="alertdialog"]',
+].join(", ");
+
+const sideways = (o) => o === "auto" || o === "scroll";
+
+// Why a touch on `target` must not become a page swipe ("" when it may), walking up to `root` (the screens):
+//   "control"   in a text field, slider or custom drag area (PAGE_SWIPE_SKIP)
+//   "drag"      in something with `touch-action: none` (it handles every move itself)
+//   "scroller"  in something that scrolls sideways and isn't at its left end (the swipe would fight its scroll)
+//   "armed"     in a list showing a row's Delete: a right swipe there puts the Delete away (sources.js & co.)
+//   "selection" text is selected: the drag is the selection's
+export function pageSwipeBlocked(target, root, win = globalThis) {
+  const sel = win.getSelection?.();
+  if (sel && !sel.isCollapsed && String(sel)) return "selection";
+  for (let el = target; el && el !== root; el = el.parentElement) {
+    if (el.nodeType !== undefined && el.nodeType !== 1) continue;
+    if (el.matches?.(PAGE_SWIPE_SKIP)) return "control";
+    const cs = win.getComputedStyle?.(el);
+    if (cs?.touchAction === "none") return "drag";
+    if (cs && sideways(cs.overflowX) && el.scrollWidth > el.clientWidth + 1 && el.scrollLeft > 0) return "scroller";
+    if (el.querySelector?.(":scope > .armed")) return "armed";
+  }
+  return "";
+}
+
+// root: the screens. canStart() at the touch (nothing else moving, a page to go back to); blocked(target) -> truthy
+// to step aside (the caller adds its own reasons to pageSwipeBlocked's). begin/move/end as attachEdgeSwipe's.
+// held() -> true when a swipe must ask first (the pairing page's running step): once the drag is a swipe, onHeld()
+// runs instead of begin, and nothing is dragged.
+export function attachPageSwipe(root, { canStart, blocked = () => false, held = () => false, onHeld = () => {}, begin, move, end }, win = globalThis) {
+  let t = null; // { id, x0, y0, started, width, dx, samples, frame }
+  const find = (list, id) => { for (const x of list ?? []) if (x.identifier === id) return x; return null; };
+  const finish = (cancelled, ts) => {
+    const tt = t;
+    t = null;
+    if (!tt?.started) return;
+    if (tt.frame) cancelAnimationFrame(tt.frame);
+    end(tt.dx, cancelled ? -1 : velocity(tt.samples, ts));
+  };
+  const drop = () => finish(true, performance.now()); // slides back
+
+  root.addEventListener("touchstart", (e) => {
+    if (t) drop(); // a second finger (a pinch: no swipe) or a touch that never ended
+    if (e.touches.length !== 1) return;
+    const p = e.changedTouches[0];
+    if (!p || !canStart() || blocked(e.target)) return;
+    t = { id: p.identifier, x0: p.clientX, y0: p.clientY, started: false, dx: 0, samples: [], frame: 0 };
+  }, { passive: true });
+
+  root.addEventListener("touchmove", (e) => {
+    if (!t) return;
+    const p = find(e.changedTouches, t.id);
+    if (!p) return;
+    if (!t.started) {
+      // A handler under the finger that took the move for itself (preventDefault) keeps it.
+      const d = e.defaultPrevented ? "none" : pageSwipeDecide(p.clientX - t.x0, p.clientY - t.y0);
+      if (d === "wait") return;
+      if (d === "none" || !canStart()) { t = null; return; }
+      if (held()) { t = null; onHeld(); return; }
+      t.started = true;
+      t.width = begin();
+      t.x0 = p.clientX; // start from here, so the screen doesn't jump by the slop
+    }
+    t.dx = Math.max(0, p.clientX - t.x0);
+    t.samples.push([e.timeStamp, p.clientX]);
+    if (t.samples.length > 6) t.samples.shift();
+    if (!t.frame) {
+      const tt = t;
+      t.frame = requestAnimationFrame(() => { tt.frame = 0; if (t === tt) move(tt.dx); });
+    }
+  }, { passive: true });
+
+  root.addEventListener("touchend", (e) => { if (t && find(e.changedTouches, t.id)) finish(false, e.timeStamp); }, { passive: true });
+  root.addEventListener("touchcancel", (e) => { if (t && find(e.changedTouches, t.id)) finish(true, e.timeStamp); }, { passive: true });
+  win.addEventListener?.("blur", drop);
+  win.document?.addEventListener("visibilitychange", () => { if (win.document.visibilityState === "hidden") drop(); });
+  return { drop };
+}
