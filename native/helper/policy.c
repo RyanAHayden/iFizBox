@@ -1091,3 +1091,154 @@ done:
     free(mine.s);
     return rc;
 }
+
+/* B348: web pages saved as apt lists. */
+
+#define WEB_LIST_URIS 512
+static char web_uris[WEB_LIST_URIS][HELPER_URI_MAX + 2];
+static int web_nuris;
+
+static void web_add_uri(const char *s, size_t n) {
+    if (web_nuris >= WEB_LIST_URIS || !n || n > HELPER_URI_MAX) return;
+    if (strncasecmp(s, "http://", 7) && strncasecmp(s, "https://", 8)) return;
+    memcpy(web_uris[web_nuris], s, n);
+    if (s[n - 1] != '/') web_uris[web_nuris][n++] = '/'; /* apt reads a source URI as a folder */
+    web_uris[web_nuris][n] = 0;
+    for (int i = 0; i < web_nuris; i++)
+        if (!strcmp(web_uris[i], web_uris[web_nuris])) return;
+    web_nuris++;
+}
+
+/* Every http(s) word in one line of a sources file, one-line (deb <uri> ...) or deb822 (URIs: <uri> ...) alike. */
+static void web_read_line(char *line) {
+    char *hash = strchr(line, '#');
+    if (hash) *hash = 0;
+    for (char *s = line; *s;) {
+        while (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n') s++;
+        size_t n = strcspn(s, " \t\r\n");
+        web_add_uri(s, n);
+        s += n;
+    }
+}
+
+static void web_read_sources(const char *path) {
+    FILE *f = fopen(path, "re");
+    if (!f) return;
+    char line[4096];
+    while (fgets(line, sizeof line, f)) web_read_line(line);
+    fclose(f);
+}
+
+/* apt's URItoFileName: the URI without scheme or user, the bytes apt quotes as %xx, then "/" as "_". */
+static int web_list_prefix(const char *uri, char *out, size_t size) {
+    const char *s = strstr(uri, "://");
+    s = s ? s + 3 : uri;
+    const char *at = strchr(s, '@'), *slash = strchr(s, '/');
+    if (at && (!slash || at < slash)) s = at + 1;
+    size_t n = 0;
+    for (; *s; s++) {
+        unsigned char c = (unsigned char)*s;
+        if (n + 4 >= size) return -1;
+        if (c <= 0x20 || c >= 0x7f || strchr("\\|{}[]<>\"^~_=!@#$%&*", c)) n += (size_t)snprintf(out + n, 4, "%%%02x", c);
+        else out[n++] = c == '/' ? '_' : (char)c;
+    }
+    out[n] = 0;
+    return 0;
+}
+
+/* The file's own URL: the source's URI it starts with (the longest), then the rest of its name, "_" as "/" and %xx
+ * undone. 0, or -1 when no source has it. */
+static int web_list_url(const char *name, char *url, size_t size) {
+    char pre[3 * HELPER_URI_MAX + 8];
+    int best = -1;
+    size_t bestlen = 0;
+    for (int i = 0; i < web_nuris; i++) {
+        if (web_list_prefix(web_uris[i], pre, sizeof pre)) continue;
+        size_t l = strlen(pre);
+        if (l > bestlen && !strncmp(name, pre, l)) { best = i; bestlen = l; }
+    }
+    if (best < 0) return -1;
+    size_t n = (size_t)snprintf(url, size, "%s", web_uris[best]);
+    for (const char *s = name + bestlen; *s && n + 1 < size; s++) {
+        unsigned h;
+        if (*s == '%' && sscanf(s + 1, "%2x", &h) == 1 && s[1] && s[2]) { url[n++] = (char)h; s += 2; }
+        else url[n++] = *s == '_' ? '/' : *s;
+    }
+    url[n] = 0;
+    return n + 1 < size ? 0 : -1;
+}
+
+/* 1 if the file's first byte that isn't blank (spaces, tabs, line ends, a UTF-8 BOM) is '<': an HTML or XML page.
+ * apt's indexes (Packages, Sources, Release, Translation, Contents) are deb822 text or compressed, never that. */
+static int web_page_file(int dir, const char *name) {
+    int fd = openat(dir, name, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC);
+    if (fd < 0) return 0;
+    struct stat st;
+    int page = 0;
+    if (!fstat(fd, &st) && S_ISREG(st.st_mode)) {
+        unsigned char buf[512];
+        size_t seen = 0;
+        ssize_t r;
+        int done = 0;
+        while (!done && seen < 65536 && (r = read(fd, buf, sizeof buf)) > 0) {
+            for (ssize_t i = 0; i < r; i++, seen++) {
+                unsigned char c = buf[i];
+                if (c == ' ' || c == '\t' || c == '\r' || c == '\n') continue;
+                if (seen < 3 && (c == 0xef || c == 0xbb || c == 0xbf)) continue;
+                page = c == '<';
+                done = 1;
+                break;
+            }
+        }
+    }
+    close(fd);
+    return page;
+}
+
+int helper_drop_web_lists(const char *prefix, const char *source_line, FILE *out) {
+    char path[PATH_MAX];
+    web_nuris = 0;
+    if (source_line) {
+        static char line[sizeof ((struct helper_plan *)0)->source_line];
+        snprintf(line, sizeof line, "%s", source_line);
+        web_read_line(line); /* update-source names its own source only; another's page is deleted, not named */
+    }
+    snprintf(path, sizeof path, "%s/etc/apt/sources.list", prefix);
+    if (!source_line) web_read_sources(path);
+    snprintf(path, sizeof path, "%s/etc/apt/sources.list.d", prefix);
+    DIR *d = source_line ? NULL : opendir(path);
+    if (d) {
+        struct dirent *e;
+        while ((e = readdir(d))) {
+            size_t l = strlen(e->d_name);
+            if ((l > 5 && !strcmp(e->d_name + l - 5, ".list")) || (l > 8 && !strcmp(e->d_name + l - 8, ".sources"))) {
+                char f[PATH_MAX];
+                if ((size_t)snprintf(f, sizeof f, "%s/%s", path, e->d_name) < sizeof f) web_read_sources(f);
+            }
+        }
+        closedir(d);
+    }
+    snprintf(path, sizeof path, "%s/var/lib/apt/lists", prefix);
+    d = opendir(path);
+    if (!d) return 0;
+    int dropped = 0;
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        if (e->d_name[0] == '.' || !strcmp(e->d_name, "lock") || !web_page_file(dirfd(d), e->d_name)) continue;
+        int gone = !unlinkat(dirfd(d), e->d_name, 0);
+        if (!gone)
+            fprintf(out, "W: ifizbox-helper: can't delete %s/%s, a web page in apt's lists: %s\n", path, e->d_name,
+                    strerror(errno));
+        dropped += gone;
+        char url[HELPER_URI_MAX + PATH_MAX];
+        if (web_list_url(e->d_name, url, sizeof url)) {
+            if (gone) fprintf(out, "W: ifizbox-helper: deleted %s/%s: a web page, not an apt index\n", path, e->d_name);
+            continue;
+        }
+        /* core/aptupdate.js reads this line (as apt's own) and turns the source red, deleted or not. */
+        fprintf(out, "E: Failed to fetch %s  the repo answered with a web page, not an apt index\n", url);
+    }
+    closedir(d);
+    fflush(out);
+    return dropped;
+}
