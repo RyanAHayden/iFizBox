@@ -295,7 +295,9 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   shipped in `web/app/shortcuts/`). Add shares it to Shortcuts' Add Shortcut sheet; back in the app it runs once
   with the input `{"check":1}` (it does nothing) and shows Done only if it ran. Once added, the page
   `installation/shortcuts` (Install Switch) shows an Added row and Test Install Switch (`vpn.testSwitch`).
-  The first connect of a queue of installs runs it through `shortcuts://x-callback-url/run-shortcut` (Shortcuts
+  The first connect of a queue of installs runs it only on cellular, or when another VPN is up (only the Shortcut's
+  Set VPN can bring that one back). On Wi-Fi with no other VPN, the app connects and disconnects the built-in VPN by
+  itself, and Shortcuts never opens. When it runs, it goes through `shortcuts://x-callback-url/run-shortcut` (Shortcuts
   comes back to `ifizbox://vpn-shortcut`) with the input `{"start":1}`: it stores the VPN connected now (Get Current
   VPN, as "previous VPN") and connects the built-in VPN (found with Find VPNs by its server address, 10.7.0.1) with
   Set VPN, which iOS runs without a prompt. The app then connects its tunnel as before. A start that didn't run, or
@@ -308,7 +310,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   SideStore's docs give. The Shortcut still accepts `{"start":1,"cellular":1}` from older app builds: it turns data
   off after Set VPN, not before. With no network at all, the built-in VPN's start fails at once, saying it can't
   start without Wi-Fi or cellular data, instead of waiting 10 s. After
-  the last connect, once the VPN goes off (the 3 second linger, so a queue shares one start and one end), it runs
+  the last connect, once the VPN goes off (the 3 second linger, so a queue shares one start and one end), when the start ran, it runs
   with `{"end":1}`, plus `"cellular":1` on cellular: cellular data goes back on, then the stored VPN (Tailscale, say)
   connects and is forgotten. Shortcuts opens only from the front, so an end due while the app is in the background
   runs when the app is next active. The Shortcut reads its input as a dictionary and tests its flags with "has any

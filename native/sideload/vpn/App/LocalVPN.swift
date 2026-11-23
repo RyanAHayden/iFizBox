@@ -15,6 +15,8 @@
 // off. Once the VPN has gone off after the last connect (`linger`), it runs with {"end":1[,"cellular":1]}: Cellular
 // Data back on and the remembered VPN connected again. One hop to Shortcuts each way per queue (two at the start on
 // cellular), not per app. An end that finds the app in the background waits until it is in front again.
+// F388: the start runs only when it is needed (switchNeeded): on cellular, or with another VPN up (Tailscale). On
+// Wi-Fi with no other VPN, an install never opens Shortcuts: this VPN comes on and goes off by itself.
 //   vpn.status          {available, bundled, entitled, tested, on, cellular, wifi, shortcuts: {off, on, switch}}; also in
 //                       idevice.status as `vpn`
 //   vpn.test            the VPN on, one connect to iOS with the pairing (idevice.verify), the VPN off: {ok, ms, kind};
@@ -219,10 +221,16 @@ enum LocalVPN {
     /// Switch added, the first begin of a queue runs its start (end() runs its end). Otherwise, on cellular with both
     /// Cellular Shortcuts added, Cellular Data Off runs: the answer says so, and connected(dataOff:) turns it back on.
     static func begin(cellular: Bool = true, _ step: (String) -> Void = { _ in }) throws -> Bool {
+        let onCellular = cellular && Path.now().cellular, other = otherVPNUp() // F388: read before the lock (getifaddrs)
         lock.lock(); holds += 1; stopGen += 1
-        let start = switchAdded() && !switchedOn // F386: the first connect of a queue runs the Install Switch's start
-        if start { switchedOn = true; switchCellular = cellular && Path.now().cellular }
+        // F386: the first connect of a queue runs the Install Switch's start. F388: only when it is needed, so an
+        // install doesn't flip to Shortcuts and back: on cellular (Cellular Data Off has no app API), or with another
+        // VPN up (Tailscale), which only its Set VPN brings back. On Wi-Fi with no other VPN, up() alone does it all.
+        let start = switchAdded() && !switchedOn && switchNeeded(cellular: onCellular, otherVPN: other)
+        if start { switchedOn = true; switchCellular = onCellular }
+        let skipped = !start && !switchedOn && holds == 1 && switchAdded() // said once per queue
         lock.unlock()
+        if skipped { log("Install Switch: not needed (not on cellular, no other VPN up)") }
         if start {
             step("running the Shortcut \(shortcutNames["switch"]!)")
             // B375: never with "cellular": iOS starts no VPN without a network ("No network available"), so Cellular
@@ -297,6 +305,32 @@ enum LocalVPN {
     }
 
     static func switchAdded() -> Bool { UserDefaults.standard.bool(forKey: shortcutKeys["switch"]!) }
+
+    /// F388: a queue's start runs the Install Switch only when the app can't do without it: on cellular (Cellular
+    /// Data Off/On has no app API), or with another VPN up, which stays off after unless Set VPN puts it back
+    /// (journal/2026-11-22-f372-builtin-vpn: our configuration keeps Settings > VPN's checkmark, so On Demand
+    /// never brings Tailscale back by itself).
+    static func switchNeeded(cellular: Bool, otherVPN: Bool) -> Bool { cellular || otherVPN }
+
+    /// F388: another app's VPN is up now: a tunnel interface (utun, ipsec, ppp) that is up with an IPv4 address that
+    /// isn't ours (10.7.0.x). iOS's own utun interfaces carry IPv6 only.
+    static func otherVPNUp() -> Bool {
+        var head: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&head) == 0 else { return false }
+        defer { freeifaddrs(head) }
+        var p = head
+        while let i = p {
+            defer { p = i.pointee.ifa_next }
+            let name = String(cString: i.pointee.ifa_name)
+            guard Int32(i.pointee.ifa_flags) & IFF_UP != 0, ["utun", "ipsec", "ppp"].contains(where: name.hasPrefix),
+                  let a = i.pointee.ifa_addr, a.pointee.sa_family == sa_family_t(AF_INET) else { continue }
+            var buf = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
+            var sin = a.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { $0.pointee.sin_addr }
+            guard inet_ntop(AF_INET, &sin, &buf, socklen_t(buf.count)) != nil else { continue }
+            if !String(cString: buf).hasPrefix("10.7.0.") { return true }
+        }
+        return false
+    }
 
     /// The Install Switch's input: a JSON dictionary of flags, as tools/shortcuts/install-switch.plist reads them.
     static func switchInput(_ verb: String, cellular: Bool = false) -> String {
