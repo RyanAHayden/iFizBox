@@ -192,21 +192,23 @@ test("B363: the author page keeps what can't work, marked, and spacing or case n
   c.load("bb", bigboss, "http://apt.thebigboss.org/repofiles/cydia/", "iphoneos-arm");
   assert.deepEqual(ids(c.list()), ["com.bb.new", "com.bb.spaced"], "the fit filter is on: lists drop the rootful ones");
   const rows = c.author("BigBoss");
-  assert.deepEqual(ids(rows), ["com.bb.new", "com.bb.case", "com.bb.old"]);
-  assert.deepEqual(rows.map((r) => Boolean(r.misfit)), [false, true, true]);
+  assert.deepEqual(ids(rows), ["com.bb.new", "com.bb.case", "com.bb.old", "com.bb.spaced"]);
+  assert.deepEqual(rows.map((r) => Boolean(r.misfit)), [false, true, true, false]);
   assert.ok(rows[1].why, "a misfit says why, for its subtitle");
   assert.equal(rows[0].why, undefined);
-  assert.deepEqual(ids(c.author("big boss")), ["com.bb.spaced"]);
-  assert.deepEqual(ids(c.author("  Big   Boss ")), ["com.bb.spaced"]);
+  assert.deepEqual(ids(c.author("  big   boss ")), ids(rows));
+  assert.deepEqual(ids(c.author("Someone")), ["com.bb.old"]);
   // Filter off: the same rows, none marked.
   c.setDevice({ ios: "16.5", jailbreak: "rootless" }, { filter: false });
-  assert.deepEqual(c.author("BigBoss").map((r) => [r.id, Boolean(r.misfit)]), [["com.bb.new", false], ["com.bb.case", false], ["com.bb.old", false]]);
+  assert.deepEqual(c.author("BigBoss").map((r) => [r.id, Boolean(r.misfit)]),
+    [["com.bb.new", false], ["com.bb.case", false], ["com.bb.old", false], ["com.bb.spaced", false]]);
   // Sideload build: BigBoss as a Tweak Source. Its tweaks aren't in All Sources' apps, but their maintainer's page finds them.
   const lite = createCatalog();
   lite.setDevice({ ios: "27.0", jailbreak: "none" });
   lite.load("bb", bigboss, "http://apt.thebigboss.org/repofiles/cydia/", "iphoneos-arm", { tweaks: true });
   assert.equal(lite.list(ALL).length, 0);
-  assert.ok(lite.author("BigBoss").length > 0, "the Tweak Source's packages are listed");
+  // (Only what the sideload build can inject loads from a Tweak Source: here the two iphoneos-arm tweaks.)
+  assert.deepEqual(ids(lite.author("BigBoss")), ["com.bb.case", "com.bb.old"], "the Tweak Source's packages are listed");
 });
 
 test("reloading a source replaces it; removing drops it from All Sources", () => {

@@ -16,7 +16,12 @@ the page:
    nothing. BigBoss's packages are mostly rootful. Loaded with arch `iphoneos-arm` on iOS 16.5 rootless, the page had
    16 of 9,109 rows before the change and all 9,109 after.
 
-Also, a name with a run of spaces ("Big  Boss") did not match "big boss"; runs of spaces now compare as one.
+Also, a name with different spacing ("Big  Boss", "Big Boss") did not match "BigBoss". Names now compare with
+spaces left out.
+
+Misfits on the author page are drawn as Search draws its exact-match misfit (red name, the reason as subtitle),
+in name order with the rest, rather than greyed or under a footer: it is the look the app already uses for "this
+can't work here" in a list, and one name-sorted list keeps the A–Z index working.
 
 The jailbreak app and the site load sources with the device arch (`iphoneos-arm64`), so BigBoss's rootful packages
 are never loaded there. `author("BigBoss")` gave 17 rows before and after the change, out of the 38 arm64 and all-arch
@@ -26,7 +31,7 @@ it is out of scope here.
 ## What changed
 
 - `web/app/core/catalog.js` `author()`: the pool is `appsAndTweaks()` when the sideload build is on, the same pool
-  the unfiltered Search uses, and `rowsOf(ALL)` otherwise. Names are compared after collapsing runs of spaces, as
+  the unfiltered Search uses, and `rowsOf(ALL)` otherwise. Names are compared with spaces left out, as
   well as lower-cased. Misfits stay in the list, marked `{ misfit: true, why }`, where `why` is the reason the package can't work
   here. Hidden sections and blocked ids still stay out. The header comment for
   `c.author(name)` says so.

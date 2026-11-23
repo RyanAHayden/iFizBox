@@ -831,11 +831,11 @@ export function createCatalog() {
   }
 
   // F104: a hidden author's own page still lists their packages (hidden sections and blocked ids stay out).
-  // B363: names compare lower-cased with runs of spaces as one. What can't work on the device stays in, marked
+  // B363: names compare lower-cased with spaces left out ("Big Boss" is "BigBoss"). What can't work on the device stays in, marked
   // `misfit` with `why` for the row's subtitle (BigBoss's packages are mostly rootful: the page was empty on a
   // rootless phone). The sideload build looks in the Tweak Sources too (appsAndTweaks), not only All Sources' apps.
   function author(name) {
-    const same = (s) => s.replace(/\s+/g, " ");
+    const same = (s) => s.replace(/\s+/g, "");
     const n = same(String(name ?? "").trim().toLowerCase());
     if (!n) return [];
     const pool = appsOnly ? appsAndTweaks() : rowsOf(ALL);
