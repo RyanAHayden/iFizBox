@@ -3,8 +3,9 @@
 ## Summary
 
 After an install on This iPhone, Shortcuts could open again when the user came back to iFizBox, with nothing to put
-back. Found by reading the code; the first cause was reproduced on the iPhone 15 Pro (scenario B below), the second was not reproduced on
-the phone. The end of the Install Switch now runs only once the queue is over, and only for what it has to put back
+back. Both causes were found by reading the code; no needless run was reproduced on an old build. The phone did reproduce
+the symptom with a VPN to bring back (B and the real install below), which is by design, so which one the user saw is
+unknown. The end of the Install Switch now runs only once the queue is over, and only for what it has to put back
 (cellular data it turned off, or another VPN that was up before the start). The automatic check on Installation &
 Signing's pages is skipped while a connect would run the Install Switch. A tapped Check Connection still runs it.
 
@@ -30,7 +31,8 @@ Signing's pages is skipped while a connect would run the Install Switch. A tappe
   - `switchDataOff` records that Cellular Data Off ran (or may have, when the error was not "didn't open"). `switchVPNBefore`
     records that another VPN was up before the start.
   - `switchEndNeeded(dataOff:vpnBefore:dataBack:vpnBack:)` is `(dataOff && !dataBack) || (vpnBefore && !vpnBack)`.
-    `dataBack` is `Path.now().cellular`; `vpnBack` is `otherVPNUp()`. The end logs "end not needed" and skips Shortcuts
+    `dataBack` is `Path.now().cellular`; `vpnBack` is every address the other VPNs had being there again
+    (a Wi-Fi Calling ipsec tunnel stays up and would otherwise stand in for Tailscale; after review, see Phone checks). The end logs "end not needed" and skips Shortcuts
     when it is false.
   - The end's input carries `cellular` only when `dataOff` is set.
 - `web/app/core/installroute.js`: `switchWouldRun(st)` is true when the built-in VPN is in use, the Install Switch is
@@ -70,8 +72,16 @@ native shell, the VPN, and Shortcuts. All with `vpn.test` unless said.
 
 ## Not verified
 
+- A carrier's ipsec tunnel (Wi-Fi Calling) with an IPv4 address counts as another VPN for the start, so Shortcuts could
+  open at the start for it (no SIM to see whether iOS lists one); the end no longer does.
 - Cellular (no SIM on the phone): the `dataOff` and `dataBack` paths.
 - Whether the user had a VPN on, and which phone.
 - `autoCheck` on the phone (node test only).
 - The old build's between-installs end (the race is read from code).
 - A self-update that ends the process between start and end loses the state: `switchedOn` is in memory. Not looked into.
+
+## After review
+
+`vpnBack` compares addresses, the end waits 1 s before reading the path when data was off, and `switchWouldRun` also
+reads `tunnels`. Final build on the 15: B (end ran on return, Tailscale back) and C ("end not needed") again, same
+results. A, D and the real install were run on the build before this change.

@@ -312,7 +312,8 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   start without Wi-Fi or cellular data, instead of waiting 10 s. After
   the last connect, once the VPN goes off and the queue is over (the 3 second linger has passed, so a queue shares one
   start and one end), the end runs only when the start ran and there is something to put back: cellular data that the
-  run turned off and that isn't on again, or another VPN that was up before the start and none is up now. It runs
+  run turned off and that isn't on again, or another VPN that was up before the start and isn't up again (its
+  address isn't back). It runs
   with `{"end":1}`, plus `"cellular":1` only when Cellular Data Off ran: cellular data goes back on, then the stored VPN
   (Tailscale, say) connects and is forgotten. Shortcuts opens only from the front, so an end due while the app is in
   the background waits until the app is next in front; with nothing to put back, the end doesn't open Shortcuts at all. The

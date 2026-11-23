@@ -222,13 +222,13 @@ enum LocalVPN {
     /// Switch added, the first begin of a queue runs its start (end() runs its end). Otherwise, on cellular with both
     /// Cellular Shortcuts added, Cellular Data Off runs: the answer says so, and connected(dataOff:) turns it back on.
     static func begin(cellular: Bool = true, _ step: (String) -> Void = { _ in }) throws -> Bool {
-        let onCellular = cellular && Path.now().cellular, other = otherVPNUp() // F388: read before the lock (getifaddrs)
+        let onCellular = cellular && Path.now().cellular, before = otherVPNAddresses(), other = !before.isEmpty // F388: read before the lock (getifaddrs)
         lock.lock(); holds += 1; stopGen += 1; switchEndDue = false // B381: the queue goes on
         // F386: the first connect of a queue runs the Install Switch's start. F388: only when it is needed, so an
         // install doesn't flip to Shortcuts and back: on cellular (Cellular Data Off has no app API), or with another
         // VPN up (Tailscale), which only its Set VPN brings back. On Wi-Fi with no other VPN, up() alone does it all.
         let start = switchAdded() && !switchedOn && switchNeeded(cellular: onCellular, otherVPN: other)
-        if start { switchedOn = true; switchDataOff = false; switchVPNBefore = other }
+        if start { switchedOn = true; switchDataOff = false; switchVPNBefore = before }
         let skipped = !start && !switchedOn && holds == 1 && switchAdded() // said once per queue
         lock.unlock()
         if skipped { log("Install Switch: not needed (not on cellular, no other VPN up)") }
@@ -241,7 +241,7 @@ enum LocalVPN {
             // NEVPNErrorDomain error 2 while iOS is still enabling our configuration: seen on the 15 Pro)
             log(r.ok ? "Install Switch: start ran" : "Install Switch: start didn't run: \(r.error ?? "?")")
             // Shortcuts never opened (the app in the background): nothing changed, so no end is due either
-            if !r.ok && notOpened(r.error) { lock.lock(); switchedOn = false; switchVPNBefore = false; lock.unlock() }
+            if !r.ok && notOpened(r.error) { lock.lock(); switchedOn = false; switchVPNBefore = []; lock.unlock() }
         }
         do { try up(step) } catch {
             lock.lock(); lastFailure = Date(); lock.unlock()
@@ -300,7 +300,7 @@ enum LocalVPN {
 
     private static var switchedOn = false // guarded by lock: its start ran (or was tried) and its end hasn't yet
     private static var switchDataOff = false // guarded by lock: Cellular Data Off ran (or may have) after the start
-    private static var switchVPNBefore = false // guarded by lock: another VPN was up before the start
+    private static var switchVPNBefore = Set<String>() // guarded by lock: the other VPNs' addresses before the start
     private static var switchEndDue = false // guarded by lock: the queue is over (linger passed), so the end may run
 
     /// runShortcut's error for a run that never reached Shortcuts (nothing in it ran).
@@ -318,14 +318,17 @@ enum LocalVPN {
     static func switchNeeded(cellular: Bool, otherVPN: Bool) -> Bool { cellular || otherVPN }
 
     /// B381: the end opens Shortcuts only for something to put back: Cellular Data, when the run turned it off and it
-    /// isn't on again (`dataBack`), or another VPN, when one was up before the start and none is now (`vpnBack`).
+    /// isn't on again (`dataBack`), or another VPN, when one was up before the start and isn't again (`vpnBack`: every
+    /// address it had is there; a carrier's ipsec tunnel, which stays up throughout, doesn't stand in for Tailscale).
     static func switchEndNeeded(dataOff: Bool, vpnBefore: Bool, dataBack: Bool, vpnBack: Bool) -> Bool { (dataOff && !dataBack) || (vpnBefore && !vpnBack) }
 
     /// F388: another app's VPN is up now: a tunnel interface (utun, ipsec, ppp) that is up with an IPv4 address that
     /// isn't ours (10.7.0.x). iOS's own utun interfaces carry IPv6 only.
-    static func otherVPNUp() -> Bool {
+    static func otherVPNUp() -> Bool { !otherVPNAddresses().isEmpty }
+    static func otherVPNAddresses() -> Set<String> {
+        var out = Set<String>()
         var head: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&head) == 0 else { return false }
+        guard getifaddrs(&head) == 0 else { return out }
         defer { freeifaddrs(head) }
         var p = head
         while let i = p {
@@ -336,9 +339,10 @@ enum LocalVPN {
             var buf = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
             var sin = a.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { $0.pointee.sin_addr }
             guard inet_ntop(AF_INET, &sin, &buf, socklen_t(buf.count)) != nil else { continue }
-            if !String(cString: buf).hasPrefix("10.7.0.") { return true }
+            let a4 = String(cString: buf)
+            if !a4.hasPrefix("10.7.0.") { out.insert(a4) }
         }
-        return false
+        return out
     }
 
     /// The Install Switch's input: a JSON dictionary of flags, as tools/shortcuts/install-switch.plist reads them.
@@ -358,9 +362,10 @@ enum LocalVPN {
             lock.unlock(); return
         }
         switchedOn = false; switchEndDue = false
-        let dataOff = switchDataOff, vpnBefore = switchVPNBefore
+        let dataOff = switchDataOff, before = switchVPNBefore
         lock.unlock()
-        let dataBack = Path.now().cellular, vpnBack = otherVPNUp()
+        if dataOff { Thread.sleep(forTimeInterval: 1) } // the path may be an old one just after a suspension
+        let vpnBefore = !before.isEmpty, dataBack = Path.now().cellular, vpnBack = before.isSubset(of: otherVPNAddresses())
         guard switchEndNeeded(dataOff: dataOff, vpnBefore: vpnBefore, dataBack: dataBack, vpnBack: vpnBack) else {
             return log("Install Switch: end not needed (data off \(dataOff), on again \(dataBack); another VPN before \(vpnBefore), now \(vpnBack))")
         }

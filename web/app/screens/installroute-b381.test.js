@@ -39,6 +39,7 @@ test("the end is wired to the rule, and coming to the front ends nothing before 
   assert.match(end, /guard switchedOn, switchEndDue, holds == 0, active/);
   assert.match(swift, /holds \+= 1; stopGen \+= 1; switchEndDue = false/);
   assert.match(swift, /if stop \{ switchEndDue = switchedOn \}/);
+  assert.match(end, /vpnBack = before\.isSubset\(of: otherVPNAddresses\(\)\)/, "that VPN, not just any tunnel");
   assert.match(swift, /if !notOpened\(r\.error\) \{ lock\.lock\(\); switchDataOff = true/);
 });
 
@@ -51,6 +52,8 @@ test("switchWouldRun follows the app's rule for the start", () => {
     assert.equal(switchWouldRun(ST({ other, cellular })), start({ cellular, otherVPN: other }));
     assert.equal(switchWouldRun(ST({ other, cellular, added: false })), false, "not added");
   }
+  assert.equal(switchWouldRun({ ...ST(), tunnels: ["utun4"] }), true, "a VPN that routes 10.7.0.1 too (otherVPN false)");
+  assert.equal(switchWouldRun({ ...ST(), tunnels: ["utun6"], vpn: { ...ST().vpn, on: true } }), false, "our own VPN, still up");
   assert.equal(switchWouldRun(null), false);
 });
 
