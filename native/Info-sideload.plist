@@ -113,8 +113,6 @@
 	     Connecting browses _remotepairing._tcp for the port the phone's RemotePairing service is on now. -->
 	<key>NSLocalNetworkUsageDescription</key><string>To pair with this iPhone in Developer Mode, so apps install without a computer.</string>
 	<key>NSBonjourServices</key><array><string>_remotepairing-pairable-host._tcp</string><string>_remotepairing._tcp</string></array>
-	<!-- canOpenURL answers only for the schemes listed here: the VPN apps This iPhone connects through
-	     (IDeviceBridge idevice.vpnApps: LocalDevVPN, and Tailscale's own deep-link scheme). -->
-	<key>LSApplicationQueriesSchemes</key><array><string>apple-magnifier</string><string>localdevvpn</string><string>tailscale</string></array>
+	<key>LSApplicationQueriesSchemes</key><array><string>apple-magnifier</string></array>
 </dict>
 </plist>

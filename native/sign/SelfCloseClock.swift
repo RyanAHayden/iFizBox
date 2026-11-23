@@ -1,8 +1,8 @@
-// When iFizBox closes itself during its own update on the This iPhone route (Sideload.swift installHere), over
-// LocalDevVPN or Tailscale. On iOS 17.4+ (RemotePairing) installd doesn't end the running copy: it takes the new IPA
+// When iFizBox closes itself during its own update on the This iPhone route (Sideload.swift installHere), through
+// the built-in VPN. On iOS 17.4+ (RemotePairing) installd doesn't end the running copy: it takes the new IPA
 // and then waits until the old copy is gone, so installation_proxy's Complete never comes while iFizBox runs (user
 // 2026-11-20: stuck on "iOS is installing it" until the app was swiped away, then it finished). Waiting for installd
-// to stand still (the first rule) still left it hanging on Tailscale, so the rule is now: once installd has accepted
+// to stand still (the first rule) still left it hanging, so the rule is now: once installd has accepted
 // the install (its first status, any percentage), iFizBox closes `accepted` later; installd goes on without it. If
 // installd sends no status at all, `firstQuiet` after the copy ended. Later statuses change nothing.
 // Pure, no UIKit: native/sign/tests/sideload/main.swift tests it on Linux.

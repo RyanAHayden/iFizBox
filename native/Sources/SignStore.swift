@@ -94,7 +94,7 @@ enum SignStore {
     // The identity itself is in the Keychain, which outlives the app's container while the signing team stays the
     // same; the certificate's SHA-256 (certKey, which picks it out) and the profile file don't. Both are kept as
     // generic-password items too (no secret: the SHA-256 of a public certificate and a profile), this device only,
-    // as the Tailscale node (TailscaleKeep). Remove Certificate deletes them.
+    // as Install Apps With (KeptRoute). Remove Certificate deletes them.
     static let keepService = "com.ryha.ifizbox.signing.setup"
     static let keepCertAccount = "cert", keepProfileAccount = "profile"
 

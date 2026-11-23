@@ -1,4 +1,0 @@
-module TailscaleFFI {
-  header "tsnet_ffi.h"
-  export *
-}

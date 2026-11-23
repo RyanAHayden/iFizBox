@@ -140,9 +140,8 @@ class RemotePairingPort(unittest.TestCase):
         src = read("IDevice.swift")
         session = src[src.index("final class Session"):src.index("static func verify()")]
         self.assertIn("IDevice.findRemotePairingPort", session)
-        self.assertIn("tailnet ? Tailscale.probe(p) : VPNCheck.probe(p)", session)
+        self.assertIn("VPNCheck.probe(p)", session)
         self.assertIn('w.alive("probing port', session)  # the watchdog's clock restarts per probe
-        self.assertIn("Tailscale.mapPort(rpPort)", session)
         self.assertIn("IDevice.connectFailure(e)", session)
 
     def test_port_search_order_and_codes(self):

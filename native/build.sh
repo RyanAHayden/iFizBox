@@ -42,8 +42,6 @@ lld=${LD64_LLD:-$(rustc --print sysroot 2>/dev/null || true)/lib/rustlib/x86_64-
 command -v clang >/dev/null || missing+=("clang")
 # F15: idevice (the "no server" install route), built from source by sideload/idevice/build.sh: Rust + aarch64-apple-ios.
 idevice_why=$(sideload/idevice/build.sh --probe 2>&1) || missing+=("${idevice_why#idevice build: missing }")
-# Tailscale for that route (sideload/tailscale/build.sh): a pinned Go builds tsnet as a c-archive, sideload app only.
-ts_why=$(sideload/tailscale/build.sh --probe 2>&1) || missing+=("${ts_why#tailscale build: missing }")
 if [ ${#missing[@]} -gt 0 ]; then
   printf 'native build: missing %s\n' "${missing[@]}" >&2
   exit 3
@@ -75,32 +73,28 @@ mkdir -p "$rd"
 rm -rf "$rd/shims" && cp -r "$tc/usr/lib/swift/shims" "$rd/shims"
 ln -sfn "$tc/usr/lib/swift/clang" "$rd/clang"
 sideload/idevice/build.sh # F15: build/idevice/{lib/libidevice_ffi.a,include}, once per pin
-sideload/tailscale/build.sh # build/tailscale/libtsnet.a, once per pin
 "$swiftc" -parse-as-library -O -wmo -swift-version 5 -runtime-compatibility-version none \
   -target "$target" -sdk "$sdk" -resource-dir "$rd" -I "$rd/shims" -module-cache-path "$out/modules" \
   -Xcc -Wno-nullability-completeness -Xcc -Wno-nullability-inferred-on-nested-type \
-  -import-objc-header Sources/iFizBox-Bridging-Header.h -I "$out/idevice/include" -I sideload/tailscale \
+  -import-objc-header Sources/iFizBox-Bridging-Header.h -I "$out/idevice/include" \
   -emit-const-values-path "$out/$BRAND_NAME.swiftconstvalues" \
   -Xfrontend -const-gather-protocols-file -Xfrontend intents/protocols.json \
   -module-name "$BRAND_NAME" -c Sources/*.swift sign/*.swift intents/*.swift intents/App/*.swift share/*.swift share/App/*.swift \
-  sideload/idevice/*.swift sideload/tailscale/*.swift sideload/vpn/App/*.swift -o "$out/$BRAND_NAME.o"
+  sideload/idevice/*.swift sideload/vpn/App/*.swift -o "$out/$BRAND_NAME.o"
 clang -target "$target" -isysroot "$sdk" -O2 -c Sources/availability.c -o "$out/availability.o"
 clang -target "$target" -isysroot "$sdk" -O2 -c Sources/mode.c -o "$out/mode.o"
 # The app's half of the root helper (ifizbox_helper_spawn), and the helper itself (N2's native/helper/).
 hflags=(-target "$target" -isysroot "$sdk" -std=c11 -Wall -Wextra -Werror -O2)
 clang "${hflags[@]}" -c helper/spawn.c -o "$out/spawn.o"
-clang "${hflags[@]}" -c sideload/tailscale/stub.c -o "$out/tsnet-stub.o"
-# Two executables from the same objects: the jailbreak one with tsnet's stub, the sideload one with tsnet itself
-# (Go's runtime and Tailscale: ~10 MB the jailbreak app doesn't need).
+# Two executables from the same objects: the jailbreak one and the sideload one.
 link() {
   clang -target "$target" -isysroot "$sdk" -fuse-ld=lld --ld-path="$lld" "$out/$BRAND_NAME.o" "$out/availability.o" \
     "$out/mode.o" "$out/spawn.o" -L "$sdk/usr/lib/swift" -lz -lbz2 -Wl,-rpath,/usr/lib/swift -Wl,-dead_strip -Wl,-adhoc_codesign \
     -L "$out/idevice/lib" -lidevice_ffi -liconv \
     -Wl,-weak_framework,AppIntents -framework NetworkExtension "$@"
 }
-link "$out/tsnet-stub.o" -o "$out/$BRAND_NAME"
-link "$out/tailscale/libtsnet.a" -framework CoreFoundation -framework Security -framework SystemConfiguration -lresolv \
-  -o "$out/$BRAND_NAME-sideload"
+link -o "$out/$BRAND_NAME"
+link -framework CoreFoundation -framework Security -framework SystemConfiguration -lresolv -o "$out/$BRAND_NAME-sideload"
 # N8: AppIntents is iOS 16+ and weak (above), so iFizBox still launches on iOS 15. Nothing else may need it strongly.
 if command -v llvm-objdump >/dev/null || [ -x "$tc/usr/bin/llvm-objdump" ]; then
   od=$(command -v llvm-objdump || echo "$tc/usr/bin/llvm-objdump")
@@ -190,7 +184,6 @@ bundle() {
   [ -z "$overlay" ] || SWIFTC=$swiftc SDK=$sdk RD=$rd LLD=$lld OUT=$out VERSION=$version BUILD=$build LDID=$ldid \
     RCODESIGN=$rcodesign sideload/vpn/build.sh "$app"
   [ -z "$overlay" ] || python3 mkipa.py plist "$app/Info.plist" "$overlay" "$app/Info.plist"
-  [ -z "$overlay" ] || cp sideload/tailscale/LICENSE "$app/LICENSE-tailscale.txt" # tsnet is BSD-3-Clause
   printf 'APPL????' > "$app/PkgInfo"
 }
 

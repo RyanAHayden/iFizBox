@@ -9,8 +9,8 @@ ROOT = os.path.normpath(os.path.join(HERE, ".."))
 IDEVICE = os.path.join(HERE, "sideload", "idevice")
 
 # What the builds are made from: the website's signer (zsign, OpenSSL, zlib), the sideload app's install route
-# (idevice, Tailscale) and tweak injection (ElleKit).
-CREDITED = ["zsign", "OpenSSL", "zlib", "idevice", "Tailscale", "ElleKit"]
+# (idevice) and tweak injection (ElleKit).
+CREDITED = ["zsign", "OpenSSL", "zlib", "idevice", "ElleKit"]
 
 
 def read(*p):

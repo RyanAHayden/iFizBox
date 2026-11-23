@@ -12,7 +12,7 @@
 //   asc.key.remove                      -> true (and the cached profiles go)
 //   asc.request {method, path, body}    -> Apple's JSON         host fixed, path /v1/..., for the page's checks
 //   asc.profiles                        -> {[identifier]: entry} the cache (core/asc.js profileRows reads it)
-//   asc.udid                            -> {udid}  through This iPhone's pairing (LocalDevVPN / Tailscale)
+//   asc.udid                            -> {udid}  through This iPhone's pairing (the built-in VPN)
 // SPDX-License-Identifier: GPL-3.0-or-later
 import CryptoKit
 import Foundation

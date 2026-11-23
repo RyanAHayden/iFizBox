@@ -90,7 +90,7 @@ py_dirs=$(git ls-files --cached --others --exclude-standard | grep -E '(^|/)test
 # T49: the Python dirs whose tests neither read native/build nor write files the build reads, so they run beside the
 # native build. Every other dir runs after it: native/ and its Built cases, tools/ (test_deploy.py publishes
 # native/build), and any new dir until it is checked and listed here.
-early_dirs='^(native/daemon|native/helper|native/sideload/tailscale|native/spike|tools/setup|web/app/icons|worker)$'
+early_dirs='^(native/daemon|native/helper|native/spike|tools/setup|web/app/icons|worker)$'
 run_py_dirs() {
   local d
   for d in "$@"; do

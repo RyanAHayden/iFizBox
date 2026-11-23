@@ -1,5 +1,5 @@
 // B246: the This iPhone route (IDevice.install) when the connection to iOS drops mid-install. Leaving the app during
-// a big install over Tailscale (user 2026-11-20, a 383.7 MB IPA) ended with "install_failed: Socket(Kind(
+// a big install (a 383.7 MB IPA) ended with "install_failed: Socket(Kind(
 // UnexpectedEof)) (1)" while iOS went on and installed the app. A dropped connection is not iOS refusing the app:
 // the install connects again, finishes the copy from where iOS's file ends, and once the install was sent asks iOS
 // for the app (installation_proxy Browse) instead of calling it failed. Only installd's own error fails.
@@ -8,8 +8,8 @@
 import Foundation
 
 enum HereRecheck {
-    /// How often one install connects again after a drop, and the pause before each try (the tunnel or the
-    /// Tailscale node coming back after the app returns to the front).
+    /// How often one install connects again after a drop, and the pause before each try (the tunnel
+    /// coming back after the app returns to the front).
     static let reconnects = 4
     static func pause(_ attempt: Int) -> TimeInterval { [2, 4, 8, 15][min(max(attempt, 1), 4) - 1] }
     /// How long to keep asking iOS for the app after a drop, and how often.
@@ -32,8 +32,8 @@ enum HereRecheck {
     }
 
     /// Whether install() connects again after this failure. A drop always; once it is already connecting again, a
-    /// connect that fails too (the route still coming back: Tailscale's VPN reconnecting refused or timed out the
-    /// connect on the iPhone 15 Pro) is tried again as well, up to `reconnects`. A refused or rejected pairing never.
+    /// connect that fails too (the route still coming back: the VPN reconnecting refused or timed out the
+    /// connect) is tried again as well, up to `reconnects`. A refused or rejected pairing never.
     static func shouldReconnect(code: String, lib: Int32?, reconnecting: Bool) -> Bool {
         isDropped(code: code, lib: lib) || (reconnecting && code == "connect_failed")
     }
@@ -107,8 +107,7 @@ enum HereRecheck {
         return chunk > 0 ? have / chunk * chunk : have
     }
 
-    /// B292: the copy's quiet limit, from how fast chunks have been landing. Over Tailscale the path between the app's
-    /// node and the phone's can drop mid-copy (R53 run 2: the phone's node fell back to DERP, handshakes went
+    /// B292: the copy's quiet limit, from how fast chunks have been landing. Over a slow path the connection can drop mid-copy (handshakes went
     /// unanswered, AFC stalled): with chunks landing every fraction of a second, waiting the full `ceiling` (30 s)
     /// before reconnecting loses most of a minute. Once `warmup` chunks have landed, the limit is `factor` times the
     /// slowest of the last `window` gaps between chunks, never under `floor` nor over `ceiling`: a fast copy that
