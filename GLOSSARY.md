@@ -117,13 +117,6 @@ _On screen_: iFizBox VPN
 _In code_: LocalVPN, BUILTIN_VPN, builtinVPN, vpn.*
 _Avoid_: LocalDevVPN, loopback VPN
 
-**Cellular Shortcuts**:
-Two Shortcuts the user adds once so This iPhone installs work on cellular: data off while the install connects, back on after
-_Said_: cellular shortcuts
-_On screen_: Cellular Shortcuts, Cellular Data Off, Cellular Data On
-_In code_: SHORTCUT_NAMES, shortcutGroups, LocalVPN.runShortcut
-_Avoid_: cellular refresh
-
 **App Tweaks**:
 The section under All Sources in the sideload build that lists every tweak from your Tweak Sources that can be added to an app
 _Said_: App Tweaks
@@ -180,13 +173,6 @@ _On screen_: Filters
 _In code_: core/sourcefilters.js, settings.sourceFilters, catalog.setFilters
 _Avoid_: source rules, package filters
 
-**Install Switch**:
-The one Shortcut the user adds on This iPhone's Set Up: before a queue of installs it connects the built-in VPN and then, on cellular, turns cellular data off; after it turns data back on and reconnects the VPN that was on before
-_Said_: one iFizBox Shortcut
-_On screen_: Install Switch
-_In code_: SHORTCUT_NAMES.switch, switchAdded, LocalVPN.endSwitch, vpn.testSwitch, install-switch.plist
-_Avoid_: VPN Shortcut, switch shortcut
-
 **Version**:
 The page under a package's or app's Details that lists its versions, each row an install button with the chevron (an installed one that can't be reinstalled says INSTALLED); its notes fold to three lines with Show More
 _Said_: versions, version page
@@ -201,13 +187,6 @@ _On screen_: Signed: Waiting to Install
 _In code_: qr-wait, is-waiting
 _Avoid_: barber pole, sweep
 
-**Trip**:
-One run of the Install Switch that covers a whole queue of installs: Shortcuts opens once, and the Shortcut goes on behind the app until the installs are over and puts cellular data and the VPN back
-_Said_: one trip to Shortcuts
-_On screen_: (none)
-_In code_: LocalVPN.takeTrip, tripReady, endTrip, switchOld, {"trip":1}
-_Avoid_: flip, hop
-
 **Waiting IPA**:
 An IPA fully downloaded for an install that hasn't gone through, kept unsigned on the iPhone for up to a week so a retry signs it again instead of downloading it
 _Said_: the cached local IPA
@@ -219,7 +198,7 @@ _Avoid_: cached IPA, pending IPA
 Another app's VPN that is selected in Settings > VPN with Connect On Demand on, but not connected right now
 _Said_: selected but idle On Demand VPN
 _On screen_: idle VPN
-_In code_: LocalVPN.otherVPNSelected, shortcuts.idle, vpnIdle
+_In code_: LocalVPN.otherVPNSelected, otherVPNOn
 _Avoid_: sleeping VPN, inactive VPN
 
 **Dark cover**:

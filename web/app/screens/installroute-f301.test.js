@@ -46,7 +46,7 @@ test("the read goes out at once; every Set Up row says Checking… until it answ
   const done = drawInstallation(box, "iphone", { store: store(), native });
   assert.deepEqual(native.calls, ["idevice.status"]);
   assert.equal(detailOf(box, "Pair This iPhone"), "Checking…");
-  assert.ok(spins(box, "Pair This iPhone") && spins(box, "Test Connection") && spins(box, "Install Switch"), "each row has its own spinner");
+  assert.ok(spins(box, "Pair This iPhone") && spins(box, "Test Connection"), "each row has its own spinner");
   dev.answer(PAIRED_ON);
   await done;
   assert.equal(detailOf(box, "Pair This iPhone"), "Done");

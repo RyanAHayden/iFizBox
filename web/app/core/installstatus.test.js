@@ -19,10 +19,10 @@ test("ready through the built-in VPN, Check Connection, installs here", () => {
   assert.equal(installStatus("iphone", paired({ otherVPN: true })).state, "ready");
 });
 
-test("on cellular without the Install Switch: the warning, with Add Install Switch", () => {
+test("on cellular: still Ready to Install, no warning, nothing to add", () => {
   const c = installStatus("iphone", paired({ vpn: { cellular: true } }));
-  assert.deepEqual([c.state, STATUS_ACTIONS[c.action], c.local], ["cellular", "Add Install Switch", true]);
-  assert.equal(installStatus("iphone", paired({ vpn: { cellular: true, shortcuts: { switch: true } } })).state, "ready");
+  assert.deepEqual([c.state, STATUS_ACTIONS[c.action], c.local], ["ready", "Check Connection", true]);
+  assert.equal(STATUS_ACTIONS.shortcuts, undefined);
 });
 
 test("a profile without Network Extensions: said plainly, the server meanwhile", () => {

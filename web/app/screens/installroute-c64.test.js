@@ -24,14 +24,14 @@ const flush = async () => { for (let i = 0; i < 4; i++) await new Promise((r) =>
 const store = () => { const m = { installRoute: "iphone" }; return { get: (k) => m[k], set: (k, v) => { m[k] = v; } }; };
 const later = () => { let answer, fail; const p = new Promise((r, no) => { answer = r; fail = no; }); return { p, answer, fail }; };
 
-const vpn = (o = {}) => ({ available: true, tested: true, cellular: false, wifi: true, shortcuts: {}, ...o });
+const vpn = (o = {}) => ({ available: true, tested: true, cellular: false, wifi: true, ...o });
 const STATES = [undefined, null, {}, { paired: false }, { paired: "rp" }, { paired: "rp", vpn: { available: false } },
   { paired: null, vpn: vpn({ available: false }) }, { paired: "rp", vpn: vpn() }, { paired: "rp", vpn: vpn({ tested: false }) },
   { paired: "rp", vpn: vpn({ cellular: true }) }, { paired: "rp", otherVPN: true, vpn: vpn() },
-  { paired: "rp", otherVPN: true, vpn: vpn({ otherVPN: true, shortcuts: { switch: true, trip: true, idle: true } }) },
+  { paired: "rp", otherVPN: true, vpn: vpn({ otherVPN: true }) },
   { paired: null, pairOnPhone: true, vpn: vpn({ tested: false }) }];
 const FLAGS = [{}, { reading: true }, { refreshing: { device: true } }, { late: { device: true } }, { picking: true }, { testing: true },
-  { pairChecking: true }, { switchChecking: true }, { hint: { paired: "rp", vpn: vpn() }, reading: true },
+  { pairChecking: true }, { hint: { paired: "rp", vpn: vpn() }, reading: true },
   { failure: { title: "iPhone Refused", short: "Every connection was refused.", fix: "check", button: "Check Again" } }];
 
 test("no state draws Tailscale, LocalDevVPN or Connect With", () => {
@@ -44,7 +44,7 @@ test("no state draws Tailscale, LocalDevVPN or Connect With", () => {
 test("the first frame: Install Apps With, Set Up (all rows Checking…) and How It Works", () => {
   const gs = installationGroups("iphone", undefined, { reading: true });
   assert.deepEqual(gs.map((g) => g.header), ["Install Apps With", "Set Up", undefined]);
-  assert.deepEqual(gs[1].rows.map((r) => [r.label, r.detail]), [["Pair This iPhone", "Checking…"], ["Test Connection", "Checking…"], ["Install Switch", "Checking…"]]);
+  assert.deepEqual(gs[1].rows.map((r) => [r.label, r.detail]), [["Pair This iPhone", "Checking…"], ["Test Connection", "Checking…"]]);
   assert.ok(gs[1].rows.every((r) => r.spin));
   assert.equal(gs[1].footer, undefined);
   assert.equal(gs[2].rows[0].label, "How It Works");
@@ -66,7 +66,7 @@ test("the page draws Set Up and How It Works before idevice.status answers, with
   const dev = later();
   const box = make("div");
   const done = drawInstallation(box, "iphone", { store: store(), native: { call: () => dev.p } });
-  assert.deepEqual(labels(box).slice(0, 4), ["Pair This iPhone", "Test Connection", "Install Switch", "How It Works"], labels(box).join(", "));
+  assert.deepEqual(labels(box).slice(0, 4), ["Pair This iPhone", "Test Connection", "How It Works"], labels(box).join(", "));
   assert.equal(detailOf(box, "Pair This iPhone"), "Checking…");
   assert.ok(!OLD.test(box.textContent), box.textContent);
   dev.answer({ paired: "rp", vpn: { available: false } });

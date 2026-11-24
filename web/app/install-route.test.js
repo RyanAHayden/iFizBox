@@ -38,12 +38,14 @@ test("not paired, or no answer: the server, said in an alert", async () => {
   }
 });
 
-test("on cellular without the Install Switch: Use Server goes through the server", async () => {
-  const st = { paired: "rp", vpn: { ...VPN, cellular: true, shortcuts: {} } };
-  forgetRoute();
-  const seen = [];
-  assert.deepEqual(await chooseRoute({ native: fake(st), storage: store("iphone"), alert: async (a) => { seen.push(a.title); return { index: 0 }; } }), {});
-  assert.deepEqual(seen, ["Add the Install Switch"]);
+test("on cellular or with another VPN up: no question, the install goes through This iPhone", async () => {
+  for (const extra of [{ cellular: true }, { otherVPN: true }]) {
+    forgetRoute();
+    const st = { paired: "rp", vpn: { ...VPN, ...extra } };
+    const seen = [];
+    assert.deepEqual(await chooseRoute({ native: fake(st), storage: store("iphone"), alert: async (a) => { seen.push(a.title); return { index: 0 }; } }), { route: "idevice" });
+    assert.deepEqual(seen, []);
+  }
 });
 
 test("a run asks once: the answer holds for a minute", async () => {

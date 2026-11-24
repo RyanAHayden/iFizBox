@@ -65,7 +65,7 @@ test("the main page: Pairing spins Checking… while idevice.status answers; no 
   const done = drawInstallation(box, null, { store: store("iphone"), native });
   assert.ok(spins(box, "Pair This iPhone"));
   assert.equal(withClass(cellOf(box, "Pair This iPhone"), "cell-detail")[0].textContent, "Checking…");
-  assert.ok(spins(box, "Test Connection") && spins(box, "Install Switch"), "every Set Up row says Checking… from the first frame");
+  assert.ok(spins(box, "Test Connection"), "every Set Up row says Checking… from the first frame");
   st.answer(PAIRED_ON);
   await done;
   assert.ok(!spins(box, "Pair This iPhone"));

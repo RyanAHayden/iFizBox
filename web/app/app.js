@@ -562,7 +562,6 @@ if (nativeBridge()) {
 }
 upgradeNotices.start();
 createPrefsMirror({ settings: settingsScreen.settings }).start(); // F70: N7's settings to the daemon
-if (settingsScreen.settings.isShown(ROUTE_KEY)) import("./incoming.js").then((m) => m.watchLeftOff()).catch(() => {}); // B395 (sideload)
 keepRoute({ settings: settingsScreen.settings, native: nativeBridge() }); // B218: Install Apps With kept in the Keychain (sideload)
 if (addFrom) requestAnimationFrame(() => load("manage").then((m) => m.addSource({ showHUD: ctx.showHUD, fromLink: true }, addFrom)).catch(() => {}));
 

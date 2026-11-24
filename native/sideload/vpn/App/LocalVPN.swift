@@ -4,8 +4,8 @@
 // keeps it). Nothing else is involved: no Shortcuts, no trip, no put-back. iOS takes another app's VPN off while ours
 // is on, so the status says `otherVPN` and the page says it. Whether that VPN comes back by itself (its On Demand) is
 // iOS's and that app's business.
-//   vpn.status          {available, bundled, entitled, tested, on, cellular, wifi, otherVPN, name}; also in
-//                       idevice.status as `vpn`
+//   idevice.status      carries the VPN's state as `vpn`: {available, bundled, entitled, tested, on, cellular, wifi,
+//                       otherVPN, name}
 //   vpn.test            the VPN on, one connect to iOS with the pairing (idevice.verify), the VPN off: {ok, ms, kind};
 //                       a pass marks This iPhone tested (set up)
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -53,7 +53,7 @@ enum LocalVPN {
                 "cellular": path.cellular, "wifi": path.wifi, "otherVPN": otherVPNUp(), "name": name]
     }
 
-    /// The keys of the Install Switch and Cellular Shortcuts, which this build no longer has: removed once at launch.
+    /// The keys of features this build no longer has: removed once at launch.
     private static let oldKeys = ["ifizbox.vpn.shortcut.off", "ifizbox.vpn.shortcut.on", "ifizbox.vpn.shortcut.switch",
                                   "ifizbox.vpn.shortcut.trip", "ifizbox.vpn.shortcut.idle", "ifizbox.vpn.switch.pending",
                                   "ifizbox.vpn.lost", "ifizbox.vpn.leftOff"]
@@ -321,7 +321,6 @@ enum LocalVPNBridge {
     static func register(_ b: Bridge) {
         LocalVPN.Path.start()
         LocalVPN.clearOldKeys()
-        b.on("vpn.status") { c in quick(c) { LocalVPN.status() } }
         b.on("vpn.test") { c in
             IDeviceBridge.run(c) {
                 guard LocalVPN.available else { throw IDevice.Failure(code: "vpn_failed", text: "this app can't run \(LocalVPN.name): its profile has no Network Extensions capability") }

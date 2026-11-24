@@ -41,11 +41,11 @@ test("the shell's every-connection-refused (route_refused): not the pairing", ()
   assert.match(f.message, /isn't the pairing/);
   assert.ok(f.message.includes(BUILTIN_VPN));
   assert.equal(verifyFailure(e, FINE).again, false);
-  // on cellular without the Install Switch: add it
+  // on cellular: join Wi-Fi (until the cellular task)
   const c = routeFailureOf(e, CELL);
-  assert.equal(c.fix, "shortcuts");
-  assert.equal(c.button, "Set Up");
-  assert.match(c.message, /Install Switch/);
+  assert.equal(c.fix, "check");
+  assert.match(c.message, /On cellular, join Wi-Fi\./);
+  assert.ok(!/Install Switch|Shortcut/.test(c.message));
   // the install alert and log say the same (deviceError), with the fix button
   const d = deviceError(e, "Unbound");
   assert.equal(d.title, "iPhone Refused");

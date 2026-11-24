@@ -119,7 +119,7 @@ test("B300: the Pairing page opened on another page's stack is still the Pairing
 // as settings/signing, but its This iPhone pages are settings/installation/…, a sibling branch: the stack swapped the
 // page (replace) without a slide. The concept check started on settings/installation, where they slid.
 const PAGES = [["installation", "iphone"], ["installation", "with"], ["installation", "server"], ["installation", "pair"],
-  ["installation", "shortcuts"], ["installation", "how"], ["signing", "certificate"], ["signing", "apps"], ["signing", "help"], ["signing", "udid"]];
+  ["installation", "how"], ["signing", "certificate"], ["signing", "apps"], ["signing", "help"], ["signing", "udid"]];
 for (const start of ["#/home", "#/home/settings", "#/home/~installed/myipas", "#/installed/myipas", "#/sources/bigboss/com.example.app"]) {
   for (const main of [SIGNING, INSTALLATION]) {
     test(`B380: from ${start}, every page of Installation & Signing (${main}) pushes, Back returns`, () => {
@@ -141,7 +141,7 @@ for (const start of ["#/home", "#/home/settings", "#/home/~installed/myipas", "#
 
 test("B380: one page's fix row or goTo() to another (This iPhone > Pairing, Signed Apps > Shortcuts) pushes too, and Back walks each", () => {
   for (const start of ["#/home", "#/installed/myipas"]) {
-    for (const [a, b] of [["iphone", "pair"], ["with", "pair"], ["iphone", "shortcuts"], ["pair", "with"]]) {
+    for (const [a, b] of [["iphone", "pair"], ["with", "pair"], ["iphone", "how"], ["pair", "with"]]) {
       const { win, open, results } = setup(start);
       open(SIGNING);
       const main = win.location.hash;

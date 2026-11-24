@@ -12,7 +12,7 @@ const { serverFallback } = await import("./core/installroute.js");
 
 const socketFailed = () => Object.assign(new Error('connect_failed: InternalError("connect: device socket io failed") (16)'), { code: "connect_failed" });
 const BUILTIN = { paired: "rp", otherVPN: true, tunnels: ["utun4"],
-  vpn: { available: true, entitled: true, bundled: true, tested: true, on: false, cellular: false, wifi: true, shortcuts: { switch: true } } };
+  vpn: { available: true, entitled: true, bundled: true, tested: true, on: false, cellular: false, wifi: true } };
 
 test("serverFallback: a failed connect through the built-in VPN offers the Signing Server and Check Again", () => {
   const f = serverFallback(socketFailed(), { route: "idevice" }, BUILTIN);

@@ -110,13 +110,8 @@ def js_calls(files=None, namespaces=None):
     return calls, unknown
 
 
-# Calls the native side no longer answers (C72 removed the Install Switch and Cellular Shortcuts); the page still makes
-# them inside try/catch until its own cleanup task lands, which deletes this list.
-GONE_NATIVE = {"vpn.checkShortcut", "vpn.leftOff", "vpn.openShortcuts", "vpn.testSwitch"}
-
-
 def missing(calls, handlers):
-    return {name: where for name, where in sorted(calls.items()) if name not in handlers and name not in GONE_NATIVE}
+    return {name: where for name, where in sorted(calls.items()) if name not in handlers}
 
 
 class BridgeContract(unittest.TestCase):

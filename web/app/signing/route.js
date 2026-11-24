@@ -11,20 +11,10 @@ export async function chooseRoute({ native, alert = showAlert, storage = storage
   if (heldRoute && now() - heldRoute.at < ROUTE_HOLD) return heldRoute.params;
   let status = null;
   try { status = await bridge(native).call("idevice.status", {}); } catch { status = null; }
-  noteSwitch(status?.vpn, storage);
-  const d = decideRoute(choice, status, { later: switchLater(storage) });
+  const d = decideRoute(choice, status);
   if (d.alert) {
     const a = ROUTE_ALERTS[d.alert];
-    const { index } = await alert({ title: a.title, message: a.message, buttons: a.buttons, cancel: 0 });
-    // F372: on cellular without the Cellular Shortcuts: Set Up opens their page and this install stops; Use Server
-    // goes on through the Signing Server (no way on through This iPhone: it always fails there)
-    if (a.setup != null) {
-      if (index === a.setup) { heldRoute = null; openRoute(["installation", "shortcuts"]); return null; }
-      if (a.later) rememberSwitchLater(a.later, storage); // B396
-      const params = routeParams(a.goes ? d : { route: "server" }); // F394: goes on without the Install Switch
-      heldRoute = { at: now(), params };
-      return params;
-    }
+    await alert({ title: a.title, message: a.message, buttons: a.buttons, cancel: 0 });
   }
   const params = routeParams(d);
   heldRoute = { at: now(), params };
@@ -42,11 +32,10 @@ export async function routeWords(err, why, native) {
   rememberRouteFailure(f);
   return { ...why, title: f.title, message: f.message, fix: f.fix, button: f.button };
 }
-// The fix button of a failure's alert: Pairing, the main page's Check Connection, or the Install Switch's page.
+// The fix button of a failure's alert: Pairing, or the main page's Check Connection.
 export function runFix(fix, { go = openRoute } = {}) {
   if (fix === "pair") return go(["installation", "pair"]);
   if (fix === "check") return go(["installation"]);
-  if (fix === "shortcuts") return go(["installation", "shortcuts"]); // F372: Cellular Shortcuts
   return undefined;
 }
 import { showBanner } from "../nav/banner.js";
@@ -58,13 +47,12 @@ import { recordSelfUpdate } from "../core/selfupdate.js";
 import { showAlert } from "../nav/alert.js";
 import { NAME } from "../brand.js";
 import { storedRoute, decideRoute, ALERTS as ROUTE_ALERTS, routeParams } from "../core/installroute.js";
-import { noteSwitch, switchLater, rememberSwitchLater } from "../core/installroute.js"; // B396
 import { routeFailureOf, rememberRouteFailure, clearRouteFailure } from "../core/installroute.js"; // B316
 import { SELF_RESTART } from "../core/apprun.js";
 import { KNOWN_MALWARE, askInsecure, bridge, failed, keepIpaHash, refusing, stopNative, storageOf,
   untilCancel } from "./common.js";
 import { getServer, defaultServer } from "./identity.js";
-import { serverFallback, switchFailedAlert, USE_SERVER, USE_SERVER_LINE } from "../core/installroute.js"; // F366
+import { serverFallback, USE_SERVER, USE_SERVER_LINE } from "../core/installroute.js"; // F366
 import { isSelfIpa, finishHere, hereLabel, shownName } from "./common.js";
 import { lastDevice, openRoute } from "./device.js";
 import { followHereSelf, followSelfUpdate } from "./selfupdate.js";
@@ -154,12 +142,6 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
     const fallback = serverFallback(e, route) ? serverRetry({ url, name, onInstalled, params, after, host, ...(listed ? { listed } : {}) }, { native, hud, alert, go, later, follow }) : null;
     if (fallback) h.page?.help?.(USE_SERVER_LINE, { label: USE_SERVER, action: () => { fallback.run(); } });
     const buttons = [...(fix ? ["OK", fix.button] : ["OK"]), ...(fallback ? [USE_SERVER] : [])];
-    if (e?.code === "switch_failed" && fix && fallback) { // B395: one plain alert
-      const { index } = await alert(switchFailedAlert(fix)) || {};
-      if (index === 1) runFix(fix.fix, { go });
-      if (index === 2) return fallback.run({ inline: true });
-      return false;
-    }
     const { index } = await alert({ title: e?.code === "malware" ? KNOWN_MALWARE : why.title, message: why.message, buttons, ...(buttons.length > 1 ? { cancel: 0 } : {}) }) || {};
     if (why.open === "signing") go(["signing"]);
     if (fix && index === 1) runFix(fix.fix, { go });
