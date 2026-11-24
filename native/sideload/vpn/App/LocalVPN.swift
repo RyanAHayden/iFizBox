@@ -155,9 +155,13 @@ enum LocalVPN {
     static func waitOffCellular(finishing: Bool, cancelled: () -> Bool, paused: (Pause) -> Void, waiting: () -> Void) throws -> Bool {
         guard available, !failedNow() else { return false }
         if finishing || !mustWait() { // B428b: here too, so Cancel ends it, and cellular coming back is seen below
-            guard try waitForNetwork({ _ in
+            let online = try waitForNetwork({ _ in
                 if cancelled() { throw IDevice.Failure(code: "cancelled", text: "Cancelled") }
-            }) else { throw noNetwork() }
+            })
+            if !online {
+                guard !finishing, mustWait() else { throw noNetwork() }
+                try waitForApp(cancelled: cancelled, paused: paused) // left meanwhile, perhaps to turn one on
+            }
         }
         guard Path.now().cellular else { return false }
         log("on cellular before \(name) is on; path: \(Path.described())")
