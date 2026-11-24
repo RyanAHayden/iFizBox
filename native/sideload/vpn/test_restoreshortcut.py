@@ -61,9 +61,12 @@ class Source(unittest.TestCase):
     def test_steps(self):
         self.assertEqual(self.steps(), [
             "detect.dictionary", "key store", "key back", "key check",
-            "if store", "vpn.get", "if vpn.get", "setstoredcontent", "RememberedVPNIntent", "end", "FinishRestoreIntent", "end",
-            "if back", "getstoredcontent", "if getstoredcontent", "RestoringVPNIntent", "vpn.set", "end", "FinishRestoreIntent", "end",
-            "if check", "FinishRestoreIntent", "end",
+            # F418b: "nothing" before each of our own, or the VPN left over is shared with the app and iOS asks again
+            "if store", "vpn.get", "if vpn.get", "setstoredcontent", "nothing", "RememberedVPNIntent", "end",
+            "nothing", "FinishRestoreIntent", "end",
+            "if back", "getstoredcontent", "if getstoredcontent", "nothing", "RestoringVPNIntent", "vpn.set", "end",
+            "nothing", "FinishRestoreIntent", "end",
+            "if check", "nothing", "FinishRestoreIntent", "end",
             "nothing",  # R100b: no output, or iOS asks over the app
         ])
         keys = [s[4:] for s in self.steps() if s.startswith("key ")]
