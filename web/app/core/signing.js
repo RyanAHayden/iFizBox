@@ -416,13 +416,24 @@ export function deviceSummary(identity, { now = new Date(), locale, timeZone } =
 }
 
 // The HUD's text for a signing.install progress event { phase, progress }. "here": This iPhone's own install (AFC
-// upload, then installd through the built-in VPN, Sideload.swift installHere), with its percentage, so a page waiting
+// upload, then installd through the built-in VPN, Sideload.swift installHere), named by step, so a page waiting
 // offline at Downloading can't be taken for one waiting on the phone.
 const PHASES = { downloading: "Downloading", reading: "Reading", signing: "Signing", installing: "Installing",
-  here: "Installing on this iPhone", airplane: AIRPLANE_ON, airplaneOff: AIRPLANE_OFF, appWait: APP_WAIT, networkWait: NETWORK_WAIT };
+  here: "Connecting to this iPhone", airplane: AIRPLANE_ON, airplaneOff: AIRPLANE_OFF, appWait: APP_WAIT, networkWait: NETWORK_WAIT };
 export function phaseLabel(ev) {
   const name = PHASES[ev?.phase];
   if (!name) return null;
+  // R91: "here" carries one number for three steps (Sideload.swift installHere): connected 0.02, the copy up to 0.3,
+  // then installd's percent (from 0.301). Name the step it is in, with its own percent.
+  if (ev.phase === "here") {
+    const f = Number(ev.progress) || 0;
+    const pctOf = (x) => Math.round(Math.max(0, Math.min(1, x)) * 100);
+    if (f <= 0.02) return "Connecting to this iPhone";
+    if (f < 0.2999) return `Copying to this iPhone ${pctOf((f - 0.02) / 0.28)}%`.replace(/ 0%$/, "");
+    if (f < 0.3005) return "Copied to this iPhone, waiting for iOS";
+    const p = pctOf((f - 0.301) / 0.699);
+    return p > 0 && p < 100 ? `Installing ${p}%` : "Installing";
+  }
   const pct = Math.round(Number(ev.progress) * 100);
   return ev.phase !== "installing" && pct > 0 && pct < 100 ? `${name} ${pct}%` : name;
 }

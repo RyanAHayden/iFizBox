@@ -49,8 +49,12 @@ test("phase labels for the HUD", () => {
   assert.equal(phaseLabel({ phase: "signing", progress: 0.5 }), "Signing 50%");
   assert.equal(phaseLabel({ phase: "installing", progress: 0.5 }), "Installing");
   // This iPhone's own install says so, with its percentage, apart from Downloading (an offline download is obvious)
-  assert.equal(phaseLabel({ phase: "here", progress: 0 }), "Installing on this iPhone");
-  assert.equal(phaseLabel({ phase: "here", progress: 0.42 }), "Installing on this iPhone 42%");
+  // R91: "here"'s one number is three steps (connected 0.02, copy up to 0.3, installd from 0.301): each named, with its own percent
+  assert.equal(phaseLabel({ phase: "here", progress: 0 }), "Connecting to this iPhone");
+  assert.equal(phaseLabel({ phase: "here", progress: 0.02 + 0.28 * 0.5 }), "Copying to this iPhone 50%");
+  assert.equal(phaseLabel({ phase: "here", progress: 0.02 + 0.28 }), "Copied to this iPhone, waiting for iOS");
+  assert.equal(phaseLabel({ phase: "here", progress: 0.301 }), "Installing");
+  assert.equal(phaseLabel({ phase: "here", progress: 0.301 + 0.699 * 0.5 }), "Installing 50%");
   assert.equal(phaseLabel({ phase: "what" }), null);
   assert.equal(phaseLabel(null), null);
 });

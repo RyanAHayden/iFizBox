@@ -490,8 +490,8 @@ test("B137: rowStatus and runStatus per route: local says Installing, the server
   // a: This iPhone, its route not settled yet (phase null)
   assert.equal(rows[0].state, "asking");
   assert.equal(rows[0].local, true);
-  assert.equal(rowStatus(rows[0]), "Installing");
-  assert.equal(runStatus(rows), "Installing A (1 of 2)");
+  assert.equal(rowStatus(rows[0]), "Preparing"); // R91: nothing installs before the route starts
+  assert.equal(runStatus(rows), "Preparing A (1 of 2)");
   assert.equal(await run.reprompt("a"), false); // no prompt to show again
   assert.deepEqual(asked, []);
   const hooks = ph.pending.install.get("a").hooks;
@@ -745,18 +745,22 @@ test("B236: a retried row starts unfetched", async () => {
   await again;
 });
 
-test("B421: a copying row at 100% says Installing, one row, several rows, and the own row", () => {
+test("B421/R91: a copying row at 100% says it waits for iOS (not Installing), one row, several rows, and the own row", () => {
   const row = (id, fraction, extra = {}) => ({ id, name: id, state: "installing", phase: "copying", here: true, fraction, ...extra });
   const one = [row("A", 1), row("B", 0, { state: "waiting", phase: null, here: false })];
-  assert.equal(rowStatus(one[0]), "Installing");
-  assert.equal(runStatus(one), "Installing A (1 of 2)");
+  assert.equal(rowStatus(one[0]), "Copied to iPhone, waiting for iOS");
+  assert.equal(runStatus(one), "Copied A to iPhone, waiting for iOS (1 of 2)");
+  assert.equal(rowStatus(row("A", 0, { phase: "connecting" })), "Connecting to iPhone");
+  assert.equal(runStatus([row("A", 0, { phase: "connecting" })]), "Connecting to iPhone for A (1 of 1)");
+  assert.equal(rowStatus(row("A", 0.4, { phase: "installing" })), "Installing 40%");
   assert.equal(rowStatus(row("A", 0.4)), "Copying to iPhone 40%");
   assert.equal(runStatus([row("A", 0.4)]), "Copying A to iPhone (1 of 1)");
-  assert.equal(runStatus([row("A", 1), row("B", 1)]), "Installing 2 apps");
-  assert.equal(runStatus([row("A", 1), row("B", 0.3)]), "Installing 2 apps");
+  assert.equal(runStatus([row("A", 1), row("B", 1)]), "Copied 2 apps to iPhone, waiting for iOS");
+  assert.equal(runStatus([row("A", 1), row("B", 0.3)]), "Sending 2 apps to iPhone");
+  assert.equal(runStatus([row("A", 0.5, { phase: "installing" }), row("B", 0.3)]), "Installing 2 apps");
   assert.equal(runStatus([row("A", 0.2), row("B", 0.3)]), "Copying 2 apps to iPhone");
   const own = row(SELF_ID, 1);
-  assert.equal(rowStatus(own), "Installing");
+  assert.equal(rowStatus(own), "Copied to iPhone, waiting for iOS");
   assert.equal(runStatus([own]).includes("closing"), false);
   assert.equal(rowStatus({ ...own, phase: "installing" }).includes("losing"), true);
 });

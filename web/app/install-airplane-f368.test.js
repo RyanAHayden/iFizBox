@@ -86,7 +86,7 @@ test("openPrepared waits only on cellular", async () => {
     const phases = [];
     await openPrepared({ id: "a", token: "t" }, { tag: "x", native, progress: (p) => phases.push(p), allSigned: async () => { order.push("signed"); } });
     assert.deepEqual(order, cellular ? ["signed", "open"] : ["open"]);
-    assert.deepEqual(phases, [...(cellular ? ["hold"] : []), "copying", "airplane", "airplaneOff"]);
+    assert.deepEqual(phases, [...(cellular ? ["hold"] : []), "connecting", "airplane", "airplaneOff"]);
   }
   delete globalThis.localStorage;
 });

@@ -29,6 +29,8 @@ test("herePhase: signing.open's copying / installing events, clamped; anything e
 test("hereLabel: signing.install's {here} events as the page's step and percent", () => {
   assert.deepEqual(hereLabel({ here: "copying", progress: 0 }), { label: "Copying to iPhone" });
   assert.deepEqual(hereLabel({ here: "copying", progress: 0.4 }), { label: "Copying to iPhone 40%" });
+  assert.deepEqual(hereLabel({ here: "connecting", progress: 0 }), { label: "Connecting to iPhone" }); // R91: no bytes yet
+  assert.deepEqual(hereLabel({ here: "copying", progress: 1 }), { label: "Copied to iPhone, waiting for iOS" }); // R91
   assert.deepEqual(hereLabel({ here: "installing", progress: 0.75 }), { label: "Installing 75%" });
   assert.deepEqual(hereLabel({ here: "installing", progress: 1 }), { label: "Installing" });
   assert.equal(hereLabel({ phase: "here", progress: 0.5 }), null);
@@ -62,7 +64,7 @@ test("a This iPhone row: Copying to iPhone N%, Installing N%, Installed; the bar
   const t = await hereRun("a", "Alpha", [["copying", 0], ["copying", 0.5], ["copying", 1], ["installing", 0.4], ["installing", 1]]);
   await flush();
   assert.deepEqual(t.seen.map((s) => s.status),
-    ["Copying to iPhone", "Copying to iPhone 50%", "Installing", "Installing 40%", "Installing"]);
+    ["Copying to iPhone", "Copying to iPhone 50%", "Copied to iPhone, waiting for iOS", "Installing 40%", "Installing"]);
   assert.ok(t.seen.every((s) => s.state === "installing"), "never the prompt's 'asking'");
   assert.equal(t.seen[1].run, "Copying Alpha to iPhone (1 of 1)");
   assert.equal(t.seen[3].run, "Installing Alpha (1 of 1)");
@@ -140,7 +142,7 @@ test("openPrepared on This iPhone: the steps from signing.open's events, install
   const r = await openPrepared({ id: "a", name: "Alpha", token: "t", bundleId: "a" },
     { tag: "a#1", native, progress: (ph, f) => steps.push([ph, f]), log: (l) => logs.push(l) });
   assert.deepEqual(r, { installed: true, expires: "2026-12-01T00:00:00Z" });
-  assert.deepEqual(steps, [["copying", 0], ["copying", 0.5], ["installing", 0.9]]);
+  assert.deepEqual(steps, [["connecting", 0], ["copying", 0.5], ["installing", 0.9]]);
   assert.ok(!steps.some(([ph]) => ph === "asking"));
   assert.deepEqual(logs, ["Connected to iOS (RemotePairing tunnel)"]);
   assert.ok(!calls.includes("signing.progress"), "no wait for iOS's prompt");

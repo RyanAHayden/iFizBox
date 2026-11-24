@@ -306,7 +306,7 @@ enum MyIPAs {
             if !servers.local { emit("installing", 0) } // This iPhone: installHere sends its own phase ("here")
             // B29: the progress page's console, as signing.install has it: the bundle ID and what iOS fetched.
             let log = { (line: String) in c.emitOnMain([["log": line]]) }
-            log("Installing the signed copy of \(file): \(s.name) \(s.version) as \(s.bundleID)")
+            log("Handing the signed copy of \(file) to iOS: \(s.name) \(s.version) as \(s.bundleID)")
             let done = { (r: Result<(SignedApp, SignedRecord), Error>) in
                 switch r {
                 case .failure(let e):
