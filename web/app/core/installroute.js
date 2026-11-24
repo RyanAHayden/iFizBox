@@ -40,6 +40,19 @@ export const APP_WAIT = `Waiting for ${NAME}`;
 export const NETWORK_WAIT = "Turn Airplane Mode off for a moment";
 export const AIRPLANE_OFF = "You can turn Airplane Mode off";
 export const CELL_LINE = "On cellular, check on Wi-Fi. Installs ask for Airplane Mode.";
+// B428a: a check can't connect there, so it doesn't try (and one that was refused and ends there says the same): no
+// Fix, no Pair Again, not kept as a Route Failure. Not set up yet: the test that finishes it is named.
+export const onCellular = (st) => builtinVPN(st) && Boolean(st.vpn.cellular);
+export function cellularCheck(st = null) {
+  return { title: "Can't Check on Cellular", buttons: ["OK"],
+    message: `Join Wi-Fi, then check again.${st?.vpn && !st.vpn.tested ? ` ${STATUS_ACTIONS.test} finishes setting up.` : ""}` };
+}
+// Refused: what iOS answers on cellular. A pairing it read and turned down isn't.
+export function connectRefused(err) {
+  const raw = String(err?.message ?? err ?? "");
+  const code = err?.code ?? raw.split(":")[0];
+  return code === "route_refused" || code === "refused" || (code === "connect_failed" && /connection refused/i.test(raw));
+}
 export const CELL_FOOTER = "On cellular, installs ask for Airplane Mode.";
 // The wait ran out: not a broken route, so it isn't remembered as one; the Signing Server works on cellular.
 export const AIRPLANE_TIMEOUT = { title: "Airplane Mode Not On", message: "Airplane Mode wasn't turned on, so nothing was installed. Try again.",

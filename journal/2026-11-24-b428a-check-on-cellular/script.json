@@ -1,0 +1,2 @@
+[{"nav":"#/home","ms":3000},{"eval":"localStorage.setItem('ifizbox.installRoute','iphone');localStorage.setItem('ifizbox.firstVisit','later');document.querySelector('.banner')?.remove()"},
+{"nav":"#/home/~settings/installation/iphone","ms":3000},{"click":".page.is-top .install-action .cell-inner"},{"wait":1500},{"shot":"check"},{"eval":"[document.querySelector('.alert-title')?.textContent,document.querySelector('.alert-message')?.textContent].join('|')"}]

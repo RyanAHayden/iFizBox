@@ -32,7 +32,7 @@ test("refused on every port: the pairing is forgotten and Pairing opens to pair 
   rememberStatus(PAIRED_TS);
   const o = await run({ "idevice.status": PAIRED_TS, "idevice.verify": fail("refused: this iPhone refused RemotePairing on port 49152", "refused"), "idevice.forget": {} });
   assert.equal(o.r, "repair");
-  assert.deepEqual(o.calls, ["idevice.status", "idevice.verify", "idevice.verify", "idevice.forget"], "tried again once first");
+  assert.deepEqual(o.calls, ["idevice.status", "idevice.verify", "idevice.verify", "idevice.status", "idevice.forget"], "tried again once first; not on cellular now (B428a)");
   assert.equal(o.alerts.length, 1);
   assert.match(o.alerts[0].message, /Pairing starts again/);
   assert.equal(o.wentToPair, 1);

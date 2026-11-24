@@ -52,7 +52,7 @@ test("a refused pairing is tried twice, then kept as Pair Again; nothing is forg
   fresh();
   const n = phone(OK, coded("refused"));
   assert.equal(await run(n), "failed");
-  assert.deepEqual(n.calls, ["idevice.status", "idevice.verify", "idevice.status", "idevice.verify"]);
+  assert.deepEqual(n.calls, ["idevice.status", "idevice.verify", "idevice.status", "idevice.verify", "idevice.status"], "the last: not on cellular now (B428a)");
   assert.equal(routeFailure().title, "Pair Again");
   assert.equal(routeFailure().at, NOW);
   assert.equal(paged, 0);
