@@ -63,7 +63,7 @@ import { handleOf } from "../nav/go.js";
 import { APP_MODE_LABEL } from "../core/appqueue.js"; // F242a
 import { installedOnPhone } from "../core/appqueue.js"; // B136
 import { whereFromGroup, reportBanner, reports, reportMalicious } from "./safety.js"; // F291
-import { addTweaksGroup, installTweaksChoice } from "./tweaks.js"; // F302a
+import { addTweaksGroup } from "./tweaks.js"; // F302a
 import { EASE, DURATION } from "../nav/motion.js";
 import { coverDark } from "../nav/statusbar.js"; // B401
 import { nativeBridge } from "../native.js";
@@ -654,7 +654,7 @@ export function queueToggle(pkg, source, { queue = appQueue, store = apps, buzz 
 export async function appPageAction(pkg, source, { queue = appQueue, ask = showActionSheet, add = queueApp,
   mode = detectMode(), ready = async () => true, store = apps, version = null, signedOf = (id) => signedRecordOf(id, { mode }),
   forget = async (id) => removeInstall(await store(), id), siteInstall = siteInstallVersion, warn = originalWarning,
-  iv = settings.ignoredVersions, tweaks = installTweaksChoice,
+  iv = settings.ignoredVersions,
   forgetSigned = (s) => nativeBridge()?.call?.("signing.forget", { bundleId: s.bundleId }), body = null } = {}) {
   const app = pkg?.stanza?.ipa;
   // B372: an app whose forget is held reads as not installed; installing it again cancels the held forget first, so the
@@ -672,8 +672,6 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
   if (!job || !(await ready())) return false;
   // F246: a fresh install (no record) asks F243's once-per-app question before it is queued; Cancel queues nothing.
   const addFresh = async () => {
-    // F302a: the install popup, when the app has tweaks added or made for it: what goes in, Tweaks, Install
-    if (!(await Promise.resolve().then(() => tweaks({ bundleId: job.id, name: job.name || app.name, version: job.version || "", ask })).catch(() => true))) return true;
     const j = rec ? job : await queueOriginalCheck(job, warn);
     if (j && held) cancelHeldForget(app.bundleIdentifier); // B372
     if (j) add(j, { queue });
