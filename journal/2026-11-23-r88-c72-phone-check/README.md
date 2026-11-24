@@ -10,3 +10,6 @@ Second attempt (22:29 to 22:48): the lock was held by F408, then by B415 for the
 
 Third attempt (2026-11-24, 09:32 to 09:42): the lock was held by B423, touched every minute, for the whole 9 minutes of
 retries every 30 s. Still nothing run.
+
+Fourth attempt (2026-11-24, 10:15 to 10:33): the lock was held by R89, touched every 1-2 minutes, for the whole 18
+minutes of retries every 30 s. Still nothing run; blocked after R89.
