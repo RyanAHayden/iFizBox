@@ -20,11 +20,10 @@ core/installroute.js, docs/sideload.md) agree with the findings in those three e
 The bug is still there. The only automatic way found is a Shortcut's Set VPN. R99 showed it works (tried with
 Tailscale only), but C72 removed Shortcut VPN switching as product behaviour after the user said it does not work.
 
-The choice goes to the person, through `ask`:
-
-1. Add an optional Shortcut that brings the other VPN back (recommended).
-2. Keep things as they are: the footer says the VPN comes back once Settings > VPN is opened.
-3. Remove the switch.
+The person chose Add a Shortcut on 2026-11-24: a Shortcut's Set VPN switches back to their VPN after installs, and
+our configuration stays. That is queued as R100a and R100b (phone check), then F418, F419, F420; nothing of it is
+built here. B427 closes with what B427a and B427b landed; until those tasks land the other VPN still comes back only
+once Settings > VPN is opened.
 
 ## Not verified
 
