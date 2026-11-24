@@ -42,7 +42,7 @@ class InstallServerSource(unittest.TestCase):
         answer = body(self.server, "private func answer(")
         self.assertIn('route.log?("iOS: ', answer)
         self.assertIn("gone[req.path]?(", answer)  # a request after serving ended says it got a 404
-        self.assertIn("iOS has \\(cov.count) of \\(size) bytes", body(self.server, "private func sent("))
+        self.assertIn("\\(cov.count) of \\(size) bytes sent to iOS", body(self.server, "private func sent("))
         self.assertIn("cutShort?(left)", body(self.server, "private func stream("))
 
     def test_route_kept_for_the_grace(self):

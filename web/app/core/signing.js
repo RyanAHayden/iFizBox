@@ -417,8 +417,11 @@ export function deviceSummary(identity, { now = new Date(), locale, timeZone } =
 
 // The HUD's text for a signing.install progress event { phase, progress }. "here": This iPhone's own install (AFC
 // upload, then installd through the built-in VPN, Sideload.swift installHere), named by step, so a page waiting
-// offline at Downloading can't be taken for one waiting on the phone.
+// offline at Downloading can't be taken for one waiting on the phone. B424: the Signing Server route's "uploading" (the
+// app's own IPA to the server) and "handoff" (the install link going to iOS): nothing installs yet, so neither says so.
+export const HANDOFF = "Handing to iOS", UPLOADING = "Uploading";
 const PHASES = { downloading: "Downloading", reading: "Reading", signing: "Signing", installing: "Installing",
+  uploading: UPLOADING, handoff: HANDOFF, prompt: "Waiting for iOS",
   here: "Connecting to this iPhone", airplane: AIRPLANE_ON, airplaneOff: AIRPLANE_OFF, appWait: APP_WAIT, networkWait: NETWORK_WAIT };
 export function phaseLabel(ev) {
   const name = PHASES[ev?.phase];
@@ -675,13 +678,15 @@ export function revocationLabel(rev) {
 export function resignLabel(ev) {
   if (!ev || ev.count == null) return null;
   const which = `${ev.name || "App"} (${Number(ev.index) + 1} of ${ev.count})`;
+  if (ev.phase === "handoff") return `Handing ${which.replace(/( \(\d+ of \d+\))$/, " to iOS$1")}`; // B424
+  if (ev.phase === "prompt") return `Waiting for iOS: ${which}`;
   return `${phaseLabel(ev) ?? "Re-signing"} ${which}`;
 }
 
 // B65: a re-sign's phases before iOS's install (downloading, reading, signing) each send progress as they go (the
 // signer at least once per bundle and per loose Mach-O). One that sends nothing for STALL_LIMIT has stopped: the call
 // is cancelled (signing.cancel) and fails with where it stopped, instead of a page left at "Signing 50%" for ever.
-// iOS's own install ("installing") has the shell's 15-minute limit (Sideload.swift serveChecked), so it isn't timed here.
+// iOS's own install ("handoff" on) has the shell's 15-minute limit (Sideload.swift serveChecked), so it isn't timed here.
 export const STALL_LIMIT = 180_000;
 
 // The failure's text for the last progress event seen (null: none came).
@@ -694,7 +699,7 @@ export function stallMessage(ev, limit = STALL_LIMIT) {
 }
 
 // native.call(method, params, onEvent) with the stall limit: resolves or rejects as the call does, or rejects with
-// { code: "stalled", message: stallMessage(...) } once a phase before "installing" goes quiet for `limit` ms (then
+// { code: "stalled", message: stallMessage(...) } once a phase before "uploading" / "handoff" goes quiet for `limit` ms (then
 // native.call("signing.cancel") stops the shell's job). Events after that are dropped.
 export function callWithStall(native, method, params, onEvent = () => {}, { limit = STALL_LIMIT, later = setTimeout, clear = clearTimeout } = {}) {
   native = loggedBridge(native); // F361: the re-sign's lines in Console Logs
@@ -720,7 +725,7 @@ export function callWithStall(native, method, params, onEvent = () => {}, { limi
       if (over) return;
       if (ev?.phase) {
         last = ev;
-        if (ev.phase === "installing" || ev.phase === "airplane" || ev.phase === "appWait" || ev.phase === "networkWait") stop(); else arm(); // F368: the shell times the airplane wait
+        if (ev.phase === "installing" || ev.phase === "handoff" || ev.phase === "prompt" || ev.phase === "uploading" || ev.phase === "airplane" || ev.phase === "appWait" || ev.phase === "networkWait") stop(); else arm(); // F368: the shell times the airplane wait
       }
       onEvent(ev);
     })).then((r) => { if (!over) { over = true; stop(); resolve(r); } },

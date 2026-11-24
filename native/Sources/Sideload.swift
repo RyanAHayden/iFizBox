@@ -462,8 +462,10 @@ enum Sideload {
     // B394: the same IPA handed over again (Try Again, or the update started again) while the link of the last upload
     // still lives opens that link: iOS may still take it, and a second copy on the server would only be a duplicate.
     static func hostAndOpen(_ output: URL, server: String, app: SignedApp, record: SignedRecord, job: SignJob? = nil,
-                            log: ((String) -> Void)? = nil, opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void, served: ((Bool) -> Void)?) {
+                            log: ((String) -> Void)? = nil, opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void, served: ((Bool) -> Void)?,
+                            phase: ((String) -> Void)? = nil) { // B424: "uploading", then "handoff" (the link going to iOS)
         let hand = { (h: CloseForUpdate.Hosted, saved: Bool) in
+            phase?("handoff")
             if saved {
                 SignBridge.queue.async {
                     saveRecords(SignedRecords.adding(record, to: records()))
@@ -494,6 +496,7 @@ enum Sideload {
                 return
             }
             // The Worker (worker/src/index.js) doesn't open the IPA: the app says what it is. B215: sent in parts (HostUpload).
+            phase?("uploading")
             log?("Uploading to \(server)/sign/host (\(app.name) replaces this app, so iOS installs it from the server)")
             let upload = HostUpload(output, server: server, app: app) { res in
                 try? FileManager.default.removeItem(at: output)
@@ -569,17 +572,19 @@ enum Sideload {
         // F343: an install that fails drops the IPA staged for it; the one kept before stays
         let answered = { (r: Result<(SignedApp, SignedRecord), Error>) in
             if case .failure = r { SignBridge.queue.async { dropOriginal(app.bundleID, sha256: record.sha256) } }
+            else if !servers.local { emit("prompt", 0) } // B424: iOS has the link; Re-sign All waits here
             opened(r)
         }
-        if servers.local { // "Installing on this iPhone" (phase "here"), not iOS's own install
+        if servers.local { // installd through the built-in VPN (phase "here"), not iOS's own install
             installHere(output, app: app, record: record, emit: emit, log: log, job: job, opened: answered, served: served, step: step)
             return
         }
-        emit("installing", 0)
         if let host = servers.host { // B64: this call's own choice, made when it started
-            hostAndOpen(output, server: host, app: app, record: record, job: job, log: log, opened: answered, served: served)
+            hostAndOpen(output, server: host, app: app, record: record, job: job, log: log, opened: answered, served: served,
+                        phase: { emit($0, 0) })
             return
         }
+        emit("handoff", 0) // B424: iOS gets the install link next; its own progress is signing.progress's
         serveAndOpen(output, server: servers.manifest, app: app, record: record, log: log, job: job, opened: answered, served: served)
     }
 
@@ -787,7 +792,7 @@ enum Sideload {
             served?(ok)
         }
         var route = InstallServer.Route(type: "application/octet-stream", body: .file(output), log: serverLog,
-                                        onServed: { serverLog("iOS has the whole IPA"); Handoff.served(bid); end(true) })
+                                        onServed: { serverLog("The whole IPA is sent to iOS"); Handoff.served(bid); end(true) })
         // B89: iOS froze iFizBox while it served: the IPA goes to the Signing Server too, and iOS gets that link
         let note = { (s: String) in InstallLog.say(bid, s) }
         route.note = note

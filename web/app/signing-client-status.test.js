@@ -77,12 +77,12 @@ test("iOS never asks within a minute: says so, and Retry opens the install link 
   assert.deepEqual(q.opened, ["itms-services://x"]);
 });
 
-test("a Worker without /status, or no answer: the page ends on Installing as before; a missed look later is skipped", async () => {
+test("a Worker without /status, or no answer: the page ends on Uploaded; a missed look later is skipped", async () => {
   for (const first of [404, "down"]) {
     const r = rig([first]);
     const w = watchInstall(TOKEN, r.h, r.opts);
     await w.first;
-    assert.deepEqual(texts(r.log), ["done Installing"]);
+    assert.deepEqual(texts(r.log), ["done Uploaded. Tap Install if iOS asks."]);
     assert.equal(await w.end, "unknown");
   }
   const r = rig([S(true, false, false), "down", S(true, true, true)]);

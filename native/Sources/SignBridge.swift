@@ -8,7 +8,7 @@
 //   signing.export              F73: {p12, profile, password} (files base64) as imported, for iFizBox Account's
 //                               certificate sync (screens/account.js) | null
 //                               when there is no certificate or it was imported before F73
-//   signing.install {url, manifestServer} (stream: {phase: "downloading"|"reading"|"signing"|"installing", progress})
+//   signing.install {url, manifestServer} (stream: {phase: "downloading"|"reading"|"signing"|"uploading"|"handoff", progress})
 //                               downloads, signs and opens the itms-services link -> {bundleId, originalBundleId,
 //                               name, version, removed}; F14 moved it to Sideload.swift, which adds the user's edits
 //                               and the calls listed there

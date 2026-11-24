@@ -91,7 +91,7 @@ test("Install with the bundle ID known: iOS's prompt opens first, reserved, then
   assert.deepEqual(ups.map((c) => [c.q.token, c.q.bundleid, "size" in c.q]), [[token, "com.ryha.ifizbox", false], [token, "com.ryha.ifizbox", true]]);
   assert.ok(srv.calls.some((c) => c.path === `/sign/upload/${token}/done`));
   assert.equal(recorded.bundleId, "com.ryha.ifizbox");
-  assert.equal(log.hud.at(-1), "done Installing");
+  assert.equal(log.hud.at(-1), "done Uploaded. Tap Install if iOS asks.");
 });
 
 test("the early link falls back to Ready to Install: another bundle ID came out, the reservation failed, too slow", async () => {
@@ -162,7 +162,7 @@ test("F132: a slow sign/upload still lands in the early link for minutes (iOS re
     assert.equal(await signInBrowser({ url: SELF, name: "iFizBox" }, d), true);
     assert.deepEqual(log.alerts, [], `alert after ${late} ms`);
     assert.equal(log.opened.length, 1);
-    assert.equal(log.hud.at(-1), "done Installing");
+    assert.equal(log.hud.at(-1), "done Uploaded. Tap Install if iOS asks.");
   }
   // at the window: Ready to Install, opening the same link again
   let calls = 0;

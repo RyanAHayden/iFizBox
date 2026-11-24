@@ -1,4 +1,4 @@
-// ---- F190: what iOS does after "Installing" -------------------------------------------------------------------
+// ---- F190: what iOS does after the upload -------------------------------------------------------------------
 //
 // Safari never hears back from itms-services, but the Worker sees iOS's own requests on the link and keeps them per
 // token: GET /sign/up/<token>/status -> { manifest, started, finished } (worker/src/index.js). watchInstall polls it
@@ -8,7 +8,7 @@
 // happens on the Home Screen, which Safari can't see: the last step says so.
 //
 //   const w = watchInstall(token, hud, { base, fetcher, app, itms, open, alert })
-//   await w.first   after the first look: a Worker without /status (or no answer) ends the page on "Installing"
+//   await w.first   after the first look: a Worker without /status (or no answer) ends the page on UPLOADED_TEXT
 //   await w.end     "installed" (downloaded) | "not_asked" | "unknown" | "closed" | "timeout"
 import { SENT_TO_IOS } from "../core/signing.js";
 import { openAppHelp } from "../screens/guides.js";
@@ -26,6 +26,8 @@ export const installSteps = (app) => [
 // The page completes once iOS starts the download (Cydia's Complete, Return under it): Safari can't see the rest, and
 // "iOS is downloading…" left people waiting on a page with nothing more to show (user 2026-11-18).
 export const installStage = (s) => (s?.finished || s?.started ? 2 : s?.manifest ? 1 : 0);
+// B424: no word from the Worker on what iOS asked for: only the upload is known.
+export const UPLOADED_TEXT = "Uploaded. Tap Install if iOS asks.";
 export const notAskedText = "iOS didn't ask for the app. Tap Install again.";
 
 // F236/F252: `cause` (core/signing.js notLandedText, "Not on the Home Screen?": the website couldn't check this
@@ -55,7 +57,7 @@ export function watchInstall(token, h, { base = "", fetcher = globalThis.fetch, 
   const end = (async () => {
     let s = await look();
     if (!s) { // a Worker without /status: as before F190
-      if (h.done) h.done("Installing"); else h.hide();
+      if (h.done) h.done(UPLOADED_TEXT); else h.hide();
       firstDone();
       return "unknown";
     }

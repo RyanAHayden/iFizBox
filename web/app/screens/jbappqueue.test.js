@@ -67,7 +67,9 @@ test("the helper's rows read Installing / Removing, never Signed or the iOS prom
   const rows = appRows([{ ...ipaJob("a", "A"), mode: "install", helper: true }, { id: "b", name: "B", op: "remove", mode: "remove", helper: true }]);
   const [a, b] = rows;
   for (const state of ["waiting", "signed"]) assert.equal(rowStatus({ ...a, state }), "Waiting");
-  assert.equal(rowStatus({ ...a, state: "asking" }), "Installing");
+  assert.equal(rowStatus({ ...a, state: "signing" }), "Checking");
+  assert.equal(rowStatus({ ...a, state: "asking" }), "Preparing"); // B424: the helper hasn't started
+  assert.equal(runStatus([{ ...a, state: "asking" }]), "Preparing A (1 of 1)");
   assert.equal(rowStatus({ ...a, state: "installing", fraction: 0.4 }), "Installing 40%");
   // B400: the helper's step and that step's own percent; the bar is the whole install's, with no half for signing
   const at = (word, wordPercent, fraction = 0.3) => ({ ...a, state: "installing", word, wordPercent, fraction });

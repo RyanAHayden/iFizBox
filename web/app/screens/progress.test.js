@@ -60,7 +60,7 @@ test("a selection that starts after a frame was asked for still holds the lines"
 
 test("a repeating byte line replaces the one before it, queued or on screen", () => {
   const { log, container, tick } = rig();
-  const sent = (n) => ({ kind: "raw", text: `Sent bytes 0-${n}; iOS has ${n + 1} of 4000000 bytes`, pkg: "a" });
+  const sent = (n) => ({ kind: "raw", text: `Sent bytes 0-${n}; ${n + 1} of 4000000 bytes sent to iOS`, pkg: "a" });
   log.push({ kind: "step", text: "Installing" });
   for (let n = 1000; n < 50000; n += 1000) log.push(sent(n));
   tick();
@@ -71,7 +71,7 @@ test("a repeating byte line replaces the one before it, queued or on screen", ()
   tick();
   assert.equal(container.appends, 1, "an update on screen is no append");
   assert.equal(container.nodes[1].textContent, sent(70000).text);
-  log.push({ kind: "raw", text: "Sent bytes 0-3999999; iOS has 4000000 of 4000000 bytes (all of it)", pkg: "a" });
+  log.push({ kind: "raw", text: "Sent bytes 0-3999999; 4000000 of 4000000 bytes sent to iOS (all of it)", pkg: "a" });
   tick();
   assert.equal(container.nodes.length, 3, "a different line is a new line");
 });

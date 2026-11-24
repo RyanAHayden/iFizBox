@@ -156,7 +156,7 @@ test("the queue run: a This iPhone failure offers its fix and Use the Signing Se
     await settle();
     assert.deepEqual(opened.filter((o) => o.server).map((o) => o.id).sort(), ["com.example.a", "com.example.b"]);
     assert.equal(queue.size, 0, "both installed through the Signing Server and left the queue");
-    assert.ok(page.lines.some((l) => l.text === "Installing A through the Signing Server"));
+    assert.ok(page.lines.some((l) => l.text === "Trying A through the Signing Server"));
     assert.equal(page.finished?.also, undefined, "nothing failed: no offer again");
     assert.equal(storedRoute(), "iphone", "Install Apps With stays This iPhone");
   } finally { globalThis.document = saved; }

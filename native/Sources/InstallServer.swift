@@ -354,7 +354,7 @@ final class InstallServer {
         if let r = r { cov.add(r) }
         covered[path] = cov
         let whole = cov.covers(size: size)
-        route.log?("Sent \(r.map { "bytes \($0.lowerBound)-\($0.upperBound)" } ?? "nothing"); iOS has \(cov.count) of \(size) bytes"
+        route.log?("Sent \(r.map { "bytes \($0.lowerBound)-\($0.upperBound)" } ?? "nothing"); \(cov.count) of \(size) bytes sent to iOS"
                    + (whole ? " (all of it)" : ""))
         if whole && !fired.contains(path) {
             fired.insert(path)

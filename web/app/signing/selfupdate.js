@@ -5,8 +5,8 @@ import { bridge } from "./common.js";
 
 export const SELF_UPDATE_LINES = {
   waiting: `Waiting for Install to be tapped on iOS's prompt`,
-  asked: `iOS is preparing the new ${NAME}. If it asks anything else, answer it`,
-  finished: `iOS is installing the new ${NAME}. Closing so it can finish`,
+  asked: `iOS asked for the new ${NAME}. If it asks anything else, answer it`,
+  finished: `iOS has started downloading the new ${NAME}. Closing so it can finish`, // B424: the shell saw the download begin, not the install
 };
 export const SELF_UPDATE_FAILED = {
   notStarted: `The update didn't start: iOS didn't download the new ${NAME}. If Install was pressed, try again.`,

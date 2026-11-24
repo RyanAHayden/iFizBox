@@ -115,7 +115,7 @@ test("Install: inspect, the sheet's edits, signing.install {token, ...edits}, th
   assert.deepEqual(installed, [{ bundleId: "com.me.delta", name: "Delta 2" }]);
   // let the progress call finish (after() runs it without awaiting)
   for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
-  assert.deepEqual(ui.labels, ["Downloading", "Downloading 50%", "Downloading", "Signing 30%", "Installing", "Sent to iOS. Press Home to watch it install."]);
+  assert.deepEqual(ui.labels, ["Downloading", "Downloading 50%", "Downloading", "Signing 30%", "Waiting for iOS", "Sent to iOS. Press Home to watch it install."]);
   assert.equal(ui.timers.length, 1); // the HUD goes a moment after Done
 });
 

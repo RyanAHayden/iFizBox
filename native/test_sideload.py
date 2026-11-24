@@ -328,7 +328,7 @@ class HandoffSourceTest(unittest.TestCase):
         self.assertIn("away || (served && !seen)", handoff)
         # each serve starts clean, and onServed marks it
         self.assertIn("Handoff.reset(app.bundleID)", side)
-        self.assertIn('onServed: { serverLog("iOS has the whole IPA"); Handoff.served(bid); end(true) }', side)
+        self.assertIn('onServed: { serverLog("The whole IPA is sent to iOS"); Handoff.served(bid); end(true) }', side)
         watch = self.body(side, "    static func watch(")
         self.assertIn("UIApplication.didEnterBackgroundNotification", watch)
         self.assertIn("{ _ in away = true }", watch)

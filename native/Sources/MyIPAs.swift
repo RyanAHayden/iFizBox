@@ -303,7 +303,7 @@ enum MyIPAs {
             let record = SignedRecord(bundleID: s.bundleID, originalBundleID: s.originalBundleID, name: s.name, version: s.version,
                                       url: libraryURL(file), signed: s.signed, expires: s.expires, options: s.options,
                                       appID: s.appID, signer: s.signer) // B259; appID: the next Re-sign reads it, as SignAhead's
-            if !servers.local { emit("installing", 0) } // This iPhone: installHere sends its own phase ("here")
+            if !servers.local { emit("handoff", 0) } // This iPhone: installHere sends its own phase ("here")
             // B29: the progress page's console, as signing.install has it: the bundle ID and what iOS fetched.
             let log = { (line: String) in c.emitOnMain([["log": line]]) }
             log("Handing the signed copy of \(file) to iOS: \(s.name) \(s.version) as \(s.bundleID)")
