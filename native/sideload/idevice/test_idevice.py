@@ -155,6 +155,16 @@ class RemotePairingPort(unittest.TestCase):
         self.assertIn('"pairing_rejected"', fail)
         self.assertIn('"refused"', fail)
 
+    def test_first_connect_reset_is_pair_again(self):  # B416
+        src = read("IDevice.swift")
+        eof = src[src.index("static func isEarlyEOF"):src.index("static func pairAgain")]
+        self.assertIn('e.code == "connect_failed" && (', eof)
+        for words in ("UnexpectedEof", "early eof", "ConnectionReset", "connection reset by peer"):
+            self.assertIn(f'"{words}"', eof)
+        # only the first connect: a drop once connected reconnects
+        self.assertIn("catch let f as Failure where !run.connected && isEarlyEOF(f)", src)
+        self.assertIn("catch let f as Failure where run.connected && HereRecheck.shouldReconnect", src)
+
     def test_browse_type_is_allowed(self):
         with open(os.path.join(NATIVE, "Info-sideload.plist")) as f:
             plist = f.read()

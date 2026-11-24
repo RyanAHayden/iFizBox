@@ -38,3 +38,16 @@ test("openPrepared: a This iPhone row that failed reads idevice.status for its f
   assert.equal(err.fallback.fix, "check");
   assert.ok(calls.lastIndexOf("idevice.status") > calls.indexOf("signing.open"), "read after the failure");
 });
+
+test("B416: a queue row whose first connect was reset: the red line, Pair Again, and the kept failure", async () => {
+  forgetRoute();
+  store.delete("ifizbox.routeFailure");
+  const e = Object.assign(new Error('Socket(Os { code: 54, kind: ConnectionReset, message: "Connection reset by peer" }) (1)'), { code: "connect_failed" });
+  const native = { call: async (m) => { if (m === "idevice.status") return BUILTIN; if (m === "signing.open") throw e; return null; } };
+  const err = await openPrepared({ id: "a", name: "Feather", token: "t", bundleId: "a" }, { tag: "a#1", native }).then(() => null, (x) => x);
+  assert.equal(err.message, "This iPhone isn't paired with iFizBox any more. Pair again.");
+  assert.equal(err.fallback.fix, "pair");
+  assert.equal(err.fallback.button, "Pair Again");
+  assert.equal(JSON.parse(store.get("ifizbox.routeFailure")).fix, "pair");
+  store.delete("ifizbox.routeFailure");
+});

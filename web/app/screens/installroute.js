@@ -16,7 +16,7 @@ import { grouped, el } from "../nav/ui.js";
 import { format, settingsRoute, mounted, parse } from "../router.js";
 import { showAlert } from "../nav/alert.js";
 import { toBase64 } from "../core/signing.js";
-import { ROUTE_KEY, ROUTE_OPTIONS, IPHONE_INTRO, setupState, PAIR_GUIDE, pairEvent, pairFooter, pairFromNative, pinText, PAIR_STEPS, verifyFailure } from "../core/installroute.js";
+import { ROUTE_KEY, ROUTE_OPTIONS, IPHONE_INTRO, setupState, droppedPairing, plainSocket, PAIR_GUIDE, pairEvent, pairFooter, pairFromNative, pinText, PAIR_STEPS, verifyFailure } from "../core/installroute.js";
 import { ringStyle } from "../core/installroute.js";
 import { leaveQuestion, LEAVE } from "../core/installroute.js";
 import { installStatus, CHECKING, CHECKING_SERVER, STATUS_ACTIONS } from "../core/installroute.js";
@@ -372,14 +372,14 @@ function warnFooters(sections) {
 // page's own row instead of the HUD.
 export const recheckHooks = { goPair: () => goTo("pair"), retryMs: 3000 }; // tests
 // B320: the phone itself turned the kept pairing down: refused everywhere (verifyFailure's `unusable`), or it answered
-// and then dropped it (the shell's pair_again, an early EOF, the channel "invalidated"). A timeout or any other failure
+// and then dropped it (the shell's pair_again, an early EOF, B416: a reset, the channel "invalidated"). A timeout or any other failure
 // isn't the pairing's fault and never forgets it.
 export function turnedDown(why, err) {
   if (!why || why.late) return false;
   if (why.unusable) return true;
   const raw = String(err?.message ?? err ?? "");
   const code = err?.code ?? raw.split(":")[0];
-  return Boolean(why.again) && (code === "pair_again" || /invalidat|early eof|UnexpectedEof/i.test(raw));
+  return Boolean(why.again) && (droppedPairing(code, raw) || /invalidat|early eof|UnexpectedEof/i.test(raw));
 }
 export async function recheckPairing(native, alert, redraw, { spin = null } = {}) {
   const st = await status(native);
@@ -786,6 +786,10 @@ async function finishSetup(v, native, alert, store, redraw) {
   try { await vpnTest(native, alert, store, { ended: done }); } finally { done(); }
 }
 
+// B416: whether this visit (`v`) of Pairing checks the kept pairing first: the last failure was the pairing's (fix
+// "pair"), once a visit, and not when this visit paired already.
+export const rechecksPairing = (v, failure = routeFailure()) => failure?.fix === "pair" && !v.rechecked && !v.started && !checking;
+
 async function drawPair(box, { store, native, alert, redraw }) {
   shown = { native, redraw };
   visit ??= { started: false, failed: false };
@@ -826,7 +830,7 @@ async function drawPair(box, { store, native, alert, redraw }) {
       v.failed = true;
       redraw();
       if (e?.code !== "canceled" && e?.code !== "cancelled" && !/^cancel+ed/.test(e?.message || "")) {
-        alert({ title: "Couldn't Pair", message: e?.message || "No answer.", buttons: ["OK"] });
+        alert({ title: "Couldn't Pair", message: plainSocket(e?.message) || "No answer.", buttons: ["OK"] });
       }
     }
   };
@@ -881,6 +885,10 @@ async function drawPair(box, { store, native, alert, redraw }) {
 
   if (state === "pairing" && !pairing && !v.started) {
     start();
+  } else if (state === "paired" && rechecksPairing(v)) {
+    // B416: Pair Again after an install: the kept pairing is checked once more, then forgotten and pairing starts
+    v.rechecked = true;
+    recheckPairing(native, alert, recheck).then((r) => { if (visit === v && r !== "repair") recheck(); });
   } else if (state === "paired") {
     autoCheck(native, alert, recheck, store, checkButton); // B316: opened after a failure, or just paired again: checks by itself
   }

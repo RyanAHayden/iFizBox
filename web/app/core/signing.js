@@ -15,6 +15,7 @@ import { isAts, ATS_TITLE, atsText, INSECURE_IPA_ALERT, insecureText } from "./i
 import { signingPage } from "./signingpage.js"; // C15: the sideload build's page is Installation & Signing
 import { developerModeFailure } from "./installroute.js"; // F300
 import { routeFailureOf } from "./installroute.js"; // B316
+import { droppedPairing, hasSocketText, plainSocket } from "./installroute.js"; // B416
 
 const bytesOf = (b) => (b instanceof Uint8Array ? b : new Uint8Array(b));
 
@@ -480,7 +481,12 @@ export function deviceError(err, name = "") {
     const f = routeFailureOf(err);
     if (f) return { title: f.title, open: null, message: f.message, fix: f.fix, button: f.button };
   }
-  return { title: name ? `Couldn't Install ${name}` : "Couldn't Install", open: null, message };
+  // B416: the pairing the phone no longer has, and any other failed connect in idevice's socket words
+  if (droppedPairing(code || raw.split(":")[0], raw) || hasSocketText(raw)) {
+    const f = routeFailureOf(err);
+    if (f) return { title: f.title, open: null, message: f.message, fix: f.fix, button: f.button };
+  }
+  return { title: name ? `Couldn't Install ${name}` : "Couldn't Install", open: null, message: plainSocket(message) };
 }
 
 // ---- Before and around signing, the page's side (F68) -----------------------------------------------------------
@@ -776,7 +782,9 @@ export function loggedBridge(native, store = sideloadLogs) {
     }, (e) => {
       try {
         const cancelled = e?.code === "cancelled";
-        run?.line(cancelled ? "Cancelled" : `Error: ${e?.message || String(e)}`);
+        const raw = e?.message || String(e);
+        if (!cancelled && hasSocketText(raw)) run?.line(raw); // B416: the raw text in a plain line
+        run?.line(cancelled ? "Cancelled" : `Error: ${hasSocketText(raw) ? deviceError(e).message : raw}`);
         run?.end(cancelled ? { cancelled: true } : { code: -1 });
       } catch { /* the log is a nicety */ }
       throw e;
