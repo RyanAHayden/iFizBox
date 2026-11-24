@@ -113,7 +113,9 @@ enum LocalVPN {
     /// Throws when cancelled, after airplaneLimit, or when the VPN doesn't start; installEnded then takes it down.
     static func waitOffCellular(cancelled: () -> Bool, waiting: () -> Void) throws -> Bool {
         guard available, !failedNow(), Path.now().cellular else { return false }
-        try begin()
+        try begin { _ in
+            if cancelled() { throw IDevice.Failure(code: "cancelled", text: "Cancelled") } // while another install's start goes on
+        }
         defer { end() }
         log("on cellular: waiting for Airplane Mode")
         waiting()
@@ -148,7 +150,7 @@ enum LocalVPN {
     private static var refusal: (at: Date, failure: IDevice.Failure)? // guarded by lock: iOS didn't save our configuration
 
     /// iOS refused our configuration less than a minute ago (the user tapped Don't Allow, or didn't answer): the rest
-    /// of a queue isn't asked again. Any other failed start fails its own install only (B418). vpn.test always tries.
+    /// of a queue isn't asked again. Any other failed start fails its own install only (B418). vpn.test asks anew.
     static func failedNow() -> Bool {
         lock.lock(); defer { lock.unlock() }
         return refusal.map { Date().timeIntervalSince($0.at) < 60 } ?? false
@@ -181,7 +183,7 @@ enum LocalVPN {
                 log(found == nil ? "saving a new configuration (iOS asks to allow it)" : "enabling the configuration")
                 var stale = false // written before done() signals the wait
                 do {
-                    let _: Bool? = try wait("saving the VPN configuration", saveLimit, refusable: true) { done in
+                    let _: Bool? = try wait("saving the VPN configuration", saveLimit, refusable: found == nil) { done in
                         m.saveToPreferences { err in stale = isStale(err); done(err, true) }
                     }
                     // iOS wants a load after a save before the tunnel starts
@@ -241,9 +243,9 @@ enum LocalVPN {
     /// The tunnel up (blocking): started if it isn't, then until iOS says connected. B418: one at a time, each install
     /// of a queue calls it: a later caller waits here, then finds the tunnel connected and saves nothing, or tries
     /// itself when the one before failed (unless iOS refused the configuration meanwhile: it isn't asked twice).
-    static func up(_ step: (String) -> Void = { _ in }) throws {
+    static func up(_ step: (String) throws -> Void = { _ in }) throws {
         let t0 = Date()
-        while !startLock.lock(before: Date().addingTimeInterval(1)) { step("waiting for \(name)") }
+        while !startLock.lock(before: Date().addingTimeInterval(1)) { try step("waiting for \(name)") }
         defer { startLock.unlock() }
         lock.lock(); let no = refusal; lock.unlock()
         if let no = no, no.at > t0 { throw no.failure }
@@ -252,7 +254,7 @@ enum LocalVPN {
     }
 
     /// up(), under startLock.
-    private static func start(_ step: (String) -> Void) throws {
+    private static func start(_ step: (String) throws -> Void) throws {
         // B375: iOS starts no VPN without a network: it goes connecting then disconnected ("No network available")
         // faster than the loop below can see, which then waited out startLimit. Asked before manager(), whose
         // save takes the user's own VPN's place
@@ -266,7 +268,7 @@ enum LocalVPN {
         // connects. manager() reads it again (and enables and saves it when off)
         var m = try manager()
         if m.connection.status == .connected { return }
-        step("turning on \(name)")
+        try step("turning on \(name)")
         let t0 = Date()
         do { try m.connection.startVPNTunnel() } catch {
             // another app's VPN took its place since, or it changed: read it again, then try once more
@@ -299,7 +301,7 @@ enum LocalVPN {
     }
 
     /// Before a connect to iOS (blocking, on IDevice.queue): the VPN on, held until end().
-    static func begin(_ step: (String) -> Void = { _ in }) throws {
+    static func begin(_ step: (String) throws -> Void = { _ in }) throws {
         lock.lock(); holds += 1; stopGen += 1; lock.unlock()
         let tunnels = tunnelAddresses() // read before up() takes another VPN's place
         log("on; up tunnels: \(tunnelList(tunnels))")

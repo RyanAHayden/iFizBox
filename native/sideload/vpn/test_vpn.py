@@ -125,7 +125,7 @@ class App(unittest.TestCase):
         failed = src[src.index("static func failedNow()"):src.index("static func manager()")]
         self.assertIn("refusal.map", failed)
         self.assertEqual(re.findall(r"if (.*?) \{ refused\(f\) \}", src), ["refusable", "refusable && denied"])
-        self.assertEqual(src.count("refusable: true"), 1)  # the save alone
+        self.assertEqual(src.count("refusable: found == nil"), 1)  # the first save alone: the one iOS asks about
 
     def test_status_is_plain(self):
         src = read("App", "LocalVPN.swift")
