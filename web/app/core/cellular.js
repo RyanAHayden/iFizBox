@@ -1,7 +1,7 @@
 // On Cellular (F417, concept K9): what a This iPhone install does while the phone is on cellular data, where iOS refuses
 // the connects it needs: "ask" (the popup, signing/cellular.js; the default), "shortcut" (Cellular Installs runs) or
 // "server" (the Signing Server, no popup). Pure: the choice, the page's group and the popup's texts. Kept in this
-// browser's storage, as is that a run of the Shortcut passed (the shell's `added` is a check's only).
+// browser's storage, as is how the Shortcut's last run or check went (the shell's `added` is a check's only).
 export const CELLULAR_KEY = "ifizbox.onCellular";
 export const SHORTCUT_RAN_KEY = "ifizbox.cellularShortcut";
 export const ON_CELLULAR = "On Cellular";
@@ -21,8 +21,9 @@ export function onCellularChoice(storage = globalThis.localStorage) {
 export function setOnCellular(v, storage = globalThis.localStorage) {
   try { storage?.setItem(CELLULAR_KEY, known(v).value); } catch { /* storage off */ }
 }
+// Whether the last run or check passed; null: none yet.
 export function shortcutRan(storage = globalThis.localStorage) {
-  try { return storage?.getItem(SHORTCUT_RAN_KEY) === "1"; } catch { return false; }
+  try { return { 1: true, 0: false }[storage?.getItem(SHORTCUT_RAN_KEY)] ?? null; } catch { return null; }
 }
 export function setShortcutRan(on, storage = globalThis.localStorage) {
   try { storage?.setItem(SHORTCUT_RAN_KEY, on ? "1" : "0"); } catch { /* storage off */ }

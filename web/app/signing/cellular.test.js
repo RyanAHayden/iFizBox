@@ -107,6 +107,11 @@ test("Set Up Shortcut in the popup: added, run, and used from then on", async ()
 });
 
 test("an added one is Use Shortcut; not added: the popup again, and nothing kept", async () => {
+  const gone = asking(shortcutOf(["not_waiting"]));
+  const w = gone.cell.watch(() => {});
+  w.phase("airplane"); await settle();
+  gone.shown[0].tap(0); await tick(); w.phase("offCellular"); await settle();
+  assert.equal(gone.kept.choice, "shortcut", "set up, and the wait ended before it ran");
   const have = asking(shortcutOf([], { added: true }));
   have.cell.watch(() => {}).phase("airplane"); await settle();
   assert.equal(have.shown[0].o.buttons[0], "Use Shortcut");

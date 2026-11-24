@@ -173,8 +173,8 @@ export function localGroups(st, { reading = false, pairChecking = false, test = 
   const onCell = cellular === "shortcut" && !shortcut ? "ask" : cellular;
   if (st?.paired) groups.push({ key: "cellular", header: ON_CELLULAR, footer: cellularFooter(onCell), rows: cellularOptions(shortcut).map((o) => ({
     label: o.label, subtitle: o.subtitle, cls: "route-row", icon: rowIcon(o.icon), checked: o.value === onCell, onClick: () => setCellular(o.value),
-    ...(adding && o.value === "shortcut" ? { spin: true } : {}) })) });
-  if (st?.paired && onCell === "shortcut") groups.push({ key: "cellshortcut", rows: [{ label: ADD_AGAIN, cls: "sign-import", onClick: addAgain }], footer: ADD_AGAIN_FOOTER });
+    ...(adding && o.value === "shortcut" && onCell !== "shortcut" ? { spin: true } : {}) })) });
+  if (st?.paired && onCell === "shortcut") groups.push({ key: "cellshortcut", rows: [{ label: ADD_AGAIN, cls: "sign-import", onClick: addAgain, ...(adding ? { spin: true } : {}) }], footer: ADD_AGAIN_FOOTER });
   if (st?.paired) groups.push({ rows: [{ label: "Forget Pairing", cls: "sign-import", onClick: forget }] });
   return [...groups, howGroup];
 }
@@ -1155,9 +1155,18 @@ async function checkOnce(native, alert, redraw, store, mark, how) {
   let st = null;
   // B428a: nothing is kept and no Fix is offered; the button keeps its label
   const cellular = async (s) => {
+    const bad = await cellularInstalls(); // F417b: touches no cellular data, so there too
     stop();
     rememberStatus(s);
-    if (how.quiet) redraw(); else await alert(cellularCheck(s));
+    if (how.quiet) return redraw();
+    await alert(cellularCheck(s));
+    await repair(bad);
+  };
+  // F417b: Use Shortcut chosen: what its Shortcut's check failed with, under the same spinner (it opens Shortcuts: never by itself)
+  const cellularInstalls = async () => (how.quiet || onCellularChoice() !== "shortcut" ? null : failedShortcut(native).catch(() => null));
+  const repair = async (code, lead) => {
+    if (!code) return;
+    try { await (await shortcutSetup()).repairShortcut(native, code, { alert }, lead); } catch { /* not the connection's failure */ }
   };
   try {
     st = await status(native);
@@ -1166,8 +1175,7 @@ async function checkOnce(native, alert, redraw, store, mark, how) {
     if (st && !builtinVPN(st)) { stop(); throw Object.assign(new Error("connect_failed: no Network Extensions"), { code: "connect_failed" }); }
     await quietRun; // F410b: one at a time with the phone; this one's deadline starts after it
     await within(call(native, "idevice.verify", ...(how.quiet ? [{ quiet: true }] : [])), TIMEOUTS.verify);
-    // F417b: Use Shortcut chosen: its Shortcut too, under the same spinner (it opens Shortcuts: never by itself)
-    const noShortcut = how.quiet || onCellularChoice() !== "shortcut" ? null : await failedShortcut(native).catch(() => null);
+    const noShortcut = await cellularInstalls();
     stop();
     clearRouteFailure(); // B316
     const used = store.get(ROUTE_KEY) !== "iphone";
@@ -1175,7 +1183,8 @@ async function checkOnce(native, alert, redraw, store, mark, how) {
     mark?.show(!noShortcut);
     if (how.quiet) redraw();
     if (noShortcut) {
-      try { await (await shortcutSetup()).repairShortcut(native, noShortcut, { alert }, "This iPhone answered, but the Shortcut for cellular data failed. "); } catch { /* not the connection's failure */ } finally { mark?.expire(); }
+      await repair(noShortcut, "This iPhone answered, but the Shortcut for cellular data failed. ");
+      mark?.expire();
     }
   } catch (e) {
     const cell = await refusedOnCellular(native, e); // still spinning while it's read

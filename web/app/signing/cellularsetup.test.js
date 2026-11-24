@@ -24,11 +24,13 @@ function alerts(...taps) {
 const whenBack = async () => true;
 const ok = { ok: true }, bad = (error) => ({ ok: false, error });
 
-test("read: available and bundled; added by a check, or a run that passed; an older shell has none", async () => {
+test("read: available and bundled; added as the last run or check went, else as the shell says; an older shell has none", async () => {
   mem.clear();
   assert.deepEqual(await readShortcut(shell({ status: { available: true, bundled: true, added: false } })), { available: true, added: false });
   mem.set(SHORTCUT_RAN_KEY, "1");
   assert.deepEqual(await readShortcut(shell({ status: { available: true, bundled: true, added: false } })), { available: true, added: true });
+  mem.set(SHORTCUT_RAN_KEY, "0");
+  assert.equal((await readShortcut(shell({ status: { available: true, bundled: true, added: true } }))).added, false, "a run didn't find it");
   assert.equal((await readShortcut(shell({ status: { available: true, bundled: false } }))).available, false);
   assert.equal(await readShortcut(shell({ status: new Error("unknown method") })), null);
 });

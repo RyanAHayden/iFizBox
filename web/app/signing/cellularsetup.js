@@ -9,7 +9,7 @@ import { alertOK, showAlert } from "../nav/alert.js";
 export async function readShortcut(native) {
   try {
     const s = await shortcutStatus(native);
-    return s?.available && s.bundled ? { available: true, added: Boolean(s.added) || shortcutRan() } : { available: false, added: false };
+    return s?.available && s.bundled ? { available: true, added: shortcutRan() ?? Boolean(s.added) } : { available: false, added: false };
   } catch { return null; }
 }
 
@@ -41,7 +41,7 @@ async function add(native, { alert, whenBack = backInApp }) {
 export async function checkFailed(native) {
   let r;
   try { r = await checkShortcut(native); } catch { r = { ok: false, error: "not_opened" }; }
-  if (r?.ok) return null;
+  if (r?.ok) { setShortcutRan(true); return null; }
   const code = r?.error || "not_run";
   if (needsAdding(code)) setShortcutRan(false);
   return code;

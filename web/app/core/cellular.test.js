@@ -35,7 +35,7 @@ test("the page's texts and the popup", () => {
 
 test("a run that passed is kept", () => {
   const mem = new Map(), storage = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
-  assert.equal(shortcutRan(storage), false);
+  assert.equal(shortcutRan(storage), null);
   setShortcutRan(true, storage);
   assert.equal(shortcutRan(storage), true);
   setShortcutRan(false, storage);

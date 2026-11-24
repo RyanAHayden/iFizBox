@@ -15,11 +15,11 @@ const iphone = { get: () => "iphone", set: () => {} };
 const all = (e) => [e, ...e.children.flatMap(all)];
 const wait = async () => { for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 1)); };
 const group = (gs, key) => gs.find((g) => g.key === key);
-function phone({ status = { available: true, bundled: true, added: true }, check = { ok: true }, add = { opened: false } } = {}) {
+function phone({ cellular = false, status = { available: true, bundled: true, added: true }, check = { ok: true }, add = { opened: false } } = {}) {
   const calls = [];
   return { calls, call: async (m) => {
     calls.push(m);
-    return { "idevice.status": ST, "idevice.verify": { ok: true }, "cellular.status": status, "cellular.check": check, "cellular.add": add }[m] ?? {};
+    return { "idevice.status": { ...ST, vpn: { ...ST.vpn, cellular, wifi: !cellular } }, "idevice.verify": { ok: true }, "cellular.status": status, "cellular.check": check, "cellular.add": add }[m] ?? {};
   } };
 }
 
@@ -81,6 +81,9 @@ test("Check Connection checks the Shortcut only when it's chosen, and says so wi
   assert.match(said[0].message, /^This iPhone answered.*wasn't found/);
   assert.ok(gone.calls.includes("cellular.add"));
   assert.equal(routeFailure(), null, "the connection works");
+  const cell = phone({ cellular: true, check: { ok: false, error: "not_run" } });
+  assert.deepEqual((await check(cell)).map((a) => a.title), ["Can't Check on Cellular", "Shortcut Didn't Run"]);
+  assert.ok(!cell.calls.includes("idevice.verify"));
 });
 
 test("the automatic check never opens Shortcuts", async () => {

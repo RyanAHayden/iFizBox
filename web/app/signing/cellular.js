@@ -49,7 +49,6 @@ export function cellularAsk({ alert = showAlert, choice = onCellularChoice, setC
     const code = await sc.run();
     if (code === "not_waiting") return false; // off cellular, or paused: the shell says when it waits again
     sc.added = sc.added || !code;
-    if (!code && picked) setChoice("shortcut"); // set up from the popup: used from now on
     for (const w of mine) w.runs++;
     failed = code ?? (mine.some((w) => waiting.has(w) && w.runs >= RUNS) ? "ran_out" : null);
     return true;
@@ -62,7 +61,11 @@ export function cellularAsk({ alert = showAlert, choice = onCellularChoice, setC
     const a = ctl.signal.aborted ? null : answers[r?.index];
     if (!a) return true; // cellular came back as it closed
     if (a === "shortcut") {
-      if (!add || await sc.add()) { picked = true; failed = null; }
+      if (!add || await sc.add()) {
+        picked = sc.added = true;
+        failed = null;
+        setChoice("shortcut"); // set up from the popup: used from now on
+      }
       return true;
     }
     if (a === "server") useServer(); else cell.answer = "cancel";
