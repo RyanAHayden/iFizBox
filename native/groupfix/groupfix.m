@@ -20,6 +20,8 @@
 //     names the app's own group. B392: that copy leaves what the own group has, unless the app was signed for the
 //     shared groups only until now and the own item is an older one from an earlier install (the keychain outlives
 //     a delete).
+//   - B415: lowers the container's files and folders from Complete data protection (an earlier signature's default, which
+//     iOS leaves on them) to CompleteUntilFirstUserAuthentication, unless this signature asks for Complete.
 // What to map comes from ifizbox-groupfix.plist beside this dylib: { groups: [original IDs], target: "" (or a profile
 // group an earlier sign chose), keychain: bool, legacy: the profile group older signs mapped to, copied in once,
 // isolate: the app's own keychain group (the first of its keychain-access-groups) }.
@@ -32,12 +34,15 @@
 #import <Security/Security.h>
 #import <objc/runtime.h>
 #include <dlfcn.h>
+#include <errno.h>
+#include <fts.h>
 #include <mach/mach.h>
 #include <mach-o/dyld.h>
 #include <mach-o/loader.h>
 #include <mach-o/nlist.h>
 #include <os/log.h>
 #include <string.h>
+#include <sys/attr.h>
 #include <sys/stat.h>
 #include <sys/sysctl.h>
 #include <unistd.h>
@@ -489,6 +494,52 @@ static id entitlement(NSString *key) {
     return v;
 }
 
+// ---- B415: files an earlier signature's default data protection left unreadable while the phone is locked ----
+
+// The container's files and folders from Complete to CompleteUntilFirstUserAuthentication, unless this signature has
+// Complete as its default (or can't be read). A file's change needs the phone unlocked; a folder's does not. At every
+// launch: an update signed with Complete puts it on the files again, and what couldn't be changed is tried again.
+// The log's words for it. After appRanBefore: it moves the change times that one looks at.
+static NSString *lowerProtection(void) {
+    if (!entitlement(@"application-identifier")) return @"left alone (no entitlements read)";
+    if ([entitlement(@"com.apple.developer.default-data-protection") isEqual:@"NSFileProtectionComplete"]) return @"left alone (signed for Complete)";
+    NSTimeInterval began = [NSProcessInfo processInfo].systemUptime;
+    NSDictionary *lower = @{ NSFileProtectionKey: NSFileProtectionCompleteUntilFirstUserAuthentication };
+    struct attrlist want = { .bitmapcount = ATTR_BIT_MAP_COUNT, .commonattr = ATTR_CMN_DATA_PROTECT_FLAGS };
+    NSUInteger looked = 0, files = 0, folders = 0, failed = 0;
+    NSInteger why = 0;
+    char *roots[] = { strdup(NSHomeDirectory().fileSystemRepresentation), NULL };
+    FTS *walk = fts_open(roots, FTS_PHYSICAL | FTS_NOCHDIR | FTS_NOSTAT | FTS_XDEV, NULL);
+    FTSENT *f;
+    while (walk && (f = fts_read(walk))) {
+        // each folder before what is in it; not the container itself, which the app may not change; links never followed
+        if (f->fts_level < 1 || f->fts_info == FTS_DP || f->fts_info == FTS_DNR || f->fts_info == FTS_ERR || f->fts_info == FTS_SL) continue;
+        struct { uint32_t size, protection; } has;
+        if (getattrlist(f->fts_path, &want, &has, sizeof(has), FSOPT_NOFOLLOW) != 0 || has.size < sizeof(has)) continue;
+        looked++;
+        if (has.protection != 1) continue; // PROTECTION_CLASS_A, Complete
+        @autoreleasepool {
+            NSError *e = nil;
+            NSString *path = [[NSFileManager defaultManager] stringWithFileSystemRepresentation:f->fts_path length:f->fts_pathlen];
+            if ([[NSFileManager defaultManager] setAttributes:lower ofItemAtPath:path error:&e]) {
+                if (f->fts_info == FTS_D) folders++;
+                else files++;
+            } else {
+                NSError *posix = e.userInfo[NSUnderlyingErrorKey];
+                NSInteger code = posix ? posix.code : e.code;
+                if (code == ENOENT) continue; // gone by now
+                failed++;
+                why = code;
+            }
+        }
+    }
+    if (walk) fts_close(walk);
+    free(roots[0]);
+    return [NSString stringWithFormat:@"%lu files and %lu folders lowered from Complete%@, of %lu in %.0f ms%@", (unsigned long)files, (unsigned long)folders,
+        failed ? [NSString stringWithFormat:@", %lu not (error %ld)", (unsigned long)failed, (long)why] : @"", (unsigned long)looked,
+        ([NSProcessInfo processInfo].systemUptime - began) * 1000, walk ? @"" : @" (container not read)"];
+}
+
 // How many items of a class there are in each group ("TEAM.a 12, TEAM.b 3"), or why none could be read.
 static NSString *itemCounts(CFStringRef cls) {
     CFTypeRef all = NULL;
@@ -593,10 +644,12 @@ __attribute__((constructor)) static void groupfixInit(void) {
         groups = [NSSet setWithArray:g];
         NSString *t = c[@"target"];
         target = [t isKindOfClass:[NSString class]] && t.length ? t : nil;
+        BOOL ownBefore = appRanBefore(); // before anything below writes or changes a file
+        NSString *protection = lowerProtection();
         CFArrayRef keys = CFPreferencesCopyKeyList(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
         NSUInteger keyCount = keys ? (NSUInteger)CFArrayGetCount(keys) : 0; // for the log
         if (keys) CFRelease(keys);
-        BOOL ownBefore = appRanBefore(), fixedBefore = groupFixedBefore(); // before anything below writes a file or a mark
+        BOOL fixedBefore = groupFixedBefore(); // before anything below writes a file or a mark
         NSUInteger prefs = keyCount;
         NSString *saw = [NSString stringWithFormat:@"passwords %@; internet %@; keys %@", itemCounts(kSecClassGenericPassword),
                                                    itemCounts(kSecClassInternetPassword), itemCounts(kSecClassKey)];
@@ -661,12 +714,12 @@ __attribute__((constructor)) static void groupfixInit(void) {
         NSDictionary *info = [NSBundle mainBundle].infoDictionary;
         NSISO8601DateFormatter *iso8601 = [NSISO8601DateFormatter new];
         NSArray *kc = entitlement(@"keychain-access-groups");
-        logLaunch([NSString stringWithFormat:@"%@ %@ %@ (%@) container %@; ran before %@, %lu preferences; application-identifier %@, keychain groups %@; saw %@; isolate %@: %@; pinned %@; app groups %lu; group fix before %@; container made %@",
+        logLaunch([NSString stringWithFormat:@"%@ %@ %@ (%@) container %@; ran before %@, %lu preferences; application-identifier %@, keychain groups %@; saw %@; isolate %@: %@; pinned %@; app groups %lu; group fix before %@; container made %@; protection %@",
             [iso8601 stringFromDate:[NSDate date]], info[@"CFBundleIdentifier"], info[@"CFBundleShortVersionString"], info[@"CFBundleVersion"],
             NSHomeDirectory().lastPathComponent, ownBefore ? @"yes" : @"no", (unsigned long)prefs, entitlement(@"application-identifier"),
             [kc isKindOfClass:[NSArray class]] ? [kc componentsJoinedByString:@", "] : @"none", saw,
             isolate ? (__bridge NSString *)isolate : @"off", isolation, pinned ? @"yes" : @"no", (unsigned long)groups.count,
-            fixedBefore ? @"yes" : @"no", containerBirth() ? [iso8601 stringFromDate:[NSDate dateWithTimeIntervalSince1970:containerBirth()]] : @"unknown"]);
+            fixedBefore ? @"yes" : @"no", containerBirth() ? [iso8601 stringFromDate:[NSDate dateWithTimeIntervalSince1970:containerBirth()]] : @"unknown", protection]);
         if (keychainStrip || pinned) _dyld_register_func_for_add_image(rebindImage);
     }
 }
