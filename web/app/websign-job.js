@@ -22,7 +22,7 @@ import { isZip, profileInfo, signingIds, appEntitlements, originalDataProtection
   IFIZBOX_ID, IDENTITY_FILE, TRANSFER_FILE } from "./core/websign.js";
 import { webSignerStamp, groupFixHash, signatureEnd } from "./core/websign.js"; // F342
 import { injectInto } from "./core/tweaks.js";
-import { entitlementsRead, groupFixPlan, withGroupFix, readConfig, GROUPFIX, groupFixLogLine } from "./core/groupfix.js";
+import { entitlementsRead, groupFixPlan, withGroupFix, readConfig, GROUPFIX, groupFixLogLine, isNotificationExtension } from "./core/groupfix.js";
 import { keychainLogLine } from "./core/websign.js"; // B327
 import { NAME } from "./brand.js";
 import { MALWARE_REFUSED } from "./core/malicious.js";
@@ -139,6 +139,9 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   // F288: tweaks (core/tweaks.js prepareTweaks, done on the page): their files into the app, and the weak load commands
   // into the main executable, before zsign signs it all (it signs Frameworks/' dylibs and frameworks as any other).
   const injected = all?.files?.length ? putTweaks(FS, appDir, plist, all) : [];
+  if (plan?.shared && injected.includes(GROUPFIX.inject)) { // B425
+    signLog.push(...fixExtensions(FS, appDir, (path) => JSON.parse(zs.ccall("ifizbox_plist_json", "string", ["string"], [path]) || "null")));
+  }
   FS.mkdir("/w/tmp");
   const args = zsignArgs({ p12: "/w/key.p12", password, profile: "/w/app.mobileprovision", entitlements: "/w/ents.plist",
     bundleId: bundleId !== info.bundleId ? bundleId : null, input: appDir, output: "/w/out.ipa", temp: "/w/tmp" });
@@ -195,6 +198,27 @@ export function putTweaks(FS, appDir, plist, { files, inject = [] }) {
   try { bin = FS.readFile(exe); } catch { throw fail("bad_ipa", "That IPA's app has no executable to inject the tweaks into."); }
   try { FS.writeFile(exe, injectInto(bin, inject)); } catch (e) { throw fail(e?.code ?? "bad_tweak", e?.message ?? String(e)); }
   return [...inject];
+}
+
+// B425: the group fix into the app's notification extensions (PlugIns/ and Extensions/), from the app's Frameworks/;
+// one with no room for the load command is left as it was. Returns the sign log's lines (the app's signer's words).
+export function fixExtensions(FS, appDir, readPlist) {
+  const lines = [];
+  for (const dir of ["PlugIns", "Extensions"]) {
+    let names;
+    try { names = FS.readdir(`${appDir}/${dir}`); } catch { continue; }
+    for (const n of names.filter((x) => x.endsWith(".appex"))) {
+      let plist = null;
+      try { plist = readPlist(`${appDir}/${dir}/${n}/Info.plist`); } catch { /* not readable: not one */ }
+      if (!isNotificationExtension(plist) || !plist.CFBundleExecutable) continue;
+      const exe = `${appDir}/${dir}/${n}/${plist.CFBundleExecutable}`;
+      try {
+        FS.writeFile(exe, injectInto(FS.readFile(exe), [GROUPFIX.inject], { rpath: GROUPFIX.extensionRpath }));
+        lines.push(`Group fix in ${dir}/${n}`);
+      } catch { lines.push(`No group fix in ${dir}/${n}: its executable has no room for it`); }
+    }
+  }
+  return lines;
 }
 
 // F260: whether `password` opens the .p12, as zsign itself loads it (OpenSSL with the legacy provider: any .p12 the

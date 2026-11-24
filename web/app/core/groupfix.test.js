@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { machoEntitlements, entitlementsRead, groupFixPlan, groupFixTweaks, withGroupFix, readConfig, GROUPFIX } from "./groupfix.js";
+import { machoEntitlements, entitlementsRead, groupFixPlan, groupFixTweaks, withGroupFix, readConfig, GROUPFIX, groupFixLogLine, isNotificationExtension } from "./groupfix.js";
 import { appEntitlements, plistXml } from "./websign.js";
 import { parsePlist } from "./signing.js";
 import { idOf, isMachO } from "./tweaks.js";
@@ -47,7 +47,7 @@ test("machoEntitlements reads the original signature's XML slot, thin or fat; nu
 test("groupFixPlan: the original's groups go to a folder of the app's own, whatever groups the profile has", () => {
   const withGroup = { "com.apple.security.application-groups": ["group.com.me.box"] };
   // legacy: the profile group the older rule picked, copied into the app's own folder once (an app signed that way)
-  assert.deepEqual(groupFixPlan(INSTA, withGroup), { groups: ["group.com.burbn.instagram", "group.com.burbn.shared"], target: "", keychain: true, legacy: "group.com.me.box" });
+  assert.deepEqual(groupFixPlan(INSTA, withGroup), { groups: ["group.com.burbn.instagram", "group.com.burbn.shared"], target: "", keychain: true, legacy: "group.com.me.box", shared: "group.com.me.box" });
   assert.deepEqual(groupFixPlan(INSTA, { "keychain-access-groups": ["T.*"] }), { groups: ["group.com.burbn.instagram", "group.com.burbn.shared"], target: "", keychain: true });
   // a group the profile has stays as it is
   assert.deepEqual(groupFixPlan(INSTA, { "com.apple.security.application-groups": ["group.com.burbn.shared"] }).groups, ["group.com.burbn.instagram"]);
@@ -57,7 +57,7 @@ test("groupFixPlan: the original's groups go to a folder of the app's own, whate
   // signed again: the executable now has the profile's groups, the config left by the first sign keeps the originals
   const previous = readConfig(groupFixTweaks(groupFixPlan(INSTA, {}), new Uint8Array(4)).files[1].data);
   assert.deepEqual(groupFixPlan({ "keychain-access-groups": ["T.com.burbn.instagram"] }, withGroup, previous),
-    { groups: ["group.com.burbn.instagram", "group.com.burbn.shared"], target: "", keychain: true });
+    { groups: ["group.com.burbn.instagram", "group.com.burbn.shared"], target: "", keychain: true, shared: "group.com.me.box" });
   assert.equal(readConfig(new Uint8Array([1, 2])), null);
 });
 
@@ -78,6 +78,20 @@ test("groupFixPlan (B227): the same folder whatever the profile's groups or thei
   const cfg = readConfig(groupFixTweaks(a, new Uint8Array(4)).files[1].data);
   assert.equal(cfg.legacy, "group.x.1");
   assert.equal(readConfig(groupFixTweaks(none, new Uint8Array(4)).files[1].data).legacy, undefined);
+});
+
+test("groupFixPlan (B425): the profile group the notification extensions get the app's group data through", () => {
+  const plan = groupFixPlan(INSTA, { "com.apple.security.application-groups": ["group.*", "group.x.1", "group.x.2"] });
+  assert.equal(plan.shared, "group.x.1");
+  assert.equal(plan.target, "", "the app's own folder stays the master");
+  assert.equal(readConfig(groupFixTweaks(plan, new Uint8Array(4)).files[1].data).shared, "group.x.1");
+  assert.ok(groupFixLogLine(plan).endsWith("; shared with its notification extensions through group.x.1"));
+  assert.equal(groupFixPlan(INSTA, {}).shared, undefined, "a profile with no groups");
+  const was = { groups: ["group.com.burbn.instagram"], target: "group.x.2", keychain: true };
+  assert.equal(groupFixPlan(INSTA, { "com.apple.security.application-groups": ["group.x.1", "group.x.2"] }, was).shared, "group.x.2", "an earlier sign's group");
+  const ext = (p) => isNotificationExtension({ NSExtension: { NSExtensionPointIdentifier: p } });
+  assert.ok(ext("com.apple.usernotifications.service") && ext("com.apple.usernotifications.content-extension"));
+  assert.ok(!ext("com.apple.share-services") && !isNotificationExtension({}) && !isNotificationExtension(null));
 });
 
 test("machoEntitlements reads the first 64-bit slice of a fat armv7+arm64 file", () => {

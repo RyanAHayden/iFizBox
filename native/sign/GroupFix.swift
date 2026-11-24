@@ -12,6 +12,8 @@ enum GroupFix {
     static let dylibPath = "Frameworks/ifizbox-groupfix.dylib"
     static let configPath = "Frameworks/ifizbox-groupfix.plist"
     static let inject = "@rpath/ifizbox-groupfix.dylib"
+    // B425: an extension loads the app's copy of the dylib (PlugIns/X.appex or Extensions/X.appex, beside Frameworks/)
+    static let extensionRpath = "@executable_path/../../Frameworks"
     // The dylib's bytes, from the app's bundled web/ (the tests set their own); nil signs without it.
     static var dylib: () -> Data? = {
         try? Data(contentsOf: Bundle.main.bundleURL.appendingPathComponent("web/vendor/groupfix/ifizbox-groupfix.dylib"))
@@ -24,6 +26,7 @@ enum GroupFix {
         var lost: String? = nil   // B227: the profile group an earlier sign mapped to, which this profile lacks
         var legacy: String? = nil // B227: the profile group older signs mapped to, copied into the app's own once
         var isolate: String? = nil // B327: the app's own keychain group, its passwords' only one (groupfix.m)
+        var shared: String? = nil // B425: the profile group the notification extensions get the app's group data through
     }
 
     private static func strings(_ v: Any?) -> [String] { (v as? [Any] ?? []).compactMap { $0 as? String }.filter { !$0.isEmpty } }
@@ -52,6 +55,8 @@ enum GroupFix {
         // the group the older rule (the profile's first) would have picked: the dylib copies its folder and suite into
         // the app's own once, so an app signed that way, now signed again from its original IPA, keeps that data
         if p.target.isEmpty, let first = have.first, !(previous != nil && prev["target"] as? String == "") { p.legacy = first }
+        // B425: what a notification extension shares with the app goes through a group the profile gives both
+        p.shared = p.target.isEmpty ? have.first { !$0.contains("*") } : p.target
         return p
     }
 
@@ -64,6 +69,13 @@ enum GroupFix {
             + (p.target.isEmpty ? "the app's own folder" : p.target) + (p.keychain ? "; keychain groups stripped" : "")
             + (p.legacy.map { "; \($0) copied in once if the app ran before" } ?? "")
             + (p.isolate.map { "; passwords kept in \($0), the shared groups' copied in once if the app ran before" } ?? "")
+            + (p.shared.map { "; shared with its notification extensions through \($0)" } ?? "")
+    }
+
+    // B425: whether a bundle is one of the app's notification extensions (its Info.plist), which get the fix too.
+    static func isNotificationExtension(_ plist: [String: Any]) -> Bool {
+        let point = (plist["NSExtension"] as? [String: Any])?["NSExtensionPointIdentifier"] as? String
+        return point == "com.apple.usernotifications.service" || point == "com.apple.usernotifications.content-extension"
     }
 
     // The tweak set with the dylib and its config added (after the user's own tweaks).
@@ -71,6 +83,7 @@ enum GroupFix {
         var c: [String: Any] = ["groups": p.groups, "target": p.target, "keychain": p.keychain]
         if let l = p.legacy { c["legacy"] = l }
         if let i = p.isolate { c["isolate"] = i }
+        if let s = p.shared { c["shared"] = s }
         let config = try PropertyListSerialization.data(fromPropertyList: c, format: .xml, options: 0)
         var t = tweaks ?? TweakSet()
         t.files.removeAll { $0.path == dylibPath || $0.path == configPath }

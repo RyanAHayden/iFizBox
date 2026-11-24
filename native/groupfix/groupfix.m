@@ -22,9 +22,14 @@
 //     a delete).
 //   - B415: lowers the container's files and folders from Complete data protection (an earlier signature's default, which
 //     iOS leaves on them) to CompleteUntilFirstUserAuthentication, unless this signature asks for Complete.
+//   - B425: runs in the app's notification extensions too, and gives them what the app keeps for its groups: the app puts
+//     a copy of its groups' suites and small files in the profile's group, which the extension brings into its own
+//     container (the app's place stays as it is; "for its notification extensions" below). An extension's password
+//     calls name the app's own keychain group once the app's do.
 // What to map comes from ifizbox-groupfix.plist beside this dylib: { groups: [original IDs], target: "" (or a profile
 // group an earlier sign chose), keychain: bool, legacy: the profile group older signs mapped to, copied in once,
-// isolate: the app's own keychain group (the first of its keychain-access-groups) }.
+// isolate: the app's own keychain group (the first of its keychain-access-groups),
+// shared: the profile's group the copy for the notification extensions goes through }.
 // The same folder and suite on every re-sign, under any profile, so the data survives.
 // B390: every launch adds a line to Library/ifizbox-groupfix.log in the app's container (and the system log): the
 // keychain groups it has and saw items in (counts only, never names or values), what was copied, whether it pinned.
@@ -40,7 +45,10 @@
 #include <mach-o/dyld.h>
 #include <mach-o/loader.h>
 #include <mach-o/nlist.h>
+#include <math.h>
+#include <notify.h>
 #include <os/log.h>
+#include <stdatomic.h>
 #include <string.h>
 #include <sys/attr.h>
 #include <sys/stat.h>
@@ -64,6 +72,9 @@ static BOOL pinned;
 // B393: the app ran before this launch (appRanBefore, as isolate's test).
 static BOOL ranBeforeLaunch;
 
+// B425: in the profile's group, the copies for the apps' notification extensions; never taken in by the legacy copy.
+static NSString *const SHARED_FOLDER = @"ifizbox.shared";
+
 static NSURL *(*origContainer)(id, SEL, NSString *);
 static id (*origSuite)(id, SEL, NSString *);
 
@@ -78,7 +89,7 @@ static BOOL copyMissing(NSURL *from, NSURL *to, NSString *rel) {
     if (!items) return e.code != NSFileReadNoPermissionError;
     for (NSURL *item in items) {
         NSString *name = item.lastPathComponent, *path = rel.length ? [rel stringByAppendingPathComponent:name] : name;
-        if ([path isEqualToString:@"Library/Caches"] || [groups containsObject:path]) continue;
+        if ([path isEqualToString:@"Library/Caches"] || [path isEqualToString:SHARED_FOLDER] || [groups containsObject:path]) continue;
         NSURL *dest = [to URLByAppendingPathComponent:name];
         NSNumber *dir = nil;
         [item getResourceValue:&dir forKey:NSURLIsDirectoryKey error:NULL];
@@ -185,18 +196,27 @@ static NSString *ownSuite(NSString *group) {
     CFPreferencesSynchronize(n, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
     return name;
 }
+// B425 (below)
+static BOOL inExtension;
+static BOOL extensionReady; // the app has put a copy out at least once
+static NSString *extensionFolder(NSString *group);
+
 static NSURL *fixContainer(id self, SEL cmd, NSString *group) {
     if (![group isKindOfClass:[NSString class]] || ![groups containsObject:group]) return origContainer(self, cmd, group);
     if (target) {
         NSURL *u = origContainer(self, cmd, target);
         if (u) return u;
     }
+    if (inExtension) { // B425: until the app has put its copy out, as without this fix
+        return extensionReady && !target ? [NSURL fileURLWithPath:extensionFolder(group) isDirectory:YES] : origContainer(self, cmd, group);
+    }
     return ownFolder(group);
 }
 
 static id fixSuite(id self, SEL cmd, NSString *name) {
     if ([name isKindOfClass:[NSString class]] && [groups containsObject:name]) {
-        name = target ?: ownSuite(name);
+        if (inExtension) name = target ?: (extensionReady ? [@"ifizbox.appgroup." stringByAppendingString:name] : name); // B425
+        else name = target ?: ownSuite(name);
     }
     return origSuite(self, cmd, name);
 }
@@ -633,6 +653,284 @@ static void rebindImage(const struct mach_header *mh, intptr_t slide) {
     }
 }
 
+// ---- B425: what the app keeps for its groups, for its notification extensions ----
+//
+// An extension can't reach the app's container, where its groups' data is, only the profile's group, which every app
+// signed with that profile reaches too. So the app stays the only writer of its own place, and puts a copy of what a
+// notification extension can use (the groups' suites, small files; no databases) under ifizbox.shared/<its bundle ID>/
+// in the profile's first group. The extension brings that into a folder and suites in its own container, never over
+// what it wrote there later. The copy holds nothing of its own: a fresh install removes one an earlier install left,
+// and under another profile's groups it is made anew.
+
+#define SHARED_MAX_FILE (512 * 1024)
+#define SHARED_MAX_TOTAL (8 * 1024 * 1024)
+#define SHARED_MAX_ITEMS 5000
+
+static NSString *sharedGroup; // the profile's group the copy goes through; nil: the profile has none
+static NSString *appID;       // the app's bundle ID, in the app and in its extensions
+
+static NSURL *sharedRoot(void) {
+    if (!sharedGroup || !appID.length) return nil;
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSURL *u = origContainer ? origContainer(fm, @selector(containerURLForSecurityApplicationGroupIdentifier:), sharedGroup)
+                             : [fm containerURLForSecurityApplicationGroupIdentifier:sharedGroup];
+    return [u URLByAppendingPathComponent:[SHARED_FOLDER stringByAppendingPathComponent:appID] isDirectory:YES];
+}
+
+static NSString *sharedNotice(void) { return [@"ifizbox.groupfix." stringByAppendingString:appID]; }
+
+// A plist file's dictionary; *unreadable when there's a file that can't be read now (locked).
+static NSDictionary *readPlist(NSString *path, BOOL *unreadable) {
+    NSData *d = [NSData dataWithContentsOfFile:path];
+    if (!d) {
+        if (unreadable && [[NSFileManager defaultManager] fileExistsAtPath:path]) *unreadable = YES;
+        return nil;
+    }
+    id v = [NSPropertyListSerialization propertyListWithData:d options:0 format:NULL error:NULL];
+    return [v isKindOfClass:[NSDictionary class]] ? v : nil;
+}
+// Readable while the phone is locked, after its first unlock (before: only with `always`, for a file with no secrets).
+static BOOL writePlist(NSDictionary *v, NSString *path, BOOL always) {
+    NSData *d = [NSPropertyListSerialization dataWithPropertyList:v format:NSPropertyListBinaryFormat_v1_0 options:0 error:NULL];
+    return [d writeToFile:path options:NSDataWritingAtomic | (always ? NSDataWritingFileProtectionNone : NSDataWritingFileProtectionCompleteUntilFirstUserAuthentication) error:NULL];
+}
+
+static double changed(const struct stat *st) { return st->st_mtimespec.tv_sec + st->st_mtimespec.tv_nsec / 1e9; }
+
+static BOOL isDatabase(NSString *path) {
+    for (NSString *end in @[ @"-wal", @"-shm", @"-journal" ]) if ([path hasSuffix:end]) return YES;
+    char head[16] = "";
+    FILE *f = fopen(path.fileSystemRepresentation, "rb");
+    size_t n = f ? fread(head, 1, sizeof(head), f) : 0;
+    if (f) fclose(f);
+    return n == sizeof(head) && memcmp(head, "SQLite format 3", 16) == 0;
+}
+
+// Brings `to` up to date with `from` (small files; never a database, which another process may have open). `had`:
+// what it brought before, path -> its change time. A file that changed or went away in `to` since is left as it is
+// there, until `from` has a newer one. Returns how many files changed.
+static NSUInteger updateFiles(NSString *from, NSString *to, NSMutableDictionary<NSString *, NSNumber *> *had) {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    if (![fm contentsOfDirectoryAtPath:from error:NULL]) return 0;
+    NSUInteger items = 0, done = 0;
+    off_t total = 0;
+    BOOL whole = YES;
+    NSMutableSet *seen = [NSMutableSet set];
+    NSDirectoryEnumerator *e = [fm enumeratorAtPath:from];
+    for (NSString *rel in e) {
+        @autoreleasepool {
+            NSString *src = [from stringByAppendingPathComponent:rel], *dest = [to stringByAppendingPathComponent:rel];
+            struct stat st, dst;
+            if (++items > SHARED_MAX_ITEMS) { whole = NO; break; }
+            if (lstat(src.fileSystemRepresentation, &st) != 0) continue;
+            if (S_ISDIR(st.st_mode)) {
+                if ([rel isEqualToString:@"Library/Caches"]) [e skipDescendants];
+                continue;
+            }
+            if (!S_ISREG(st.st_mode) || st.st_size > SHARED_MAX_FILE || [rel.lastPathComponent hasPrefix:@".ifizbox"]) continue;
+            if (total + st.st_size > SHARED_MAX_TOTAL) { whole = NO; continue; }
+            total += st.st_size;
+            NSNumber *was = had[rel];
+            if (was && fabs(was.doubleValue - changed(&st)) < 0.001) { [seen addObject:rel]; continue; }
+            if (isDatabase(src)) continue;
+            [seen addObject:rel];
+            if (lstat(dest.fileSystemRepresentation, &dst) == 0 && changed(&dst) > changed(&st)) continue;
+            NSString *tmp = [dest.stringByDeletingLastPathComponent stringByAppendingPathComponent:@".ifizbox-copy"];
+            [fm createDirectoryAtPath:dest.stringByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:NULL];
+            [fm removeItemAtPath:tmp error:NULL];
+            if (![fm copyItemAtPath:src toPath:tmp error:NULL]) continue; // locked now: the next time
+            [fm setAttributes:@{ NSFileProtectionKey: NSFileProtectionCompleteUntilFirstUserAuthentication } ofItemAtPath:tmp error:NULL];
+            if (rename(tmp.fileSystemRepresentation, dest.fileSystemRepresentation) != 0) { [fm removeItemAtPath:tmp error:NULL]; continue; }
+            had[rel] = @(changed(&st));
+            done++;
+        }
+    }
+    if (!whole) return done;
+    for (NSString *rel in had.allKeys) { // gone from `from`
+        if ([seen containsObject:rel]) continue;
+        NSString *dest = [to stringByAppendingPathComponent:rel];
+        struct stat dst;
+        if (lstat(dest.fileSystemRepresentation, &dst) == 0 && fabs(changed(&dst) - had[rel].doubleValue) < 0.001) {
+            [fm removeItemAtPath:dest error:NULL];
+            done++;
+        }
+        [had removeObjectForKey:rel];
+    }
+    return done;
+}
+
+static NSMutableDictionary *editable(NSDictionary *d) { return [d isKindOfClass:[NSDictionary class]] ? [d mutableCopy] : [NSMutableDictionary dictionary]; }
+
+static NSString *suiteCopy(NSURL *root, NSString *group) {
+    return [root URLByAppendingPathComponent:[@"suites" stringByAppendingPathComponent:[group stringByAppendingString:@".plist"]]].path;
+}
+static NSString *filesCopy(NSURL *root, NSString *group) {
+    return [root URLByAppendingPathComponent:[@"files" stringByAppendingPathComponent:group]].path;
+}
+static BOOL plainName(id group) {
+    return [group isKindOfClass:[NSString class]] && [group length] && ![group containsString:@"/"] && ![group hasPrefix:@"."];
+}
+
+// The app: puts the copy out (on shareQueue).
+static void shareOut(void) {
+    NSURL *root = sharedRoot();
+    if (!root) return;
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *statePath = [root URLByAppendingPathComponent:@"state.plist"].path;
+    NSString *recordPath = [NSHomeDirectory() stringByAppendingPathComponent:@"Library/ifizbox-groupfix-shared.plist"];
+    BOOL unreadable = NO;
+    NSDictionary *was = readPlist(recordPath, &unreadable);
+    if (unreadable) return;
+    NSMutableDictionary *record = editable(was);
+    // this install's first copy, or the first through this group: what is there isn't this install's. `seed`: the
+    // extension may bring in once what it kept without this fix (an app that ran before only).
+    if (!was || ![record[@"group"] isEqual:sharedGroup]) [fm removeItemAtPath:root.path error:NULL];
+    if (!was) record[@"seed"] = @(ranBeforeLaunch);
+    if (![fm fileExistsAtPath:statePath]) [record removeObjectForKey:@"files"];
+    record[@"group"] = sharedGroup;
+    [fm createDirectoryAtURL:[root URLByAppendingPathComponent:@"suites"] withIntermediateDirectories:YES attributes:nil error:NULL];
+    if (!writePlist(record, recordPath, YES)) return;
+    NSUInteger news = 0;
+    NSMutableDictionary *files = editable(record[@"files"]);
+    for (NSString *group in groups) {
+        if (target || !plainName(group)) continue;
+        CFStringRef n = (__bridge CFStringRef)[@"ifizbox.appgroup." stringByAppendingString:group];
+        NSMutableDictionary *now = editable(CFBridgingRelease(CFPreferencesCopyMultiple(NULL, n, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)));
+        [now removeObjectForKey:@"ifizbox.groupfix.copied"];
+        // an empty one may be one that can't be read yet (before the first unlock): the copy stays as it is
+        if (now.count && ![readPlist(suiteCopy(root, group), NULL) isEqual:now] && writePlist(now, suiteCopy(root, group), NO)) news++;
+        NSMutableDictionary *had = editable(files[group]);
+        news += updateFiles([NSHomeDirectory() stringByAppendingPathComponent:[@"Library/AppGroups" stringByAppendingPathComponent:group]],
+                            filesCopy(root, group), had);
+        files[group] = had;
+    }
+    if (![record[@"files"] isEqual:files]) {
+        record[@"files"] = files;
+        writePlist(record, recordPath, YES);
+    }
+    NSDictionary *state = @{ @"pinned": @(pinned), @"seed": record[@"seed"] ?: @NO };
+    if (![readPlist(statePath, NULL) isEqual:state] && writePlist(state, statePath, YES)) news++;
+    if (news) notify_post(sharedNotice().UTF8String);
+}
+
+static dispatch_queue_t shareQueue;
+
+// Soon, once for a burst of changes; `now`: the app goes to the background, and gets the time to finish.
+static void shareSoon(BOOL now) {
+    static atomic_bool waiting;
+    if (now) {
+        [[NSProcessInfo processInfo] performExpiringActivityWithReason:@"ifizbox.groupfix" usingBlock:^(BOOL expired) {
+            if (!expired) dispatch_sync(shareQueue, ^{ @autoreleasepool { shareOut(); } });
+        }];
+        return;
+    }
+    if (atomic_exchange(&waiting, true)) return;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), shareQueue, ^{
+        @autoreleasepool { atomic_store(&waiting, false); shareOut(); }
+    });
+}
+
+static void shareInit(void) {
+    if (!sharedGroup) return;
+    shareQueue = dispatch_queue_create("ifizbox.groupfix.share", dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_UTILITY, 0));
+    NSNotificationCenter *c = [NSNotificationCenter defaultCenter];
+    [c addObserverForName:NSUserDefaultsDidChangeNotification object:nil queue:nil usingBlock:^(NSNotification *n) { (void)n; shareSoon(NO); }];
+    [c addObserverForName:@"UIApplicationDidEnterBackgroundNotification" object:nil queue:nil usingBlock:^(NSNotification *n) { (void)n; shareSoon(YES); }];
+    shareSoon(NO);
+}
+
+static NSString *extensionFolder(NSString *group) {
+    return [NSHomeDirectory() stringByAppendingPathComponent:[@"Library/AppGroups" stringByAppendingPathComponent:group]];
+}
+
+// The extension: brings the copy into its own container. The log's words for it.
+static NSString *shareIn(void) {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *recordPath = [NSHomeDirectory() stringByAppendingPathComponent:@"Library/ifizbox-groupfix-shared.plist"];
+    BOOL unreadable = NO;
+    NSDictionary *was = readPlist(recordPath, &unreadable);
+    if (was || unreadable) extensionReady = YES;
+    if (unreadable) return @"own record not readable now";
+    NSURL *root = sharedRoot();
+    NSDictionary *state = root ? readPlist([root URLByAppendingPathComponent:@"state.plist"].path, NULL) : nil;
+    if (!state) return root ? @"the app has put nothing out" : @"no profile group";
+    extensionReady = YES;
+    if (isolate && [state[@"pinned"] isEqual:@YES]) pinned = YES;
+    [fm createDirectoryAtPath:recordPath.stringByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:NULL];
+    NSMutableDictionary *record = editable(was), *suites = editable(record[@"suites"]), *files = editable(record[@"files"]);
+    NSMutableArray *words = [NSMutableArray array];
+    for (NSString *group in groups) {
+        if (target || !plainName(group)) continue;
+        NSString *name = [@"ifizbox.appgroup." stringByAppendingString:group], *own = extensionFolder(group);
+        CFStringRef n = (__bridge CFStringRef)name;
+        [fm createDirectoryAtPath:[own stringByAppendingPathComponent:@"Library/Preferences"] withIntermediateDirectories:YES attributes:nil error:NULL];
+        NSDictionary *app = readPlist(suiteCopy(root, group), NULL), *last = editable(suites[group]);
+        NSUInteger set = 0, gone = 0;
+        if (app) {
+            NSMutableDictionary *add = [NSMutableDictionary dictionary];
+            for (NSString *k in app) if (![last[k] isEqual:app[k]]) add[k] = app[k];
+            NSMutableArray *drop = [NSMutableArray array];
+            for (NSString *k in last) if (!app[k]) [drop addObject:k];
+            set = add.count;
+            gone = drop.count;
+            if (set || gone) {
+                CFPreferencesSetMultiple((__bridge CFDictionaryRef)add, (__bridge CFArrayRef)drop, n, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+                if (CFPreferencesSynchronize(n, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)) suites[group] = app;
+            }
+        }
+        NSMutableDictionary *had = editable(files[group]);
+        NSUInteger changedFiles = updateFiles(filesCopy(root, group), own, had);
+        files[group] = had;
+        // once: what the extension kept for the group without this fix (a tweak's own shim), after the app's, never over it
+        NSURL *shim = !was && [state[@"seed"] isEqual:@YES] && origContainer
+            ? origContainer(fm, @selector(containerURLForSecurityApplicationGroupIdentifier:), group) : nil;
+        if (shim) {
+            copyMissing(shim, [NSURL fileURLWithPath:own isDirectory:YES], @"");
+            NSDictionary *old = readPlist([shim URLByAppendingPathComponent:[NSString stringWithFormat:@"Library/Preferences/%@.plist", group]].path, NULL);
+            NSDictionary *have = CFBridgingRelease(CFPreferencesCopyMultiple(NULL, n, kCFPreferencesCurrentUser, kCFPreferencesAnyHost));
+            NSMutableDictionary *add = editable(old);
+            [add removeObjectsForKeys:have.allKeys ?: @[]];
+            [add removeObjectsForKeys:app.allKeys ?: @[]];
+            if (add.count) CFPreferencesSetMultiple((__bridge CFDictionaryRef)add, NULL, n, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+            CFPreferencesSynchronize(n, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+        }
+        [words addObject:[NSString stringWithFormat:@"%@ suite %lu of the app's, %lu new, %lu removed; %lu files, %lu changed%@", group, (unsigned long)app.count,
+            (unsigned long)set, (unsigned long)gone, (unsigned long)had.count, (unsigned long)changedFiles, shim ? @"; its earlier data brought in" : @""]];
+    }
+    record[@"suites"] = suites;
+    record[@"files"] = files;
+    if (![record isEqual:was]) writePlist(record, recordPath, NO);
+    return words.count ? [words componentsJoinedByString:@"; "] : @"no groups";
+}
+
+static void extensionInit(void) {
+    inExtension = YES;
+    // a password query names the app's group only where this process has it
+    NSArray *kc = entitlement(@"keychain-access-groups");
+    if (isolate && !([kc isKindOfClass:[NSArray class]] && [kc containsObject:(__bridge id)isolate])) isolate = NULL;
+    if (groups.count) {
+        swizzle([NSFileManager class], @selector(containerURLForSecurityApplicationGroupIdentifier:), (IMP)fixContainer, (IMP *)&origContainer);
+        swizzle([NSUserDefaults class], @selector(initWithSuiteName:), (IMP)fixSuite, (IMP *)&origSuite);
+    }
+    NSString *in = shareIn();
+    if (keychainStrip || isolate) _dyld_register_func_for_add_image(rebindImage);
+    if (appID.length) {
+        int token;
+        notify_register_dispatch(sharedNotice().UTF8String, &token, dispatch_queue_create("ifizbox.groupfix.share", DISPATCH_QUEUE_SERIAL), ^(int t) {
+            (void)t;
+            @autoreleasepool { shareIn(); }
+        });
+    }
+    NSString *line = [NSString stringWithFormat:@"%@ extension %@ of %@; %@; keychain groups %@; passwords %@; pinned %@",
+        [[NSISO8601DateFormatter new] stringFromDate:[NSDate date]], [NSBundle mainBundle].bundleIdentifier, appID, in,
+        [kc isKindOfClass:[NSArray class]] ? [kc componentsJoinedByString:@", "] : @"none", itemCounts(kSecClassGenericPassword), pinned ? @"yes" : @"no"];
+    logLaunch(line);
+    // the app's container can't be reached: the last start, beside the copy
+    NSURL *root = extensionReady ? sharedRoot() : nil;
+    if (root) [[line dataUsingEncoding:NSUTF8StringEncoding] writeToURL:[root URLByAppendingPathComponent:@"extension.log"]
+                  options:NSDataWritingAtomic | NSDataWritingFileProtectionNone error:NULL];
+}
+
 __attribute__((constructor)) static void groupfixInit(void) {
     @autoreleasepool {
         findRealSecItem();
@@ -644,6 +942,17 @@ __attribute__((constructor)) static void groupfixInit(void) {
         groups = [NSSet setWithArray:g];
         NSString *t = c[@"target"];
         target = [t isKindOfClass:[NSString class]] && t.length ? t : nil;
+        // B425
+        NSString *sh = c[@"shared"];
+        sharedGroup = [sh isKindOfClass:[NSString class]] && sh.length ? sh : nil;
+        appID = [[NSDictionary dictionaryWithContentsOfFile:[dir.stringByDeletingLastPathComponent stringByAppendingPathComponent:@"Info.plist"]][@"CFBundleIdentifier"] copy];
+        if ([[NSBundle mainBundle].bundlePath hasSuffix:@".appex"]) {
+            NSString *iso = c[@"isolate"];
+            keychainStrip = [c[@"keychain"] boolValue];
+            if ([iso isKindOfClass:[NSString class]] && iso.length) isolate = CFBridgingRetain(iso);
+            extensionInit();
+            return;
+        }
         BOOL ownBefore = appRanBefore(); // before anything below writes or changes a file
         NSString *protection = lowerProtection();
         CFArrayRef keys = CFPreferencesCopyKeyList(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
@@ -711,6 +1020,8 @@ __attribute__((constructor)) static void groupfixInit(void) {
                 broughtIn = nil;
             }
         }
+        ranBeforeLaunch = ownBefore;
+        shareInit(); // B425
         NSDictionary *info = [NSBundle mainBundle].infoDictionary;
         NSISO8601DateFormatter *iso8601 = [NSISO8601DateFormatter new];
         NSArray *kc = entitlement(@"keychain-access-groups");

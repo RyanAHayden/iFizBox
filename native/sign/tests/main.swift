@@ -875,7 +875,7 @@ test("B211: group fix") {
     let mine = ["com.apple.security.application-groups": ["group.com.me.box"]]
     // B227: to the app's own folder whatever the profile has; the older rule's group (the profile's first) as legacy
     check(GroupFix.plan(original: insta, profile: mine) == GroupFix.Plan(groups: ["group.com.burbn.instagram"], target: "", keychain: true,
-                                                                         legacy: "group.com.me.box"), "to the app's own folder, legacy copied")
+                                                                         legacy: "group.com.me.box", shared: "group.com.me.box"), "to the app's own folder, legacy copied")
     let was = try PropertyListSerialization.data(fromPropertyList: ["groups": ["group.com.burbn.instagram"], "target": "group.com.me.box", "keychain": true],
                                                  format: .xml, options: 0)
     check(GroupFix.plan(original: insta, profile: mine, previous: was)?.target == "group.com.me.box", "an earlier sign's profile group stays")
@@ -905,7 +905,7 @@ test("B211: group fix") {
         "; passwords kept in T.a, the shared groups' copied in once if the app ran before"), "B327: the log line names isolate")
     // B327: the sign log names the whole config, or why there is none
     check(GroupFix.logLine(GroupFix.plan(original: insta, profile: mine))
-          == "Group fix: group.com.burbn.instagram -> the app's own folder; keychain groups stripped; group.com.me.box copied in once if the app ran before",
+          == "Group fix: group.com.burbn.instagram -> the app's own folder; keychain groups stripped; group.com.me.box copied in once if the app ran before; shared with its notification extensions through group.com.me.box",
           "\(GroupFix.logLine(GroupFix.plan(original: insta, profile: mine)))")
     check(GroupFix.logLine(nil) == "Group fix: none (the original signature names no app groups or keychain groups)", "no fix")
     check(Profile.keychainLine(["application-identifier": "T.com.me.sideload", "keychain-access-groups": ["T.com.burbn.instagram", "T.com.me.sideload"]])
@@ -957,6 +957,57 @@ test("B211: group fix") {
     let config = try PropertyListSerialization.propertyList(from: f[a + GroupFix.configPath]!, format: nil) as? [String: Any]
     check(config?["groups"] as? [String] == ["group.com.burbn.instagram"] && config?["target"] as? String == "" && config?["keychain"] as? Bool == true, "\(String(describing: config))")
     check(signer.options.tweaks == nil, "the user's options stay without it")
+
+    // B425: a notification extension gets the fix from the app's Frameworks/, and no other extension does
+    let wild = ["com.apple.security.application-groups": ["group.*", "group.x.1", "group.x.2"]]
+    let sp = GroupFix.plan(original: insta, profile: wild)
+    check(sp?.shared == "group.x.1" && sp?.target == "", "\(String(describing: sp))")
+    check(GroupFix.plan(original: insta, profile: [:])?.shared == nil, "a profile with no groups")
+    check(GroupFix.plan(original: insta, profile: mine, previous: was)?.shared == "group.com.me.box", "an earlier sign's group")
+    let sc = try PropertyListSerialization.propertyList(from: GroupFix.adding(sp!, dylib: Data([1]), to: nil).files[1].data, format: nil) as? [String: Any]
+    check(sc?["shared"] as? String == "group.x.1", "the config carries shared")
+    check(GroupFix.isNotificationExtension(["NSExtension": ["NSExtensionPointIdentifier": "com.apple.usernotifications.service"]]), "service")
+    check(!GroupFix.isNotificationExtension(["NSExtension": ["NSExtensionPointIdentifier": "com.apple.share-services"]]), "share")
+
+    // signed with a profile that has a group: the executables of the app and of its notification extension load the fix
+    var grouped = try fixture("profile.mobileprovision")
+    let at = grouped.range(of: Data("<key>application-identifier</key>".utf8))!.lowerBound
+    grouped.insert(contentsOf: Data("<key>com.apple.security.application-groups</key><array><string>group.x.1</string></array>".utf8), at: at)
+    let gp = try Profile(grouped)
+    for (point, gets) in [("com.apple.usernotifications.service", true), ("com.apple.share-services", false)] {
+        let src = try ZipReader(url: try ipa("ext-\(gets).ipa", id: nil))
+        let url = work.appendingPathComponent("ext-in-\(gets).ipa"), signedURL = work.appendingPathComponent("ext-out-\(gets).ipa")
+        let w = try ZipWriter(url: url)
+        for e in src.entries {
+            var d = try src.data(e)
+            if e.name == "Payload/Fixture.app/PlugIns/Share.appex/Info.plist" {
+                var pl = try PropertyListSerialization.propertyList(from: d, format: nil) as! [String: Any]
+                pl["NSExtension"] = ["NSExtensionPointIdentifier": point]
+                d = try PropertyListSerialization.data(fromPropertyList: pl, format: .xml, options: 0)
+            }
+            try w.add(e.name, d, mode: e.unixMode)
+        }
+        w.close()
+        let s = IPASigner(profile: gp, identity: identity)
+        var lines = [String]()
+        s.log = { lines.append($0) }
+        _ = try s.sign(url, to: signedURL)
+        // signed again, the extension still loads it once
+        let again = work.appendingPathComponent("ext-again-\(gets).ipa")
+        _ = try IPASigner(profile: gp, identity: identity).sign(signedURL, to: again)
+        for u in [signedURL, again] {
+            let g = try entries(u)
+            let exe = g["Payload/Fixture.app/PlugIns/Share.appex/Share"]!
+            check(MachOEdit.dylibs(exe).filter { $0 == GroupFix.inject }.count == (gets ? 1 : 0), "\(point): \(MachOEdit.dylibs(exe))")
+            check(MachOEdit.rpaths(exe).contains(GroupFix.extensionRpath) == gets, "\(point): \(MachOEdit.rpaths(exe))")
+            let c = try PropertyListSerialization.propertyList(from: g[a + GroupFix.configPath]!, format: nil) as? [String: Any]
+            check(c?["shared"] as? String == "group.x.1" && c?["target"] as? String == "", "\(String(describing: c))")
+            let b = "Payload/Fixture.app/PlugIns/Share.appex/"
+            try verifySigned(exe, name: "ext-fix", expectIdent: "dev.ifizbox.fixture.share", team: team,
+                             info: g[b + "Info.plist"], resources: g[b + "_CodeSignature/CodeResources"], ents: true)
+        }
+        check(lines.contains("Group fix in PlugIns/Share.appex") == gets, "\(lines)")
+    }
 
     let ownSigner = IPASigner(profile: p, identity: identity)
     var ownLogged = [String]()

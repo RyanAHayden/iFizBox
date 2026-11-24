@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
-import { runSignJob, putTweaks } from "./websign-job.js";
+import { runSignJob, putTweaks, fixExtensions } from "./websign-job.js";
 import { prepareTweaks, dylibsOf, loadCommands, LC, RPATH } from "./core/tweaks.js";
 import { readZip } from "./core/unpack.js";
 import { GROUPFIX } from "./core/groupfix.js";
@@ -95,4 +95,21 @@ test("B211: an app whose original signature names keychain groups gets the group
   const own = await runSignJob(createZsign, { ...base, ipa: first.ipa, appBundleId: "com.ryha.ifizbox" });
   assert.equal(own.injected, undefined);
   assert.equal(seen.dylib, null);
+});
+
+test("B425: the app's notification extensions load the group fix from the app's Frameworks/; other extensions don't", () => {
+  const app = new Uint8Array(readFileSync(new URL("./core/fixtures/tweaks/app.macho", import.meta.url)));
+  const ext = (point) => ({ CFBundleExecutable: "E", NSExtension: { NSExtensionPointIdentifier: point } });
+  const plists = { "/a/PlugIns/N.appex/Info.plist": ext("com.apple.usernotifications.service"),
+    "/a/PlugIns/S.appex/Info.plist": ext("com.apple.share-services"), "/a/PlugIns/B.appex/Info.plist": ext("com.apple.usernotifications.content-extension") };
+  const files = { "/a/PlugIns/N.appex/E": app, "/a/PlugIns/S.appex/E": app, "/a/PlugIns/B.appex/E": new Uint8Array([1, 2, 3]) };
+  const FS = { readdir: (p) => { if (p !== "/a/PlugIns") throw new Error("ENOENT"); return [".", "..", "N.appex", "S.appex", "B.appex"]; },
+    readFile: (p) => files[p], writeFile: (p, d) => { files[p] = d; } };
+  const run = () => fixExtensions(FS, "/a", (p) => plists[p]);
+  assert.deepEqual(run(), ["Group fix in PlugIns/N.appex", "No group fix in PlugIns/B.appex: its executable has no room for it"]);
+  run(); // signed again: once only
+  const cmds = loadCommands(files["/a/PlugIns/N.appex/E"]);
+  assert.equal(cmds.filter((c) => c.cmd === LC.LOAD_WEAK_DYLIB && c.name === GROUPFIX.inject).length, 1);
+  assert.ok(cmds.some((c) => c.name === GROUPFIX.extensionRpath));
+  assert.equal(files["/a/PlugIns/S.appex/E"], app);
 });

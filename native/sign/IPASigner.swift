@@ -248,6 +248,7 @@ final class IPASigner {
         var groupFix: String? = nil // B259: kept in the record's SignerStamp
         // B327: every sign logs the keychain groups the app gets and the group fix it got (or why none), so a report of
         // an app that lost its data can be read from Console Logs
+        var sharedFix = false // B425: the app's notification extensions get the group fix too
         let signedBefore = files[appDir + GroupFix.configPath] != nil // B413: before the fix goes in below
         let appEnts = profile.entitlements(for: entID, keptID: keep ? newID : nil)
         log(Profile.keychainLine(appEnts))
@@ -260,6 +261,7 @@ final class IPASigner {
             if let plan = plan, let dylib = GroupFix.dylib() {
                 tweaks = try GroupFix.adding(plan, dylib: dylib, to: tweaks)
                 groupFix = SignerStamp.hash(dylib)
+                sharedFix = plan.shared != nil
                 log(GroupFix.logLine(plan))
                 if let lost = plan.lost { log("Warning: this profile has no \(lost), where the app kept its shared data until now; iOS keeps that folder from it") }
             } else {
@@ -343,6 +345,15 @@ final class IPASigner {
                 if dir == appDir, let t = tweaks, !t.inject.isEmpty { // F288
                     (data, injected) = try MachOEdit.inject(data, t.inject)
                     for i in injected { log("Injected \(i)") }
+                }
+                // B425: one with no room for the load command is left as it was
+                if sharedFix, dir.hasSuffix(".appex/"), dir.dropFirst(appDir.count).split(separator: "/").count == 2,
+                   GroupFix.isNotificationExtension(b.plist) {
+                    let name = dir.dropFirst(appDir.count).dropLast()
+                    do {
+                        data = try MachOEdit.inject(data, [GroupFix.inject], rpath: GroupFix.extensionRpath).0
+                        log("Group fix in \(name)")
+                    } catch { log("No group fix in \(name): its executable has no room for it") }
                 }
                 let params = CodeSignParams(identifier: id, team: profile.team,
                                             entitlements: isApp ? profile.entitlements(for: keep || id == newID ? entID : id, keptID: keep ? newID : nil,
