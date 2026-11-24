@@ -5,6 +5,7 @@
 //                      website adds to iFizBox's own IPA as it signs it (F93, Install iFizBox App's bring). Imported
 //                      into the Keychain on the first launch that finds it, unless the Keychain already holds one;
 //                      the bundle is read-only, so its digest is remembered and the same file is never looked at again.
+//                      B420: with one held, a newer profile for the same certificate replaces the held profile, once.
 //   IncomingLink       which ifizbox:// links the shell hands to the page: ifizbox://import?d=… (sources and settings),
 //                      ifizbox://install?url=… (F89: the website's Open in iFizBox on an app page), ifizbox://myipas (F77),
 //                      ifizbox://add?url=… (N8's Add Source intent), ifizbox://shared?route=… (N9), ifizbox://package?id=… (F96:
@@ -32,6 +33,36 @@ enum BundledIdentity {
     // Import this file? Only when it is new (not the one already looked at) and the Keychain holds no identity.
     static func shouldImport(digest: String, seen: String?, hasIdentity: Bool) -> Bool {
         !hasIdentity && digest != seen
+    }
+
+    // ---- B420: an update's file with a newer profile for the certificate already held
+
+    // UserDefaults: the digest of the file whose profile was last compared. A key of its own: a file that seenKey
+    // marked before this rule existed still gets its one look.
+    static let profileSeenKey = "ifizbox.bundledProfile"
+
+    static func shouldCompareProfile(digest: String, seen: String?, hasIdentity: Bool) -> Bool {
+        hasIdentity && digest != seen
+    }
+
+    // Take the file's profile in place of the held one? Only a strictly newer profile of the same team and App ID, for
+    // the certificate held (the file's .p12 holds it too, and the profile lists it), that can sign now and isn't known
+    // to leave this iPhone out. In doubt (a date missing), what is held stays.
+    static func replacesProfile(_ new: Profile, held: Profile, certificate: Data, fileCertificate: Data?,
+                                phone: DeviceCheck.Phone?, now: Date = Date()) -> Bool {
+        guard fileCertificate == certificate, new.team == held.team, new.appID == held.appID, !new.appID.isEmpty,
+              let made = new.created, let was = held.created, made > was, new.expires != nil,
+              new.problem(with: certificate, now: now) == nil, new.devices != 0 else { return false }
+        return DeviceCheck.check(profile: new.data, phone: phone).state != .out
+    }
+
+    // The log's line: which profile replaced which.
+    static func replacedLine(_ new: Profile, held: Profile) -> String {
+        let iso = ISO8601DateFormatter()
+        func words(_ p: Profile) -> String {
+            "\"\(p.name)\" (made \(p.created.map(iso.string(from:)) ?? "?"), expires \(p.expires.map(iso.string(from:)) ?? "?"))"
+        }
+        return "the profile inside the app \(words(new)) replaced \(words(held))"
     }
 }
 

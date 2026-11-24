@@ -107,6 +107,7 @@ enum SignBridge {
     // Keychain already holds an identity or this same file was looked at before (its digest in UserDefaults; the
     // bundle is read-only, so the file stays until the next update replaces it). Also clears the old Local Install's
     // leftovers. Never throws; a file that doesn't import is remembered too, so it isn't tried on every launch.
+    // B420: with an identity held, the file's newer profile for the same certificate is taken (refreshBundledProfile).
     static func importBundled() {
         guard AppMode.current == .sideload else { return }
         queue.async {
@@ -116,16 +117,41 @@ enum SignBridge {
                   let data = try? Data(contentsOf: url) else { return }
             let digest = BundledIdentity.digest(data)
             let seen = UserDefaults.standard.string(forKey: BundledIdentity.seenKey)
-            guard BundledIdentity.shouldImport(digest: digest, seen: seen, hasIdentity: SignStore.identity() != nil) else { return }
+            let hasIdentity = SignStore.identity() != nil
+            guard BundledIdentity.shouldImport(digest: digest, seen: seen, hasIdentity: hasIdentity) else {
+                return refreshBundledProfile(data, digest: digest, hasIdentity: hasIdentity)
+            }
             UserDefaults.standard.set(digest, forKey: BundledIdentity.seenKey)
             guard let c = BundledIdentity.parse(data) else { return }
             do {
                 _ = try SignStore.importIdentity(p12: c.p12, password: c.password, profile: c.profile)
                 try confirmImport(p12: c.p12, password: c.password)
+                UserDefaults.standard.set(digest, forKey: BundledIdentity.profileSeenKey) // B420: its profile is the one held
             } catch {
                 NSLog("\(Brand.name): the certificate inside the app didn't import: %@", text(error))
             }
         }
+    }
+
+    // B420: an identity is held, so only the file's profile can be taken (BundledIdentity.replacesProfile). The file
+    // counts as looked at for shouldImport too: a certificate removed afterwards doesn't come back from it. While the
+    // held profile can't be read, or the new one can't be written, nothing is marked and the next launch looks again.
+    private static func refreshBundledProfile(_ data: Data, digest: String, hasIdentity: Bool) {
+        let defaults = UserDefaults.standard
+        guard BundledIdentity.shouldCompareProfile(digest: digest, seen: defaults.string(forKey: BundledIdentity.profileSeenKey),
+                                                   hasIdentity: hasIdentity),
+              let id = SignStore.identity(), let der = SignStore.certificateDER(id), let held = SignStore.profile() else { return }
+        if let c = BundledIdentity.parse(data), let new = try? Profile(c.profile),
+           BundledIdentity.replacesProfile(new, held: held, certificate: der,
+                                           fileCertificate: SignStore.certificateDER(p12: c.p12, password: c.password),
+                                           phone: PhoneID.current()) {
+            do { try SignStore.replaceProfile(new, line: BundledIdentity.replacedLine(new, held: held)) } catch {
+                NSLog("\(Brand.name): the profile inside the app wasn't kept: %@", text(error))
+                return
+            }
+        }
+        defaults.set(digest, forKey: BundledIdentity.seenKey)
+        defaults.set(digest, forKey: BundledIdentity.profileSeenKey)
     }
 
     // ---- F73: the certificate for the Signing Server

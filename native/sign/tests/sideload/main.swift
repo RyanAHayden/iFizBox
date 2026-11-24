@@ -331,6 +331,54 @@ test("bundled identity: first launch imports, once") {
     check(BundledIdentity.shouldImport(digest: "other", seen: d, hasIdentity: false), "an update's new file, empty Keychain: import")
 }
 
+// B420: an update's file brings a newer profile while the Keychain holds its certificate.
+test("bundled identity: a newer profile for the held certificate") {
+    let now = Date(), hour: TimeInterval = 3600, here = "00008110-000000000000000A"
+    func profile(_ name: String = "p", made: TimeInterval?, expires: TimeInterval = 100, team: String = "TEAM123456", app: String = "*",
+                 certs: [Data] = [cert], devices: [String]? = [here], all: Bool = false) throws -> Profile {
+        var d: [String: Any] = ["Name": name, "TeamIdentifier": [team], "ExpirationDate": now.addingTimeInterval(expires * hour),
+                                "Entitlements": ["application-identifier": "\(team).\(app)"], "DeveloperCertificates": certs]
+        if let m = made { d["CreationDate"] = now.addingTimeInterval(m * hour) }
+        if let u = devices { d["ProvisionedDevices"] = u }
+        if all { d["ProvisionsAllDevices"] = true }
+        return try Profile(PropertyListSerialization.data(fromPropertyList: d, format: .xml, options: 0))
+    }
+    let held = try profile("held", made: -48)
+    func takes(_ p: Profile, held h: Profile? = nil, file: Data? = cert, phone: DeviceCheck.Phone? = .udid(here)) -> Bool {
+        BundledIdentity.replacesProfile(p, held: h ?? held, certificate: cert, fileCertificate: file, phone: phone, now: now)
+    }
+    let new = try profile("new", made: -24)
+    check(takes(new), "newer, same certificate, team and App ID, lists this iPhone: taken")
+    check(takes(new, held: try profile(made: -48, expires: -1)), "the held one expired: taken")
+    check(try !takes(profile(made: -24, expires: -1)), "expired: kept")
+    check(try !takes(profile(made: -72)), "older: kept")
+    check(!takes(held), "the same one: kept")
+    check(try !takes(new, held: profile(made: -1)), "a newer one imported by hand: kept")
+    check(try !takes(profile(made: nil)) && !takes(new, held: profile(made: nil)), "a date missing: kept")
+    check(try !takes(profile(made: -24, team: "OTHER12345")), "another team: kept")
+    check(try !takes(profile(made: -24, app: "com.you.app")) && !takes(profile(made: -24, app: "com.you.*")), "another App ID: kept")
+    check(!takes(new, file: Data([1])) && !takes(new, file: nil), "the file's certificate is another, or can't be read: kept")
+    check(try !takes(profile(made: -24, certs: [Data([1])])), "the profile doesn't list the certificate: kept")
+    let gone = try profile(made: -24, devices: ["00008110-000000000000000B"])
+    check(!takes(gone), "leaves this iPhone out: kept")
+    check(takes(gone, phone: nil), "this iPhone unknown: taken")
+    check(try takes(profile(made: -24, devices: [here, "B"]), phone: .candidates([here, "B", "C"])), "one of several, some listed: taken")
+    check(!takes(gone, phone: .candidates([here, "C"])), "one of several, none listed: kept")
+    check(try takes(profile(made: -24, devices: nil, all: true)), "every device: taken")
+    check(try !takes(profile(made: -24, devices: nil)), "no device at all (App Store): kept")
+
+    check(BundledIdentity.shouldCompareProfile(digest: "d", seen: nil, hasIdentity: true), "marked by the old rule only: one look")
+    check(!BundledIdentity.shouldCompareProfile(digest: "d", seen: "d", hasIdentity: true), "looked at: not again")
+    check(BundledIdentity.shouldCompareProfile(digest: "e", seen: "d", hasIdentity: true), "an update's new file: a look")
+    check(!BundledIdentity.shouldCompareProfile(digest: "d", seen: nil, hasIdentity: false), "removed identity: nothing to compare")
+    check(BundledIdentity.profileSeenKey != BundledIdentity.seenKey, "a key of its own")
+
+    let iso = ISO8601DateFormatter()
+    check(BundledIdentity.replacedLine(new, held: held) == "the profile inside the app \"new\" (made \(iso.string(from: new.created!)), expires "
+          + "\(iso.string(from: new.expires!))) replaced \"held\" (made \(iso.string(from: held.created!)), expires \(iso.string(from: held.expires!)))",
+          "the log line: \(BundledIdentity.replacedLine(new, held: held))")
+}
+
 test("incoming ifizbox:// links") {
     check(IncomingLink.accepts(URL(string: "ifizbox://import?d=H4sI")!), "import")
     check(IncomingLink.accepts(URL(string: "ifizbox://install?url=https%3A%2F%2Fe.example%2Fa.ipa")!), "install (F89)")

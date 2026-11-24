@@ -84,6 +84,21 @@ enum SignStore {
         return SecCertificateCopyData(cert) as Data
     }
 
+    // The certificate in a .p12, without adding anything to the Keychain; nil when it doesn't open.
+    static func certificateDER(p12: Data, password: String) -> Data? {
+        var items: CFArray?
+        guard SecPKCS12Import(p12 as CFData, [kSecImportExportPassphrase as String: password] as CFDictionary, &items) == errSecSuccess,
+              let first = (items as? [[String: Any]])?.first, let ref = first[kSecImportItemIdentity as String] else { return nil }
+        return certificateDER(ref as! SecIdentity) // swiftlint:disable:this force_cast
+    }
+
+    // B420: another profile for the identity in use; the certificate and its key stay as they are.
+    static func replaceProfile(_ new: Profile, line: String) throws {
+        try new.data.write(to: profileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        writeKept(keepProfileAccount, new.data)
+        say("\(Brand.name): \(line)")
+    }
+
     static func profile() -> Profile? {
         _ = restored
         return (try? Data(contentsOf: profileURL)).flatMap { try? Profile($0) }
