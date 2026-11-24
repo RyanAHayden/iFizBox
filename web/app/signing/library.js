@@ -9,7 +9,7 @@
 //                                      Resolves "installed" | "offline" | false (an error, shown) | null (walkthrough)
 //                                      F241: with the Signing Server reachable the IPA page queues the file instead
 //                                      (screens/myipas.js queueLibraryInstall, prepareParams's `library` above); this
-//                                      stays the offline path and Sign (n)'s.
+//                                      stays the offline path (Sign (n)'s too, F416).
 import { phaseLabel, deviceError, HANDOFF } from "../core/signing.js";
 import { withKeep } from "../core/keepid.js";
 import { progressHUD } from "../nav/progress.js";
