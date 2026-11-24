@@ -40,7 +40,7 @@ class Due(unittest.TestCase):
     def test_once_per_queue(self):
         """Cleared before Shortcuts opens, with no start in between; due again only when Shortcuts wasn't opened."""
         back = self.part("case .back:", "private static func done()")
-        self.assertOrder(back, ["LocalVPN.withNoStart", "owed = false", "RestoreShortcutBridge.back()", "RestoreDue.stillDue(", "owed = true"])
+        self.assertOrder(back, ["LocalVPN.withNoStart", "RestoreDue.step(now()) == .back", "owed = false", "RestoreShortcutBridge.back()", "RestoreDue.stillDue(", "owed = true"])
         drop = self.part("case .drop:", "case .onReturn:")
         self.assertOrder(drop, ["LocalVPN.withNoStart", "RestoreDue.step(now()) == .drop", "owed = false"])
         look = self.part("static func look()")

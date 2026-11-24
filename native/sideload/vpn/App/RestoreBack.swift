@@ -69,6 +69,7 @@ enum RestoreBack {
         case .back:
             // under startLock: an install that starts now waits, so Set VPN never takes ours down
             let ran = LocalVPN.withNoStart { () -> Bool in
+                guard RestoreDue.step(now()) == .back else { return false } // the next app began, or the app was left, meanwhile
                 owed = false // before Shortcuts opens: an app killed meanwhile doesn't open it again
                 let error = RestoreShortcutBridge.back()
                 let active = CellularShortcutBridge.active()

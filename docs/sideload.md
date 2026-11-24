@@ -283,7 +283,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   Signing Server for that install or run only; Install Apps With stays This iPhone. The queue's fix row for a failed app
   reads `idevice.status` first, so a failure through the built-in VPN offers Fix and Use the Signing Server. In the install run's Log and install failure alerts, Fix opens Pairing, or
   Installation & Signing, which runs the check at once. Home's status slot shows Pair This iPhone (amber, opens Pairing) while This iPhone is chosen and `idevice.status` says it isn't paired, ahead of a Route Failure tile; a signing problem that stops every install still comes first.
-- **Quiet Pairing Check**: with This iPhone chosen and set up (paired, and its VPN tested), the sideload app checks the pairing in the background: 5 s after launch and 2 s after coming back, at most once every 24 h (`ifizbox.quietPairingCheck` holds when it last ran), and at each launch while a Route Failure is kept (skipped then, it runs on coming back). It runs `idevice.verify` and is skipped, without using up the day, while another VPN is up, on cellular, off Wi-Fi, while the built-in VPN is untested or already on, while an install or an app run is under way, while the app is away, or while a check, a test or the Pairing page is open, and always with Restore My VPN on (iOS would ask Allow each time). A pairing refusal, or every connection refused (`route_refused`), is tried again 3 s later and then kept as a Route Failure, which Home shows; a pass clears it. A retry that finds cellular keeps nothing. A timeout, a failed connect or a VPN that didn't start changes nothing. It never opens Pairing, never forgets a pairing and shows no alert; a check the user starts meanwhile waits for it, and its answer counts instead. Code: `core/installroute.js` `quietCheckDue` and `quietCheckAllowed`, `screens/installroute.js` `quietPairingCheck`.
+- **Quiet Pairing Check**: with This iPhone chosen and set up (paired, and its VPN tested), the sideload app checks the pairing in the background: 5 s after launch and 2 s after coming back, at most once every 24 h (`ifizbox.quietPairingCheck` holds when it last ran), and at each launch while a Route Failure is kept (skipped then, it runs on coming back). It runs `idevice.verify` and is skipped, without using up the day, while another VPN is up, on cellular, off Wi-Fi, while the built-in VPN is untested or already on, while an install or an app run is under way, while the app is away, or while a check, a test or the Pairing page is open, and always with Restore My VPN on, since its check would need a trip to Shortcuts. A pairing refusal, or every connection refused (`route_refused`), is tried again 3 s later and then kept as a Route Failure, which Home shows; a pass clears it. A retry that finds cellular keeps nothing. A timeout, a failed connect or a VPN that didn't start changes nothing. It never opens Pairing, never forgets a pairing and shows no alert; a check the user starts meanwhile waits for it, and its answer counts instead. Code: `core/installroute.js` `quietCheckDue` and `quietCheckAllowed`, `screens/installroute.js` `quietPairingCheck`.
 - **This iPhone with the built-in VPN** (`native/sideload/vpn/`): the sideload IPA carries its own packet tunnel,
   `PlugIns/iFizBoxVPN.appex` (`com.ryha.ifizbox.vpn`), the loopback idea of StosVPN: the phone is
   10.7.0.0 on the tunnel, only 10.7.0.1 is routed into it (no default route), and every packet is written back with
@@ -293,10 +293,10 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   `networkextension` entitlement); when the app's embedded profile lacks `packet-tunnel-provider`, This iPhone isn't offered: installs go through the Signing Server after the alert "No Network Extensions". `IDevice.Session` turns the VPN on just before it connects to iOS (`LocalVPN.begin`,
   saving the configuration the first time: iOS asks to allow it) and off 3 seconds after the last connection ends (under a background task, so an app that iOS suspends meanwhile
   still takes it down),
-  so a queue of installs or a reconnect finds it on. A queue holds through an install's reconnects, however long the pauses between them (`installBegan` and `installEnded` in `IDevice.install`). The configuration is never On Demand. It is removed only with Restore My VPN on (below). Otherwise it
-  stays in Settings > VPN, only connected during installs, so iOS's "Add VPN Configurations" Allow comes once, unless it is removed.
+  so a queue of installs or a reconnect finds it on. A queue holds through an install's reconnects, however long the pauses between them (`installBegan` and `installEnded` in `IDevice.install`). The configuration is never On Demand. It is never removed, with Restore My VPN on or off (below), so it stays in
+  Settings > VPN, only connected during installs, and iOS's "Add VPN Configurations" Allow comes once.
   Setting up asks it: right after pairing (or importing a pairing file), the pairing page runs the same test as
-  Test Connection (`vpn.test`) before it says Paired. iOS runs one VPN at a time, so your VPN pauses for the install, and since ours keeps Settings > VPN's checkmark, that VPN stays off until you open Settings > VPN, even with Restore My VPN on (below).
+  Test Connection (`vpn.test`) before it says Paired. iOS runs one VPN at a time, so your VPN pauses for the install, and since ours keeps Settings > VPN's checkmark, that VPN stays off until you open Settings > VPN, or, with Restore My VPN on (below), until the Shortcut turns it back on after the queue.
   On cellular, iOS refuses these connections and starts no VPN without a network, but keeps one that is up. So before
   each connect, `IDevice.install` calls `LocalVPN.waitOffCellular`. The built-in VPN comes on while data is on, then the
   path is read again for 3 s (a short Wi-Fi drop isn't cellular). Only then does the install wait, its row reading
@@ -354,20 +354,22 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   it needs data between. Real cellular is not verified on a phone.
   `LocalVPN.begin` runs `up()`: it saves the configuration the first time (iOS asks to allow it) and connects it. The end
   takes our VPN down 3 seconds after the queue's last connection. The configuration is never On Demand. iOS runs one VPN at
-  a time, so while ours is on any other VPN is taken off, and `idevice.status`'s `vpn.otherVPN` says so. Nothing puts that VPN back by itself: iOS leaves it disabled, On Demand or not, until you open
+  a time, so while ours is on any other VPN is taken off, and `idevice.status`'s `vpn.otherVPN` says so. Without Restore My VPN, nothing puts that VPN back by itself: iOS leaves it disabled, On Demand or not, until you open
   Settings > VPN (measured on an iPhone 15 Pro, iOS 27.0; connecting it in its own app is not verified).
-  **Restore My VPN** is a kept setting, off by default, set with the switch on This iPhone's page (docs/settings.md). When it is on,
-  our configuration is removed whenever nothing uses it, whatever VPN was up before, so that VPN can come back, but removing
-  ours does not bring it back by itself: iOS leaves it disabled until you open Settings > VPN, which turns it on again. The check runs after the queue's last connection (once the
-  3 s linger is over and ours is disconnected, waiting up to 10 s), when the switch is turned on, at launch and on return to
-  the app, and when Allow is tapped after the 90 s save limit. Nothing is removed while an install or a check holds the VPN,
-  while an install is paused for the app or the network, or while an app is being downloaded, signed or installed (including
-  a Signing Server install until iOS has fetched it, at most 15 min); the check runs again every 5 s. While an install is
-  paused the VPN goes off, but the configuration stays until the install ends. A failed removal, or a tunnel that won't go
-  off, is retried 3 times 10 s apart, then at the next stop, return or launch (the retries are code only, not yet seen on a phone). The log lines "vpn: Restore My VPN: ..." say
-  what was decided and why. A background task's early end runs the removal off the main thread, at most 3 s. With the
-  setting off nothing is removed. The cost: the next install saves a new configuration, and iOS asks Allow again.
-  Bridge: `idevice.status`'s `vpn` is `{available, bundled, entitled, tested, on, cellular, wifi, otherVPN, restore, name}`,
+  **Restore My VPN** is a kept setting, off by default, set with the switch on This iPhone's page (docs/settings.md). Our configuration
+  is never removed, so it stays in Settings > VPN and iOS asks Allow once. With the switch on, the other VPN is brought back after the queue.
+  Before ours starts, if another VPN is up and one is remembered (a `restore.store` passed; `vpn.remembered` in `idevice.status`), it is
+  noted as owed (UserDefaults `ifizbox.vpn.backOwed`); with none remembered, nothing is owed and the log says so. After the queue's last
+  connection (the 3 s linger over, ours down, no install waiting and no app being downloaded, signed or installed, the app in front, a
+  network there), the Restore My VPN Shortcut's back run opens once, under the start lock, so an install that starts meanwhile waits.
+  Shortcuts shows for about 3-4 s and returns. A look that has to wait looks again every 2 s while the app is in front; if the app was
+  left or killed, it is done at its return or next launch. Owed is cleared before Shortcuts opens. Nothing runs when no other VPN was up,
+  none was remembered, another VPN came up or took Settings > VPN's checkmark meanwhile, iOS is below 16, or the bundle ID is not the
+  app's own. Success is judged by another VPN being up, not by Set VPN's error. A run that failed is not repeated; only `not_opened`,
+  `busy` and `vpn_on` are tried again. `not_stored` clears `remembered`. With the switch off nothing is brought back. The log lines
+  "vpn: Restore My VPN: ..." say what was decided and why. Code: `RestoreBack.swift` (the looks and the back run), `RestoreDue.swift`
+  (when a run is due).
+  Bridge: `idevice.status`'s `vpn` is `{available, bundled, entitled, tested, on, cellular, wifi, otherVPN, restore, remembered, name}`,
   `vpn.setRestore` `{on}` turns Restore My VPN on or off and answers the same status, and `vpn.test` runs the Set Up test.
   Cellular Installs bridge: `cellular.status` is `{available, bundled, added}`: whether the signed Shortcut is in this build
   and its last check passed. `cellular.add` opens the signed Shortcut (made by `tools/shortcuts/sign.sh`) in a share sheet,
@@ -400,7 +402,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   run, or one that ended under 10 s ago before its Shortcut did. Run failures: `not_opened`, `not_run`, `no_vpn` (Shortcuts
   found none), `not_stored`, `not_back`, `no_end`, `no_return` (`RestoreShortcut.Verdict`). All three are refused with
   `unavailable: …` in the jailbreak app, under another bundle ID and before iOS 16, and with `missing: …` while the signed file
-  is not in the build. No page calls them yet. Code: `RestoreShortcutBridge.swift`, `web/app/core/restoreshortcut.js`.
+  is not in the build. No page calls them yet; the app's own back run does (Restore My VPN above). Code: `RestoreShortcutBridge.swift`, `web/app/core/restoreshortcut.js`, `RestoreBack.swift`, `RestoreDue.swift`.
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`.
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and
