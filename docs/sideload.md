@@ -327,7 +327,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   takes our VPN down 3 seconds after the queue's last connection. The configuration is never On Demand. iOS runs one VPN at
   a time, so while ours is on any other VPN is taken off, and `idevice.status`'s `vpn.otherVPN` says so. Without Restore My VPN nothing puts that VPN back
   (whether one that relies on On Demand comes back by itself is not verified on a phone).
-  **Restore My VPN** is a kept setting, off by default. When it is on and another VPN was up as ours started (or our
+  **Restore My VPN** is a kept setting, off by default, set with the switch on This iPhone's page (docs/settings.md). When it is on and another VPN was up as ours started (or our
   configuration was removed less than 5 minutes ago, since On Demand may need 1 to 4 minutes to bring a VPN back), our
   configuration is removed after the queue's last connection, after the 3 s linger and once ours is disconnected. It is
   also removed when the VPN goes off because an install pauses with the app left. iOS then gives the other VPN its

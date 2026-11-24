@@ -66,8 +66,14 @@ async function status(native) { return (await readStatus(native)).st; }
 // F301: the last idevice.status answer, shown at once the next time a page draws (its rows spinning while it's read
 // again). Kept for this run of the app only: after a relaunch the VPN may well be another, so the first read waits.
 let lastStatus = null;
-export function rememberStatus(st) { if (st && typeof st === "object") { lastStatus = st; } }
-export function forgetStatus() { lastStatus = null; } // tests, and Forget Pairing
+// F412: a status read that began before a tap on Restore My VPN doesn't bring the old setting back (a read ends within TIMEOUTS.status)
+let restoreTap = null; // { on, at, was, sending }: the last tap; was = the setting before it, as last confirmed
+export function rememberStatus(st) {
+  if (!st || typeof st !== "object") return;
+  if (restoreTap && !restoreTap.sending && Date.now() - restoreTap.at > TIMEOUTS.status) restoreTap = null;
+  lastStatus = restoreTap && restoreShown(st) ? { ...st, vpn: { ...st.vpn, restore: restoreTap.on } } : st;
+}
+export function forgetStatus() { lastStatus = null; restoreTap = null; } // tests, and Forget Pairing
 export const cachedStatus = () => lastStatus;
 
 // B133: every step that waits on the phone, the network or the pairing shows iOS 6's activity indicator and what it
@@ -168,7 +174,6 @@ function syncRestore(page, on) {
   const sw = page.querySelector?.(".restore-vpn .switch");
   if (sw && sw.getAttribute("aria-checked") !== String(on)) sw.setAttribute("aria-checked", String(on));
 }
-let restoreTaps = 0; // a status read that began before a tap doesn't bring the old setting back
 const STEP_ICON = { pair: "pairPhone", allow: "cellular", test: "testConnection" };
 // The status cell's tile and the action's dimming on the drawn rows (as mainPage's).
 function dressStatus(frag, sections) {
@@ -311,21 +316,21 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
     paint();
     try { await vpnTest(native, ask, store); } finally { settled(); }
   };
-  // F412: shown at once; a call that fails puts it back
-  const keepRestore = (on) => {
+  // F412: shown at once; a call that fails reads the setting again (no answer: as it was)
+  restoreToggles.set(el, async (on) => {
     const st = lastStatus ?? view;
     if (!st) return;
-    view = { ...st, vpn: { ...st.vpn, restore: on } };
-    rememberStatus(view);
+    const tap = restoreTap = { on, at: Date.now(), was: restoreTap?.sending ? restoreTap.was : Boolean(st.vpn?.restore), sending: true };
+    rememberStatus(st);
+    view = lastStatus;
     paint();
-  };
-  restoreToggles.set(el, async (on) => {
-    const tap = ++restoreTaps;
-    keepRestore(on);
-    try { await within(setRestoreVPN(native, on), TIMEOUTS.status); } catch {
-      if (tap !== restoreTaps) return;
-      if (mine()) keepRestore(!on);
-      else if (lastStatus) { rememberStatus({ ...lastStatus, vpn: { ...lastStatus.vpn, restore: !on } }); redraw(); }
+    try { await within(setRestoreVPN(native, on), TIMEOUTS.status); tap.sending = false; } catch {
+      const read = (await readStatus(native)).st;
+      if (restoreTap !== tap) return; // tapped again meanwhile
+      restoreTap = null;
+      if (read) rememberStatus(read);
+      else if (lastStatus) rememberStatus({ ...lastStatus, vpn: { ...lastStatus.vpn, restore: tap.was } });
+      redraw();
     }
   });
   const paint = () => {
@@ -368,16 +373,14 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
     syncRestore(el, restore);
   };
   paint();
-  const taps = restoreTaps;
   // F301: idevice.status is read for the Signing Server choice too (the choice row's spinner waits on it)
   await readStatus(native).then(({ st }) => {
     if (!mine()) return;
     got.device = Boolean(st);
     late.device = !st; // failed or too slow: Not Responding (a failure says no more than that)
     if (st) {
-      if (taps !== restoreTaps && restoreShown(st) && restoreShown(lastStatus)) st = { ...st, vpn: { ...st.vpn, restore: lastStatus.vpn.restore } }; // F412
       rememberStatus(st);
-      view = st;
+      view = lastStatus;
     }
     // B316: opened after a failure: the pairing is checked by itself; the page repaints when it passes or fails
     if (st?.paired && choice === "iphone") autoCheck(native, alert, () => { if (mine()) paint(); }, store);

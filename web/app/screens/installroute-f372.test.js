@@ -130,9 +130,17 @@ test("F412: Restore My VPN, its own group, off by default; shown only when the s
   assert.deepEqual(sent, [true, false], "a redrawn page: the tap goes out once");
   assert.ok(says(core.restoreFooter(false)));
   fail = true;
+  await Promise.all([tap(), tap()]);
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(on(), "false", "two that fail");
   await tap();
+  await new Promise((r) => setTimeout(r, 5));
   assert.equal(on(), "false", "a failed call puts it back");
   assert.ok(says(core.restoreFooter(false)));
+  fail = false;
+  await tap();
+  screens.rememberStatus(ST({ tested: true, restore: false }));
+  assert.equal(cachedStatus().vpn.restore, true, "a read begun before the tap");
   forgetStatus();
 });
 
