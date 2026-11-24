@@ -4,7 +4,7 @@
 - Built the app on this Linux desktop with `native/build.sh`. No MBA is needed; the earlier notes saying MBA were wrong.
 - The T79 switch is read only under `#if DEBUG`, and build.sh has no `-DDEBUG`. I built a debug IPA from a throwaway
   copy of build.sh with `-DDEBUG` added to the swiftc line. The copy is deleted; nothing is committed.
-- Installed the debug build on the iPhone 15 Pro with `tools/ui-15.sh` (phone locked for R93). Variants were set with
+- Installed the debug build on the iPhone 15 Pro with `tools/ui-15.sh` (UI lock held as R93; the screen stayed on). Variants were set with
   launch arguments: `ios launch com.ryha.ifizbox --kill-existing --arg=-afcChunkMB --arg=N`, plus
   `--arg=-afcPipelined --arg=YES` for pipelined runs.
 - Test IPA: a stub app `com.ryha.ifizbox.r93test` (iFizBox's executable renamed, plus a 330 MB random file; 318.1 MB
@@ -21,9 +21,14 @@ Every run moved 318.1 MB in about 13 s. Speeds (MB/s):
 - 4 MB, one at a time: 24.2; 8 MB, one at a time: 24.4
 - 1 MB pipelined: 24.3; 4 MB pipelined: 24.3; 8 MB pipelined: 24.6, 24.5
 
-All runs fall within 24.2 to 24.6, which is noise (about 1%). Bigger chunks and pipelined reads do not help. The limit
-is the route (phone to phone through the built-in VPN) or iOS's AFC side, not the app's send loop. No variant helps,
-so no follow-up tasks were filed.
+All runs fall within 24.2 to 24.6, which is noise (about 1%). Bigger chunks and pipelined reads do not help. "Pipelined" here is T79's switch: the next chunk is
+read while the last write runs, but writes still go out one at a time. Several AFC writes in flight were **not**
+measured (afc_file_write is synchronous, so it needs parallel AFC connections or files); filed as a follow-up. For
+what was measured, the limit is not chunk size or reading. No measured variant helps, so none is filed as a speed-up.
+Each variant ran once or twice; the baseline's two runs differ by 0.1 MB/s.
+
+To repeat: copy native/build.sh, add `-DDEBUG` after `-O` on the swiftc line, run it with `ipa`, and install with
+`tools/ui-15.sh`.
 
 R55 saw 17 to 18 MB/s on the same route with a 340 MB IPA. Today's 24.3 is a little faster, probably a different day or
 network state; the 1 MB baseline is the direct comparison. If this is picked up later, the lever is the route itself
