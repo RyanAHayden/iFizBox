@@ -1244,7 +1244,7 @@ enum IDevice {
 
     static let chunk = 1 << 20
 
-    /// T79: the copy's test switch. Only a debug build reads it (UserDefaults `afcChunkMB`: 1, 4 or 8, and
+    /// T79: the copy's test switch. Only a debug build reads it (the setting `afcChunkMB`: 1, 4 or 8, and
     /// `afcPipelined`: true reads the next chunk while the last write runs); a release build always sends 1 MB
     /// chunks one at a time. The speed of each run goes to the log either way.
     static var copySwitch: (chunk: Int, pipelined: Bool) {
