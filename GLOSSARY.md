@@ -234,3 +234,10 @@ _Said_: waiting for iFizBox
 _On screen_: Waiting for iFizBox
 _In code_: APP_WAIT, appWait, LocalVPN.pause
 _Avoid_: paused install, background wait
+
+**Restore My VPN**:
+Optional, off by default: after an install, the built-in VPN's configuration is removed so the VPN it took the place of comes back; iOS asks to allow the built-in VPN again next time
+_Said_: Restore My VPN switch
+_On screen_: Restore My VPN
+_In code_: LocalVPN.restore, vpn.setRestore, noteOther, giveBack
+_Avoid_: put-back, give back VPN
