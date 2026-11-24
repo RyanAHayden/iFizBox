@@ -217,6 +217,6 @@ _Avoid_: error sheet, failed Confirm
 **Airplane wait**:
 On cellular, a This iPhone install holds after signing until the phone leaves cellular
 _Said_: the airplane wait
-_On screen_: Turn on Airplane Mode to install
+_On screen_: Join Wi-Fi or turn on Airplane Mode
 _In code_: LocalVPN.waitOffCellular, AIRPLANE_ON, airplaneStatus
 _Avoid_: cellular pause, data off wait

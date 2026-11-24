@@ -952,7 +952,7 @@ enum IDevice {
             let waited: Bool
             do {
                 waited = try LocalVPN.waitOffCellular(cancelled: cancelled) {
-                    note("On cellular: turn on Airplane Mode to install")
+                    note("On cellular: join Wi-Fi or turn on Airplane Mode")
                     progress(.airplane)
                 }
             } catch let f as Failure {

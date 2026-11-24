@@ -82,13 +82,45 @@ enum LocalVPN {
             monitor.start(queue: queue)
         }
 
-        /// cellular: cellular data is in use and Wi-Fi isn't (Wi-Fi switched on but not joined counts as no Wi-Fi).
+        /// cellular: cellular data is in use and Wi-Fi isn't joined (switched on but not joined counts as no Wi-Fi).
+        /// B419: joined is also an IPv4 address on en0, whatever the path says: Wi-Fi Assist, Wi-Fi without internet
+        /// and another VPN's route leave Wi-Fi joined but out of the path.
         static func now() -> (cellular: Bool, wifi: Bool) {
             start()
             plock.lock(); let p = path; plock.unlock()
             guard let p = p, p.status == .satisfied else { return (false, false) }
-            let wifi = p.usesInterfaceType(.wifi)
+            let wifi = p.usesInterfaceType(.wifi) || wifiAddress()
             return (p.usesInterfaceType(.cellular) && !wifi, wifi)
+        }
+
+        /// en0 (Wi-Fi) is up and has an IPv4 address.
+        static func wifiAddress() -> Bool {
+            var head: UnsafeMutablePointer<ifaddrs>?
+            guard getifaddrs(&head) == 0 else { return false }
+            defer { freeifaddrs(head) }
+            let up = IFF_UP | IFF_RUNNING
+            var p = head
+            while let i = p {
+                defer { p = i.pointee.ifa_next }
+                guard String(cString: i.pointee.ifa_name) == "en0", Int32(i.pointee.ifa_flags) & up == up,
+                      let a = i.pointee.ifa_addr else { continue }
+                if Int32(a.pointee.sa_family) == AF_INET { return true }
+            }
+            return false
+        }
+
+        /// The log's line: the path's status and interfaces in iOS's order, such as "satisfied; pdp_ip0 cellular,
+        /// utun4 other; uses cellular; expensive; en0 IPv4 no".
+        static func described() -> String {
+            start()
+            plock.lock(); let p = path; plock.unlock()
+            let en0 = "en0 IPv4 \(wifiAddress() ? "yes" : "no")"
+            guard let p = p else { return "no path yet; \(en0)" }
+            let all = p.availableInterfaces.map { "\($0.name) \($0.type)" }.joined(separator: ", ")
+            let types: [NWInterface.InterfaceType] = [.wifi, .cellular, .wiredEthernet, .loopback, .other]
+            let used = types.filter { p.usesInterfaceType($0) }.map { "\($0)" }.joined(separator: ", ")
+            return ["\(p.status)", all.isEmpty ? "no interfaces" : all, "uses \(used.isEmpty ? "none" : used)",
+                    p.isExpensive ? "expensive" : nil, p.isConstrained ? "Low Data Mode" : nil, en0].compactMap { $0 }.joined(separator: "; ")
         }
 
         /// B375: some network is up (Wi-Fi, cellular data, wired), so iOS can start a VPN. True before the first
@@ -107,9 +139,10 @@ enum LocalVPN {
 
     static let airplaneLimit: TimeInterval = 300 // how long an install waits for Airplane Mode
     static let airplaneSettle: TimeInterval = 1  // off cellular for this long: a passing gap isn't Airplane Mode
+    static let airplaneReread: TimeInterval = 3  // B419: on cellular for this long before asking: a short Wi-Fi drop isn't cellular
 
-    /// Blocking: true once the path has left cellular (the VPN on, kept by installBegan), false when it wasn't on
-    /// cellular. Polled through NWPathMonitor's last path, so Control Center over the app changes nothing.
+    /// Blocking: true once the path has left cellular after `waiting` was said (the VPN on, kept by installBegan),
+    /// false when it wasn't on cellular, or left it within airplaneReread. Wi-Fi joined ends it as well. Polled through NWPathMonitor's last path, so Control Center over the app changes nothing.
     /// Throws when cancelled, after airplaneLimit, or when the VPN doesn't start; installEnded then takes it down.
     static func waitOffCellular(cancelled: () -> Bool, waiting: () -> Void) throws -> Bool {
         guard available, !failedNow(), Path.now().cellular else { return false }
@@ -117,19 +150,29 @@ enum LocalVPN {
             if cancelled() { throw IDevice.Failure(code: "cancelled", text: "Cancelled") } // while another install's start goes on
         }
         defer { end() }
-        log("on cellular: waiting for Airplane Mode")
-        waiting()
-        let t0 = Date()
+        log("on cellular: reading the path again for \(Int(airplaneReread)) s; path: \(Path.described())")
+        let t0 = Date() // after begin: Wi-Fi can drop as the VPN starts
         var left: Date?
+        var asked = false
         while true {
             if cancelled() {
                 log("the airplane wait was cancelled")
                 throw IDevice.Failure(code: "cancelled", text: "Cancelled")
             }
-            if Path.now().cellular { left = nil } else if left == nil { left = Date() }
+            let now = Path.now()
+            if now.wifi && !asked {
+                log("on Wi-Fi: no wait; path: \(Path.described())")
+                return false
+            }
+            if now.cellular { left = nil } else if left == nil { left = Date() }
             if let l = left, Date().timeIntervalSince(l) >= airplaneSettle {
-                log("off cellular after \(Int(Date().timeIntervalSince(t0))) s")
-                return true
+                log("off cellular after \(Int(Date().timeIntervalSince(t0))) s; path: \(Path.described())")
+                return asked
+            }
+            if now.cellular && !asked && Date().timeIntervalSince(t0) >= airplaneReread {
+                asked = true
+                log("on cellular: waiting for Wi-Fi or Airplane Mode; path: \(Path.described())")
+                waiting()
             }
             if Date().timeIntervalSince(t0) > airplaneLimit {
                 log("no Airplane Mode in \(Int(airplaneLimit)) s")

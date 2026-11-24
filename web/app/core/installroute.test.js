@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { decideRoute, routeParams, storedRoute, pairState, pairEvent, pairFooter, pairFromNative, pinText, verifyFailure, ROUTE_OPTIONS, ALERTS, STORAGE_KEY, IPHONE_INTRO, setupState, PAIR_GUIDE,
-  NO_VPN, STATUS_ACTIONS, HOW_STEPS, routeRefused, installStatus, BUILTIN_VPN, earlyEOF } from "./installroute.js";
+  NO_VPN, AIRPLANE_ON, STATUS_ACTIONS, HOW_STEPS, routeRefused, installStatus, BUILTIN_VPN, earlyEOF } from "./installroute.js";
 import { existsSync, readFileSync } from "node:fs";
 import { ringStyle } from "./installroute.js";
 import { SETTINGS } from "./settings.js";
@@ -176,4 +176,8 @@ test("no text the core says names Tailscale or LocalDevVPN", () => {
   }
   assert.ok(words.length > 50);
   for (const w of words) assert.doesNotMatch(w, /tailscale|localdevvpn/i, w);
+});
+
+test("B419: the wait on cellular asks for Wi-Fi or Airplane Mode", () => {
+  assert.equal(AIRPLANE_ON, "Join Wi-Fi or turn on Airplane Mode");
 });
