@@ -12,6 +12,8 @@
 //                                            signing.inspect answer, or the website's parseProfile + profileInfo
 //   keepPlan(profile, bundleId, { keep })    { keep, bundleId (Info.plist), entitlementsId, notes: [note] }
 //   profileNotes(profile, { keep, name })    what the profile can't do the new way, or the old way's warning
+//   notifyNote(info, { keep, name })         App Groups or Communication Notifications the app asks for and the profile has
+//                                            none of (F413), from a signing.inspect answer; null when there is nothing to say
 //   originalNote(name, { installed, ours })  the original (same ID) is on the phone and would be replaced
 //   OLD_WAY_ALERT                            the alert that turning Keep Bundle IDs off shows first
 //   siteSigned / rememberSiteSigned / resignNote / installWarningText   the website's warnings before it signs and
@@ -92,6 +94,29 @@ export function profileNotes(profile, { keep = true, name = "", as = "" } = {}) 
   return notes;
 }
 
+// F413: an app that hands its notifications to a notification service extension reads them back through App Groups and
+// may need Communication Notifications: signed with Push alone, only its badges come. Null unless the app's own
+// signature asks for one, it has that extension, and a profile with real Push has none of it: profileNotes speaks for
+// the other profiles. signing.inspect's `missing` is keys the profile doesn't have; App Groups can also be there and
+// empty (profileGroups; an older shell doesn't send it).
+const APP_GROUPS = "com.apple.security.application-groups";
+const COMMUNICATION = "com.apple.developer.usernotifications.communication";
+const SERVICE_EXTENSION = "com.apple.usernotifications.service";
+
+export function notifyNote(info, { keep = true, name = "" } = {}) {
+  const f = profileFacts(info);
+  if (!keep || !f || f.wildcard || f.kind === "Development" || f.push !== "production") return null;
+  if (!(info.app?.extensions ?? []).some((x) => x?.point === SERVICE_EXTENSION)) return null;
+  const ents = info.app.entitlements ?? {}, missing = info.missing ?? [];
+  const lacks = [];
+  if (Array.isArray(ents[APP_GROUPS]) && ents[APP_GROUPS].length
+    && (missing.includes(APP_GROUPS) || info.profileGroups?.length === 0)) lacks.push("App Groups");
+  if (ents[COMMUNICATION] === true && missing.includes(COMMUNICATION)) lacks.push("Communication Notifications");
+  if (!lacks.length) return null;
+  return { id: "no-notify", guide: true,
+    text: `Your profile has no ${lacks.join(" or ")}, which ${String(name ?? "").trim() || "the app"} asks for: its notifications may not show. Import a newer profile that has ${lacks.length > 1 ? "them" : "it"}.` };
+}
+
 // The original app, under the same ID, is on the phone. `ours`: iFizBox signed that copy (a signed-apps record), so
 // this is an update and nothing to warn about. R25: iOS refuses to put a signed app over an App Store one.
 export function originalNote(name, { installed = false, ours = false } = {}) {
@@ -152,6 +177,8 @@ export const installWarningText = (warnings) => (Array.isArray(warnings) ? warni
 export function sheetNotes(info, { keep = true, installed = false, ours = false, name = "" } = {}) {
   const who = name || info?.app?.name || "";
   const notes = profileNotes(info, { keep, name: who, as: info?.appIdAs || "" });
+  const notify = notifyNote(info, { keep, name: who });
+  if (notify) notes.unshift(notify);
   const orig = keep ? originalNote(who, { installed, ours }) : null;
   if (orig) notes.unshift(orig);
   return { notes, guide: notes.some((n) => n.guide) };

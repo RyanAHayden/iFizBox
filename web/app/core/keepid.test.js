@@ -3,7 +3,7 @@
 // the profile's App ID in the entitlements), Custom Install's params and the queue's library job.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { keepPlan, profileFacts, profileNotes, originalNote, sheetNotes, originalState, withKeep, storedKeep, keepOn,
+import { keepPlan, profileFacts, profileNotes, originalNote, sheetNotes, notifyNote, originalState, withKeep, storedKeep, keepOn,
   OLD_WAY_ALERT, GUIDE_ID, GUIDE_ROUTE, siteSigned, rememberSiteSigned, resignNote, installWarningText, SITE_SIGNED_KEY,
   RESIGN_TITLE, RESIGN_BUTTONS, INSTALL_WARNING_TITLE, INSTALL_WARNING_BUTTONS } from "./keepid.js";
 import { signingIds, profileInfo, plistXml } from "./websign.js";
@@ -81,6 +81,37 @@ test("the original app on the phone: warned unless iFizBox signed that copy; not
   assert.deepEqual(calls, ["apps.isInstalled", "signing.installed"]);
   assert.deepEqual(await originalState({ call: async () => { throw new Error("no"); } }, "a.b"), { installed: false, ours: false });
   assert.deepEqual(await originalState(null, "a.b"), { installed: false, ours: false });
+});
+
+test("notifyNote (F413): the app asks for App Groups or Communication Notifications and the profile has none", () => {
+  const GROUPS = "com.apple.security.application-groups", COMM = "com.apple.developer.usernotifications.communication";
+  const app = { name: "RyukGram", bundleId: "com.burbn.instagram", entitlements: { [GROUPS]: ["group.com.burbn.instagram"], [COMM]: true },
+    extensions: [{ path: "PlugIns/Service.appex", point: "com.apple.usernotifications.service" }] };
+  const info = { app, profileAppId: "com.you.apps", push: "production", profileKind: "Ad Hoc", wildcard: false, appIdAs: "com.you.apps",
+    profileGroups: [], missing: [COMM] }; // App Groups ticked, none assigned: not in missing
+  const both = notifyNote(info, { name: "RyukGram" });
+  assert.match(both.text, /no App Groups or Communication Notifications, which RyukGram asks for.*may not show.*newer profile that has them/);
+  assert.equal(both.guide, true);
+  assert.deepEqual(ids(sheetNotes(info).notes), ["no-notify", "one-app"]);
+  assert.equal(sheetNotes(info).guide, true);
+  // missing one
+  assert.match(notifyNote({ ...info, profileGroups: ["group.com.you.1"] }).text, /no Communication Notifications, which the app asks for.*has it/);
+  assert.match(notifyNote({ ...info, missing: [] }).text, /no App Groups, which/);
+  // an older shell sends no profileGroups: only an absent key is known
+  assert.match(notifyNote({ ...info, profileGroups: undefined, missing: [GROUPS] }).text, /no App Groups, which/);
+  assert.equal(notifyNote({ ...info, profileGroups: undefined, missing: [] }), null);
+  // has both
+  const has = { ...info, profileGroups: ["group.com.you.1"], missing: [] };
+  assert.equal(notifyNote(has), null);
+  assert.equal(sheetNotes(has).guide, false);
+  // the app does not ask, or has no notification service extension
+  for (const entitlements of [{}, { [GROUPS]: [] }, undefined]) assert.equal(notifyNote({ ...info, app: { ...app, entitlements } }), null);
+  assert.equal(notifyNote({ ...info, app: { ...app, extensions: [{ point: "com.apple.widgetkit-extension" }] } }), null);
+  assert.equal(notifyNote({ ...info, app: { ...app, extensions: undefined } }), null);
+  // other profiles have their own note; off is the old way's warning alone
+  for (const p of [{ wildcard: true }, { profileKind: "Development" }, { push: "development" }, { push: null }]) assert.equal(notifyNote({ ...info, ...p }), null);
+  assert.deepEqual(ids(sheetNotes(info, { keep: false }).notes), ["old-way"]);
+  assert.equal(notifyNote(null), null);
 });
 
 test("the setting: on by default, both signing builds; withKeep sends false only when off, a job's choice wins", () => {
