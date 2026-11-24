@@ -1,0 +1,72 @@
+r95 t80 at 2026-11-24T17:45:12Z (com.burbn.instagram 456.0.0)
+keychain S8NFX3A2LT.com.burbn.instagram: generic passwords 38, zxPluginsInjectGenericEntry 1
+  zx entry created 2026-11-23T19:19:28Z modified 2026-11-24T17:43:52Z accessible cku
+keychain S8NFX3A2LT.com.ryha.sideload: generic passwords 16, zxPluginsInjectGenericEntry 1
+  zx entry created 2026-11-23T19:33:53Z modified 2026-11-24T17:43:52Z accessible cku
+  S8NFX3A2LT.com.burbn.instagram service com.instagram.notifications.hpke: accessible dku, created 2026-11-24T02:41:21Z, modified 2026-11-24T02:41:21Z
+  S8NFX3A2LT.com.burbn.instagram class keys: 0
+  S8NFX3A2LT.com.burbn.instagram class inet: 0
+  S8NFX3A2LT.com.burbn.instagram class cert: 0
+  S8NFX3A2LT.com.burbn.instagram class idnt: 0
+  S8NFX3A2LT.com.ryha.sideload class keys: 0
+  S8NFX3A2LT.com.ryha.sideload class inet: 0
+  S8NFX3A2LT.com.ryha.sideload class cert: 0
+  S8NFX3A2LT.com.ryha.sideload class idnt: 0
+keychain MH9GU9K5PX.shared (the original group, not in the entitlements): refused
+keychain MH9GU9K5PX.platformFamily (the original group, not in the entitlements): refused
+keychain MH9GU9K5PX.com.burbn.instagram (the original group, not in the entitlements): refused
+group-less read of the zx entry (what zxPluginsInject's start-up does): S8NFX3A2LT.com.burbn.instagram
+group-less read, all matches by group: {
+    "S8NFX3A2LT.com.burbn.instagram" = 1;
+    "S8NFX3A2LT.com.ryha.sideload" = 1;
+}
+app's own Library/AppGroups (the group fix's place):
+  AppGroups: AppGroups — 96 files, 14096672 bytes; top level (
+    "group.com.burbn.instagram",
+    "group.com.facebook.family",
+    "group.com.burbn.family"
+)
+containerURL for group.com.burbn.instagram as the app gets it: group.com.burbn.instagram
+  tree: group.com.burbn.instagram — 25 files, 2057781 bytes; top level (
+    TerminationReporter,
+    Documents,
+    ReinstallDetection,
+    Library,
+    CrossAppFetch,
+    "ryspy.txt",
+    "fba_extentions_event_store"
+)
+    Library/Preferences group.com.burbn.instagram.plist: 13 keys
+containerURL for group.com.facebook.family as the app gets it: group.com.facebook.family
+  tree: group.com.facebook.family — 2 files, 830 bytes; top level (
+    FDID,
+    Library,
+    "ryspy.txt"
+)
+    Library/Preferences group.com.facebook.family.plist: 7 keys
+containerURL for group.com.burbn.family as the app gets it: group.com.burbn.family
+  tree: group.com.burbn.family — 2 files, 80 bytes; top level (
+    Library,
+    "ryspy.txt"
+)
+    Library/Preferences group.com.burbn.family.plist: 1 keys
+profile groups (what an extension without the group fix reaches through zxPluginsInject):
+  group.com.ryha.sideload.1: group.com.ryha.sideload.1 — 4 files, 387 bytes; top level (
+    RyukGram,
+    "zx-real-file.txt",
+    "probe-marker.txt"
+)
+  group.com.ryha.sideload.2: group.com.ryha.sideload.2 — 0 files, 0 bytes; top level (
+)
+  group.com.ryha.sideload.3: group.com.ryha.sideload.3 — 0 files, 0 bytes; top level (
+)
+  group.com.ryha.sideload.4: group.com.ryha.sideload.4 — 0 files, 0 bytes; top level (
+)
+  group.com.ryha.sideload.5: group.com.ryha.sideload.5 — 0 files, 0 bytes; top level (
+)
+suite domain group.com.burbn.instagram: 10 keys
+suite domain ifizbox.appgroup.group.com.burbn.instagram: 365 keys
+suite domain group.com.facebook.family: 6 keys
+suite domain ifizbox.appgroup.group.com.facebook.family: 9 keys
+initWithSuiteName:group.com.burbn.instagram dictionary count 1119
+initWithSuiteName:group.com.facebook.family dictionary count 1115

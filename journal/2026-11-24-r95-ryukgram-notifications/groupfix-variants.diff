@@ -1,0 +1,6 @@
+642a643,647
+> #if defined(R95_KEYCHAIN_ONLY) // R95 variant: no container or suite mapping, keychain as production
+>         { NSMutableDictionary *m = [c mutableCopy]; m[@"groups"] = @[]; c = m; }
+> #elif defined(R95_CONTAINERS_ONLY) // R95 variant: containers and suites as production, no keychain change
+>         { NSMutableDictionary *m = [c mutableCopy]; [m removeObjectForKey:@"isolate"]; m[@"keychain"] = @NO; c = m; }
+> #endif
