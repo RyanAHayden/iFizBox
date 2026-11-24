@@ -49,5 +49,15 @@ test("B416: a queue row whose first connect was reset: the red line, Pair Again,
   assert.equal(err.fallback.fix, "pair");
   assert.equal(err.fallback.button, "Pair Again");
   assert.equal(JSON.parse(store.get("ifizbox.routeFailure")).fix, "pair");
-  store.delete("ifizbox.routeFailure");
+  // an install that goes through clears it
+  const ok = { call: async (m) => (m === "idevice.status" ? BUILTIN : m === "signing.open" ? { installed: true } : null) };
+  await openPrepared({ id: "a", name: "Feather", token: "t", bundleId: "a" }, { tag: "a#2", native: ok });
+  assert.equal(store.has("ifizbox.routeFailure"), false);
+  // a timeout, a mid-install drop: not the pairing
+  for (const [code, text] of [["connect_failed", "Socket(Kind(TimedOut)) (1)"], ["upload_failed", e.message], ["timeout", "no answer from iOS for 30 s"]]) {
+    const bad = { call: async (m) => { if (m === "idevice.status") return BUILTIN; if (m === "signing.open") throw Object.assign(new Error(text), { code }); return null; } };
+    const x = await openPrepared({ id: "a", name: "Feather", token: "t", bundleId: "a" }, { tag: "a#3", native: bad }).then(() => null, (y) => y);
+    assert.doesNotMatch(`${x.message} ${JSON.stringify(x.fallback ?? {})}`, /pair|Socket/i);
+    assert.equal(store.has("ifizbox.routeFailure"), false);
+  }
 });

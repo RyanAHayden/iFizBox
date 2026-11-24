@@ -247,7 +247,7 @@ export const PAIR_AGAIN_LINE = `This iPhone isn't paired with ${NAME} any more. 
 // never shows in a red line or an alert: the grey log lines keep it. plainSocket(text) is `text` without it: a
 // parenthesis around it goes ("lost the connection … (Socket(…) (1)). iOS may …"); nothing but it becomes LOST_LINE.
 export const LOST_LINE = "The connection to this iPhone was lost. Try again.";
-const SOCKET = /\b(?:Socket|InternalError|RemotePairing|CdTunnel)\(|\bOs \{|\bKind\(|UnexpectedEof|\bearly eof\b|\bos error \d+|connection (?:reset|refused|closed|aborted)\b|broken pipe|operation timed? ?out/i;
+const SOCKET = /\b(?:Socket|InternalError|RemotePairing|CdTunnel)\(|\bOs \{|\bKind\(|UnexpectedEof|\bearly eof\b|\bos error \d+|connection (?:reset|refused|closed|aborted)\b|broken pipe|no route to host|network is (?:unreachable|down)|operation timed? ?out/i;
 export const hasSocketText = (text) => SOCKET.test(String(text ?? ""));
 export function plainSocket(text) {
   const t = String(text ?? "");

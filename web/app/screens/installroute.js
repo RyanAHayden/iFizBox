@@ -876,7 +876,7 @@ async function drawPair(box, { store, native, alert, redraw }) {
         if (test) return finishSetup(v, native, alert, store, recheck);
         recheck();
       } catch (e) {
-        alert({ title: "Not a Pairing File", message: e?.message || "That file isn't a pairing for this iPhone.", buttons: ["OK"] });
+        alert({ title: "Not a Pairing File", message: plainSocket(e?.message) || "That file isn't a pairing for this iPhone.", buttons: ["OK"] });
       }
     });
     frag.querySelector(".sign-import")?.append(input); // F317: the row is in step 2's group (setupGroups)

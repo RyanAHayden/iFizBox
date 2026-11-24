@@ -141,6 +141,7 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
       }, { tag, signal });
     // F380: the IPA the shell kept in My IPAs for this install (keepInLibrary), for the save after it lands
     if (opened?.libraryFile) await keptIpa(row?.job?.url, opened.libraryFile);
+    if (route.route) clearRouteFailure(); // B416: an install went through
     if (route.route) return { installed: opened?.installed ?? true, expires: opened?.expires ?? null };
   } catch (e) {
     const err = rowError(e, name);
@@ -149,7 +150,6 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
     if (fallback?.fix === "pair") rememberRouteFailure(fallback); // B416: Pair Again's page checks it, then pairs
     throw fallback ? Object.assign(err, { fallback }) : err;
   }
-  if (route?.route === "idevice") clearRouteFailure(); // B416: an install went through
   progress("asking", 0);
   if (host) recordSelfUpdate(storageOf(), opened?.version || row?.version); // B83: the next launch checks it landed
   if (host) return { installed: null, expires: opened?.expires ?? null, host: true };
