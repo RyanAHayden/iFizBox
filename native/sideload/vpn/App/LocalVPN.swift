@@ -4,7 +4,7 @@
 // keeps it). Nothing else is involved: no Shortcuts, no trip, no put-back. iOS takes another app's VPN off while ours
 // is on, so the status says `otherVPN` and the page says it. Whether that VPN comes back by itself (its On Demand) is
 // iOS's and that app's business, unless Restore My VPN is on (F411): then our configuration is removed once nothing uses
-// it (B427a: whatever was up before), which gives the other VPN its checkmark in Settings > VPN back.
+// it (B427a: whatever was up before), which lets Settings > VPN pick the other VPN again once that page is opened; iOS leaves the other one disabled until then.
 // B423: in the background it starts only to finish an install already connected; anything else waits for the app.
 //   idevice.status      carries the VPN's state as `vpn`: {available, bundled, entitled, tested, on, cellular, wifi,
 //                       otherVPN, restore, name}
@@ -304,9 +304,10 @@ enum LocalVPN {
 
     // ---- Restore My VPN (F411)
     // While our configuration exists it keeps Settings > VPN's checkmark after a connect, so the VPN it took the place
-    // of stays off, On Demand or not. Removing it is the one way iOS gives the checkmark back; the next start saves a
-    // new one and iOS asks Allow again. B427a: with the setting on it never stays, whatever was up as ours started: in
-    // Airplane Mode, or minutes after the last install, the other VPN isn't up, and it lost its place all the same.
+    // of stays off, On Demand or not. Removing it lets Settings > VPN pick the other VPN again once that page is opened;
+    // iOS leaves the other one disabled until then. The next start saves a new one and iOS asks Allow again.
+    // B427a: with the setting on it never stays, whatever was up as ours started: in Airplane Mode, or minutes after the last install,
+    // the other VPN isn't up, and it lost its place all the same.
 
     private static let restoreKey = "ifizbox.vpn.restore"
     static var restore: Bool { UserDefaults.standard.bool(forKey: restoreKey) }

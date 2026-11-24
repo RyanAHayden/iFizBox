@@ -243,7 +243,7 @@ _In code_: quietPairingCheck, quietCheckDue, quietCheckAllowed, ifizbox.quietPai
 _Avoid_: background verify, auto check
 
 **Restore My VPN**:
-Optional, off by default: once nothing uses the built-in VPN (after an install, or when the switch is turned on), its configuration is removed, so whatever VPN was up before comes back; iOS asks to allow the built-in VPN again next time
+Optional, off by default: once nothing uses the built-in VPN (after an install, or when the switch is turned on), its configuration is removed, so the VPN that was up before can be turned on again in Settings > VPN (iOS leaves it off until that page is opened); iOS asks to allow the built-in VPN again next time
 _Said_: Restore My VPN switch
 _On screen_: Restore My VPN
 _In code_: LocalVPN.restore, vpn.setRestore, giveBack
