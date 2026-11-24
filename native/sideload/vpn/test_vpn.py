@@ -78,7 +78,7 @@ class App(unittest.TestCase):
         src = read("App", "LocalVPN.swift")
         listed = set(re.findall(r"^//\s+(vpn\.\w+)", src, re.M))
         registered = set(re.findall(r'b\.on\("(vpn\.\w+)"\)', src))
-        self.assertEqual(listed, {"vpn.status", "vpn.test"})
+        self.assertEqual(listed, {"vpn.test"})
         self.assertEqual(listed, registered)
         self.assertIn("LocalVPNBridge.register(b)", read("Sources", "SignBridge.swift", base=NATIVE))
 

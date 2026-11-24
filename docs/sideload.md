@@ -295,10 +295,10 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   page says "On cellular, join Wi-Fi.". Nothing turns cellular data off or on.
   `LocalVPN.begin` runs `up()`: it saves the configuration the first time (iOS asks to allow it) and connects it. The end
   takes our VPN down 3 seconds after the queue's last connection. The configuration is never On Demand. iOS runs one VPN at
-  a time, so while ours is on any other VPN is taken off, and `vpn.status`'s `otherVPN` says so. Nothing puts that VPN back
+  a time, so while ours is on any other VPN is taken off, and `idevice.status`'s `vpn.otherVPN` says so. Nothing puts that VPN back
   (whether one that relies on On Demand comes back by itself is not verified on a phone).
-  Bridge calls: `vpn.status` (also `idevice.status`'s `vpn`) answers `{available, bundled, entitled, tested, on, cellular,
-  wifi, otherVPN, name}`, and `vpn.test` runs the Set Up test.
+  Bridge: `idevice.status`'s `vpn` is `{available, bundled, entitled, tested, on, cellular, wifi, otherVPN, name}`, and
+  `vpn.test` runs the Set Up test.
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`.
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and
