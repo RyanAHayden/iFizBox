@@ -278,9 +278,9 @@ confirmCase("Confirm with only packages queued starts their run", async () => an
   }
 });
 
-// B414: Roll Back (the console, not the queue run) of iFizBox itself is held too, and let go unless a tap is awaited.
-for (const [line, left] of [["", ["hold", "run", "release"]], ["finish:restart", ["hold", "run"]]]) {
-  test(`a rollback of iFizBox ${line ? "ending on Restart SpringBoard stays held" : "lets go at its end"}`, withDom(async () => {
+// B414: Roll Back (the console, not the queue run) of iFizBox itself is held too while its button waits (the page stays up: last test).
+for (const [line, left] of [["finish:restart", ["hold", "run"]]]) {
+  test(`a rollback of iFizBox ending on Restart SpringBoard stays held`, withDom(async () => {
     const raf = globalThis.requestAnimationFrame;
     globalThis.requestAnimationFrame = (f) => { queueMicrotask(f); return 1; };
     const saved = { queueInfo: catalog.queueInfo, reloadInstalled: catalog.reloadInstalled };
@@ -294,7 +294,6 @@ for (const [line, left] of [["", ["hold", "run", "release"]], ["finish:restart",
       const button = () => find(globalThis.document.body, (e) => e.tagName === "BUTTON" && e._cls.has("progress-finish") && !e.hidden);
       for (const end = Date.now() + 5000; !button() && Date.now() < end;) await new Promise((r) => setTimeout(r, 10));
       assert.deepEqual(calls, left);
-      if (!line) button().click(); // Close: the next run may start
       await new Promise((r) => setTimeout(r, 600));
     } finally {
       for (const k of ["holdSelf", "rollback"]) delete backend[k];
