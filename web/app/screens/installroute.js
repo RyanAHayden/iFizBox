@@ -27,6 +27,7 @@ import { switchAdded, switchTestResult, BUILTIN_VPN } from "../core/installroute
 import { switchOld } from "../core/installroute.js"; // F394
 import { SHORTCUT_LINKS } from "../core/installroute.js"; // F392
 import { switchWouldRun } from "../core/installroute.js"; // B381
+import { switchOutdated, switchLater, rememberSwitchLater, noteSwitch, SWITCH_OFFER } from "../core/installroute.js"; // B396
 import { NAME } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
 import { showHUD } from "../nav/hud.js";
@@ -66,7 +67,7 @@ async function status(native) { return (await readStatus(native)).st; }
 // F301: the last idevice.status answer, shown at once the next time a page draws (its rows spinning while it's read
 // again). Kept for this run of the app only: after a relaunch the VPN may well be another, so the first read waits.
 let lastStatus = null;
-export function rememberStatus(st) { if (st && typeof st === "object") lastStatus = st; }
+export function rememberStatus(st) { if (st && typeof st === "object") { lastStatus = st; noteSwitch(st.vpn); } }
 export function forgetStatus() { lastStatus = null; } // tests, and Forget Pairing
 export const cachedStatus = () => lastStatus;
 
@@ -241,7 +242,18 @@ export async function vpnTest(native, alert, store, { ended = () => {}, onPass =
     return r;
   }
   await alert({ title: why.title, message: why.message, buttons: ["OK"] });
+  if (r?.ok && (usedNow || first) && store?.get(ROUTE_KEY) === "iphone") await offerSwitchUpdate(alert, lastStatus ?? before);
   return r;
+}
+
+// B396: This iPhone was just chosen (`st`: idevice.status): an outdated Install Switch offers its update, unless Later was
+// tapped. true when Update opened the Install Switch's page.
+export async function offerSwitchUpdate(alert, st, { go = goTo } = {}) {
+  if (!switchOutdated("iphone", st) || switchLater()) return false;
+  const { index } = await alert(SWITCH_OFFER) || {};
+  if (index === 1) { go("shortcuts"); return true; }
+  rememberSwitchLater("choose");
+  return false;
 }
 
 // B359: resolves once the user is back in the app: the page went hidden (Shortcuts in front) and visible again. A
@@ -422,7 +434,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
       pick: (v) => {
         if (v === choice && !picked) return;
         picked = v; pickRoute(v, { set: (r) => store.set(ROUTE_KEY, r) }); if (mine()) redraw();
-        if (v === "iphone" && v !== choice) recheckPairing(native, alert, redraw, { spin: pairSpin }); // B220: set up again, the kept pairing checked
+        if (v === "iphone" && v !== choice) recheckPairing(native, alert, redraw, { spin: pairSpin, first: (st) => offerSwitchUpdate(alert, st) }); // B220: set up again, the kept pairing checked
       },
       test: async () => {
         if (testing) return;
@@ -545,8 +557,9 @@ export function turnedDown(why, err) {
   const code = err?.code ?? raw.split(":")[0];
   return Boolean(why.again) && (code === "pair_again" || /invalidat|early eof|UnexpectedEof/i.test(raw));
 }
-export async function recheckPairing(native, alert, redraw, { spin = null } = {}) {
+export async function recheckPairing(native, alert, redraw, { spin = null, first: before = null } = {}) {
   const st = await status(native);
+  if (await before?.(st)) return "skipped"; // B396: the outdated Install Switch's offer, before the check, which may run it
   if (!st?.paired || !builtinVPN(st)) return "skipped";
   const verify = async () => {
     try { await within(call(native, "idevice.verify"), TIMEOUTS.verify); return null; } catch (e) { lastErr = e; return isLate(e) ? { late: true } : verifyFailure(e, st); }
@@ -666,7 +679,10 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
     if (v === "iphone" && !iphoneSetUp(known ?? lastStatus)) { setUseAfterSetup(true); return goTo("iphone"); } // not set up: its setup
     showRoute(v);
     // the store's change redraws the page; it waits for the checkmarks to fade
-    if (store.get(ROUTE_KEY) !== v) setTimeout(() => { store.set(ROUTE_KEY, v); refresh(); }, 260);
+    if (store.get(ROUTE_KEY) !== v) setTimeout(() => {
+      store.set(ROUTE_KEY, v); refresh();
+      if (v === "iphone") offerSwitchUpdate(alert, known ?? lastStatus); // B396
+    }, 260);
   };
   const slots = { with: slotOf(el("span", "cell-detail")) }; // This iPhone's pairing is said on its own page now
   ["certificate", "apps"].forEach((k, i) => { slots[k] = slotOf(cells[i + 4].querySelector(".cell-detail")); });
@@ -750,7 +766,7 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
     if (a === "checkServer") return checkServer();
     if (a === "pair") return goTo("pair");
     if (a === "certificate") return navGo(links.certificate); // B250: the Certificate page, as its row opens
-    if (a === "shortcuts") return goTo("shortcuts"); // F372: on cellular without the Cellular Shortcuts
+    if (a === "shortcuts" || a === "updateSwitch") return goTo("shortcuts"); // F372: on cellular without the Cellular Shortcuts
   };
   return { el: box, refresh, known: () => known, status: () => now };
 }
@@ -1089,9 +1105,11 @@ async function checkOnce(native, alert, redraw, store, mark = null, { quiet = fa
     if (st && !builtinVPN(st)) { stop(); throw Object.assign(new Error("connect_failed: no Network Extensions"), { code: "connect_failed" }); }
     try { await within(call(native, "idevice.verify", ...(quiet ? [{ quiet: true }] : [])), TIMEOUTS.verify); } finally { stop(); }
     clearRouteFailure(); // B316
-    if (store.get(ROUTE_KEY) !== "iphone") store.set(ROUTE_KEY, "iphone"); // a set redraws Settings' pages, and the mark with them
+    const used = store.get(ROUTE_KEY) !== "iphone";
+    if (used) store.set(ROUTE_KEY, "iphone"); // a set redraws Settings' pages, and the mark with them
     mark?.show(true);
     if (quiet) redraw();
+    if (used) offerSwitchUpdate(alert, st); // B396
   } catch (e) {
     if (quiet && (e?.code ?? String(e?.message ?? e).split(":")[0]) === "switch_needed") return undefined; // B395: it would open Shortcuts
     const why = isLate(e)

@@ -119,5 +119,5 @@ test("Install Apps With's check of the kept pairing spins the Pairing row, not t
   assert.equal(pairingRow({ pairChecking: true }).spin, true);
   assert.equal(pairingRow({}).spin, undefined);
   const src = (await import("node:fs")).readFileSync(new URL("./installroute.js", import.meta.url), "utf8");
-  assert.match(src, /if \(v === "iphone" && v !== choice\) recheckPairing\(native, alert, redraw, \{ spin: pairSpin \}\)/);
+  assert.match(src, /if \(v === "iphone" && v !== choice\) recheckPairing\(native, alert, redraw, \{ spin: pairSpin[, ]/);
 });

@@ -60,6 +60,7 @@ export function setupFooter(st) {
   if (st && !builtinVPN(st)) return NO_VPN.message;
   if (!st?.paired) return "Pair this iPhone once to install straight onto it.";
   if (!st.vpn.tested) return "Test the connection to finish setting up.";
+  if (switchOld(st.vpn)) return "Set up. The Install Switch is an older one: tap it to update."; // B396
   if (shortcutsAdded(st)) return "Set up. Apps install straight onto this iPhone, on Wi-Fi, cellular or offline.";
   if (!switchWanted(st)) return "Set up. Apps install straight onto this iPhone, on Wi-Fi or offline.";
   return "Set up for Wi-Fi and offline. Add the Install Switch to install on cellular and get your VPN back after.";
@@ -77,6 +78,30 @@ export const CELLULAR = {
   short: "On cellular, installs need them.",
   button: "Set Up",
 };
+// B396: This iPhone in use with an outdated Install Switch on the phone: Home, Installation & Signing's status, choosing This
+// iPhone and an install that would run it (switchWouldRun) offer Update, its page. Nobody without one is asked.
+export const SWITCH_OLD = {
+  title: "Update Install Switch",
+  message: `${NAME} has a newer Install Switch. In Shortcuts, delete the old one first, then tap Update on its page.`,
+  short: "The one in Shortcuts is an older one.",
+  button: "Update",
+};
+export const switchOutdated = (choice, st) => choice === "iphone" && builtinVPN(st) && switchOld(st.vpn);
+// Where Later was tapped: "choose" (choosing This iPhone asks no more; the next install that would run it still does) or
+// "install" (nothing asks any more). Forgotten once the Install Switch isn't outdated, so a later one is offered again.
+export const LATER_KEY = "ifizbox.switchLater";
+export function switchLater(storage = globalThis.localStorage) {
+  try { const v = storage?.getItem(LATER_KEY); return v === "choose" || v === "install" ? v : null; } catch { return null; }
+}
+export function rememberSwitchLater(at, storage = globalThis.localStorage) {
+  try { storage?.setItem(LATER_KEY, at); } catch { /* storage off */ }
+}
+// `vpn` as just read (vpn.status)
+export function noteSwitch(vpn, storage = globalThis.localStorage) {
+  if (!vpn || switchOld(vpn)) return;
+  try { if (switchLater(storage)) storage.removeItem(LATER_KEY); } catch { /* storage off */ }
+}
+export const SWITCH_OFFER = { title: SWITCH_OLD.title, message: SWITCH_OLD.message, buttons: ["Later", SWITCH_OLD.button], cancel: 0 };
 // How It Works: the steps of one install, a row each.
 export const HOW_STEPS = [
   { label: "1. Download", subtitle: "The app downloads over Wi-Fi or cellular." },
@@ -118,13 +143,14 @@ export function storedRoute(storage = globalThis.localStorage) {
 
 // One install's route: { route: "idevice" } or { route: "server" }, with `alert` (a key of ALERTS) when This iPhone
 // is chosen but can't be used now: the alert says the install goes through the Signing Server instead.
-// `status` is idevice.status ({paired, vpn, otherVPN}), null when the call failed.
-export function decideRoute(choice, status) {
+// `status` is idevice.status ({paired, vpn, otherVPN}), null when the call failed. `later`: switchLater().
+export function decideRoute(choice, status, { later = null } = {}) {
   if (choice !== "iphone") return { route: "server" };
   if (!status) return { route: "server", alert: "noStatus" };
   if (!status.paired) return { route: "server", alert: "notPaired" };
   if (!builtinVPN(status)) return { route: "server", alert: "noVPN" };
   if (cellularWarning(choice, status)) return { route: "idevice", alert: "cellular" }; // F372
+  if (later !== "install" && switchOutdated(choice, status) && switchWouldRun(status)) return { route: "idevice", alert: "switchOld" }; // B396
   if (!switchWanted(status)) return { route: "idevice" };
   return { route: "idevice", alert: status.vpn.otherVPN ? "vpnStaysOff" : "vpnIdle" }; // F394: another VPN is on; F389: or selected
 }
@@ -141,6 +167,8 @@ export const ALERTS = {
   vpnStaysOff: { title: "Your VPN Stays Off", message: `This install turns your VPN off, and it stays off after. Add the Install Switch, and ${NAME} brings it back.`, buttons: ["Install", CELLULAR.button], setup: 1, goes: true },
   // F389: selected, not connected: iOS tells an app nothing of its On Demand, so the words say "if"
   vpnIdle: { title: "Your VPN May Stay Off", message: `If your VPN connects on demand, it stays off after this install. Add the Install Switch, and ${NAME} brings it back.`, buttons: ["Install", CELLULAR.button], setup: 1, goes: true },
+  // B396: it would run an outdated Install Switch; Later goes on with it, and is kept (`later`)
+  switchOld: { title: SWITCH_OLD.title, message: SWITCH_OLD.message, buttons: SWITCH_OFFER.buttons, setup: 1, goes: true, later: "install" },
 };
 
 // ---- Installation & Signing's top cell (F284, option B of the concept): one two-line status and one action row
@@ -151,7 +179,7 @@ export const ALERTS = {
 // `action` is a key of STATUS_ACTIONS. Every subtitle fits two lines at 320pt (the cell keeps two lines' height).
 export const STATUS_ACTIONS = {
   check: "Check Connection", checkServer: "Check Server", pair: "Start Pairing",
-  certificate: "Import Certificate", shortcuts: "Add Install Switch",
+  certificate: "Import Certificate", shortcuts: "Add Install Switch", updateSwitch: "Update Install Switch",
 };
 export const CHECKING = { state: "checking", title: "Checking…", subtitle: "Pairing and the VPN.", action: "check", tone: "wait", local: false };
 // B250: `certificate` is whether signing.status has an identity (signing/device.js statusReady): false says Import Your
@@ -164,7 +192,7 @@ export const CHECKING_SERVER = { ...CHECKING, subtitle: "Your certificate." };
 // Ready to Install into that failure, red with its fix, until a check passes; any other answer stands as it is.
 export function installStatus(choice, st, { host = DOMAIN, certificate, failure = null } = {}) {
   const s = routeStatus(choice, st, { host, certificate });
-  return failure && s.state === "ready" ? failureStatus(failure) : s;
+  return failure && (s.state === "ready" || s.state === "switchOld") ? failureStatus(failure) : s;
 }
 function routeStatus(choice, st, { host = DOMAIN, certificate } = {}) {
   if (certificate === false) return NO_CERTIFICATE;
@@ -176,6 +204,7 @@ function routeStatus(choice, st, { host = DOMAIN, certificate } = {}) {
   if (!st.paired) return { state: "pair", title: "Pair This iPhone", subtitle: `Installs use ${host} until it's paired.`, action: "pair", tone: "warn", local: false };
   // F372: the shell turns the built-in VPN on for each install; only cellular can stop it
   if (cellularWarning(choice, st)) return { state: "cellular", title: CELLULAR.title, subtitle: CELLULAR.short, action: "shortcuts", tone: "warn", local: true };
+  if (switchOutdated(choice, st)) return { state: "switchOld", title: SWITCH_OLD.title, subtitle: SWITCH_OLD.short, action: "updateSwitch", tone: "warn", local: true }; // B396
   return { state: "ready", via: BUILTIN_VPN, title: "Ready to Install", subtitle: `Straight onto this iPhone, through ${BUILTIN_VPN}.`, action: "check", tone: "ok", local: true };
 }
 

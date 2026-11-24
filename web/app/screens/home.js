@@ -52,6 +52,7 @@ import { rowIcon, PAGE_ICONS } from "../icons/rowicons.js";
 import { nativeBridge } from "../native.js";
 import { routeFailure, ROUTE_KEY } from "../core/installroute.js"; // B316
 import { cellularWarning, CELLULAR } from "../core/installroute.js"; // F372
+import { switchOutdated, SWITCH_OLD } from "../core/installroute.js"; // B396
 
 export const title = "Home";
 
@@ -605,6 +606,12 @@ export function cellularTile(mode, choice, vpn) {
   if (mode !== "sideload" || !cellularWarning(choice, { vpn })) return null;
   return { stage: "close", kind: "cellular", title: CELLULAR.title, subtitle: CELLULAR_TILE_SUBTITLE, href: format(settingsRoute(["installation", "shortcuts"])) };
 }
+// B396: This iPhone in use with an outdated Install Switch: the same slot offers Update (its page) until it's done.
+export const SWITCH_TILE_SUBTITLE = "An older one is in Shortcuts · Update"; // fits the tile at 320pt
+export function switchTile(mode, choice, vpn) {
+  if (mode !== "sideload" || !switchOutdated(choice, { vpn })) return null;
+  return { stage: "close", kind: "switch", title: SWITCH_OLD.title, subtitle: SWITCH_TILE_SUBTITLE, href: format(settingsRoute(["installation", "shortcuts"])) };
+}
 // vpn.status for the slot, only when This iPhone is the way in use (null otherwise, or when the shell has none)
 export async function slotVPN(mode, choice, native = nativeBridge()) {
   if (mode !== "sideload" || choice !== "iphone" || typeof native?.call !== "function") return null;
@@ -626,7 +633,8 @@ function certRow() {
   let seq = 0;
   let last = null;
   let vpn = null; // F372: vpn.status, for the cellular tile
-  const routeOrCellular = () => routeTile(settings.mode, routeFailure(), settings.get(ROUTE_KEY)) ?? cellularTile(settings.mode, settings.get(ROUTE_KEY), vpn);
+  const routeOrCellular = () => routeTile(settings.mode, routeFailure(), settings.get(ROUTE_KEY)) ?? cellularTile(settings.mode, settings.get(ROUTE_KEY), vpn)
+    ?? switchTile(settings.mode, settings.get(ROUTE_KEY), vpn); // B396
   const draw = (slot) => {
     seq++; last = slot;
     paintCert(row, slotOrRoute(slotTile(settings.mode, slot), routeOrCellular())); // B316, F372
