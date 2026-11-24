@@ -33,7 +33,7 @@ every port `_remotepairing._tcp` is advertised on over mDNS (listed in `NSBonjou
 connect fails with `refused` (a turned-down pairing with `pairing_rejected`), and the page pairs again.
 
 Pair-setup isn't allowed over loopback or Wi-Fi (`allowsPairSetup` false), so a connection only ever
-verifies an existing pairing. The built-in VPN is on while installing (the app turns it on and off); iOS lets no app switch another app's VPN, so the Install Switch Shortcut does. A build without Network Extensions has no way to connect (`vpn_failed`).
+verifies an existing pairing. The built-in VPN is on while installing (the app turns it on and off); iOS lets no app switch another app's VPN, so an install turns that VPN off and the person turns it back on afterwards. A build without Network Extensions has no way to connect (`vpn_failed`).
 
 ## When the connection drops mid-install
 

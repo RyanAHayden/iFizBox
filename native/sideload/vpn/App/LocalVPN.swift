@@ -53,7 +53,7 @@ enum LocalVPN {
                 "cellular": path.cellular, "wifi": path.wifi, "otherVPN": otherVPNUp(), "name": name]
     }
 
-    /// The keys of the Install Switch and Cellular Shortcuts, which this build no longer has: removed once at launch.
+    /// Keys left by the old Shortcut features, removed once at launch.
     private static let oldKeys = ["ifizbox.vpn.shortcut.off", "ifizbox.vpn.shortcut.on", "ifizbox.vpn.shortcut.switch",
                                   "ifizbox.vpn.shortcut.trip", "ifizbox.vpn.shortcut.idle", "ifizbox.vpn.switch.pending",
                                   "ifizbox.vpn.lost", "ifizbox.vpn.leftOff"]

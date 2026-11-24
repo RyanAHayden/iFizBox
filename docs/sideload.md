@@ -259,8 +259,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   built from source on Linux and linked statically. The signed IPA goes to this phone's installd over the built-in VPN
   (AFC upload to PublicStaging, then installation_proxy), so nothing reaches the Signing Server, no install sheet has
   to stay up, it works offline, and iFizBox updates itself (installd closes and replaces it). Choosing This iPhone
-  opens its page (`installation/iphone`): Set Up (Pair This iPhone, Test Connection, Install Switch), then How It Works.
-  The native side no longer runs Shortcuts for This iPhone installs; the Install Switch on this page is web UI only.
+  opens its page (`installation/iphone`): Set Up (Pair This iPhone, Test Connection), then How It Works.
   Set Up's rows say Checking… until `idevice.status` answers; a failed or late answer says Not Responding. Pair This
   iPhone opens `installation/pair`, a page that runs by itself: one sentence on what it gives, then on iOS 27 pairing
   starts on its own, the 6-digit code big at the top and where to type it, a short line a step with a ringed screenshot
@@ -292,23 +291,16 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   stays in Settings > VPN, only connected during installs, so iOS's "Add VPN Configurations" Allow comes once.
   Setting up asks it: right after pairing (or importing a pairing file), the pairing page runs the same test as
   Test Connection (`vpn.test`) before it says Paired. iOS runs one VPN at a time, so your VPN pauses for the install, and since ours keeps Settings > VPN's checkmark, a VPN that relies on On Demand stays off until you turn it on again.
-  On cellular (cellular in use, no Wi-Fi joined) iOS can refuse these connections while cellular data is on. The native
-  side runs no Shortcut and never turns cellular data off or on. The web Set Up page still offers an Install Switch
-  (settings.md): Add opens its iCloud link (`SHORTCUT_LINKS.switch` in `core/installroute.js`) as a universal link
-  (`UIApplication.open` with `universalLinksOnly`), and Share Shortcut File shares the signed file
-  (`tools/shortcuts/sign.sh` from `tools/shortcuts/install-switch.plist`, shipped in `web/app/shortcuts/`). The link holds a
-  copy of the Shortcut as it was made, so when the plist changes it is re-signed, a new link is made and the constant is updated.
-  The native side doesn't read the Shortcut at all.
+  On cellular (cellular in use, no Wi-Fi joined) iOS can refuse these connections while cellular data is on, and the
+  page says "On cellular, join Wi-Fi.". Nothing turns cellular data off or on.
   `LocalVPN.begin` runs `up()`: it saves the configuration the first time (iOS asks to allow it) and connects it. The end
   takes our VPN down 3 seconds after the queue's last connection. The configuration is never On Demand. iOS runs one VPN at
   a time, so while ours is on any other VPN is taken off, and `vpn.status`'s `otherVPN` says so. Nothing puts that VPN back
   (whether one that relies on On Demand comes back by itself is not verified on a phone).
-  On launch the app clears the old Shortcut keys once (`ifizbox.vpn.shortcut.*`, `ifizbox.vpn.switch.pending`,
+  On launch the app clears the keys of the removed Shortcut features once (`ifizbox.vpn.shortcut.*`, `ifizbox.vpn.switch.pending`,
   `ifizbox.vpn.lost`, `ifizbox.vpn.leftOff`).
   Bridge calls: `vpn.status` (also `idevice.status`'s `vpn`) answers `{available, bundled, entitled, tested, on, cellular,
-  wifi, otherVPN, name}`, and `vpn.test` stays. `vpn.testSwitch`, `vpn.checkShortcut`, `vpn.openShortcuts` and `vpn.leftOff`
-  are gone from native, and so is the `ifizbox://vpn-shortcut` URL. The web code still calls the first three and tolerates
-  the missing answers.
+  wifi, otherVPN, name}`, and `vpn.test` runs the Set Up test.
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`.
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and

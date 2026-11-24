@@ -17,7 +17,7 @@ const { drawInstallation, leave, needsTestAfterPairing, setupGroups, TESTING_AFT
 globalThis.location = { hash: format(settingsRoute(["installation", "pair"])) };
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
-const VPN = (o = {}) => ({ available: true, tested: false, cellular: false, wifi: true, shortcuts: { off: false, on: false }, ...o });
+const VPN = (o = {}) => ({ available: true, tested: false, cellular: false, wifi: true, ...o });
 const NOT_PAIRED = (vpn) => ({ paired: null, pairOnPhone: true, otherVPN: false, ...(vpn ? { vpn } : {}) });
 
 // idevice.pair sends the code and answers when `pair()` is called; vpn.test answers when `test()` is.

@@ -47,9 +47,8 @@ import { listedOf } from "../core/appqueue.js"; // F400
 import { apps as appStore, undoRecord } from "../core/installed.js"; // B170
 import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, HERE_CLOSING_LINE, waitHints } from "../signing/selfupdate.js";
 import { nativeBridge, hasNativeCall } from "../native.js";
-import { USE_SERVER, USE_SERVER_LINE, serverStep, switchFailedAlert } from "../core/installroute.js"; // F366
-import { showAlert } from "../nav/alert.js"; // B395
-const SETTINGS_FIXES = new Set(["signIn", "pair", "check", "shortcuts"]); // F366: fixes that open Installation & Signing
+import { USE_SERVER, USE_SERVER_LINE, serverStep } from "../core/installroute.js"; // F366
+const SETTINGS_FIXES = new Set(["signIn", "pair", "check"]); // F366: fixes that open Installation & Signing
 
 // The phone's side of a run, from signing-client.js (prepareOnDevice, openPrepared, discardPrepared). Each attempt of a
 // row gets its own tag, so signing.cancel {tag} stops that try only.
@@ -485,14 +484,6 @@ export async function runAppRun(jobs, deps) {
       return true;
     };
     page.help?.(USE_SERVER_LINE, { label: USE_SERVER, action: go });
-    // B395: the Install Switch didn't run: one plain alert for the run, over its Log
-    const sw = failed.map((r) => lanes.fallbacks.get(r.id)).find((f) => f.code === "switch_failed");
-    if (sw) {
-      Promise.resolve((deps.alert ?? showAlert)(switchFailedAlert(sw))).then(({ index } = {}) => {
-        if (index === 1 && lanes.fix) { page.close(); lanes.fix(sw.fix); }
-        if (index === 2) go();
-      }).catch(() => {});
-    }
     return { label: USE_SERVER, action: go };
   }
 

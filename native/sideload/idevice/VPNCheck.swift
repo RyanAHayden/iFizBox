@@ -1,7 +1,7 @@
 // Tunnel interfaces and the probe of the phone's own address, for the built-in VPN (native/sideload/vpn).
 //   otherVPN: a tunnel interface (utun, ipsec, ppp) of another app is up with an IPv4 address
 //   tunnels:  the tunnel interfaces that are up
-// iOS gives an app no way to switch another app's VPN; the built-in VPN's Install Switch pauses and restores it.
+// iOS gives an app no way to switch another app's VPN: during installs the built-in VPN takes it off, and the person turns it back on after.
 import Darwin
 import Foundation
 

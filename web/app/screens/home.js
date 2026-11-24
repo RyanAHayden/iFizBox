@@ -51,8 +51,6 @@ import { NAME } from "../brand.js";
 import { rowIcon, PAGE_ICONS } from "../icons/rowicons.js";
 import { nativeBridge } from "../native.js";
 import { routeFailure, ROUTE_KEY } from "../core/installroute.js"; // B316
-import { cellularWarning, CELLULAR } from "../core/installroute.js"; // F372
-import { switchOutdated, SWITCH_OLD } from "../core/installroute.js"; // B396
 
 export const title = "Home";
 
@@ -557,8 +555,7 @@ export function paintCert(row, w) {
   row.querySelector(".cell-label").textContent = w.title;
   row.querySelector(".cell-subtitle").textContent = w.subtitle;
   const a = row.querySelector(".home-tile");
-  if (a) a.href = w.href ?? CERT_HREF(); // F372: the cellular tile opens Cellular Shortcuts
-}
+  if (a) a.href = w.href ?? CERT_HREF();}
 const CERT_HREF = () => format(settingsRoute(["signing"]));
 // F307 (concept K3, option C): the same slot holds Signing Needs Setup and Signing Server Down (core/signing.js
 // signingTile), on the website and in the sideload app; the plain Signing half-tile is gone. The jailbreak app has none.
@@ -597,27 +594,7 @@ export function routeTile(mode, failure, choice) {
   if (mode !== "sideload" || choice !== "iphone" || !failure?.title) return null;
   return { stage: "close", kind: "route", title: failure.title, subtitle: ROUTE_TILE_SUBTITLE };
 }
-// B396: the Install Switch's update (amber, installs still work) also gives way to a red one.
-export function slotOrRoute(t, route) { return t?.stage === "gone" || (t?.stage === "close" && route?.kind === "switch") ? t : route ?? t; }
-// F372 (user 2026-11-22): This iPhone in use, the phone on cellular and the Cellular Shortcuts not added (core
-// cellularWarning, from vpn.status `vpn`): the slot says so and opens Cellular Shortcuts. A failed install (routeTile)
-// says more, so it comes first.
-export const CELLULAR_TILE_SUBTITLE = "On cellular, installs need them"; // fits the tile at 320pt
-export function cellularTile(mode, choice, vpn) {
-  if (mode !== "sideload" || !cellularWarning(choice, { vpn })) return null;
-  return { stage: "close", kind: "cellular", title: CELLULAR.title, subtitle: CELLULAR_TILE_SUBTITLE, href: format(settingsRoute(["installation", "shortcuts"])) };
-}
-// B396: This iPhone in use with an outdated Install Switch: the same slot offers Update (its page) until it's done.
-export const SWITCH_TILE_SUBTITLE = "An older one is in Shortcuts · Update"; // fits the tile at 320pt
-export function switchTile(mode, choice, vpn) {
-  if (mode !== "sideload" || !switchOutdated(choice, { vpn })) return null;
-  return { stage: "soon", kind: "switch", title: SWITCH_OLD.title, subtitle: SWITCH_TILE_SUBTITLE, href: format(settingsRoute(["installation", "shortcuts"])) };
-}
-// vpn.status for the slot, only when This iPhone is the way in use (null otherwise, or when the shell has none)
-export async function slotVPN(mode, choice, native = nativeBridge()) {
-  if (mode !== "sideload" || choice !== "iphone" || typeof native?.call !== "function") return null;
-  try { return await native.call("vpn.status", {}); } catch { return null; }
-}
+export function slotOrRoute(t, route) { return t?.stage === "gone" ? t : route ?? t; }
 // The Signing Server when installs can use it (an https:// address, as screens/signing.js serverReady), else null.
 // Settings > Signing has two steps (certificate, server), so with this set, not set up means no certificate.
 export function httpsServer(server) {
@@ -633,18 +610,15 @@ function certRow() {
   if (!showsSigningSlot(settings.mode)) return row;
   let seq = 0;
   let last = null;
-  let vpn = null; // F372: vpn.status, for the cellular tile
-  const routeOrCellular = () => routeTile(settings.mode, routeFailure(), settings.get(ROUTE_KEY)) ?? cellularTile(settings.mode, settings.get(ROUTE_KEY), vpn)
-    ?? switchTile(settings.mode, settings.get(ROUTE_KEY), vpn); // B396
+  const routeNow = () => routeTile(settings.mode, routeFailure(), settings.get(ROUTE_KEY));
   const draw = (slot) => {
     seq++; last = slot;
-    paintCert(row, slotOrRoute(slotTile(settings.mode, slot), routeOrCellular())); // B316, F372
+    paintCert(row, slotOrRoute(slotTile(settings.mode, slot), routeNow())); // B316
   };
-  const onRoute = () => { if (alive()) { seq++; paintCert(row, slotOrRoute(slotTile(settings.mode, last), routeOrCellular())); } };
+  const onRoute = () => { if (alive()) { seq++; paintCert(row, slotOrRoute(slotTile(settings.mode, last), routeNow())); } };
   const check = async () => {
     const mine = ++seq;
-    const [slot, v] = await Promise.all([signingSlot(settings.mode), slotVPN(settings.mode, settings.get(ROUTE_KEY))]);
-    vpn = v;
+    const slot = await signingSlot(settings.mode);
     if (mine === seq && alive()) draw(slot);
   };
   const onHash = () => { if (/^#\/home\/?$/.test(location.hash)) check(); };

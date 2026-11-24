@@ -65,12 +65,11 @@ rows or change footers. Top to bottom:
 - A status cell, always two lines under its title (`installStatus`), and one action row whose label changes:
   Checking… (Check Connection, dimmed); Pair This iPhone with Start Pairing; Pair Again (a check the phone turned down)
   opens Pairing, which starts pairing at once; No Network Extensions (the app's profile lacks them, so installs go
-  through the Signing Server); Couldn't Connect and iPhone Refused, red, with their fix (Check Connection, Pairing, or the
-  Install Switch page). On This iPhone with the built-in VPN and an added Install Switch that is outdated (core `switchOutdated`; a state with no check run yet counts as outdated), the cell reads Update Install Switch, "The one in Shortcuts is an older one.", and its action Update Install Switch opens `installation/shortcuts`; a failed check takes priority over it. Home's warning slot shows it too, amber, until it's updated (a red signing warning comes first). A pairing the phone dropped is redone on Pairing by itself. With Signing Server chosen: Ready to
-  Install through the server, Check Server.
+  through the Signing Server); Couldn't Connect and iPhone Refused, red, with their fix (Check Connection or Pairing).
+  On cellular, those two messages add "On cellular, join Wi-Fi." A pairing the phone dropped is redone on Pairing by
+  itself. With Signing Server chosen: Ready to Install through the server, Check Server.
   With the built-in VPN (the app's profile has Network Extensions): Ready to Install, "Straight onto this iPhone,
-  through iFizBox VPN"; on cellular with the Install Switch not added, Add the Install Switch with Add Install
-  Switch (it opens its page).
+  through iFizBox VPN".
 - **Install Apps With**: This iPhone ("Works offline") and Signing Server ("Default - Uses ifizbox.com"), a row each
   with its icon. A tap on a row picks that way: its checkmark moves to it, and the way in use keeps its checkmark. A
   row for This iPhone that isn't set up yet (not paired, or its connection not tested once) opens its setup page
@@ -89,18 +88,12 @@ The pages under it:
   Pair This iPhone (Start / Done, opens Pairing), Test Connection (Test / Testing… / Connected: `vpn.test` turns
   the VPN on, connects once with the pairing and turns it off; the first time, iOS asks to allow the VPN
   configuration; Pairing runs it by itself right after pairing, with a "Testing the Connection…" spinner, before it
-  says Paired, so setup asks that once), Install Switch (Add / Checking… / Update / Done, "Optional: cellular, and your VPN
-  back after"; Add opens Shortcuts' Add Shortcut directly with the iCloud link, Update (an older one) opens Install Switch's page, and Done shows only once it has run;
-  Share Shortcut File and the "Shortcut Not Added" alert's Share File share the signed file instead), with a footer that says
-  the next step (pair, test, or add the Install Switch) or that it's set up (or that the Install Switch is an older one). A failed check or install is
-  said there instead, red, with its fix row. Choosing This iPhone (a row tap on either page, Pairing, the first Test Connection that passes, or Check Connection that switches to it) asks once when the Install Switch is outdated: Later or Update, the text saying to delete the old one in Shortcuts first; Update opens the Install Switch page. An install that would run it (`switchWouldRun`) asks before it starts: Later goes on, Update stops and opens the page. Later is kept in localStorage `ifizbox.switchLater`: `choose` (only the next install that would run it asks) or `install` (no question again), removed once the Install Switch is current. Someone without an Install Switch never sees any of this. Then **How It Works** › (`installation/how`: the six steps of one install
-  and Offline). **Install Switch** (`installation/shortcuts`, titled Install Switch): an Added row, a Share Shortcut File
-  row while the Install Switch isn't added or needs Update (the signed file, as a backup), and Test Install
-  Switch (`vpn.testSwitch` runs its start and end, turning cellular data off and back on and the VPN with it; its row's subtitle says which step it is on, and if the Install Switch doesn't run the test fails and your VPN stays on). Phones
-  that added the older Cellular Data Off and Cellular Data On Shortcuts still have them to run, but this page no
-  longer lists them. **Signing Server** (`installation/server`): Server,
+  says Paired, so setup asks that once). The footer names the next step (pair or test); once paired and tested it reads
+  "Set up. Apps install straight onto this iPhone, on Wi-Fi or offline.", and when another VPN is up or chosen in
+  Settings > VPN it adds "Your VPN goes off during installs. Turn it back on after." A failed check or install is
+  said there instead, red, with its fix row. Then **How It Works** › (`installation/how`: the five steps of one install:
+  Download, Sign, iFizBox VPN On, Install, iFizBox VPN Off; and Offline). **Signing Server** (`installation/server`): Server,
   Check Server, Run Your Own. Without Network Extensions in the app's profile, This iPhone's page shows the Set Up group "Network Extensions: Missing" below.
-  The native side no longer runs Shortcuts for This iPhone installs; the Install Switch rows described above are web UI only (docs/sideload.md).
 - **Install Apps With** (`installation/with`, the older page): This iPhone (installd over the built-in VPN, docs/sideload.md) or Signing Server
   (the manifest and iOS's Install prompt, the default), with a checkmark, each subtitle a short point per line,
   wrapped. This iPhone's says Built-in VPN / No server, no install popup / Updates itself: installs

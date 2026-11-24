@@ -20,7 +20,7 @@ test("This iPhone chosen: Set Up and How It Works, and a tap picks", () => {
   const picked = [];
   const gs = installationGroups("iphone", VPN_ST, { pick: (v) => picked.push(v) });
   assert.deepEqual(gs.map((g) => g.header), ["Install Apps With", "Set Up", undefined]);
-  assert.deepEqual(gs[1].rows.map((r) => [r.label, r.detail]), [["Pair This iPhone", "Done"], ["Test Connection", "Connected"], ["Install Switch", "Add"]]);
+  assert.deepEqual(gs[1].rows.map((r) => [r.label, r.detail]), [["Pair This iPhone", "Done"], ["Test Connection", "Connected"]]);
   assert.match(gs[1].rows[0].href, /installation\/pair$/);
   assert.equal(gs[2].rows[0].label, "How It Works");
   gs[0].rows[1].onClick();
