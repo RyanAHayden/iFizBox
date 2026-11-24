@@ -349,6 +349,12 @@ class CellularInstalls(unittest.TestCase):
         name = re.search(r'shortcutName = "(.+)"', self.swift).group(1)
         self.assertIn('name="%s"' % name, read("tools", "shortcuts", "sign.sh", base=os.path.dirname(NATIVE)))
 
+    def test_signed(self):
+        name = re.search(r'shortcutName = "(.+)"', self.swift).group(1)
+        with open(os.path.join(os.path.dirname(NATIVE), "web", "app", "shortcuts", name + ".shortcut"), "rb") as f:
+            self.assertEqual(f.read(4), b"AEA1")  # signed: iOS refuses the plain one
+        self.assertIn('subdirectory: "web/shortcuts"', read("App", "CellularShortcutBridge.swift"))
+
     def test_bridge(self):
         src = read("App", "CellularShortcutBridge.swift")
         self.assertEqual(sorted(re.findall(r'b\.on\("([^"]+)"', src)), ["cellular.add", "cellular.check", "cellular.status"])
