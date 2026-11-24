@@ -28,9 +28,11 @@ the hold file was gone, no postinst or uicache job left, `install ok installed` 
 Cleaned up: the test source, its lists, the test tweak and the temp files are off the phone; iFizBox 5070 (this branch)
 stays; lock given back, server and tunnel stopped.
 
-`git reset`-free note: an empty commit, "build number", is on the branch only to give the second build a higher one.
+An empty commit, "build number", is on the branch only to give the second build a higher one.
 
 ## Not verified
 - The userspace reboot and Reload SpringBoard on the phone. A userspace reboot may lose the palera1n jailbreak, so these are covered by unit tests only. Reload uses the same respring verb as Restart.
 - That LaunchServices' own record names the new version. Only that uicache's job ended.
+- Closing the held app from the app switcher, and Cancel, on the phone: unit tests only (the postinst's "closed" and
+  "released" cases; the respring that killed the app ended the job the same way).
 - iOS 16+ and other jailbreaks.
