@@ -960,6 +960,8 @@ enum IDevice {
         var firstDrop: Failure?
         LocalVPN.installBegan() // B395: its reconnects share one queue, so the VPN stays on through them
         defer { LocalVPN.installEnded() }
+        let wait = UUID() // F417a2: Cellular Installs keeps cellular data off until this connection is open
+        defer { CellularShortcut.connected(wait) }
         let paused = { (p: LocalVPN.Pause) -> Void in // B423
             if p == .app { note("Waiting for \(Brand.name): open it to go on") }
             if p == .network { note("No network: iOS starts a VPN only with one. Turn Airplane Mode off for a moment, or join Wi-Fi") }
@@ -968,6 +970,7 @@ enum IDevice {
         }
         while true {
             if !run.connected { try LocalVPN.waitForApp(cancelled: cancelled, paused: paused) }
+            CellularShortcut.connects(wait)
             // a reconnect waits again when cellular data is back
             let waited: Bool
             do {
@@ -992,7 +995,7 @@ enum IDevice {
             } : nil
             do {
                 try watched(attempt == 0 ? "install" : "install, connection \(attempt + 1)") { (w: Watch) -> Void in
-                    try installTry(run, watch: w, note: note, progress: progress)
+                    try installTry(run, wait: wait, watch: w, note: note, progress: progress)
                 }
                 return
             } catch where run.lookedInstalled {
@@ -1027,9 +1030,10 @@ enum IDevice {
 
     /// One connection's worth of install(): connect, ask what iOS has (once), copy what iOS lacks, then install, or
     /// after a drop, ask iOS whether the install it was sent landed.
-    private static func installTry(_ run: HereRun, watch w: Watch, note: @escaping (String) -> Void,
+    private static func installTry(_ run: HereRun, wait: UUID, watch w: Watch, note: @escaping (String) -> Void,
                                    progress: @escaping (Step) -> Void) throws {
         let s = try Session(watch: w, finishing: run.connected)
+        CellularShortcut.connected(wait)
         run.onConnect?()
         run.onConnect = nil
         let route = s.kind == .remotePairing ? "\(s.via) (RemotePairing tunnel)" : "\(s.via) (lockdown)"

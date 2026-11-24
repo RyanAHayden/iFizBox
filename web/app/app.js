@@ -679,6 +679,10 @@ if (nativeBridge()) {
     setTimeout(() => Promise.all([import("./core/push.js"), import("./signing/identity.js")])
       .then(([p, s]) => p.autoEnablePush({ native, server: s.getServer() })).catch(() => {}), 3000);
   }
+  // F417a2: the app was closed while Cellular Installs had cellular data off: the shell puts it back, the page says so
+  if (detectMode() === "sideload") {
+    import("./signing/cellularrun.js").then((m) => m.sayPutBackAtLaunch(nativeBridge())).catch(() => {});
+  }
   // F410b: the pairing of This iPhone, checked in the background at launch and on coming back (screens/installroute.js
   // quietPairingCheck says when it runs). A moment after, so a link or a tap that starts an install goes first.
   if (detectMode() === "sideload") {

@@ -187,7 +187,7 @@ class App(unittest.TestCase):
         wait = src[src.index("static func waitOffCellular("):src.index("// ---- The app out of sight")]
         self.assertIn("static let awayGrace: TimeInterval = 30", src)
         # on cellular alone: never once Airplane Mode is on
-        pause = wait[wait.index("if now.cellular, IDevice.AppFront.away >= awayGrace {"):wait.index("if now.cellular { left = nil }")]
+        pause = wait[wait.index("if now.cellular, !running, IDevice.AppFront.away >= awayGrace {"):wait.index("if now.cellular { left = nil }")]
         self.assertLess(pause.index("end()"), pause.index("try pause("))
         self.assertLess(pause.index("try pause("), pause.index("try hold(false)"))
         body = src[src.index("private static func pause("):src.index("static func takeDownLeftOver()")]
@@ -363,7 +363,31 @@ class CellularInstalls(unittest.TestCase):
         self.assertIn("AppMode.current != .jailbreak", src)
         self.assertIn("CellularShortcutBridge.register(b)", read("App", "LocalVPN.swift"))
         self.assertIn("if CellularShortcutBridge.receive(url) { return }", read("Sources", "App.swift", base=NATIVE))
-        self.assertNotIn(".run)", src)  # nothing here turns cellular data off
+        self.assertNotIn("drive(.run", src)  # nothing here turns cellular data off
+
+    def test_run(self):
+        """F417a2: only in the wait with the VPN up; what is owed is kept before Shortcuts opens, cleared once data is on."""
+        src = read("App", "CellularRun.swift")
+        self.assertEqual(sorted(re.findall(r'b\.on\("([^"]+)"', src)), ["cellular.putBack", "cellular.run"])
+        self.assertIn("if let e = CellularShortcutBridge.refusal", src)
+        run = src[src.index("private static func run()"):src.index("// ---- Putting")]
+        order = ["guard LocalVPN.waitsOnCellular()", "guard LocalVPN.connectedNow()", "CellularShortcut.begin(.run", "owed = true", "drive(.run)", "owed = false"]
+        self.assertEqual(sorted(order, key=run.index), order)
+        self.assertLess(run.index("giveUp()"), run.index("= putBack()"))
+        back = src[src.index("private static func putBack()"):]
+        self.assertNotIn("owed = false", back)  # its callers: a run keeps it after a failed put-back, for one more at launch
+        self.assertIn('if back != "failed" { owed = false }', run)
+        self.assertLess(run.index("begin(.run"), run.index("releaseIfNone()"))
+        self.assertIn("guard owed, CellularShortcutBridge.available", src)
+        vpn = read("App", "LocalVPN.swift")
+        self.assertIn("CellularRun.register(b)", vpn)
+        wait = vpn[vpn.index("static func waitOffCellular("):vpn.index("// ---- The app out of sight")]
+        self.assertLess(wait.index("try hold(finishing)"), wait.index("count(true)"))
+        self.assertIn("if now.cellular, !running, IDevice.AppFront.away", wait)
+        idev = read("idevice", "IDevice.swift", base=os.path.dirname(HERE))
+        self.assertLess(idev.index("CellularShortcut.connects(wait)"), idev.index("try LocalVPN.waitOffCellular("))
+        self.assertIn("defer { CellularShortcut.connected(wait) }", idev)  # failed or cancelled
+        self.assertLess(idev.index("try Session(watch: w, finishing: run.connected)"), idev.index("        CellularShortcut.connected(wait)\n        run.onConnect"))
 
     @unittest.skipUnless(SWIFTC, "no Swift toolchain (SWIFT_TOOLCHAIN or swiftc on PATH): CellularShortcut.swift not tested")
     def test_state(self):

@@ -109,6 +109,37 @@ enum CellularShortcut {
         return .wait
     }
 
+    /// A `run` so far: until Open ran as a check. After it, its actions report at least every waitStep, and at once when
+    /// its waits may end; `quiet` is how long they haven't.
+    /// failed: also ran_out (it got to its end, with installs not connected).
+    static func runVerdict(_ r: Report?, elapsed: TimeInterval, front: TimeInterval, quiet: TimeInterval, said: String?) -> Verdict {
+        guard let r, r.opened else { return verdict(r, elapsed: elapsed, front: front, said: said) }
+        if r.ok { return r.ranOut ? .failed("ran_out", nil) : .ok }
+        let limit = r.released || r.ranOut ? endLimit : waitStep + endLimit
+        return quiet >= limit ? .failed("no_end", said) : .wait
+    }
+
+    /// A `run` has begun and hasn't finished or been given up.
+    static var running: Bool { report.map { $0.kind == .run && !$0.finished } ?? false }
+
+    // ---- The installs it waits for: each from before its wait off cellular until its connection is open, or it ended.
+
+    private static var connecting = Set<UUID>() // guarded by lock
+
+    static func connects(_ id: UUID) { lock.lock(); connecting.insert(id); lock.unlock() }
+    /// The last one ends the waits of a run going on.
+    static func connected(_ id: UUID) {
+        lock.lock()
+        let last = connecting.remove(id) != nil && connecting.isEmpty
+        lock.unlock()
+        if last { release() }
+    }
+
+    static func releaseIfNone() {
+        lock.lock(); let none = connecting.isEmpty; lock.unlock()
+        if none { release() }
+    }
+
     private static func change(_ f: (inout Report) -> Void) {
         lock.lock(); defer { lock.unlock() }
         guard var c = current, !c.finished else { return }

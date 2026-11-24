@@ -37,7 +37,7 @@ enum CellularShortcutBridge {
         guard #available(iOS 16.0, *) else { return false }
         return AppMode.current != .jailbreak && Bundle.main.bundleIdentifier == SignOptions.selfBundleID
     }
-    private static var refusal: String? {
+    static var refusal: String? {
         available ? nil : "unavailable: \(CellularShortcut.shortcutName) needs iOS 16 and the sideload app under its own bundle ID"
     }
     private static var file: URL? {
@@ -66,16 +66,7 @@ enum CellularShortcutBridge {
     /// Blocking. error: nil when it passed.
     private static func check() -> (error: String?, text: String?) {
         guard CellularShortcut.begin(.check, vpnUp: false) else { return ("busy", nil) }
-        var verdict = open(.check)
-        var left = false, front = 0.0, elapsed = 0.0 // the app went behind Shortcuts; seconds in front again, and in all
-        while verdict == .wait {
-            Thread.sleep(forTimeInterval: 0.1)
-            lock.lock(); let back = called, text = said; lock.unlock()
-            elapsed += 0.1
-            if !active() { left = true; front = 0 } else if left || back { front += 0.1 }
-            verdict = CellularShortcut.verdict(CellularShortcut.report, elapsed: elapsed, front: front, said: text)
-        }
-        lock.lock(); runID = nil; called = false; said = nil; lock.unlock()
+        let verdict = drive(.check) { r, s in CellularShortcut.verdict(r, elapsed: s.elapsed, front: s.front, said: s.said) }
         guard case .failed(let code, let text) = verdict else {
             UserDefaults.standard.set(true, forKey: addedKey)
             LocalVPN.log("\(CellularShortcut.shortcutName): check passed")
@@ -88,7 +79,30 @@ enum CellularShortcutBridge {
         return (code, text)
     }
 
-    private static func active() -> Bool {
+    /// How far a run is, in seconds the process ran: in all, back in front after Shortcuts, and since its actions last
+    /// reported; and what its callback said.
+    struct Sofar { var elapsed = 0.0, front = 0.0, quiet = 0.0, said: String? }
+
+    /// Blocking: opens the Shortcut, then asks `judge` ten times a second until it decides.
+    static func drive(_ k: CellularShortcut.Kind, _ judge: (CellularShortcut.Report?, Sofar) -> CellularShortcut.Verdict) -> CellularShortcut.Verdict {
+        var verdict = open(k)
+        var s = Sofar(), left = false // left: the app went behind Shortcuts
+        var last = CellularShortcut.report
+        while verdict == .wait {
+            Thread.sleep(forTimeInterval: 0.1)
+            lock.lock(); let back = called; s.said = said; lock.unlock()
+            s.elapsed += 0.1
+            if !active() { left = true; s.front = 0 } else if left || back { s.front += 0.1 }
+            let r = CellularShortcut.report
+            s.quiet = r == last ? s.quiet + 0.1 : 0
+            last = r
+            verdict = judge(r, s)
+        }
+        lock.lock(); runID = nil; called = false; said = nil; lock.unlock()
+        return verdict
+    }
+
+    static func active() -> Bool {
         DispatchQueue.main.sync { UIApplication.shared.applicationState == .active }
     }
 
