@@ -196,7 +196,7 @@ class App(unittest.TestCase):
         self.assertLess(down.index("startLock.unlock()"), down.index("defer { giveBack(idle) }"))
         self.assertLess(down.index("defer { giveBack(idle) }"), down.index("stopVPNTunnel()"))
         left = src[src.index("static func takeDownLeftOver()"):src.index("private static func downIfIdle(")]
-        self.assertIn("owed || [", left)  # a killed app's, its tunnel down already
+        self.assertIn("guard on || owed else", left)  # a killed app's, its tunnel down already
 
     def test_tunnel_stops_itself(self):
         """B423: a killed app's tunnel: 60 s awake with no packet; the app's beat is well inside it."""
