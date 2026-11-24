@@ -7,7 +7,7 @@ syslog recording and Settings > VPN never opened.
 
 | # | Idea | Result |
 |---|------|--------|
-| 1 | A Shortcut's **Set VPN** after our configuration is removed | **Works, no person.** It enabled Tailscale again and it connected, with no iOS prompt and no dialog in Shortcuts. |
+| 1 | A Shortcut's **Set VPN** after our configuration is removed | **Works with no tap or prompt at run time** (runs started by URL from the rig, not by the app; the user adds the Shortcut once). It enabled Tailscale again and it connected, with no iOS prompt and no dialog in Shortcuts. |
 | 2 | Open Settings > VPN for the user (`app.openURL`) | **Does not reach the page.** `App-prefs:VPN`, `App-prefs:General&path=VPN` and `App-prefs:root=General&path=VPN` only bring Settings forward on whatever page it was on (Apps here); `prefs:root=General&path=VPN` did nothing. Tailscale stayed off. |
 | 3 | Tailscale's own **Connect** button | Works (it saves its configuration enabled, ours goes to enabled = 0), but a person taps it. |
 | 4 | Private `grade` | Not run again; B427a found it reads 1 with no setter. |
@@ -32,10 +32,10 @@ The Install Switch Shortcut (still on the phone from F386; the app stopped using
    No prompt, no dialog; Shortcuts showed its plain list.
 
 So iOS lets Set VPN enable a configuration that another save disabled, which our app cannot do itself.
-What it needs: the VPN must be **stored before our configuration is saved** (the start run's Get Current VPN
-after the save finds nothing to restore; a start run on its own when ours was already gone showed "No VPN was
-passed" from its Find VPNs step, and a lone end run with nothing stored changed nothing). The stored VPN is
-whichever one is current, so it is not Tailscale-specific; only Tailscale was tried.
+What it needs (inferred, not measured): the VPN is stored **before our configuration is saved**. A start run on
+its own when ours was already gone showed "No VPN was passed" from its Find VPNs step, and a lone end run with
+nothing stored changed nothing; what Get Current VPN returns after the save was not run. Get Current VPN is generic,
+but only Tailscale was tried.
 
 Costs: Shortcuts comes to the front for each run (one trip per queue, as F394 did), the Shortcut has to be added
 once by the user (the share-sheet Add), iOS 16+ only, and R77 saw NEVPNErrorDomain error 2 at the end of Set VPN
@@ -73,6 +73,8 @@ person's OK. It is not filed here because it changes the product's Shortcuts sta
 
 ## Not verified
 
+- `signing.openApp` on Settings, and any other deep-link form than the four tried.
+- "iOS 16+ only" for Set VPN, and that NE's one-enabled rule covers a Personal VPN: from memory of Apple's docs, not checked.
 - A VPN other than Tailscale as the other one.
 - The x-callback result of the end run (error 2 or clean); only the NE log and `otherVPN` were read.
 - Wording and timing of Shortcuts coming to the front in a real queue, and on a locked phone.
