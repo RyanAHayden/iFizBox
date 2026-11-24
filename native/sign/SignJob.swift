@@ -25,6 +25,9 @@ final class SignJob {
 
     static var current: SignJob? { lock.lock(); defer { lock.unlock() }; return running }
 
+    // B427a: an app is being downloaded, signed or installed, by any of the jobs.
+    static var anyGoing: Bool { lock.lock(); defer { lock.unlock() }; return running != nil || !tagged.isEmpty }
+
     // Stops the current job. False when none runs (or it was already cancelled).
     @discardableResult
     static func cancelCurrent() -> Bool {

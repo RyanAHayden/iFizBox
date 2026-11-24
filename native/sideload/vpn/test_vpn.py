@@ -182,7 +182,8 @@ class App(unittest.TestCase):
         self.assertLess(pause.index("try pause("), pause.index("try hold(false)"))
         body = src[src.index("private static func pause("):src.index("static func takeDownLeftOver()")]
         self.assertLess(body.index("installEnded()"), body.index("while !IDevice.AppFront.now || !Path.online()"))
-        self.assertIn("defer { installBegan(); paused(.over) }", body)
+        back = body[body.index("defer {"):body.index("var offline")]
+        self.assertLess(back.index("installBegan()"), back.index("paused(.over)"))
         self.assertIn("if !run.connected { try LocalVPN.waitForApp(", idev)
         self.assertIn("Session(watch: w, finishing: run.connected)", idev)
         self.assertEqual(idev.count("finishing: run.connected"), 2)
@@ -198,26 +199,38 @@ class App(unittest.TestCase):
         self.assertIn('else if held { held = false; KeepAlive.shared.end() }', sideload)
 
     def test_restore_my_vpn(self):
-        """F411: the configuration is removed only with the setting on and another VPN up at the start, once ours is
-        down; remembered across a killed app."""
+        """F411/B427a: with the setting on (off by default) the configuration is removed once nothing uses it, whatever
+        was up before; not while an install waits; tried again, and the log says what was decided."""
         src = read("App", "LocalVPN.swift")
         self.assertEqual(src.count("removeFromPreferences"), 1)
         self.assertNotIn("register(defaults", src)  # off by default
-        self.assertIn("private static var owed: Bool { restore && UserDefaults.standard.bool(forKey: owedKey) }", src)
-        note = src[src.index("private static func noteOther()"):src.index("private static func giveBack(")]
-        self.assertLess(note.index("guard restore else { return }"), note.index("set(true, forKey: owedKey)"))
-        self.assertLess(note.index("guard up ||"), note.index("set(true, forKey: owedKey)"))
-        start = src[src.index("private static func start("):src.index("/// Before a connect to iOS")]
-        self.assertLess(start.index("noteOther()"), start.index("try manager()"))  # whose save takes the other's place
+        for gone in ["noteOther", "owedKey", "comeBack"]:
+            self.assertNotIn(gone, src)
         give = src[src.index("private static func giveBack("):src.index("static let beatEvery")]
-        order = ["guard owed, idle(), !Thread.isMainThread", "m.isEnabled", "[.disconnected, .invalid].contains", "guard owed, idle() else", "m.removeFromPreferences"]
+        order = ["guard restore, let id", "guard idle() else", "if let w = waiting()", "[.disconnected, .invalid].contains",
+                 "guard restore, idle(), waiting() == nil", "m.removeFromPreferences", "configuration removed"]
         self.assertEqual(sorted(order, key=give.index), order)
+        self.assertNotIn("guard m.isEnabled", give)  # never stays, the checkmark its own or not
+        self.assertIn("if again { giveBackLater(retryAfter) }", give)
+        for line in ["in use again, kept", "stays for now", "no configuration to remove", "configuration not removed"]:
+            self.assertIn(line, give)
+        waiting = src[src.index("private static func waiting()"):src.index("private static func giveBack(")]
+        self.assertIn("pauses", waiting)
+        self.assertIn("SignJob.anyGoing", waiting)
+        pause = src[src.index("private static func pause("):src.index("static func takeDownLeftOver()")]
+        self.assertLess(pause.index("pauses += 1"), pause.index("installEnded()"))
+        self.assertLess(pause.index("installBegan()"), pause.index("pauses -= 1"))
         down = src[src.index("private static func downIfIdle("):src.index("// ---- Restore My VPN")]
         # under startLock, after the stop's wait
         self.assertLess(down.index("startLock.unlock()"), down.index("defer { giveBack(idle) }"))
         self.assertLess(down.index("defer { giveBack(idle) }"), down.index("stopVPNTunnel()"))
         left = src[src.index("static func takeDownLeftOver()"):src.index("private static func downIfIdle(")]
-        self.assertIn("guard on || owed else", left)  # a killed app's, its tunnel down already
+        self.assertIn("guard on || (restore && m != nil) else", left)  # a killed app's, its tunnel down already
+        setr = src[src.index("static func setRestore("):src.index("static let laterEvery")]
+        self.assertIn("if on { takeDownLeftOver() }", setr)  # ours there already
+        self.assertNotIn("isMainThread", src)  # a background task's end runs off the main thread
+        hold = src[src.index("final class BackgroundHold"):src.index("// ---- Other VPNs")]
+        self.assertLess(hold.index("DispatchQueue.global"), hold.index("f(); self.end()"))
 
     def test_tunnel_stops_itself(self):
         """B423: a killed app's tunnel: 60 s awake with no packet; the app's beat is well inside it."""
