@@ -127,6 +127,25 @@ class App(unittest.TestCase):
         self.assertEqual(re.findall(r"if (.*?) \{ refused\(f\) \}", src), ["refusable", "refusable && denied"])
         self.assertEqual(src.count("refusable: found == nil"), 1)  # the first save alone: the one iOS asks about
 
+    def test_wifi_joined_never_waits(self):
+        """B419: an IPv4 address on en0 is Wi-Fi, whatever the path says; a short drop is read again before asking."""
+        src = read("App", "LocalVPN.swift")
+        now = src[src.index("static func now()"):src.index("static func wifiAddress()")]
+        self.assertIn("let wifi = p.usesInterfaceType(.wifi) || wifiAddress()", now)
+        self.assertIn("return (p.usesInterfaceType(.cellular) && !wifi, wifi)", now)
+        addr = src[src.index("static func wifiAddress()"):src.index("static func described()")]
+        self.assertIn('== "en0"', addr)
+        self.assertIn("== AF_INET {", addr)
+        self.assertIn("static let airplaneReread: TimeInterval = 3", src)
+        wait = src[src.index("static func waitOffCellular("):src.index("// ---- The tunnel")]
+        self.assertIn("!failedNow(), Path.now().cellular else { return false }", wait)
+        self.assertLess(wait.index("try begin"), wait.index("let t0 = Date()"))
+        self.assertLess(wait.index("if now.wifi && !asked {"), wait.index("waiting()\n"))
+        self.assertIn("if now.cellular && !asked && Date().timeIntervalSince(t0) >= airplaneReread {", wait)
+        self.assertEqual(wait.count("waiting()\n"), 1)
+        # the path's interfaces are in the log where the wait begins
+        self.assertLess(wait.index("waiting for Wi-Fi or Airplane Mode; path:"), wait.index("waiting()\n"))
+
     def test_status_is_plain(self):
         src = read("App", "LocalVPN.swift")
         status = src[src.index("static func status()"):src.index("/// The keys of")]

@@ -31,9 +31,9 @@ export const NO_VPN = {
 };
 // This iPhone is set up: paired, and with the built-in VPN tested once (vpn.test). Using it waits for that.
 export const iphoneSetUp = (st) => Boolean(st?.paired) && builtinVPN(st) && Boolean(st.vpn.tested);
-// F368: on cellular iOS refuses the connects an install needs, so the install waits for Airplane Mode (LocalVPN.swift
+// F368: on cellular iOS refuses the connects an install needs, so the install waits for Wi-Fi or Airplane Mode (LocalVPN.swift
 // waitOffCellular). AIRPLANE_ON: the wait; AIRPLANE_OFF: the connection is open; CELL_LINE: a failed check there.
-export const AIRPLANE_ON = "Turn on Airplane Mode to install";
+export const AIRPLANE_ON = "Join Wi-Fi or turn on Airplane Mode";
 export const AIRPLANE_OFF = "You can turn Airplane Mode off";
 export const CELL_LINE = "On cellular, check on Wi-Fi. Installs ask for Airplane Mode.";
 export const CELL_FOOTER = "On cellular, installs ask for Airplane Mode.";

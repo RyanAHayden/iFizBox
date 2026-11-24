@@ -215,8 +215,8 @@ _In code_: openConfirm, refusedGroups, unqueueGroup, helperRefusal, refusalIds
 _Avoid_: error sheet, failed Confirm
 
 **Airplane wait**:
-On cellular, a This iPhone install holds after signing until the phone leaves cellular
+On cellular, a This iPhone install holds after signing until Wi-Fi is joined or Airplane Mode is on
 _Said_: the airplane wait
-_On screen_: Turn on Airplane Mode to install
+_On screen_: Join Wi-Fi or turn on Airplane Mode
 _In code_: LocalVPN.waitOffCellular, AIRPLANE_ON, airplaneStatus
 _Avoid_: cellular pause, data off wait
