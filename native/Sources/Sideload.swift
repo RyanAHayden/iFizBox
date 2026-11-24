@@ -339,9 +339,10 @@ enum Sideload {
     // "cancelled: Cancelled" if it hasn't answered yet. iOS's own install, once it has the whole IPA, goes on.
     static func cancel(_ c: Bridge.Call) {
         guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: the jailbreak app installs IPAs through its helper") }
+        // F417: keep: the signed copy stays, for the Signing Server instead
         // F235: {tag} stops one app of the IPA queue's run (its download, signing, serving and watch), nothing else
         if let tag = c.params["tag"] as? String, !tag.isEmpty {
-            return DispatchQueue.main.async { c.reply(["cancelled": SignJob.cancel(tag: tag)], nil) }
+            return DispatchQueue.main.async { c.reply(["cancelled": SignJob.cancel(tag: tag, keep: c.params["keep"] as? Bool ?? false)], nil) }
         }
         DispatchQueue.main.async {
             watchCancels += 1
@@ -634,6 +635,7 @@ enum Sideload {
                                     note: { log?($0) }) { st in
                     switch st {
                     case .airplane: emit?("airplane", 0); step?("airplane", 0)
+                    case .offCellular: step?("connecting", 0); emit?("offCellular", 0) // emit: library.install has no step
                     case .airplaneOff: emit?("airplaneOff", 0); step?("airplaneOff", 0)
                     case .appWait(let p): // B423: paused, iOS may suspend the app (held: once each way)
                         if p == .over { if !held { held = true; KeepAlive.shared.begin() } }

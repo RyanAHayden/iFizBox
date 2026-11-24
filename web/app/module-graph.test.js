@@ -16,7 +16,8 @@ const root = dirname(fileURLToPath(import.meta.url));
 // C32: core/tweaks.js + core/unpack.js, the website's signer (signing/browser.js and its parts) and screens/guides.js
 // left startup (1.55 MB -> 1.34 MB): 114, so 117.
 // F382: core/sourcefilters.js, which the worker's catalog and the settings store both need at startup: 118.
-const MAX_MODULES = 118;
+// F417: core/cellular.js and signing/cellular.js, with signing/route.js: 120.
+const MAX_MODULES = 120;
 
 // Static imports only: `import x from "…"`, `import "…"`, `export … from "…"` at the start of a line (multi-line
 // lists included). import() calls are not matched.

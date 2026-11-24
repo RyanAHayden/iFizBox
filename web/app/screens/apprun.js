@@ -84,21 +84,26 @@ export function phoneLanes(sc, { native, run = laneRunId() } = {}) {
   // default Signing Server (Use the Signing Server): for this run only, Install Apps With is left as it is
   const fallbacks = new Map();
   let server = false;
+  // F417: the popup on cellular, one for the run; Try Again of a row it cancelled asks anew
+  const cell = sc.cellularAsk?.({ onServer: () => { server ||= "own"; } });
+  const cellCancelled = new Set();
   return {
     sign: (r, { signal, progress }, log = () => {}) => sc.prepareOnDevice(r.job, { tag: tagOf(r), signal, progress, log, native }),
     install: (r, { signal, progress, again = false, allSigned = null }, log = () => {}) => {
       const tag = (again && served.get(r.id)) || tagOf(r);
       served.set(r.id, tag);
       fallbacks.delete(r.id);
-      return Promise.resolve(sc.openPrepared(r, { tag, signal, progress, log, host: isSelf(r), native, allSigned, ...(again ? { again: true } : {}),
-        ...(server ? { server: true } : {}) })).catch((e) => {
+      if (cellCancelled.delete(r.id)) { cellCancelled.clear(); cell?.forget(); }
+      return Promise.resolve(sc.openPrepared(r, { tag, signal, progress, log, host: isSelf(r), native, allSigned, ...(cell ? { cell } : {}), ...(again ? { again: true } : {}),
+        ...(server ? { server } : {}) })).catch((e) => {
+        if (e?.code === "cellular") cellCancelled.add(r.id);
         if (e?.fallback && !server) fallbacks.set(r.id, e.fallback);
         throw e;
       });
     },
     fallbacks,
     useServer: () => { server = true; },
-    serverRoute: () => server, // a function: heldLanes copies the lanes' keys
+    serverRoute: () => Boolean(server), // a function: heldLanes copies the lanes' keys
     fix: (fix) => sc.runFix?.(fix, { native }), // the failure's own fix button (signing/route.js runFix)
     discard: (r) => sc.discardPrepared(r.token, native),
     // B123: iFizBox's own update once its IPA is with iOS (signing.selfUpdate): onState(state) -> the last state | null

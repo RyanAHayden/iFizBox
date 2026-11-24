@@ -937,9 +937,9 @@ enum IDevice {
 
     // ---- Installing
 
-    /// airplane: on cellular, waiting for Airplane Mode; airplaneOff: connected after that wait, so it can go off.
+    /// airplane: on cellular, waiting for Airplane Mode; offCellular: that wait is over; airplaneOff: connected after that wait, so it can go off.
     /// B423: appWait(true): paused until the app is opened (its KeepAlive is let go); appWait(false): going on.
-    enum Step { case airplane, airplaneOff, appWait(LocalVPN.Pause), connected, upload(Double), install(Double) }
+    enum Step { case airplane, offCellular, airplaneOff, appWait(LocalVPN.Pause), connected, upload(Double), install(Double) }
 
     private final class ProgressBox { let f: (UInt64) -> Void; init(_ f: @escaping (UInt64) -> Void) { self.f = f } }
 
@@ -985,6 +985,7 @@ enum IDevice {
             // Wi-Fi ended the wait as well: then there is no Airplane Mode to turn off, and the row leaves the wait's
             // line (B419: a reconnect emits no .connected of its own)
             let wifi = LocalVPN.Path.now().wifi
+            if waited { progress(.offCellular) } // F417: the page's popup goes now
             run.onConnect = waited ? {
                 note("The connection is open")
                 if !wifi { progress(.airplaneOff) } else if run.connected { progress(run.installSent ? .install(0) : .connected) }

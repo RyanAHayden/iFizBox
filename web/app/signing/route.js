@@ -11,7 +11,7 @@ export async function chooseRoute({ native, alert = showAlert, storage = storage
   if (heldRoute && now() - heldRoute.at < ROUTE_HOLD) return heldRoute.params;
   let status = null;
   try { status = await bridge(native).call("idevice.status", {}); } catch { status = null; }
-  const d = decideRoute(choice, status);
+  const d = decideRoute(choice, status, onCellularChoice(storage)); // F417
   if (d.alert) {
     const a = ROUTE_ALERTS[d.alert];
     await alert({ title: a.title, message: a.message, buttons: a.buttons, cancel: 0 });
@@ -64,6 +64,8 @@ import { getServer, defaultServer } from "./identity.js";
 import { serverFallback, USE_SERVER, USE_SERVER_LINE, AIRPLANE_OFF } from "../core/installroute.js"; // F366
 import { isSelfIpa, finishHere, hereLabel, shownName } from "./common.js";
 import { lastDevice, openRoute } from "./device.js";
+import { onCellularChoice } from "../core/cellular.js"; // F417
+import { cellularAsk, cellularStopped } from "./cellular.js";
 import { followHereSelf, followSelfUpdate } from "./selfupdate.js";
 
 // Signs `url` (an IPA) on the phone and opens the install link: true once iOS was asked to install; false after an
@@ -111,9 +113,10 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   // F366: `server`: this install goes through the default Signing Server whatever Install Apps With says
   const route = server ? {} : await chooseRoute({ native, alert });
   if (!route) return false;
-  const manifestServer = server ? defaultServer() : getServer();
+  const manifestServer = server && server !== "own" ? defaultServer() : getServer(); // F417: "own": the user's
   // This iPhone: installd puts the app (iFizBox too) in place itself, so no Signing Server and no hosting.
   const self = isSelfIpa(url) || host; // iFizBox itself, whichever route
+  const hosted = host; // F417: for the Signing Server instead
   if (route.route) host = false;
   const h = hud("Downloading");
   h.onCancel?.(() => stopNative(native));
@@ -121,6 +124,8 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   let airplaneOff = ""; // F368
   let rate = 0; // B262
   let result;
+  const wait = cellularAsk({ alert }).watch(() => stopNative(native)); // F417
+  h.onCancel?.(() => wait.end());
   try {
     // manifestServer: the signing server hands iOS the manifest while iFizBox serves the IPA over plain HTTP at
     // 127.0.0.1 (nothing to set up on the phone; the server sees only the app's ID, version and name).
@@ -128,6 +133,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
       if (ev?.log) h.page?.raw?.(ev.log); // the shell's console lines (Sideload.swift install's log)
       // B111: This iPhone: the copy's and installd's own percents ({here}), not the overall "Installing on this iPhone"
       const here = route.route ? hereLabel(ev) : null;
+      if (route.route) wait.phase(ev?.here); // F417
       if (here) {
         if (ev.here !== lastHere) {
           lastHere = ev.here;
@@ -144,7 +150,17 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
       if (t) h.set(ev?.phase === "downloading" && rate > 0 ? `${t}, ${rateText(rate)}` : t);
     }), { alert, url: params ? null : url }));
   } catch (e) {
+    const stopped = wait.end();
     if (h.cancelled) return false;
+    if (stopped && e?.code === "cancelled") { // F417: the popup's answer
+      if (stopped === "server") {
+        h.hide();
+        return installOnDeviceOnce({ url, name, onInstalled, params, after, host: hosted, server: "own", listed }, { native, hud, alert, go, later, follow });
+      }
+      const why = cellularStopped(stopped).message;
+      failed(h, `${why.charAt(0).toUpperCase()}${why.slice(1)}.`);
+      return false;
+    }
     if (e?.code === "cancelled") { h.hide(); return false; } // B104: Cancel on This Download Is Not Secure
     let why = deviceError(e, name);
     if (route.route) why = await routeWords(e, why, native); // B316: the route's own words; kept until a check passes
@@ -160,6 +176,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
     if (fallback && index === buttons.length - 1) return fallback.run({ inline: true });
     return false;
   }
+  wait.end();
   if (route.route) clearRouteFailure(); // B316: an install went through: the route works
   keepIpaHash(storageOf(), result, { bundleId: params?.bundleId ?? null }); // F292
   if (h.cancelled) return false;

@@ -33,7 +33,7 @@ export const NO_VPN = {
 export const iphoneSetUp = (st) => Boolean(st?.paired) && builtinVPN(st) && Boolean(st.vpn.tested);
 // F368: on cellular iOS refuses the connects an install needs, so the install waits for Wi-Fi or Airplane Mode (LocalVPN.swift
 // waitOffCellular). AIRPLANE_ON: the wait; AIRPLANE_OFF: the connection is open; CELL_LINE: a failed check there.
-export const AIRPLANE_ON = "Join Wi-Fi or turn on Airplane Mode";
+export const AIRPLANE_ON = "Waiting to leave cellular data";
 // B423: a wait paused because the app is in the background (LocalVPN.swift pause)
 export const APP_WAIT = `Waiting for ${NAME}`;
 // opened again with no network (Airplane Mode went on meanwhile): iOS starts no VPN without one
@@ -65,7 +65,7 @@ export const OTHER_VPN_LINE = "Your VPN goes off during installs. Turn it back o
 export function setupFooter(st) {
   if (!iphoneSetUp(st)) return "";
   if (otherVPNOn(st) && !st.vpn.restore) return OTHER_VPN_LINE;
-  return st.vpn.cellular ? CELL_FOOTER : "";
+  return ""; // F417: On Cellular's own footer says what happens there
 }
 // F414: setting up, as rows: what each is and whether it's done (`next`: a tap does it). The test is when iOS asks to
 // allow the VPN (B357), so those two are done together.
@@ -105,7 +105,7 @@ export const HOW_STEPS = [
   { label: "1. Download", subtitle: "The app downloads over Wi-Fi or cellular." },
   { label: "2. Sign", subtitle: "Signed on this iPhone with your certificate." },
   { label: `3. ${BUILTIN_VPN} On`, subtitle: "iOS runs one VPN at a time, so yours pauses." },
-  { label: "4. Install", subtitle: "Copied straight to iOS. On cellular, turn on Airplane Mode when asked." },
+  { label: "4. Install", subtitle: "Copied straight to iOS. On cellular, as On Cellular says." },
   { label: `5. ${BUILTIN_VPN} Off`, subtitle: "Turn yours back on after." },
 ];
 // vpn.test's answer, or its error, as the alert's words.
@@ -127,11 +127,13 @@ export function storedRoute(storage = globalThis.localStorage) {
 // One install's route: { route: "idevice" } or { route: "server" }, with `alert` (a key of ALERTS) when This iPhone
 // is chosen but can't be used now: the alert says the install goes through the Signing Server instead.
 // `status` is idevice.status ({paired, vpn, otherVPN}), null when the call failed.
-export function decideRoute(choice, status) {
+// F417: `cellular` (core/cellular.js): "server" goes through the Signing Server while the phone is on cellular.
+export function decideRoute(choice, status, cellular = "ask") {
   if (choice !== "iphone") return { route: "server" };
   if (!status) return { route: "server", alert: "noStatus" };
   if (!status.paired) return { route: "server", alert: "notPaired" };
   if (!builtinVPN(status)) return { route: "server", alert: "noVPN" };
+  if (cellular === "server" && onCellular(status)) return { route: "server" };
   return { route: "idevice" };
 }
 

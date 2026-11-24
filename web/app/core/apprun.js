@@ -409,6 +409,12 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       res = await install(r, { signal: f.ctl.signal, progress: progressOf(r, f), allSigned: () => allSigned(f.ctl.signal), ...(again ? { again: true } : {}) });
     } catch (e) {
       if (f.why || ended(r)) return;
+      if (e?.code === "cell_server") { // F417: the popup's Use Signing Server: the signed copy, again in turn
+        finishRow(r, "signed", { phase: null, fraction: 1, here: false, airplane: null });
+        log(r, "step", `Installing ${label(r)} through the Signing Server`);
+        pump();
+        return;
+      }
       if (reinstall && e?.code === "gone") {
         // B337: the shell no longer keeps that signed IPA (its `life` ran out, or an older shell): signed again
         finishRow(r, "waiting", { token: null, phase: null, fraction: 0, progress: 0 });

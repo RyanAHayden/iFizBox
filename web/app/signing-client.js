@@ -26,6 +26,7 @@ export { loadIdentity, saveIdentity, clearIdentity, signingReady, getBring, setB
 export { isSelfIpa, signAndInstall, ORIGINAL_WARNED_KEY, originalWarning } from "./signing/install.js";
 export { deviceStatus, statusReady, importToDevice, removeFromDevice, firstInstallCheck,
   openSigning } from "./signing/device.js";
+export { cellularAsk } from "./signing/cellular.js"; // F417
 export { ROUTE_HOLD, chooseRoute, forgetRoute, installOnDevice } from "./signing/route.js";
 export { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, followSelfUpdate, HERE_CLOSING_LINE, followHereSelf,
   watchSelfUpdate } from "./signing/selfupdate.js";
