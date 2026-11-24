@@ -480,8 +480,11 @@ enum IDevice {
         private static let lock = NSLock()
         private static var front = true
         private static var watching = false
+        private static var leftAt: Date? // guarded by lock: nil in front
+        /// B423: how long the app has been in the background; 0 in front.
+        static var away: TimeInterval { lock.lock(); defer { lock.unlock() }; return leftAt.map { Date().timeIntervalSince($0) } ?? 0 }
         static var now: Bool { lock.lock(); defer { lock.unlock() }; return front }
-        private static func set(_ f: Bool) { lock.lock(); front = f; lock.unlock() }
+        private static func set(_ f: Bool) { lock.lock(); front = f; leftAt = f ? nil : leftAt ?? Date(); lock.unlock() }
 
         /// Starts following the app's state; call it on the main thread (idempotent).
         static func watch() {
@@ -494,7 +497,10 @@ enum IDevice {
             }
             nc.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: nil) { _ in
                 set(true); IDevice.ilog("the app is in front again")
+                LocalVPN.takeDownLeftOver()
             }
+            // the first launch's own way to the front
+            nc.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: nil) { _ in set(true) }
         }
     }
 
@@ -692,6 +698,7 @@ enum IDevice {
         private var heartbeat: OpaquePointer?
         private var beating = false
         private let watch: Watch
+        private let finishing: Bool // B423: an install already connected: the VPN may start in the background
         private let second: Bool // a second look beside the install's own session: rides on its VPN
         let kind: Kind
         private var builtIn = false // through the built-in VPN, held (LocalVPN.begin) until deinit
@@ -707,7 +714,7 @@ enum IDevice {
             watch.begin("turning on \(LocalVPN.name)", Limit.tunnel)
             let w = watch
             do {
-                try LocalVPN.begin { w.alive($0) }
+                try LocalVPN.begin(finishing: finishing) { w.alive($0) }
                 builtIn = true
                 return (address, port)
             } catch {
@@ -725,8 +732,9 @@ enum IDevice {
             failureLock.lock(); defer { failureLock.unlock() }
             return vpnFailure ?? Failure(code: "vpn_failed", text: "\(LocalVPN.name) didn't start a moment ago")
         }
-        init(watch: Watch, second: Bool = false) throws {
+        init(watch: Watch, second: Bool = false, finishing: Bool = false) throws {
             self.watch = watch
+            self.finishing = finishing
             self.second = second
             guard let (kind, data) = IDevice.pairing() else {
                 throw Failure(code: "not_paired", text: "pair this iPhone first (Settings > Installation)")
@@ -926,7 +934,8 @@ enum IDevice {
     // ---- Installing
 
     /// airplane: on cellular, waiting for Airplane Mode; airplaneOff: connected after that wait, so it can go off.
-    enum Step { case airplane, airplaneOff, connected, upload(Double), install(Double) }
+    /// B423: appWait(true): paused until the app is opened (its KeepAlive is let go); appWait(false): going on.
+    enum Step { case airplane, airplaneOff, appWait(Bool), connected, upload(Double), install(Double) }
 
     private final class ProgressBox { let f: (UInt64) -> Void; init(_ f: @escaping (UInt64) -> Void) { self.f = f } }
 
@@ -947,11 +956,17 @@ enum IDevice {
         var firstDrop: Failure?
         LocalVPN.installBegan() // B395: its reconnects share one queue, so the VPN stays on through them
         defer { LocalVPN.installEnded() }
+        let paused = { (on: Bool) -> Void in // B423
+            if on { note("Waiting for \(Brand.name): open it to go on") }
+            progress(.appWait(on))
+            if !on { progress(run.installSent ? .install(0) : .connected) } // the row leaves that line
+        }
         while true {
+            if !run.connected { try LocalVPN.waitForApp(cancelled: cancelled, paused: paused) }
             // a reconnect waits again when cellular data is back
             let waited: Bool
             do {
-                waited = try LocalVPN.waitOffCellular(cancelled: cancelled) {
+                waited = try LocalVPN.waitOffCellular(finishing: run.connected, cancelled: cancelled, paused: paused) {
                     note("On cellular: join Wi-Fi or turn on Airplane Mode")
                     progress(.airplane)
                 }
@@ -1008,7 +1023,7 @@ enum IDevice {
     /// after a drop, ask iOS whether the install it was sent landed.
     private static func installTry(_ run: HereRun, watch w: Watch, note: @escaping (String) -> Void,
                                    progress: @escaping (Step) -> Void) throws {
-        let s = try Session(watch: w)
+        let s = try Session(watch: w, finishing: run.connected)
         run.onConnect?()
         run.onConnect = nil
         let route = s.kind == .remotePairing ? "\(s.via) (RemotePairing tunnel)" : "\(s.via) (lockdown)"

@@ -13,6 +13,40 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     static let deviceAddress = "10.7.0.0"
     static let peerAddress = "10.7.0.1"
 
+    /// B423: an app that was killed can't turn the tunnel off, so it stops itself after this long awake without a
+    /// packet for the peer or a message from the app (LocalVPN.beat, while it holds the tunnel).
+    static let quietLimit = 60
+    private static let tickEvery = 5
+    private let ticks = DispatchQueue(label: "ifizbox.vpn.quiet")
+    private var quiet = 0 // seconds, on `ticks`; counted by ticks, so the phone's sleep doesn't count
+    private var timer: DispatchSourceTimer?
+
+    private func heard() { ticks.async { self.quiet = 0 } }
+
+    private func watchQuiet() {
+        let t = DispatchSource.makeTimerSource(queue: ticks)
+        t.schedule(deadline: .now() + .seconds(Self.tickEvery), repeating: .seconds(Self.tickEvery))
+        t.setEventHandler { [weak self] in
+            guard let self = self else { return }
+            self.quiet += Self.tickEvery
+            guard self.quiet >= Self.quietLimit else { return }
+            self.timer?.cancel()
+            self.timer = nil
+            self.cancelTunnelWithError(nil)
+        }
+        ticks.async {
+            self.quiet = 0
+            self.timer?.cancel()
+            self.timer = t
+            t.resume()
+        }
+    }
+
+    override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)?) {
+        heard()
+        completionHandler?(nil)
+    }
+
     override func startTunnel(options: [String: NSObject]?, completionHandler: @escaping (Error?) -> Void) {
         let s = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: Self.peerAddress)
         let v4 = NEIPv4Settings(addresses: [Self.deviceAddress], subnetMasks: ["255.255.255.255"])
@@ -21,12 +55,13 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         s.ipv4Settings = v4
         s.mtu = 16384 // a loop on the phone: large packets copy faster, nothing on a wire limits them
         setTunnelNetworkSettings(s) { [weak self] err in
-            if err == nil { self?.loop() }
+            if err == nil { self?.loop(); self?.watchQuiet() }
             completionHandler(err)
         }
     }
 
     override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
+        ticks.async { self.timer?.cancel(); self.timer = nil }
         completionHandler()
     }
 
@@ -42,7 +77,10 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 out.append(back)
                 outProtocols.append(protocols[i])
             }
-            if !out.isEmpty { self.packetFlow.writePackets(out, withProtocols: outProtocols) }
+            if !out.isEmpty {
+                self.heard()
+                self.packetFlow.writePackets(out, withProtocols: outProtocols)
+            }
             self.loop()
         }
     }

@@ -4,6 +4,7 @@
 // keeps it). Nothing else is involved: no Shortcuts, no trip, no put-back. iOS takes another app's VPN off while ours
 // is on, so the status says `otherVPN` and the page says it. Whether that VPN comes back by itself (its On Demand) is
 // iOS's and that app's business.
+// B423: in the background it starts only to finish an install already connected; anything else waits for the app.
 //   idevice.status      carries the VPN's state as `vpn`: {available, bundled, entitled, tested, on, cellular, wifi,
 //                       otherVPN, name}
 //   vpn.test            the VPN on, one connect to iOS with the pairing (idevice.verify), the VPN off: {ok, ms, kind};
@@ -20,6 +21,7 @@ enum LocalVPN {
     static let testedKey = "ifizbox.vpn.tested"
     /// How long the VPN stays on after the last connection ends: the next install of a queue, or a reconnect, finds it on.
     static let linger: TimeInterval = 3
+    static let downWait: TimeInterval = 3 // from stopVPNTunnel to disconnected
     static let startLimit: TimeInterval = 10 // from startVPNTunnel to connected
     static let saveLimit: TimeInterval = 90 // the first save waits for the user's Allow on iOS's "Add VPN Configurations"
 
@@ -144,15 +146,21 @@ enum LocalVPN {
     /// Blocking: true once the path has left cellular after `waiting` was said (the VPN on, kept by installBegan),
     /// false when it wasn't on cellular, or left it within airplaneReread. Wi-Fi joined ends it as well. Polled through NWPathMonitor's last path, so Control Center over the app changes nothing.
     /// Throws when cancelled, after airplaneLimit, or when the VPN doesn't start; installEnded then takes it down.
-    static func waitOffCellular(cancelled: () -> Bool, waiting: () -> Void) throws -> Bool {
+    /// B423: out of the app for awayGrace with the path still cellular, the wait pauses (pause()): its hold is let go,
+    /// so the VPN goes off. Airplane Mode on isn't cellular, so the VPN is never dropped then.
+    static func waitOffCellular(finishing: Bool, cancelled: () -> Bool, paused: (Bool) -> Void, waiting: () -> Void) throws -> Bool {
         guard available, !failedNow(), Path.now().cellular else { return false }
         log("on cellular before \(name) is on; path: \(Path.described())")
-        try begin { _ in
-            if cancelled() { throw IDevice.Failure(code: "cancelled", text: "Cancelled") } // while another install's start goes on
+        func hold(_ finishing: Bool) throws {
+            try begin(finishing: finishing) { _ in
+                if cancelled() { throw IDevice.Failure(code: "cancelled", text: "Cancelled") } // while another install's start goes on
+            }
         }
-        defer { end() }
+        try hold(finishing)
+        var held = true
+        defer { if held { end() } }
         log("on cellular: reading the path again for \(Int(airplaneReread)) s; path: \(Path.described())")
-        let t0 = Date() // after begin: Wi-Fi can drop as the VPN starts
+        var t0 = Date() // after begin: Wi-Fi can drop as the VPN starts
         var left: Date?
         var asked = false
         while true {
@@ -164,6 +172,19 @@ enum LocalVPN {
             if now.wifi && !asked {
                 log("on Wi-Fi: no wait; path: \(Path.described())")
                 return false
+            }
+            if now.cellular, IDevice.AppFront.away >= awayGrace {
+                log("out of the app for \(Int(awayGrace)) s, still on cellular: the wait pauses")
+                end()
+                held = false
+                let before = Date()
+                try pause(cancelled: cancelled, paused: paused)
+                try hold(false)
+                held = true
+                t0 += Date().timeIntervalSince(before) // the pause isn't part of airplaneLimit
+                left = nil
+                if asked { waiting() }
+                continue
             }
             if now.cellular { left = nil } else if left == nil { left = Date() }
             if let l = left, Date().timeIntervalSince(l) >= airplaneSettle {
@@ -180,6 +201,90 @@ enum LocalVPN {
                 throw IDevice.Failure(code: "airplane_timeout", text: "Airplane Mode wasn't turned on in \(Int(airplaneLimit / 60)) minutes, so nothing was installed")
             }
             Thread.sleep(forTimeInterval: 0.25)
+        }
+    }
+
+    // ---- The app out of sight (B423)
+    // KeepAlive keeps the app running in the background through an install, so the VPN could come on (or stay on) over
+    // the user's own VPN after they left. In the background it starts only to finish an install already connected.
+
+    static let awayGrace: TimeInterval = 30 // a trip to Settings for Airplane Mode: the wait's VPN stays on this long
+    static let awayLimit: TimeInterval = 300 // how long a check (no install) waits awake for the app to be opened
+
+    /// A start isn't allowed now: the app is in the background and the tunnel isn't up already.
+    private static func mustWait() -> Bool {
+        guard !IDevice.AppFront.now else { return false }
+        lock.lock(); defer { lock.unlock() }
+        return cached?.connection.status != .connected
+    }
+
+    /// Before an install's first connect: blocking until the app is in front, when the VPN would have to start.
+    static func waitForApp(cancelled: () -> Bool, paused: (Bool) -> Void) throws {
+        guard available, mustWait() else { return }
+        log("in the background: the install waits for the app to be opened")
+        try pause(cancelled: cancelled, paused: paused)
+    }
+
+    /// An install waits, blocking, for the app to be in front; it holds nothing meanwhile. `paused(true)` lets go of
+    /// its KeepAlive too, so iOS can suspend the app; no time limit.
+    private static func pause(cancelled: () -> Bool, paused: (Bool) -> Void) throws {
+        paused(true)
+        installEnded()
+        defer { installBegan(); paused(false) }
+        while !IDevice.AppFront.now {
+            if cancelled() { throw IDevice.Failure(code: "cancelled", text: "Cancelled") }
+            Thread.sleep(forTimeInterval: 0.25)
+        }
+        log("the app is in front: going on")
+    }
+
+    /// At launch and on coming back: our tunnel is up and no install or check is going on (a killed or suspended app
+    /// left it, or Settings turned it on): down.
+    static func takeDownLeftOver() {
+        guard available, let id = providerID else { return }
+        NETunnelProviderManager.loadAllFromPreferences { ms, _ in
+            guard let m = ms?.first(where: { ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == id }),
+                  [.connected, .connecting, .reasserting].contains(m.connection.status) else { return }
+            DispatchQueue.global(qos: .utility).async { downIfIdle(m, why: "left on with nothing going on") }
+        }
+    }
+
+    /// Blocking: `m`'s tunnel down, unless something holds it (or a start came after `gen`). Under startLock, until iOS
+    /// says it is off, so a start never meets a tunnel on its way down.
+    private static func downIfIdle(_ m: NETunnelProviderManager?, gen: Int? = nil, why: String) {
+        func idle() -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            return holds == 0 && installs == 0 && (gen == nil || gen == stopGen)
+        }
+        guard let m = m, idle() else { return } // a start going on has a hold: no waiting for startLock
+        startLock.lock(); defer { startLock.unlock() }
+        guard idle(), ![.disconnected, .invalid].contains(m.connection.status) else { return }
+        m.connection.stopVPNTunnel()
+        log("off (\(why))")
+        let t0 = Date()
+        while m.connection.status != .disconnected, m.connection.status != .invalid, Date().timeIntervalSince(t0) < downWait {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+    }
+
+    /// The tunnel stops itself after a minute without packets (PacketTunnelProvider), for an app that was killed.
+    /// While anything holds it, a message every beatEvery says the app is still there.
+    static let beatEvery: TimeInterval = 15
+    private static var beating = false // guarded by lock
+    private static func beat() {
+        lock.lock(); let start = !beating; beating = true; lock.unlock()
+        if start { beatLater() }
+    }
+    private static func beatLater() {
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + beatEvery) {
+            lock.lock()
+            let go = holds > 0 || installs > 0
+            beating = go
+            let conn = cached?.connection as? NETunnelProviderSession
+            lock.unlock()
+            guard go else { return }
+            if let c = conn, c.status == .connected { try? c.sendProviderMessage(Data([1])) }
+            beatLater()
         }
     }
 
@@ -287,9 +392,23 @@ enum LocalVPN {
     /// The tunnel up (blocking): started if it isn't, then until iOS says connected. B418: one at a time, each install
     /// of a queue calls it: a later caller waits here, then finds the tunnel connected and saves nothing, or tries
     /// itself when the one before failed (unless iOS refused the configuration meanwhile: it isn't asked twice).
-    static func up(_ step: (String) throws -> Void = { _ in }) throws {
+    /// B423: not while the app is in the background, unless `finishing` an install already connected: it waits for the
+    /// app, without startLock, so a finishing start isn't held up.
+    static func up(finishing: Bool = false, _ step: (String) throws -> Void = { _ in }) throws {
         let t0 = Date()
-        while !startLock.lock(before: Date().addingTimeInterval(1)) { try step("waiting for \(name)") }
+        var waited: TimeInterval = 0 // awake: a suspended app doesn't count
+        while true {
+            while !finishing && mustWait() {
+                if waited == 0 { log("in the background: \(name) waits for the app to be opened") }
+                guard waited < awayLimit else { throw IDevice.Failure(code: "vpn_failed", text: "\(name) starts only while \(Brand.name) is open") }
+                try step("waiting for \(Brand.name)")
+                Thread.sleep(forTimeInterval: 0.25)
+                waited += 0.25
+            }
+            while !startLock.lock(before: Date().addingTimeInterval(1)) { try step("waiting for \(name)") }
+            if finishing || !mustWait() { break } // it left while waiting for startLock: wait again
+            startLock.unlock()
+        }
         defer { startLock.unlock() }
         lock.lock(); let no = refusal; lock.unlock()
         if let no = no, no.at > t0 { throw no.failure }
@@ -336,20 +455,13 @@ enum LocalVPN {
         throw IDevice.Failure(code: "vpn_failed", text: "\(name) didn't connect in \(Int(startLimit)) s")
     }
 
-    /// The tunnel down now. The configuration stays saved (never removed): a new one would make iOS ask Allow on
-    /// "Add VPN Configurations" again at the next install, so iOS asks once, at setup's test (user, B357).
-    static func down() {
-        lock.lock(); let m = cached; lock.unlock()
-        guard let m = m else { return }
-        if m.connection.status != .disconnected { m.connection.stopVPNTunnel(); log("off") }
-    }
-
     /// Before a connect to iOS (blocking, on IDevice.queue): the VPN on, held until end().
-    static func begin(_ step: (String) throws -> Void = { _ in }) throws {
+    static func begin(finishing: Bool = false, _ step: (String) throws -> Void = { _ in }) throws {
         lock.lock(); holds += 1; stopGen += 1; lock.unlock()
+        beat()
         let tunnels = tunnelAddresses() // read before up() takes another VPN's place
         log("on; up tunnels: \(tunnelList(tunnels))")
-        do { try up(step) } catch {
+        do { try up(finishing: finishing, step) } catch {
             end()
             throw error
         }
@@ -366,7 +478,7 @@ enum LocalVPN {
 
     /// An install, its reconnects and the pauses between them (up to 15 s, HereRecheck.pause) are one queue: the VPN
     /// stays on through them, and goes off `linger` seconds after the last one.
-    static func installBegan() { lock.lock(); installs += 1; lock.unlock() }
+    static func installBegan() { lock.lock(); installs += 1; lock.unlock(); beat() }
     static func installEnded() {
         lock.lock(); installs = max(0, installs - 1); lock.unlock()
         stopLater()
@@ -375,9 +487,37 @@ enum LocalVPN {
     private static func stopLater() {
         lock.lock(); let gen = stopGen, idle = holds == 0 && installs == 0; lock.unlock()
         guard idle else { return }
+        // B423: under a background task, so an app that iOS suspends meanwhile still takes it down
+        let task = BackgroundHold("\(name) off") { stopNow() }
         DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + linger) {
-            lock.lock(); let stop = holds == 0 && installs == 0 && stopGen == gen; lock.unlock()
-            if stop { down() }
+            stopNow(gen: gen)
+            task.end()
+        }
+    }
+
+    /// The tunnel down now, when idle. The configuration stays saved (never removed): a new one would make iOS ask
+    /// Allow on "Add VPN Configurations" again at the next install, so iOS asks once, at setup's test (user, B357).
+    private static func stopNow(gen: Int? = nil) {
+        lock.lock(); let m = cached; lock.unlock()
+        downIfIdle(m, gen: gen, why: "nothing left to do")
+    }
+
+    /// One background task, ended once; `expiring` runs first when iOS ends it early.
+    private final class BackgroundHold {
+        private let lock = NSLock()
+        private var id = UIBackgroundTaskIdentifier.invalid
+        private var ended = false
+        init(_ name: String, expiring: @escaping () -> Void) {
+            let task = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
+                expiring()
+                self?.end()
+            }
+            lock.lock(); id = task; let late = ended; lock.unlock()
+            if late { UIApplication.shared.endBackgroundTask(task) }
+        }
+        func end() {
+            lock.lock(); let task = ended ? .invalid : id; ended = true; id = .invalid; lock.unlock()
+            if task != .invalid { UIApplication.shared.endBackgroundTask(task) }
         }
     }
 
@@ -450,6 +590,8 @@ enum LocalVPNBridge {
     static func register(_ b: Bridge) {
         LocalVPN.Path.start()
         LocalVPN.clearOldKeys()
+        DispatchQueue.main.async { IDevice.AppFront.watch() }
+        LocalVPN.takeDownLeftOver() // B423: a killed app's
         b.on("vpn.test") { c in
             IDeviceBridge.run(c) {
                 guard LocalVPN.available else { throw IDevice.Failure(code: "vpn_failed", text: "this app can't run \(LocalVPN.name): its profile has no Network Extensions capability") }

@@ -193,7 +193,7 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
 // B111: signing.open's event on the This iPhone route -> the run's { phase: "copying" | "installing", fraction 0..1 },
 // or null (not a step event). F368: "airplane" and "airplaneOff" too.
 export function herePhase(ev) {
-  if (ev?.phase === "airplane" || ev?.phase === "airplaneOff") return { phase: ev.phase, fraction: 0 };
+  if (["airplane", "airplaneOff", "appWait"].includes(ev?.phase)) return { phase: ev.phase, fraction: 0 };
   if (ev?.phase !== "copying" && ev?.phase !== "installing") return null;
   const f = Number(ev.progress);
   return { phase: ev.phase, fraction: Number.isFinite(f) ? Math.max(0, Math.min(1, f)) : 0 };

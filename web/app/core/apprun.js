@@ -73,7 +73,7 @@
 // app (Downloading Delta 48 MB, Signed Delta, Asked iOS to install Delta, Installed Delta / the reason it failed);
 // percents only move the row's bar and the bottom status.
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { AIRPLANE_ON, AIRPLANE_OFF } from "./installroute.js"; // F368
+import { AIRPLANE_ON, AIRPLANE_OFF, APP_WAIT } from "./installroute.js"; // F368
 import { runOrder, sizeText, SELF_ID } from "./appqueue.js";
 import { NAME } from "../brand.js";
 import { isNewer } from "./selfupdate.js"; // B159: staleSelf
@@ -280,6 +280,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       else if (phase === "asking") log(r, "step", `Asked iOS to install ${label(r)}`);
       else if (phase === "copying") log(r, "step", copyingText(r)); // B111: This iPhone
       else if (phase === "airplane") log(r, "step", AIRPLANE_ON); // F368
+      else if (phase === "appWait") log(r, "step", APP_WAIT); // B423
       else if (phase === "airplaneOff") log(r, "step", "Connected to iOS"); // the status says it can go off (airplaneStatus)
       else if (phase === "installing" && r.here) {
         log(r, "step", `Installing ${label(r)}`);
@@ -292,6 +293,10 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     if (word.word && word.word !== r.word && word.word !== "Preparing") log(r, "step", `${word.word} ${label(r)}`);
     const settled = !r.here && phase === "copying"; // F359: its This iPhone route is settled: others may join it
     const here = r.here || phase === "copying";
+    if (phase === "appWait") { // B423: paused until the app is opened
+      set(r, { phase, state: "installing", here: true, fraction: 0 });
+      return;
+    }
     if (phase === "airplane" || phase === "airplaneOff") { // F368: This iPhone's wait on cellular, and its end
       set(r, { phase, state: "installing", here: true, fraction: 0, airplane: phase === "airplane" ? "on" : "off" });
       return;
@@ -652,6 +657,7 @@ export function rowStatus(row, opts = {}) {
       return promptUp(row) ? "Tap Install on the iOS prompt" : "Installing"; // B137: This iPhone has no prompt
     case "installing":
       if (row.phase === "airplane") return AIRPLANE_ON; // F368
+      if (row.phase === "appWait") return APP_WAIT; // B423
       if (row.phase === "airplaneOff") return "Connected to iOS";
       if (row.phase === "copying") return p > 0 && p < 100 ? `Copying to iPhone ${p}%` : "Copying to iPhone";
       if (selfClosing(row)) return SELF_CLOSING;
@@ -693,6 +699,7 @@ export function airplaneStatus(rows) {
 export function runStatus(rows) {
   const air = airplaneStatus(rows); // F368
   if (air) return air;
+  if (rows.some((r) => r.state === "installing" && r.phase === "appWait")) return APP_WAIT; // B423
   const pos = (r) => `${rows.indexOf(r) + 1} of ${rows.length}`;
   const withIos = rows.filter((r) => WITH_IOS.has(r.state) && r.phase !== "hold");
   if (withIos.length > 1) { // F359: This iPhone rows installing together
@@ -721,7 +728,7 @@ export function rowProgress(r) {
   if (ended(r)) return 1;
   if (helperRow(r)) return r.state === "installing" ? f : 0; // B400: no signing: the helper's bar is the row's whole bar
   if (r?.state === "installing" && r.phase === "copying") return 0.5 + 0.1 * f;
-  if (r?.state === "installing" && (r.phase === "airplane" || r.phase === "airplaneOff")) return 0.5; // F408: the copy comes next
+  if (r?.state === "installing" && ["airplane", "airplaneOff", "appWait"].includes(r.phase)) return 0.5; // F408: the copy comes next
   if (r?.state === "installing" && r.here) return 0.6 + 0.4 * f;
   if (r?.state === "downloading") return 0.25 * f;
   if (r?.state === "signing") return 0.25 + 0.25 * f;

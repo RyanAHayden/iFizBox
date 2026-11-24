@@ -89,14 +89,14 @@ class App(unittest.TestCase):
 
     def test_on_for_the_connect_off_after(self):
         idev = read("idevice", "IDevice.swift", base=os.path.dirname(HERE))
-        self.assertIn("try LocalVPN.begin {", idev)
+        self.assertIn("try LocalVPN.begin(finishing: finishing) {", idev)
         self.assertIn("if builtIn { LocalVPN.end() }", idev)
         src = read("App", "LocalVPN.swift")
         self.assertIn("m.isOnDemandEnabled = false", src)  # never on by itself
         self.assertIn("static let linger: TimeInterval = 3", src)
-        self.assertIn("if stop { down() }", src)  # ours is off after the last connection
+        self.assertIn("stopNow(gen: gen)", src)  # ours is off after the last connection
         self.assertIn('s["vpn"] = LocalVPN.status()', read("idevice", "IDeviceBridge.swift", base=os.path.dirname(HERE)))
-        up = src[src.index("static func up("):src.index("static func down(")]
+        up = src[src.index("static func up("):src.index("/// Before a connect to iOS")]
         self.assertLess(up.index("if !Path.online() {"), up.index("var m = try manager()"))  # no network: say so at once, not after startLimit
 
     def test_one_start_at_a_time(self):
@@ -105,7 +105,7 @@ class App(unittest.TestCase):
         up = src[src.index("static func up("):src.index("private static func start(")]
         self.assertLess(up.index("startLock.lock(before:"), up.index("try start(step)"))
         self.assertIn("defer { startLock.unlock() }", up)
-        start = src[src.index("private static func start("):src.index("static func down(")]
+        start = src[src.index("private static func start("):src.index("/// Before a connect to iOS")]
         self.assertLess(start.index("if on { return }"), start.index("try manager()"))
         manager = src[src.index("static func manager()"):src.index("private static func isOurs")]
         self.assertLess(manager.index("loadAllFromPreferences"), manager.index("if found == nil || !isOurs(m) {"))
@@ -137,14 +137,55 @@ class App(unittest.TestCase):
         self.assertIn('== "en0"', addr)
         self.assertIn("== AF_INET {", addr)
         self.assertIn("static let airplaneReread: TimeInterval = 3", src)
-        wait = src[src.index("static func waitOffCellular("):src.index("// ---- The tunnel")]
+        wait = src[src.index("static func waitOffCellular("):src.index("// ---- The app out of sight")]
         self.assertIn("!failedNow(), Path.now().cellular else { return false }", wait)
-        self.assertLess(wait.index("try begin"), wait.index("let t0 = Date()"))
+        self.assertLess(wait.index("try hold(finishing)"), wait.index("var t0 = Date()"))
         self.assertLess(wait.index("if now.wifi && !asked {"), wait.index("waiting()\n"))
         self.assertIn("if now.cellular && !asked && Date().timeIntervalSince(t0) >= airplaneReread {", wait)
-        self.assertEqual(wait.count("waiting()\n"), 1)
+        self.assertEqual(wait.count(" waiting()\n"), 1)
         # the path's interfaces are in the log where the wait begins
         self.assertLess(wait.index("waiting for Wi-Fi or Airplane Mode; path:"), wait.index("waiting()\n"))
+
+    def test_background(self):
+        """B423: no VPN start in the background but to finish a connected install; the wait pauses; the stop runs."""
+        src = read("App", "LocalVPN.swift")
+        idev = read("idevice", "IDevice.swift", base=os.path.dirname(HERE))
+        up = src[src.index("static func up("):src.index("private static func start(")]
+        self.assertLess(up.index("while !finishing && mustWait()"), up.index("startLock.lock(before:"))  # not under the lock
+        self.assertIn("if finishing || !mustWait() { break }", up)
+        wait = src[src.index("static func waitOffCellular("):src.index("// ---- The app out of sight")]
+        self.assertIn("static let awayGrace: TimeInterval = 30", src)
+        # on cellular alone: never once Airplane Mode is on
+        pause = wait[wait.index("if now.cellular, IDevice.AppFront.away >= awayGrace {"):wait.index("if now.cellular { left = nil }")]
+        self.assertLess(pause.index("end()"), pause.index("try pause("))
+        self.assertLess(pause.index("try pause("), pause.index("try hold(false)"))
+        body = src[src.index("private static func pause("):src.index("static func takeDownLeftOver()")]
+        self.assertLess(body.index("installEnded()"), body.index("while !IDevice.AppFront.now"))
+        self.assertIn("defer { installBegan(); paused(false) }", body)
+        self.assertIn("if !run.connected { try LocalVPN.waitForApp(", idev)
+        self.assertIn("Session(watch: w, finishing: run.connected)", idev)
+        self.assertEqual(idev.count("finishing: run.connected"), 2)
+        stop = src[src.index("private static func stopLater()"):src.index("private static func stopNow(")]
+        self.assertLess(stop.index("BackgroundHold("), stop.index("asyncAfter"))
+        # every stop: idle, checked again under startLock
+        self.assertEqual(src.count("stopVPNTunnel()"), 1)
+        down = src[src.index("private static func downIfIdle("):src.index("static let beatEvery")]
+        self.assertLess(down.index("startLock.lock()"), down.index("guard idle(), !["))
+        self.assertIn("LocalVPN.takeDownLeftOver()", src[src.index("static func register("):])
+        self.assertIn("LocalVPN.takeDownLeftOver()", idev[idev.index("willEnterForegroundNotification"):])
+        sideload = read("Sources", "Sideload.swift", base=NATIVE)
+        self.assertIn('if on { KeepAlive.shared.end(); emit?("appWait", 0)', sideload)
+
+    def test_tunnel_stops_itself(self):
+        """B423: a killed app's tunnel: 60 s awake with no packet and no message; the app's beat is well inside it."""
+        ext = read("Extension", "PacketTunnelProvider.swift")
+        self.assertIn("static let quietLimit = 60", ext)
+        self.assertIn("self.cancelTunnelWithError(nil)", ext)
+        self.assertIn("heard()", ext[ext.index("handleAppMessage"):ext.index("override func startTunnel")])
+        src = read("App", "LocalVPN.swift")
+        every = int(re.search(r"beatEvery: TimeInterval = (\d+)", src).group(1))
+        self.assertLessEqual(every * 3, 60)
+        self.assertIn("let go = holds > 0 || installs > 0", src)
 
     def test_status_is_plain(self):
         src = read("App", "LocalVPN.swift")

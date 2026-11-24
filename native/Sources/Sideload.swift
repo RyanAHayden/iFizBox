@@ -629,6 +629,8 @@ enum Sideload {
                     switch st {
                     case .airplane: emit?("airplane", 0); step?("airplane", 0)
                     case .airplaneOff: emit?("airplaneOff", 0); step?("airplaneOff", 0)
+                    case .appWait(let on): // B423: paused, iOS may suspend the app
+                        if on { KeepAlive.shared.end(); emit?("appWait", 0); step?("appWait", 0) } else { KeepAlive.shared.begin() }
                     case .connected: emit?("here", 0.02); step?("copying", 0)
                     case .upload(let p): emit?("here", 0.02 + p * 0.28); step?("copying", p); if p >= 1 { closer?.copied() }
                     case .install(let p): emit?("here", 0.3 + p * 0.7); step?("installing", p); closer?.installd(p)
