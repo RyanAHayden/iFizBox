@@ -255,3 +255,10 @@ _Said_: on cellular
 _On screen_: On Cellular: Ask Each Time / Use Signing Server
 _In code_: core/cellular.js, onCellularChoice
 _Avoid_: cellular mode, data mode
+
+**Cellular Installs**:
+The one Shortcut that turns cellular data off while This iPhone installs connect, then on again
+_Said_: cellular installs shortcut
+_On screen_: Cellular Installs
+_In code_: CellularShortcut, cellular-installs.plist
+_Avoid_: Install Switch, Cellular Shortcuts

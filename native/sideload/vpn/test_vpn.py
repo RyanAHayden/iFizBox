@@ -6,10 +6,20 @@ looks at the built IPA (the extension, its packet tunnel point, Network Extensio
 import os
 import plistlib
 import re
+import shutil
+import subprocess
+import sys
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 NATIVE = os.path.normpath(os.path.join(HERE, "..", ".."))
+
+sys.path.insert(0, NATIVE)
+
+import disktmp  # noqa: E402
+from test_sign import toolchain  # noqa: E402
+
+SWIFTC = toolchain()
 
 
 def read(*p, base=HERE):
@@ -277,6 +287,83 @@ class App(unittest.TestCase):
         other = src[src.index("static func otherVPNUp()"):src.index("/// One address entry")]
         self.assertIn('hasPrefix("10.7.0.")', other)  # our own tunnel's address never counts as another VPN
         self.assertIn("AF_INET", other)
+
+
+class CellularInstalls(unittest.TestCase):
+    """F417a: the Cellular Installs Shortcut and the state its actions report into."""
+
+    def setUp(self):
+        self.swift = read("App", "CellularShortcut.swift")
+        with open(os.path.join(os.path.dirname(NATIVE), "tools", "shortcuts", "cellular-installs.plist"), "rb") as f:
+            self.wf = plistlib.load(f)
+
+    def branches(self):
+        """{the input key: the actions inside its If}, and the actions outside every If."""
+        short = {"is.workflow.actions.cellulardata.set": "data", "is.workflow.actions.repeat.count": "repeat"}
+        names = {}  # output UUID -> dictionary key
+        inside, outside, key = {}, [], None
+        for a in self.wf["WFWorkflowActions"]:
+            i, p = a["WFWorkflowActionIdentifier"], a["WFWorkflowActionParameters"]
+            if i.endswith("getvalueforkey"):
+                names[p["UUID"]] = p["WFDictionaryKey"]
+            elif i.endswith("conditional") and p["WFControlFlowMode"] == 0:
+                self.assertEqual(p["WFCondition"], 100)  # has any value: "contains" loses its text on import
+                key = names[p["WFInput"]["Variable"]["Value"]["OutputUUID"]]
+                inside[key] = []
+            elif i.endswith("conditional"):
+                self.assertEqual(p["WFControlFlowMode"], 2)  # no Otherwise
+                key = None
+            else:
+                v = short.get(i, i.rsplit(".", 1)[1])
+                if v == "data":
+                    v += " on" if p["OnValue"] else " off"
+                elif v == "repeat":
+                    v += " %d" % p["WFRepeatCount"] if p["WFControlFlowMode"] == 0 else " end"
+                (outside if key is None else inside[key]).append(v)
+        return inside, outside
+
+    def test_plist(self):
+        inside, outside = self.branches()
+        turns = int(re.search(r"waitTurns = (\d+)", self.swift).group(1))
+        self.assertEqual(inside, {
+            "run": ["data off", "OpenForInstallIntent", "repeat %d" % turns, "WaitForInstallIntent", "repeat end", "data on", "FinishInstallsIntent"],
+            "on": ["data on", "OpenForInstallIntent", "FinishInstallsIntent"],
+            "check": ["OpenForInstallIntent", "WaitForInstallIntent", "FinishInstallsIntent"],
+        })
+        self.assertEqual(outside, ["dictionary", "nothing"])  # no input: no action of ours, no data touched; no output
+        self.assertEqual(set(inside), set(re.search(r"case (run, on, check)", self.swift).group(1).split(", ")))
+        self.assertLess(float(re.search(r"waitStep: TimeInterval = (\d+)", self.swift).group(1)), 30)
+
+    def test_plist_names_our_actions(self):
+        intents = read("intents", "App", "CellularInstalls.swift", base=NATIVE)
+        env = read("brand.env", base=NATIVE)
+        own = [a for a in self.wf["WFWorkflowActions"] if not a["WFWorkflowActionIdentifier"].startswith("is.workflow.")]
+        self.assertEqual(len(own), 8)
+        for a in own:
+            d = a["WFWorkflowActionParameters"]["AppIntentDescriptor"]
+            self.assertIn("struct %s: AppIntent" % d["AppIntentIdentifier"], intents)
+            self.assertEqual(a["WFWorkflowActionIdentifier"], "%s.%s" % (d["BundleIdentifier"], d["AppIntentIdentifier"]))
+            self.assertIn(d["BundleIdentifier"], env)
+
+    def test_one_name(self):
+        name = re.search(r'shortcutName = "(.+)"', self.swift).group(1)
+        self.assertIn('name="%s"' % name, read("tools", "shortcuts", "sign.sh", base=os.path.dirname(NATIVE)))
+
+    @unittest.skipUnless(SWIFTC, "no Swift toolchain (SWIFT_TOOLCHAIN or swiftc on PATH): CellularShortcut.swift not tested")
+    def test_state(self):
+        tmp = disktmp.build_dir("ifizbox-cellulartest-")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        env = disktmp.swift_env(dict(os.environ), tmp)
+        if os.path.exists("/usr/lib/libncursesw.so.6") and not os.path.exists("/usr/lib/libncurses.so.6"):
+            os.makedirs(os.path.join(tmp, "libshim"))
+            os.symlink("/usr/lib/libncursesw.so.6", os.path.join(tmp, "libshim", "libncurses.so.6"))
+            env["LD_LIBRARY_PATH"] = os.path.join(tmp, "libshim") + (":" + env["LD_LIBRARY_PATH"] if env.get("LD_LIBRARY_PATH") else "")
+        binary = os.path.join(tmp, "cellulartest")
+        r = subprocess.run([SWIFTC, "-module-cache-path", os.path.join(tmp, "modules"), os.path.join(HERE, "App", "CellularShortcut.swift"),
+                            os.path.join(HERE, "tests", "main.swift"), "-o", binary], capture_output=True, text=True, env=env, timeout=600)
+        self.assertEqual(r.returncode, 0, (r.stdout + r.stderr)[-4000:])
+        r = subprocess.run([binary], capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
 
 if __name__ == "__main__":

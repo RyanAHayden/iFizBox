@@ -141,6 +141,8 @@ class Ipa(unittest.TestCase):
 
     def test_intents_checked(self):
         # N8: only the both-modes intents; the widget's controls and its jailbreak entitlements are the .deb's.
+        self.intents(sorted(mkipa.SIDELOAD_INTENTS - {"FinishInstallsIntent"}))
+        self.assertTrue(any("App Intents" in p for p in self.problems()))
         self.intents(sorted(mkipa.SIDELOAD_INTENTS) + ["RespringIntent"])
         self.assertTrue(any("App Intents" in p and "RespringIntent" in p for p in self.problems()))
         self.intents(sorted(mkipa.SIDELOAD_INTENTS))

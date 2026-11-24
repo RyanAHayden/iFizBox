@@ -36,7 +36,8 @@ from mkipa import macho_entitlements  # noqa: E402
 SWIFTC = toolchain()
 JAILBREAK = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent", "InstallAllUpdatesIntent",
              "RespringIntent", "UserspaceRebootIntent", "ExportPackagesIntent"}
-SIDELOAD = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent"}
+CELLULAR = ["OpenForInstallIntent", "WaitForInstallIntent", "FinishInstallsIntent"]  # F417a: Cellular Installs' actions
+SIDELOAD = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent", *CELLULAR}
 
 
 def read(*p):
@@ -244,8 +245,10 @@ class Wiring(unittest.TestCase):
         self.assertIn("-emit-const-values-path", b)
         self.assertIn("-weak_framework,AppIntents", b)
         self.assertIn("widget/build.sh", b)
-        self.assertIn("SIDELOAD_INTENTS=" + ",".join(["CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent"]), b)
+        self.assertIn("SIDELOAD_INTENTS=" + ",".join(["CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent", *CELLULAR]), b)
         self.assertIn("JAILBREAK_INTENTS", b)
+        for name in CELLULAR:
+            self.assertNotIn(name, re.search(r"^JAILBREAK_INTENTS=.*", b, re.M).group(0))
         self.assertNotIn("ConnectVPNIntent", b)  # the Install Switch's actions are gone
 
     def test_intents_match_the_lists(self):
@@ -253,6 +256,11 @@ class Wiring(unittest.TestCase):
         for name in JAILBREAK:
             self.assertIn("struct %s: AppIntent" % name, src)
         self.assertNotIn("import UIKit", src)
+        cellular = read("intents", "App", "CellularInstalls.swift")
+        for name in CELLULAR:
+            self.assertIn("struct %s: AppIntent" % name, cellular)
+        self.assertNotIn("ReturnsValue", cellular)  # output as the last action makes iOS ask over the app
+        self.assertNotIn("import UIKit", cellular)
         self.assertFalse(os.path.exists(os.path.join(NATIVE, "intents", "App", "InstallSwitch.swift")))
         self.assertNotIn("import WidgetKit", src)
 
