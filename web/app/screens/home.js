@@ -629,7 +629,7 @@ function certRow() {
   };
   const paintRoute = () => paintCert(row, slotOrRoute(slotTile(settings.mode, last), routeNow()));
   const onRoute = () => { if (alive()) { seq++; paintRoute(); } };
-  // F410a: on its own, so the Signing Server's answer (seconds, when it's down) doesn't hold it back
+  // F410a: on its own: on coming back it doesn't wait for the Signing Server's answer (the first paint does)
   let phoneSeq = 0;
   const readPhone = async () => {
     const mine = ++phoneSeq;

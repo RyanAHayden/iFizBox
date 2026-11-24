@@ -280,7 +280,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   Use the Signing Server) and at its bottom. It runs the same install, or the same failed apps, again through the default
   Signing Server for that install or run only; Install Apps With stays This iPhone. The queue's fix row for a failed app
   reads `idevice.status` first, so a failure through the built-in VPN offers Fix and Use the Signing Server. In the install run's Log and install failure alerts, Fix opens Pairing, or
-  Installation & Signing, which runs the check at once.
+  Installation & Signing, which runs the check at once. Home's status slot shows Pair This iPhone (amber, opens Pairing) while This iPhone is chosen and `idevice.status` says it isn't paired, ahead of a Route Failure tile; a signing problem that stops every install still comes first.
 - **This iPhone with the built-in VPN** (`native/sideload/vpn/`): the sideload IPA carries its own packet tunnel,
   `PlugIns/iFizBoxVPN.appex` (`com.ryha.ifizbox.vpn`), the loopback idea of StosVPN: the phone is
   10.7.0.0 on the tunnel, only 10.7.0.1 is routed into it (no default route), and every packet is written back with
