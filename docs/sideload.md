@@ -328,6 +328,10 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   (self-update included) the next launch runs the end, unless an end already opened Shortcuts. If things aren't back 25 seconds after the queue (or 10 seconds
   after the waits ran out, whichever comes first), the app runs the separate `{"end":1}` run described below as a retry,
   once the app is in front. The rules for when a start or an end is needed are unchanged.
+  The trip's end selects a connected VPN again before it connects: Set VPN > Set On Demand sets the remembered VPN's
+  On Demand back to its own value, which selects it, then Connect runs after 2 seconds. So a VPN without On Demand for
+  the network comes back in the one trip; Connect alone on an unselected VPN ended with error 2 (likely because iOS
+  hadn't finished selecting it), so the wait is there for that.
   `vpn.testSwitch` does one trip when ready. It emits `{step}` events (`opening`, `connecting`, `back`), which its row
   on `installation/shortcuts` shows as the row's subtitle: Opening Shortcuts…, Connecting…, Putting Things Back…. In a test the built-in VPN
   goes off at once, with no 3 second wait, and putting things back is waited for 12 seconds at most before the end run
