@@ -1,7 +1,7 @@
 // F368: This iPhone on cellular: every app is signed first, then the install waits for Airplane Mode and says so.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { appRows, createAppRun, rowStatus, runStatus, airplaneStatus } from "./core/apprun.js";
+import { appRows, createAppRun, rowStatus, runStatus, rowProgress, airplaneStatus } from "./core/apprun.js";
 import { AIRPLANE_ON, AIRPLANE_OFF, AIRPLANE_TIMEOUT, serverFallback, routeFailureOf } from "./core/installroute.js";
 import { hereLabel } from "./signing/common.js";
 import { openPrepared, herePhase } from "./signing/queue.js";
@@ -57,6 +57,12 @@ test("the wait, then the line that it can go off, once every app is connected", 
   assert.equal(runStatus([a, b]), AIRPLANE_OFF);
   Object.assign(a, { state: "installed" });
   assert.equal(runStatus([a, b]), AIRPLANE_OFF);
+});
+
+test("the wait leaves the bar where it was, so the copy moves it", () => {
+  const at = (phase, fraction) => rowProgress({ state: "installing", here: true, phase, fraction });
+  const bar = [rowProgress({ state: "signed" }), at("airplane", 0), at("airplaneOff", 0), at("copying", 0), at("copying", 0.5), at("installing", 0)];
+  assert.deepEqual(bar, [0.5, 0.5, 0.5, 0.5, 0.55, 0.6]);
 });
 
 test("openPrepared waits only on cellular", async () => {
