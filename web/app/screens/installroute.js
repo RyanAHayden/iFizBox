@@ -28,6 +28,7 @@ import { quietCheckDue, quietCheckAllowed, markQuietCheck } from "../core/instal
 import { RESTORE_VPN, restoreShown, restoreFooter, setRestoreVPN } from "../core/installroute.js"; // F412
 import { createSwitch } from "../nav/switch.js";
 import { NAME } from "../brand.js";
+import { cellGroups } from "./cellconcept.js";
 import { rowIcon } from "../icons/rowicons.js";
 import { showHUD } from "../nav/hud.js";
 import { slideChange } from "../nav/slide.js";
@@ -118,7 +119,7 @@ function spinRows(frag, sections) {
 // F301: `late: {device}` idevice.status didn't answer in time: the status says Not Responding.
 export function installationGroups(choice, st, { pick = () => {}, test = () => {},
   reading = false, picking = false, hint = null, server = () => [],
-  late = {}, testing = false, failure = null, fix = () => {}, fixing = false, pairChecking = false, checkNow, forget, setUp } = {}) {
+  late = {}, testing = false, failure = null, fix = () => {}, fixing = false, pairChecking = false, checkNow, forget, setUp, repaint } = {}) {
   const groups = [{
     header: "Install Apps With",
     rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", icon: rowIcon(ROUTE_ICON[o.value]), checked: o.value === choice, onClick: () => pick(o.value),
@@ -130,7 +131,7 @@ export function installationGroups(choice, st, { pick = () => {}, test = () => {
   if (choice !== "iphone") return [...groups, ...(server() ?? [])];
   // F372: the built-in VPN is the way in: This iPhone's page is Set Up and How It Works, drawn from the first frame
   // (rows Checking… until idevice.status answers). A profile without Network Extensions says so there (core NO_VPN).
-  return [...groups, ...localGroups(st ?? hint, { reading: reading && !hint && !st, pairChecking, test, testing, failure, fix, fixing, checkNow, forget, setUp, late: Boolean(late.device) })];
+  return [...groups, ...localGroups(st ?? hint, { reading: reading && !hint && !st, pairChecking, test, testing, failure, fix, fixing, checkNow, forget, setUp, repaint, late: Boolean(late.device) })];
 }
 
 // ---- F372: This iPhone with the built-in VPN (core BUILTIN_VPN; native/sideload/vpn)
@@ -140,7 +141,7 @@ export function installationGroups(choice, st, { pick = () => {}, test = () => {
 // `testing`/`fixing`/`pairChecking` while a test, a check or Fix runs. A failed check or install (B316's `failure`) is
 // the status, red, and its action is Fix.
 export function localGroups(st, { reading = false, pairChecking = false, test = () => {}, testing = false, failure = null, fix = () => {}, fixing = false, late = false,
-  checkNow = () => {}, forget = () => {}, setUp = () => goTo("pair") } = {}) {
+  checkNow = () => {}, forget = () => {}, setUp = () => goTo("pair"), repaint = () => {} } = {}) {
   const howGroup = { rows: [{ label: "How It Works", icon: rowIcon("help"), href: route("how") }] };
   // A profile without Network Extensions: nothing to set up, and the page says so instead of the VPN's rows
   if (st && !reading && !late && !builtinVPN(st)) {
@@ -158,6 +159,7 @@ export function localGroups(st, { reading = false, pairChecking = false, test = 
   }
   // F412: not in the row's content: a repaint keeps the row, so the knob slides (syncRestore sets it)
   if (restoreShown(st)) groups.push({ key: "restore", rows: [{ label: RESTORE_VPN, cls: "restore-vpn", icon: rowIcon("syncNow") }], footer: restoreFooter(st.vpn.restore) });
+  if (st?.paired) groups.push(...cellGroups(repaint));
   if (st?.paired) groups.push({ rows: [{ label: "Forget Pairing", cls: "sign-import", onClick: forget }] });
   return [...groups, howGroup];
 }
@@ -362,6 +364,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
         if (v === "iphone" && v !== choice) recheckPairing(native, alert, redraw, { spin: pairSpin }); // B220: set up again, the kept pairing checked
       },
       test: () => runTest(),
+      repaint: () => paint(),
     });
     const shown = subGroups(sections, sub);
     const restore = Boolean((view ?? lastStatus)?.vpn?.restore);

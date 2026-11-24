@@ -67,7 +67,7 @@ function nativeColors(colors, count) {
 }
 
 // The CSS alert: iOS 6's UIAlertView, restyled by each era's stylesheet.
-function cssAlert({ title = "", message = "", input = null, buttons = ["OK"], cancel = 0, stacked = false, countdown = null, colors = {}, onTap = null } = {}) {
+function cssAlert({ title = "", message = "", input = null, buttons = ["OK"], cancel = 0, stacked = false, countdown = null, colors = {}, onTap = null, signal = null } = {}) {
   return new Promise((resolve) => {
     const scrim = document.createElement("div");
     scrim.className = "alert-scrim";
@@ -181,6 +181,7 @@ function cssAlert({ title = "", message = "", input = null, buttons = ["OK"], ca
     ], { duration: 360, easing: "ease-out" });
     (field || [...row.children].reverse().find((b) => !b.disabled) || row.lastChild).focus({ preventScroll: true });
 
+    signal?.addEventListener?.("abort", () => close(-1));
     let done = false;
     function close(index) {
       if (done) return;

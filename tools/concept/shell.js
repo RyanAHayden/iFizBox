@@ -498,6 +498,8 @@
       (p.bundleIds || []).forEach(function (b) { out[b] = false; });
       return { installed: out };
     },
+    "idevice.status": function () { return { paired: true, pairOnPhone: true, vpn: { available: true, tested: true, on: false, cellular: true, wifi: false, restore: false } }; },
+    "idevice.verify": function () { return { ok: true }; },
     "library.list": function () { return { identity: false, ipas: [] }; },
     "helper.run": function (p) {
       return { code: 64, stdout: "", stderr: "ifizbox-helper: " + ((p.words || [])[0] || "") + ": not run in the concept\n" };

@@ -33,7 +33,7 @@ export const NO_VPN = {
 export const iphoneSetUp = (st) => Boolean(st?.paired) && builtinVPN(st) && Boolean(st.vpn.tested);
 // F368: on cellular iOS refuses the connects an install needs, so the install waits for Wi-Fi or Airplane Mode (LocalVPN.swift
 // waitOffCellular). AIRPLANE_ON: the wait; AIRPLANE_OFF: the connection is open; CELL_LINE: a failed check there.
-export const AIRPLANE_ON = "Join Wi-Fi or turn on Airplane Mode";
+export const AIRPLANE_ON = "Waiting to leave cellular data";
 // B423: a wait paused because the app is in the background (LocalVPN.swift pause)
 export const APP_WAIT = `Waiting for ${NAME}`;
 // opened again with no network (Airplane Mode went on meanwhile): iOS starts no VPN without one
@@ -52,7 +52,7 @@ export const OTHER_VPN_LINE = "Your VPN goes off during installs. Turn it back o
 export function setupFooter(st) {
   if (!iphoneSetUp(st)) return "";
   if (otherVPNOn(st) && !st.vpn.restore) return OTHER_VPN_LINE;
-  return st.vpn.cellular ? CELL_FOOTER : "";
+  return "";
 }
 // F414: setting up, as rows: what each is and whether it's done (`next`: a tap does it). The test is when iOS asks to
 // allow the VPN (B357), so those two are done together.
