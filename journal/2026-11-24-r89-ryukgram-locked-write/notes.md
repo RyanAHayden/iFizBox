@@ -39,6 +39,9 @@ No B. Nothing shown is broken that B413 and B415 do not already cover. One follo
 
 ## Not verified
 - A real system background launch (push or refresh) while locked. It could not be triggered. The stand-in is a foreground launch that is locked during start.
+- A Complete-signed copy that survives a locked launch: not achieved. ry-C-old died of SIGBUS every time (crash_counter deleted, other mapped files still class A). The surviving runs used plain-signed copies with only the preferences file forced to class A, which is the state that matters for the file. The pre-B413 signer itself was not built; Complete was added to the original signature and this tree's signer kept it.
+- Class A through the locked window is shown indirectly: the spy's direct file read returned -1 (unreadable) from the constructor until the unlock, then 202. No file class was logged after the unlock.
+- Instagram's own clearing on sign-out: not found in the strings and not run.
 - A process left suspended for a long time. In one test iOS ended it, and the cause was not found.
 - The longest locked run was about 25 s locked plus 60 to 85 s after the unlock. The reported launch lasted about 30 minutes, which was not reproduced.
 - Whether a suspended locked process resumes after cfprefsd has dropped its state.
