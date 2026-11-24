@@ -70,7 +70,9 @@ class Bridge(unittest.TestCase):
     def test_pairing_stays_on_this_device(self):
         src = read("IDevice.swift")
         self.assertIn("kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly", src)
-        self.assertNotIn("UserDefaults", src)
+        # the copy's debug-only test switch (afcChunkMB) reads settings, never the pairing
+        release = re.sub(r"#if DEBUG.*?#else", "", src, flags=re.S)
+        self.assertNotIn("UserDefaults", release)
 
 
 class PairOnPhone(unittest.TestCase):

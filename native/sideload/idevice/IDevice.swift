@@ -1244,6 +1244,19 @@ enum IDevice {
 
     static let chunk = 1 << 20
 
+    /// T79: the copy's test switch. Only a debug build reads it (the setting `afcChunkMB`: 1, 4 or 8, and
+    /// `afcPipelined`: true reads the next chunk while the last write runs); a release build always sends 1 MB
+    /// chunks one at a time. The speed of each run goes to the log either way.
+    static var copySwitch: (chunk: Int, pipelined: Bool) {
+        #if DEBUG
+        let d = UserDefaults.standard
+        let mbs = d.integer(forKey: "afcChunkMB")
+        return ([1, 4, 8].contains(mbs) ? mbs << 20 : chunk, d.bool(forKey: "afcPipelined"))
+        #else
+        return (chunk, false)
+        #endif
+    }
+
     static func mb(_ n: Int) -> String { String(format: "%.1f MB", Double(n) / 1_048_576) }
 
     /// Copies the IPA to PublicStaging. B246: after a drop it carries on from the end of iOS's file (a whole chunk
@@ -1252,6 +1265,8 @@ enum IDevice {
     private static func upload(_ run: HereRun, session s: Session, watch w: Watch,
                                note: (String) -> Void, progress: (Step) -> Void) throws {
         let total = run.size, remote = run.remote
+        let (chunk, pipelined) = copySwitch
+        if chunk != Self.chunk || pipelined { ilog("AFC: test switch: \(chunk >> 20) MB chunks, \(pipelined ? "pipelined" : "one at a time")") }
         let fh = try FileHandle(forReadingFrom: run.ipa)
         defer { try? fh.close() }
         let afc = try s.afc()
@@ -1288,8 +1303,28 @@ enum IDevice {
         let t0 = Date()
         var last = Date()
         var quiet = HereRecheck.CopyQuiet(), shown = Limit.upload, suspensions = w.suspensions
+        // T79: pipelined, the next chunk is read on another queue while the current one is written
+        final class Ahead: @unchecked Sendable {
+            let queue = DispatchQueue(label: "afc.read"), group = DispatchGroup()
+            var result: Result<Data?, Error> = .success(nil)
+            var running = false
+        }
+        let box = Ahead()
+        func readAhead() {
+            box.running = true
+            box.group.enter()
+            box.queue.async { box.result = Result { try fh.read(upToCount: chunk) }; box.group.leave() }
+        }
+        func nextChunk() throws -> Data? {
+            if !pipelined { return try fh.read(upToCount: chunk) }
+            if !box.running { readAhead() }
+            box.group.wait()
+            box.running = false
+            return try box.result.get()
+        }
         do {
-            while let d = try fh.read(upToCount: chunk), !d.isEmpty {
+            while let d = try nextChunk(), !d.isEmpty {
+                if pipelined { readAhead() }
                 try d.withUnsafeBytes { try check(afc_file_write(file, $0.baseAddress?.assumingMemoryBound(to: UInt8.self), d.count), "upload_failed") }
                 sent += d.count
                 run.sent = sent
@@ -1320,13 +1355,15 @@ enum IDevice {
                 progress(.upload(total > 0 ? Double(sent) / Double(total) : 0))
             }
         } catch {
+            if box.running { box.group.wait() }
             afc_file_close(file).map(idevice_error_free)
             throw error
         }
         w.begin("closing \(remote) on iOS (AFC)", Limit.afcStep)
         try check(afc_file_close(file), "upload_failed")
         let secs = Date().timeIntervalSince(run.copyStart ?? t0)
-        ilog("AFC: copied \(mb(sent)) in \(String(format: "%.1f", secs)) s: \(run.speed.summary)")
+        let rate = Double(sent - from) / 1_048_576 / max(Date().timeIntervalSince(t0), 0.001)
+        ilog("AFC: copied \(mb(sent)) in \(String(format: "%.1f", secs)) s: \(run.speed.summary) (this run \(String(format: "%.1f", rate)) MB/s, \(chunk >> 20) MB chunks, \(pipelined ? "pipelined" : "one at a time"))")
         note("Copied \(mb(sent)) to iOS")
     }
 }
