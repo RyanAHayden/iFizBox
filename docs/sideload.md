@@ -393,9 +393,9 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   `runCellular` (`signing/cellularrun.js`).
   Restore My VPN Shortcut bridge: `restore.add` opens the signed Shortcut (`web/app/shortcuts/Restore My VPN.shortcut`) in a share sheet, where Shortcuts opens it on Add Shortcut; it answers `{opened}`. `restore.store`
   and `restore.back` answer `{ok, error, text}`. Store remembers the VPN that is on: only while another VPN is up and the
-  built-in VPN is down (`no_vpn` otherwise, `vpn_on` when the built-in VPN is up), so Shortcuts never saves the built-in VPN.
-  Back sets that VPN on again: only with the built-in tunnel down (no install or connection uses it, and iOS says disconnected;
-  a failed read counts as up, `vpn_on`) and no other VPN up (`on_already`). It passes as soon as `otherVPN` is true, whatever
+  built-in VPN is down (`no_vpn` or `vpn_on` otherwise), so Shortcuts never saves the built-in VPN.
+  Back sets that VPN on again: only with the built-in VPN down (`vpn_on`) and no other VPN up (`on_already`).
+  For both, down means no install or connection uses it and iOS says disconnected; a failed read counts as up. It passes as soon as `otherVPN` is true, whatever
   Shortcuts' callback (`ifizbox://restore-vpn`) says, since Set VPN often ends with error 2 after switching. `busy`: another
   run, or one that ended under 10 s ago before its Shortcut did. Run failures: `not_opened`, `not_run`, `no_vpn` (Shortcuts
   found none), `not_stored`, `not_back`, `no_end`, `no_return` (`RestoreShortcut.Verdict`). All three are refused with
