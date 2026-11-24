@@ -259,7 +259,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   built from source on Linux and linked statically. The signed IPA goes to this phone's installd over the built-in VPN
   (AFC upload to PublicStaging, then installation_proxy), so nothing reaches the Signing Server, no install sheet has
   to stay up, it works offline, and iFizBox updates itself (installd closes and replaces it). Choosing This iPhone
-  opens its page (`installation/iphone`): Set Up This iPhone (1. Pair This iPhone, 2. Allow iFizBox VPN, 3. Test Connection,
+  opens its page (`installation/iphone`): Set Up (1. Pair This iPhone, 2. Allow iFizBox VPN, 3. Test Connection,
   the done ones checked) until it's set up, then How It Works. The status says Checking… until `idevice.status` answers;
   a failed or late answer says Not Responding. Pair This
   iPhone opens `installation/pair`, a page that runs by itself: one sentence on what it gives, then on iOS 27 pairing

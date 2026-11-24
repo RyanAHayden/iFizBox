@@ -67,8 +67,8 @@ rows or change footers. Top to bottom:
   then installs use the Signing Server."), or Finish Setting Up (paired, connection not tested yet), its action row
   Set Up This iPhone in both; that row opens This iPhone's page. The red failures are Couldn't Connect, iPhone Refused, Pairing Lost, No Network Extensions (the app's profile lacks them, so installs go through the Signing Server) and Not
   Responding, whose action row is Fix. Fix on Pairing Lost opens Pairing, which checks the kept pairing once more, then
-  pairs. Otherwise a failed check asks first when the pairing is lost or the connection couldn't be reached (Not Now or
-  Fix; Fix runs it again from the start), and any other reason shows an alert with the plain reason (OK). Check
+  pairs. A failed check asks Not Now or Fix: Fix pairs again when the pairing is lost, otherwise it checks again
+  from the start, and a second failure shows its plain reason (OK). Check
   Connection shows only while nothing is failing; a Fix tapped while a check runs joins it. On cellular, the
   Couldn't Connect message adds "On cellular, check on Wi-Fi. Installs ask for Airplane Mode." With Signing Server
   chosen: Ready to Install through the server, Check Server.
@@ -93,7 +93,7 @@ The pages under it:
   red reason) or Not Responding, with one action: Start Setup, Test Connection, Check Connection or Fix. Its footer
   shows once it's ready: the other-VPN line ("Your VPN goes off during installs. Turn it back on after.") when another
   VPN is up or chosen in Settings > VPN, else the cellular line ("On cellular, installs ask for Airplane Mode."), else
-  none. Until This iPhone is set up, **Set Up This iPhone** has three steps: 1. Pair This iPhone (opens Pairing),
+  none. Until This iPhone is set up, **Set Up** has three steps: 1. Pair This iPhone (opens Pairing),
   2. Allow iFizBox VPN, 3. Test Connection. A step that's done is checked, and the next one is open. Steps 2 and 3
   are done together: `vpn.test` turns the VPN on, connects once with the pairing and turns it off, and iOS asks to
   allow the VPN configuration the first time. The footer reads "Once is enough. It stays set up after updates and
@@ -107,10 +107,9 @@ The pages under it:
   through installation_proxy never show iOS's install prompt. Under the choice, the chosen route's groups slide in:
   This iPhone's (below), or the Signing Server's (Server, Check Server, Run Your Own). A tap moves the checkmark at
   once, whether or not the iPhone is paired, and the row shows the grey spinner until `idevice.status` answers.
-- **This iPhone** (also `installation/iphone` on its own): the status group, then Set Up This iPhone (until it's set up)
-  or Forget Pairing, then **How It Works**, as above. While `idevice.status` is read, the status says Checking… with a
-  spinner, and the steps appear once it answers. The last answer of this app run shows at once, read again behind its
-  spinner; a failed or late read (past its deadline, `TIMEOUTS`) says Not Responding, red. A profile without Network
+- **This iPhone** (also `installation/iphone` on its own): the status group, then Set Up (until it's set up)
+  and Forget Pairing (once paired), then **How It Works**, as above. While `idevice.status` is read, the status says Checking… with a
+  spinner, and the steps appear once it answers. The last answer of this app run shows at once while it's read again; a failed or late read (past its deadline, `TIMEOUTS`) says Not Responding, red. A profile without Network
   Extensions shows a Set Up group "Network Extensions: Missing" with the footer "This profile has no Network Extensions,
   so it can't connect. Sign with one that has them, or use the Signing Server." No Developer Mode row: an install it
   stops explains it in its alert. Groups that come, go or change size slide (FLIP, transform and opacity only:
