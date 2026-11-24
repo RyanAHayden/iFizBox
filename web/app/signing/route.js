@@ -32,12 +32,21 @@ export async function routeWords(err, why, native) {
   rememberRouteFailure(f);
   return { ...why, title: f.title, message: f.message, fix: f.fix, button: f.button };
 }
-// The fix button of a failure's alert: Pairing, or the main page's Check Connection.
-export function runFix(fix, { go = openRoute } = {}) {
+// A failure's Fix (its alert, the run's Log): Pairing, or Installation & Signing, which checks the connection at once
+// (F409; a page already on screen isn't drawn again, so it is told).
+// Not openRoute: it remembers the page it left, and Installation & Signing goes back there once signing is ready.
+const openFix = (path) => { location.hash = format(settingsRoute(path)).replace(/^#/, ""); };
+export function runFix(fix, { go = openRoute, later = setTimeout } = {}) {
+  if (go === openRoute) go = openFix;
   if (fix === "pair") return go(["installation", "pair"]);
-  if (fix === "check") return go(["installation"]);
+  if (fix === "check") {
+    askFix();
+    go(["installation"]);
+    later(tellFix, 600);
+  }
   return undefined;
 }
+import { format, settingsRoute } from "../router.js";
 import { showBanner } from "../nav/banner.js";
 import { phaseLabel, deviceError, rateText } from "../core/signing.js"; // rateText: B262
 import { IFIZBOX_ID } from "../core/websign.js";
@@ -47,7 +56,7 @@ import { recordSelfUpdate } from "../core/selfupdate.js";
 import { showAlert } from "../nav/alert.js";
 import { NAME } from "../brand.js";
 import { storedRoute, decideRoute, ALERTS as ROUTE_ALERTS, routeParams } from "../core/installroute.js";
-import { routeFailureOf, rememberRouteFailure, clearRouteFailure } from "../core/installroute.js"; // B316
+import { routeFailureOf, rememberRouteFailure, clearRouteFailure, askFix, tellFix } from "../core/installroute.js"; // B316
 import { SELF_RESTART } from "../core/apprun.js";
 import { KNOWN_MALWARE, askInsecure, bridge, failed, keepIpaHash, refusing, stopNative, storageOf,
   untilCancel } from "./common.js";

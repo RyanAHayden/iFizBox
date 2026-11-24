@@ -21,9 +21,11 @@ export const ROUTE_OPTIONS = [
 // or a profile without the capability) This iPhone can't be used: noVPN says so.
 export const BUILTIN_VPN = `${NAME} VPN`;
 export const builtinVPN = (st) => Boolean(st?.vpn?.available);
+// F409: the fix button of every route failure: the status cell's action row, the install run, the alerts.
+export const FIX = "Fix";
 // A profile without Network Extensions (or a shell that doesn't know the VPN): said plainly where the VPN's rows would be.
 export const NO_VPN = {
-  title: "No Network Extensions", again: false, fix: "check", button: "Check Again",
+  title: "No Network Extensions", again: false, fix: "check", button: FIX,
   message: "This profile has no Network Extensions, so it can't connect. Sign with one that has them, or use the Signing Server.",
   short: "This profile has no Network Extensions.",
 };
@@ -99,7 +101,7 @@ export const ALERTS = {
 // `local`: installs go straight onto this iPhone now (the Signing Server row then says This iPhone).
 // `action` is a key of STATUS_ACTIONS. Every subtitle fits two lines at 320pt (the cell keeps two lines' height).
 export const STATUS_ACTIONS = {
-  check: "Check Connection", checkServer: "Check Server", pair: "Start Pairing",
+  check: "Check Connection", fix: FIX, checkServer: "Check Server", pair: "Start Pairing",
   certificate: "Import Certificate",
 };
 export const CHECKING = { state: "checking", title: "Checking…", subtitle: "Pairing and the VPN.", action: "check", tone: "wait", local: false };
@@ -120,8 +122,8 @@ function routeStatus(choice, st, { host = DOMAIN, certificate } = {}) {
   if (choice !== "iphone") return { state: "server", title: "Ready to Install", subtitle: `Through the Signing Server, ${host}.`, action: "checkServer", tone: "ok", local: false };
   if (st === undefined) return CHECKING;
   const later = `Installs use ${host} for now.`;
-  if (!st) return { state: "noStatus", title: "Can't Reach This iPhone", subtitle: later, action: "check", tone: "warn", local: false };
-  if (!builtinVPN(st)) return { state: "noVPN", title: NO_VPN.title, subtitle: `This profile can't connect. ${later}`, action: "check", tone: "warn", local: false };
+  if (!st) return { state: "noStatus", title: "Can't Reach This iPhone", subtitle: later, action: "fix", tone: "warn", local: false };
+  if (!builtinVPN(st)) return { state: "noVPN", title: NO_VPN.title, subtitle: `This profile can't connect. ${later}`, action: "fix", tone: "warn", local: false };
   if (!st.paired) return { state: "pair", title: "Pair This iPhone", subtitle: `Installs use ${host} until it's paired.`, action: "pair", tone: "warn", local: false };
   return { state: "ready", via: BUILTIN_VPN, title: "Ready to Install", subtitle: `Straight onto this iPhone, through ${BUILTIN_VPN}.`, action: "check", tone: "ok", local: true };
 }
@@ -269,13 +271,13 @@ export function plainSocket(text) {
 const CONNECT_CODES = new Set(["refused", "pairing_rejected", "pair_again", "connect_failed", "bad_pairing"]);
 
 // The alerts' words ({title, message}), the install log's and the status cell's (`short`: two lines at 320pt), and
-// `fix`: what the fix row or button does ("pair": Pairing; "check": Check
-// Connection again).
+// `fix`: what the Fix row or button does ("pair": Pairing; "check": the
+// connection checked at once).
 // The phone refused every connection through the VPN, lockdown's port too (the shell's route_refused): not the
 // pairing. On cellular, iOS takes RemotePairing (49152) and lockdownd (62078) only while data is off (R72).
 export function routeRefused(st = null) {
   const cell = Boolean(st?.vpn?.cellular);
-  return { title: "iPhone Refused", again: false, fix: "check", button: "Check Again",
+  return { title: "iPhone Refused", again: false, fix: "check", button: FIX,
     message: `This iPhone refused every connection through ${BUILTIN_VPN}, so it isn't the pairing. ${cell ? CELL_LINE : "Try again."}`,
     short: cell ? `Refused. ${CELL_FOOTER}` : "Every connection was refused. Try again." };
 }
@@ -293,8 +295,7 @@ export function routeFailureOf(err, st = null) {
   const why = verifyFailure(err, st);
   const fix = why.fix ?? (why.again ? "pair" : "check");
   const short = why.short ?? (droppedPairing(code, raw) && why.again ? "Not paired any more. Pair again." : why.again ? "Installs are refused. Pair again." : "Installs can't reach this iPhone.");
-  const button = why.button ?? (fix === "pair" ? "Pair Again" : "Check Again");
-  return { title: why.title, message: why.message, short, fix, button };
+  return { title: why.title, message: why.message, short, fix, button: FIX };
 }
 
 // Kept in this browser's storage (it outlives a relaunch: the route stays broken until a check passes), and told to
@@ -318,15 +319,22 @@ export function clearRouteFailure(storage = globalThis.localStorage) {
   if (had) tell();
 }
 
-// A check that got no answer in time (screens' Not Responding): kept too, with Check Again as its fix.
+// A check that got no answer in time (screens' Not Responding): kept too, with the check as its fix.
 export const NO_ANSWER_FAILURE = { title: "Not Responding", message: "This iPhone didn't answer the last check. Check that the VPN is on, then check again.",
-  short: "This iPhone didn't answer the last check.", fix: "check", button: "Check Again" };
+  short: "This iPhone didn't answer the last check.", fix: "check", button: FIX };
 
-// The status cell for a remembered failure: red, with the fix as its action row.
-const FIX_ACTIONS = { pair: "pair", check: "check" };
+// The status cell for a remembered failure: red, with Fix as its action row (`fix`: what it does).
 export function failureStatus(f) {
-  return { state: "failed", title: f.title, subtitle: f.short, action: FIX_ACTIONS[f.fix] ?? "check", tone: "warn", red: true, local: false };
+  return { state: "failed", title: f.title, subtitle: f.short, action: "fix", fix: f.fix, tone: "warn", red: true, local: false };
 }
+
+// F409: Fix tapped outside Installation & Signing (an install's alert, the run's Log): the page runs the check when it
+// draws; "ifizbox:route-fix" tells one already on screen. The tap holds FIX_HOLD ms.
+export const FIX_HOLD = 10_000;
+let fixAsked = 0;
+export function askFix(now = Date.now()) { fixAsked = now; }
+export function takeFix(now = Date.now()) { const on = fixAsked > 0 && now - fixAsked < FIX_HOLD; fixAsked = 0; return on; }
+export function tellFix() { try { globalThis.dispatchEvent?.(new CustomEvent("ifizbox:route-fix")); } catch { /* no events here */ } }
 
 // B378: the built-in VPN didn't start for an install, so the shell said the VPN's own error (e.g. "can't start without
 // a network").
@@ -335,7 +343,7 @@ export function vpnFailed(raw) {
   const noNetwork = /without a network|no network/i.test(why);
   const first = why.startsWith(NAME) ? why : `${why.charAt(0).toUpperCase()}${why.slice(1)}`; // the name keeps its own case
   return { title: `${BUILTIN_VPN} Didn't Start`, message: `${first || `${BUILTIN_VPN} didn't start`}.`,
-    short: noNetwork ? `${BUILTIN_VPN} needs Wi-Fi or cellular data to start.` : `${BUILTIN_VPN} didn't start.`, fix: "check", button: "Check Again", again: false };
+    short: noNetwork ? `${BUILTIN_VPN} needs Wi-Fi or cellular data to start.` : `${BUILTIN_VPN} didn't start.`, fix: "check", button: FIX, again: false };
 }
 // What a failed idevice.verify means: { title, message, again } (`again`: offer Pair Again). `st` is the
 // idevice.status read for the check (null or left out: not known).

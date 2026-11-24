@@ -456,7 +456,7 @@ export async function runAppRun(jobs, deps) {
     return end(cancelled);
   }
 
-  // F366: rows This iPhone couldn't reach (lanes.fallbacks) end the Log with their fix (Sign In, Pair Again, …) and
+  // F366: rows This iPhone couldn't reach (lanes.fallbacks) end the Log with their Fix and
   // Use the Signing Server, which runs those same rows again through the default Signing Server, for this run only
   // (lanes.useServer); the bottom gets the same button above Return. -> page.finish's `also`, or null with none.
   function offerServer() {

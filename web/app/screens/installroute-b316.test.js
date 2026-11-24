@@ -9,8 +9,8 @@ import { fakeDocument } from "../fakes.test-helper.js";
 const mem = new Map();
 globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
 globalThis.document ??= fakeDocument();
-const { autoCheck, AUTO_CHECK, installationGroups, hudHooks, withDetail, FAILING, TIMEOUTS } = await import("./installroute.js");
-const { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf } = await import("../core/installroute.js");
+const { autoCheck, AUTO_CHECK, installationGroups, hudHooks, withDetail, FAILING, TIMEOUTS, mainPage, recheckHooks, forgetStatus, setupGroups } = await import("./installroute.js");
+const { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, askFix, takeFix } = await import("../core/installroute.js");
 hudHooks.show = () => () => {};
 hudHooks.delay = 0;
 
@@ -69,7 +69,7 @@ test("Paired turns to a red Failing while a failure is kept (main page's row and
   assert.equal(test.detail, FAILING);
 });
 
-test("a check that gets no answer in time is kept too (Check Again)", async () => {
+test("a check that gets no answer in time is kept too", async () => {
   clearRouteFailure();
   rememberRouteFailure(routeFailureOf(refused, FINE));
   AUTO_CHECK.last = 0;
@@ -88,8 +88,103 @@ test("Install Apps With: the failure in Set Up's footer, its fix row in the grou
   const g = groups.find((x) => x.header === "Set Up");
   assert.equal(g.footer, "Pair Again. Installs are refused. Pair again.");
   assert.equal(g.warn, true);
-  assert.ok(g.rows.some((r) => r.label === "Pair Again" && r.cls === "sign-import"));
+  assert.ok(g.rows.some((r) => r.label === "Fix" && r.cls === "sign-import"));
   const ok = installationGroups("iphone", FINE).find((x) => x.header === "Set Up");
-  assert.ok(!ok.rows.some((r) => r.label === "Pair Again"));
+  assert.ok(!ok.rows.some((r) => r.label === "Fix"));
   assert.ok(!ok.warn);
+});
+
+// ---- F409: Fix in place of Check Connection while failing
+const { runFix } = await import("../signing/route.js");
+const all = (e) => [e, ...e.children.flatMap(all)];
+const actionOf = (page) => all(page.el).find((n) => n._cls.has("install-action")).children[0];
+const labelOf = (cell) => all(cell).find((n) => n._cls.has("cell-label")).textContent;
+const tapOn = (cell) => Promise.all(cell.listeners.click.map((f) => f({})));
+const DROPPED = Object.assign(new Error("pair_again: closed"), { code: "pair_again" });
+async function failing(err, answers, { auto = false } = {}) {
+  forgetStatus();
+  clearRouteFailure();
+  if (err) rememberRouteFailure(routeFailureOf(err, FINE));
+  AUTO_CHECK.last = auto ? 0 : Date.now();
+  const native = phone({ "idevice.status": FINE, ...answers });
+  const alerts = [];
+  let paired = 0;
+  recheckHooks.goPair = () => { paired++; };
+  const page = mainPage({ store: iphone, native, alert: async (a) => { alerts.push(a); return { index: 0 }; }, links: {} });
+  Object.defineProperty(page.el, "isConnected", { value: true });
+  await page.refresh();
+  return { page, native, alerts, paired: () => paired, cell: actionOf(page) };
+}
+
+test("F409: the failed status cell's row says Fix; it checks at once and goes green", async () => {
+  let go;
+  const t = await failing(noRoute, { "idevice.verify": new Promise((r) => { go = r; }) });
+  assert.equal(labelOf(t.cell), "Fix");
+  const run = tapOn(t.cell);
+  assert.ok(all(t.cell).some((n) => n._cls.has("loading-spinner")), "spins at once");
+  go({ ok: true });
+  await run;
+  assert.equal(t.page.status().state, "ready");
+  assert.equal(labelOf(t.cell), "✓Successful");
+  assert.deepEqual(t.alerts, []);
+});
+
+test("F409: Fix that fails again says the plain reason, and the row stays Fix with no x", async () => {
+  const t = await failing(noRoute, { "idevice.verify": noRoute });
+  await tapOn(t.cell);
+  assert.deepEqual(t.alerts.map((a) => [a.title, a.buttons]), [["iPhone Refused", ["OK"]]]);
+  assert.equal(labelOf(t.cell), "Fix");
+  assert.ok(!all(t.cell).some((n) => n._cls.has("check-mark")));
+});
+
+test("F409: Fix opens Pairing when the phone turned the pairing down, with no question", async () => {
+  const t = await failing(noRoute, { "idevice.verify": DROPPED });
+  await tapOn(t.cell);
+  assert.equal(t.paired(), 1);
+  assert.deepEqual(t.alerts, []);
+  assert.equal(routeFailure().fix, "pair");
+  assert.ok(!t.native.calls.includes("idevice.forget"), "Pairing checks it once more first");
+});
+
+test("F409: a failed Check Connection turns into Fix, and so does the automatic check", async () => {
+  const t = await failing(null, { "idevice.verify": noRoute });
+  assert.equal(labelOf(t.cell), "Check Connection");
+  await tapOn(t.cell);
+  assert.deepEqual(t.alerts[0].buttons, ["OK", "Fix"]);
+  assert.equal(labelOf(t.cell), "Fix");
+  const u = await failing(refused, { "idevice.verify": noRoute }, { auto: true });
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(labelOf(u.cell), "Fix");
+  assert.deepEqual(u.alerts, []);
+});
+
+test("F409: Fix tapped while the automatic check runs makes that check Fix's: one check, its reason said", async () => {
+  let no;
+  const t = await failing(refused, { "idevice.verify": new Promise((_, r) => { no = r; }) }, { auto: true });
+  const run = tapOn(t.cell);
+  await new Promise((r) => setTimeout(r, 5));
+  no(noRoute);
+  await run;
+  assert.equal(t.native.calls.filter((c) => c === "idevice.verify").length, 1);
+  assert.deepEqual(t.alerts.map((a) => a.title), ["iPhone Refused"]);
+});
+
+test("F409: Fix in an install's alert or Log: Pairing, or the page that then checks at once", async () => {
+  const went = [];
+  runFix("pair", { go: (p) => went.push(p.join("/")) });
+  assert.equal(takeFix(), false);
+  runFix("check", { go: (p) => went.push(p.join("/")), later: () => {} });
+  assert.deepEqual(went, ["installation/pair", "installation"]);
+  const t = await failing(noRoute, { "idevice.verify": noRoute }); // drawn after the tap
+  await new Promise((r) => setTimeout(r, 10));
+  assert.deepEqual(t.alerts.map((a) => a.title), ["iPhone Refused"], "checked by itself, its reason said");
+  assert.equal(takeFix(), false, "once");
+  askFix(0);
+  assert.equal(takeFix(60_000), false, "an old tap is dropped");
+  clearRouteFailure();
+});
+
+test("F409: Pairing's row says Fix while failing", () => {
+  const label = (failing) => setupGroups("paired", FINE, null, { failing })[2].rows[0].label;
+  assert.deepEqual([label(false), label(true)], ["Check Connection", "Fix"]);
 });

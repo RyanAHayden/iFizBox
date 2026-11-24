@@ -63,9 +63,12 @@ value still loading shows the grey spinner in its slot and fades in (opacity onl
 rows or change footers. Top to bottom:
 
 - A status cell, always two lines under its title (`installStatus`), and one action row whose label changes:
-  Checking… (Check Connection, dimmed); Pair This iPhone with Start Pairing; Pair Again (a check the phone turned down)
-  opens Pairing, which starts pairing at once; No Network Extensions (the app's profile lacks them, so installs go
-  through the Signing Server); Couldn't Connect and iPhone Refused, red, with their fix (Check Connection or Pairing).
+  Checking… (Check Connection, dimmed); Pair This iPhone with Start Pairing; and the red failures Couldn't Connect,
+  iPhone Refused, Pair Again, No Network Extensions (the app's profile lacks them, so installs go through the Signing
+  Server) and Not Responding, whose action row is Fix. Fix opens Pairing, which checks the kept pairing, then pairs, when
+  the pairing is lost or missing (Pair Again); otherwise it checks the connection at once, spinning on the row: a pass
+  turns the cell green, the phone turning the pairing down opens Pairing, and anything else shows an alert with the plain
+  reason (OK). Check Connection shows only while nothing is failing; a Fix tapped while a check runs joins it.
   On cellular, those two messages add "On cellular, check on Wi-Fi. Installs ask for Airplane Mode." A pairing the phone dropped is redone on Pairing by
   itself. With Signing Server chosen: Ready to Install through the server, Check Server.
   With the built-in VPN (the app's profile has Network Extensions): Ready to Install, "Straight onto this iPhone,
@@ -91,7 +94,7 @@ The pages under it:
   says Paired, so setup asks that once). The footer names the next step (pair or test); once paired and tested it reads
   "Set up. Apps install straight onto this iPhone, on Wi-Fi or offline." On cellular it adds "On cellular, installs ask for Airplane Mode.", and when another VPN is up or chosen in
   Settings > VPN it adds "Your VPN goes off during installs. Turn it back on after." A failed check or install is
-  said there instead, red, with its fix row. Then **How It Works** › (`installation/how`: the five steps of one install:
+  said there instead, red, with its Fix row. Then **How It Works** › (`installation/how`: the five steps of one install:
   Download, Sign, iFizBox VPN On, Install, iFizBox VPN Off; and Offline). **Signing Server** (`installation/server`): Server,
   Check Server, Run Your Own. Without Network Extensions in the app's profile, This iPhone's page shows the Set Up group "Network Extensions: Missing" below.
 - **Install Apps With** (`installation/with`, the older page): This iPhone (installd over the built-in VPN, docs/sideload.md) or Signing Server
@@ -111,7 +114,7 @@ The pages under it:
   25 and 20 seconds.
 - **Pairing** (`installation/pair`), one page that runs by itself: a sentence on what it gives, then on iOS 27 pairing starts
   on its own: the 6-digit code and where to type it, a line and a ringed Settings screenshot a step; before iOS 27,
-  Import Pairing File; once paired, Paired with a check, Check Connection (Pair Again when the pairing is refused)
+  Import Pairing File; once paired, Paired with a check, Check Connection (which says Fix while it fails)
   and Forget Pairing. One pairing at a time: drawing the page again while it pairs, or coming back to it within 90
   seconds of leaving, keeps the same code and the same advertisement (iOS's Developer Mode page keeps a dead "Pair
   with" row for every advertisement that came and went).

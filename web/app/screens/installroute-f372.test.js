@@ -71,11 +71,11 @@ test("This iPhone's page: Set Up (Pair, Test) with its footer, then How It Works
   assert.equal(localGroups(ST(), { reading: true })[0].rows[0].detail, "Checking…");
   assert.equal(localGroups(ST(), { late: true })[0].rows[0].detail, "Not Responding");
   // a failed install: said in the footer, red, with its fix row
-  const f = { title: "iPhone Refused", short: "Every connection was refused.", fix: "check", button: "Check Again" };
+  const f = { title: "iPhone Refused", short: "Every connection was refused.", fix: "check", button: "Fix" };
   const failed = localGroups(ST({ tested: true }), { failure: f });
   assert.equal(failed[0].warn, true);
   assert.equal(failed[0].footer, "iPhone Refused. Every connection was refused.");
-  assert.equal(failed[0].rows.at(-1).label, "Check Again");
+  assert.equal(failed[0].rows.at(-1).label, "Fix");
   // the page's own titles, each pushed
   for (const k of ["how", "server", "iphone", "pair"]) assert.ok(SUB_TITLES[k], k);
   assert.equal(SUB_TITLES.shortcuts, undefined);

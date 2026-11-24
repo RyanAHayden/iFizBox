@@ -28,7 +28,7 @@ test("on cellular: still Ready to Install, no warning, nothing to add", () => {
 test("a profile without Network Extensions: said plainly, the server meanwhile", () => {
   for (const st of [{ paired: "rp" }, { paired: "rp", vpn: { available: false } }, { paired: null }]) {
     const n = installStatus("iphone", st);
-    assert.deepEqual([n.state, n.title, STATUS_ACTIONS[n.action], n.local], ["noVPN", "No Network Extensions", "Check Connection", false]);
+    assert.deepEqual([n.state, n.title, STATUS_ACTIONS[n.action], n.local], ["noVPN", "No Network Extensions", "Fix", false]);
     assert.equal(serverDetail(n, "ifizbox.com"), "ifizbox.com");
   }
   assert.equal(decideRoute("iphone", { paired: "rp" }).alert, "noVPN");

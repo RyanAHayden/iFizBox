@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { verifyFailure, routeFailureOf, installStatus, routeFailure, rememberRouteFailure, clearRouteFailure,
-  failureStatus, FAILURE_KEY, BUILTIN_VPN, PAIR_AGAIN_LINE, LOST_LINE, hasSocketText, plainSocket, pairFooter, vpnTestResult, serverFallback } from "./installroute.js";
+  failureStatus, FAILURE_KEY, BUILTIN_VPN, PAIR_AGAIN_LINE, LOST_LINE, hasSocketText, plainSocket, pairFooter, vpnTestResult, serverFallback, STATUS_ACTIONS } from "./installroute.js";
 import { deviceError, loggedBridge } from "./signing.js";
 
 const refused = Object.assign(new Error("refused: this iPhone refused RemotePairing on port 49152: it no longer has this pairing. Pair again"), { code: "refused" });
@@ -22,7 +22,7 @@ test("refused: Pair Again; the pairing is forgotten", () => {
   const f = routeFailureOf(refused, FINE);
   assert.equal(f.title, "Pair Again");
   assert.equal(f.fix, "pair");
-  assert.equal(f.button, "Pair Again");
+  assert.equal(f.button, "Fix");
   assert.equal(verifyFailure(refused, FINE).unusable, true);
 });
 
@@ -49,7 +49,7 @@ test("the shell's every-connection-refused (route_refused): not the pairing", ()
   // the install alert and log say the same (deviceError), with the fix button
   const d = deviceError(e, "Unbound");
   assert.equal(d.title, "iPhone Refused");
-  assert.equal(d.button, "Check Again");
+  assert.equal(d.button, "Fix");
 });
 
 test("a profile without Network Extensions: the failure is No Network Extensions, not the pairing", () => {
@@ -78,7 +78,7 @@ test("a failure is kept until a check passes, and turns Ready to Install into it
   const s = installStatus("iphone", FINE, { failure: f });
   assert.equal(s.state, "failed");
   assert.equal(s.title, "Pair Again");
-  assert.equal(s.action, "pair");
+  assert.deepEqual([STATUS_ACTIONS[s.action], s.fix], ["Fix", "pair"]);
   assert.equal(s.red, true);
   assert.equal(s.local, false, "the Signing Server row no longer says This iPhone");
   assert.deepEqual(s, failureStatus(f));
@@ -112,14 +112,14 @@ test("B416: the first connect reset: the red line, the alert, the kept failure a
     assert.equal(d.message, PAIR_AGAIN_LINE);
     assert.equal(d.title, "Pair Again");
     assert.equal(d.fix, "pair");
-    assert.equal(d.button, "Pair Again");
+    assert.equal(d.button, "Fix");
     const storage = memory();
     rememberRouteFailure(routeFailureOf(e, FINE), { storage });
     const f = routeFailure(storage);
-    assert.deepEqual([f.title, f.message, f.fix, f.button], ["Pair Again", PAIR_AGAIN_LINE, "pair", "Pair Again"]);
-    assert.equal(failureStatus(f).action, "pair");
+    assert.deepEqual([f.title, f.message, f.fix, f.button], ["Pair Again", PAIR_AGAIN_LINE, "pair", "Fix"]);
+    assert.deepEqual([failureStatus(f).action, failureStatus(f).fix], ["fix", "pair"]);
     assert.ok(!hasSocketText(JSON.stringify(f)) && f.short.length <= 70);
-    assert.equal(serverFallback(e, { route: "idevice" }, FINE).button, "Pair Again");
+    assert.equal(serverFallback(e, { route: "idevice" }, FINE).button, "Fix");
     assert.equal(verifyFailure(e, FINE).again, true);
     assert.ok(!verifyFailure(e, FINE).unusable, "checked once more before it is forgotten");
     assert.equal(vpnTestResult(null, e).title, "Pair Again");

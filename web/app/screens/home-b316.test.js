@@ -24,7 +24,7 @@ test("after a failed install the slot says the failure; after a passing check it
   const noRoute = Object.assign(new Error("route_refused: every port"), { code: "route_refused" });
   const why = await routeWords(noRoute, { title: "Couldn't Install Unbound", message: noRoute.message, open: null }, native(CELL_ST));
   assert.equal(why.title, "iPhone Refused", "the install's alert and log");
-  assert.equal(why.button, "Check Again");
+  assert.equal(why.button, "Fix");
   const t = slotOrRoute(slotTile("sideload", { setUp: true, serverUp: true, identity: null }), routeTile("sideload", routeFailure(), "iphone"));
   assert.deepEqual(t, { stage: "close", kind: "route", title: "iPhone Refused", subtitle: ROUTE_TILE_SUBTITLE });
   clearRouteFailure(); // a check passed

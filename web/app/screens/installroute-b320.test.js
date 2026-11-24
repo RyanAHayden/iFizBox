@@ -71,7 +71,7 @@ test("dropped once, then the retry connects: the pairing stays", async () => {
   assert.ok(!native.calls.includes("idevice.forget"));
 });
 
-test("Pair Again from the main page's Check Connection opens Pairing (it pairs by itself)", async () => {
+test("Fix in the alert of the main page's Check Connection opens Pairing (it pairs by itself)", async () => {
   forgetStatus();
   clearRouteFailure();
   let wentToPair = 0;
@@ -82,7 +82,7 @@ test("Pair Again from the main page's Check Connection opens Pairing (it pairs b
   AUTO_CHECK.last = Date.now();
   await page.refresh();
   await tap(withClass(page.el, "install-action")[0].children[0]);
-  assert.deepEqual(alerts.map((a) => a.buttons), [["Cancel", "Pair Again"]]);
+  assert.deepEqual(alerts.map((a) => a.buttons), [["Cancel", "Fix"]]);
   assert.ok(native.calls.includes("idevice.forget"));
   assert.equal(wentToPair, 1);
   clearRouteFailure();
