@@ -228,7 +228,8 @@ def check(path):
 # N8: the IPA carries the intents that work without a jailbreak (native/build.sh SIDELOAD_INTENTS), and a widget
 # extension without controls (no intents of its own) and without jailbreak entitlements.
 SIDELOAD_INTENTS = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent",
-                    "OpenForInstallIntent", "WaitForInstallIntent", "FinishInstallsIntent"}  # F417a: Cellular Installs' actions
+                    "OpenForInstallIntent", "WaitForInstallIntent", "FinishInstallsIntent",  # F417a: Cellular Installs' actions
+                    "RememberedVPNIntent", "RestoringVPNIntent", "FinishRestoreIntent"}  # F418: Restore My VPN's
 WIDGET = APP + "PlugIns/%sWidget.appex/" % NAME
 
 

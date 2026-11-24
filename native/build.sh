@@ -108,7 +108,7 @@ rcodesign=${RCODESIGN:-$(command -v rcodesign || true)}
 ldid=${LDID:-$(command -v ldid || true)}
 if [ -z "$rcodesign$ldid" ] && [ -x "$HOME/.cargo/bin/rcodesign" ]; then rcodesign=$HOME/.cargo/bin/rcodesign; fi
 
-SIDELOAD_INTENTS=CheckForUpdatesIntent,AddSourceIntent,RestorePackagesIntent,OpenForInstallIntent,WaitForInstallIntent,FinishInstallsIntent # N8: the both-modes intents, F417a: Cellular Installs' actions
+SIDELOAD_INTENTS=CheckForUpdatesIntent,AddSourceIntent,RestorePackagesIntent,OpenForInstallIntent,WaitForInstallIntent,FinishInstallsIntent,RememberedVPNIntent,RestoringVPNIntent,FinishRestoreIntent # N8: the both-modes intents, F417a: Cellular Installs' actions, F418: Restore My VPN's
 JAILBREAK_INTENTS=CheckForUpdatesIntent,AddSourceIntent,RestorePackagesIntent,InstallAllUpdatesIntent,RespringIntent,UserspaceRebootIntent,ExportPackagesIntent # the both-modes ones and the jailbreak's
 
 # bundle <iFizBox.app dir> <entitlements> <Info.plist overlay or "">: the executable signed ad hoc with the

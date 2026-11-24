@@ -37,7 +37,8 @@ SWIFTC = toolchain()
 JAILBREAK = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent", "InstallAllUpdatesIntent",
              "RespringIntent", "UserspaceRebootIntent", "ExportPackagesIntent"}
 CELLULAR = ["OpenForInstallIntent", "WaitForInstallIntent", "FinishInstallsIntent"]  # F417a: Cellular Installs' actions
-SIDELOAD = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent", *CELLULAR}
+RESTORE = ["RememberedVPNIntent", "RestoringVPNIntent", "FinishRestoreIntent"]  # F418: Restore My VPN's actions
+SIDELOAD = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent", *CELLULAR, *RESTORE}
 
 
 def read(*p):
@@ -245,9 +246,9 @@ class Wiring(unittest.TestCase):
         self.assertIn("-emit-const-values-path", b)
         self.assertIn("-weak_framework,AppIntents", b)
         self.assertIn("widget/build.sh", b)
-        self.assertIn("SIDELOAD_INTENTS=" + ",".join(["CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent", *CELLULAR]), b)
+        self.assertIn("SIDELOAD_INTENTS=" + ",".join(["CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent", *CELLULAR, *RESTORE]), b)
         self.assertIn("JAILBREAK_INTENTS", b)
-        for name in CELLULAR:
+        for name in CELLULAR + RESTORE:
             self.assertNotIn(name, re.search(r"^JAILBREAK_INTENTS=.*", b, re.M).group(0))
         self.assertNotIn("ConnectVPNIntent", b)  # the Install Switch's actions are gone
 
@@ -261,6 +262,11 @@ class Wiring(unittest.TestCase):
             self.assertIn("struct %s: AppIntent" % name, cellular)
         self.assertNotIn("ReturnsValue", cellular)  # output as the last action makes iOS ask over the app
         self.assertNotIn("import UIKit", cellular)
+        restore = read("intents", "App", "RestoreVPN.swift")
+        for name in RESTORE:
+            self.assertIn("struct %s: AppIntent" % name, restore)
+        self.assertNotIn("ReturnsValue", restore)
+        self.assertNotIn("import UIKit", restore)
         self.assertFalse(os.path.exists(os.path.join(NATIVE, "intents", "App", "InstallSwitch.swift")))
         self.assertNotIn("import WidgetKit", src)
 
