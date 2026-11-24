@@ -33,6 +33,9 @@
   one that is already up, so the VPN has to be up first.
 - `on` also opens the app and runs Finish Cellular Installs, so the app can judge it by its own actions too.
 - The old Connect VPN action is not in the Shortcut. The VPN is already up when a run starts, so it isn't needed.
+- Review: a given-up Shortcut could report into the next run. `begin()` now refuses a run or a check for 10 s after one
+  was given up (its waits end at once, so it is over by then). A Shortcut that hangs for longer before Open could still
+  report into a later run: F417a2 gives a run up only after its own time limit.
 
 ## Not verified
 - The plist's import into Shortcuts, and signing: there is no Mac to sign on. `ssh mba` timed out on 2026-11-24, so

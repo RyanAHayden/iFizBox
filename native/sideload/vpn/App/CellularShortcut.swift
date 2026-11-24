@@ -31,15 +31,20 @@ enum CellularShortcut {
 
     private static let lock = NSLock()
     private static var current: Report? // guarded by lock
+    private static var givenUpAt: Date? // guarded by lock
+    /// After a run was given up its Shortcut may still go on; its waits end at once, so it is over by then. No run or
+    /// check begins before, or its actions would count for the new one. `on` may: either end means data is on again.
+    static let settle: TimeInterval = 10
 
     static var report: Report? { lock.lock(); defer { lock.unlock() }; return current }
 
-    /// Before the Shortcut is opened with input(kind). False while an earlier run hasn't finished or been given up, and
-    /// for `run` without the built-in VPN up: iOS starts no VPN once data is off, and keeps one that is up.
-    static func begin(_ k: Kind, vpnUp: Bool) -> Bool {
+    /// Before the Shortcut is opened with input(kind). False while an earlier run hasn't finished or been given up, for
+    /// `settle` after one was given up, and for `run` without the built-in VPN up: iOS starts no VPN once data is off, and keeps one that is up.
+    static func begin(_ k: Kind, vpnUp: Bool, now: Date = Date()) -> Bool {
         guard k != .run || vpnUp else { return false }
         lock.lock(); defer { lock.unlock() }
         if let c = current, !c.finished { return false }
+        if k != .on, let t = givenUpAt, (0..<settle).contains(now.timeIntervalSince(t)) { return false }
         current = Report(kind: k)
         return true
     }
@@ -47,10 +52,12 @@ enum CellularShortcut {
     /// Every waiting install is connected: Wait for Install ends and the Shortcut turns cellular data on.
     static func release() { change { $0.released = true } }
 
-    /// The run failed or didn't come back: nothing it reports later counts, and its waits end. Answers what it reported.
+    /// The run failed or didn't come back: its waits end, and what it reports while no run is going on
+    /// is ignored. Answers what it reported.
     static func giveUp() -> Report? {
         lock.lock(); defer { lock.unlock() }
         let c = current
+        if let c, !c.finished { givenUpAt = Date() }
         current = nil
         return c
     }
