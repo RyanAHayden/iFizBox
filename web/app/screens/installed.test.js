@@ -565,7 +565,7 @@ test("B36: the record's sections show version, source and signature, then the ac
   assert.deepEqual(secs.actions.rows.map((x) => x.label), [OPEN, RESIGN]);
   assert.deepEqual(secs.remove.rows.map((x) => x.label), [REMOVE]);
   const extra = recordSections({ id: "com.example.mine", name: "Mine", version: "2", signedOnly: true, signed: { bundleId: "com.example.mine" } }, { mode: "site" });
-  assert.match(extra.infoFooter, /No source lists/);
+  assert.match(extra.infoFooter, /not from a source/);
   assert.match(extra.remove.footer, /done from the Home Screen/); // B46
 });
 

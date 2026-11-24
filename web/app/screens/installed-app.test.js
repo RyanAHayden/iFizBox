@@ -114,3 +114,12 @@ test("reloadSigned still reaches a source page", () => {
   assert.ok(drawn.includes(body));
   body.isConnected = false;
 });
+
+test("a quiet reload during the first draw takes it over: never a placeholder for ever", async () => {
+  const log = [];
+  const body = stub();
+  const none = { row: async () => null, find: async () => null };
+  const first = renderInstalledApp(body, ROUTE, null, drawer(log, none));
+  await Promise.all([first, renderInstalledApp(body, ROUTE, null, drawer(log, { ...none, quiet: true }))]);
+  assert.deepEqual(log, [["missing"]]);
+});

@@ -24,3 +24,8 @@ Installed's row linked to `#installed/app:<id>`, a plain page, whenever the cand
 ## Not verified
 - Not on a phone (the task says none needed).
 - The jailbreak app's Apps page and the website only by unit tests, not drawn in Chromium.
+
+Review: a quiet reload during the first draw of an app with no row left the placeholder; fixed. A signed-only page says
+"Signed by <name>, not from a source." (no source was asked). When a record page fills in from its source, the
+selected tab goes back to Details. The drawn pages themselves (renderRecordApp, renderApp's refresh) have no unit test:
+the record page was checked in Chromium, the refresh on reloadSigned was not (Not verified).

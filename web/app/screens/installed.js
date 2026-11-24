@@ -1355,7 +1355,7 @@ export async function renderInstalledApp(body, route, ctx, { quiet = false, row 
   const { id, key: routeKey } = appOf(route.path.at(-1));
   const r = await row(id);
   if (stale()) return;
-  if (quiet && !r) return; // forgotten: the page is on its way out
+  if (quiet && !r && view.shown) return; // forgotten: the page is on its way out
   const key = routeKey ?? recordKey(r);
   const source = async (pkg) => {
     view.shown = "source";
@@ -1483,7 +1483,7 @@ export function recordSections(r, { ipa = null, loading = false, mode = detectMo
   const source = r.sourceName || r.source || (fromMyIpas(r.signed) ? "My IPAs" : "");
   const out = { source, sourceHref, installed: { header: "Installed", rows, footer: r.note || null }, actions: null, remove: null,
     infoFooter: loading ? `Loading ${source || "your sources"}…` : r.self ? null
-      : sourceHref && source ? `${source} didn't load, or doesn't list this app now.` : "No source lists this app." };
+      : sourceHref && source ? `${source} didn't load, or doesn't list this app now.` : r.signedOnly ? `Signed by ${NAME}, not from a source.` : "No source lists this app." };
   if (loading) return out;
   const acts = appActions(r, { mode, ipa });
   const main = acts.filter((a) => !isDelete(a));
