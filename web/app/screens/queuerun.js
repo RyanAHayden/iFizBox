@@ -20,6 +20,10 @@
 //   The bottom: the status and bar while it runs, then the finish button (core/progress.js chooseFinish over what
 //     was installed: Restart SpringBoard for a tweak, Reload Data for an app, Return to iFizBox).
 //
+// F407: queued apps run on the same page (deps.apps; screens/apprun.js as its guest): their rows above the packages',
+// "Queue | Log" for the tabs. The apps go first while the packages download; dpkg's lane starts once they have ended
+// (core/installrun.js hold), failed apps or not. One Cancel, one Retry All, one summary, one finish button for both.
+//
 // What installed leaves the queue as it goes; what failed or was skipped stays queued, so Confirm shows it again.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { el, barButton } from "../nav/ui.js";
@@ -57,7 +61,8 @@ export async function markNeededBy(group, plan, jobs, names, catalog) {
 }
 
 // run: Confirm's { jobs, plan }. deps: { backend, catalog, queue, runLogs, names, finishAction(choice),
-//   onEnd({ ok, stopped, installed }), setBadge(text | null), open (openProgress, for tests) }
+//   onEnd({ ok, stopped, installed }), apps (F407: { jobs, start(host) -> runAppRun's on that host, finish() ->
+//   { levels, kinds } the apps ask of the finish button, or null, idle() -> settles once no app's helper call is going }), setBadge(text | null), open (openProgress, for tests) }
 // -> a promise for the first end: { ok, stopped, rows }.
 export async function runQueue({ jobs, plan }, deps) {
   const { backend, catalog, queue, runLogs, finishAction = async () => false, onEnd = () => {}, setBadge = () => {},
@@ -84,8 +89,9 @@ export async function runQueue({ jobs, plan }, deps) {
   let pass = 0;
   // F363: each pass is kept in Console Logs from its first line (runLogs.start), each line saved as it comes, so a
   // run that hangs or is killed still leaves its log; a retry pass is an entry of its own, holding that pass's lines.
-  const runJobs = jobs.map((j) => ({ op: j.op, id: j.id, version: j.version, mode: j.mode }));
-  const titleNow = () => runTitle(jobs.map((j) => ({ ...j, name: j.name || names[j.id] })));
+  const allJobs = [...(deps.apps?.jobs ?? []), ...jobs];
+  const runJobs = allJobs.map((j) => ({ op: j.op, id: j.id, version: j.version, mode: j.mode }));
+  const titleNow = () => runTitle(allJobs.map((j) => ({ ...j, name: j.name || names[j.id] })));
   let live = null;
   let passFrom = 0; // where this pass's lines start in `log`
   const entry = () => {
@@ -112,10 +118,10 @@ export async function runQueue({ jobs, plan }, deps) {
   summary.hidden = true;
   pane.append(list);
   page.pane(pane);
-  const seg = page.segmented(["Packages", "Log"], (i) => {
+  const seg = page.segmented([deps.apps ? "Queue" : "Packages", "Log"], (i) => {
     if (i === 0) { page.filter(null); page.view("pane"); } else page.view("log");
   });
-  openOn(page, seg, rows.length); // F247: one package opens on the Log
+  if (!deps.apps) openOn(page, seg, rows.length); // F247: one package opens on the Log
   const showLog = (pkg) => { seg.select(1); page.filter(pkg); page.view("log"); };
 
   const views = new Map();
@@ -133,7 +139,7 @@ export async function runQueue({ jobs, plan }, deps) {
     li.append(main, act);
     list.append(li);
     main.addEventListener("click", () => {
-      if (r.state === "failed" || r.state === "skipped" || (r.state === "cancelled" && !run.running)) retry(r.id);
+      if (r.state === "failed" || r.state === "skipped" || (r.state === "cancelled" && !busy)) retry(r.id);
       else showLog(r.id);
     });
     act.addEventListener("click", () => run.stop(r.id));
@@ -153,6 +159,9 @@ export async function runQueue({ jobs, plan }, deps) {
 
   // ---- the run ----
   let levels = [];
+  let apps = null;  // F407: the apps' half (apprun.js host.attach)
+  let helperBusy = false; // a stopped app's helper call may still be ending: dpkg waits for it
+  let busy = false; // a pass is going, the apps' half included
   let asking = Promise.resolve();
   const canAsk = typeof backend.answerConffile === "function";
   const ask = (file, pkg) => {
@@ -188,22 +197,30 @@ export async function runQueue({ jobs, plan }, deps) {
     rows, installed: info.installed ?? {},
     fetch: (r, hooks) => backend.queueFetch(r, hooks),
     install,
+    hold: () => Boolean(apps?.run.running) || helperBusy,
     onChange: (r) => { draw(r); tick(); },
     onLog: ({ pkg, kind, text }) => line(kind, text, pkg),
   });
   // What installed leaves the queue now; the IDs apt only pulled in aren't queued.
   const cleared = new Set();
   let tickFrame = 0;
+  const running = () => run.running || Boolean(apps?.run.running);
+  const total = () => rows.length + (apps?.rows.length ?? 0);
+  // the status's "(1 of 3)" counts the whole run
+  const status = () => {
+    const app = Boolean(apps?.run.running);
+    return (app ? apps.status() : runStatus(rows, names)).replace(/\((\d+) of \d+\)$/, (_, n) => `(${Number(n) + (app ? 0 : apps?.rows.length ?? 0)} of ${total()})`);
+  };
   const tick = () => {
     if (tickFrame) return;
     tickFrame = requestAnimationFrame(() => {
       tickFrame = 0;
       for (const r of rows) if (r.state === "installed" && !cleared.has(r.id)) { cleared.add(r.id); queue.clear(r.id); }
-      if (run.stopping) {
+      if (run.stopping || apps?.run.stopping) {
         page.status(run.current ? `Stopping after ${label(run.current.id)}…` : "Stopping…");
-      } else if (run.running) page.status(runStatus(rows, names));
-      page.progress(runPercent(rows));
-      const left = rows.filter((r) => !ended(r)).length;
+      } else if (running()) page.status(status());
+      page.progress(apps ? Math.round((apps.percent() * apps.rows.length + runPercent(rows) * rows.length) / total()) : runPercent(rows));
+      const left = rows.filter((r) => !ended(r)).length + (apps?.left() ?? 0);
       if (page.hidden) { setBadge(left ? String(left) : null); strip.update(); }
     });
   };
@@ -215,14 +232,24 @@ export async function runQueue({ jobs, plan }, deps) {
   const cancel = barButton("Cancel");
   const closeB = barButton("Close");
   const retryAll = barButton("Retry All");
-  hide.addEventListener("click", () => { page.hide(); strip.show(); tick(); });
+  const putAway = () => { page.hide(); strip.show(); tick(); };
+  hide.addEventListener("click", putAway);
   cancel.addEventListener("click", () => {
     if (cancel.disabled) return;
-    if (run.cancel()) { cancel.disabled = true; for (const r of rows) draw(r); tick(); }
+    const stopped = [apps?.run.cancel(), run.cancel()];
+    if (stopped.some(Boolean)) { cancel.disabled = true; apps?.redraw(); for (const r of rows) draw(r); tick(); }
   });
   closeB.addEventListener("click", () => page.close());
-  retryAll.addEventListener("click", () => { const p = run.retryAll(); if (p) drive(p); });
-  const retry = (id) => { const wasRunning = run.running; const p = run.retry(id); if (p && !wasRunning) drive(p); };
+  retryAll.addEventListener("click", () => {
+    const app = apps?.run.retryAll() ?? null; // first: dpkg's lane waits for it
+    const pkg = run.retryAll();
+    if (app || pkg) drive({ pkg, app });
+  });
+  const retry = (id) => {
+    const p = run.retry(id);
+    if (!p) return;
+    if (busy) going.pkg = p; else drive({ pkg: p }); // busy: this pass waits for it too
+  };
 
   // ---- Hide's strip, under every tab's nav bar ----
   const strip = (() => {
@@ -238,35 +265,74 @@ export async function runQueue({ jobs, plan }, deps) {
         document.body.classList.add("qr-stripped");
         strip.update();
       },
-      update() { if (node) node.firstChild.textContent = run.running ? runStatus(rows, names) : summaryLine(rows); },
+      update() { if (node) node.firstChild.textContent = running() ? status() : summary_(); },
       hide() { node?.remove(); node = null; document.body.classList.remove("qr-stripped"); setBadge(null); },
     };
   })();
   page.onClose(() => strip.hide());
   if (deps.onClose) page.onClose(() => deps.onClose(latest));
 
+  // ---- F407: the apps' half ----
+  const summary_ = () => summaryLine([...(apps?.rows ?? []).map((r) => ({ state: r.state, op: r.mode === "remove" ? "remove" : "install" })), ...rows]);
+  const appKey = (id) => (id ? `app:${id}` : null); // a package may have an app's bundle ID
+  // what runAppRun gets in place of a page of its own
+  const appHost = {
+    get busy() { return busy; },
+    attach(half) { apps = half; },
+    drive: (p) => drive({ app: p }),
+    changed: () => tick(),
+    page: {
+      // a line once nothing runs (a record written late) is for the page only: it would open a new Console Logs entry
+      line: (kind, text, id) => (live || apps?.run.running ? line(kind, text, appKey(id)) : page.line(kind, text, appKey(id))),
+      pane(n) { pane.replaceChildren(...n.children, list); },
+      segmented: () => ({ select: (i) => seg.select(i) }),
+      filter: (id) => page.filter(appKey(id)),
+      view: (v) => page.view(v),
+      status() {}, progress() {}, bar() {}, reopen() {}, finish() {}, clear() {},
+      get hidden() { return page.hidden; },
+      get closed() { return page.closed; },
+      hide: putAway,
+      close: () => page.close(),
+      onClose: (f) => page.onClose(f),
+    },
+  };
   // ---- one pass of the run, from start or a retry, to its end ----
   let first = null;
   let latest = null;
-  async function drive(promise) {
+  let going = {}; // this pass's promises: { pkg, app }
+  async function drive(promises) {
+    going = promises;
+    busy = true;
+    if (going.app) {
+      helperBusy = true;
+      going.app = going.app.then(() => deps.apps.idle?.()).then(() => { helperBusy = false; run.resume(); });
+    }
     pass++;
     entry(); // kept as running from the pass's start, even before its first line
-    page.reopen({ title: "Running", status: runStatus(rows, names) });
+    page.reopen({ title: "Running", status: status() });
     cancel.disabled = false;
     summary.hidden = true;
     page.bar({ left: cancel, right: hide }); // a retry keeps the finish levels earlier passes asked for
     for (const r of rows) draw(r);
-    await promise;
-    await asking;
+    apps?.redraw();
+    do {
+      await Promise.all([going.pkg, going.app]);
+      await asking;
+    } while (running());
+    busy = false;
     return ended_(cancel.disabled); // disabled: this pass was cancelled
   }
 
   async function ended_(wasCancel) {
     for (const r of rows) draw(r);
+    apps?.redraw();
     tick();
+    const appEnd = apps?.end(wasCancel) ?? { ok: true, installed: 0 };
     const installed = rows.filter((r) => r.state === "installed");
     const bad = rows.filter((r) => ["failed", "skipped", "cancelled"].includes(r.state));
-    const text = summaryLine(rows);
+    const clean = !bad.length && appEnd.ok;
+    const done = installed.length + appEnd.installed;
+    const text = summary_();
     summary.textContent = text;
     summary.hidden = false;
     line("step", text);
@@ -274,13 +340,16 @@ export async function runQueue({ jobs, plan }, deps) {
     const auto = installed.filter((r) => r.added && r.op === "install" && !r.from).map((r) => r.id);
     if (auto.length) await backend.markAuto?.(auto);
     const instKinds = installed.map((r) => kinds[r.id]?.kind ?? (kinds[r.id]?.restart ? "tweak" : "package"));
-    const choice = chooseFinish({ ok: installed.length > 0, levels: installed.length ? [...levels, ...selfLevels(installed.map((r) => ({ id: r.id, op: r.op })))] : [], kinds: instKinds });
+    const asked = deps.apps?.finish?.() ?? { levels: [], kinds: [] }; // F407: AppSync Unified's respring
+    const own = [...installed.map((r) => ({ id: r.id, op: r.op })), ...(apps?.rows ?? []).filter((r) => r.state === "installed").map((r) => ({ id: r.id, op: r.mode === "remove" ? "remove" : "install" }))];
+    const choice = chooseFinish({ ok: installed.length > 0 || asked.levels.length > 0 || own.length > 0,
+      levels: [...(installed.length ? levels : []), ...selfLevels(own), ...asked.levels], kinds: [...instKinds, ...asked.kinds] });
     const kept = entry();
     live = null;
     kept.set({ title: titleNow() });
-    kept.end({ code: bad.length ? 1 : 0, cancelled: wasCancel, finish: choice.level, text: log.slice(passFrom).join("\n") });
+    kept.end({ code: clean ? 0 : 1, cancelled: wasCancel, finish: choice.level, text: log.slice(passFrom).join("\n") });
     const reloaded = catalog.reloadInstalled?.().catch(() => {});
-    const result = { ok: !bad.length, stopped: wasCancel, rows, installed: installed.length, reloaded };
+    const result = { ok: clean, stopped: wasCancel, rows, installed: done, reloaded, ...(apps ? { apps: apps.rows } : {}) };
     if (!first) first = result;
     latest = result;
     onEnd(result);
@@ -288,17 +357,22 @@ export async function runQueue({ jobs, plan }, deps) {
       // Cancel: back to Confirm with what finished cleared, and a footer that says so
       strip.hide();
       await page.close();
-      deps.reopenConfirm?.(`Stopped. ${installed.length} installed and cleared from the queue.`);
+      deps.reopenConfirm?.(`Stopped. ${done} installed and cleared from the queue.`);
       return result;
     }
-    page.bar(bad.length ? { left: closeB, right: retryAll } : {});
+    page.bar(clean ? {} : { left: closeB, right: retryAll });
     page.finish({ label: choice.label, status: text, action: () => finishAction(choice) });
     if (page.hidden) strip.update();
+    apps?.settled();
     return result;
   }
 
+  if (deps.apps) {
+    try { await deps.apps.start(appHost); } catch (e) { await page.close(); throw e; }
+    openOn(page, seg, total());
+  }
   return new Promise((resolve) => {
-    const p = run.start();
-    drive(p).then(() => resolve(first), () => resolve(first));
+    const app = apps?.run.start() ?? null; // first: dpkg's lane waits for it
+    drive({ app, pkg: run.start() }).then(() => resolve(first), () => resolve(first));
   });
 }

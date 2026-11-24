@@ -233,8 +233,8 @@ export function upgradeAll(queue, available, skip = null) {
 // can't fetch them (F87), so upgradeJobs leaves them out; counting only its jobs hid the button whenever every listed
 // upgrade was an app. The count is both. Only `available` rows: never the ignored ones.
 // F255: the tap queues apt's rows in the install queue and each app's new IPA in the app queue (app-queue.js), as a
-// row's swipe queues an app there (B71a), so one Confirm lists them all and runs them (screens/queue.js
-// runJailbreakApps: the apps on the helper's black page first, then apt's packages).
+// row's swipe queues an app there (B71a), so one Confirm lists them all and runs them in one run (screens/queue.js
+// runConfirmed: the apps through the helper first, then apt's packages).
 
 // The remembered apps' rows among the available upgrades (B19's `skip` too).
 export const appUpgradeRows = (available = [], skip = null) =>

@@ -5,6 +5,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runQueue } from "./queuerun.js";
 import { parseSimulation, createQueue, createRunLog } from "../core/queue.js";
+import { createAppQueue } from "../core/appqueue.js";
+import { helperLanes, runAppRun } from "./apprun.js";
+import { helperCalls } from "./queue.js";
+import { PACKAGE } from "../brand.js";
 import { fakeDocument as fakeDom } from "../fakes.test-helper.js";
 
 // A stand-in for nav/progress.js's page: records what the run asks of it.
@@ -188,4 +192,231 @@ test("F363: each pass is its own entry: the first ends Failed with its lines, Re
   assert.doesNotMatch(two.text, /SHA256/);
   assert.match(two.text, /» Unpacking Lib/);
   assert.match(two.text, /3 installed$/);
+}));
+
+// ---- F407: apps and packages in one run ---------------------------------------------------------------------------
+
+// apps: { id: "ok" | "fail" | a function () -> a promise for runIpaInstall's answer }
+function mixed(s, apps, { finish = () => null, kinds = {}, idle, jobs: js = jobs, plan: pl = plan } = {}) {
+  const queue = createAppQueue();
+  for (const id of Object.keys(apps)) queue.add({ id, name: id.toUpperCase(), version: "2.0", url: `https://s/${id}.ipa` });
+  const order = [];
+  const recorded = [];
+  const install = s.backend.queueInstall;
+  s.backend.queueInstall = (r, o) => { order.push(r.id); return install(r, o); };
+  s.catalog.queueInfo = async () => kinds;
+  const lanes = helperLanes({ backend: {}, install: async ({ url }) => {
+    const id = url.slice("https://s/".length, -".ipa".length);
+    order.push(`app ${id}`);
+    await settle();
+    const how = apps[id];
+    if (typeof how === "function") return how();
+    return how === "ok" ? { ok: true } : { ok: false, error: { message: "installd refused it" } };
+  } });
+  const list = queue.list().map((j) => ({ ...j, helper: true }));
+  const ends = [];
+  const confirms = [];
+  let appClosed = 0;
+  const done = runQueue({ jobs: js, plan: pl }, { backend: s.backend, catalog: s.catalog, queue: s.queue, runLogs: s.runLogs,
+    names: { tweak: "Tweak", other: "Other" }, open: () => s.page, onEnd: (r) => ends.push(r), reopenConfirm: (f) => confirms.push(f),
+    finishAction: async (choice) => { s.choice = choice; return false; },
+    apps: { jobs: list, finish, idle,
+      start: (host) => runAppRun(list, { queue, lanes, host, open: () => host.page, record: async (j) => recorded.push(j.id), isInstalled: null,
+        onClose: () => { appClosed++; } }) } });
+  return { done, queue, order, recorded, ends, confirms, apps, closed: () => appClosed,
+    row: (name) => (s.page.panes[0]?.children ?? []).flatMap((ul) => ul.children).find((li) => li.children?.[0]?.children?.[0]?.textContent === name) };
+}
+const until = async (f) => { for (let i = 0; i < 100 && !f(); i++) await settle(); assert.ok(f(), "never came"); };
+
+test("F407 mixed: one page, every app before any package, one end with one finish button and no tap between", () => withDom(async () => {
+  const s = setup({ badLib: false });
+  const m = mixed(s, { a: "ok", b: "ok" }, { kinds: { tweak: { kind: "tweak" } } });
+  const r = await m.done;
+  await settle();
+  assert.deepEqual(m.order, ["app a", "app b", "lib", "tweak", "other"]);
+  assert.equal(r.ok, true);
+  assert.equal(r.installed, 5);
+  assert.deepEqual(r.rows.map((x) => x.id), ["lib", "tweak", "other"]);
+  assert.equal(m.ends.length, 1);
+  assert.deepEqual([m.queue.size, s.queue.size], [0, 0]);
+  assert.deepEqual(m.recorded, ["a", "b"]);
+  assert.deepEqual(s.page.seg.labels, ["Queue", "Log"]);
+  assert.deepEqual(["A", "B", "Lib", "Tweak", "Other"].map((n) => Boolean(m.row(n))), [true, true, true, true, true]);
+  assert.equal(s.page.views.at(-1), "pane");
+  assert.equal(s.page.bars.length, 2, "one Running bar, one end");
+  assert.deepEqual(s.page.bars[1], {});
+  assert.equal(s.page.finished.label, "Restart SpringBoard"); // the tweak's
+  assert.equal(s.page.lines.at(-1).text, "5 installed");
+  assert.equal(s.page.lines.filter((l) => /installed$/.test(l.text)).length, 1, "one summary");
+  assert.ok(s.page.statuses.some((t) => /^Installing B \(2 of 5\)$/.test(t) || /^Preparing B \(2 of 5\)$/.test(t)), s.page.statuses.join(" | "));
+  assert.ok(s.page.statuses.some((t) => /\(\d of 5\)/.test(t) && /Lib|Tweak|Other/.test(t)));
+  // one Console Logs entry for both
+  assert.equal(s.runLogs.list().length, 1);
+  assert.equal(s.calls.logs[0].title, "Install A, Install B and 2 more");
+  assert.match(s.runLogs.get(s.calls.logs[0].id).text, /» Installed A[\s\S]*» Installed Tweak/);
+  // an app's row shows its own lines, kept apart from a package of the same ID
+  m.row("A").children[0].click();
+  assert.equal(s.page.filtered, "app:a");
+  assert.ok(s.page.lines.some((l) => l.pkg === "app:a" && l.text === "Installed A"));
+  s.page.close();
+  assert.equal(m.closed(), 1);
+}));
+
+test("F407 an app and a package fail: the rest installs, both stay queued, Retry All runs both, the app first", () => withDom(async () => {
+  const s = setup();
+  const m = mixed(s, { a: "fail", b: "ok" });
+  const r = await m.done;
+  await settle();
+  assert.equal(r.ok, false);
+  assert.deepEqual(m.order, ["app a", "app b", "other"]);
+  assert.deepEqual([m.queue.list().map((j) => j.id), s.queue.list().map((j) => j.id)], [["a"], ["tweak"]]);
+  assert.equal(s.page.lines.at(-1).text, "2 installed, 2 failed, 1 skipped");
+  assert.equal(s.page.bars.at(-1).left.textContent, "Close");
+  assert.equal(s.page.bars.at(-1).right.textContent, "Retry All");
+  assert.equal(s.calls.logs[0].code, 1);
+  m.order.length = 0;
+  m.apps.a = "ok";
+  s.fixLib();
+  s.page.bars.at(-1).right.click();
+  await until(() => m.ends.length === 2);
+  await settle();
+  assert.deepEqual(m.order, ["app a", "lib", "tweak"]);
+  assert.equal(m.ends[1].ok, true);
+  assert.deepEqual([m.queue.size, s.queue.size], [0, 0]);
+  assert.deepEqual(s.page.bars.at(-1), {});
+}));
+
+test("F407 only an app failed: Retry All and its row's tap run just that app", () => withDom(async () => {
+  const s = setup({ badLib: false });
+  const m = mixed(s, { a: "fail" });
+  await m.done;
+  m.row("A").children[0].click();
+  await until(() => m.ends.length === 2);
+  assert.equal(m.ends[1].ok, false);
+  m.apps.a = "ok";
+  s.page.bars.at(-1).right.click();
+  await until(() => m.ends.length === 3);
+  assert.deepEqual(m.order, ["app a", "lib", "tweak", "other", "app a", "app a"]);
+  assert.equal(m.ends[2].ok, true);
+}));
+
+test("F407 a failed app's tap while the packages still run opens its log: no app install beside dpkg", () => withDom(async () => {
+  const s = setup({ badLib: false });
+  const install = s.backend.queueInstall;
+  let go;
+  const gate = new Promise((f) => { go = f; });
+  s.backend.queueInstall = async (r, o) => { await gate; return install(r, o); };
+  const m = mixed(s, { a: "fail" });
+  await until(() => m.order.includes("lib"));
+  m.row("A").children[0].click();
+  await settle();
+  assert.equal(s.page.filtered, "app:a");
+  assert.deepEqual(m.order, ["app a", "lib"]);
+  go();
+  await m.done;
+  assert.equal(m.ends.length, 1);
+}));
+
+test("F407 a package that failed its download is retried while the apps run: the same pass waits for it, after them", () => withDom(async () => {
+  const s = setup();
+  let go;
+  const gate = new Promise((f) => { go = f; });
+  const m = mixed(s, { a: async () => { await gate; return { ok: true }; } });
+  await until(() => m.row("Lib")?.dataset.state === "failed");
+  s.fixLib();
+  m.row("Lib").children[0].click();
+  await settle();
+  assert.deepEqual(m.order, ["app a"], "dpkg waits for the app");
+  go();
+  await m.done;
+  assert.deepEqual(m.order, ["app a", "lib", "tweak", "other"]);
+  assert.equal(m.ends.length, 1);
+}));
+
+test("F407 Cancel while an app installs stops everything left and reopens Confirm", () => withDom(async () => {
+  const s = setup({ badLib: false });
+  let n = 0;
+  const m = mixed(s, { a: "ok", b: () => { n++; return new Promise(() => {}); }, c: "ok" });
+  await until(() => n === 1);
+  s.page.bars.at(-1).left.click();
+  const r = await m.done;
+  await settle();
+  assert.equal(r.stopped, true);
+  assert.deepEqual(m.order, ["app a", "app b"]);
+  assert.ok(r.rows.every((x) => x.state === "cancelled"));
+  assert.deepEqual(m.queue.list().map((j) => j.id), ["b", "c"]);
+  assert.equal(s.queue.size, 2);
+  assert.deepEqual(m.confirms, ["Stopped. 1 installed and cleared from the queue."]);
+  assert.equal(s.page.closed, true);
+  assert.equal(s.page.finished, null);
+  assert.equal(m.closed(), 1);
+}));
+
+test("F407 Cancel during the packages: dpkg finishes its package, the count has the apps too", () => withDom(async () => {
+  const s = setup({ badLib: false });
+  const install = s.backend.queueInstall;
+  let go;
+  const gate = new Promise((f) => { go = f; });
+  s.backend.queueInstall = async (r, o) => { await gate; return install(r, o); };
+  const m = mixed(s, { a: "ok" });
+  await until(() => m.order.includes("lib"));
+  s.page.bars.at(-1).left.click();
+  await settle();
+  assert.equal(m.confirms.length, 0);
+  go();
+  await m.done;
+  await settle();
+  assert.deepEqual(m.order, ["app a", "lib"]);
+  assert.deepEqual(m.confirms, ["Stopped. 2 installed and cleared from the queue."]);
+}));
+
+test("F407 the finish level is the highest of both halves", () => withDom(async () => {
+  const end = async (opts, apps = { a: "ok" }) => {
+    const s = setup({ badLib: false });
+    await mixed(s, apps, opts).done;
+    const { label } = s.page.finished;
+    await s.page.finished.action();
+    return [label, s.choice.level, s.choice.uicache];
+  };
+  const respring = () => ({ levels: ["restart"], kinds: ["app"] });
+  assert.deepEqual((await end({})).slice(1), ["return", false]);
+  assert.deepEqual(await end({ kinds: { other: { kind: "app" } } }), ["Reload Data", "uicache", false]);
+  assert.deepEqual(await end({ finish: respring }), ["Restart SpringBoard", "restart", true]);
+  assert.deepEqual(await end({ finish: respring, kinds: { other: { kind: "app" } } }), ["Restart SpringBoard", "restart", true]);
+  assert.deepEqual(await end({ kinds: { tweak: { kind: "tweak" } } }, { a: "fail" }), ["Restart SpringBoard", "restart", false]);
+}));
+
+test("F407 a stopped app's helper call still ending holds dpkg", () => withDom(async () => {
+  const s = setup({ badLib: false });
+  const h = helperCalls();
+  let end;
+  const m = mixed(s, { a: () => h.track(new Promise((f) => { end = () => f({ ok: true }); })) }, { idle: h.idle });
+  await until(() => end);
+  m.row("A").children[1].click();
+  await settle();
+  assert.equal(m.row("A").dataset.state, "cancelled");
+  assert.deepEqual(m.order, ["app a"]);
+  end();
+  await m.done;
+  assert.deepEqual(m.order, ["app a", "lib", "tweak", "other"]);
+  const hung = helperCalls({ limit: 5 });
+  hung.track(new Promise(() => {}));
+  await hung.idle();
+}));
+
+test("F407 iFizBox's own package goes last, after the apps, and the run ends on its Close button", () => withDom(async () => {
+  const s = setup({ badLib: false });
+  const own = [{ op: "install", id: PACKAGE, mode: "upgrade" }, jobs[1]];
+  const m = mixed(s, { a: "ok" }, { jobs: own, plan: parseSimulation(`Inst ${PACKAGE} [1.0] (2.0 R [a])\nInst other (1.0 R [a])`) });
+  await m.done;
+  assert.deepEqual(m.order, ["app a", "other", PACKAGE]);
+  assert.match(s.page.finished.label, /^Close /);
+}));
+
+test("F407 the apps failing to start closes the page and runs no package", () => withDom(async () => {
+  const s = setup({ badLib: false });
+  await assert.rejects(runQueue({ jobs, plan }, { backend: s.backend, catalog: s.catalog, queue: s.queue, runLogs: s.runLogs, open: () => s.page,
+    apps: { jobs: [], start: async () => { throw new Error("no"); } } }), /no/);
+  assert.equal(s.page.closed, true);
+  assert.deepEqual(s.calls.fetch, []);
 }));
