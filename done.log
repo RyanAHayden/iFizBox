@@ -1,0 +1,4 @@
+gate passed: tools/check.sh
+ticked R90
+448317ee R90 B418 checked on the iPhone 15 Pro: no stale rows, one start, VPN off after; installs never overlapped (R94 filed)
+pushed task/R90 -> origin
