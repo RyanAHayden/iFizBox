@@ -274,6 +274,8 @@ enum LocalVPN {
             let m = ms?.first { ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == id }
             let on = m.map { [.connected, .connecting, .reasserting].contains($0.connection.status) } ?? false
             guard on || (restore && m != nil) else { return }
+            lock.lock(); let used = holds > 0 || installs > 0; lock.unlock()
+            if used { return log("\(restore ? "Restore My VPN: " : "")in use, the configuration stays until that ends") }
             DispatchQueue.global(qos: .utility).async { downIfIdle(m, why: "left on with nothing going on") }
         }
     }
@@ -310,8 +312,7 @@ enum LocalVPN {
     static var restore: Bool { UserDefaults.standard.bool(forKey: restoreKey) }
     static func setRestore(_ on: Bool) {
         UserDefaults.standard.set(on, forKey: restoreKey)
-        lock.lock(); let used = holds > 0 || installs > 0; lock.unlock()
-        log("Restore My VPN turned \(on ? "on" : "off")\(on && used ? ": the configuration is in use, removed after" : "")")
+        log("Restore My VPN turned \(on ? "on" : "off")")
         if on { takeDownLeftOver() }
     }
 
@@ -353,6 +354,7 @@ enum LocalVPN {
                 return log("Restore My VPN: no configuration to remove")
             }
             guard [.disconnected, .invalid].contains(m.connection.status) else {
+                m.connection.stopVPNTunnel() // `cached` may be none
                 throw IDevice.Failure(code: "vpn_failed", text: "\(name) isn't off yet")
             }
             guard restore, idle(), waiting() == nil else {
@@ -378,11 +380,12 @@ enum LocalVPN {
     private static func giveBackLater(_ after: TimeInterval) {
         lock.lock(); let already = later; later = true; lock.unlock()
         guard !already else { return }
-        let task = BackgroundHold("\(name) configuration")
+        lock.lock(); let paused = pauses > 0; lock.unlock()
+        let task = paused ? nil : BackgroundHold("\(name) configuration") // a pause lets iOS suspend the app
         DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + after) {
             lock.lock(); later = false; lock.unlock()
             stopNow()
-            task.end()
+            task?.end()
         }
     }
 
