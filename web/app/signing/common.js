@@ -149,13 +149,16 @@ export function setServer(s) {
 }
 
 // B111: signing.install's {here: "copying" | "installing", progress} event (This iPhone) -> { label } for the page's
-// step and bar ("Copying to iPhone 40%", "Installing 75%"), or null. F368: "airplane" and "airplaneOff" too.
+// step and bar ("Connecting to iPhone", "Copying to iPhone 40%", "Installing 75%"), or null. F368: "airplane" and "airplaneOff" too.
 export function hereLabel(ev) {
   const air = { airplane: AIRPLANE_ON, airplaneOff: AIRPLANE_OFF, appWait: APP_WAIT, networkWait: NETWORK_WAIT }[ev?.here];
   if (air) return { label: air };
+  if (ev?.here === "connecting") return { label: "Connecting to iPhone" }; // R91: no bytes yet
   const word = { copying: "Copying to iPhone", installing: "Installing" }[ev?.here];
   if (!word) return null;
-  const p = Math.round(Math.max(0, Math.min(1, Number(ev.progress) || 0)) * 100);
+  const f = Math.max(0, Math.min(1, Number(ev.progress) || 0));
+  if (ev.here === "copying" && f >= 1) return { label: "Copied to iPhone, waiting for iOS" }; // R91: the copy ended
+  const p = Math.round(f * 100);
   return { label: p > 0 && p < 100 ? `${word} ${p}%` : word };
 }
 

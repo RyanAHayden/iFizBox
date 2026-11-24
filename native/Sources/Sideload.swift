@@ -597,7 +597,7 @@ enum Sideload {
         let isSelf = app.bundleID == Bundle.main.bundleIdentifier
         IDevice.ilog("This iPhone: \(app.bundleID) \(app.version), \(Sideload.size(output))")
         let way = "\(LocalVPN.name) (\(IDevice.address))"
-        log?("Installing on this iPhone through \(way); nothing goes to a Signing Server")
+        log?("Using this iPhone's own install route through \(way); nothing goes to a Signing Server")
         emit?("here", 0)
         if isSelf {
             saveRecords(SignedRecords.adding(record, to: records()))
@@ -623,7 +623,7 @@ enum Sideload {
             var held = true // KeepAlive
             do {
                 try job?.check()
-                log?("Copying the IPA to iOS (\(Sideload.size(output))), then iOS installs it")
+                log?("Connecting to iOS to copy the signed IPA (\(Sideload.size(output)))")
                 // B246: the bundle ID and version let a dropped connection ask iOS for the app instead of failing
                 try IDevice.install(output, bundleID: app.bundleID, version: app.version, cancelled: { job?.cancelled == true },
                                     note: { log?($0) }) { st in
@@ -635,9 +635,9 @@ enum Sideload {
                         else if held { held = false; KeepAlive.shared.end() }
                         if p == .app { emit?("appWait", 0); step?("appWait", 0) }
                         if p == .network { emit?("networkWait", 0); step?("networkWait", 0) }
-                    case .connected: emit?("here", 0.02); step?("copying", 0)
+                    case .connected: emit?("here", 0.02); step?("connecting", 0) // connected; the copy starts with its first chunk
                     case .upload(let p): emit?("here", 0.02 + p * 0.28); step?("copying", p); if p >= 1 { closer?.copied() }
-                    case .install(let p): emit?("here", 0.3 + p * 0.7); step?("installing", p); closer?.installd(p)
+                    case .install(let p): emit?("here", 0.301 + p * 0.699); step?("installing", p); closer?.installd(p)
                     }
                 }
                 result = .success(())

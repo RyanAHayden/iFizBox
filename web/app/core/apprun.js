@@ -110,7 +110,7 @@ export const APP_STALL = 180_000;
 export const SIGN_STEPS = { reading: [0, 0.5], signing: [0.5, 1] };
 
 const PHASE_WORD = { downloading: "Downloading", signing: "Signing", asking: "Asking iOS", installing: "Installing",
-  copying: "Copying to iPhone" };
+  connecting: "Connecting to iPhone", copying: "Copying to iPhone" };
 
 export function appRows(jobs = []) {
   return runOrder(jobs).map((j) => ({
@@ -278,6 +278,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       if (phase === "downloading") log(r, "step", `Downloading ${label(r)}${r.size ? ` ${sizeText(r.size)}` : ""}`);
       else if (phase === "signing") log(r, "step", `Signing ${label(r)}`);
       else if (phase === "asking") log(r, "step", `Asked iOS to install ${label(r)}`);
+      else if (phase === "connecting") log(r, "step", `Connecting to this iPhone for ${label(r)}`); // R91: no bytes yet
       else if (phase === "copying") log(r, "step", copyingText(r)); // B111: This iPhone
       else if (phase === "airplane") log(r, "step", AIRPLANE_ON); // F368
       else if (phase === "appWait") log(r, "step", APP_WAIT); // B423
@@ -292,8 +293,9 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     // B400: the helper's step ({ word, percent }, screens/apprun.js helperLanes): each logged once, "Preparing" not at all
     const word = helperRow(r) && info?.word ? { word: info.word, wordPercent: info.percent ?? null } : {};
     if (word.word && word.word !== r.word && word.word !== "Preparing") log(r, "step", `${word.word} ${label(r)}`);
-    const settled = !r.here && phase === "copying"; // F359: its This iPhone route is settled: others may join it
-    const here = r.here || phase === "copying";
+    const starts = phase === "connecting" || phase === "copying"; // R91: the route's first step is connecting
+    const settled = !r.here && starts; // F359: its This iPhone route is settled: others may join it
+    const here = r.here || starts;
     if (phase === "appWait" || phase === "networkWait") { // B423: paused until the app is opened
       set(r, { phase, state: "installing", here: true, fraction: 0 });
       return;
@@ -302,7 +304,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       set(r, { phase, state: "installing", here: true, fraction: 0, airplane: phase === "airplane" ? "on" : "off" });
       return;
     }
-    const state = phase === "copying" ? "installing" : SIGNING.has(phase) || WITH_IOS.has(phase) ? phase : r.state;
+    const state = starts ? "installing" : SIGNING.has(phase) || WITH_IOS.has(phase) ? phase : r.state;
     let frac = Math.max(0, Math.min(1, Number(fraction) || 0));
     if (phase === "signing" && SIGN_STEPS[step]) frac = SIGN_STEPS[step][0] + (SIGN_STEPS[step][1] - SIGN_STEPS[step][0]) * frac;
     const dl = phase === "downloading" && info ? { bytes: Number(info.bytes) || 0, total: Number(info.total) || 0, rate: Number(info.rate) || 0 } : {};
@@ -655,13 +657,16 @@ export function rowStatus(row, opts = {}) {
     case "asking":
       if (row.phase === "busy") return busyText(label(row)); // B312
       if (row.phase === "hold") return "Signed: Waiting to Install"; // F368: on cellular, until every app is signed
-      return promptUp(row) ? "Tap Install on the iOS prompt" : "Installing"; // B137: This iPhone has no prompt
+      if (promptUp(row)) return "Tap Install on the iOS prompt";
+      return row.local && !row.phase ? "Preparing" : "Asking iOS"; // R91: nothing installs yet: This iPhone's route hasn't started, or iOS has only been asked
     case "installing":
       if (row.phase === "airplane") return AIRPLANE_ON; // F368
       if (row.phase === "appWait") return APP_WAIT; // B423
       if (row.phase === "networkWait") return NETWORK_WAIT;
       if (row.phase === "airplaneOff") return "Connected to iOS";
+      if (row.phase === "connecting") return "Connecting to iPhone"; // R91
       if (isCopying(row)) return p > 0 && p < 100 ? `Copying to iPhone ${p}%` : "Copying to iPhone";
+      if (row.phase === "copying") return "Copied to iPhone, waiting for iOS"; // R91: the copy ended, installd hasn't reported
       if (selfClosing(row)) return SELF_CLOSING;
       return p > 0 && p < 100 ? `Installing ${p}%` : "Installing";
     case "installed":
@@ -674,8 +679,9 @@ export function rowStatus(row, opts = {}) {
   }
 }
 
-// B421: the copy is still going: phase "copying" below fraction 1. At 100% the IPA is with iOS and installd's first
-// percent may take long: the row already says Installing (its own row says it is closing only once installd took it).
+// B421: the copy is still going: phase "copying" below fraction 1. R91: at 100% the IPA is with iOS and installd's first
+// percent comes only after it has unpacked and checked the IPA (measured: 2 to 10 s, more with thousands of files, and
+// one install at a time): the row says "Copied to iPhone, waiting for iOS", and Installing from installd's first percent.
 const isCopying = (row) => row?.phase === "copying" && !((Number(row.fraction) || 0) >= 1);
 
 export function summaryLine(rows) {
@@ -710,15 +716,21 @@ export function runStatus(rows) {
   const pos = (r) => `${rows.indexOf(r) + 1} of ${rows.length}`;
   const withIos = rows.filter((r) => WITH_IOS.has(r.state) && r.phase !== "hold");
   if (withIos.length > 1) { // F359: This iPhone rows installing together
-    return withIos.every(isCopying) ? `Copying ${withIos.length} apps to iPhone` : `Installing ${withIos.length} apps`;
+    const sending = (r) => r.phase === "connecting" || r.phase === "copying" || r.state === "asking";
+    if (withIos.every(isCopying)) return `Copying ${withIos.length} apps to iPhone`;
+    if (withIos.every(sending)) return `Sending ${withIos.length} apps to iPhone`; // R91: none has reached installd yet
+    return `Installing ${withIos.length} apps`;
   }
   const ios = withIos[0];
   if (ios && helperRow(ios) && ios.state === "installing" && ios.word) return `${ios.word} ${label(ios)}${wordPercent(ios)} (${pos(ios)})`; // B400
   if (ios && helperRow(ios)) return `${ios.mode === "remove" ? "Removing" : "Installing"} ${label(ios)} (${pos(ios)})`;
   if (ios?.phase === "busy") return busyText(label(ios)); // B312
+  if (ios?.phase === "connecting") return `Connecting to iPhone for ${label(ios)} (${pos(ios)})`; // R91
   if (isCopying(ios)) return `Copying ${label(ios)} to iPhone (${pos(ios)})`; // B111: This iPhone
+  if (ios?.phase === "copying") return `Copied ${label(ios)} to iPhone, waiting for iOS (${pos(ios)})`; // R91
   if (selfClosing(ios)) return `Installing ${label(ios)}: ${SELF_CLOSING}`;
-  if (ios) return ios.state === "asking" && promptUp(ios) ? `Tap Install for ${label(ios)} (${pos(ios)})` : `Installing ${label(ios)} (${pos(ios)})`;
+  if (ios?.state === "asking") return promptUp(ios) ? `Tap Install for ${label(ios)} (${pos(ios)})` : `${ios.local && !ios.phase ? "Preparing" : "Asking iOS to install"} ${label(ios)} (${pos(ios)})`; // R91
+  if (ios) return `Installing ${label(ios)} (${pos(ios)})`;
   const s = rows.filter((r) => SIGNING.has(r.state));
   if (s.length && s.every(helperRow)) return "Preparing";
   if (s.length === 1) return `${s[0].state === "signing" ? "Signing" : "Downloading"} ${label(s[0])} (${pos(s[0])})`;
@@ -734,6 +746,7 @@ export function rowProgress(r) {
   const f = Math.max(0, Math.min(1, Number(r?.fraction) || 0));
   if (ended(r)) return 1;
   if (helperRow(r)) return r.state === "installing" ? f : 0; // B400: no signing: the helper's bar is the row's whole bar
+  if (r?.state === "installing" && r.phase === "connecting") return 0.5; // R91
   if (r?.state === "installing" && r.phase === "copying") return 0.5 + 0.1 * f;
   if (r?.state === "installing" && ["airplane", "airplaneOff", "appWait", "networkWait"].includes(r.phase)) return 0.5; // F408: the copy comes next
   if (r?.state === "installing" && r.here) return 0.6 + 0.4 * f;

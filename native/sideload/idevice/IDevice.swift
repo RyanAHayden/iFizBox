@@ -507,6 +507,7 @@ enum IDevice {
     /// B246: install() connects again after a drop and carries on where the last try stopped.
     private final class HereRun {
         let ipa: URL, size: Int, remote: String, bundleID: String?, version: String?
+        let began = Date()      // R91: for the connect time in the log
         var connected = false   // the first try got as far as a session: later drops are worth connecting again
         var before: HereRecheck.Before?  // what iOS listed before the install; nil until asked
         var sent = 0            // bytes of the IPA iOS has
@@ -1032,7 +1033,7 @@ enum IDevice {
         run.onConnect = nil
         let route = s.kind == .remotePairing ? "\(s.via) (RemotePairing tunnel)" : "\(s.via) (lockdown)"
         if !run.connected {
-            note("Connected to iOS through \(route)")
+            note("Connected to iOS through \(route) after \(String(format: "%.1f", Date().timeIntervalSince(run.began))) s")
             progress(.connected)
             run.connected = true
         } else {
@@ -1068,11 +1069,17 @@ enum IDevice {
             throw Failure(code: "install_failed", text: "lost the connection to iOS while it was installing, and iOS doesn't list \(run.bundleID ?? "the app") \(run.version ?? "") after \(Int(HereRecheck.askFor)) s. It may still be installing it: look on the Home Screen")
         }
         w.begin("iOS installing the app (installd)", Limit.install)
-        note("iOS is installing it")
+        // R91: what the quiet before installd's first percentage is: iOS unpacks and checks the staged IPA first
+        // (measured on the iPhone 15 Pro: about 8 of 9.5 s for 12,000 files, 2 of 4 s for one file of the same size)
+        note("The IPA is on iOS: asking installd to install it. Its first percentage comes after it has unpacked and checked the IPA (seconds; longer with thousands of files)")
+        let requestAt = Date()
         var lastPct: UInt64 = .max
         let box = Unmanaged.passRetained(ProgressBox { pct in
             w.alive("\(pct)% installed")
-            if pct != lastPct { lastPct = pct; ilog("installd: \(pct)%") }
+            if pct != lastPct {
+                lastPct = pct
+                ilog("installd: \(pct)% \(String(format: "%.1f", Date().timeIntervalSince(requestAt))) s after the request")  // R91
+            }
             progress(.install(Double(min(pct, 100)) / 100))
         })
         defer { box.release() }
@@ -1091,7 +1098,7 @@ enum IDevice {
             removeStaged(run.remote, session: s, watch: w)
             throw error
         }
-        ilog("installd: Complete")
+        ilog("installd: Complete \(String(format: "%.1f", Date().timeIntervalSince(requestAt))) s after the request")
         removeStaged(run.remote, session: s, watch: w)
         progress(.install(1))
     }
@@ -1272,7 +1279,7 @@ enum IDevice {
             note("Carrying on with the copy from \(mb(from)) of \(mb(total))")
         } else {
             try check(afc_file_open(afc, remote, AfcWrOnly, &file), "upload_failed")
-            note("Copying the IPA to iOS (\(mb(total)))")
+            note("Copying the IPA to iOS: \(mb(total)) to send")
         }
         w.begin("copying the IPA to iOS (AFC)", Limit.upload)
         var sent = from, logged = from
