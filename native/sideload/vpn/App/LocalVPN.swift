@@ -174,6 +174,13 @@ enum LocalVPN {
         try hold(finishing)
         var held = true
         defer { if held { end() } }
+        var said = false // counted in offWaits
+        func count(_ on: Bool) {
+            guard on != said else { return }
+            said = on
+            lock.lock(); offWaits += on ? 1 : -1; lock.unlock()
+        }
+        defer { count(false) }
         log("on cellular: reading the path again for \(Int(airplaneReread)) s; path: \(Path.described())")
         var t0 = Date() // after begin: Wi-Fi can drop as the VPN starts
         var left: Date?
@@ -188,8 +195,13 @@ enum LocalVPN {
                 log("on Wi-Fi: no wait; path: \(Path.described())")
                 return false
             }
-            if now.cellular, IDevice.AppFront.away >= awayGrace {
+            // Cellular Installs is being opened (its verdict has its own limits): the VPN stays on, for iOS starts none once
+            // data is off; after a failed run there is the whole time again
+            let running = CellularShortcut.running
+            if running && asked { t0 = Date() }
+            if now.cellular, !running, IDevice.AppFront.away >= awayGrace {
                 log("out of the app for \(Int(awayGrace)) s, still on cellular: the wait pauses")
+                count(false)
                 end()
                 held = false
                 let before = Date()
@@ -198,7 +210,7 @@ enum LocalVPN {
                 held = true
                 t0 += Date().timeIntervalSince(before) // the pause isn't part of airplaneLimit
                 left = nil
-                if asked { waiting() }
+                if asked { count(true); waiting() }
                 continue
             }
             if now.cellular { left = nil } else if left == nil { left = Date() }
@@ -209,6 +221,7 @@ enum LocalVPN {
             if now.cellular && !asked && Date().timeIntervalSince(t0) >= airplaneReread {
                 asked = true
                 log("on cellular: waiting for Wi-Fi or Airplane Mode; path: \(Path.described())")
+                count(true)
                 waiting()
             }
             if Date().timeIntervalSince(t0) > airplaneLimit {
@@ -217,6 +230,13 @@ enum LocalVPN {
             }
             Thread.sleep(forTimeInterval: 0.25)
         }
+    }
+
+    private static var offWaits = 0 // guarded by lock: installs that said they wait, the VPN on
+    /// An install waits on cellular now, our VPN held on for it: Cellular Installs may run.
+    static func waitsOnCellular() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return offWaits > 0
     }
 
     // ---- The app out of sight (B423)
@@ -764,6 +784,7 @@ enum LocalVPNBridge {
         LocalVPN.Path.start()
         LocalVPN.clearOldKeys()
         CellularShortcutBridge.register(b) // cellular.*
+        CellularRun.register(b) // cellular.run, and the put-back after a killed app
         DispatchQueue.main.async { IDevice.AppFront.watch() }
         LocalVPN.takeDownLeftOver() // B423: a killed app's
         b.on("vpn.setRestore") { c in

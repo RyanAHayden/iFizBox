@@ -47,6 +47,35 @@ C.opened(); C.finished()
 check(C.report?.ok == true, "on ok")
 check(C.begin(.run, vpnUp: true, now: Date() + C.settle + 1), "a run begins once it is over")
 
+// the installs a run waits for
+let a = UUID(), b = UUID()
+C.finished(); _ = C.giveUp()
+C.connects(a); C.connected(a) // no run: nothing
+C.connects(a); C.connects(b)
+check(C.begin(.run, vpnUp: true, now: Date() + 60) && C.running, "a run for two installs")
+C.opened(); C.connected(a); C.connected(a)
+check(C.waiting(), "one isn't connected yet")
+C.connected(b)
+check(!C.waiting() && C.report?.released == true, "both are: the wait ends early")
+C.waited(); C.finished()
+check(C.report?.ok == true && !C.running, "and the run is over")
+
+// a run's verdict
+func rv(opened: Bool = true, turns: Int = 0, released: Bool = false, finished: Bool = false, elapsed: Double = 100, front: Double = 90, quiet: Double = 0) -> C.Verdict {
+    C.runVerdict(C.Report(kind: .run, opened: opened, turns: turns, released: released, finished: finished),
+                 elapsed: elapsed, front: front, quiet: quiet, said: "an earlier run's error")
+}
+let said = "an earlier run's error"
+check(rv(turns: 14, quiet: 25) == .wait, "waiting, turn by turn")
+check(rv(quiet: C.waitStep + C.endLimit) == .failed("no_end", said), "its turns stopped coming: it died")
+check(rv(released: true, quiet: 9) == .wait, "released: the end is near")
+check(rv(released: true, quiet: 10) == .failed("no_end", said), "released, no end")
+check(rv(turns: 1, released: true, finished: true) == .ok, "a run that ended")
+check(rv(turns: C.waitTurns, finished: true) == .failed("ran_out", nil), "ended, not connected")
+check(rv(opened: false, elapsed: 5, front: 3) == .failed("not_run", said), "back without our Open")
+check(rv(opened: false, elapsed: 59, front: 0) == .wait, "Allow is asked")
+check(rv(opened: false, elapsed: C.checkLimit, front: 0) == .failed("no_return", nil), "never came back")
+
 // a check's verdict: the actions decide; Shortcuts' callback is only told on
 func v(opened: Bool = false, ended: Bool = false, _ elapsed: Double, front: Double = 0, _ said: String? = nil) -> C.Verdict {
     let r = C.Report(kind: .check, opened: opened, turns: ended ? 1 : 0, finished: ended)
