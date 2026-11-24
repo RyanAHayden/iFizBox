@@ -721,6 +721,7 @@ export function rowProgress(r) {
   if (ended(r)) return 1;
   if (helperRow(r)) return r.state === "installing" ? f : 0; // B400: no signing: the helper's bar is the row's whole bar
   if (r?.state === "installing" && r.phase === "copying") return 0.5 + 0.1 * f;
+  if (r?.state === "installing" && (r.phase === "airplane" || r.phase === "airplaneOff")) return 0.5; // F408: the copy comes next
   if (r?.state === "installing" && r.here) return 0.6 + 0.4 * f;
   if (r?.state === "downloading") return 0.25 * f;
   if (r?.state === "signing") return 0.25 + 0.25 * f;
