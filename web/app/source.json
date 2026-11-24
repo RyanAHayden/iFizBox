@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "0.28.0",
+          "date": "2026-11-24T13:15:40Z",
+          "localizedDescription": "On cellular, installs ask for Airplane Mode after signing.\nInstall on an app's page goes straight to the queue.\nConfirm runs apps and tweaks together in one go.\nApps signed here no longer crash when started while locked.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.28.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.28.0/iFizBox.ipa",
+          "size": 31839193,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.27.0",
           "date": "2026-11-24T01:09:12Z",
           "localizedDescription": "Updates no longer bounce between iFizBox and Shortcuts.\nUpdating iFizBox by Signing Server no longer gets stuck.\nAdd Tweaks now queues the app too.\nAn older Install Switch is offered its update.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.27.0",
@@ -250,14 +258,6 @@
           "localizedDescription": "Fixes popup menus (Modify and others) whose buttons did nothing.\nAction sheets in 0.17.1 stayed on screen with dead buttons after a tap, and a second tap stacked another one. Also includes everything merged since 0.17.1.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.17.2",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.17.2/iFizBox.ipa",
           "size": 28497479,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.17.1",
-          "date": "2026-11-20T21:06:55Z",
-          "localizedDescription": "Paid tweaks in sideloaded apps: sign in to Chariz or Havoc and buy, or get free purchased tweaks without signing in\nHome warns in red when signing needs setup or the Signing Server is down; a Why iFizBox tile\nA source that fails to refresh opens a page with the whole error and Refresh / Edit / Remove; BigBoss loads again\nPull to refresh holds open while it refreshes; notifications show iFizBox's icon; the launch screen matches the app\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.17.1",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.17.1/iFizBox.ipa",
-          "size": 17718352,
           "minOSVersion": "15.0"
         }
       ]
