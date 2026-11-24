@@ -25,7 +25,7 @@ class OpenRescueWiring(unittest.TestCase):
 
     def test_incoming_marks_files_the_delegate_delivered(self):
         receive = self.app[self.app.index("static func receive(_ url: URL)"):]
-        receive = receive[:receive.index("if LocalVPN.receive(url)")]
+        receive = receive[:receive.index("if SharedInbox.receive(url)")]
         self.assertIn("if url.isFileURL { OpenRescue.delivered(url) }", receive)
 
     def test_sideload_only_and_hooks_the_action_url(self):
