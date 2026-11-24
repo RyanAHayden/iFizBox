@@ -10,6 +10,7 @@
 //   const w = watchInstall(token, hud, { base, fetcher, app, itms, open, alert })
 //   await w.first   after the first look: a Worker without /status (or no answer) ends the page on UPLOADED_TEXT
 //   await w.end     "installed" (downloaded) | "not_asked" | "unknown" | "closed" | "timeout"
+import { sayFirstLaunch } from "../core/firstlaunch.js"; // F415
 import { SENT_TO_IOS } from "../core/signing.js";
 import { openAppHelp } from "../screens/guides.js";
 import { showAlert } from "../nav/alert.js";
@@ -69,6 +70,7 @@ export function watchInstall(token, h, { base = "", fetcher = globalThis.fetch, 
         const left = minShow - (clock() - shownAt);
         if (left > 0) await sleep(left);
         if (cause) h.page?.help?.(cause, { action: help });
+        sayFirstLaunch(h.page); // F415
         if (h.done) h.done(steps[2]); else h.hide();
         return "installed";
       }

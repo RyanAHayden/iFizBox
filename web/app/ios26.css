@@ -696,7 +696,7 @@ html[data-style="ios26"] .pl-raw { font-family: ui-monospace, "SF Mono", Menlo, 
 html[data-style="ios26"] .pl-step { font-weight: 600; color: var(--i26-label); }
 html[data-style="ios26"] .pl-error { font-weight: 600; color: var(--i26-red); }
 html[data-style="ios26"] .pl-warning { font-weight: 600; color: var(--i26-run-warning); }
-html[data-style="ios26"] .pl-help { color: var(--i26-run-raw); }
+html[data-style="ios26"] :is(.pl-help, .qr-hint) { color: var(--i26-run-raw); }
 html[data-style="ios26"] .progress-cursor { background: var(--i26-run-raw); }
 html[data-style="ios26"] .progress-jump {
   border-radius: 12px; font-weight: 600; color: var(--i26-label); background: var(--i26-capsule); box-shadow: var(--i26-capsule-shadow);

@@ -1,6 +1,7 @@
 // Signing's shared helpers (signing-client.js re-exports the public ones): the bridge, the build checks, the
 // insecure-download alert, the malware hash, and the progress page's Cancel.
 import { AIRPLANE_ON, AIRPLANE_OFF, APP_WAIT, NETWORK_WAIT } from "../core/installroute.js"; // F368
+import { sayFirstLaunch } from "../core/firstlaunch.js"; // F415
 import { detectMode } from "../core/settings.js";
 import { showAlert } from "../nav/alert.js";
 import { isInsecure, INSECURE_IPA_ALERT, INSTALL_ANYWAY } from "../core/insecureipa.js";
@@ -178,6 +179,7 @@ export function finishHere(h, result, { native, name = "", later = setTimeout } 
   const bid = result?.bundleId;
   if (typeof h.finish === "function") {
     h.set(`${text} 100%`);
+    sayFirstLaunch(h.page);
     const open = () => { try { Promise.resolve(bridge(native).call("signing.openApp", { bundleId: bid })).catch(() => {}); } catch { /* no bridge */ } return false; };
     h.finish({ status: text, ...(bid ? { also: { label: `Open ${app}`, action: open } } : {}) });
   } else later(() => (h.done ? h.done(text) : h.hide()), 1200);

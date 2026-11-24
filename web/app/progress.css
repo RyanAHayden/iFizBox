@@ -199,6 +199,7 @@
 .qr-stop[hidden] { display: none; }
 .qr-summary { padding: 14px 14px 6px; }
 .qr-summary[hidden] { display: none; }
+.qr-hint { margin-top: 8px; }
 
 /* ==== look-only { ==== the queue run's rows, bars, stop and summary */
 .qr-list { list-style: none; }
@@ -219,4 +220,5 @@
   background: no-repeat center / 22px 22px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='12' fill='%23636363'/%3E%3Cpath d='M8.8 8.8l8.4 8.4M17.2 8.8l-8.4 8.4' stroke='%23fff' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 .qr-summary { font: bold 13px/17px "Helvetica Neue", Helvetica, sans-serif; color: #fff; text-align: center; }
+.qr-hint { font-weight: normal; color: #a9a9a9; }
 /* ==== } look-only ==== */
