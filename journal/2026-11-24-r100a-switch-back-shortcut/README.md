@@ -8,7 +8,9 @@ Measured 2026-11-24. Tailscale On Demand on. Restore My VPN off unless stated. S
 
 - A Shortcut built by hand in the Shortcuts UI does not work. Its Back run never receives the stored VPN.
 - The signed draft at `ref/shortcuts-signed` (`Restore My VPN Plain.shortcut`, legacy `setstoredcontent` / `getstoredcontent` actions from `gen.py`) works. Over 5 cycles, Tailscale went off when our VPN started and came back within 8 s after Back ran. No prompt appeared during the cycles.
-- Recommended follow-up: queue an F task to bundle the signed "Restore My VPN" Shortcut. See the last item under Summary for the details.
+- Answer to "does our next save or start ever show Add VPN Configurations, Allow or the passcode": with Restore My VPN off, only the very first save did (our configuration had been removed before; one tap on Allow). Every later save and start, 5 cycles, showed nothing. With it on, the first save after each removal asks again. A passcode prompt is untested: the phone has no passcode.
+- The "GO" covers the signed plist only. For the hand-built Shortcut the answer is NO-GO: it failed twice and its cause is unknown, so it is weak evidence.
+- Follow-up: the F task for this Shortcut already exists in the plan; see the Follow-up paragraph below.
 
 Setup and use:
 
