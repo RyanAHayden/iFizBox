@@ -16,3 +16,14 @@ No MB/s measured. Nothing new beyond R91: desktop USB 150 MB/s, the phone's own 
 - Every variant (4 MB, 8 MB, pipelined) on the phone: no build possible (MBA unreachable, and no switch exists yet).
 
 R93 itself stays the measuring task: it waits for T79 (`--after T79`), and needs the MBA for the build.
+
+## Second attempt (T79 landed)
+- The switch is in `IDevice.swift` (`copySwitch`: defaults `afcChunkMB` 1/4/8 and `afcPipelined`, debug builds only;
+  each run logs its MB/s).
+- Still no MB/s: `ssh mba` times out again and `tailscale status` shows mbas-macbook-air offline (last seen 14h ago).
+  The debug app builds only there.
+- Plan once it is back: debug build to the 15 Pro (`tools/ui-15.sh`), set the defaults, copy the same IPA with
+  1 MB, 4 MB, 8 MB and pipelined, three runs each, read the "this run ... MB/s" log line.
+
+## Not verified
+- Every variant on the phone: the MBA is offline, so no debug build.
