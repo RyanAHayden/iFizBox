@@ -455,3 +455,6 @@ export function serverFallback(err, route = { route: "idevice" }, st = null) {
   if (airplaneTimeout(err)) return AIRPLANE_TIMEOUT; // F368
   return routeFailureOf(err, st);
 }
+
+// Restore My VPN (sideload, built-in VPN): the kept setting, read as idevice.status's vpn.restore. Answers that vpn status.
+export const setRestoreVPN = (native, on) => native.call("vpn.setRestore", { on: Boolean(on) });
