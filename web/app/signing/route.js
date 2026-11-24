@@ -11,7 +11,8 @@ export async function chooseRoute({ native, alert = showAlert, storage = storage
   if (heldRoute && now() - heldRoute.at < ROUTE_HOLD) return heldRoute.params;
   let status = null;
   try { status = await bridge(native).call("idevice.status", {}); } catch { status = null; }
-  const d = decideRoute(choice, status);
+  noteSwitch(status?.vpn, storage);
+  const d = decideRoute(choice, status, { later: switchLater(storage) });
   if (d.alert) {
     const a = ROUTE_ALERTS[d.alert];
     const { index } = await alert({ title: a.title, message: a.message, buttons: a.buttons, cancel: 0 });
@@ -19,6 +20,7 @@ export async function chooseRoute({ native, alert = showAlert, storage = storage
     // goes on through the Signing Server (no way on through This iPhone: it always fails there)
     if (a.setup != null) {
       if (index === a.setup) { heldRoute = null; openRoute(["installation", "shortcuts"]); return null; }
+      if (a.later) rememberSwitchLater(a.later, storage); // B396
       const params = routeParams(a.goes ? d : { route: "server" }); // F394: goes on without the Install Switch
       heldRoute = { at: now(), params };
       return params;
@@ -56,6 +58,7 @@ import { recordSelfUpdate } from "../core/selfupdate.js";
 import { showAlert } from "../nav/alert.js";
 import { NAME } from "../brand.js";
 import { storedRoute, decideRoute, ALERTS as ROUTE_ALERTS, routeParams } from "../core/installroute.js";
+import { noteSwitch, switchLater, rememberSwitchLater } from "../core/installroute.js"; // B396
 import { routeFailureOf, rememberRouteFailure, clearRouteFailure } from "../core/installroute.js"; // B316
 import { SELF_RESTART } from "../core/apprun.js";
 import { KNOWN_MALWARE, askInsecure, bridge, failed, keepIpaHash, refusing, stopNative, storageOf,
