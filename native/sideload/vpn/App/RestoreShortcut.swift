@@ -1,7 +1,7 @@
 // Restore My VPN, the Shortcut that remembers the VPN that is on and sets it again after ours was used
 // (tools/shortcuts/restore-vpn.plist): what its own actions (../../../intents/App/RestoreVPN.swift) tell the app about
 // the run going on. Shortcuts' callback only brings the app back: it can be an earlier run's, and Set VPN often ends
-// with error 2 after it has switched (R100b), so a back run is judged by the other VPN being up.
+// with error 2 after it has switched (R100b), so a back run is judged by the other VPN, off as it began, being up.
 // Foundation only: ../tests/restore/main.swift tests it on Linux.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
@@ -33,9 +33,10 @@ enum RestoreShortcut {
 
     /// Before the Shortcut is opened with input(kind). The refusal's code, or nil once the run has begun.
     /// busy: another run goes on or just ended early; no_vpn: no other VPN is up to remember (with ours the current one,
-    /// Shortcuts would keep ours); vpn_on: ours is up, which a back run would turn off.
+    /// Shortcuts would keep ours); on_already: another VPN is up, nothing to bring back; vpn_on: ours is up, which a back run would turn off.
     static func begin(_ k: Kind, vpnUp: Bool, otherVPN: Bool, now: Date = Date()) -> String? {
         if k == .store, !otherVPN { return "no_vpn" }
+        if k == .back, otherVPN { return "on_already" }
         if k != .check, vpnUp { return "vpn_on" }
         lock.lock(); defer { lock.unlock() }
         if current != nil { return "busy" }
@@ -92,7 +93,7 @@ enum RestoreShortcut {
             case .store:
                 if r.finished { return r.remembered ? .ok : .failed("no_vpn", nil) }
             case .back:
-                if r.restoring, otherVPN { return .ok }
+                if otherVPN { return .ok } // it was off as the run began
                 if r.finished, !r.restoring { return .failed("not_stored", nil) }
             }
             if r.remembered || r.restoring {
@@ -101,7 +102,7 @@ enum RestoreShortcut {
             }
         }
         if front >= grace { return .failed("not_run", said) }
-        return elapsed >= runLimit ? .failed("no_return", nil) : .wait
+        return front == 0 && elapsed >= runLimit ? .failed("no_return", nil) : .wait
     }
 
     private static func change(_ f: (inout Report) -> Void) {
