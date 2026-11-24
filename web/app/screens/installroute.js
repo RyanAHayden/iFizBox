@@ -270,7 +270,12 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
   const asPicked = { get: () => "iphone", set: () => {} };
   // Drawn again once the answer is kept, under its alert and after it; no automatic check right behind this one
   const settled = () => { fixing = testing = false; AUTO_CHECK.last = Date.now(); redraw(); };
-  const ask = (q) => { settled(); return alert(q); };
+  const ask = async (q) => {
+    settled();
+    const r = await alert(q);
+    if (r?.index === 1 && q.buttons?.[1] === FIX) { fixing = true; redraw(); } // Fix goes on: Checking… again
+    return r;
+  };
   const runCheck = async (how = {}) => {
     if (fixing || testing) return;
     fixing = true;
