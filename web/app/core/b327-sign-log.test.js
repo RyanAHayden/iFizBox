@@ -19,7 +19,7 @@ test("B327: the keychain line names every group in order and the application-ide
 test("B327: the group fix line names the whole config, or why there is none", () => {
   const plan = groupFixPlan(INSTA, { "com.apple.security.application-groups": ["group.com.me.box"] });
   assert.equal(groupFixLogLine(plan),
-    "Group fix: group.com.burbn.instagram -> the app's own folder; keychain groups stripped; group.com.me.box copied in once if the app ran before");
+    "Group fix: group.com.burbn.instagram -> the app's own folder; keychain groups stripped; group.com.me.box copied in once if the app ran before; shared with its notification extensions through group.com.me.box");
   assert.equal(groupFixLogLine({ groups: [], target: "group.com.me.box", keychain: false }), "Group fix: no app groups -> group.com.me.box");
   assert.equal(groupFixLogLine(null), "Group fix: none (the original signature names no app groups or keychain groups)");
   assert.equal(groupFixLogLine(null, "no fix dylib"), "Group fix: none (no fix dylib)");

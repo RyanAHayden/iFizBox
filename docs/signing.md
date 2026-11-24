@@ -708,8 +708,12 @@ An app keeps its data in three places, and a re-sign must leave each where the a
   earlier install left. While a copy isn't complete (launch cut short, or files unreadable before first unlock)
   `Library/AppGroups/.<group>.copying` stays and the next launch tries again. The fix's log
   (`Library/ifizbox-groupfix.log`) gets one extra line then: `<time> brought in from before the group fix: <group>
-  folder <files>, suite <keys>` (the files and keys found there). Extensions don't get the dylib, so they keep the
-  old place.
+  folder <files>, suite <keys>` (the files and keys found there). The app's notification extensions (extension point
+  `com.apple.usernotifications.service`, in `PlugIns/` or `Extensions/`) load the group fix
+  too, from the app's `Frameworks/` (rpath `@executable_path/../../Frameworks`), when the profile has an app group.
+  Both signers inject it (`IPASigner.swift`, `websign-job.js fixExtensions`) and log `Group fix in PlugIns/X.appex`, or
+  `No group fix in ...: its executable couldn't take it`, and that extension is left as it was. Other extensions
+  (notification content, share, widgets...) don't get it and keep what they reach without it: a tweak's shim, or nothing.
 - **Keeping an app's passwords to itself**: `TEAM.<App ID>` (and the profile's app groups) stay keychain groups every
   app under that App ID can reach, and a read that names no group finds what is there: a fresh app took over another
   app's item, and one app's delete that named no group (a fresh install clearing its keychain, a logout, any app the
@@ -731,14 +735,37 @@ An app keeps its data in three places, and a re-sign must leave each where the a
   another signer gave its own group plus the shared one, with no group fix, that has written no password in this
   install, can take another app's newer shared item. Until
   every item could be copied (locked before the first unlock after a restart, or behind Face ID or a passcode) calls
-  stay as before and the next launch tries again. Keys and certificates keep the plain stripping. Extensions don't
-  get the dylib; they have the app's keychain groups, so they still find its items.
+  stay as before and the next launch tries again. Keys and certificates keep the plain stripping. Other extensions
+  don't get the dylib; they have the app's keychain groups, so a call naming no group still finds its items, and one
+  naming an original group fails unless a tweak changes it. A notification extension with the fix is covered by the
+  next bullet.
+- **Sharing with the app's notification extensions**: an extension can't reach the app's container, so the app stays
+  the only writer of its own place (`Library/AppGroups`, `ifizbox.appgroup.*`) and puts a one-way copy in the profile
+  group `shared` in `ifizbox-groupfix.plist` (the profile's first group, or `target`): `ifizbox.shared/<app bundle
+  ID>/` with `suites/<group>.plist`, `files/<group>/` (files up to 512 KB, 8 MB a group in total, 5000 items; not
+  `Library/Caches`, SQLite databases or their `-wal`/`-shm`/`-journal`), and `state.plist`. It is refreshed a few
+  seconds after launch, a few seconds after a setting changes (changed files go along), and when the app goes to the
+  background; then a Darwin notification tells the extension. The app's record is `Library/ifizbox-groupfix-shared.plist`
+  in its container. The extension brings the copy into its own container's `Library/AppGroups/<group>/` and
+  `ifizbox.appgroup.<group>` suite at start and on that notification: only what the app changed since last time, and
+  never a file it wrote later itself (a setting both changed takes the app's value; settings carry no times); its record is the same file name in its own container. What the extension writes
+  doesn't go back to the app. Until the app has run once with this fix, the extension works as without it. The first
+  time, for an app that ran before, the extension also brings in what it kept without the fix (the tweak's shim folder
+  and suite), never over what the app gave. A fresh install removes a copy an earlier install left and seeds nothing.
+  Another profile's groups: the copy is made anew, nothing is lost since app and extension hold their own. The legacy
+  copy skips `ifizbox.shared`. Limit: any app signed with the same profile can technically reach the copy's folder,
+  though the fix of one app never reads another's. With `target`, app and extension both use that group directly.
+  Passwords: in the extension, original keychain group names are stripped, and password calls name the app's own
+  keychain group once the app's own calls do (`state.plist` `pinned`) and only if the extension has that group
+  entitled. The extension's log: its own `Library/ifizbox-groupfix.log`, and its last start in
+  `ifizbox.shared/<bundle ID>/extension.log`.
 
 Every sign logs what it gave the app, so a report of an app that lost its sign-in or settings can be read from
 Console Logs (the run's log): `Keychain: TEAM.<its ID>, TEAM.<App ID> (application-identifier TEAM.<App ID>)`, the
 groups in their order (new items go to the first), and `Group fix: <groups> -> the app's own folder; keychain groups
 stripped; <group> copied in once if the app ran before; passwords kept in TEAM.<its ID>, the shared groups' copied in
-once if the app ran before` (every part of `ifizbox-groupfix.plist`), or `Group fix:
+once if the app ran before; shared with its notification extensions through <group>` (every part of
+`ifizbox-groupfix.plist`), or `Group fix:
 none (<why>)`: the original names no groups, iFizBox's own IPA, or no fix dylib in the build (the app's groups then
 go unmapped). The app's signer writes them to the log (`Profile.keychainLine`, `GroupFix.logLine`); the website's
 job returns them as `signLog` (`core/websign.js keychainLogLine`, `core/groupfix.js groupFixLogLine`), which the

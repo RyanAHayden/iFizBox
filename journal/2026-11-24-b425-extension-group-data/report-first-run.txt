@@ -1,0 +1,38 @@
+app at 2026-11-24 18:45:30 +0000; extension object found ((null)), request DB165731-7D60-45F1-A88D-9E7ECE5A07E5
+group.com.burbn.instagram: the copy 363 keys; own suite 364, 363 of the copy's equal; initWithSuiteName reads 363 equal; differ 
+  container /var/mobile/Containers/Data/Application/7C944E92-5770-4B31-81A4-BB2FBE637FCA/Library/AppGroups/group.com.burbn.instagram: 86 files; the copy 64 files
+group.com.facebook.family: the copy 8 keys; own suite 9, 8 of the copy's equal; initWithSuiteName reads 8 equal; differ 
+  container /var/mobile/Containers/Data/Application/7C944E92-5770-4B31-81A4-BB2FBE637FCA/Library/AppGroups/group.com.facebook.family: 1 files; the copy 1 files
+group.com.burbn.family: the copy 1 keys; own suite 2, 1 of the copy's equal; initWithSuiteName reads 1 equal; differ 
+  container /var/mobile/Containers/Data/Application/7C944E92-5770-4B31-81A4-BB2FBE637FCA/Library/AppGroups/group.com.burbn.family: 1 files; the copy 1 files
+passwords asked for in 'MH9GU9K5PX.platformFamily': status 0, S8NFX3A2LT.com.burbn.instagram 38 , hpke 1
+passwords asked for in 'MH9GU9K5PX.shared': status 0, S8NFX3A2LT.com.burbn.instagram 38 , hpke 1
+passwords asked for in '': status 0, S8NFX3A2LT.com.burbn.instagram 38 , hpke 1
+root /private/var/mobile/Containers/Shared/AppGroup/531F199D-DE93-4F08-8581-803876CFE1CC/group.com.ryha.sideload.1/ifizbox.shared/com.burbn.instagram: (
+    "extension.log",
+    suites,
+    "spy.txt",
+    files,
+    "state.plist"
+)
+extension.log: 2026-11-24T18:45:16Z extension com.burbn.instagram.notificationextension of com.burbn.instagram; group.com.burbn.instagram suite 363 of the app's, 1 new, 0 removed; 64 files, 13 changed; group.com.facebook.family suite 8 of the app's, 1 new, 0 removed; 1 files, 0 changed; group.com.burbn.family suite 1 of the app's, 0 new, 0 removed; 1 files, 0 changed; keychain groups S8NFX3A2LT.com.burbn.instagram, S8NFX3A2LT.com.ryha.sideload; passwords S8NFX3A2LT.com.burbn.instagram 44, S8NFX3A2LT.com.ryha.sideload 18; pinned yes
+spy.txt: extension com.burbn.instagram.notificationextension at 2026-11-24 18:45:18 +0000, home /var/mobile/Containers/Data/PluginKitPlugin/3BB4FED4-A207-4D9E-9DDA-ACA2B18FB50B
+group.com.burbn.instagram: the copy 363 keys; own suite 364, 363 of the copy's equal; initWithSuiteName reads 363 equal; differ 
+  container /var/mobile/Containers/Data/PluginKitPlugin/3BB4FED4-A207-4D9E-9DDA-ACA2B18FB50B/Library/AppGroups/group.com.burbn.instagram: 83 files; the copy 64 files
+  group.com.burbn.instagram key instagram.app.auth.device.storage: there
+  group.com.burbn.instagram key com.burbn.instagram.IGdeviceID: there
+  group.com.burbn.instagram key com.instagram.app-install-date: there
+group.com.facebook.family: the copy 8 keys; own suite 9, 8 of the copy's equal; initWithSuiteName reads 8 equal; differ 
+  container /var/mobile/Containers/Data/PluginKitPlugin/3BB4FED4-A207-4D9E-9DDA-ACA2B18FB50B/Library/AppGroups/group.com.facebook.family: 3 files; the copy 1 files
+  group.com.facebook.family key instagram.app.auth.device.storage: missing
+  group.com.facebook.family key com.burbn.instagram.IGdeviceID: missing
+  group.com.facebook.family key com.instagram.app-install-date: missing
+group.com.burbn.family: the copy 1 keys; own suite 2, 1 of the copy's equal; initWithSuiteName reads 1 equal; differ 
+  container /var/mobile/Containers/Data/PluginKitPlugin/3BB4FED4-A207-4D9E-9DDA-ACA2B18FB50B/Library/AppGroups/group.com.burbn.family: 3 files; the copy 1 files
+  group.com.burbn.family key instagram.app.auth.device.storage: missing
+  group.com.burbn.family key com.burbn.instagram.IGdeviceID: missing
+  group.com.burbn.family key com.instagram.app-install-date: missing
+passwords asked for in 'MH9GU9K5PX.platformFamily': status 0, S8NFX3A2LT.com.burbn.instagram 38 , hpke 1
+passwords asked for in 'MH9GU9K5PX.shared': status 0, S8NFX3A2LT.com.burbn.instagram 38 , hpke 1
+passwords asked for in '': status 0, S8NFX3A2LT.com.burbn.instagram 38 , hpke 1
+

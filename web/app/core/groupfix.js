@@ -8,7 +8,8 @@
 //
 //   machoEntitlements(bin)                  the entitlements (XML slot) of a Mach-O's first slice, or null when unsigned
 //   entitlementsRead(read)                  the same through read(pos, len), reading only the parts it needs
-//   groupFixPlan(original, profileEnts, previous, keychainGroups)  { groups, target, keychain, legacy?, lost?, isolate? } to
+//   groupFixPlan(original, profileEnts, previous, keychainGroups)  { groups, target, keychain, legacy?, lost?, isolate?,
+//                                           shared? } to
 //                                           fix, or null when the app needs nothing; previous: the config an earlier sign
 //                                           left in the app; keychainGroups: the signed app's (appEntitlements')
 //   readConfig(bytes)                       that config's { groups, keychain }, or null
@@ -25,6 +26,8 @@ export const GROUPFIX = Object.freeze({
   dylib: "Frameworks/ifizbox-groupfix.dylib",
   config: "Frameworks/ifizbox-groupfix.plist",
   inject: "@rpath/ifizbox-groupfix.dylib",
+  // B425: an extension loads the app's copy of the dylib (PlugIns/X.appex or Extensions/X.appex, beside Frameworks/)
+  extensionRpath: "@executable_path/../../Frameworks",
 });
 
 const APP_GROUPS = "com.apple.security.application-groups";
@@ -103,7 +106,15 @@ export function groupFixPlan(original, profileEnts = {}, previous = null, keycha
   // the group the older rule (the profile's first) would have picked: the dylib copies its folder and suite into the
   // app's own once, so an app signed that way, now signed again from its original IPA, keeps that data
   if (!plan.target && have.length && !(previous && was === "")) plan.legacy = have[0];
+  // B425: what a notification extension shares with the app goes through a group the profile gives both
+  const shared = plan.target || have.find((g) => !g.includes("*"));
+  if (shared) plan.shared = shared;
   return plan;
+}
+
+// B425: whether an Info.plist is a notification service extension's, which gets the fix too.
+export function isNotificationExtension(plist) {
+  return plist?.NSExtension?.NSExtensionPointIdentifier === "com.apple.usernotifications.service";
 }
 
 // B327: the sign log's line for the group fix a sign put in, every part of its config, or why none (the same words as
@@ -113,7 +124,8 @@ export function groupFixLogLine(plan, none = GROUPFIX_NOT_NEEDED) {
   if (!plan) return `Group fix: none (${none})`;
   return `Group fix: ${plan.groups.length ? plan.groups.join(", ") : "no app groups"} -> ${plan.target || "the app's own folder"}`
     + (plan.keychain ? "; keychain groups stripped" : "") + (plan.legacy ? `; ${plan.legacy} copied in once if the app ran before` : "")
-    + (plan.isolate ? `; passwords kept in ${plan.isolate}, the shared groups' copied in once if the app ran before` : "");
+    + (plan.isolate ? `; passwords kept in ${plan.isolate}, the shared groups' copied in once if the app ran before` : "")
+    + (plan.shared ? `; shared with its notification extensions through ${plan.shared}` : "");
 }
 
 export function readConfig(bytes) {
@@ -128,7 +140,8 @@ export function groupFixTweaks(plan, dylib) {
   return {
     files: [{ path: GROUPFIX.dylib, data },
       { path: GROUPFIX.config, data: new TextEncoder().encode(plistXml({ groups: plan.groups, target: plan.target, keychain: plan.keychain,
-        ...(plan.legacy ? { legacy: plan.legacy } : {}), ...(plan.isolate ? { isolate: plan.isolate } : {}) })) }],
+        ...(plan.legacy ? { legacy: plan.legacy } : {}), ...(plan.isolate ? { isolate: plan.isolate } : {}),
+        ...(plan.shared ? { shared: plan.shared } : {}) })) }],
     inject: [GROUPFIX.inject],
   };
 }
