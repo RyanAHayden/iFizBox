@@ -438,7 +438,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
     }
     // B316: opened after a failure: the pairing is checked by itself; the page repaints when it passes or fails
     if (st?.paired && choice === "iphone") autoCheck(native, alert, () => { if (mine()) paint(); }, store);
-    if (st?.paired && builtinVPN(st)) readShortcut().then(() => { if (mine()) paint(); }, () => {}); // F417b
+    if (st?.paired && builtinVPN(st)) readShortcut().then(() => { if (mine()) paint(); }).catch(() => {}); // F417b: after the page is painted
     const wasPicked = picked === choice;
     if (wasPicked) picked = null;
     if (choice !== "iphone" && !wasPicked) return; // nothing on the page waited on the answer
