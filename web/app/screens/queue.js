@@ -48,7 +48,7 @@ import { helperRefusal, refusalIds } from "../core/queuerefusal.js";
 import { NAME } from "../brand.js";
 import { storedRoute } from "../core/installroute.js"; // B137
 import { rowIcon } from "../icons/rowicons.js";
-import { runQueue, markNeededBy } from "./queuerun.js";
+import { runQueue, TAP_LEVELS, markNeededBy } from "./queuerun.js";
 import { createQueueHint } from "../nav/queuehint.js";
 import { showSheet } from "../nav/sheet.js";
 import { nativeBridge } from "../native.js";
@@ -1027,6 +1027,11 @@ async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = n
     });
   };
   const canAsk = asks && typeof getBackend().answerConffile === "function";
+  // B414: iFizBox itself held open, as in screens/queuerun.js, until the run ends without a button that waits for the
+  // tap, or the page closes.
+  let held = selfLevels(jobs).length > 0;
+  const letGo = () => { if (held) { held = false; getBackend().holdSelf?.(false)?.catch?.(() => {}); } };
+  if (held) { page.onClose(letGo); try { await getBackend().holdSelf?.(true); } catch { held = false; } }
   try {
     result = await run(({ fd, line: raw }) => {
       if (fd === "status" && !dpkg && /^pm(status|conffile|error):/.test(String(raw ?? ""))) dpkgStarted();
@@ -1072,6 +1077,7 @@ async function runConsole({ jobs, ids, keepQueue = false, asks = true, title = n
   }
 
   const choice = chooseFinish({ ok, levels: [...levels, ...selfLevels(jobs)], kinds });
+  if (!TAP_LEVELS.includes(choice.level)) letGo();
   live.set({ title: title ? title(names) : runTitle(jobs.map((j) => ({ ...j, name: j.name || names[j.id] }))) });
   live.end({ code: error ? -1 : result.code, cancelled: stopped, finish: choice.level, text: log.join("\n") });
   // F189: what waited on a package of this run (whenQueueRuns), out before clearAll would cancel it.

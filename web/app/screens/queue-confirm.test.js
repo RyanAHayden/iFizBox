@@ -3,7 +3,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
-import { confirmCancel, openAppConfirm, openConfirm, initQueue } from "./queue.js";
+import { confirmCancel, openAppConfirm, openConfirm, initQueue, runRollback } from "./queue.js";
+import { PACKAGE } from "../brand.js";
 import { helperRefusal, refusalIds } from "../core/queuerefusal.js";
 import { parseSimulation } from "../core/queue.js";
 import { getBackend } from "../backend.js";
@@ -276,3 +277,29 @@ confirmCase("Confirm with only packages queued starts their run", async () => an
     delete backend.queueInstall;
   }
 });
+
+// B414: Roll Back (the console, not the queue run) of iFizBox itself is held too, and let go unless a tap is awaited.
+for (const [line, left] of [["", ["hold", "run", "release"]], ["finish:restart", ["hold", "run"]]]) {
+  test(`a rollback of iFizBox ${line ? "ending on Restart SpringBoard stays held" : "lets go at its end"}`, withDom(async () => {
+    const raf = globalThis.requestAnimationFrame;
+    globalThis.requestAnimationFrame = (f) => { queueMicrotask(f); return 1; };
+    const saved = { queueInfo: catalog.queueInfo, reloadInstalled: catalog.reloadInstalled };
+    Object.assign(catalog, { queueInfo: async () => ({}), reloadInstalled: async () => {} });
+    const backend = getBackend();
+    const calls = [];
+    backend.holdSelf = async (on) => { calls.push(on ? "hold" : "release"); };
+    backend.rollback = async (id, version, onEvent) => { calls.push("run"); if (line) onEvent({ fd: "status", line }); return { code: 0, stdout: "", stderr: "" }; };
+    try {
+      assert.equal(runRollback({ id: PACKAGE, version: "1.0", name: "Own" }), true);
+      const button = () => find(globalThis.document.body, (e) => e.tagName === "BUTTON" && e._cls.has("progress-finish") && !e.hidden);
+      for (const end = Date.now() + 5000; !button() && Date.now() < end;) await new Promise((r) => setTimeout(r, 10));
+      assert.deepEqual(calls, left);
+      if (!line) button().click(); // Close: the next run may start
+      await new Promise((r) => setTimeout(r, 600));
+    } finally {
+      for (const k of ["holdSelf", "rollback"]) delete backend[k];
+      Object.assign(catalog, saved);
+      globalThis.requestAnimationFrame = raf;
+    }
+  }));
+}

@@ -64,6 +64,8 @@ export async function markNeededBy(group, plan, jobs, names, catalog) {
 //   onEnd({ ok, stopped, installed }), apps (F407: { jobs, start(host) -> runAppRun's on that host, finish() ->
 //   { levels, kinds } the apps ask of the finish button, or null, idle() -> settles once no app's helper call is going }), setBadge(text | null), open (openProgress, for tests) }
 // -> a promise for the first end: { ok, stopped, rows }.
+export const TAP_LEVELS = ["restart", "reload", "reboot"]; // B414: finish buttons that wait for the tap
+
 export async function runQueue({ jobs, plan }, deps) {
   const { backend, catalog, queue, runLogs, finishAction = async () => false, onEnd = () => {}, setBadge = () => {},
     open = openProgress, alert = showAlert } = deps;
@@ -300,7 +302,6 @@ export async function runQueue({ jobs, plan }, deps) {
   // A run that installs iFizBox itself may end on a button that waits for the tap (Restart or Reload SpringBoard,
   // Reboot Device), known only at its end: the app doesn't close itself over its new copy until the run ended clean
   // on Close iFizBox, or the page closes (the button, Close, Cancel). One hold at a time, in order.
-  const TAP_LEVELS = ["restart", "reload", "reboot"];
   const ownOf = (state) => selfLevels([...rows.map((r) => ({ id: r.id, op: r.op, state: r.state })),
     ...(apps?.rows ?? []).map((r) => ({ id: r.id, op: r.mode === "remove" ? "remove" : "install", state: r.state }))]
     .filter((r) => !state || r.state === state)).length > 0;

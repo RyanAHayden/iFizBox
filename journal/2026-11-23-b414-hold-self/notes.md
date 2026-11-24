@@ -36,3 +36,11 @@ An empty commit, "build number", is on the branch only to give the second build 
 - Closing the held app from the app switcher, and Cancel, on the phone: unit tests only (the postinst's "closed" and
   "released" cases; the respring that killed the app ended the job the same way).
 - iOS 16+ and other jailbreaks.
+- A hard reboot or power-off while the app is held: the postinst's job ends with it and nothing re-registers at boot.
+- An app package in the same run: the button runs `uicache -a` before the respring. On the 7, `uicache -a` with
+  iFizBox's Info.plist changed on disk didn't close the (suspended) app, but neither did `uicache -p`, the control, so
+  that says little about a frontmost app. Not tried with a real app package.
+
+## Spec review
+Found the console's runs (Roll Back, an opened .deb) weren't held: fixed in queue.js, with tests. The queue.js
+packages-only fix is kept though outside the task's files: no run of iFizBox + a tweak starts without it.
