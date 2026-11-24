@@ -73,6 +73,42 @@ enum CellularShortcut {
     static func waited() { change { $0.turns += 1 } }
     static func finished() { change { if $0.opened { $0.finished = true } } } // not opened: an earlier run's end
 
+    // ---- Opening it, and judging a check
+
+    /// Shortcuts' x-callback link that runs it. `back` makes the link Shortcuts opens for ok, error or cancel.
+    static func runURL(_ k: Kind, back: (String) -> String) -> URL? {
+        var c = URLComponents()
+        c.scheme = "shortcuts"; c.host = "x-callback-url"; c.path = "/run-shortcut"
+        c.queryItems = [URLQueryItem(name: "name", value: shortcutName), URLQueryItem(name: "input", value: "text"),
+                        URLQueryItem(name: "text", value: input(k)), URLQueryItem(name: "x-success", value: back("ok")),
+                        URLQueryItem(name: "x-error", value: back("error")), URLQueryItem(name: "x-cancel", value: back("cancel"))]
+        return c.url
+    }
+
+    /// failed: not_opened (Shortcuts didn't open), not_run (it ended without our Open: no Shortcut of that name, Allow
+    /// refused, an older one), no_end (it opened the app but didn't finish), no_return (nothing came back in time),
+    /// busy (check's own). The text is what Shortcuts said.
+    enum Verdict: Equatable { case wait, ok, failed(String, String?) }
+    /// After Shortcuts' callback, or back in front, for our own actions to say it runs.
+    static let grace: TimeInterval = 3
+    static let endLimit: TimeInterval = 10 // from a callback, or back in front, after Open ran, until Finish
+    static let checkLimit: TimeInterval = 60 // the first run waits for the user's Allow
+
+    /// A check so far. Its own actions decide; Shortcuts' callback (seconds since it, its error) only ends the wait,
+    /// for iOS 27 gives a new run the error of the one before. `front`: seconds back in front after Shortcuts.
+    static func verdict(_ r: Report?, elapsed: TimeInterval, front: TimeInterval?, callback: (since: TimeInterval, error: String?)?) -> Verdict {
+        if r?.ok == true { return .ok }
+        let over = max(front ?? 0, callback?.since ?? 0)
+        if r?.opened == true {
+            if over >= endLimit || elapsed >= checkLimit { return .failed("no_end", callback?.error) }
+        } else if over >= grace {
+            return .failed("not_run", callback?.error)
+        } else if elapsed >= checkLimit {
+            return .failed("no_return", nil)
+        }
+        return .wait
+    }
+
     private static func change(_ f: (inout Report) -> Void) {
         lock.lock(); defer { lock.unlock() }
         guard var c = current, !c.finished else { return }

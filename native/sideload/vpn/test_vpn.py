@@ -349,6 +349,16 @@ class CellularInstalls(unittest.TestCase):
         name = re.search(r'shortcutName = "(.+)"', self.swift).group(1)
         self.assertIn('name="%s"' % name, read("tools", "shortcuts", "sign.sh", base=os.path.dirname(NATIVE)))
 
+    def test_bridge(self):
+        src = read("App", "CellularShortcutBridge.swift")
+        self.assertEqual(sorted(re.findall(r'b\.on\("([^"]+)"', src)), ["cellular.add", "cellular.check", "cellular.status"])
+        for name in ["cellular.add", "cellular.check"]:  # never in the jailbreak app, nor under another bundle ID
+            self.assertIn("if let e = refusal", src[src.index('b.on("%s")' % name):][:120])
+        self.assertIn("AppMode.current != .jailbreak", src)
+        self.assertIn("CellularShortcutBridge.register(b)", read("App", "LocalVPN.swift"))
+        self.assertIn("if CellularShortcutBridge.receive(url) { return }", read("Sources", "App.swift", base=NATIVE))
+        self.assertNotIn(".run)", src)  # nothing here turns cellular data off
+
     @unittest.skipUnless(SWIFTC, "no Swift toolchain (SWIFT_TOOLCHAIN or swiftc on PATH): CellularShortcut.swift not tested")
     def test_state(self):
         tmp = disktmp.build_dir("ifizbox-cellulartest-")
