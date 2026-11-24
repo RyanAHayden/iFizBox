@@ -69,7 +69,7 @@ test("Install Apps With: a tap moves the checkmark at once and spins that row un
   tap(box, "This iPhone");
   assert.equal(s.m.installRoute, "iphone");
   assert.ok(spins(box, "This iPhone"), "spins at once");
-  assert.ok(labels(box).includes("Pair This iPhone"), `This iPhone's groups come in at once: ${labels(box)}`);
+  assert.ok(labels(box).includes("Forget Pairing"), `This iPhone's groups come in at once: ${labels(box)}`);
   assert.ok(!labels(box).includes("Check Server"));
   st.answer(PAIRED_ON);
   await flush();

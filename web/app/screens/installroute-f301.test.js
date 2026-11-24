@@ -18,7 +18,6 @@ const all = (e) => [e, ...e.children.flatMap(all)];
 const withClass = (box, c) => all(box).filter((n) => n._cls.has(c));
 const labels = (box) => withClass(box, "cell-label").map((n) => n.textContent);
 const cellOf = (box, label) => withClass(box, "cell-inner").find((n) => withClass(n, "cell-label")[0]?.textContent === label);
-const detailOf = (box, label) => withClass(cellOf(box, label), "cell-detail")[0]?.textContent;
 const spins = (box, label) => withClass(cellOf(box, label), "loading-spinner").length === 1;
 const tap = (box, label) => {
   const cell = cellOf(box, label);
@@ -38,22 +37,22 @@ const huds = [];
 hudHooks.show = (l) => { huds.push(l); return () => {}; };
 hudHooks.delay = 0;
 
-test("the read goes out at once; every Set Up row says Checking… until it answers", async () => {
+test("the read goes out at once; the status says Checking… until it answers", async () => {
   forgetStatus();
   const dev = later();
   const native = bridge({ "idevice.status": () => dev.p });
   const box = make("div");
   const done = drawInstallation(box, "iphone", { store: store(), native });
   assert.deepEqual(native.calls, ["idevice.status"]);
-  assert.equal(detailOf(box, "Pair This iPhone"), "Checking…");
-  assert.ok(spins(box, "Pair This iPhone") && spins(box, "Test Connection"), "each row has its own spinner");
+  assert.ok(labels(box).includes("Checking…"));
+  assert.ok(spins(box, "Check Connection"));
   dev.answer(PAIRED_ON);
   await done;
-  assert.equal(detailOf(box, "Pair This iPhone"), "Done");
+  assert.ok(labels(box).includes("Ready to Install"));
   assert.equal(withClass(box, "loading-spinner").length, 0);
 });
 
-test("a read past its deadline says Not Responding in its rows, and nothing spins on", async () => {
+test("a read past its deadline says Not Responding, and nothing spins on", async () => {
   forgetStatus();
   const was = { ...TIMEOUTS };
   TIMEOUTS.status = 20;
@@ -61,7 +60,7 @@ test("a read past its deadline says Not Responding in its rows, and nothing spin
     const native = bridge({ "idevice.status": () => new Promise(() => {}) });
     const box = make("div");
     await drawInstallation(box, "iphone", { store: store(), native });
-    assert.equal(detailOf(box, "Pair This iPhone"), NOT_RESPONDING);
+    assert.ok(labels(box).includes(NOT_RESPONDING));
     assert.equal(withClass(box, "loading-spinner").length, 0, "no row spins for ever");
     assert.ok(withClass(box, "install-red").length >= 1, "in red");
   } finally { Object.assign(TIMEOUTS, was); }
@@ -69,19 +68,17 @@ test("a read past its deadline says Not Responding in its rows, and nothing spin
   assert.equal(await within(Promise.resolve(7), 50), 7);
 });
 
-test("the last answer shows at once on the next draw, its rows spinning while it's read again", async () => {
+test("the last answer shows at once on the next draw while it's read again", async () => {
   forgetStatus();
   await drawInstallation(make("div"), "iphone", { store: store(), native: bridge({ "idevice.status": PAIRED_ON }) });
   assert.equal(cachedStatus().paired, "rp");
   const dev = later();
   const box = make("div");
   const done = drawInstallation(box, "iphone", { store: store(), native: bridge({ "idevice.status": () => dev.p }) });
-  assert.equal(detailOf(box, "Pair This iPhone"), "Done", "no Checking… when an answer is known");
-  assert.ok(spins(box, "Pair This iPhone"), "but its row spins while it's read again");
-  assert.ok(labels(box).includes("Test Connection"));
+  assert.ok(labels(box).includes("Ready to Install"), "no Checking… when an answer is known");
   dev.answer({ ...PAIRED_ON, paired: null });
   await done;
-  assert.equal(detailOf(box, "Pair This iPhone"), "Start", "the fresh answer replaces it");
+  assert.ok(labels(box).includes("Not Set Up") && labels(box).includes("1. Pair This iPhone"), "the fresh answer replaces it");
   assert.equal(withClass(box, "loading-spinner").length, 0);
 });
 
@@ -91,16 +88,14 @@ test("an answer patches the rows in place: groups and unchanged rows stay the sa
   const box = make("div");
   const done = drawInstallation(box, "iphone", { store: store(), native: bridge({ "idevice.status": () => dev.p }) });
   await flush();
-  const groups = [...box.children];
+  const [status] = box.children;
   const howRow = cellOf(box, "How It Works");
-  const pairRow = cellOf(box, "Pair This iPhone");
+  const waiting = cellOf(box, "Checking…");
   dev.answer(PAIRED_ON);
   await done;
-  assert.equal(box.children.length, groups.length);
-  assert.ok(box.children[1] === groups[1], "so is How It Works' group (Set Up's gets its footer, so it's drawn again)");
+  assert.ok(box.children[0] === status, "the status group stays; its rows are swapped in it");
   assert.ok(cellOf(box, "How It Works") === howRow, "a row whose content didn't change is the same element");
-  assert.ok(cellOf(box, "Pair This iPhone") !== pairRow, "the row that changed was swapped");
-  assert.equal(detailOf(box, "Pair This iPhone"), "Done");
+  assert.ok(cellOf(box, "Ready to Install") && cellOf(box, "Ready to Install") !== waiting, "the row that changed was swapped");
 });
 
 test("a row kept from an earlier draw calls the latest draw's handler", async () => {
@@ -110,25 +105,25 @@ test("a row kept from an earlier draw calls the latest draw's handler", async ()
   const native = bridge({ "idevice.status": { ...PAIRED_ON, vpn: { available: true, tested: false } }, "vpn.test": () => { calls.push(1); return Promise.resolve({ ok: true }); } });
   const alert = async () => ({ index: 0 });
   await drawInstallation(box, "iphone", { store: store(), native, alert });
-  const row = cellOf(box, "Test Connection");
+  const row = cellOf(box, "3. Test Connection");
   await drawInstallation(box, "iphone", { store: store(), native, alert });
-  assert.equal(cellOf(box, "Test Connection"), row, "kept");
-  await tap(box, "Test Connection");
+  assert.equal(cellOf(box, "3. Test Connection"), row, "kept");
+  await tap(box, "3. Test Connection");
   assert.deepEqual(calls, [1]);
 });
 
-test("Test Connection spins Testing… in its own row (no HUD) and ends with the answer's alert", async () => {
+test("Test Connection spins in its own row (no HUD) and ends with the answer's alert", async () => {
   forgetStatus();
   huds.length = 0;
   const alerts = [];
   const test = later();
   const box = make("div");
-  const native = bridge({ "idevice.status": PAIRED_ON, "vpn.test": () => test.p });
+  const native = bridge({ "idevice.status": { ...PAIRED_ON, vpn: { available: true, tested: false } }, "vpn.test": () => test.p });
   await drawInstallation(box, "iphone", { store: store(), native, alert: async (a) => { alerts.push(a); return { index: 0 }; } });
   const run = tap(box, "Test Connection");
   await flush();
   assert.ok(spins(box, "Test Connection"));
-  assert.equal(detailOf(box, "Test Connection"), "Testing…");
+  assert.ok(labels(box).includes("Checking…"));
   tap(box, "Test Connection"); // a second tap while it runs does nothing
   test.answer({ ok: true, ms: 40 });
   await run;
