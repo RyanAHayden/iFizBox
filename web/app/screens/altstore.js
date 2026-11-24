@@ -1090,9 +1090,10 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   const tracking = trackingSection(app, pkg, source, body);
   details.append(tracking);
   // F210: and the same in one tap from the nav bar (sideload and site only, F242).
+  let toggle = null;
   if (markToggleApplies(app)) {
     // B338: the page follows at once; B372: the forget waits until the page is left
-    const toggle = markToggle(app, pkg, source, { after: () => tracking.redraw(), body });
+    toggle = markToggle(app, pkg, source, { after: () => tracking.redraw(), body });
     if (!addNavIcon(body, toggle, "mark")) setTimeout(() => addNavIcon(body, toggle, "mark"), 0);
     const offMark = onAppsChange(() => { if (body.isConnected && toggle.isConnected) toggle.refresh(); else offMark(); });
     const offHeld = onHeldForget(() => { if (body.isConnected && toggle.isConnected) toggle.refresh(); else if (!body.isConnected) offHeld(); });
@@ -1146,7 +1147,46 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   // F350: the caller's rows (Wish List, Installed App) go in `tail`, above the centred footer.
   const tail = el("div", "alt-app-tail");
   details.append(tail, footerGroup(detailsFooter(app.bundleIdentifier, sourceName, pkg.row.section)));
-  return { details, tabs, tail };
+  return { details, tabs, tail, refresh: () => { tracking.redraw(); toggle?.refresh(); } }; // B417: the records changed
+}
+
+// B417: Details for an app on the Installed list with no source's data to draw (not loaded yet, or no source lists
+// it), filled from its record and signed data (screens/installed.js recordSections): renderApp's header and tabs, then
+// Add Tweaks, Version, Information, the Installed section and its actions.
+//   r: the list's row { id, name, version, icon, signed }   icon: its picture's URL, or null
+//   sections: { source, sourceHref, installed, actions, remove, infoFooter }   loading: the source is still coming
+export function renderRecordApp(body, r, { icon: src = null, sections, loading = false } = {}) {
+  const page = el("div", "alt-app");
+  const icon = el("span", "pkg-icon large alt-app-icon");
+  icon.append(el("span", "pkg-letter", r.name.charAt(0).toUpperCase()));
+  const i = img(src);
+  if (i) { i.onload = () => i.classList.add("loaded"); icon.append(i); }
+  const header = storeHeader({ art: icon, name: r.name, line: headerLine({ version: r.version || null }) });
+  page.append(header.head);
+  const api = getBackend().reviews ?? reviewsApi({ base: reviewsBase(detectMode()) });
+  const first = loading ? null : api.list(r.id, 0).catch(() => null);
+  first?.then((ours) => header.setRating(pageRating({ ours, appStore: null })));
+  const tabs = storeTabs({
+    reviews: (pane) => reviewsTab(pane, { id: r.id, version: r.version ?? "", build: true, api, first, onRating: (x) => header.setRating(x) }),
+    related: (pane) => { pane.replaceChildren(el("p", "empty", loading ? "The source is still loading." : "No related packages.")); },
+  });
+  const details = tabs.panes.details;
+  body.classList.replace("plain", "grouped");
+  body.replaceChildren(page, ...tabs.nodes);
+  tabs.attach(body);
+  const bundleId = r.signed?.bundleId || r.id;
+  const plan = appRows({ sideload: detectMode() === "sideload" && !r.self, bundleId, version: r.version || "Unknown", source: sections.source || "None" });
+  if (plan.addTweaks) {
+    const tw = addTweaksGroup({ bundleId: r.signed?.originalBundleId || r.id, name: r.name }).el;
+    tw.querySelector(".group-footer")?.remove();
+    details.append(tileCells(tw, "pkgTweaks"));
+  }
+  const info = plan.info.filter((x) => x.key === "source" || x.key === "bundleId");
+  if (bundleId !== r.id) info.push({ key: "originalId", label: "Original ID", detail: r.id, icon: "pkgBundle", cls: "store-info-long" });
+  details.append(grouped([{ header: "Version", rows: detailRows(plan.version) },
+    { header: "Information", rows: detailRows(info, { source: sections.sourceHref ? { href: sections.sourceHref } : {} }), footer: sections.infoFooter || null },
+    sections.installed, ...(sections.actions ? [sections.actions] : []), ...(sections.remove ? [sections.remove] : [])]));
+  details.append(footerGroup(detailsFooter(bundleId, sections.source || "")));
 }
 
 // F350: an app's More Information: the whole description in the dashed box (the App Store's when the source has

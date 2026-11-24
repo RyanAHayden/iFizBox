@@ -38,7 +38,7 @@ test("installed tab: My IPAs pages without a jailbreak (F77)", async () => {
 
 test("F87: the jailbreak app's Apps page: the phone's versions, I4's notes, no upgrade for an app that's gone", () => {
   assert.equal(pageKind(r(APPS), "jailbreak"), "apps");
-  assert.equal(pageKind(r(APPS, "package:x"), "jailbreak"), "browse");
+  assert.equal(pageKind(r(APPS, "package:x"), "jailbreak"), "app"); // B417
   assert.equal(pageKind(r(APPS), "sideload"), "browse"); // the list is the root there
   assert.equal(appSubtitle({ note: "Installed: 1.6 (iFizBox remembered 1.5)", sourceName: "AltStore", date: 0, upgrade: "1.7" }),
     "Installed: 1.6 (iFizBox remembered 1.5) · Upgrade to 1.7 · AltStore");
@@ -333,7 +333,7 @@ async function autoInstalledOf(native) {
 }
 
 // ---- B36: every app row opens, holds and swipes ------------------------------------------------------------------
-import { appListElement, appRowHref, appActions, appSheet, appPageSections, keptIpaOf, appIdOf, appToken, OPEN, RESIGN,
+import { appListElement, appRowHref, appActions, appSheet, recordSections, keptIpaOf, OPEN, RESIGN,
   SAVE_IPA, REMOVE } from "./installed.js";
 import { deleteSwipeAction, swipeDelete } from "./installed.js"; // B332
 
@@ -393,18 +393,16 @@ const B36_EXTRA = [{ id: "com.example.mine", name: "Mine", version: "2.0", signe
 const B36_SIGNED = { apps: [{ bundleId: "com.example.opentennis", name: "OpenTennis Beta", version: "1.0", expires: "2099-01-01T00:00:00Z" },
   { bundleId: "com.example.mine", name: "Mine", version: "2.0", expires: "2099-01-01T00:00:00Z" }] };
 
-test("B36: a row no source lists and an extra row open a page; the source's page while a source has it", () => {
+test("B36, B417: a row and an extra row open Details; app:<id> is an old link to it", () => {
   const root = r();
-  assert.match(appRowHref(B36_ROWS[1], null, root), /app(:|%3A)com\.example\.opentennis$/);
+  assert.match(appRowHref(B36_ROWS[1], null, root), /package(:|%3A)com\.example\.opentennis$/);
   assert.match(appRowHref(B36_ROWS[1], new Map([["com.example.opentennis", {}]]), root), /package(:|%3A)com\.example\.opentennis$/);
-  assert.equal(appIdOf(appToken("a.b")), "a.b");
-  assert.equal(appIdOf("app:"), null);
-  assert.equal(appIdOf("package:a"), null);
   assert.equal(pageKind(r("app:a.b"), "sideload"), "app");
   assert.equal(pageKind(r("app:a.b"), "site"), "app");
   assert.equal(pageKind(r(APPS, "app:a.b"), "jailbreak"), "app");
   assert.equal(pageKind(r("app:a.b"), "jailbreak"), "browse"); // the list is one row down there
-  assert.equal(pageKind(r(APPS, "package:a"), "jailbreak"), "browse");
+  assert.equal(pageKind(r(APPS, "package:a"), "jailbreak"), "app");
+  assert.equal(pageKind(r("package:a"), "sideload"), "app");
 });
 
 test("B36: every row is a link (pressed highlight), extra rows included; Delete on every row but iFizBox's own", () => withDom(() => {
@@ -419,8 +417,8 @@ test("B36: every row is a link (pressed highlight), extra rows included; Delete 
     assert.ok(li.classList.contains("installed-app"));
   }
   assert.match(cells[0].querySelector(".cell-inner").href, /package/); // iFizBox: its source's page, as before
-  assert.match(cells[1].querySelector(".cell-inner").href, /app(:|%3A)com\.example\.opentennis/);
-  assert.match(cells[2].querySelector(".cell-inner").href, /app(:|%3A)com\.example\.mine/);
+  assert.match(cells[1].querySelector(".cell-inner").href, /package(:|%3A)com\.example\.opentennis/);
+  assert.match(cells[2].querySelector(".cell-inner").href, /package(:|%3A)com\.example\.mine/);
   assert.equal(cells[0].querySelector(".del-confirm"), null, "no Delete on the app's own row");
   assert.ok(cells[1].querySelector(".del-confirm"));
   assert.ok(cells[2].querySelector(".del-confirm"), "the extra row deletes too");
@@ -555,21 +553,20 @@ test("B36: the sheet's actions per row and build; Save Signed IPA when My IPAs k
   assert.equal(await appSheet({ id: "s", name: "Me", self: true }, { mode: "site", sheet: async () => assert.fail() }), null);
 });
 
-test("B36: the installed-app page shows version, bundle ID, source and signature, then the actions", () => {
+test("B36: the record's sections show version, source and signature, then the actions", () => {
   const now = new Date("2026-11-18T00:00:00Z");
   const rec = { id: "com.example.opentennis", name: "OpenTennis Beta", version: "1.0", sourceName: "Beta",
     signed: { bundleId: "com.example.opentennis", expires: "2026-11-25T00:00:00Z" } };
-  const secs = appPageSections(rec, { mode: "sideload", now, window: 2 });
-  const rows = Object.fromEntries(secs[0].rows.map((x) => [x.label, x.detail]));
-  assert.equal(rows.Version, "1.0");
-  assert.equal(rows["Bundle ID"], "com.example.opentennis");
-  assert.equal(rows.Source, "Beta");
+  const secs = recordSections(rec, { mode: "sideload", now, window: 2 });
+  const rows = Object.fromEntries(secs.installed.rows.map((x) => [x.label, x.detail]));
+  assert.equal(rows["Installed Version"], "1.0");
+  assert.equal(secs.source, "Beta");
   assert.equal(rows.Signature, "7 days left");
-  assert.deepEqual(secs[1].rows.map((x) => x.label), [OPEN, RESIGN]);
-  assert.deepEqual(secs[2].rows.map((x) => x.label), [REMOVE]);
-  const extra = appPageSections({ id: "com.example.mine", name: "Mine", version: "2", signedOnly: true, signed: { bundleId: "com.example.mine" } }, { mode: "site" });
-  assert.match(extra[0].footer, /No source lists it/);
-  assert.match(extra.at(-1).footer, /done from the Home Screen/); // B46
+  assert.deepEqual(secs.actions.rows.map((x) => x.label), [OPEN, RESIGN]);
+  assert.deepEqual(secs.remove.rows.map((x) => x.label), [REMOVE]);
+  const extra = recordSections({ id: "com.example.mine", name: "Mine", version: "2", signedOnly: true, signed: { bundleId: "com.example.mine" } }, { mode: "site" });
+  assert.match(extra.infoFooter, /No source lists/);
+  assert.match(extra.remove.footer, /done from the Home Screen/); // B46
 });
 
 // ---- B46: Delete uninstalls where it can; Remove from List where it can't ----------------------------------------
@@ -611,10 +608,10 @@ test("B46: which label and action each mode gets", () => {
   // The hold sheet and the app page carry the same label.
   assert.deepEqual(appActions({ ...rec, actual: "1.6" }, { mode: "jailbreak" }), [DELETE]);
   assert.deepEqual(appActions(rec, { mode: "site" }), [REMOVE]);
-  const page = appPageSections({ ...rec, actual: "1.6" }, { mode: "jailbreak" });
-  assert.deepEqual(page.at(-1).rows.map((x) => x.label), [DELETE]);
-  assert.match(page.at(-1).footer, /Deletes Delta/);
-  assert.equal(appPageSections(rec, { mode: "sideload" }).at(-1).footer, HOME_SCREEN);
+  const page = recordSections({ ...rec, actual: "1.6" }, { mode: "jailbreak" });
+  assert.deepEqual(page.remove.rows.map((x) => x.label), [DELETE]);
+  assert.match(page.remove.footer, /Deletes Delta/);
+  assert.equal(recordSections(rec, { mode: "sideload" }).remove.footer, HOME_SCREEN);
 });
 
 test("B46: Delete is confirmed by an iOS 6 action sheet; Cancel does nothing", async () => {

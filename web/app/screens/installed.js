@@ -61,6 +61,9 @@
 // record's url is library:..., native MyIPAs.fileOf) and re-sign from that file (signing.resign does).
 import * as browse from "./browse.js";
 import * as myipas from "./myipas.js";
+import { renderRecordApp, signatureRow } from "./altstore.js"; // B417
+import { DETAILS_TITLE } from "./details.js"; // B417
+import { isAltKey } from "../core/altstore.js"; // B417
 import { grouped, plain, placeholder, segments, barButton, note } from "../nav/ui.js";
 import { searchBar, pinned } from "../nav/searchbar.js";
 import { format, mounted, parse } from "../router.js";
@@ -113,8 +116,8 @@ import { collapse } from "../nav/ui.js"; // B332
 // Screen). In the sideload app a row the shell reports installed (signing.isInstalled) isn't hidden: iOS's word wins
 // over the record. A real uninstall is confirmed by an iOS 6 action sheet first (deleteAction, confirmDelete).
 
-// B36: every row on the apps list opens a page (the source's package page, else an installed-app page for the record,
-// #installed/app:<id>), a hold opens an action sheet (Open, Re-sign, Save Signed IPA, Remove: what applies) and a left
+// B36: every row on the apps list opens its Details (B417: one page, drawn from its source, or from the record while the
+// source loads or where none lists the app), a hold opens an action sheet (Open, Re-sign, Save Signed IPA, Remove: what applies) and a left
 // swipe shows Delete on every row but iFizBox's own: Delete on a signed app the list doesn't remember (F91's extra
 // rows) forgets it as Settings > Signed Apps does (signing.forget), on a remembered one removeInstall as before.
 
@@ -270,7 +273,9 @@ export function init(ctx) {
   onAppsChange(() => {
     loadAllApps();
     for (const v of dpkgLive()) refreshAppCount({ view: v }); // B52: the root's Apps count, under the Apps page
+    fillRecordPages();
   });
+  catalog.onLoaded(() => fillRecordPages()); // B417
   // F125/F147: the count on the Wish List button, and the Wish List page, follow the list (the package page's sheet, a Delete).
   browse.wishlist().onChange(() => {
     if (wishView.body) loadWish();
@@ -330,8 +335,7 @@ function dpkgNav(view) {
 const ROUTES = [
   { match: "browse", nav: (route) => browse.nav(route), render: (body, route, ctx) => browse.render(body, route, ctx) },
   { match: "myipas", nav: (route) => myipas.nav(route), render: (body, route, ctx) => myipas.render(body, route, ctx) },
-  { match: "app", nav: (route) => ({ title: appNames.get(appIdOf(route.path.at(-1))) || appIdOf(route.path.at(-1)) }),
-    render: (body, route, ctx) => { renderAppPage(body, route, ctx); } },
+  { match: "app", nav: (route) => installedAppNav(route), render: (body, route, ctx) => { renderInstalledApp(body, route, ctx); } },
   { match: "wishlist",
     nav: () => ({ title: "Wish List", style: "plain",
       right: { label: wishView.editing ? "Done" : "Edit", onClick: (e) => setWishEditing(!wishView.editing, e.currentTarget) } }),
@@ -976,7 +980,6 @@ function decorateApp(li, r) {
     li.querySelector(".cell-icon").append(img);
   }
   li._app = r; // B36: what a hold or Delete acts on
-  appNames.set(r.id, r.name);
   if (!canDelete(r)) { li.dataset.self = "1"; return; } // iFizBox's own row: no Delete
   const toggle = Object.assign(document.createElement("button"), { type: "button", className: "del-toggle" });
   toggle.setAttribute("aria-label", "Delete " + r.name);
@@ -1101,25 +1104,29 @@ function removeApp(li, r) {
 
 // ---- B36: every row opens, holds and swipes ---------------------------------------------------------------------
 
-const appNames = new Map(); // id -> name, for the installed-app page's title before it loads
-
-// The installed-app page's path segment for an app id, and back.
-export const appToken = (id) => `app:${id}`;
-export const appIdOf = (seg) => (typeof seg === "string" && seg.startsWith("app:") && seg.length > 4 ? seg.slice(4) : null);
+// The app a row's path segment opens: { id, key } (key: the source's, or null), or null for any other segment.
+// "app:<id>" is an old link (B417: rows are package:<id>[@<source key>]); it opens the same page.
+export function appOf(seg) {
+  const [, kind, rest] = /^(app|package):(.+)$/.exec(typeof seg === "string" ? seg : "") ?? [];
+  if (!kind) return null;
+  const at = kind === "package" ? rest.indexOf("@") : -1;
+  return at > 0 ? { id: rest.slice(0, at), key: rest.slice(at + 1) } : { id: rest, key: null };
+}
 
 // The page is under the apps list: Installed's root without a jailbreak, the Apps page (#installed/apps) in the app.
 export function isAppPage(route, mode = detectMode()) {
   const p = route.path;
-  if (appIdOf(p.at(-1)) == null) return false;
+  if (!appOf(p.at(-1))) return false;
   return recordsApps(mode) ? p.length === 1 : p.length === 2 && p[0] === APPS;
 }
 
-// Where a row goes: the source's package page when a source still lists the app, else its installed-app page.
-// B305: in the candidate's source (the record's own when it still lists it), so RyukGram's row opens RyukGram's entry.
+// Where a row goes: the app's Details, in the candidate's source (B305: the record's own when it still lists it, so
+// RyukGram's row opens RyukGram's entry), or the record's own while the candidates aren't loaded.
 export function appRowHref(r, cands, route) {
-  const seg = cands?.has?.(r.id) ? browse.keyedToken(r.id, cands.get(r.id)?.key) : appToken(r.id);
+  const seg = browse.keyedToken(r.id, cands?.get?.(r.id)?.key ?? recordKey(r));
   return format({ tab: route.tab, path: [...route.path, seg] });
 }
+const recordKey = (r) => (isAltKey(r?.key) ? r.key : null);
 
 // F91's extra row (a signed app the list doesn't remember), now with its page.
 export function extraRow(route) {
@@ -1304,26 +1311,115 @@ export function attachRowHold(ul, { view = latest.apps, ...opts } = {}) {
   });
 }
 
-// The installed-app page (#installed/app:<id>): what iFizBox knows of an app no source lists any more, or one it
-// signed but doesn't remember: version (browse.js installedAppSection, with I4's note in the jailbreak app), bundle ID,
-// source, install date and the signature's days left; then the sheet's actions as rows.
-async function renderAppPage(body, route, ctx, { quiet = false } = {}) {
-  const id = appIdOf(route.path.at(-1));
-  appPages.open(body, { route, ctx }); // B281: drawn again by reloadSigned
-  if (!quiet) body.append(placeholder("page"));
+// ---- B417: an app's Details, from its source or from what this device knows -----------------------------------------
+// A row (and an old #installed/app:<id> link) opens Details: the source's entry where the worker has it already, then
+// the one that stands once the load in progress ends. Until then, and for an app no source lists (signed only, from a
+// URL, My IPAs, its source removed), the same layout drawn from the record and the signed data (altstore.js
+// renderRecordApp); it fills in by itself when the source loads or the records change (fillRecordPages).
+
+// The row's record and signed data -> the list's row ({ ...record, signed }, or a signedOnly one), null for neither.
+async function installedRow(id) {
   let rec = null;
   let signed = null;
   try {
     const [records, installed] = await Promise.all([rememberedApps().catch(() => []), signedApps()]);
     signed = signedIndex(installed ?? (detectMode() === "site" ? siteSignedApps(records) : null)).get(id) ?? null; // F342
     rec = (records ?? []).find((x) => x?.id === id) ?? null;
+    if (rec && installed) [rec] = creditedRecords([rec], installed); // B247
     if (rec) [rec] = await withInstalled([rec]); // B46
   } catch { /* drawn from what there is */ }
-  const r = rec ? { ...rec, signed } : signed ? { id, name: signed.name || id, version: signed.version || "", signedOnly: true, signed } : null;
-  if (!r) { body.replaceChildren(note("This app isn't installed.")); return; }
-  appNames.set(id, r.name);
-  const ipa = detectMode() === "sideload" ? await keptIpa(r) : null;
-  body.replaceChildren(grouped(appPageSections(r, { ipa, onAction: (label) => runAppAction(label, r, { ipa, after: navBack }) })));
+  if (rec) return { ...rec, signed };
+  return signed ? { id: signed.bundleId || id, name: signed.name || id, version: signed.version || "", signedOnly: true, signed } : null;
+}
+
+// The app in the source `key` names, else on any source (as candidates(): the source may be gone); null when none has it.
+export async function findApp(id, key, ask = catalog.package) {
+  const own = key ? await ask(id, key).catch(() => null) : null;
+  if (own?.key && own.stanza?.version) return own;
+  const any = await ask(id, ALL).catch(() => null);
+  return any?.key && any.stanza?.version ? any : null;
+}
+
+const samePackage = (a, b) => a?.key === b?.key && JSON.stringify(a?.stanza) === JSON.stringify(b?.stanza);
+export const FIND_WAIT_MS = 150; // a loaded catalog answers within this: Details is drawn once, from the source
+
+// `row`, `peek`, `find`, `drawSource`, `drawRecord`, `drawMissing`: stand-ins for tests.
+//   view.shown: "source" | "record" | null   view.refresh: the source page's own redraw (renderApp)
+export async function renderInstalledApp(body, route, ctx, { quiet = false, row = installedRow, peek = catalog.peekPackage, find = findApp,
+  drawSource = drawSourcePage, drawRecord = drawRecordPage, drawMissing = drawMissingPage, wait = FIND_WAIT_MS } = {}) {
+  const view = appPages.open(body, { route, ctx });
+  if (quiet && view.shown === "source") { view.refresh?.(); return; }
+  const seq = view.seq = (view.seq ?? 0) + 1;
+  const stale = () => view.seq !== seq || (view.seen && body.isConnected === false);
+  if (!quiet) body.append(placeholder("page"));
+  const { id, key: routeKey } = appOf(route.path.at(-1));
+  const r = await row(id);
+  if (stale()) return;
+  if (quiet && !r) return; // forgotten: the page is on its way out
+  const key = routeKey ?? recordKey(r);
+  const source = async (pkg) => {
+    view.shown = "source";
+    view.record = view.drawn = null;
+    const page = await drawSource(body, route, pkg, id, ctx);
+    if (view.seq === seq) view.refresh = page?.refresh ?? null;
+  };
+  // An app signed with no record of it came from a URL or My IPAs, not from a source that lists its ID.
+  if (r?.signedOnly && !routeKey) { await drawRecord(body, view, r, { loading: false, stale }); return; }
+  const found = Promise.resolve().then(() => find(id, key)).catch(() => null);
+  let pkg = key && view.shown !== "record" ? await peek(id, key) : null;
+  if (!(pkg?.key && pkg.stanza?.version)) pkg = null;
+  if (stale()) return;
+  if (pkg) {
+    await source(pkg);
+  } else if (r && view.shown !== "record") {
+    const early = await Promise.race([found, new Promise((res) => setTimeout(res, wait, undefined))]);
+    if (stale()) return;
+    if (early === undefined) await drawRecord(body, view, r, { loading: true, stale });
+  }
+  const last = await found;
+  if (stale()) return;
+  if (last) { if (!samePackage(last, pkg)) await source(last); } // a failed load keeps what was drawn
+  else if (!pkg && r) await drawRecord(body, view, r, { loading: false, stale });
+  else if (!pkg) drawMissing(body, id);
+}
+
+const drawSourcePage = (body, route, pkg, id, ctx) => browse.renderPackage(body, route, pkg.key, id, ctx, { found: pkg });
+const drawMissingPage = (body, id) => body.replaceChildren(grouped([{ rows: [{ label: "Package not found" }], footer: id }]));
+
+async function drawRecordPage(body, view, r, { loading, stale }) {
+  const [ipa, sources] = await Promise.all([!loading && detectMode() === "sideload" ? keptIpa(r) : null,
+    Promise.resolve().then(() => getBackend().sources()).catch(() => [])]);
+  if (stale()) return;
+  const was = view.shown;
+  view.shown = "record";
+  view.record = r;
+  const drawn = JSON.stringify([r, ipa, loading]);
+  if (was === "record" && view.drawn === drawn) return; // nothing new: the page keeps its tab and place
+  view.drawn = drawn;
+  renderRecordApp(body, r, { icon: r.icon || selfIconUrl(r), loading, sections: recordSections(r, { ipa, loading,
+    sourceHref: r.key && sources?.some((s) => s.key === r.key) ? format({ tab: "sources", path: [r.key] }) : null,
+    onAction: (label) => runAppAction(label, r, { ipa, after: navBack }) }) });
+}
+
+// The nav bar: Details with Modify, as an installed app's page says; a page drawn from the record offers the hold sheet's
+// actions there, a source's its own (browse.js).
+function installedAppNav(route) {
+  const own = browse.packageNav(route);
+  const sheetOf = (b) => {
+    const at = format(route);
+    const v = appPages.all().find((p) => p.shown === "record" && p.record && p.route && format(p.route) === at);
+    if (!v) return false;
+    appSheet(v.record, { sheet: (o) => showActionSheet({ ...o, from: b }), after: navBack }).catch(() => {});
+    return true;
+  };
+  return { title: DETAILS_TITLE, right: { label: "Modify",
+    onClick: (e) => { if (!sheetOf(e.currentTarget)) own.right.onClick(e); },
+    onHold: (b) => { if (!sheetOf(b)) own.right.onHold(b); } } };
+}
+
+// The pages drawn from a record look again: their source loaded, or the record changed (B156 wrote it back).
+function fillRecordPages() {
+  for (const p of appPages.all()) if (p.shown === "record" && p.body?.isConnected) renderInstalledApp(p.body, p.route, p.ctx, { quiet: true });
 }
 
 // ---- B281: an install that records nothing itself ended ----------------------------------------------------------
@@ -1332,9 +1428,9 @@ async function renderAppPage(body, route, ctx, { quiet = false } = {}) {
 // (a My IPAs install's) until they were opened again. When that run ends, every live apps list and app page loads
 // the signed records again.
 //   reloadSigned({ load, draw })   -> the number of app pages drawn again (load, draw: stand-ins for tests)
-const appPages = pageViews(() => ({ kind: "app", route: null, ctx: null }));
+const appPages = pageViews(() => ({ kind: "app", route: null, ctx: null, shown: null, record: null, refresh: null, seq: 0 }));
 
-export function reloadSigned({ load = loadAllApps, draw = renderAppPage } = {}) {
+export function reloadSigned({ load = loadAllApps, draw = renderInstalledApp } = {}) {
   load();
   let n = 0;
   for (const p of appPages.all()) {
@@ -1371,29 +1467,32 @@ export async function dropMyIpasRecord(answer, { store = apps, signed = signedAp
   } catch { return false; }
 }
 
-// Registers `body` as an app page, as renderAppPage does (tests).
+// Registers `body` as an app page, as renderInstalledApp does (tests).
 export const openAppPage = (body, route, ctx = null) => appPages.open(body, { route, ctx });
 
-// The page's sections for a row `r` (with `signed`), testable without a page.
-export function appPageSections(r, { ipa = null, mode = detectMode(), now = new Date(), window, onAction = () => {} } = {}) {
-  const sec = browse.installedAppSection(r);
-  const rows = [...sec.rows, { label: "Bundle ID", detail: r.signed?.bundleId || r.id }];
-  if (r.signed?.bundleId && r.signed.bundleId !== r.id) rows.push({ label: "Original ID", detail: r.id });
-  if (r.sourceName || r.source) rows.push({ label: "Source", detail: r.sourceName || r.source });
-  if (r.date) rows.push({ label: "Installed", detail: new Date(r.date).toLocaleDateString(undefined, { dateStyle: "medium" }) });
+// What renderRecordApp draws of a row `r` (with `signed`), testable without a page: the Installed section (version,
+// install date, signature; I4's note in the jailbreak app), the sheet's actions and Remove or Delete. `loading`: the
+// source is still coming and its page brings its own rows, so no actions here (the nav bar's Modify has them).
+export function recordSections(r, { ipa = null, loading = false, mode = detectMode(), now = new Date(), window, sourceHref = null, onAction = () => {} } = {}) {
+  const rows = [{ label: "Installed Version", detail: r.actual === null ? "Not Installed" : r.version || "Unknown" }];
   if (r.signed) {
-    const sig = signatureState(r.signed.expires, { now, window: window ?? resignWindow((k) => settings.get(k)) });
-    rows.push({ label: "Signature", detail: sig?.long || "Signed by " + NAME });
+    rows.push(signatureRow(r.signed, { now, show: true, window: window ?? resignWindow((k) => settings.get(k)) })
+      ?? { label: "Signature", detail: `Signed by ${NAME}` });
   }
-  const out = [{ header: sec.header, rows, footer: sec.footer || (r.signedOnly ? `Signed by ${NAME}. No source lists it.` : null) }];
+  if (r.date) rows.push({ label: "Installed", detail: new Date(r.date).toLocaleDateString(undefined, { dateStyle: "medium" }) });
+  const source = r.sourceName || r.source || (fromMyIpas(r.signed) ? "My IPAs" : "");
+  const out = { source, sourceHref, installed: { header: "Installed", rows, footer: r.note || null }, actions: null, remove: null,
+    infoFooter: loading ? `Loading ${source || "your sources"}…` : r.self ? null
+      : sourceHref && source ? `${source} didn't load, or doesn't list this app now.` : "No source lists this app." };
+  if (loading) return out;
   const acts = appActions(r, { mode, ipa });
   const main = acts.filter((a) => !isDelete(a));
-  if (main.length) out.push({ rows: main.map((label) => ({ label, onClick: () => onAction(label) })) });
+  if (main.length) out.actions = { rows: main.map((label) => ({ label, onClick: () => onAction(label) })) };
   const del = acts.find(isDelete);
   if (del) {
     const a = deleteAction(r, { mode });
-    out.push({ rows: [{ label: del, onClick: () => onAction(del) }],
-      footer: a.kind === "uninstall" ? `Deletes ${r.name} and its data from your iPhone.` : a.note });
+    out.remove = { rows: [{ label: del, onClick: () => onAction(del) }],
+      footer: a.kind === "uninstall" ? `Deletes ${r.name} and its data from your iPhone.` : a.note };
   }
   return out;
 }
