@@ -797,8 +797,11 @@ static void shareOut(void) {
         CFStringRef n = (__bridge CFStringRef)[@"ifizbox.appgroup." stringByAppendingString:group];
         NSMutableDictionary *now = editable(CFBridgingRelease(CFPreferencesCopyMultiple(NULL, n, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)));
         [now removeObjectForKey:@"ifizbox.groupfix.copied"];
-        // an empty one may be one that can't be read yet (before the first unlock): the copy stays as it is
-        if (now.count && ![readPlist(suiteCopy(root, group), NULL) isEqual:now] && writePlist(now, suiteCopy(root, group), NO)) news++;
+        // one that can't be read yet (before the first unlock) looks empty: the copy stays as it is
+        BOOL locked = NO;
+        if (!now.count) readPlist([NSHomeDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"Library/Preferences/ifizbox.appgroup.%@.plist", group]], &locked);
+        BOOL there = [fm fileExistsAtPath:suiteCopy(root, group)];
+        if ((now.count || (there && !locked)) && ![readPlist(suiteCopy(root, group), NULL) isEqual:now] && writePlist(now, suiteCopy(root, group), NO)) news++;
         NSMutableDictionary *had = editable(files[group]);
         news += updateFiles([NSHomeDirectory() stringByAppendingPathComponent:[@"Library/AppGroups" stringByAppendingPathComponent:group]],
                             filesCopy(root, group), had);
@@ -850,12 +853,18 @@ static NSString *shareIn(void) {
     BOOL unreadable = NO;
     NSDictionary *was = readPlist(recordPath, &unreadable);
     if (was || unreadable) extensionReady = YES;
+    if (isolate && [was[@"pinned"] isEqual:@YES]) pinned = YES; // also when the app's copy can't be reached
     if (unreadable) return @"own record not readable now";
     NSURL *root = sharedRoot();
     NSDictionary *state = root ? readPlist([root URLByAppendingPathComponent:@"state.plist"].path, NULL) : nil;
     if (!state) return root ? @"the app has put nothing out" : @"no profile group";
     extensionReady = YES;
     if (isolate && [state[@"pinned"] isEqual:@YES]) pinned = YES;
+    for (NSString *group in groups) { // before the first unlock: nothing is brought in, and nothing recorded, until it can be read
+        if (plainName(group)) readPlist(suiteCopy(root, group), &unreadable);
+    }
+    if (unreadable) return @"the copy not readable now";
+    BOOL seeding = [state[@"seed"] isEqual:@YES] && ![was[@"seeded"] isEqual:@YES], seeded = YES;
     [fm createDirectoryAtPath:recordPath.stringByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:NULL];
     NSMutableDictionary *record = editable(was), *suites = editable(record[@"suites"]), *files = editable(record[@"files"]);
     NSMutableArray *words = [NSMutableArray array];
@@ -882,11 +891,13 @@ static NSString *shareIn(void) {
         NSUInteger changedFiles = updateFiles(filesCopy(root, group), own, had);
         files[group] = had;
         // once: what the extension kept for the group without this fix (a tweak's own shim), after the app's, never over it
-        NSURL *shim = !was && [state[@"seed"] isEqual:@YES] && origContainer
+        NSURL *shim = seeding && origContainer
             ? origContainer(fm, @selector(containerURLForSecurityApplicationGroupIdentifier:), group) : nil;
         if (shim) {
-            copyMissing(shim, [NSURL fileURLWithPath:own isDirectory:YES], @"");
-            NSDictionary *old = readPlist([shim URLByAppendingPathComponent:[NSString stringWithFormat:@"Library/Preferences/%@.plist", group]].path, NULL);
+            seeded = copyMissing(shim, [NSURL fileURLWithPath:own isDirectory:YES], @"") && seeded;
+            BOOL closed = NO;
+            NSDictionary *old = readPlist([shim URLByAppendingPathComponent:[NSString stringWithFormat:@"Library/Preferences/%@.plist", group]].path, &closed);
+            if (closed) seeded = NO;
             NSDictionary *have = CFBridgingRelease(CFPreferencesCopyMultiple(NULL, n, kCFPreferencesCurrentUser, kCFPreferencesAnyHost));
             NSMutableDictionary *add = editable(old);
             [add removeObjectsForKeys:have.allKeys ?: @[]];
@@ -897,6 +908,8 @@ static NSString *shareIn(void) {
         [words addObject:[NSString stringWithFormat:@"%@ suite %lu of the app's, %lu new, %lu removed; %lu files, %lu changed%@", group, (unsigned long)app.count,
             (unsigned long)set, (unsigned long)gone, (unsigned long)had.count, (unsigned long)changedFiles, shim ? @"; its earlier data brought in" : @""]];
     }
+    if (seeded) record[@"seeded"] = @YES; // else the next start tries again
+    record[@"pinned"] = @(pinned);
     record[@"suites"] = suites;
     record[@"files"] = files;
     if (![record isEqual:was]) writePlist(record, recordPath, NO);

@@ -215,7 +215,7 @@ export function fixExtensions(FS, appDir, readPlist) {
       try {
         FS.writeFile(exe, injectInto(FS.readFile(exe), [GROUPFIX.inject], { rpath: GROUPFIX.extensionRpath }));
         lines.push(`Group fix in ${dir}/${n}`);
-      } catch { lines.push(`No group fix in ${dir}/${n}: its executable has no room for it`); }
+      } catch { lines.push(`No group fix in ${dir}/${n}: its executable couldn't take it`); }
     }
   }
   return lines;

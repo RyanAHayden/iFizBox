@@ -708,12 +708,12 @@ An app keeps its data in three places, and a re-sign must leave each where the a
   earlier install left. While a copy isn't complete (launch cut short, or files unreadable before first unlock)
   `Library/AppGroups/.<group>.copying` stays and the next launch tries again. The fix's log
   (`Library/ifizbox-groupfix.log`) gets one extra line then: `<time> brought in from before the group fix: <group>
-  folder <files>, suite <keys>` (the files and keys found there). The app's notification extensions (extension points
-  `com.apple.usernotifications.service` and `.content-extension`, in `PlugIns/` or `Extensions/`) load the group fix
+  folder <files>, suite <keys>` (the files and keys found there). The app's notification extensions (extension point
+  `com.apple.usernotifications.service`, in `PlugIns/` or `Extensions/`) load the group fix
   too, from the app's `Frameworks/` (rpath `@executable_path/../../Frameworks`), when the profile has an app group.
   Both signers inject it (`IPASigner.swift`, `websign-job.js fixExtensions`) and log `Group fix in PlugIns/X.appex`, or
-  `No group fix in ...: its executable has no room for it`, and that extension is left as it was. Other extensions
-  (share, widgets...) don't get it and keep what they reach without it: a tweak's shim, or nothing.
+  `No group fix in ...: its executable couldn't take it`, and that extension is left as it was. Other extensions
+  (notification content, share, widgets...) don't get it and keep what they reach without it: a tweak's shim, or nothing.
 - **Keeping an app's passwords to itself**: `TEAM.<App ID>` (and the profile's app groups) stay keychain groups every
   app under that App ID can reach, and a read that names no group finds what is there: a fresh app took over another
   app's item, and one app's delete that named no group (a fresh install clearing its keychain, a logout, any app the
@@ -748,7 +748,7 @@ An app keeps its data in three places, and a re-sign must leave each where the a
   background; then a Darwin notification tells the extension. The app's record is `Library/ifizbox-groupfix-shared.plist`
   in its container. The extension brings the copy into its own container's `Library/AppGroups/<group>/` and
   `ifizbox.appgroup.<group>` suite at start and on that notification: only what the app changed since last time, and
-  never a file it wrote later itself; its record is the same file name in its own container. What the extension writes
+  never a file it wrote later itself (a setting both changed takes the app's value; settings carry no times); its record is the same file name in its own container. What the extension writes
   doesn't go back to the app. Until the app has run once with this fix, the extension works as without it. The first
   time, for an app that ran before, the extension also brings in what it kept without the fix (the tweak's shim folder
   and suite), never over what the app gave. A fresh install removes a copy an earlier install left and seeds nothing.

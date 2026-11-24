@@ -90,7 +90,7 @@ test("groupFixPlan (B425): the profile group the notification extensions get the
   const was = { groups: ["group.com.burbn.instagram"], target: "group.x.2", keychain: true };
   assert.equal(groupFixPlan(INSTA, { "com.apple.security.application-groups": ["group.x.1", "group.x.2"] }, was).shared, "group.x.2", "an earlier sign's group");
   const ext = (p) => isNotificationExtension({ NSExtension: { NSExtensionPointIdentifier: p } });
-  assert.ok(ext("com.apple.usernotifications.service") && ext("com.apple.usernotifications.content-extension"));
+  assert.ok(ext("com.apple.usernotifications.service") && !ext("com.apple.usernotifications.content-extension"));
   assert.ok(!ext("com.apple.share-services") && !isNotificationExtension({}) && !isNotificationExtension(null));
 });
 

@@ -112,9 +112,9 @@ export function groupFixPlan(original, profileEnts = {}, previous = null, keycha
   return plan;
 }
 
-// B425: whether an Info.plist is a notification extension's, which get the fix too.
+// B425: whether an Info.plist is a notification service extension's, which gets the fix too.
 export function isNotificationExtension(plist) {
-  return ["com.apple.usernotifications.service", "com.apple.usernotifications.content-extension"].includes(plist?.NSExtension?.NSExtensionPointIdentifier);
+  return plist?.NSExtension?.NSExtensionPointIdentifier === "com.apple.usernotifications.service";
 }
 
 // B327: the sign log's line for the group fix a sign put in, every part of its config, or why none (the same words as

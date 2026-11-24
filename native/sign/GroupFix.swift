@@ -72,10 +72,10 @@ enum GroupFix {
             + (p.shared.map { "; shared with its notification extensions through \($0)" } ?? "")
     }
 
-    // B425: whether a bundle is one of the app's notification extensions (its Info.plist), which get the fix too.
+    // B425: whether a bundle is the app's notification service extension (its Info.plist), which gets the fix too.
     static func isNotificationExtension(_ plist: [String: Any]) -> Bool {
         let point = (plist["NSExtension"] as? [String: Any])?["NSExtensionPointIdentifier"] as? String
-        return point == "com.apple.usernotifications.service" || point == "com.apple.usernotifications.content-extension"
+        return point == "com.apple.usernotifications.service"
     }
 
     // The tweak set with the dylib and its config added (after the user's own tweaks).

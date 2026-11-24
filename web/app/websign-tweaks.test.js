@@ -101,12 +101,12 @@ test("B425: the app's notification extensions load the group fix from the app's 
   const app = new Uint8Array(readFileSync(new URL("./core/fixtures/tweaks/app.macho", import.meta.url)));
   const ext = (point) => ({ CFBundleExecutable: "E", NSExtension: { NSExtensionPointIdentifier: point } });
   const plists = { "/a/PlugIns/N.appex/Info.plist": ext("com.apple.usernotifications.service"),
-    "/a/PlugIns/S.appex/Info.plist": ext("com.apple.share-services"), "/a/PlugIns/B.appex/Info.plist": ext("com.apple.usernotifications.content-extension") };
+    "/a/PlugIns/S.appex/Info.plist": ext("com.apple.share-services"), "/a/PlugIns/B.appex/Info.plist": ext("com.apple.usernotifications.service") };
   const files = { "/a/PlugIns/N.appex/E": app, "/a/PlugIns/S.appex/E": app, "/a/PlugIns/B.appex/E": new Uint8Array([1, 2, 3]) };
   const FS = { readdir: (p) => { if (p !== "/a/PlugIns") throw new Error("ENOENT"); return [".", "..", "N.appex", "S.appex", "B.appex"]; },
     readFile: (p) => files[p], writeFile: (p, d) => { files[p] = d; } };
   const run = () => fixExtensions(FS, "/a", (p) => plists[p]);
-  assert.deepEqual(run(), ["Group fix in PlugIns/N.appex", "No group fix in PlugIns/B.appex: its executable has no room for it"]);
+  assert.deepEqual(run(), ["Group fix in PlugIns/N.appex", "No group fix in PlugIns/B.appex: its executable couldn't take it"]);
   run(); // signed again: once only
   const cmds = loadCommands(files["/a/PlugIns/N.appex/E"]);
   assert.equal(cmds.filter((c) => c.cmd === LC.LOAD_WEAK_DYLIB && c.name === GROUPFIX.inject).length, 1);

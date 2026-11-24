@@ -348,12 +348,13 @@ final class IPASigner {
                 }
                 // B425: one with no room for the load command is left as it was
                 if sharedFix, dir.hasSuffix(".appex/"), dir.dropFirst(appDir.count).split(separator: "/").count == 2,
+                   dir.hasPrefix(appDir + "PlugIns/") || dir.hasPrefix(appDir + "Extensions/"),
                    GroupFix.isNotificationExtension(b.plist) {
                     let name = dir.dropFirst(appDir.count).dropLast()
                     do {
                         data = try MachOEdit.inject(data, [GroupFix.inject], rpath: GroupFix.extensionRpath).0
                         log("Group fix in \(name)")
-                    } catch { log("No group fix in \(name): its executable has no room for it") }
+                    } catch { log("No group fix in \(name): its executable couldn't take it") }
                 }
                 let params = CodeSignParams(identifier: id, team: profile.team,
                                             entitlements: isApp ? profile.entitlements(for: keep || id == newID ? entID : id, keptID: keep ? newID : nil,
