@@ -354,7 +354,8 @@ test("B85/B91: tapping the asking row re-prompts; a dismissed prompt fails that 
   assert.equal(s.page.lines.filter((x) => x.id === "a").at(-1).text, "Asked iOS again to install Alpha");
   // Beta waits its turn: its tap opens the Log
   rows[1].children[0].click();
-  assert.equal(s.page.filtered, "b");
+  assert.equal(s.page.filtered, null); // B422: one Log of everything, no filter
+  assert.equal(s.page.views.at(-1), "log");
   answers.get("a")({ installed: false, dismissed: true });
   await settle();
   assert.equal(statusOf(rows[0]), "Failed: iOS didn't download it"); // B91: not "Cancelled"

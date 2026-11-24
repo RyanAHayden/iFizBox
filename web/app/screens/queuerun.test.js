@@ -254,9 +254,9 @@ test("F407 mixed: one page, every app before any package, one end with one finis
   assert.equal(s.runLogs.list().length, 1);
   assert.equal(s.calls.logs[0].title, "Install A, Install B and 2 more");
   assert.match(s.runLogs.get(s.calls.logs[0].id).text, /» Installed A[\s\S]*» Installed Tweak/);
-  // an app's row shows its own lines, kept apart from a package of the same ID
+  // an app's row opens the one Log of everything (B422), its lines still keyed apart from a package of the same ID
   m.row("A").children[0].click();
-  assert.equal(s.page.filtered, "app:a");
+  assert.equal(s.page.filtered, null);
   assert.ok(s.page.lines.some((l) => l.pkg === "app:a" && l.text === "Installed A"));
   s.page.close();
   assert.equal(m.closed(), 1);
@@ -310,7 +310,7 @@ test("F407 a failed app's tap while the packages still run opens its log: no app
   await until(() => m.order.includes("lib"));
   m.row("A").children[0].click();
   await settle();
-  assert.equal(s.page.filtered, "app:a");
+  assert.equal(s.page.filtered, null); // B422: the one Log
   assert.deepEqual(m.order, ["app a", "lib"]);
   go();
   await m.done;
