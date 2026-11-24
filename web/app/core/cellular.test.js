@@ -1,7 +1,7 @@
 // F417: On Cellular's choice, its texts, and the route it makes.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CELLULAR_KEY, CELLULAR_OPTIONS, CELLULAR_ANSWERS, onCellularChoice, setOnCellular, cellularFooter, cellularQuestion } from "./cellular.js";
+import { CELLULAR_KEY, CELLULAR_OPTIONS, cellularOptions, onCellularChoice, setOnCellular, cellularFooter, cellularQuestion, shortcutRan, setShortcutRan, shortcutWhy, needsAdding } from "./cellular.js";
 import { decideRoute } from "./installroute.js";
 
 test("the choice: Ask Each Time until picked, kept, and an unknown or broken value is Ask Each Time", () => {
@@ -16,11 +16,30 @@ test("the choice: Ask Each Time until picked, kept, and an unknown or broken val
 });
 
 test("the page's texts and the popup", () => {
-  assert.deepEqual(CELLULAR_OPTIONS.map((o) => o.label), ["Ask Each Time", "Use Signing Server"]);
+  assert.deepEqual(CELLULAR_OPTIONS.map((o) => o.label), ["Ask Each Time", "Use Shortcut", "Use Signing Server"]);
+  assert.deepEqual(cellularOptions(true).map((o) => o.subtitle).slice(0, 2), ["Airplane Mode, Shortcut or server.", "Cellular data goes off for a moment."]);
+  assert.deepEqual(cellularOptions(false).map((o) => [o.value, o.subtitle]).slice(0, 1), [["ask", "Airplane Mode or server."]]);
+  assert.equal(cellularOptions(false).length, 2);
   assert.match(cellularFooter("server"), /On Wi-Fi/);
-  const q = cellularQuestion();
-  assert.equal(q.buttons.length, CELLULAR_ANSWERS.length);
-  assert.equal(CELLULAR_ANSWERS[q.cancel], "cancel");
+  assert.equal(cellularFooter("shortcut"), "Shortcuts opens for a moment and turns cellular data back on by itself.");
+  const first = (o) => { const q = cellularQuestion(o); assert.equal(q.buttons.length, q.answers.length); assert.equal(q.answers[q.cancel], "cancel"); return [q.title, q.buttons[0], q.add]; };
+  assert.equal(first({})[1], "Use Signing Server", "no Shortcut here");
+  assert.deepEqual(first({ shortcut: { added: false } }), ["You're on Cellular", "Set Up Shortcut", true]);
+  assert.deepEqual(first({ shortcut: { added: true } }), ["You're on Cellular", "Use Shortcut", false]);
+  assert.deepEqual(first({ shortcut: { added: true }, failed: "not_run" }), ["Shortcut Didn't Run", "Add Shortcut Again", true]);
+  assert.deepEqual(first({ shortcut: { added: true }, failed: "ran_out" }), ["Shortcut Didn't Run", "Use Shortcut", false], "adding it again wouldn't help");
+  assert.match(cellularQuestion({ shortcut: {}, failed: "not_run" }).message, /“Cellular Installs” wasn't found .*join Wi-Fi, or choose:$/);
+  for (const c of ["not_run", "no_end", "no_return", "not_opened", "busy", "vpn_off", "ran_out", "other"]) assert.match(shortcutWhy(c), /\.$/);
+  assert.equal(needsAdding("busy"), false);
+});
+
+test("a run that passed is kept", () => {
+  const mem = new Map(), storage = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
+  assert.equal(shortcutRan(storage), false);
+  setShortcutRan(true, storage);
+  assert.equal(shortcutRan(storage), true);
+  setShortcutRan(false, storage);
+  assert.equal(shortcutRan(storage), false);
 });
 
 test("Use Signing Server decides the route only on cellular", () => {
