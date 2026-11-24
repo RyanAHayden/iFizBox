@@ -765,17 +765,29 @@ enum LocalVPN {
     }
 
     /// This VPN's configuration is connected now (read only: nothing saved, so iOS asks nothing). Blocking.
-    static func connectedNow() -> Bool {
-        guard let id = providerID else { return false }
+    static func connectedNow() -> Bool { savedStatus() == .connected }
+
+    /// Nothing of ours is up or about to be: no install or connection uses it, and iOS says it is off. A read that failed
+    /// isn't down. Blocking, read only.
+    static func isDown() -> Bool {
+        lock.lock(); let used = holds > 0 || installs > 0; lock.unlock()
+        if used { return false }
+        guard let s = savedStatus() else { return false }
+        return [.disconnected, .invalid].contains(s)
+    }
+
+    /// Our configuration's state as iOS has it; .invalid with none saved, nil when it couldn't be read. Blocking.
+    private static func savedStatus() -> NEVPNStatus? {
+        guard let id = providerID else { return .invalid }
         var status = NEVPNStatus.invalid // written before done() signals the wait
-        let _: Bool? = try? wait("reading the VPN configuration", 5) { done in
+        let read: Bool? = try? wait("reading the VPN configuration", 5) { done in
             NETunnelProviderManager.loadAllFromPreferences { ms, err in
                 let m = ms?.first { ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == id }
                 status = m?.connection.status ?? .invalid
                 done(err, true)
             }
         }
-        return status == .connected
+        return read == nil ? nil : status
     }
 }
 
@@ -784,6 +796,7 @@ enum LocalVPNBridge {
         LocalVPN.Path.start()
         LocalVPN.clearOldKeys()
         CellularShortcutBridge.register(b) // cellular.*
+        RestoreShortcutBridge.register(b) // restore.*
         CellularRun.register(b) // cellular.run, and the put-back after a killed app
         DispatchQueue.main.async { IDevice.AppFront.watch() }
         LocalVPN.takeDownLeftOver() // B423: a killed app's

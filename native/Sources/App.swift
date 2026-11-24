@@ -110,6 +110,7 @@ enum Incoming {
         OpenLog.hop("Incoming: \(OpenLog.url(url))")
         if url.isFileURL { OpenRescue.delivered(url) } // B334: the delegate had it; no rescue needed
         if CellularShortcutBridge.receive(url) { return } // Shortcuts coming back from Cellular Installs
+        if RestoreShortcutBridge.receive(url) { return } // and from Restore My VPN
         if SharedInbox.receive(url) { return } // N9: shared .ipa/.deb files and the share extension's links
         if MyIPAs.receive(url) { return } // F77: an .ipa file goes into My IPAs, which then sends ifizbox://myipas
         if url.isFileURL {
