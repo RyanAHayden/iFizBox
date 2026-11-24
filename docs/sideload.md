@@ -361,7 +361,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   `vpn.setRestore` `{on}` turns Restore My VPN on or off and answers the same status, and `vpn.test` runs the Set Up test.
   Cellular Installs bridge: `cellular.status` is `{available, bundled, added}`: whether the signed Shortcut is in this build
   and its last check passed. `cellular.add` opens the signed Shortcut (made by `tools/shortcuts/sign.sh`) in a share sheet,
-  where Shortcuts opens it on Add Shortcut; it reports only that the sheet closed, since Shortcuts never says it was added.
+  where Shortcuts opens it on Add Shortcut; it answers `{opened}`, false when the sheet was dismissed, and not whether it was added, which Shortcuts never says.
   `cellular.check` runs the Shortcut with `{"check":1}`, which touches no cellular data, and passes only when its Finish
   Cellular Installs ran in the app. The app judges a run by those actions, not by Shortcuts' callback
   (`ifizbox://cellular-installs`), whose error is only passed on as text. A failure answers `not_opened`, `not_run`, `no_end`,
