@@ -71,7 +71,9 @@ up() {
   fi
   # The disk image stays mounted until the phone reboots. Apple's signing server needs Apple's root CA (ca-bundle.pem).
   gi image list | grep -q signature ||
-    SSL_CERT_FILE=$rig/ca-bundle.pem gi image mount --path="$rig/ddi/iOS_DDI/Restore" >/dev/null
+    SSL_CERT_FILE=$rig/ca-bundle.pem gi image mount --path="$rig/ddi/iOS_DDI/Restore" >/dev/null ||
+    tail -n 2 "$run/ios.log" | grep -q 'already mounted at /System/Developer' ||  # iOS's own copy: not in image list
+    { echo "the disk image didn't mount: $run/ios.log" >&2; exit 1; }
   ss -ltn 'sport = :8100' | grep -q 8100 || bg forward forward 8100 8100
   if ! gi ps | grep -q WebDriverAgentRunner; then
     bg wda runwda --bundleid=com.ryha.wda.xctrunner --testrunnerbundleid=com.ryha.wda.xctrunner \
