@@ -391,6 +391,16 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   Settings > Cellular); a put-back that failed after a run is tried once more at the next launch. Installs queued behind (more than 3 at
   once) that start after the last connection wait again and need another run. The popup and Use Shortcut run it through
   `runCellular` (`signing/cellularrun.js`).
+  Restore My VPN Shortcut bridge: `restore.add` opens the signed Shortcut (`web/app/shortcuts/Restore My VPN.shortcut`) in a share sheet, where Shortcuts opens it on Add Shortcut; it answers `{opened}`. `restore.store`
+  and `restore.back` answer `{ok, error, text}`. Store remembers the VPN that is on: only while another VPN is up and the
+  built-in VPN is down (`no_vpn` otherwise, `vpn_on` when the built-in VPN is up), so Shortcuts never saves the built-in VPN.
+  Back sets that VPN on again: only with the built-in tunnel down (no install or connection uses it, and iOS says disconnected;
+  a failed read counts as up, `vpn_on`) and no other VPN up (`on_already`). It passes as soon as `otherVPN` is true, whatever
+  Shortcuts' callback (`ifizbox://restore-vpn`) says, since Set VPN often ends with error 2 after switching. `busy`: another
+  run, or one that ended under 10 s ago before its Shortcut did. Run failures: `not_opened`, `not_run`, `no_vpn` (Shortcuts
+  found none), `not_stored`, `not_back`, `no_end`, `no_return` (`RestoreShortcut.Verdict`). All three are refused with
+  `unavailable: …` in the jailbreak app, under another bundle ID and before iOS 16, and with `missing: …` while the signed file
+  is not in the build. No page calls them yet. Code: `RestoreShortcutBridge.swift`, `web/app/core/restoreshortcut.js`.
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`.
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and
