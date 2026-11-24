@@ -1,0 +1,11 @@
+Updates no longer bounce between iFizBox and Shortcuts.
+Updating iFizBox by Signing Server no longer gets stuck.
+Add Tweaks now queues the app too.
+An older Install Switch is offered its update.
+
+- An update stops after one try in Shortcuts and says if your VPN is still off, an older Install Switch is offered its update when you choose This iPhone, on Home and in Installation & Signing, and Test Install Switch answers sooner and says what it is doing.
+- The Install Switch can bring back a selected but idle VPN that connects on demand (delete Install Switch in Shortcuts, then tap Update on Settings > Installation & Signing > This iPhone > Install Switch), and bring back a VPN without On Demand for the network in one trip (delete it and add it with Share Shortcut File instead, as Update doesn't have that yet).
+- Updating iFizBox through the Signing Server closes the app as soon as iOS starts the download and offers Try Again after 8 seconds if it hasn't, adding a tweak on an app's Add Tweaks page also queues that app, and retrying a failed install uses the IPA already downloaded.
+- This iPhone now installs only through the built-in VPN (Tailscale and LocalDevVPN are no longer used, and a profile without Network Extensions needs the Signing Server); an app with tweaks signed another way before keeps its settings and files, and no longer comes back signed out because of an old sign-in.
+- In the jailbreak app, IPA installs show each step, take about half as long after the download and go on when you leave, packages with capital letters, an underscore or a trailing + can be queued and show as installed, and Confirm keeps your queue and gives each reason in full, with a row that removes just the package in the way.
+- Smaller fixes: Depends and Conflicts are one row each that opens the whole list; tabs on a package's or app's page switch by tapping, and swipe back works from anywhere; the queue, Installed and Share buttons show properly in the iOS 7, 13 and 26 styles; the app's tweak lists come from a list kept current in the background (Settings > General > Update Tweak Index turns that off); source refreshes always download fresh; the status bar stays readable over black pages; hiding a run in the iOS 13 and 26 styles brings the app behind it forward; and the app no longer jumps to Home once you have started using it.
