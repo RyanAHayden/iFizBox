@@ -1,9 +1,11 @@
 # F415: first-launch hint on every signed install's end
 
 ## What I did
-- `web/app/core/firstlaunch.js` (new): `FIRST_LAUNCH_HINT` (the grey line's text), `firstLaunchHint(rows)` (null
-  unless an app signed with a profile installed, not the jailbreak helper's and not our own IPA) and
-  `sayFirstLaunch(page, text)`, which calls `page.help(text, {label: ""})`, so there is no button.
+- `web/app/core/installroute.js`: `FIRST_LAUNCH_HINT` (the grey line's text) and `sayFirstLaunch(page, text)`, which calls
+  `page.help(text, {label: ""})`, so there is no button. `web/app/core/apprun.js`: `firstLaunchHint(rows)` (null unless
+  an app signed with a profile installed, not the jailbreak helper's and not our own IPA).
+- Failed first: a module of its own (`core/firstlaunch.js`) went over the startup module limit, as it brought
+  `core/apprun.js` in through `signing/common.js`.
 - Shown through `nav/progress.js` `page.help` from `screens/apprun.js`, `signing/common.js` `finishHere`,
   `signing-sheet.js` `followInstall` and `signing/watch.js`.
 - The app run's Apps list summary stays the run's last line step; the hint follows it through `page.help`.

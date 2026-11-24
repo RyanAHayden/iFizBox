@@ -43,7 +43,8 @@ import { ipaStep } from "../core/ipainstall.js"; // B400
 import { appRows, createAppRun, rowStatus, helperRow, summaryLine, runStatus, runPercent, ended, isSelf, DIDNT_DOWNLOAD, barOf } from "../core/apprun.js";
 import { recordWhen } from "../core/apprun.js"; // B136
 import { HERE_PARALLEL } from "../core/apprun.js"; // F359
-import { firstLaunchHint, sayFirstLaunch } from "../core/firstlaunch.js"; // F415
+import { firstLaunchHint } from "../core/apprun.js"; // F415
+import { sayFirstLaunch } from "../core/installroute.js"; // F415
 import { listedOf } from "../core/appqueue.js"; // F400
 import { apps as appStore, undoRecord } from "../core/installed.js"; // B170
 import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, HERE_CLOSING_LINE, waitHints } from "../signing/selfupdate.js";

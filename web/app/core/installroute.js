@@ -492,3 +492,11 @@ export const restoreFooter = (on) => (on
   ? "After installs your own VPN comes back. iOS asks to allow the app's VPN again next time."
   : "Your own VPN stays off after installs.");
 export const setRestoreVPN = (native, on) => native.call("vpn.setRestore", { on: Boolean(on) });
+
+// F415: iOS checks a new or regenerated provisioning profile online on an app's first launch; with no network then (or
+// one changing) it shows "Unable to Verify App" (R96). No app can run that check ahead, so every signed install's end
+// says what to do, as a grey line with no button (nav/progress.js page.help). An app run's: core/apprun.js firstLaunchHint.
+export const FIRST_LAUNCH_HINT = "If the first launch says Unable to Verify App, turn Airplane Mode off, make sure you're online, tap Cancel and open the app again.";
+export function sayFirstLaunch(page, text = FIRST_LAUNCH_HINT) {
+  if (text) page?.help?.(text, { label: "" });
+}

@@ -16,7 +16,7 @@
 //
 // The bridge comes from native.js nativeBridge(); an older shell without signing.inspect installs straight away as before.
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { sayFirstLaunch } from "./core/firstlaunch.js"; // F415
+import { sayFirstLaunch } from "./core/installroute.js"; // F415
 import { showSheet } from "./nav/sheet.js";
 import { showAlert } from "./nav/alert.js";
 import { liveHUD } from "./nav/hud.js";

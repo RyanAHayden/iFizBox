@@ -8,7 +8,7 @@ import { deviceCheckText, IN_PROFILE_TEXT, notLandedText, NOT_LANDED_TEXT, SENT_
 import { answerFor, appHelpHref, openAppHelp, APP_HELP } from "./guides.js";
 import { siteCause } from "../signing-client.js";
 import { followInstall } from "../signing-sheet.js";
-import { FIRST_LAUNCH_HINT } from "../core/firstlaunch.js"; // F415: ends every install
+import { FIRST_LAUNCH_HINT } from "../core/installroute.js"; // F415: ends every install
 
 const UDID = "00008030-0011223344556677";
 

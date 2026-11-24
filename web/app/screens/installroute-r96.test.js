@@ -4,7 +4,8 @@ import assert from "node:assert/strict";
 import { runAppRun } from "./apprun.js";
 import { createAppQueue } from "../core/appqueue.js";
 import { memoryAppStore } from "../core/installed.js";
-import { FIRST_LAUNCH_HINT, firstLaunchHint } from "../core/firstlaunch.js";
+import { FIRST_LAUNCH_HINT } from "../core/installroute.js";
+import { firstLaunchHint } from "../core/apprun.js";
 import { finishHere } from "../signing/common.js";
 import { fakeDocument } from "../fakes.test-helper.js";
 
