@@ -128,6 +128,17 @@ test("an install that starts while idevice.status answers, or before the second 
   assert.equal(routeFailure(), null);
 });
 
+test("an install that starts during the verify: its answer is dropped, pass or fail", async () => {
+  for (const a of [{ ok: true }, coded("refused")]) {
+    fresh();
+    rememberRouteFailure(PAIR, { now: 1 });
+    let busy = false;
+    const n = phone(OK, coded("refused"), () => { busy = true; return a; });
+    assert.equal(await run(n, { launch: true, installing: () => busy }), "unknown");
+    assert.equal(routeFailure().at, 1);
+  }
+});
+
 test("another VPN that came up before the second try stops it", async () => {
   fresh();
   let st = OK;
@@ -150,8 +161,9 @@ test("one at a time, and a page's check waits for it", async () => {
   await new Promise((r) => setTimeout(r, 5));
   assert.equal(verifies(n), 1);
   answer({ ok: true });
-  assert.equal(await first, "ok");
+  assert.equal(await first, "unknown", "the page's own check answers instead");
   await page;
+  assert.equal(routeFailure(), null);
   assert.equal(verifies(n), 2);
   assert.equal(paged, 0);
 });

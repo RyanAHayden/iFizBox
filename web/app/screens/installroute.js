@@ -198,6 +198,7 @@ export async function vpnTest(native, alert, store, { ended = () => {}, onPass =
   let usedNow = false;
   const before = lastStatus ?? await status(native);
   const first = Boolean(before) && !before.vpn?.tested; // not known: a later test, the pick stays
+  await quietRun; // F410b
   try { r = await within(call(native, "vpn.test"), TEST_MS); } catch (e) { err = e; }
   // the row says Connected under the alert: the status is marked tested before the row repaints (ended)
   if (r?.ok && lastStatus) lastStatus = { ...lastStatus, vpn: { ...(lastStatus.vpn ?? {}), tested: true } };
@@ -1030,7 +1031,7 @@ async function runQuietCheck(native, store, { launch = false, installing = () =>
     if (!quietCheckAllowed(choice(), again, { again: true }) || !clear()) return "unknown";
     err = await verify();
   }
-  if (choice() !== "iphone" || pairing || visit?.started || !visible()) return "unknown"; // changed or left meanwhile: not the pairing's answer
+  if (choice() !== "iphone" || !clear()) return "unknown"; // changed or left meanwhile: not the pairing's answer
   if (!err) { clearRouteFailure(storage); return "ok"; }
   const f = broken(err) ? routeFailureOf(err, st) : null;
   if (!f) return "unknown";

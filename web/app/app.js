@@ -38,7 +38,7 @@ import { showReloadBar } from "./nav/reloadbar.js";
 import { catalog } from "./catalog.js";
 import { createUpgradeNotices } from "./settings.js";
 import { createPrefsMirror } from "./settings.js";
-import { keepRoute, ROUTE_KEY } from "./core/installroute.js"; // B218
+import { keepRoute, ROUTE_KEY, routeFailure } from "./core/installroute.js"; // B218
 import { nativeBridge } from "./native.js";
 import { NAME } from "./brand.js";
 import { takeInstallParam, askFromInstallLink, launchRefresh } from "./websign-gate.js";
@@ -691,9 +691,11 @@ if (nativeBridge()) {
       soon = setTimeout(() => import("./signing/route.js").then((r) => {
         if (!visible()) return; // back again later
         const first = launch;
+        const kept = Boolean(routeFailure());
         launch = false;
         return quietPairingCheck(nativeBridge(), settingsScreen.settings, { launch: first, visible,
-          installing: () => r.installingNow() || Boolean(loadedScreen("queue")?.appQueueRunning()) });
+          installing: () => r.installingNow() || Boolean(loadedScreen("queue")?.appQueueRunning()) })
+          .then((did) => { if (first && kept && did === "off") launch = true; }); // couldn't run (another VPN, cellular): on coming back
       }).catch(() => {}), launch ? 5000 : 2000);
     };
     checkPairing();

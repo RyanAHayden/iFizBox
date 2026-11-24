@@ -234,3 +234,10 @@ _Said_: waiting for iFizBox
 _On screen_: Waiting for iFizBox
 _In code_: APP_WAIT, appWait, LocalVPN.pause
 _Avoid_: paused install, background wait
+
+**Quiet Pairing Check**:
+The background check of This iPhone's pairing that runs at most once a day, on Wi-Fi with no other VPN, and keeps a pairing failure as Home's Route Failure. It shows no alert, opens no page and never forgets a pairing.
+_Said_: quiet pairing check
+_On screen_: (none: only Home's red tile)
+_In code_: quietPairingCheck, quietCheckDue, quietCheckAllowed, ifizbox.quietPairingCheck
+_Avoid_: background verify, auto check
