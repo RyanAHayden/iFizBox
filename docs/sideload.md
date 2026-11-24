@@ -364,7 +364,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   where Shortcuts opens it on Add Shortcut; it reports only that the sheet closed, since Shortcuts never says it was added.
   `cellular.check` runs the Shortcut with `{"check":1}`, which touches no cellular data, and passes only when its Finish
   Cellular Installs ran in the app. The app judges a run by those actions, not by Shortcuts' callback
-  (`ifizbox://cellular-installs`), which only ends the wait. A failure answers `not_opened`, `not_run`, `no_end`,
+  (`ifizbox://cellular-installs`), whose error is only passed on as text. A failure answers `not_opened`, `not_run`, `no_end`,
   `no_return` or `busy` (`CellularShortcut.Verdict`). The bridge is refused in the jailbreak app and under any other bundle
   ID. Nothing on screen uses it yet.
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and

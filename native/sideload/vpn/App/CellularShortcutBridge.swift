@@ -15,7 +15,7 @@ enum CellularShortcutBridge {
     private static let host = "cellular-installs"
     private static let lock = NSLock()
     private static var runID: String? // guarded by lock: the run whose callback counts
-    private static var callback: (at: Date, error: String?)? // guarded by lock
+    private static var called = false, said: String? // guarded by lock: its callback came, and the last one's error
 
     static func register(_ b: Bridge) {
         b.on("cellular.status") { c in Apt.reply(c, status(), nil) }
@@ -66,20 +66,16 @@ enum CellularShortcutBridge {
     /// Blocking. error: nil when it passed.
     private static func check() -> (error: String?, text: String?) {
         guard CellularShortcut.begin(.check, vpnUp: false) else { return ("busy", nil) }
-        let t0 = Date()
         var verdict = open(.check)
-        var left = false, front: Date? // the app went behind Shortcuts; in front again since
+        var left = false, front = 0.0, elapsed = 0.0 // the app went behind Shortcuts; seconds in front again, and in all
         while verdict == .wait {
             Thread.sleep(forTimeInterval: 0.1)
-            if active() {
-                if left, front == nil { front = Date() }
-            } else { left = true; front = nil }
-            lock.lock(); let cb = callback; lock.unlock()
-            let now = Date()
-            verdict = CellularShortcut.verdict(CellularShortcut.report, elapsed: now.timeIntervalSince(t0), front: front.map { now.timeIntervalSince($0) },
-                                               callback: cb.map { (now.timeIntervalSince($0.at), $0.error) })
+            lock.lock(); let back = called, text = said; lock.unlock()
+            elapsed += 0.1
+            if !active() { left = true; front = 0 } else if left || back { front += 0.1 }
+            verdict = CellularShortcut.verdict(CellularShortcut.report, elapsed: elapsed, front: front, said: text)
         }
-        lock.lock(); runID = nil; callback = nil; lock.unlock()
+        lock.lock(); runID = nil; called = false; said = nil; lock.unlock()
         guard case .failed(let code, let text) = verdict else {
             UserDefaults.standard.set(true, forKey: addedKey)
             LocalVPN.log("\(CellularShortcut.shortcutName): check passed")
@@ -99,7 +95,7 @@ enum CellularShortcutBridge {
     /// Opens Shortcuts on the Shortcut. Blocking; .wait once it opened.
     private static func open(_ k: CellularShortcut.Kind) -> CellularShortcut.Verdict {
         let id = UUID().uuidString
-        lock.lock(); runID = id; callback = nil; lock.unlock()
+        lock.lock(); runID = id; called = false; said = nil; lock.unlock()
         guard let url = CellularShortcut.runURL(k, back: { "ifizbox://\(host)?id=\(id)&r=\($0)" }) else { return .failed("not_opened", nil) }
         // the page sees itself visible again a moment before iOS calls the app active, and refuses the open until then
         let t0 = Date()
@@ -120,7 +116,7 @@ enum CellularShortcutBridge {
         let v = { (k: String) in q.first { $0.name == k }?.value }
         let error: String? = v("r") == "ok" ? nil : v("errorMessage") ?? (v("r") == "cancel" ? "canceled" : "the Shortcut failed")
         lock.lock()
-        if let id = runID, v("id") == id, callback == nil { callback = (Date(), error) }
+        if let id = runID, v("id") == id { called = true; said = error }
         lock.unlock()
         return true
     }

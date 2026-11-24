@@ -47,18 +47,18 @@ C.opened(); C.finished()
 check(C.report?.ok == true, "on ok")
 check(C.begin(.run, vpnUp: true, now: Date() + C.settle + 1), "a run begins once it is over")
 
-// a check's verdict: the actions decide, the callback only ends the wait
-func v(opened: Bool = false, ended: Bool = false, _ elapsed: Double, front: Double? = nil, _ cb: (Double, String?)? = nil) -> C.Verdict {
+// a check's verdict: the actions decide; Shortcuts' callback is only told on
+func v(opened: Bool = false, ended: Bool = false, _ elapsed: Double, front: Double = 0, _ said: String? = nil) -> C.Verdict {
     let r = C.Report(kind: .check, opened: opened, turns: ended ? 1 : 0, finished: ended)
-    return C.verdict(r, elapsed: elapsed, front: front, callback: cb.map { (since: $0.0, error: $0.1) })
+    return C.verdict(r, elapsed: elapsed, front: front, said: said)
 }
 check(v(1) == .wait, "Shortcuts just opened")
 check(v(30) == .wait, "waiting for Allow")
-check(v(1, (0.5, "an earlier run's error")) == .wait, "an earlier run's error doesn't end it")
-check(v(opened: true, ended: true, 2, (1, "an earlier run's error")) == .ok, "nor fail it")
-check(v(5, (3, nil)) == .failed("not_run", nil), "Shortcuts' success without our actions is no success")
-check(v(5, front: 3, (3, "missing")) == .failed("not_run", "missing"), "a missing Shortcut")
-check(v(5, front: 3) == .failed("not_run", nil), "back by hand")
+check(v(30, "an earlier run's error") == .wait, "an earlier run's error doesn't end it")
+check(v(opened: true, ended: true, 2, front: 1, ("an earlier run's error")) == .ok, "nor fail it")
+check(v(5, front: 3, nil) == .failed("not_run", nil), "Shortcuts' success without our actions is no success")
+check(v(5, front: 3, "missing") == .failed("not_run", "missing"), "a missing Shortcut")
+check(v(5, front: 2.9) == .wait, "just back")
 check(v(opened: true, 5, front: 4) == .wait, "Open ran: still going")
 check(v(opened: true, 15, front: 10) == .failed("no_end", nil), "Open ran, no end")
 check(v(C.checkLimit) == .failed("no_return", nil), "nothing came back")

@@ -89,20 +89,20 @@ enum CellularShortcut {
     /// refused, an older one), no_end (it opened the app but didn't finish), no_return (nothing came back in time),
     /// busy (check's own). The text is what Shortcuts said.
     enum Verdict: Equatable { case wait, ok, failed(String, String?) }
-    /// After Shortcuts' callback, or back in front, for our own actions to say it runs.
+    /// Back in front, for our own actions to say it runs.
     static let grace: TimeInterval = 3
-    static let endLimit: TimeInterval = 10 // from a callback, or back in front, after Open ran, until Finish
+    static let endLimit: TimeInterval = 10 // back in front after Open ran, until Finish
     static let checkLimit: TimeInterval = 60 // the first run waits for the user's Allow
 
-    /// A check so far. Its own actions decide; Shortcuts' callback (seconds since it, its error) only ends the wait,
-    /// for iOS 27 gives a new run the error of the one before. `front`: seconds back in front after Shortcuts.
-    static func verdict(_ r: Report?, elapsed: TimeInterval, front: TimeInterval?, callback: (since: TimeInterval, error: String?)?) -> Verdict {
+    /// A check so far. Its own actions decide, for iOS 27 gives a new run the callback of the one before; `said`, that
+    /// callback's error, is only told on. `front`: seconds back in front after Shortcuts. Both count the time the
+    /// process ran, so a check that iOS suspended behind Shortcuts goes on from where it was.
+    static func verdict(_ r: Report?, elapsed: TimeInterval, front: TimeInterval, said: String?) -> Verdict {
         if r?.ok == true { return .ok }
-        let over = max(front ?? 0, callback?.since ?? 0)
         if r?.opened == true {
-            if over >= endLimit || elapsed >= checkLimit { return .failed("no_end", callback?.error) }
-        } else if over >= grace {
-            return .failed("not_run", callback?.error)
+            if front >= endLimit || elapsed >= checkLimit { return .failed("no_end", said) }
+        } else if front >= grace {
+            return .failed("not_run", said)
         } else if elapsed >= checkLimit {
             return .failed("no_return", nil)
         }

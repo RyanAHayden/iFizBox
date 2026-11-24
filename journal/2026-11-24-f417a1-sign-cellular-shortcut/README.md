@@ -41,3 +41,9 @@
 ## Gate
 - The first gate run failed only in `native/test_bridge_contract.py`: every Swift handler needs a caller in `web/app`.
   So `web/app/core/cellularshortcut.js` holds the three calls; F417b's screens use them.
+
+## Review
+- Fixed: Shortcuts' callback no longer ends a check (a stale one during Allow would have failed it). Only the time back
+  in front does, counted in the time the process ran (suspended time doesn't count); the last callback's error is kept
+  as text only. This replaces the 3 s callback grace above.
+- Kept: `cellular.status` and its `added`, which F417b's "adds the Shortcut first if it is not added yet" needs.
