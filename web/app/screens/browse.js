@@ -186,6 +186,11 @@ export function pageOf(route) {
   return { key: ALL, page: t.kind, value: t.value };
 }
 
+// B330: a tap queues; F392: a hold too, quietly. Also Installed's app pages (B417).
+export const packageNav = (route) => ({ title: DETAILS_TITLE,
+  right: { label: "Install", onClick: (e) => installTap(route, e.currentTarget).catch(() => {}),
+    onHold: (b) => installHold(route, b).catch(() => {}) } });
+
 export function nav(route, sourceName = () => null) {
   const p = pageOf(route);
   switch (p.page) {
@@ -203,9 +208,7 @@ export function nav(route, sourceName = () => null) {
     case "files": return { title: "Files", style: "plain" };
     case "depends": return { title: "Depends" }; // F402
     case "conflicts": return { title: "Conflicts" };
-    case "package": return { title: DETAILS_TITLE,
-      right: { label: "Install", onClick: (e) => installTap(route, e.currentTarget).catch(() => {}),
-        onHold: (b) => installHold(route, b).catch(() => {}) } }; // B330: a tap queues; F392: a hold too, quietly
+    case "package": return packageNav(route);
     case "versions": return { title: "Version" };
     case "addtweaks": return { title: "Add Tweaks", style: "plain" }; // F352
     default: return { title: "Not Found" };
@@ -1191,12 +1194,14 @@ function wishRow(id) {
 
 const httpUrl = (u) => (/^https?:\/\//i.test(String(u ?? "").trim()) ? String(u).trim() : null);
 
-async function renderPackage(body, route, key, id, ctx) {
-  body.append(placeholder("page"));
+// B417: `found`: the package when the caller has it already (installed.js renderInstalledApp), drawn without waiting for
+// a load to end. -> for an AltStore app, renderApp's handles.
+export async function renderPackage(body, route, key, id, ctx, { found = null } = {}) {
+  if (!found) body.append(placeholder("page"));
   let pkg, sources;
   try {
-    await catalog.ensure();
-    [pkg, sources] = await Promise.all([catalog.package(id, key), getBackend().sources()]);
+    if (!found) await catalog.ensure();
+    [pkg, sources] = await Promise.all([found ?? catalog.package(id, key), getBackend().sources()]);
   } catch (e) {
     body.replaceChildren(note(e.message));
     return;
@@ -1211,12 +1216,17 @@ async function renderPackage(body, route, key, id, ctx) {
     const altSrc = sources.find((s) => s.key === pkg.key);
     // F181: its Related tab is the same as a package's: the source's other apps in that category.
     // F350: the same Details layout.
-    const { tail } = renderApp(body, route, pkg, altSrc, { related: (pane) => relatedPane(pane, route, pkg, id) });
+    const drawn = renderApp(body, route, pkg, altSrc, { related: (pane) => relatedPane(pane, route, pkg, id) });
+    const { tail } = drawn;
     // F102 for apps: their nav button installs at once (no sheet to hold Wish List), so it's a row on the page.
     tail.append(wishRow(id));
     if (detectMode() === "jailbreak") installedAppGroup(st.ipa.bundleIdentifier).then((g) => { if (g && tail.isConnected) tail.append(g); });
-    rememberPackage(body, route, { id, pkg, source: altSrc, history: await catalog.history(id, key).catch(() => null) });
-    return;
+    const page = { id, pkg, source: altSrc, history: null };
+    if (found) { // B417: the nav button works before a load in progress answers with the history
+      rememberPackage(body, route, page);
+      catalog.history(id, key).then((h) => { const now = packagePages.get(format(route)); if (now?.body === body && now.pkg === pkg) now.history = h; }, () => {});
+    } else rememberPackage(body, route, { ...page, history: await catalog.history(id, key).catch(() => null) });
+    return drawn;
   }
   const sourceOf = (k) => sources.find((s) => s.key === k);
   const source = sourceOf(pkg.key);

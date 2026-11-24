@@ -458,6 +458,9 @@ export const catalog = {
     return freshLists(records, rows, { now })[kind] ?? [];
   },
   package: (id, key = ALL) => ask("package", [id, key]),
+  // B417: package() from what the worker has now, without waiting for a load (a refresh, the launch's) to end; null
+  // where it has none yet. Installed's rows open with it and ask package() for the answer that stands.
+  peekPackage: (id, key) => Promise.resolve().then(() => getParser().catalog("package", [id, key])).catch(() => null),
   shows: (id, key) => ask("shows", [id, key]), // B391: a source's featured banners
   history: (id, key = ALL) => ask("history", [id, key]), // F29: Version History (core/catalog.js history)
   altSource: (key) => ask("altSource", [key]),
