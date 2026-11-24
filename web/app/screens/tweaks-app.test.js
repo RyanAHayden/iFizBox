@@ -1,13 +1,16 @@
 // F302a: tweaks on the app side, screens/tweaks.js: the kept tweaks go with a plain install's signing.prepare (one log
-// line per tweak), the install popup offers them (its Tweaks pushes the Add Tweaks page), the app page's Add Tweaks row
+// line per tweak), Install queues at once with them, the app page's Add Tweaks row
 // counts them, Add to App greys App Store copies, an encrypted IPA picked in Files is flagged, and a newer .deb on a
 // Tweak Source is a tweak update.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { keptTweakParams, installTweaksChoice, addTweaksGroup, pushAddTweaksUntilBack, addTweaksAppName, addToApp, isEncrypted, markEncrypted, checkPickedIpa,
+import { keptTweakParams, addTweaksGroup, addToApp, isEncrypted, markEncrypted, checkPickedIpa,
   tweakUpdatesFor, updateTweaks, savedTweaks, saveTweaks, addDebTo, ENC_KEY, tweakUpdateApps, runTweakUpdates } from "./tweaks.js";
+import { appPageAction } from "./altstore.js";
+import { queueApp } from "./queue.js";
+import { createAppQueue } from "../core/appqueue.js";
 import { memoryIpaStore } from "../core/myipas.js";
 import { HOW_TO_GET_ONE } from "../core/tweaks.js";
 import { addTweakPill } from "./installed.js";
@@ -56,29 +59,22 @@ test("keptTweakParams: a plain install from a source takes the app's kept tweaks
   assert.equal(await keptTweakParams(same, { id: "library:x.ipa" }, { store }), same);
 });
 
-test("installTweaksChoice: no tweaks installs straight away; otherwise the popup says what goes in", async () => {
+test("Install on an app with kept tweaks queues at once and asks nothing; the kept tweaks go in with the job", async () => {
   const store = memStore();
-  let asked = 0;
-  assert.equal(await installTweaksChoice({ bundleId: "com.me.fixture", rows: async () => [], store, ask: async () => { asked++; return 1; } }), true);
-  assert.equal(asked, 0);
-  await saveTweaks("com.me.fixture", [{ name: "com.me.a_1.deb", data: new Uint8Array([1]), title: "YTLite" }, { name: "Plain.dylib", data: new Uint8Array([2]) }], { store });
-  const seen = [];
-  assert.equal(await installTweaksChoice({ bundleId: "com.me.fixture", name: "Tube", version: "1.2", rows: async () => [], store,
-    ask: async (o) => { seen.push(o); return 1; } }), true);
-  assert.equal(seen[0].title, "Tube 1.2\nwith YTLite and Plain");
-  assert.deepEqual(seen[0].buttons, ["Tweaks: 2", "Install"]);
-  // Tweaks opens the page, then the popup again; Cancel queues nothing
-  let opened = 0, n = 0;
-  assert.equal(await installTweaksChoice({ bundleId: "com.me.fixture", rows: async () => [], store, open: async () => { opened++; },
-    ask: async () => (n++ === 0 ? 0 : -1) }), false);
-  assert.equal(opened, 1);
-  // none added, some made for it (cached checks): Add Tweaks…
-  const s = storage();
-  s.setItem("ifizbox.tweakInfo", JSON.stringify({ "com.t.yt@2": { ok: true, bundles: ["com.x.tube"], anyApp: false } }));
-  const seen2 = [];
-  await installTweaksChoice({ bundleId: "com.x.tube", name: "Tube", rows: async () => [{ id: "com.t.yt", version: "2" }], store, storage: s,
-    ask: async (o) => { seen2.push(o); return 1; } });
-  assert.deepEqual(seen2[0].buttons, ["Add Tweaks…", "Install"]);
+  await addDebTo("com.x.tube", st({ version: "9" }), fx("tweak-xz.deb"), { store });
+  const pkg = { key: "alt:k", row: { id: "com.x.tube", name: "Tube" }, stanza: { kind: "ipa", ipa: { bundleIdentifier: "com.x.tube", name: "Tube",
+    sourceUrl: "https://s/", versions: [{ version: "2", downloadURL: "https://s/t.ipa", size: 2048 }] } } };
+  const q = createAppQueue();
+  const opened = [];
+  const add = (j, o) => queueApp(j, { ...o, open: (qq) => opened.push(qq) });
+  assert.equal(await appPageAction(pkg, null, { queue: q, add, mode: "sideload", ready: async () => true, store: async () => ({ all: async () => [] }),
+    ask: async () => assert.fail("no popup") }), true);
+  assert.ok(q.get("com.x.tube"));
+  assert.equal(opened.length, 1);
+  const p = await keptTweakParams({ url: "https://s/t.ipa" }, { id: "com.x.tube" }, { store, ellekit: async () => fx("ellekit.deb"), toBase64: (b) => `b64:${b.length}` });
+  assert.deepEqual(p.tweaks.names, ["com.me.fixture_9.deb"]);
+  const src = readFileSync(new URL("./tweaks.js", import.meta.url), "utf8");
+  assert.doesNotMatch(src, /installTweaksChoice|pushAddTweaksUntilBack|openAddTweaks|showPushedPage/);
 });
 
 test("the app page's Add Tweaks row counts the tweaks made for the app, then the ones added", () => withDoc(async () => {
@@ -94,34 +90,6 @@ test("the app page's Add Tweaks row counts the tweaks made for the app, then the
   await g.refresh();
   assert.equal(g.el.all("cell-detail")[0].textContent, "1 Added");
 }));
-
-test("the install popup's Tweaks pushes the Add Tweaks page and asks again once back; going elsewhere cancels", async () => {
-  // B374: the page under the app's page (addtweaks:<bundle id>), not a sheet of its own
-  const win = new EventTarget();
-  const loc = { hash: "#/sources/pkg:com.x.tube" };
-  const go = (h) => { loc.hash = h; win.dispatchEvent(new Event("hashchange")); };
-  const back = pushAddTweaksUntilBack("com.x.tube", { name: "Tube", loc, win });
-  assert.equal(loc.hash, "#/sources/pkg:com.x.tube/addtweaks%3Acom.x.tube");
-  win.dispatchEvent(new Event("hashchange"));
-  go(`${loc.hash}/pkg:com.t.yt`); // a tweak's page above it: still waiting
-  go("#/sources/pkg:com.x.tube/addtweaks%3Acom.x.tube");
-  go("#/sources/pkg:com.x.tube");
-  assert.equal(await back, true);
-  assert.equal(addTweaksAppName("com.x.tube"), "Tube");
-  const away = pushAddTweaksUntilBack("com.x.tube", { loc, win });
-  go("#/installed");
-  assert.equal(await away, false);
-
-  // the popup: the default opener pushes; back -> asked again, elsewhere -> nothing installed
-  const store = memStore();
-  await saveTweaks("com.x.tube", [{ name: "Plain.dylib", data: new Uint8Array([2]) }], { store });
-  let asks = 0;
-  assert.equal(await installTweaksChoice({ bundleId: "com.x.tube", rows: async () => [], store, open: async () => false,
-    ask: async () => { asks++; return 0; } }), false);
-  assert.equal(asks, 1, "not asked again over another page");
-  const src = readFileSync(new URL("./tweaks.js", import.meta.url), "utf8");
-  assert.doesNotMatch(src, /openAddTweaks|showPushedPage/, "the old Add Tweaks sheet is gone");
-});
 
 test("Add to App: an App Store copy is listed under Can't Take Tweaks, not offered", async () => {
   const s = storage();

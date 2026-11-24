@@ -22,7 +22,7 @@ import { prepareTweaks, tweakProblem, tweakKind, TWEAK_ACCEPT, ELLEKIT, checkEll
 import { inspectTweakDeb, targetsApp, worksInText, TWEAK_LIMIT, UnpackError } from "../core/tweaks.js"; // F302
 import { isLibraryStanza, LIBRARY_WHY } from "../core/tweaks.js"; // B185
 import { detectMode } from "../core/settings.js"; // F302
-import { debOf, tweakTitle, withTweaksText, tweakSteps, madeFor, tweakUpdates, ipaEncrypted, ENCRYPTED_ALERT, HOW_TO_GET_ONE,
+import { debOf, tweakTitle, tweakSteps, madeFor, tweakUpdates, ipaEncrypted, ENCRYPTED_ALERT, HOW_TO_GET_ONE,
   HOW_TO_TEXT, tweakParams } from "../core/tweaks.js"; // F302a
 import { BUNDLE_ID } from "../brand.js"; // F302a
 import { indexSource, entryInfo, guessEntry, liteTweaks, worksInLine, dropsFromCatalog } from "../core/tweakindex.js"; // F344
@@ -792,9 +792,6 @@ export function pickSourceTweak({ bundleId, onPick, rows = sourceTweakRows, pkg 
 //
 //   addTweaksGroup({ bundleId, name })      the app page's group right under its header (Install): "Add Tweaks", the
 //                                           count made for this app (cached checks) or of those added; opens the page
-//   await installTweaksChoice({ … })        the install popup before an app is queued: "<app> <version>" and what goes in,
-//                                           "Tweaks: N" (or "Add Tweaks…": pushes the Add Tweaks page, asks again after
-//                                           back), Install. true: install, false: cancelled
 //   await keptTweakParams(params, job)      signing.prepare's params with the app's kept tweaks (prepared, ElleKit when
 //                                           needed), one log line per tweak; so updates from a source keep the tweaks
 //   await tweakUpdatesFor(bundleId)         the kept .debs a Tweak Source has newer: [{ package, title, from, to, row }]
@@ -1253,45 +1250,6 @@ export function addTweaksGroup({ bundleId, name = "", rows = sourceTweakRows, st
 
 // F305a: Add Tweaks' Search All Repos (screens/findmore.js, loaded when tapped so this module doesn't pull it in).
 export const openSearchAllRepos = (o) => import("./findmore.js").then((m) => m.searchAllRepos(o));
-
-// The install popup's Tweaks / Add Tweaks… (B374): the Add Tweaks page pushed under the page shown now (the app's page),
-// as its Details' row does; resolves true once back on that page, false when the viewer went elsewhere (another tab,
-// a link) so the popup isn't shown again over another page.
-export function pushAddTweaksUntilBack(bundleId, { name = "", loc = globalThis.location, win = globalThis } = {}) {
-  if (bundleId && name) appNames.set(bundleId, name);
-  const trim = (h) => String(h ?? "").replace(/\/$/, "");
-  const from = trim(loc.hash);
-  return new Promise((resolve) => {
-    const on = () => {
-      const h = trim(loc.hash);
-      if (h.startsWith(`${from}/`)) return; // the Add Tweaks page, or a tweak's page above it
-      win.removeEventListener?.("hashchange", on);
-      resolve(h === from);
-    };
-    win.addEventListener?.("hashchange", on);
-    pushAddTweaks(bundleId, loc);
-  });
-}
-
-// The install popup (the app page's Install in the sideload build): shown when the app has tweaks added or made for
-// it, so they're offered on install; an app nobody made a tweak for installs straight away as before. Tweaks pushes
-// the Add Tweaks page; back on the app's page the popup asks again with what was added.
-export async function installTweaksChoice({ bundleId, name = "", version = "", ask = showActionSheet,
-  open = (o) => pushAddTweaksUntilBack(o.bundleId, { name: o.name }),
-  rows = sourceTweakRows, store = tweakStore, storage } = {}) {
-  if (!bundleId) return true;
-  const made = await madeForRows(bundleId, { rows, storage }).catch(() => []);
-  for (;;) {
-    const kept = await savedTweaks(bundleId, { store });
-    if (!kept.length && !made.length) return true;
-    const what = kept.length ? withTweaksText(kept.map(tweakTitle)) : `${made.length} ${made.length === 1 ? "tweak" : "tweaks"} made for it, none added`;
-    const i = await ask({ title: `${[name, version].filter(Boolean).join(" ")}\n${what}`,
-      buttons: [kept.length ? `Tweaks: ${kept.length}` : "Add Tweaks…", "Install"] });
-    if (i === 1) return true;
-    if (i !== 0) return false;
-    if ((await open({ bundleId, name, rows, store, storage })) === false) return false;
-  }
-}
 
 // Installed's pill after a row's subtitle: "2 Tweaks", or "Tweak Update" (up).
 export function tweakPill(text, { up = false } = {}) {
