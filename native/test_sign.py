@@ -8,6 +8,7 @@ import io
 import os
 import plistlib
 import random
+import re
 import shutil
 import struct
 import subprocess
@@ -243,6 +244,10 @@ class OnDeviceSigner(unittest.TestCase):
         w("other.der", other.public_bytes(der))
         cls.profile = T.profile(key, cert)
         w("profile.mobileprovision", cls.profile)
+        # B413: what an all-capabilities profile has (the fixture's CMS isn't checked, so its plist is replaced)
+        w("profile-dataprotection.mobileprovision", re.sub(
+            rb"<key>Entitlements</key>\s*<dict>", rb"\g<0><key>com.apple.developer.default-data-protection</key>"
+            rb"<string>NSFileProtectionComplete</string>", cls.profile, count=1))
         w("profile-explicit.mobileprovision", T.profile(key, cert, app_id="com.me.fixture"))
         w("profile-prefix.mobileprovision", T.profile(key, cert, app_id="com.me.*"))
         w("profile-expired.mobileprovision", T.profile(key, cert, days=-1))

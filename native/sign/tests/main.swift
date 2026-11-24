@@ -971,6 +971,47 @@ test("B211: group fix") {
     check(app.stamp.isStale(against: other) && !own.stamp.isStale(against: other), "a new dylib: only apps with the fix")
 }
 
+// B413: the profile's default data protection only for an app (or extension) whose original signature asked for it
+test("B413: data protection") {
+    let key = Profile.dataProtectionKey, complete = "NSFileProtectionComplete"
+    let until = "NSFileProtectionCompleteUntilFirstUserAuthentication"
+    let p = try Profile(try fixture("profile-dataprotection.mobileprovision"))
+    check(p.entitlements[key] as? String == complete, "the fixture profile has it")
+    check(p.originalDataProtection([key: complete, "application-identifier": "\(team).a.b"], signedBefore: false) == nil, "the profile's own team")
+    check(p.originalDataProtection([key: until], signedBefore: false) == until && p.originalDataProtection([key: until], signedBefore: true) == nil, "signed before")
+    check(p.entitlements(for: "a.b", dataProtection: complete)[key] as? String == complete && p.entitlements(for: "a.b")[key] == nil, "kept or left out")
+    // Signs rich.ipa, its executables signed first with their own value (nil: none); returns each one's signed value.
+    func signed(app: String?, ext: String?, before: Bool = false) throws -> [String?] {
+        let src = try ZipReader(url: fixtures.appendingPathComponent("rich.ipa"))
+        let url = work.appendingPathComponent("dataprotection-in.ipa"), out = work.appendingPathComponent("dataprotection-out.ipa")
+        try? FileManager.default.removeItem(at: url)
+        try? FileManager.default.removeItem(at: out)
+        let exes = src.entries.map { $0.name }.filter { $0 == "Payload/Fixture.app/Fixture" || $0.hasSuffix(".appex/Share") }
+        check(exes.count == 2, "an app and an extension: \(src.entries.map { $0.name })")
+        let w = try ZipWriter(url: url)
+        for e in src.entries {
+            var d = try src.data(e)
+            if exes.contains(e.name) {
+                var ents: [String: Any] = ["application-identifier": "OLDTEAM.dev.ifizbox.fixture"]
+                if let v = e.name.hasSuffix(".app/Fixture") ? app : ext { ents[key] = v }
+                d = try MachO.sign(d, CodeSignParams(identifier: "x", team: "OLDTEAM", entitlements: ents), identity)
+            }
+            try w.add(e.name, d, mode: e.unixMode)
+        }
+        if before { try w.add("Payload/Fixture.app/" + GroupFix.configPath, Data("{}".utf8), mode: 0o100644) }
+        w.close()
+        _ = try IPASigner(profile: p, identity: identity).sign(url, to: out)
+        let f = try entries(out)
+        func value(_ n: String?) -> String? { n.flatMap { f[$0] }.flatMap { Inspect.entitlements($0) }?[key] as? String }
+        return [value(exes.first { $0.hasSuffix(".app/Fixture") }), value(exes.first { !$0.hasSuffix(".app/Fixture") })]
+    }
+    check(try signed(app: nil, ext: nil) == [nil, nil], "no original value")
+    check(try signed(app: until, ext: until) == [nil, nil], "UntilFirstUserAuthentication, which the profile doesn't allow")
+    check(try signed(app: complete, ext: nil) == [complete, nil], "Complete, the app only")
+    check(try signed(app: nil, ext: complete) == [nil, complete], "Complete, the extension only")
+    check(try signed(app: complete, ext: complete, before: true) == [nil, nil], "signed here before")
+}
+
 // B259: Needs Re-sign's signer stamp on records and My IPAs' signed copies
 test("B259: signer stamp") {
     let cur = SignerStamp.now
