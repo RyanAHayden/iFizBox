@@ -72,9 +72,9 @@ export const bridge = (native) => {
   return loggedBridge(n); // F361: each sign and install kept in Console Logs as it goes
 };
 
-// The shell (native CloseForUpdate) closes iFizBox only once iOS has fetched the whole new IPA from the Signing
+// The shell (native CloseForUpdate) closes iFizBox only once iOS has begun to download the new IPA from the Signing
 // Server; signing.selfUpdate streams how far it is. The locked page (lockSelfUpdate) gets a line a step, and when iOS
-// never took the update (notStarted, stalled) its buttons back with Try Again (`retry`). An older shell, without the
+// never took the update (notStarted) its buttons back with Try Again (`retry`). An older shell, without the
 // call, leaves the page as B49 does. -> the last state, or null.
 export const storageOf = () => { try { return globalThis.localStorage ?? null; } catch { return null; } };
 

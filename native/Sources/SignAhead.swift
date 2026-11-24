@@ -294,8 +294,7 @@ enum SignAhead {
                 return
             }
             if let host = servers.host {
-                log("Uploading to \(host)/sign/host (\(k.app.name) replaces this app, so iOS installs it from the server)")
-                Sideload.hostAndOpen(k.output, server: host, app: k.app, record: k.record, job: job, opened: opened, served: nil)
+                Sideload.hostAndOpen(k.output, server: host, app: k.app, record: k.record, job: job, log: log, opened: opened, served: nil)
                 return
             }
             Sideload.serveAndOpen(k.output, server: servers.manifest, app: k.app, record: k.record, log: log, job: job, opened: opened, served: nil)

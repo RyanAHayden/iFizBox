@@ -834,21 +834,21 @@ import { d1 } from "./src/d1-sqlite.js";
   let r = await at("/sign/host?bundleid=com.ryha.ifizbox&version=0.9.9&title=iFizBox", { method: "POST", body: big, headers: { "Content-Length": String(big.length) } });
   const tok = /\/sign\/host\/([0-9a-f]{48})\//.exec((await r.json()).manifest)[1];
   const status = async () => (await at(`/sign/host/${tok}/status`)).json();
-  assert.deepEqual(await status(), { manifest: false, started: false, finished: false });
+  assert.deepEqual(await status(), { manifest: false, asked: false, started: false, finished: false });
   // KV shows the IPA only after a moment: the manifest waits for it instead of a 404
   lag.add(tok);
   setTimeout(() => lag.delete(tok), 40);
   r = await at(`/sign/host/${tok}/manifest.plist`);
   assert.equal(r.status, 200);
   assert.match(await r.text(), /<string>0\.9\.9<\/string>/);
-  assert.deepEqual(await status(), { manifest: true, started: false, finished: false });
+  assert.deepEqual(await status(), { manifest: true, asked: false, started: false, finished: false });
   // HEAD and a Range short of the end start nothing / finish nothing
   assert.equal((await at(`/sign/host/${tok}/app.ipa`, { method: "HEAD" })).headers.get("Content-Length"), String(big.length));
-  assert.deepEqual(await status(), { manifest: true, started: false, finished: false });
+  assert.deepEqual(await status(), { manifest: true, asked: true, started: false, finished: false });
   r = await at(`/sign/host/${tok}/app.ipa`, { headers: { Range: "bytes=0-9" } });
   assert.equal(r.status, 206);
   assert.equal((await r.arrayBuffer()).byteLength, 10);
-  assert.deepEqual(await status(), { manifest: true, started: true, finished: false });
+  assert.deepEqual(await status(), { manifest: true, asked: true, started: true, finished: false });
   // app.ipa, lagging too, waits, then streams whole: finished only once its last byte is handed over
   lag.add(tok);
   setTimeout(() => lag.delete(tok), 40);
@@ -862,17 +862,17 @@ import { d1 } from "./src/d1-sqlite.js";
   for (let c = await reader.read(); !c.done; c = await reader.read()) { got += c.value.byteLength; last = c.value[c.value.byteLength - 1]; }
   assert.equal(got, big.length);
   assert.equal(last, 9);
-  assert.deepEqual(await status(), { manifest: true, started: true, finished: true });
-  // asked again: no more writes (3 marks in all)
+  assert.deepEqual(await status(), { manifest: true, asked: true, started: true, finished: true });
+  // asked again: no more writes (4 marks in all, a key each)
   await (await at(`/sign/host/${tok}/app.ipa`)).arrayBuffer();
   await (await at(`/sign/host/${tok}/manifest.plist`)).text();
-  assert.equal(writes.filter((k) => k.endsWith(".ios")).length, 3);
+  assert.equal(writes.filter((k) => /\.ios\./.test(k)).length, 4);
   // a link KV never shows: 404 once the wait is over
   const t0 = Date.now();
   assert.equal((await at(`/sign/host/${"e".repeat(48)}/manifest.plist`)).status, 404);
   assert.ok(Date.now() - t0 >= 0.02 * 6000 - 40, "it looked again before the 404");
   assert.equal((await at(`/sign/host/${"e".repeat(48)}/app.ipa`)).status, 404);
-  assert.deepEqual(await (await at(`/sign/host/${"e".repeat(48)}/status`)).json(), { manifest: false, started: false, finished: false });
+  assert.deepEqual(await (await at(`/sign/host/${"e".repeat(48)}/status`)).json(), { manifest: false, asked: false, started: false, finished: false });
   console.log("worker host status: ok");
 }
 
@@ -889,10 +889,10 @@ import { d1 } from "./src/d1-sqlite.js";
   const tok = /\/sign\/host\/([0-9a-f]{48})\//.exec((await r.json()).manifest)[1];
   r = await at(`/sign/host/${tok}/app.ipa`, { headers: { Range: "bytes=0-9" } });
   await r.arrayBuffer();
-  assert.equal(kept.length, 0, "a Range short of the end marks nothing finished");
+  assert.equal(kept.length, 1, "a Range short of the end: asked only, nothing finished");
   r = await at(`/sign/host/${tok}/app.ipa`);
   assert.equal((await r.arrayBuffer()).byteLength, big.length);
-  assert.equal(kept.length, 1, "the finished mark is kept alive past the response");
+  assert.equal(kept.length, 3, "asked again, and the finished mark, are kept alive past the response");
   await Promise.all(kept);
   assert.equal((await (await at(`/sign/host/${tok}/status`)).json()).finished, true);
   console.log("worker host finished mark kept: ok");
@@ -922,7 +922,7 @@ import { d1 } from "./src/d1-sqlite.js";
     assert.equal(got.length, big.length);
     assert.ok(got[0] === 0x50 && got[P - 1] === 7 && got[P] === 8 && got[big.length - 1] === 9);
     await Promise.all(kept);
-    assert.deepEqual(await (await at(`/sign/host/${tok}/status`)).json(), { manifest: true, started: true, finished: true });
+    assert.deepEqual(await (await at(`/sign/host/${tok}/status`)).json(), { manifest: true, asked: true, started: true, finished: true });
   };
   // in parts
   let r = await at(q + "&size=" + big.length, { method: "POST" });

@@ -110,6 +110,8 @@ export const CLOSING_LABEL = `Closing ${NAME}`;
 // B123: the locked finish button while iOS hasn't got the whole new IPA yet (iOS's prompt up, or its download going):
 // CLOSING_LABEL only once the shell says it is closing (signing.selfUpdate finished or guessed).
 export const WAITING_LABEL = "Waiting for iOS";
+// B394: the page's title meanwhile (not "Complete": iOS hasn't installed it), and once it unlocks with Try Again.
+export const UPDATING_TITLE = "Updating", NOT_YET_TITLE = "Not Updated Yet";
 // B123: how long after "Closing" the page waits for iFizBox to be gone before it says to close it by hand (the
 // shell exits 3 s after finished, 8 s after guessed).
 export const CLOSE_GRACE = 20_000;
@@ -436,7 +438,7 @@ const lockedPages = new WeakMap();
 export function lockSelfUpdate(h, { later = setTimeout, label = CLOSING_LABEL } = {}) {
   if (typeof h?.finish === "function") {
     h.set?.("Done");
-    h.finish({ label, status: "Done", locked: true });
+    h.finish({ label, status: "Done", ...(label === WAITING_LABEL ? { title: UPDATING_TITLE } : {}), locked: true });
     return true;
   }
   later(() => (h?.done ? h.done("Done") : h?.hide?.()), 1200);

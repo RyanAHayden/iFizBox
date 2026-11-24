@@ -52,7 +52,7 @@
 // leaves the queue. Failed stays for a refusal seen while iFizBox stayed in front (iOS never fetched the IPA).
 //   rowStatus(row, { locale, timeZone }) -> the row's grey line ("Downloading 12.0 of 48.0 MB", "Tap Install on the
 //                              iOS prompt", "Re-signed, expires Dec 3, 2026")
-//   summaryLine(rows)          -> "2 installed, 1 re-signed, 1 failed, 1 cancelled"
+//   summaryLine(rows)          -> "1 sent to iOS" (iFizBox's own, B394), "2 installed, 1 re-signed, 1 failed, 1 cancelled"
 //   runStatus(rows) / runPercent(rows)   the bottom status and bar
 //   rowProgress(row) / barOf(row)  B152: a row's place in its whole run (stage weights) / the row bar's fill: row.progress,
 //                              which never goes backwards within one try (a retry or a fresh signing starts it again)
@@ -646,10 +646,13 @@ export function rowStatus(row, opts = {}) {
 
 export function summaryLine(rows) {
   const n = (f) => rows.filter(f).length;
+  // B394: iFizBox's own IPA handed to iOS isn't installed yet: iOS has to accept and download it first
+  const sent = (r) => r.state === "installed" && r.unsure && isSelf(r);
   const parts = [
-    [n((r) => r.state === "installed" && r.mode !== "resign" && r.mode !== "remove"), "installed"],
+    [n((r) => r.state === "installed" && r.mode !== "resign" && r.mode !== "remove" && !sent(r)), "installed"],
+    [n(sent), "sent to iOS"],
     [n((r) => r.state === "installed" && r.mode === "remove"), "removed"],
-    [n((r) => r.state === "installed" && r.mode === "resign"), "re-signed"],
+    [n((r) => r.state === "installed" && r.mode === "resign" && !sent(r)), "re-signed"],
     [n((r) => r.state === "failed"), "failed"],
     [n((r) => r.state === "cancelled"), "cancelled"],
   ].filter(([c]) => c);

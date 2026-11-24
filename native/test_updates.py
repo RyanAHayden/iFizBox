@@ -146,7 +146,7 @@ class Wiring(unittest.TestCase):
         host = side[side.index("static func hostAndOpen"):]
         host = host[:host.index("\n    }\n")]
         self.assertNotIn("askToNotify", host)
-        self.assertIn("UIApplication.shared.open(link)", host)
+        self.assertIn("UIApplication.shared.open(h.link)", host)
         self.assertIn("afterPrompt(status: status, app: app)", host)
         self.assertIn("UpdateCheck.without(", self.src)
         self.assertIn("UpdateCheck.handedOff(", self.src)
