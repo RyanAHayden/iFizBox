@@ -1,6 +1,6 @@
 // R87 probe: at each launch records (to os_log and to Documents/ryprobe.log once writable) whether the app's
 // preferences can be read, the protection class of the container's files, and a keychain read status.
-// Loaded as a dependency of CydiaSubstrate (see prep.py), so it runs before the app's own code.
+// Loaded as a dependency of CydiaSubstrate (see ../2026-11-23-b390-ryukgram/prep.py), so it runs before the app's own code.
 #import <Foundation/Foundation.h>
 #import <Security/Security.h>
 #import <UIKit/UIKit.h>
