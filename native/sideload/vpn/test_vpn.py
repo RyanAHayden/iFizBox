@@ -190,7 +190,9 @@ class App(unittest.TestCase):
         stop = src[src.index("private static func stopLater()"):src.index("private static func stopNow(")]
         self.assertLess(stop.index("BackgroundHold("), stop.index("asyncAfter"))
         # every stop: idle, checked again under startLock
-        self.assertEqual(src.count("stopVPNTunnel()"), 1)
+        self.assertEqual(src.count("stopVPNTunnel()"), 2)  # downIfIdle's and giveBack's
+        give = src[src.index("private static func giveBack("):src.index("private static func giveBackLater(")]
+        self.assertLess(give.index("guard idle() else"), give.index("stopVPNTunnel()"))
         down = src[src.index("private static func downIfIdle("):src.index("static let beatEvery")]
         self.assertLess(down.index("startLock.lock()"), down.index("guard let m = m, idle(), !["))
         self.assertIn("LocalVPN.takeDownLeftOver()", src[src.index("static func register("):])
