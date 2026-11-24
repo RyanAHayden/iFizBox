@@ -70,8 +70,11 @@ struct Profile {
     // by all of them. Items go to the first group, the app's alone, under any profile or certificate of the same
     // team; TEAM.<App ID> stays second for items an earlier signature put there. The website's signer does the same
     // (core/websign.js keychainGroups).
-    func entitlements(for bundleID: String, keptID: String? = nil) -> [String: Any] {
+    // dataProtection: the bundle's own default-data-protection (originalDataProtection); the profile's is left out
+    // unless it's the same.
+    func entitlements(for bundleID: String, keptID: String? = nil, dataProtection: String? = nil) -> [String: Any] {
         var e = entitlements
+        if dataProtection == nil || e[Profile.dataProtectionKey] as? String != dataProtection { e[Profile.dataProtectionKey] = nil }
         let t = e["com.apple.developer.team-identifier"] as? String ?? team
         if !t.isEmpty {
             e["application-identifier"] = "\(t).\(bundleID)"
@@ -81,6 +84,20 @@ struct Profile {
         }
         e["get-task-allow"] = false
         return e
+    }
+
+    // B413: a profile with every capability gives NSFileProtectionComplete, and an app that didn't ask for it can't read
+    // its own preferences and files when it's launched in the background on a locked phone.
+    static let dataProtectionKey = "com.apple.developer.default-data-protection"
+
+    // The default-data-protection a bundle's original signature asked for, or nil. An executable signed here before
+    // (signedBefore: the app carries a group fix config) or under the profile's own team carries what that profile
+    // gave it, not what the app asked for. The same rule as core/websign.js originalDataProtection.
+    func originalDataProtection(_ original: [String: Any]?, signedBefore: Bool) -> String? {
+        guard let o = original, !signedBefore else { return nil }
+        let appID = o["application-identifier"] as? String ?? ""
+        if !team.isEmpty && (o["com.apple.developer.team-identifier"] as? String == team || appID.hasPrefix(team + ".")) { return nil }
+        return o[Profile.dataProtectionKey] as? String
     }
 
     // [TEAM.keptID, TEAM.bundleID] (once when they're the same), the first only when the profile's groups allow it.

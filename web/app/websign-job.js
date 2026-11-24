@@ -18,7 +18,7 @@
 // groupFix (B211): the fix dylib's bytes (vendor/groupfix, signing-worker.js loads it); an app whose original
 // signature names app groups or keychain groups gets it injected (core/groupfix.js), iFizBox's own IPA never.
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { isZip, profileInfo, signingIds, appEntitlements, plistXml, identityPlist, zsignArgs, zsignError, appInfo,
+import { isZip, profileInfo, signingIds, appEntitlements, originalDataProtection, plistXml, identityPlist, zsignArgs, zsignError, appInfo,
   IFIZBOX_ID, IDENTITY_FILE, TRANSFER_FILE } from "./core/websign.js";
 import { webSignerStamp, groupFixHash, signatureEnd } from "./core/websign.js"; // F342
 import { injectInto } from "./core/tweaks.js";
@@ -101,7 +101,10 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
 
   FS.writeFile("/w/key.p12", new Uint8Array(p12));
   FS.writeFile("/w/app.mobileprovision", new Uint8Array(profile));
-  const ents = appEntitlements(prof, entitlementsId, bundleId);
+  let previous = null, signedBefore = false;
+  try { const c = FS.readFile(`${appDir}/${GROUPFIX.config}`); signedBefore = true; previous = readConfig(c); } catch { /* first sign */ }
+  const original = fileEntitlements(FS, `${appDir}/${plist.CFBundleExecutable || ""}`);
+  const ents = appEntitlements(prof, entitlementsId, bundleId, originalDataProtection(original, prof, signedBefore)); // B413
   FS.writeFile("/w/ents.plist", plistXml(ents));
   if (bring && own === IFIZBOX_ID) {
     if (bring.identity) FS.writeFile(`${appDir}/${IDENTITY_FILE}`, identityPlist({ p12, password, profile }));
@@ -112,15 +115,13 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   }
   // B211: the original signature's app groups and keychain groups, read before signing, decide whether the app gets
   // the group fix (core/groupfix.js); never iFizBox's own IPA.
-  let previous = null;
-  try { previous = readConfig(FS.readFile(`${appDir}/${GROUPFIX.config}`)); } catch { /* first sign */ }
   const plan = groupFix?.length && own !== IFIZBOX_ID
-    ? groupFixPlan(fileEntitlements(FS, `${appDir}/${plist.CFBundleExecutable || ""}`), prof.entitlements, previous, ents["keychain-access-groups"]) : null;
+    ? groupFixPlan(original, prof.entitlements, previous, ents["keychain-access-groups"]) : null;
   const all = withGroupFix(tweaks, plan, groupFix);
   // B327: the keychain groups and the group fix this sign used (or why none), the app's signer's words
   // (a plan made without the dylib only to tell "nothing to fix" from "left unmapped", as the app's signer does)
   const wanted = plan ?? (own !== IFIZBOX_ID && !groupFix?.length
-    ? groupFixPlan(fileEntitlements(FS, `${appDir}/${plist.CFBundleExecutable || ""}`), prof.entitlements, previous, ents["keychain-access-groups"]) : null);
+    ? groupFixPlan(original, prof.entitlements, previous, ents["keychain-access-groups"]) : null);
   const signLog = [keychainLogLine(ents), groupFixLogLine(plan,
     own === IFIZBOX_ID ? `${NAME}'s own IPA` : wanted ? "no fix dylib was loaded, the app's groups go unmapped" : undefined)];
   // F288: tweaks (core/tweaks.js prepareTweaks, done on the page): their files into the app, and the weak load commands

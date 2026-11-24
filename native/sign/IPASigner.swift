@@ -248,6 +248,7 @@ final class IPASigner {
         var groupFix: String? = nil // B259: kept in the record's SignerStamp
         // B327: every sign logs the keychain groups the app gets and the group fix it got (or why none), so a report of
         // an app that lost its data can be read from Console Logs
+        let signedBefore = files[appDir + GroupFix.configPath] != nil // B413: before the fix goes in below
         let appEnts = profile.entitlements(for: entID, keptID: keep ? newID : nil)
         log(Profile.keychainLine(appEnts))
         if oldID == SignOptions.selfBundleID {
@@ -337,12 +338,15 @@ final class IPASigner {
             if let exe = exe {
                 guard files[exe] != nil else { throw SignError("bad_ipa", "\(exe.dropFirst(appDir.count)) is missing.") }
                 var data = fixed(exe, try contents(exe, files, zip))
+                // B413: each bundle's own original signature says whether it gets the profile's data protection
+                let dataProtection = isApp ? profile.originalDataProtection(Inspect.entitlements(data), signedBefore: signedBefore) : nil
                 if dir == appDir, let t = tweaks, !t.inject.isEmpty { // F288
                     (data, injected) = try MachOEdit.inject(data, t.inject)
                     for i in injected { log("Injected \(i)") }
                 }
                 let params = CodeSignParams(identifier: id, team: profile.team,
-                                            entitlements: isApp ? profile.entitlements(for: keep || id == newID ? entID : id, keptID: keep ? newID : nil) : nil,
+                                            entitlements: isApp ? profile.entitlements(for: keep || id == newID ? entID : id, keptID: keep ? newID : nil,
+                                                                                         dataProtection: dataProtection) : nil,
                                             infoPlist: infoData, codeResources: resources)
                 let m = mode(exe, files)
                 files[exe] = try hold(try MachO.sign(consume data, params, identity, time: time), mode: m, sealed: dir != appDir)

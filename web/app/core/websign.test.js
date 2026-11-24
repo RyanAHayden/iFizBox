@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { profileInfo, targetBundleId, appEntitlements, keychainGroups, plistXml, identityPlist, zsignArgs, zsignError, appInfo, isZip } from "./websign.js";
+import { profileInfo, targetBundleId, appEntitlements, originalDataProtection, keychainGroups, plistXml, identityPlist, zsignArgs, zsignError, appInfo, isZip } from "./websign.js";
 import { parsePlist } from "./signing.js";
 
 const fx = (n) => new Uint8Array(readFileSync(new URL(`./fixtures/signing/${n}`, import.meta.url)));
@@ -27,6 +27,24 @@ test("entitlements narrowed to the app, never debuggable", () => {
   const e = appEntitlements({ teamId: "T1", entitlements: { "application-identifier": "T1.*", "keychain-access-groups": ["T1.*"], "get-task-allow": true, "aps-environment": "development" } }, "com.you.delta");
   assert.deepEqual(e, { "application-identifier": "T1.com.you.delta", "keychain-access-groups": ["T1.com.you.delta"], "get-task-allow": false, "aps-environment": "development" });
   assert.equal(appEntitlements({ entitlements: { "com.apple.developer.team-identifier": "T2" } }, "a.b")["application-identifier"], "T2.a.b");
+});
+
+test("appEntitlements (B413): the profile's data protection only when the app's original signature asked for the same", () => {
+  const K = "com.apple.developer.default-data-protection";
+  const prof = { teamId: "T", entitlements: { "application-identifier": "T.*", [K]: "NSFileProtectionComplete" } };
+  const COMPLETE = "NSFileProtectionComplete", UNTIL = "NSFileProtectionCompleteUntilFirstUserAuthentication";
+  const signed = (original, before = false, p = prof) => appEntitlements(p, "a.b", "a.b", originalDataProtection(original, p, before))[K];
+  const app = (v) => ({ "application-identifier": "OLD.a.b", ...(v ? { [K]: v } : {}) });
+  assert.equal(signed(null), undefined, "unsigned");
+  assert.equal(signed(app()), undefined, "no original value");
+  assert.equal(signed(app(UNTIL)), undefined, "the profile doesn't allow UntilFirstUserAuthentication");
+  assert.equal(signed(app(COMPLETE)), COMPLETE);
+  const until = { teamId: "T", entitlements: { [K]: UNTIL } };
+  assert.equal(signed(app(UNTIL), false, until), UNTIL);
+  assert.equal(signed(app(COMPLETE), false, until), undefined);
+  assert.equal(signed(app(COMPLETE), false, { teamId: "T", entitlements: {} }), undefined, "a profile without it");
+  assert.equal(signed(app(COMPLETE), true), undefined, "signed here before: the profile's value, not the app's");
+  assert.equal(signed({ ...app(COMPLETE), "application-identifier": "T.a.b" }), undefined, "signed under the profile's team before");
 });
 
 test("keychainGroups (B227): the app's own ID first when the profile allows it, the App ID's group after", () => {

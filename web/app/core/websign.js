@@ -4,7 +4,8 @@
 //   profileInfo(bytes)                      { appId, teamId, entitlements } from a .mobileprovision
 //   targetBundleId(appId, bundleId)         the ID the app is signed as (a com.you.* profile signs any app)
 //   signingIds(appId, bundleId, { keep })   F237: Info.plist's ID and the entitlements' (Keep Bundle IDs)
-//   appEntitlements(info, bundleId, keptId) the profile's entitlements narrowed to that app (Xcode's way), its
+//   originalDataProtection(original, info, signedBefore)  B413: the data protection an app's original signature asked for
+//   appEntitlements(info, bundleId, keptId, dataProtection) the profile's entitlements narrowed to that app (Xcode's way), its
 //                                           keychain group named after its own ID (keychainGroups)
 //   plistXml(value)                         an XML plist (dict, array, string, integer, real, bool, data, date)
 //   identityPlist({ p12, password, profile })   iFizBox's own IPA's ifizbox-identity.plist (native BundledIdentity)
@@ -120,8 +121,11 @@ export function targetBundleId(appId, bundleId) {
 // group named after that ID was one keychain shared by all of them (one app clearing its items cleared the others').
 // Keychain items go to the first group, the app's alone, under any profile or certificate of the same team.
 // TEAM.<App ID> stays second, so items an earlier signature put there are still the app's.
-export function appEntitlements({ entitlements = {}, teamId = null }, bundleId, keptId = bundleId) {
+// dataProtection: the app's own default-data-protection (originalDataProtection); the profile's is left out unless
+// it's the same.
+export function appEntitlements({ entitlements = {}, teamId = null }, bundleId, keptId = bundleId, dataProtection = null) {
   const ents = { ...entitlements };
+  if (!dataProtection || ents[DATA_PROTECTION] !== dataProtection) delete ents[DATA_PROTECTION];
   const team = ents["com.apple.developer.team-identifier"] || teamId;
   if (team) {
     ents["application-identifier"] = `${team}.${bundleId}`;
@@ -129,6 +133,21 @@ export function appEntitlements({ entitlements = {}, teamId = null }, bundleId, 
   }
   ents["get-task-allow"] = false;
   return ents;
+}
+
+// B413: a profile with every capability gives NSFileProtectionComplete, and an app that didn't ask for it can't read its
+// own preferences and files when it's launched in the background on a locked phone.
+const DATA_PROTECTION = "com.apple.developer.default-data-protection";
+
+// The default-data-protection an app's original signature asked for, or null. An executable signed here before
+// (signedBefore: the app carries a group fix config) or under the profile's own team carries what that profile gave
+// it, not what the app asked for. The same rule as native/sign/Profile.swift originalDataProtection.
+export function originalDataProtection(original, { entitlements = {}, teamId = null } = {}, signedBefore = false) {
+  if (!original || signedBefore) return null;
+  const team = teamId || entitlements["com.apple.developer.team-identifier"];
+  if (team && (original["com.apple.developer.team-identifier"] === team || String(original["application-identifier"] ?? "").startsWith(`${team}.`))) return null;
+  const v = original[DATA_PROTECTION];
+  return typeof v === "string" && v ? v : null;
 }
 
 // [TEAM.keptId, TEAM.bundleId] (once when they're the same), the first only when the profile's groups allow it.
@@ -209,7 +228,8 @@ export const isZip = (b) => b?.length >= 4 && b[0] === 0x50 && b[1] === 0x4b;
 //                             that is earlier (the signing certificate is one of them); null when unknown
 // 1: own keychain group first and the group fix's own folders (B227, B211), as the app's SignerStamp 1.
 // 2: every app with a keychain group of its own gets the group fix's isolate (B327), as SignerStamp 2.
-export const WEB_SIGNER_VERSION = 2;
+// 3: no default data protection from the profile that the app didn't ask for (B413), as SignerStamp 3.
+export const WEB_SIGNER_VERSION = 3;
 export async function groupFixHash(bytes) {
   if (!bytes?.length) return null;
   try {
