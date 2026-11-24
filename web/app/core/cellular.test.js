@@ -25,7 +25,7 @@ test("the page's texts and the popup", () => {
 
 test("Use Signing Server decides the route only on cellular", () => {
   const st = (cellular) => ({ paired: "rp", vpn: { available: true, tested: true, cellular } });
-  assert.deepEqual(decideRoute("iphone", st(true), "server"), { route: "server" });
+  assert.deepEqual(decideRoute("iphone", st(true), "server"), { route: "server", cellular: true });
   assert.deepEqual(decideRoute("iphone", st(false), "server"), { route: "idevice" });
   assert.deepEqual(decideRoute("iphone", st(true), "ask"), { route: "idevice" });
 });

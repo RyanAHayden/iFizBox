@@ -635,7 +635,7 @@ enum Sideload {
                                     note: { log?($0) }) { st in
                     switch st {
                     case .airplane: emit?("airplane", 0); step?("airplane", 0)
-                    case .offCellular: step?("connecting", 0); emit?("offCellular", 0) // emit: library.install has no step
+                    case .offCellular: emit?("offCellular", 0); step?("offCellular", 0)
                     case .airplaneOff: emit?("airplaneOff", 0); step?("airplaneOff", 0)
                     case .appWait(let p): // B423: paused, iOS may suspend the app (held: once each way)
                         if p == .over { if !held { held = true; KeepAlive.shared.begin() } }

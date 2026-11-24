@@ -72,7 +72,7 @@ rows or change footers. Top to bottom:
   Connection shows only while nothing is failing; a Fix tapped while a check runs joins it. On cellular without
   Wi-Fi, Check Connection, Fix, Test Connection and Set Up's test don't connect: they say "Can't Check on Cellular"
   ("Join Wi-Fi, then check again.", OK), with no Fix, no Pair Again and nothing kept as a Route Failure; the automatic
-  checks stay silent. Installs ask for Airplane Mode there. With Signing Server
+  checks stay silent. Installs there follow On Cellular. With Signing Server
   chosen: Ready to Install through the server, Check Server.
   With the built-in VPN (the app's profile has Network Extensions): Ready to Install, "Straight onto this iPhone,
   through iFizBox VPN".
@@ -94,7 +94,7 @@ The pages under it:
   first: Checking… (with a spinner), Not Set Up, Almost Done, Ready to Install, the failure (Pairing Lost or another
   red reason) or Not Responding, with one action: Start Setup, Test Connection, Check Connection or Fix. Its footer
   shows once it's ready: the other-VPN line ("Your VPN goes off during installs. Turn it back on after.") when another
-  VPN is up or chosen in Settings > VPN and Restore My VPN is off, else the cellular line ("On cellular, installs ask for Airplane Mode."), else
+  VPN is up or chosen in Settings > VPN and Restore My VPN is off, else
   none. Until This iPhone is set up, **Set Up** has three steps: 1. Pair This iPhone (opens Pairing),
   2. Allow iFizBox VPN, 3. Test Connection. A step that's done is checked, and the next one is open. Steps 2 and 3
   are done together: `vpn.test` turns the VPN on, connects once with the pairing and turns it off, and iOS asks to
@@ -102,7 +102,7 @@ The pages under it:
   re-signing." Then **Restore My VPN**, a switch in a group of its own, off by default, shown when `idevice.status`'s
   `vpn.available` and the shell has the `restore` setting (before set-up too). Its footer reads "After installs your own VPN
   comes back. iOS asks to allow the app's VPN again next time." when on, "Your own VPN stays off after installs." when off.
-  A tap shows at once and calls `vpn.setRestore`; a failed call puts the switch back. Once paired, **Forget Pairing** (back to the Signing Server). Then **How It Works** › (`installation/how`:
+  A tap shows at once and calls `vpn.setRestore`; a failed call puts the switch back. Once paired, **On Cellular**, a group of its own (after Restore My VPN, before Forget Pairing): what an install does while the phone is on cellular data, where iOS refuses the connections. Two rows, **Ask Each Time** (the default) and **Use Signing Server**, one checked, kept in this browser's storage (`ifizbox.onCellular`). Its footer follows the pick: "iOS can't install straight onto this iPhone while it's on cellular data." under Ask Each Time, "On Wi-Fi, apps still go straight onto this iPhone." under Use Signing Server. Ask Each Time shows a popup during a wait (docs/sideload.md); Use Signing Server sends the install through the Signing Server at once on cellular, with no popup. Then **Forget Pairing** (back to the Signing Server). Then **How It Works** › (`installation/how`:
   the five steps of one install: Download, Sign, iFizBox VPN On, Install, iFizBox VPN Off; and Offline). **Signing
   Server** (`installation/server`): Server, Check Server, Run Your Own. Without Network Extensions in the app's profile,
   This iPhone's page shows the Set Up group "Network Extensions: Missing" below.

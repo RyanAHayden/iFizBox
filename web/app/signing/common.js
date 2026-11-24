@@ -154,7 +154,7 @@ export function setServer(s) {
 export function hereLabel(ev) {
   const air = { airplane: AIRPLANE_ON, airplaneOff: AIRPLANE_OFF, appWait: APP_WAIT, networkWait: NETWORK_WAIT }[ev?.here];
   if (air) return { label: air };
-  if (ev?.here === "connecting") return { label: "Connecting to iPhone" }; // R91: no bytes yet
+  if (ev?.here === "connecting" || ev?.here === "offCellular") return { label: "Connecting to iPhone" }; // R91: no bytes yet
   const word = { copying: "Copying to iPhone", installing: "Installing" }[ev?.here];
   if (!word) return null;
   const f = Math.max(0, Math.min(1, Number(ev.progress) || 0));

@@ -28,9 +28,9 @@ test("one popup while any install waits; it goes by itself when none does", asyn
   a.phase("airplane"); b.phase("airplane"); await tick();
   assert.equal(shown.length, 1);
   assert.equal(shown[0].o.title, "You're on Cellular");
-  a.phase("appWait"); a.phase("connecting"); await tick();
+  a.phase("appWait"); a.phase("connecting"); b.phase("appWait"); b.phase("connecting"); a.phase("offCellular"); await tick();
   assert.equal(shown[0].o.signal.aborted, false, "b still waits");
-  b.phase("connecting"); await tick();
+  b.phase("offCellular"); await tick();
   assert.equal(shown[0].o.signal.aborted, true);
   assert.deepEqual([cell.answer, a.end(), stops], [null, null, []]);
   a.phase("airplane"); await tick();

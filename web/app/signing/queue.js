@@ -144,7 +144,7 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
       (ev) => {
         if (ev?.log) { log(ev.log); return; }
         const p = route.route ? herePhase(ev) : null;
-        if (p && !signal?.aborted) cellWait?.phase(p.phase); // F417
+        if (p && !signal?.aborted) cellWait?.phase(ev.phase); // F417
         if (p) progress(p.phase, p.fraction);
         else if (!route.route && (ev?.phase === "uploading" || ev?.phase === "handoff")) progress(ev.phase, 0); // B424: before iOS's prompt
       }, { tag, signal });
@@ -206,6 +206,7 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
 // or null (not a step event). F368: "airplane" and "airplaneOff" too.
 export function herePhase(ev) {
   if (["airplane", "airplaneOff", "appWait", "networkWait"].includes(ev?.phase)) return { phase: ev.phase, fraction: 0 };
+  if (ev?.phase === "offCellular") return { phase: "connecting", fraction: 0 }; // F417
   if (ev?.phase !== "connecting" && ev?.phase !== "copying" && ev?.phase !== "installing") return null;
   const f = Number(ev.progress);
   return { phase: ev.phase, fraction: Number.isFinite(f) ? Math.max(0, Math.min(1, f)) : 0 };

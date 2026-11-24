@@ -9,6 +9,7 @@
 import { onCellularChoice, cellularQuestion, CELLULAR_ANSWERS, CELLULAR_CANCELLED } from "../core/cellular.js";
 import { showAlert } from "../nav/alert.js";
 
+const OFF = new Set(["offCellular", "airplaneOff", "networkWait", "copying", "installing"]); // the wait is over
 export function cellularAsk({ alert = showAlert, choice = onCellularChoice, onServer = () => {} } = {}) {
   const waiting = new Set();
   let popup = null; // its AbortController
@@ -42,7 +43,7 @@ export function cellularAsk({ alert = showAlert, choice = onCellularChoice, onSe
           if (!cell.answer && choice() === "server") useServer();
           waiting.add(w);
           if (cell.answer) w.stopNow(); else open();
-        } else if (p && p !== "appWait") leave(w); // appWait: the app was left meanwhile, still on cellular
+        } else if (OFF.has(p)) leave(w); // appWait, and connecting after it: the app was left meanwhile, still on cellular
       },
       end: () => { leave(w); return w.answer; },
       get answer() { return w.answer; },

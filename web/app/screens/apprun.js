@@ -93,7 +93,7 @@ export function phoneLanes(sc, { native, run = laneRunId() } = {}) {
       const tag = (again && served.get(r.id)) || tagOf(r);
       served.set(r.id, tag);
       fallbacks.delete(r.id);
-      if (cellCancelled.delete(r.id)) { cellCancelled.clear(); cell?.forget(); }
+      if (cellCancelled.has(r.id)) cell?.forget();
       return Promise.resolve(sc.openPrepared(r, { tag, signal, progress, log, host: isSelf(r), native, allSigned, ...(cell ? { cell } : {}), ...(again ? { again: true } : {}),
         ...(server ? { server } : {}) })).catch((e) => {
         if (e?.code === "cellular") cellCancelled.add(r.id);

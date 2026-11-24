@@ -17,7 +17,7 @@ export async function chooseRoute({ native, alert = showAlert, storage = storage
     await alert({ title: a.title, message: a.message, buttons: a.buttons, cancel: 0 });
   }
   const params = routeParams(d);
-  heldRoute = { at: now(), params };
+  if (!d.cellular) heldRoute = { at: now(), params }; // F417: cellular is read again for the next run
   return params;
 }
 export const forgetRoute = () => { heldRoute = null; };

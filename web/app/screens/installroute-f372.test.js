@@ -199,14 +199,14 @@ test("the tests' answers in words", () => {
   assert.equal(vpnTestResult(null, new Error("refused: this iPhone no longer has the pairing")).again, true);
 });
 
-test("a failed connect through the built-in VPN never says to turn on another VPN app; on cellular it says installs ask for Airplane Mode", () => {
+test("a failed connect through the built-in VPN never says to turn on another VPN app; on cellular it says check on Wi-Fi", () => {
   const st = ST({ tested: true, cellular: true });
   const why = verifyFailure(new Error("connect_failed: no answer"), st);
   assert.equal(why.title, "Couldn't Connect");
-  assert.match(why.message, /On cellular, check on Wi-Fi\. Installs ask for Airplane Mode\./);
+  assert.match(why.message, /On cellular, check on Wi-Fi\./);
   const refused = routeFailureOf(new Error("route_refused: every port"), st);
   assert.equal(refused.fix, "check");
-  assert.match(refused.message, /On cellular, check on Wi-Fi\. Installs ask for Airplane Mode\./);
+  assert.match(refused.message, /On cellular, check on Wi-Fi\./);
   assert.ok(!/Shortcut|Install Switch/i.test(JSON.stringify([why, refused])));
   assert.ok(!/LocalDevVPN|Tailscale|Turn On/.test(JSON.stringify([why, refused])));
 });
