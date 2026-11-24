@@ -625,7 +625,8 @@ enum LocalVPN {
     private static func stopNow(gen: Int? = nil) {
         lock.lock(); let m = cached; lock.unlock()
         if let m = m { downIfIdle(m, gen: gen, why: "nothing left to do") }
-        RestoreBack.look()
+        lock.lock(); let over = holds == 0 && installs == 0 && (gen == nil || gen == stopGen); lock.unlock()
+        if over { RestoreBack.look() } // else what came after it looks, at its own end
     }
 
     /// One background task, ended once; `expiring` runs first when iOS ends it early, off the main thread (downIfIdle

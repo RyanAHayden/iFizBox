@@ -8,7 +8,7 @@ import Foundation
 enum RestoreBack {
     private static let owedKey = "ifizbox.vpn.backOwed"
     private static let rememberedKey = "ifizbox.vpn.remembered"
-    static let again: TimeInterval = 5 // how often a look that must wait looks again, the app in front
+    static let again: TimeInterval = 2 // how often a look that must wait looks again, the app in front
 
     private static let lock = NSLock()
     private static var looking = false // guarded by lock: a look, or its wait for the next one, goes on

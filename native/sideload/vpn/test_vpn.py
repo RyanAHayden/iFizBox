@@ -218,7 +218,7 @@ class App(unittest.TestCase):
         start = src[src.index("private static func start("):src.index("/// Before a connect to iOS")]
         self.assertEqual(len(re.findall(r"RestoreBack.note\(\)\n\s*(?:var )?m = try manager\(\)", start)), start.count("try manager()"))
         stop = src[src.index("private static func stopNow("):src.index("/// One background task")]
-        self.assertLess(stop.index("downIfIdle("), stop.index("RestoreBack.look()"))
+        self.assertLess(stop.index("downIfIdle("), stop.index("if over { RestoreBack.look() }"))
         left = src[src.index("static func takeDownLeftOver()"):src.index("private static func downIfIdle(")]
         self.assertIn("else { return RestoreBack.look() }", left)
         self.assertLess(left.index("downIfIdle("), left.rindex("RestoreBack.look()"))
