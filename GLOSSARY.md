@@ -72,7 +72,7 @@ _Avoid_: tab bar, filter tabs
 **Route Failure**:
 The last check or install on This iPhone couldn't reach the phone; it is shown as the broken state, with its Fix button, until a check passes
 _Said_: installs being refused, pairing broken
-_On screen_: iPhone Refused / Couldn't Connect / Pair Again / No Network Extensions (red status, Fix button, Home tile: Installs are failing · Fix in Settings)
+_On screen_: iPhone Refused / Couldn't Connect / Pairing Lost / No Network Extensions (red status, Fix button, Home tile: Installs are failing · Fix in Settings)
 _In code_: routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, ifizbox.routeFailure
 _Avoid_: pairing error, connection error
 
@@ -220,3 +220,10 @@ _Said_: the airplane wait
 _On screen_: Join Wi-Fi or turn on Airplane Mode
 _In code_: LocalVPN.waitOffCellular, AIRPLANE_ON, airplaneStatus
 _Avoid_: cellular pause, data off wait
+
+**Set Up Steps**:
+The numbered steps that set up This iPhone, in order: 1. Pair This iPhone, 2. Allow iFizBox VPN, 3. Test Connection. A step that's done is checked and the next one is open; the group is there until This iPhone is set up, and its footer says once is enough
+_Said_: set up steps, setup steps
+_On screen_: This iPhone > Set Up
+_In code_: setupSteps, SETUP_FOOTER, iphoneStatus
+_Avoid_: setup checklist, wizard

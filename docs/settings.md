@@ -63,14 +63,15 @@ value still loading shows the grey spinner in its slot and fades in (opacity onl
 rows or change footers. Top to bottom:
 
 - A status cell, always two lines under its title (`installStatus`), and one action row whose label changes:
-  Checking… (Check Connection, dimmed); Pair This iPhone with Start Pairing; and the red failures Couldn't Connect,
-  iPhone Refused, Pair Again, No Network Extensions (the app's profile lacks them, so installs go through the Signing
-  Server) and Not Responding, whose action row is Fix. Fix opens Pairing, which checks the kept pairing, then pairs, when
-  the pairing is lost or missing (Pair Again); otherwise it checks the connection at once, spinning on the row: a pass
-  turns the cell green, the phone turning the pairing down opens Pairing, and anything else shows an alert with the plain
-  reason (OK). Check Connection shows only while nothing is failing; a Fix tapped while a check runs joins it.
-  On cellular, those two messages add "On cellular, check on Wi-Fi. Installs ask for Airplane Mode." A pairing the phone dropped is redone on Pairing by
-  itself. With Signing Server chosen: Ready to Install through the server, Check Server.
+  Checking… (Check Connection, dimmed); Set Up This iPhone (not paired: the subtitle "Takes about a minute, once. Until
+  then installs use the Signing Server."), or Finish Setting Up (paired, connection not tested yet), its action row
+  Set Up This iPhone in both; that row opens This iPhone's page. The red failures are Couldn't Connect, iPhone Refused, Pairing Lost, No Network Extensions (the app's profile lacks them, so installs go through the Signing Server) and Not
+  Responding, whose action row is Fix. Fix on Pairing Lost opens Pairing, which checks the kept pairing once more, then
+  pairs. Otherwise a failed check asks first when the pairing is lost or the connection couldn't be reached (Not Now or
+  Fix; Fix runs it again from the start), and any other reason shows an alert with the plain reason (OK). Check
+  Connection shows only while nothing is failing; a Fix tapped while a check runs joins it. On cellular, the
+  Couldn't Connect message adds "On cellular, check on Wi-Fi. Installs ask for Airplane Mode." With Signing Server
+  chosen: Ready to Install through the server, Check Server.
   With the built-in VPN (the app's profile has Network Extensions): Ready to Install, "Straight onto this iPhone,
   through iFizBox VPN".
 - **Install Apps With**: This iPhone ("Works offline") and Signing Server ("Default - Uses ifizbox.com"), a row each
@@ -87,31 +88,35 @@ rows or change footers. Top to bottom:
 
 The pages under it:
 
-- **This iPhone with the built-in VPN** (`installation/iphone`, when `idevice.status`'s `vpn.available`): **Set Up**:
-  Pair This iPhone (Start / Done, opens Pairing), Test Connection (Test / Testing… / Connected: `vpn.test` turns
-  the VPN on, connects once with the pairing and turns it off; the first time, iOS asks to allow the VPN
-  configuration; Pairing runs it by itself right after pairing, with a "Testing the Connection…" spinner, before it
-  says Paired, so setup asks that once). The footer names the next step (pair or test); once paired and tested it reads
-  "Set up. Apps install straight onto this iPhone, on Wi-Fi or offline." On cellular it adds "On cellular, installs ask for Airplane Mode.", and when another VPN is up or chosen in
-  Settings > VPN it adds "Your VPN goes off during installs. Turn it back on after." A failed check or install is
-  said there instead, red, with its Fix row. Then **How It Works** › (`installation/how`: the five steps of one install:
-  Download, Sign, iFizBox VPN On, Install, iFizBox VPN Off; and Offline). **Signing Server** (`installation/server`): Server,
-  Check Server, Run Your Own. Without Network Extensions in the app's profile, This iPhone's page shows the Set Up group "Network Extensions: Missing" below.
+- **This iPhone with the built-in VPN** (`installation/iphone`, when `idevice.status`'s `vpn.available`): a status group
+  first: Checking… (with a spinner), Not Set Up, Almost Done, Ready to Install, the failure (Pairing Lost or another
+  red reason) or Not Responding, with one action: Start Setup, Test Connection, Check Connection or Fix. Its footer
+  shows once it's ready: the other-VPN line ("Your VPN goes off during installs. Turn it back on after.") when another
+  VPN is up or chosen in Settings > VPN, else the cellular line ("On cellular, installs ask for Airplane Mode."), else
+  none. Until This iPhone is set up, **Set Up This iPhone** has three steps: 1. Pair This iPhone (opens Pairing),
+  2. Allow iFizBox VPN, 3. Test Connection. A step that's done is checked, and the next one is open. Steps 2 and 3
+  are done together: `vpn.test` turns the VPN on, connects once with the pairing and turns it off, and iOS asks to
+  allow the VPN configuration the first time. The footer reads "Once is enough. It stays set up after updates and
+  re-signing." Once paired, **Forget Pairing** (back to the Signing Server). Then **How It Works** › (`installation/how`:
+  the five steps of one install: Download, Sign, iFizBox VPN On, Install, iFizBox VPN Off; and Offline). **Signing
+  Server** (`installation/server`): Server, Check Server, Run Your Own. Without Network Extensions in the app's profile,
+  This iPhone's page shows the Set Up group "Network Extensions: Missing" below.
 - **Install Apps With** (`installation/with`, the older page): This iPhone (installd over the built-in VPN, docs/sideload.md) or Signing Server
   (the manifest and iOS's Install prompt, the default), with a checkmark, each subtitle a short point per line,
   wrapped. This iPhone's says Built-in VPN / No server, no install popup / Updates itself: installs
   through installation_proxy never show iOS's install prompt. Under the choice, the chosen route's groups slide in:
   This iPhone's (below), or the Signing Server's (Server, Check Server, Run Your Own). A tap moves the checkmark at
   once, whether or not the iPhone is paired, and the row shows the grey spinner until `idevice.status` answers.
-- **This iPhone** (also `installation/iphone` on its own): **Set Up** and **How It Works**, as above. Set Up's rows are drawn
-  from the first frame: each says Checking… until `idevice.status` answers, and a failed or late answer says Not Responding,
-  red. A profile without Network Extensions shows a Set Up group "Network Extensions: Missing" with the footer "This
-  profile has no Network Extensions, so it can't connect. Sign with one that has them, or use the Signing Server." No Developer Mode row: an install it stops explains it in its alert. Groups that come,
-  go or change size slide (FLIP, transform and opacity only: nav/slide.js's watcher). `idevice.status` is read at once and
-  each row fills as it answers; the last answer of this app run shows at once, its rows spinning while they're read again;
-  a read past its deadline (`TIMEOUTS`) says Not Responding, red. An answer swaps only the rows that changed
-  (`patchGroups`), never the whole page. Test Connection and Check Connection spin in their own row (no HUD) for at most
-  25 and 20 seconds.
+- **This iPhone** (also `installation/iphone` on its own): the status group, then Set Up This iPhone (until it's set up)
+  or Forget Pairing, then **How It Works**, as above. While `idevice.status` is read, the status says Checking… with a
+  spinner, and the steps appear once it answers. The last answer of this app run shows at once, read again behind its
+  spinner; a failed or late read (past its deadline, `TIMEOUTS`) says Not Responding, red. A profile without Network
+  Extensions shows a Set Up group "Network Extensions: Missing" with the footer "This profile has no Network Extensions,
+  so it can't connect. Sign with one that has them, or use the Signing Server." No Developer Mode row: an install it
+  stops explains it in its alert. Groups that come, go or change size slide (FLIP, transform and opacity only:
+  nav/slide.js's watcher). An answer swaps only the rows that changed (`patchGroups`), never the whole page. Test
+  Connection and Check Connection spin in their own row (no HUD) for at most 25 and 20 seconds. A check on this page
+  doesn't change the Install Apps With pick.
 - **Pairing** (`installation/pair`), one page that runs by itself: a sentence on what it gives, then on iOS 27 pairing starts
   on its own: the 6-digit code and where to type it, a line and a ringed Settings screenshot a step; before iOS 27,
   Import Pairing File; once paired, Paired with a check, Check Connection (which says Fix while it fails)

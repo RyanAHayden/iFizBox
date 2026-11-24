@@ -308,6 +308,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
       forget: async () => {
         await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {}));
         forgetStatus();
+        clearRouteFailure(); // the forgotten pairing's
         store.set(ROUTE_KEY, "server");
         redraw();
       },
