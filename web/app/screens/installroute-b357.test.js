@@ -114,8 +114,8 @@ test("without the built-in VPN: the page says Network Extensions are missing, an
 
 test("the shell keeps its VPN configuration: no removal after an install, so iOS asks Allow once", () => {
   const src = readFileSync(new URL("../../../native/sideload/vpn/App/LocalVPN.swift", import.meta.url), "utf8");
-  // F411: removed only for Restore My VPN (off by default), when another VPN was up at the start
+  // F411: removed only for Restore My VPN (off by default)
   assert.equal(src.split("removeFromPreferences").length, 2);
-  assert.match(src, /func giveBack\([^{]*\{\n\s*guard owed,/);
+  assert.match(src, /func giveBack\([^{]*\{\n\s*guard restore,/);
   assert.doesNotMatch(src, /otherWasOn/);
 });

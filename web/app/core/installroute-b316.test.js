@@ -202,6 +202,8 @@ test("F410b: only set up, on Wi-Fi, with no VPN on", () => {
   assert.equal(quietCheckAllowed("iphone", vpn({ available: false })), false);
   assert.equal(quietCheckAllowed("iphone", vpn({ tested: false })), false, "iOS would ask Allow");
   assert.equal(quietCheckAllowed("iphone", vpn({ otherVPN: true })), false);
+  assert.equal(quietCheckAllowed("iphone", vpn({ restore: true })), false, "B427a: iOS would ask Allow each time");
+  assert.equal(quietCheckAllowed("iphone", vpn({ restore: false })), true);
   assert.equal(quietCheckAllowed("iphone", { ...ok, otherVPN: true }), false);
   assert.equal(quietCheckAllowed("iphone", vpn({ cellular: true, wifi: false })), false);
   assert.equal(quietCheckAllowed("iphone", vpn({ wifi: false })), false, "no network: the VPN can't start");
