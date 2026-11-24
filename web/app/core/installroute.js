@@ -44,13 +44,44 @@ export const airplaneTimeout = (err) => (err?.code ?? String(err?.message ?? err
 // C73: another VPN is up (or chosen in Settings > VPN): iOS runs one at a time, so an install turns it off.
 export const otherVPNOn = (st) => builtinVPN(st) && Boolean(st.vpn.otherVPN || st.vpn.otherVPNSelected);
 export const OTHER_VPN_LINE = "Your VPN goes off during installs. Turn it back on after.";
-// Set Up's footer: the next step, or what is set up.
+// F414: the status group's footer once This iPhone is set up: one hint, or none.
 export function setupFooter(st) {
-  if (st && !builtinVPN(st)) return NO_VPN.message;
-  if (!st?.paired) return "Pair this iPhone once to install straight onto it.";
-  if (!st.vpn.tested) return "Test the connection to finish setting up.";
-  const set = `Set up. Apps install straight onto this iPhone, on Wi-Fi or offline.${st.vpn.cellular ? ` ${CELL_FOOTER}` : ""}`;
-  return otherVPNOn(st) ? `${set} ${OTHER_VPN_LINE}` : set;
+  if (!iphoneSetUp(st)) return "";
+  if (otherVPNOn(st)) return OTHER_VPN_LINE;
+  return st.vpn.cellular ? CELL_FOOTER : "";
+}
+// F414: setting up, as rows: what each is and whether it's done (`next`: a tap does it). The test is when iOS asks to
+// allow the VPN (B357), so those two are done together.
+export const SET_UP = "Set Up This iPhone";
+export const SETUP_FOOTER = "Once is enough. It stays set up after updates and re-signing.";
+export function setupSteps(st) {
+  const paired = Boolean(st?.paired), tested = Boolean(st?.vpn?.tested);
+  const test = { done: paired && tested, next: paired && !tested };
+  return [
+    { key: "pair", label: "1. Pair This iPhone", subtitle: pairState(st) === "file" ? "Import a pairing file from a computer" : "Type a 6-digit code in Settings", done: paired, next: !paired },
+    { key: "allow", label: `2. Allow ${BUILTIN_VPN}`, subtitle: "iOS asks once, right after pairing", ...test },
+    { key: "test", label: "3. Test Connection", subtitle: "Runs by itself", ...test },
+  ];
+}
+// F414: This iPhone's own page: its status cell and action ({ state, title, subtitle, tone, red, action, busy }). `failure`
+// (routeFailure) counts only while paired; `running`: a check, test or Fix runs; `late`: idevice.status didn't answer.
+export function iphoneStatus(st, { reading = false, running = false, late = false, failure = null } = {}) {
+  const action = !st ? "check" : !st.paired ? "start" : failure ? "fix" : !st.vpn?.tested ? "test" : "check";
+  if (running) return { state: "checking", title: CHECKING.title, subtitle: "Turning on the VPN and reaching this iPhone.", tone: "wait", action, busy: true };
+  if (late) return { state: "late", title: "Not Responding", subtitle: "This iPhone didn't answer.", tone: "warn", red: true, action: "check" };
+  if (reading || !st) return { state: "checking", title: CHECKING.title, subtitle: CHECKING.subtitle, tone: "wait", action: "check", dim: true };
+  if (!st.paired) return { state: "setup", title: "Not Set Up", subtitle: "Installs straight onto this iPhone, with no server and no popups.", tone: "warn", action };
+  if (failure) { const f = failureStatus(failure); return { state: "failed", title: f.title, subtitle: f.subtitle, tone: f.tone, red: true, action }; }
+  if (!st.vpn?.tested) return { state: "finish", title: "Almost Done", subtitle: FINISH_LINE, tone: "warn", action };
+  return { state: "ready", title: "Ready to Install", subtitle: `Straight onto this iPhone, through ${BUILTIN_VPN}.`, tone: "ok", action };
+}
+const FINISH_LINE = "Paired. Test the connection once to finish.";
+// F414: a failed check asks to fix: { title, message, buttons, cancel: 0 }. `why` is verifyFailure's (or Not Responding).
+export function fixQuestion(why, st = null) {
+  const q = { title: why.title, message: why.message, buttons: ["Not Now", FIX], cancel: 0 };
+  if (why.again) return { ...q, title: PAIRING_LOST, message: `This iPhone isn't paired with ${NAME} any more, so nothing can install. Fix it now?` };
+  if (why.title === "Couldn't Connect") q.message = `${BUILTIN_VPN} came on, but this iPhone didn't answer. Fix tries again from the start.${st?.vpn?.cellular ? ` ${CELL_LINE}` : ""}`;
+  return q;
 }
 // How It Works: the steps of one install, a row each.
 export const HOW_STEPS = [
@@ -101,7 +132,7 @@ export const ALERTS = {
 // `local`: installs go straight onto this iPhone now (the Signing Server row then says This iPhone).
 // `action` is a key of STATUS_ACTIONS. Every subtitle fits two lines at 320pt (the cell keeps two lines' height).
 export const STATUS_ACTIONS = {
-  check: "Check Connection", fix: FIX, checkServer: "Check Server", pair: "Start Pairing",
+  check: "Check Connection", fix: FIX, checkServer: "Check Server", setup: SET_UP, start: "Start Setup", test: "Test Connection",
   certificate: "Import Certificate",
 };
 export const CHECKING = { state: "checking", title: "Checking…", subtitle: "Pairing and the VPN.", action: "check", tone: "wait", local: false };
@@ -115,7 +146,7 @@ export const CHECKING_SERVER = { ...CHECKING, subtitle: "Your certificate." };
 // Ready to Install into that failure, red with its fix, until a check passes; any other answer stands as it is.
 export function installStatus(choice, st, { host = DOMAIN, certificate, failure = null } = {}) {
   const s = routeStatus(choice, st, { host, certificate });
-  return failure && (s.state === "ready") ? failureStatus(failure) : s;
+  return failure && (s.state === "ready" || s.state === "finish") ? failureStatus(failure) : s;
 }
 function routeStatus(choice, st, { host = DOMAIN, certificate } = {}) {
   if (certificate === false) return NO_CERTIFICATE;
@@ -124,7 +155,8 @@ function routeStatus(choice, st, { host = DOMAIN, certificate } = {}) {
   const later = `Installs use ${host} for now.`;
   if (!st) return { state: "noStatus", title: "Can't Reach This iPhone", subtitle: later, action: "fix", tone: "warn", local: false };
   if (!builtinVPN(st)) return { state: "noVPN", title: NO_VPN.title, subtitle: `This profile can't connect. ${later}`, action: "fix", tone: "warn", local: false };
-  if (!st.paired) return { state: "pair", title: "Pair This iPhone", subtitle: `Installs use ${host} until it's paired.`, action: "pair", tone: "warn", local: false };
+  if (!st.paired) return { state: "pair", title: SET_UP, subtitle: "Takes about a minute, once. Until then installs use the Signing Server.", action: "setup", tone: "warn", local: false };
+  if (!st.vpn.tested) return { state: "finish", title: "Finish Setting Up", subtitle: FINISH_LINE, action: "setup", tone: "warn", local: true }; // F414
   return { state: "ready", via: BUILTIN_VPN, title: "Ready to Install", subtitle: `Straight onto this iPhone, through ${BUILTIN_VPN}.`, action: "check", tone: "ok", local: true };
 }
 
@@ -323,9 +355,11 @@ export function clearRouteFailure(storage = globalThis.localStorage) {
 export const NO_ANSWER_FAILURE = { title: "Not Responding", message: "This iPhone didn't answer the last check. Check that the VPN is on, then check again.",
   short: "This iPhone didn't answer the last check.", fix: "check", button: FIX };
 
+export const PAIRING_LOST = "Pairing Lost";
 // The status cell for a remembered failure: red, with Fix as its action row (`fix`: what it does).
 export function failureStatus(f) {
-  return { state: "failed", title: f.title, subtitle: f.short, action: "fix", fix: f.fix, tone: "warn", red: true, local: false };
+  const lost = f.fix === "pair"; // F414
+  return { state: "failed", title: lost ? PAIRING_LOST : f.title, subtitle: lost ? "This iPhone isn't paired any more. Nothing can install until it's fixed." : f.short, action: "fix", fix: f.fix, tone: "warn", red: true, local: false };
 }
 
 // F409: Fix tapped outside Installation & Signing (an install's alert, the run's Log): the page runs the check when it

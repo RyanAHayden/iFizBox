@@ -59,14 +59,12 @@ test("no failure, or the Signing Server route: nothing runs", () => {
   clearRouteFailure();
 });
 
-test("Paired turns to a red Failing while a failure is kept (main page's row and Install Apps With's Pairing)", () => {
+test("Paired turns to a red Failing while a failure is kept (main page's row)", () => {
   const f = routeFailureOf(refused, FINE);
   assert.equal(withDetail("iphone", FINE), "Paired");
   assert.equal(withDetail("iphone", FINE, f), FAILING);
   assert.equal(withDetail("iphone", { paired: false }, f), "Not Paired");
   assert.equal(withDetail("server", FINE, f), "");
-  const test = installationGroups("iphone", FINE, { failure: f }).find((x) => x.header === "Set Up").rows[1];
-  assert.equal(test.detail, FAILING);
 });
 
 test("a check that gets no answer in time is kept too", async () => {
@@ -82,16 +80,12 @@ test("a check that gets no answer in time is kept too", async () => {
   } finally { TIMEOUTS.verify = 20000; clearRouteFailure(); }
 });
 
-test("Install Apps With: the failure in Set Up's footer, its fix row in the group", () => {
+test("This iPhone's page: the failure is its status, red, and its action is Fix", () => {
   const f = routeFailureOf(refused, FINE);
-  const groups = installationGroups("iphone", FINE, { failure: f });
-  const g = groups.find((x) => x.header === "Set Up");
-  assert.equal(g.footer, "Pair Again. Installs are refused. Pair again.");
-  assert.equal(g.warn, true);
-  assert.ok(g.rows.some((r) => r.label === "Fix" && r.cls === "sign-import"));
-  const ok = installationGroups("iphone", FINE).find((x) => x.header === "Set Up");
-  assert.ok(!ok.rows.some((r) => r.label === "Fix"));
-  assert.ok(!ok.warn);
+  const [status, action] = installationGroups("iphone", FINE, { failure: f }).find((x) => x.key === "status").rows;
+  assert.deepEqual([status.label, status.red, status.tone, action.label], ["Pairing Lost", true, "warn", "Fix"]);
+  const ok = installationGroups("iphone", FINE).find((x) => x.key === "status").rows;
+  assert.deepEqual([ok[0].red, ok[1].label], [false, FINE.vpn.tested ? "Check Connection" : "Test Connection"]);
 });
 
 // ---- F409: Fix in place of Check Connection while failing
@@ -150,7 +144,7 @@ test("F409: a failed Check Connection turns into Fix, and so does the automatic 
   const t = await failing(null, { "idevice.verify": noRoute });
   assert.equal(labelOf(t.cell), "Check Connection");
   await tapOn(t.cell);
-  assert.deepEqual(t.alerts[0].buttons, ["OK", "Fix"]);
+  assert.deepEqual(t.alerts[0].buttons, ["Not Now", "Fix"]);
   assert.equal(labelOf(t.cell), "Fix");
   const u = await failing(refused, { "idevice.verify": noRoute }, { auto: true });
   await new Promise((r) => setTimeout(r, 10));

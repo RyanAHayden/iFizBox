@@ -58,17 +58,16 @@ test("busy: the HUD only once the call has taken the delay, and it goes when the
   assert.deepEqual(log, ["Forgetting Pairing", "hide"]);
 });
 
-test("the main page: Pairing spins Checking… while idevice.status answers; no Developer Mode row (F300)", async () => {
+test("the main page: the status says Checking… while idevice.status answers; no Developer Mode row (F300)", async () => {
   const st = later();
   const native = bridge({ "idevice.status": () => st.p });
   const box = make("div");
   const done = drawInstallation(box, null, { store: store("iphone"), native });
-  assert.ok(spins(box, "Pair This iPhone"));
-  assert.equal(withClass(cellOf(box, "Pair This iPhone"), "cell-detail")[0].textContent, "Checking…");
-  assert.ok(spins(box, "Test Connection"), "every Set Up row says Checking… from the first frame");
+  assert.ok(labels(box).includes("Checking…"));
+  assert.ok(spins(box, "Check Connection"), "from the first frame");
   st.answer(PAIRED_ON);
   await done;
-  assert.ok(!spins(box, "Pair This iPhone"));
+  assert.ok(labels(box).includes("Ready to Install"));
   assert.ok(!labels(box).includes("Developer Mode"), labels(box).join(", "));
   assert.deepEqual(native.calls, ["idevice.status"], "Developer Mode isn't asked");
   assert.equal(withClass(box, "loading-spinner").length, 0, "nothing spins once everything answered");
