@@ -505,7 +505,7 @@ export const RESTORE_VPN = "Restore My VPN";
 // F412: shown when the shell can run the built-in VPN and knows the setting
 export const restoreShown = (st) => builtinVPN(st) && typeof st.vpn.restore === "boolean";
 export const restoreFooter = (on) => (on
-  ? "After installs your own VPN comes back. iOS asks to allow the app's VPN again next time."
+  ? "After installs your own VPN comes back once you open Settings > VPN."
   : "Your own VPN stays off after installs.");
 export const setRestoreVPN = (native, on) => native.call("vpn.setRestore", { on: Boolean(on) });
 

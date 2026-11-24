@@ -93,7 +93,7 @@ test("F412: Restore My VPN, its own group, off by default; shown only when the s
   const off = group(ST({ tested: true, restore: false }));
   assert.deepEqual(off.rows.map((r) => r.label), ["Restore My VPN"]);
   assert.equal(off.footer, "Your own VPN stays off after installs.");
-  assert.equal(group(ST({ tested: true, restore: true })).footer, "After installs your own VPN comes back. iOS asks to allow the app's VPN again next time.");
+  assert.equal(group(ST({ tested: true, restore: true })).footer, "After installs your own VPN comes back once you open Settings > VPN.");
   assert.equal(setupFooter(ST({ tested: true, otherVPN: true, restore: true })), "", "it comes back: not told to turn it on");
 
   const { drawInstallation, forgetStatus, cachedStatus } = screens;
