@@ -1,13 +1,13 @@
 // The built-in VPN for This iPhone installs (sideload build only): the app's side of PlugIns/iFizBoxVPN.appex
 // (../Extension/PacketTunnelProvider.swift, the phone at 10.7.0.1). IDevice.Session turns it on just before it
 // connects to iOS and off a moment after the last connection ends (`linger`, so a queue of installs or a reconnect
-// keeps it). Nothing else is involved: no Shortcuts, no trip, no put-back. iOS takes another app's VPN off while ours
+// keeps it). The configuration stays saved. iOS takes another app's VPN off while ours
 // is on, so the status says `otherVPN` and the page says it. Whether that VPN comes back by itself (its On Demand) is
-// iOS's and that app's business, unless Restore My VPN is on (F411): then our configuration is removed once nothing uses
-// it (B427a: whatever was up before), which lets Settings > VPN pick the other VPN again once that page is opened; iOS leaves the other one disabled until then.
+// iOS's and that app's business, unless Restore My VPN is on: then its Shortcut sets that VPN again after the queue
+// (RestoreBack.swift).
 // B423: in the background it starts only to finish an install already connected; anything else waits for the app.
 //   idevice.status      carries the VPN's state as `vpn`: {available, bundled, entitled, tested, on, cellular, wifi,
-//                       otherVPN, restore, name}
+//                       otherVPN, restore, remembered, name}
 //   vpn.setRestore      {on}: Restore My VPN (kept; off by default) -> the status' vpn
 //   vpn.test           the VPN on, one connect to iOS with the pairing (idevice.verify), the VPN off: {ok, ms, kind};
 //                       a pass marks This iPhone tested (set up)
@@ -24,7 +24,6 @@ enum LocalVPN {
     /// How long the VPN stays on after the last connection ends: the next install of a queue, or a reconnect, finds it on.
     static let linger: TimeInterval = 3
     static let downWait: TimeInterval = 3 // from stopVPNTunnel to disconnected
-    static let downWaitRestore: TimeInterval = 10 // the same, when our configuration is removed after it (giveBack)
     static let startLimit: TimeInterval = 10 // from startVPNTunnel to connected
     static let networkWait: TimeInterval = 8 // B428b: with no network, how long a start waits for one
     static let saveLimit: TimeInterval = 90 // the first save waits for the user's Allow on iOS's "Add VPN Configurations"
@@ -56,7 +55,8 @@ enum LocalVPN {
         let path = Path.now()
         lock.lock(); let on = cached?.connection.status == .connected; lock.unlock()
         return ["available": available, "bundled": providerID != nil, "entitled": entitled, "tested": tested, "on": on,
-                "cellular": path.cellular, "wifi": path.wifi, "otherVPN": otherVPNUp(), "restore": restore, "name": name]
+                "cellular": path.cellular, "wifi": path.wifi, "otherVPN": otherVPNUp(), "restore": restore,
+                "remembered": RestoreBack.remembered, "name": name]
     }
 
     /// The keys of features this build no longer has: removed once at launch.
@@ -268,7 +268,7 @@ enum LocalVPN {
     /// its KeepAlive too, so iOS can suspend the app; no time limit.
     private static func pause(cancelled: () -> Bool, paused: (Pause) -> Void) throws {
         paused(.app)
-        lock.lock(); pauses += 1; lock.unlock() // before installEnded: the configuration stays for it
+        lock.lock(); pauses += 1; lock.unlock() // before installEnded: the other VPN isn't brought back in between
         installEnded()
         defer {
             installBegan()
@@ -285,129 +285,64 @@ enum LocalVPN {
         log("the app is in front: going on")
     }
 
-    /// At launch, on coming back and when Restore My VPN is turned on: nothing is going on and our tunnel is up (a killed
-    /// or suspended app left it, or Settings turned it on): down. With Restore My VPN our configuration goes as well.
+    /// At launch and on coming back: nothing is going on and our tunnel is up (a killed or suspended app left it, or
+    /// Settings turned it on): down.
     static func takeDownLeftOver() {
         guard available, let id = providerID else { return }
-        NETunnelProviderManager.loadAllFromPreferences { ms, err in
-            if restore, let e = err { log("Restore My VPN: the configuration wasn't read: \(e.localizedDescription)") }
+        NETunnelProviderManager.loadAllFromPreferences { ms, _ in
             let m = ms?.first { ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == id }
-            let on = m.map { [.connected, .connecting, .reasserting].contains($0.connection.status) } ?? false
-            guard on || (restore && m != nil) else { return }
-            lock.lock(); let used = holds > 0 || installs > 0; lock.unlock()
-            if used { return log("\(restore ? "Restore My VPN: " : "")in use, the configuration stays until that ends") }
-            DispatchQueue.global(qos: .utility).async { downIfIdle(m, why: "left on with nothing going on") }
+            guard let m = m, [.connected, .connecting, .reasserting].contains(m.connection.status) else { return RestoreBack.look() }
+            DispatchQueue.global(qos: .utility).async {
+                downIfIdle(m, why: "left on with nothing going on")
+                RestoreBack.look()
+            }
         }
     }
 
-    /// Blocking, never on the main thread (iOS answers a load or a removal there): `m`'s tunnel down, unless something
-    /// holds it (or a start came after `gen`). Under startLock, until iOS says it is off, so a start never meets a
-    /// tunnel on its way down.
-    private static func downIfIdle(_ m: NETunnelProviderManager?, gen: Int? = nil, why: String) {
+    /// Blocking, never on the main thread: `m`'s tunnel down, unless something holds it (or a start came after `gen`).
+    /// Under startLock, until iOS says it is off, so a start never meets a tunnel on its way down.
+    private static func downIfIdle(_ m: NETunnelProviderManager, gen: Int? = nil, why: String) {
         func idle() -> Bool {
             lock.lock(); defer { lock.unlock() }
             return holds == 0 && installs == 0 && (gen == nil || gen == stopGen)
         }
-        guard m != nil || restore, idle() else { return } // a start going on has a hold: no waiting for startLock
+        guard idle() else { return } // a start going on has a hold: no waiting for startLock
         startLock.lock()
         defer { startLock.unlock() }
-        defer { giveBack(idle) }
-        guard let m = m, idle(), ![.disconnected, .invalid].contains(m.connection.status) else { return }
+        guard idle(), ![.disconnected, .invalid].contains(m.connection.status) else { return }
         m.connection.stopVPNTunnel()
-        log("off (\(why))\(restore ? "" : "; Restore My VPN is off: the configuration stays")")
+        log("off (\(why)); the configuration stays")
         let t0 = Date()
-        let limit = restore ? downWaitRestore : downWait
-        while m.connection.status != .disconnected, m.connection.status != .invalid, Date().timeIntervalSince(t0) < limit {
+        while m.connection.status != .disconnected, m.connection.status != .invalid, Date().timeIntervalSince(t0) < downWait {
             Thread.sleep(forTimeInterval: 0.05)
         }
     }
 
-    // ---- Restore My VPN (F411)
-    // While our configuration exists it keeps Settings > VPN's checkmark after a connect, so the VPN it took the place
-    // of stays off, On Demand or not. Removing it lets Settings > VPN pick the other VPN again once that page is opened;
-    // iOS leaves the other one disabled until then. The next start saves a new one and iOS asks Allow again.
-    // B427a: with the setting on it never stays, whatever was up as ours started: in Airplane Mode, or minutes after the last install,
-    // the other VPN isn't up, and it lost its place all the same.
+    // ---- Restore My VPN (F411, F419)
+    // Our configuration keeps Settings > VPN's checkmark after a connect, so the VPN it took the place of stays off, On
+    // Demand or not. With the setting on, RestoreBack brings that VPN back after the queue.
 
     private static let restoreKey = "ifizbox.vpn.restore"
     static var restore: Bool { UserDefaults.standard.bool(forKey: restoreKey) }
     static func setRestore(_ on: Bool) {
         UserDefaults.standard.set(on, forKey: restoreKey)
         log("Restore My VPN turned \(on ? "on" : "off")")
-        if on { takeDownLeftOver() }
+        if !on { RestoreBack.forget() }
     }
 
-    static let laterEvery: TimeInterval = 5 // while an install waits, how often giveBack looks again
-    static let retryAfter: TimeInterval = 10 // after a removal that failed
-    static let retries = 3
-    private static var failures = 0 // under startLock
-    private static var saidBusy = false // under startLock: one line per wait
     private static var pauses = 0 // guarded by lock: installs waiting in pause(), which hold nothing else
-    private static var later = false // guarded by lock: a giveBackLater is scheduled
 
-    /// What still needs the configuration with the tunnel off, or nil: an install waiting for the app, or an app being
-    /// downloaded, signed or installed (the next of a queue: iOS would ask Allow again between the two).
-    private static func waiting() -> String? {
+    /// The queue isn't over, with the tunnel off: an install waits for the app, or an app is being downloaded, signed or
+    /// installed.
+    static func waiting() -> Bool {
         lock.lock(); let n = pauses; lock.unlock()
-        if n > 0 { return "an install waits for the app" }
-        return SignJob.anyGoing ? "an app is being downloaded, signed or installed" : nil
+        return n > 0 || SignJob.anyGoing
     }
 
-    /// Blocking, under startLock: our configuration removed, with Restore My VPN on, once nothing uses it and it is
-    /// disconnected. Not now: looked at again (giveBackLater), and at the next stop, return to the app or launch.
-    private static func giveBack(_ idle: () -> Bool) {
-        guard restore, let id = providerID else { return }
-        guard idle() else { return log("Restore My VPN: the configuration is in use again, kept") }
-        if let w = waiting() {
-            if !saidBusy { log("Restore My VPN: the configuration stays for now: \(w)") }
-            saidBusy = true
-            return giveBackLater(laterEvery)
-        }
-        saidBusy = false
-        do {
-            let found: NETunnelProviderManager? = try wait("reading the VPN configuration", 10) { done in
-                NETunnelProviderManager.loadAllFromPreferences { ms, err in
-                    done(err, ms?.first { ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == id })
-                }
-            }
-            guard let m = found else { // Don't Allow, or removed already
-                failures = 0
-                return log("Restore My VPN: no configuration to remove")
-            }
-            guard [.disconnected, .invalid].contains(m.connection.status) else {
-                m.connection.stopVPNTunnel() // `cached` may be none
-                throw IDevice.Failure(code: "vpn_failed", text: "\(name) isn't off yet")
-            }
-            guard restore, idle(), waiting() == nil else {
-                log("Restore My VPN: turned off or in use again, the configuration is kept")
-                return giveBackLater(laterEvery)
-            }
-            let checked = m.isEnabled
-            let _: Bool? = try wait("removing the VPN configuration", 30) { done in
-                m.removeFromPreferences { done($0, true) }
-            }
-            lock.lock(); cached = nil; lock.unlock()
-            failures = 0
-            log("Restore My VPN: configuration removed (\(checked ? "it had" : "it didn't have") Settings > VPN's checkmark); up tunnels: \(tunnelList(tunnelAddresses()))")
-        } catch {
-            failures += 1
-            let again = failures <= retries
-            log("Restore My VPN: configuration not removed: \(error.localizedDescription); \(again ? "trying again in \(Int(retryAfter)) s" : "left for the next stop, return to the app or launch")")
-            if again { giveBackLater(retryAfter) } else { failures = 0 }
-        }
-    }
-
-    /// One at a time; when something uses the VPN by then, its own end looks again.
-    private static func giveBackLater(_ after: TimeInterval) {
-        lock.lock(); let already = later; later = true; lock.unlock()
-        guard !already else { return }
-        lock.lock(); let paused = pauses > 0; lock.unlock()
-        let task = paused ? nil : BackgroundHold("\(name) configuration") // a pause lets iOS suspend the app
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + after) {
-            lock.lock(); later = false; lock.unlock()
-            stopNow()
-            task?.end()
-        }
+    /// Blocking: runs `f` with no start of ours going on or beginning. A start waits for it, and can be cancelled.
+    static func withNoStart<T>(_ f: () -> T) -> T {
+        startLock.lock(); defer { startLock.unlock() }
+        return f()
     }
 
     /// The tunnel stops itself after a minute without packets (PacketTunnelProvider), for an app that was killed.
@@ -496,7 +431,6 @@ enum LocalVPN {
                         m.saveToPreferences { err in
                             stale = isStale(err)
                             done(err, true)
-                            if restore { stopLater() } // B427a: Allow tapped after saveLimit: nothing holds it any more
                         }
                     }
                     // iOS wants a load after a save before the tunnel starts
@@ -618,12 +552,14 @@ enum LocalVPN {
         if on { return }
         // Another VPN set since disabled ours, which the kept copy doesn't say: its start gives no error and never
         // connects. manager() reads it again (and enables and saves it when off)
+        RestoreBack.note()
         var m = try manager()
         if m.connection.status == .connected { return }
         try step("turning on \(name)")
         let t0 = Date()
         do { try m.connection.startVPNTunnel() } catch {
             // another app's VPN took its place since, or it changed: read it again, then try once more
+            RestoreBack.note()
             m = try manager()
             do { try m.connection.startVPNTunnel() } catch { throw IDevice.Failure(code: "vpn_failed", text: "\(name) didn't start: \(error.localizedDescription)") }
         }
@@ -684,16 +620,16 @@ enum LocalVPN {
         }
     }
 
-    /// The tunnel down now, when idle. The configuration stays saved (removed only with Restore My VPN, giveBack): a new
-    /// one would make iOS ask Allow on "Add VPN Configurations" again at the next install, so iOS asks once, at setup's
-    /// test (user, B357).
+    /// The tunnel down now, when idle. The configuration stays saved: a new one would make iOS ask Allow on "Add VPN
+    /// Configurations" again at the next install, so iOS asks once, at setup's test (user, B357).
     private static func stopNow(gen: Int? = nil) {
         lock.lock(); let m = cached; lock.unlock()
-        downIfIdle(m, gen: gen, why: "nothing left to do")
+        if let m = m { downIfIdle(m, gen: gen, why: "nothing left to do") }
+        RestoreBack.look()
     }
 
-    /// One background task, ended once; `expiring` runs first when iOS ends it early, off the main thread (B427a: giveBack
-    /// can't run there), for expireLimit at most: iOS ends an app that keeps an expired task.
+    /// One background task, ended once; `expiring` runs first when iOS ends it early, off the main thread (downIfIdle
+    /// blocks), for expireLimit at most: iOS ends an app that keeps an expired task.
     final class BackgroundHold {
         private let lock = NSLock()
         private var id = UIBackgroundTaskIdentifier.invalid
@@ -765,29 +701,34 @@ enum LocalVPN {
     }
 
     /// This VPN's configuration is connected now (read only: nothing saved, so iOS asks nothing). Blocking.
-    static func connectedNow() -> Bool { savedStatus() == .connected }
+    static func connectedNow() -> Bool { saved()?.status == .connected }
 
     /// Nothing of ours is up or about to be: no install or connection uses it, and iOS says it is off. A read that failed
     /// isn't down. Blocking, read only.
-    static func isDown() -> Bool {
+    static func isDown() -> Bool { state()?.down ?? false }
+
+    /// down: as isDown(). replaced: ours is saved but no longer enabled, so another VPN was picked since. nil when it
+    /// couldn't be read. Blocking, read only.
+    static func state() -> (down: Bool, replaced: Bool)? {
         lock.lock(); let used = holds > 0 || installs > 0; lock.unlock()
-        if used { return false }
-        guard let s = savedStatus() else { return false }
-        return [.disconnected, .invalid].contains(s)
+        if used { return (false, false) }
+        guard let s = saved() else { return nil }
+        return ([.disconnected, .invalid].contains(s.status), s.enabled == false)
     }
 
-    /// Our configuration's state as iOS has it; .invalid with none saved, nil when it couldn't be read. Blocking.
-    private static func savedStatus() -> NEVPNStatus? {
-        guard let id = providerID else { return .invalid }
-        var status = NEVPNStatus.invalid // written before done() signals the wait
+    /// Our configuration as iOS has it: .invalid and nil with none saved; nil when it couldn't be read. Blocking.
+    private static func saved() -> (status: NEVPNStatus, enabled: Bool?)? {
+        guard let id = providerID else { return (.invalid, nil) }
+        var status = NEVPNStatus.invalid, enabled: Bool? // written before done() signals the wait
         let read: Bool? = try? wait("reading the VPN configuration", 5) { done in
             NETunnelProviderManager.loadAllFromPreferences { ms, err in
                 let m = ms?.first { ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == id }
                 status = m?.connection.status ?? .invalid
+                enabled = m?.isEnabled
                 done(err, true)
             }
         }
-        return read == nil ? nil : status
+        return read == nil ? nil : (status, enabled)
     }
 }
 

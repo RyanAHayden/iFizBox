@@ -59,6 +59,9 @@ enum RestoreShortcutBridge {
         top.present(vc, animated: true)
     }
 
+    /// Blocking: the back run after a queue (RestoreBack). The error's code, "unavailable" where it can't run.
+    static func back() -> String? { refusal == nil ? run(.back).error : "unavailable" }
+
     private static func answer(_ c: Bridge.Call, _ k: RestoreShortcut.Kind) {
         DispatchQueue.global(qos: .userInitiated).async {
             let r = run(k)
@@ -81,8 +84,10 @@ enum RestoreShortcutBridge {
         RestoreShortcut.end()
         guard case .failed(let code, let text) = verdict else {
             log("\(k.rawValue) done")
+            if k == .store { RestoreBack.stored() }
             return (nil, nil)
         }
+        if code == "not_stored" { RestoreBack.notStored() }
         log("\(k.rawValue) failed: \(code)\(text.map { " (\($0))" } ?? ""); up tunnels: \(LocalVPN.tunnelList(LocalVPN.tunnelAddresses()))")
         return (code, text)
     }
