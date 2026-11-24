@@ -118,7 +118,7 @@ test("F361 loggedBridge: a signing.install that never ends is in the logs, Runni
   const [e] = logs.list();
   assert.equal(e.state, "running");
   assert.equal(e.title, "Install Delta");
-  assert.equal(logs.get(e.id).text, "Downloading\nSigned Delta 1.6 as com.example.delta, 40 MB\nInstalling on this iPhone");
+  assert.equal(logs.get(e.id).text, "Downloading\nSigned Delta 1.6 as com.example.delta, 40 MB\nConnecting to this iPhone");
   assert.equal(events.length, 4); // every event still reaches the caller
   finish({ bundleId: "com.example.delta", name: "Delta Emulator" });
   assert.equal((await p).name, "Delta Emulator");
