@@ -62,7 +62,7 @@ test("a This iPhone row: Copying to iPhone N%, Installing N%, Installed; the bar
   const t = await hereRun("a", "Alpha", [["copying", 0], ["copying", 0.5], ["copying", 1], ["installing", 0.4], ["installing", 1]]);
   await flush();
   assert.deepEqual(t.seen.map((s) => s.status),
-    ["Copying to iPhone", "Copying to iPhone 50%", "Copying to iPhone", "Installing 40%", "Installing"]);
+    ["Copying to iPhone", "Copying to iPhone 50%", "Installing", "Installing 40%", "Installing"]);
   assert.ok(t.seen.every((s) => s.state === "installing"), "never the prompt's 'asking'");
   assert.equal(t.seen[1].run, "Copying Alpha to iPhone (1 of 1)");
   assert.equal(t.seen[3].run, "Installing Alpha (1 of 1)");
