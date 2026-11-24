@@ -80,4 +80,4 @@ The step "copying" now starts at the first chunk that landed (the shell sends `c
   site (websign), the jailbreak build, notifications/Live Activity.
 
 ## Merge note
-The person answered "merge anyway": code and findings brought over from wip/R91 (not done.out, not plan files). Not split. The agent-runner fix for this kind of DECIDE (research task whose own text asks for code) could not be filed from this slot (plan add refuses outside its repo); to file from agent-runner.
+The person answered "merge anyway": this code and these findings are wip/R91 as is. Not split, not measured again.
