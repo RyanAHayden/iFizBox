@@ -1086,7 +1086,6 @@
 				</dict>
 			</dict>
 		</dict>
-		<!--   remember the VPN that is on now, or forget an old one -->
 		<!--   B398: whether the connected VPN has Connect On Demand on -->
 		<dict>
 			<key>WFWorkflowActionIdentifier</key>
@@ -1229,6 +1228,7 @@
 				<integer>2</integer>
 			</dict>
 		</dict>
+		<!--   remember the VPN that is on now, or forget an old one -->
 		<!--   forget an old idle VPN (F389) -->
 		<dict>
 			<key>WFWorkflowActionIdentifier</key>
