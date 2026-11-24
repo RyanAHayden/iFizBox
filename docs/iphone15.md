@@ -48,7 +48,7 @@ In `$IFIZBOX_15_RIG` (default `~/.local/share/ifizbox-rig/`), never in the repo:
 - `WDA.ipa`: WebDriverAgent, built and signed (below).
 - `ddi/iOS_DDI/`: the personalised developer disk image, copied from a Mac with Xcode
   (`/Library/Developer/DeveloperDiskImages/iOS_DDI`). Mounting asks Apple's signing server (gs.apple.com) for a
-  signature; it stays mounted until the phone reboots.
+  signature; iOS keeps its own copy mounted across restarts (see Gotchas).
 - `selfIdentity.plist`: go-ios's pairing identity. go-ios reads and writes it in the current directory, so
   `ui-15.sh` runs `ios` from this folder; run it there by hand too, or it makes a new one wherever you are.
 - `zsign` (native, built from the commit `tools/build-zsign-wasm.sh` pins) and `sign/` (`key.pem`, `cert.pem`,
@@ -92,7 +92,10 @@ keychain, put it on the search list (`security list-keychains -d user -s tmp.key
 - **While WDA runs, the phone shows WebDriverAgent's black app** if nothing else is in front, and the status bar
   offers "◀ WebDriverAgent…". `launch` brings the app you want forward.
 - **`home` from an app can land on the App Library** page; it's the Home Screen, just not page one.
-- **After a reboot**, the disk image is gone; `up` mounts it again and restarts WDA (about 5 s).
+- **The disk image survives reboots.** iOS keeps its own developer disk image (27B52, mounted as a cryptex from
+  codex.system) across restarts. It isn't in `ios image list`, and `umount-personalized` refuses it. `up` accepts it
+  as already mounted at /System/Developer and reports any other mount error. Don't run `mounter auto-mount --replace`:
+  it hangs in cryptexd and leaves the phone with no mount. After a reboot, `up` restarts WDA (about 5 s).
 - **Don't open WebDriverAgent from the Home Screen**: it only runs under the test runner and closes at once
   otherwise. That's normal.
 - **`lock-button` is a short side-button press** (an IOHID event). WDA's own `/wda/lock` holds the button, which
@@ -114,3 +117,9 @@ keychain, put it on the search list (`security list-keychains -d user -s tmp.key
   '{"token":"<token>"}'`. The token is in the push database: `npx wrangler d1 execute ifizbox-push --remote -c
   wrangler.ifizbox.toml --command "SELECT token, version, ios, updated FROM push_devices ORDER BY updated DESC"`
   in `worker/`; launching iFizBox on the phone re-registers it, so its row is the newest `updated` (docs/push.md).
+- **Tests that need a passcode**: prepare everything first (installs, test apps), then turn the passcode on. Never let
+  WebDriverAgent restart while it's on: iOS then asks for the passcode ("Enter iPhone Passcode for XCTest, Enable UI
+  Automation"), which nothing here can type. The backup is `pymobiledevice3 developer core-device universal-hid-service
+  tap -- X Y` (X and Y, 0..65535), which taps without WebDriverAgent and needs the disk image mounted. Confirm the
+  passcode is off by Settings showing "Turn Passcode On"; lockdown's PasswordProtected reads false while unlocked even
+  with one, so it proves nothing. Leave none on.
