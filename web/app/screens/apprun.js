@@ -564,7 +564,10 @@ export async function runAppRun(jobs, deps) {
     };
     // B394: Try Again while still following: signed again, and the shell hands iOS the copy already uploaded
     const again = () => {
-      if (live() && !closing && giveBack(DIDNT_DOWNLOAD)) retry(self.id);
+      if (live() && !closing) {
+        if (giveBack(DIDNT_DOWNLOAD)) retry(self.id);
+        else line("step", `Another app is still installing. Tap ${TRY_AGAIN_LABEL} once it's done.`, self.id);
+      }
       return true;
     };
     const hints = waitHints({ later, over: () => !live() || closing, show: (hint) => {

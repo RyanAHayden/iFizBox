@@ -107,7 +107,7 @@ const MAX_LINES = 1500; // lines kept on screen while it follows; the callers' l
 export const LOCK_LIMIT = 120_000;
 // B49: the finish button while iFizBox's own update is with iOS (disabled; iOS closes iFizBox to finish it).
 export const CLOSING_LABEL = `Closing ${NAME}`;
-// B123: the locked finish button while iOS hasn't got the whole new IPA yet (iOS's prompt up, or its download going):
+// B123: the locked finish button while iOS hasn't begun downloading the new IPA (iOS's prompt up, or unanswered):
 // CLOSING_LABEL only once the shell says it is closing (signing.selfUpdate finished or guessed).
 export const WAITING_LABEL = "Waiting for iOS";
 // B394: the page's title meanwhile (not "Complete": iOS hasn't installed it), and once it unlocks with Try Again.
@@ -437,15 +437,16 @@ const lockedPages = new WeakMap();
 // B123: `label` WAITING_LABEL while the shell still waits for iOS (followSelfUpdate turns it to CLOSING_LABEL).
 export function lockSelfUpdate(h, { later = setTimeout, label = CLOSING_LABEL } = {}) {
   if (typeof h?.finish === "function") {
-    h.set?.("Done");
-    h.finish({ label, status: "Done", ...(label === WAITING_LABEL ? { title: UPDATING_TITLE } : {}), locked: true });
+    const status = label === WAITING_LABEL ? "Sent to iOS" : "Done";
+    h.set?.(status);
+    h.finish({ label, status, ...(label === WAITING_LABEL ? { title: UPDATING_TITLE } : {}), locked: true });
     return true;
   }
   later(() => (h?.done ? h.done("Done") : h?.hide?.()), 1200);
   return false;
 }
 
-// B83: iFizBox's own update ended without iOS taking it (native CloseForUpdate said notStarted or stalled; iFizBox
+// B83: iFizBox's own update ended without iOS taking it (native CloseForUpdate said notStarted; iFizBox
 // stays open): the locked page (lockSelfUpdate) gets its buttons back, the error in red, and Try Again as its finish
 // button (`retry`, which runs on the tap; the page closes first). -> true when the page was there to change.
 export const TRY_AGAIN_LABEL = "Try Again";

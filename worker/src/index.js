@@ -14,7 +14,7 @@
 //   GET  /sign/host/<token>/manifest.plist, /sign/host/<token>/app.ipa   what that itms link fetches (each looks
 //                                           again for a few seconds before a 404: KV is eventually consistent)
 //   GET  /sign/host/<token>/status          B83: {manifest, asked, started, finished} as /sign/up's: the app stays open
-//                                           until iOS has the whole IPA, then closes so iOS can install over it
+//                                           until iOS has begun the download, then closes so iOS can install over it
 //
 //   POST /sign/upload?bundleid=&version=&title=&size=   F93: an app the website signed in the browser (any app) ->
 //                                           {token, partSize, parts}; then PUT /sign/upload/<token>/<i> each part (KV

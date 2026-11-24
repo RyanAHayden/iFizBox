@@ -33,8 +33,8 @@ class HostedSelfUpdate(unittest.TestCase):
 
     def test_closes_at_the_download_not_before(self):
         poll = body(cfu(), "private static func poll(")
-        self.assertIn('if known, on("started") || on("finished") {', poll)
-        asked = poll[poll.index('if known, on("asked")'):]
+        self.assertIn('if known, mark("started") || mark("finished") {', poll)
+        asked = poll[poll.index('if known, mark("asked")'):]
         asked = asked[:asked.index("set(.asked)")]
         self.assertNotIn("finish()", asked)
         self.assertNotIn("guess()", asked)

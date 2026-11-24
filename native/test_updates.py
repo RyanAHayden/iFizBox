@@ -147,7 +147,7 @@ class Wiring(unittest.TestCase):
         host = host[:host.index("\n    }\n")]
         self.assertNotIn("askToNotify", host)
         self.assertIn("UIApplication.shared.open(h.link)", host)
-        self.assertIn("afterPrompt(status: status, app: app)", host)
+        self.assertIn("afterPrompt(h, app: app)", host)
         self.assertIn("UpdateCheck.without(", self.src)
         self.assertIn("UpdateCheck.handedOff(", self.src)
         self.assertIn("forKey: BackgroundCheck.foundKey", self.src)

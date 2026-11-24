@@ -473,6 +473,11 @@ enum Sideload {
             }
             // B178: iFizBox closes itself once iOS has begun the download, with no notification (the progress page says so)
             CloseForUpdate.inFront {
+                guard h.age < h.life - CloseForUpdate.reuseSpare else { // came back too late
+                    opened(.failure(Failed(text: "server: the install link expired while \(Brand.name) was in the background. Try again.")))
+                    served?(false)
+                    return
+                }
                 UIApplication.shared.open(h.link)
                 CloseForUpdate.afterPrompt(h, app: app)
                 opened(.success((app, record)))
@@ -1529,16 +1534,23 @@ enum CloseForUpdate {
     static let quickPoll: TimeInterval = 1, quickFor: TimeInterval = 30 // B394: the first half minute
 
     // B394: the last upload and its install link, which the same IPA handed over again reuses. Main queue.
-    struct Hosted {
+    struct Hosted: Codable {
         let link: URL, status: URL?, record: SignedRecord, server: String, at: Date, life: TimeInterval
+        var again = false // reused: its `asked` mark may be the try before's, so it says nothing
         var age: TimeInterval { Date().timeIntervalSince(at) }
     }
-    static var hosted: Hosted?
+    // Kept across a close by hand; dropped once iOS has begun the download or the link has died.
+    private static let hostedKey = "ifizbox.selfUpdateHosted"
+    static var hosted: Hosted? {
+        get { UserDefaults.standard.data(forKey: hostedKey).flatMap { try? JSONDecoder().decode(Hosted.self, from: $0) } }
+        set { UserDefaults.standard.set(newValue.flatMap { try? JSONEncoder().encode($0) }, forKey: hostedKey) }
+    }
     private static var held = false // KeepAlive, once however often the prompt is opened again
     static let reuseSpare: TimeInterval = 30 // of the link's life, for the tap and iOS's requests
     static func reusable(_ r: SignedRecord, server: String) -> Hosted? {
-        guard let h = hosted, h.age < h.life - reuseSpare, h.server == server else { return nil }
+        guard var h = hosted, h.age < h.life - reuseSpare, h.server == server else { return nil }
         let o = h.record
+        h.again = true
         let same = o.sha256 != nil && r.sha256 != nil ? o.sha256 == r.sha256 : o.url == r.url
         return same && o.bundleID == r.bundleID && o.version == r.version && o.appID == r.appID
             && o.expires == r.expires && o.options == r.options ? h : nil
@@ -1625,13 +1637,13 @@ enum CloseForUpdate {
             let marks = (data.flatMap { try? JSONSerialization.jsonObject(with: $0) }) as? [String: Any]
             DispatchQueue.main.async {
                 guard mine == run else { return }
-                let on = { (k: String) in marks?[k] as? Bool == true }
+                let mark = { (k: String) in marks?[k] as? Bool == true }
                 let known = code == 200 && marks?["finished"] != nil
-                if known, on("started") || on("finished") {
-                    IDevice.ilog("self-close: iOS began the download (finished \(on("finished")))")
+                if known, mark("started") || mark("finished") {
+                    IDevice.ilog("self-close: iOS began the download (finished \(mark("finished")))")
                     return finish()
                 }
-                if known, on("asked"), state != .asked {
+                if known, mark("asked"), state != .asked, !h.again {
                     IDevice.ilog("self-update: iOS asked for the IPA (Install was tapped)")
                     set(.asked)
                 }
@@ -1647,6 +1659,7 @@ enum CloseForUpdate {
     // iOS has accepted the install: out, so iOS installs over this one. B178: no notification (user 2026-11-20); the
     // progress page already says iFizBox closes.
     private static func finish() {
+        hosted = nil
         set(.finished)
         closeWith()
     }
