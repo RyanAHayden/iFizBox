@@ -25,6 +25,7 @@ import { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, 
 import { SETUP_FOOTER, setupSteps, iphoneStatus, fixQuestion } from "../core/installroute.js"; // F414
 import { builtinVPN, setupFooter, iphoneSetUp, HOW_STEPS, vpnTestResult, NO_VPN, BUILTIN_VPN } from "../core/installroute.js"; // F372
 import { quietCheckDue, quietCheckAllowed, markQuietCheck } from "../core/installroute.js"; // F410b
+import { onCellular, cellularCheck, connectRefused } from "../core/installroute.js"; // B428a
 import { RESTORE_VPN, restoreShown, restoreFooter, setRestoreVPN } from "../core/installroute.js"; // F412
 import { createSwitch } from "../nav/switch.js";
 import { NAME } from "../brand.js";
@@ -62,6 +63,12 @@ async function readStatus(native) {
   try { return { st: (await within(call(native, "idevice.status"), TIMEOUTS.status)) ?? null, late: false }; } catch (e) { return { st: null, late: isLate(e) }; }
 }
 async function status(native) { return (await readStatus(native)).st; }
+// B428a: a check that was refused, read again: the status when the phone is on cellular now, else null.
+async function refusedOnCellular(native, err) {
+  if (!err || !connectRefused(err)) return null;
+  const st = await status(native);
+  return onCellular(st) ? st : null;
+}
 
 // F301: the last idevice.status answer, shown at once the next time a page draws (its rows spinning while it's read
 // again). Kept for this run of the app only: after a relaunch the VPN may well be another, so the first read waits.
@@ -220,10 +227,24 @@ export const TEST_MS = 120000; // vpn.test: the first one waits for the user's A
 export async function vpnTest(native, alert, store, { ended = () => {}, onPass = () => {} } = {}) {
   let r = null, err = null;
   let usedNow = false;
-  const before = lastStatus ?? await status(native);
+  const read = await status(native); // B428a: the network as it is now
+  if (read) rememberStatus(read);
+  const before = lastStatus;
+  if (onCellular(read)) {
+    ended();
+    await alert(cellularCheck(read));
+    return null;
+  }
   const first = Boolean(before) && !before.vpn?.tested; // not known: a later test, the pick stays
   await quietRun; // F410b
   try { r = await within(call(native, "vpn.test"), TEST_MS); } catch (e) { err = e; }
+  const cell = await refusedOnCellular(native, err);
+  if (cell) {
+    rememberStatus(cell);
+    ended();
+    await alert(cellularCheck(cell));
+    return r;
+  }
   // the row says Connected under the alert: the status is marked tested before the row repaints (ended)
   if (r?.ok && lastStatus) lastStatus = { ...lastStatus, vpn: { ...(lastStatus.vpn ?? {}), tested: true } };
   ended();
@@ -474,9 +495,12 @@ export function turnedDown(why, err) {
   const code = err?.code ?? raw.split(":")[0];
   return Boolean(why.again) && (code === "bad_pairing" || code === "not_paired" || droppedPairing(code, raw) || /invalidat|early eof|UnexpectedEof/i.test(raw));
 }
-export async function recheckPairing(native, alert, redraw, { spin = null } = {}) {
+// B428a: on cellular it can't tell: nothing is checked, kept or forgotten; `tell`: Fix or Pair Again asked for it, so it says so.
+export async function recheckPairing(native, alert, redraw, { spin = null, tell = false } = {}) {
   const st = await status(native);
   if (!st?.paired || !builtinVPN(st)) return "skipped";
+  const sayCellular = async (s) => { if (tell) await alert(cellularCheck(s)); return "cellular"; };
+  if (onCellular(st)) return sayCellular(st);
   const verify = async () => {
     await quietRun; // F410b
     try { await within(call(native, "idevice.verify"), TIMEOUTS.verify); return null; } catch (e) { lastErr = e; return isLate(e) ? { late: true } : verifyFailure(e, st); }
@@ -491,6 +515,8 @@ export async function recheckPairing(native, alert, redraw, { spin = null } = {}
   let why;
   if (spin) { const stop = spin("Checking Pairing"); try { why = await work(); } finally { stop(); } } else why = await busy("Checking Pairing", work);
   if (!why) { clearRouteFailure(); return "ok"; } // B316: after a sign-in or a new way in, the pairing answered: green again
+  const cell = why.late ? null : await refusedOnCellular(native, lastErr);
+  if (cell) return sayCellular(cell);
   if (!turnedDown(why, lastErr)) { rememberRouteFailure(why.late ? NO_ANSWER_FAILURE : routeFailureOf(lastErr, st)); return "failed"; } // B316
   await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {}));
   forgetStatus();
@@ -994,7 +1020,7 @@ async function drawPair(box, { store, native, alert, redraw }) {
   } else if (state === "paired" && rechecksPairing(v)) {
     // B416: Pair Again after an install: the kept pairing is checked once more, then forgotten and pairing starts
     v.rechecked = true;
-    recheckPairing(native, alert, recheck).then((r) => { if (visit === v && r !== "repair") recheck(); });
+    recheckPairing(native, alert, recheck, { tell: true }).then((r) => { if (visit === v && r !== "repair") recheck(); });
   } else if (state === "paired") {
     autoCheck(native, alert, recheck, store, checkButton); // B316: opened after a failure, or just paired again: checks by itself
   }
@@ -1076,8 +1102,8 @@ async function runQuietCheck(native, store, { launch = false, installing = () =>
   }
   if (choice() !== "iphone" || !clear()) return "unknown"; // changed or left meanwhile: not the pairing's answer
   if (!err) { clearRouteFailure(storage); return "ok"; }
-  const f = broken(err) ? routeFailureOf(err, st) : null;
-  if (!f) return "unknown";
+  const f = broken(err) && !(await refusedOnCellular(native, err)) ? routeFailureOf(err, st) : null;
+  if (!f || choice() !== "iphone" || !clear()) return "unknown";
   rememberRouteFailure(f, { storage, now: now() });
   return "failed";
 }
@@ -1087,18 +1113,29 @@ async function checkOnce(native, alert, redraw, store, mark, how) {
   mark?.reset();
   const stop = mark?.spin() ?? (() => {});
   let st = null;
+  // B428a: nothing is kept and no Fix is offered; the button keeps its label
+  const cellular = async (s) => {
+    stop();
+    rememberStatus(s);
+    if (how.quiet) redraw(); else await alert(cellularCheck(s));
+  };
   try {
     st = await status(native);
     rememberStatus(st);
+    if (onCellular(st)) return await cellular(st);
     if (st && !builtinVPN(st)) { stop(); throw Object.assign(new Error("connect_failed: no Network Extensions"), { code: "connect_failed" }); }
     await quietRun; // F410b: one at a time with the phone; this one's deadline starts after it
-    try { await within(call(native, "idevice.verify", ...(how.quiet ? [{ quiet: true }] : [])), TIMEOUTS.verify); } finally { stop(); }
+    await within(call(native, "idevice.verify", ...(how.quiet ? [{ quiet: true }] : [])), TIMEOUTS.verify);
+    stop();
     clearRouteFailure(); // B316
     const used = store.get(ROUTE_KEY) !== "iphone";
     if (used) store.set(ROUTE_KEY, "iphone"); // a set redraws Settings' pages, and the mark with them
     mark?.show(true);
     if (how.quiet) redraw();
   } catch (e) {
+    const cell = await refusedOnCellular(native, e); // still spinning while it's read
+    if (cell) return await cellular(cell);
+    stop();
     const why = isLate(e)
       ? { title: NOT_RESPONDING, message: `This iPhone didn't answer in ${TIMEOUTS.verify / 1000} seconds. Check that the VPN is on, then check again.`, again: false }
       : verifyFailure(e, st);

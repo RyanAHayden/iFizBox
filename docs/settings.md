@@ -69,8 +69,10 @@ rows or change footers. Top to bottom:
   Responding, whose action row is Fix. Fix on Pairing Lost opens Pairing, which checks the kept pairing once more, then
   pairs. A failed check asks Not Now or Fix: Fix pairs again when the pairing is lost, otherwise it checks again
   from the start, and a second failure shows its plain reason (OK). Check
-  Connection shows only while nothing is failing; a Fix tapped while a check runs joins it. On cellular, the
-  Couldn't Connect message adds "On cellular, check on Wi-Fi. Installs ask for Airplane Mode." With Signing Server
+  Connection shows only while nothing is failing; a Fix tapped while a check runs joins it. On cellular without
+  Wi-Fi, Check Connection, Fix, Test Connection and Set Up's test don't connect: they say "Can't Check on Cellular"
+  ("Join Wi-Fi, then check again.", OK), with no Fix, no Pair Again and nothing kept as a Route Failure; the automatic
+  checks stay silent. Installs ask for Airplane Mode there. With Signing Server
   chosen: Ready to Install through the server, Check Server.
   With the built-in VPN (the app's profile has Network Extensions): Ready to Install, "Straight onto this iPhone,
   through iFizBox VPN".
