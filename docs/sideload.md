@@ -366,7 +366,21 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   Cellular Installs ran in the app. The app judges a run by those actions, not by Shortcuts' callback
   (`ifizbox://cellular-installs`), whose error is only passed on as text. A failure answers `not_opened`, `not_run`, `no_end`,
   `no_return` or `busy` (`CellularShortcut.Verdict`). The bridge is refused in the jailbreak app and under any other bundle
-  ID. Nothing on screen uses it yet.
+  ID. No button on screen uses it yet, only the launch put-back below runs the Shortcut.
+  Cellular run: `cellular.run` runs the Shortcut with `{"run":1}`, only while installs wait in `waitOffCellular` with the
+  built-in VPN up. It answers `not_waiting` when none wait, `vpn_off` when the VPN is down, and `busy` while another run or
+  a put-back goes on. Each install counts from before its wait until its connection is open or it ended; when the last
+  one is done, the Wait for Install turns end early (20 s each, 15 of them). While the run goes on, the wait neither pauses
+  nor times out. The app judges the run by its own actions only (`runVerdict`): `not_opened`, `not_run` and `no_return` as
+  a check; `no_end` when no report comes for 30 s (10 s once the waits may end); `ran_out` when the Shortcut reached its end
+  with installs not connected, so nothing is put back. After a failed run, cellular data seen on (a cellular-only
+  NWPathMonitor path satisfied for 10 s) means nothing to put back; otherwise the app runs `{"on":1}`, once it is in front.
+  The answer's `putBack` is `null`, `"on"` or `"failed"`. `ifizbox.cellular.owed` in UserDefaults is set just before
+  Shortcuts opens and cleared once data is on again. Found at launch, it runs the same put-back, and `cellular.putBack`
+  gives the page the outcome once. The page then says "Cellular Data Is Back On" or "Check Cellular Data" (turn it on in
+  Settings > Cellular); a put-back that failed after a run is tried once more at the next launch. Installs queued behind (more than 3 at
+  once) that start after the last connection wait again and need another run. The page runs it through `runCellular`
+  (`signing/cellularrun.js`); no button calls it yet.
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`.
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and

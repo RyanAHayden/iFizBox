@@ -260,5 +260,5 @@ _Avoid_: cellular mode, data mode
 The one Shortcut that turns cellular data off while This iPhone installs connect, then on again
 _Said_: cellular installs shortcut
 _On screen_: Cellular Installs
-_In code_: CellularShortcut, cellular-installs.plist
+_In code_: CellularShortcut, cellular-installs.plist, CellularRun, cellularrun.js
 _Avoid_: Install Switch, Cellular Shortcuts

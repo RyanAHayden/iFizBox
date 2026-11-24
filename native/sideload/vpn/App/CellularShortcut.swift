@@ -135,6 +135,11 @@ enum CellularShortcut {
         if last { release() }
     }
 
+    static func releaseIfNone() {
+        lock.lock(); let none = connecting.isEmpty; lock.unlock()
+        if none { release() }
+    }
+
     private static func change(_ f: (inout Report) -> Void) {
         lock.lock(); defer { lock.unlock() }
         guard var c = current, !c.finished else { return }

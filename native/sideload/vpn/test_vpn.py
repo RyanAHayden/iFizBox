@@ -373,9 +373,11 @@ class CellularInstalls(unittest.TestCase):
         run = src[src.index("private static func run()"):src.index("// ---- Putting")]
         order = ["guard LocalVPN.waitsOnCellular()", "guard LocalVPN.connectedNow()", "CellularShortcut.begin(.run", "owed = true", "drive(.run)", "owed = false"]
         self.assertEqual(sorted(order, key=run.index), order)
-        self.assertLess(run.index("giveUp()"), run.index("putBack())"))
+        self.assertLess(run.index("giveUp()"), run.index("= putBack()"))
         back = src[src.index("private static func putBack()"):]
-        self.assertLess(back.index("drive(.on)"), back.rindex("owed = false"))
+        self.assertNotIn("owed = false", back)  # its callers: a run keeps it after a failed put-back, for one more at launch
+        self.assertIn('if back != "failed" { owed = false }', run)
+        self.assertLess(run.index("begin(.run"), run.index("releaseIfNone()"))
         self.assertIn("guard owed, CellularShortcutBridge.available", src)
         vpn = read("App", "LocalVPN.swift")
         self.assertIn("CellularRun.register(b)", vpn)

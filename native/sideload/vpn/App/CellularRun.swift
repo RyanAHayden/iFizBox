@@ -43,8 +43,10 @@ enum CellularRun {
     private static func run() -> (error: String?, text: String?, putBack: String?) {
         guard LocalVPN.waitsOnCellular() else { return ("not_waiting", nil, nil) }
         guard LocalVPN.connectedNow() else { return ("vpn_off", nil, nil) }
-        guard !owed, CellularShortcut.begin(.run, vpnUp: true) else { return ("busy", nil, nil) }
+        lock.lock(); let atLaunch = launching; lock.unlock()
+        guard !atLaunch, CellularShortcut.begin(.run, vpnUp: true) else { return ("busy", nil, nil) }
         log("run begins; path: \(LocalVPN.Path.described())")
+        CellularShortcut.releaseIfNone() // the last install ended meanwhile
         owed = true
         let verdict = CellularShortcutBridge.drive(.run) { r, s in
             CellularShortcut.runVerdict(r, elapsed: s.elapsed, front: s.front, quiet: s.quiet, said: s.said)
@@ -60,44 +62,54 @@ enum CellularRun {
             return (code, nil, nil)
         }
         _ = CellularShortcut.giveUp()
-        return (code, text, putBack())
+        let back = putBack()
+        if back != "failed" { owed = false } // else the next launch tries once more
+        return (code, text, back)
     }
 
     // ---- Putting cellular data back
 
-    static let onSteady: TimeInterval = 2 // cellular up for this long: the data is on
-    static let onLimit: TimeInterval = 4
+    static let onLimit: TimeInterval = 2 // for the first reading
+    /// Cellular up for this long: the data is on, and a Shortcut given up or left by a killed app isn't about to turn
+    /// it off any more.
+    static let onSteady: TimeInterval = CellularShortcut.settle
 
     private static let lock = NSLock()
     private static let launch = DispatchGroup() // the put-back at launch
+    private static var launching = false // guarded by lock: that goes on
     private static var outcome: String? // guarded by lock: what it did, until the page asked
 
     private static func launched() {
         guard owed, CellularShortcutBridge.available else { return }
         log("the app ended during a run")
+        lock.lock(); launching = true; lock.unlock()
         DispatchQueue.global(qos: .utility).async(group: launch) {
             let o = putBack()
-            lock.lock(); outcome = o; lock.unlock()
+            owed = false // failed as well: the page says to turn it on, and no later launch opens Shortcuts again
+            lock.lock(); outcome = o; launching = false; lock.unlock()
         }
     }
 
-    /// Blocking, however long until the app is in front: cellular data on again. nil when it was on already. A
-    /// put-back that failed isn't tried again: the page says to turn it on in Settings.
+    /// Blocking, however long until the app is in front: cellular data on again. nil when it was on already.
     private static func putBack() -> String? {
-        if dataOn() {
-            owed = false
+        func nothing() -> Bool {
+            guard dataOn() else { return false }
             log("cellular data is on: nothing to put back")
-            return nil
+            return true
         }
+        if nothing() { return nil }
         while true {
-            while !CellularShortcutBridge.active() { Thread.sleep(forTimeInterval: 0.25) }
+            if !CellularShortcutBridge.active() {
+                while !CellularShortcutBridge.active() { Thread.sleep(forTimeInterval: 0.25) }
+                if nothing() { return nil } // it came on while the app was away
+                continue
+            }
             if CellularShortcut.begin(.on, vpnUp: false) { break }
             Thread.sleep(forTimeInterval: 0.25) // a check goes on
         }
         let verdict = CellularShortcutBridge.drive(.on) { r, s in
             CellularShortcut.verdict(r, elapsed: s.elapsed, front: s.front, said: s.said)
         }
-        owed = false
         guard case .failed(let code, let text) = verdict else {
             log("cellular data put back")
             return "on"
@@ -113,7 +125,7 @@ enum CellularRun {
         m.start(queue: DispatchQueue(label: "ifizbox.cellular.data"))
         defer { m.cancel() }
         var steady = 0.0, waited = 0.0
-        while waited < onLimit {
+        while waited < onLimit || steady > 0 {
             Thread.sleep(forTimeInterval: 0.1)
             waited += 0.1
             steady = m.currentPath.status == .satisfied ? steady + 0.1 : 0

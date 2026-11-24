@@ -60,6 +60,11 @@ check(!C.waiting() && C.report?.released == true, "both are: the wait ends early
 C.waited(); C.finished()
 check(C.report?.ok == true && !C.running, "and the run is over")
 
+check(C.begin(.run, vpnUp: true, now: Date() + 60) && C.waiting(), "a run")
+C.releaseIfNone()
+check(!C.waiting(), "no install left: it doesn't wait")
+C.opened(); C.waited(); C.finished()
+
 // a run's verdict
 func rv(opened: Bool = true, turns: Int = 0, released: Bool = false, finished: Bool = false, elapsed: Double = 100, front: Double = 90, quiet: Double = 0) -> C.Verdict {
     C.runVerdict(C.Report(kind: .run, opened: opened, turns: turns, released: released, finished: finished),
