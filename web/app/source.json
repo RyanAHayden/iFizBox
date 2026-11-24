@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "0.27.0",
+          "date": "2026-11-24T01:09:12Z",
+          "localizedDescription": "Updates no longer bounce between iFizBox and Shortcuts.\nUpdating iFizBox by Signing Server no longer gets stuck.\nAdd Tweaks now queues the app too.\nAn older Install Switch is offered its update.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.27.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.27.0/iFizBox.ipa",
+          "size": 31921638,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.26.0",
           "date": "2026-11-23T20:17:19Z",
           "localizedDescription": "Install Switch opens Shortcuts once per install queue.\nSwipe between Details, Reviews and Related.\nHold Install to queue an update straight away.\nApps waiting their turn show a moving bar.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.26.0",
@@ -250,14 +258,6 @@
           "localizedDescription": "Paid tweaks in sideloaded apps: sign in to Chariz or Havoc and buy, or get free purchased tweaks without signing in\nHome warns in red when signing needs setup or the Signing Server is down; a Why iFizBox tile\nA source that fails to refresh opens a page with the whole error and Refresh / Edit / Remove; BigBoss loads again\nPull to refresh holds open while it refreshes; notifications show iFizBox's icon; the launch screen matches the app\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.17.1",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.17.1/iFizBox.ipa",
           "size": 17718352,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.17.0",
-          "date": "2026-11-20T16:22:38Z",
-          "localizedDescription": "Tweaks in sideloaded apps: add APT and GitHub tweaks to any app you sign, no jailbreak\nAdd Tweaks on every app page: tweaks made for that app, ElleKit bundled, kept through updates\nGitHub repos as sources: YTLite, BHTwitter, uYouEnhanced and more, straight from their releases\nFind More Sources from Canister's repo index; Why iFizBox page; .ipa files open in iFizBox instead of unzipping\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.17.0",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.17.0/iFizBox.ipa",
-          "size": 16587049,
           "minOSVersion": "15.0"
         }
       ]
