@@ -178,8 +178,8 @@ test("no text the core says names Tailscale or LocalDevVPN", () => {
   for (const w of words) assert.doesNotMatch(w, /tailscale|localdevvpn/i, w);
 });
 
-test("B419: the wait on cellular asks for Wi-Fi or Airplane Mode", () => {
-  assert.equal(AIRPLANE_ON, "Join Wi-Fi or turn on Airplane Mode");
+test("B419: the wait on cellular has its own line", () => {
+  assert.equal(AIRPLANE_ON, "Waiting to leave cellular data");
 });
 
 test("setRestoreVPN: vpn.setRestore with a plain boolean", async () => {

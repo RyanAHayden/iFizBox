@@ -19,7 +19,7 @@ test("Install Apps With: This iPhone and Signing Server, the chosen one checked,
 test("This iPhone chosen: its status and How It Works, and a tap picks", () => {
   const picked = [];
   const gs = installationGroups("iphone", VPN_ST, { pick: (v) => picked.push(v) });
-  assert.deepEqual(gs.map((g) => g.rows.map((r) => r.label)).slice(1), [["Ready to Install", "Check Connection"], ["Forget Pairing"], ["How It Works"]]);
+  assert.deepEqual(gs.map((g) => g.rows.map((r) => r.label)).slice(1), [["Ready to Install", "Check Connection"], ["Ask Each Time", "Use Signing Server"], ["Forget Pairing"], ["How It Works"]]);
   gs[0].rows[1].onClick();
   assert.deepEqual(picked, ["server"]);
   assert.equal(SUB_TITLES.pair, "Pairing");

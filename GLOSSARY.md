@@ -248,3 +248,10 @@ _Said_: Restore My VPN switch
 _On screen_: Restore My VPN
 _In code_: LocalVPN.restore, vpn.setRestore, noteOther, giveBack
 _Avoid_: put-back, give back VPN
+
+**On Cellular**:
+What an install straight onto this iPhone does while the phone is on cellular data: ask each time, or go through the Signing Server
+_Said_: on cellular
+_On screen_: On Cellular: Ask Each Time / Use Signing Server
+_In code_: core/cellular.js, onCellularChoice
+_Avoid_: cellular mode, data mode

@@ -42,10 +42,10 @@ test("the shell's every-connection-refused (route_refused): not the pairing", ()
   assert.match(f.message, /isn't the pairing/);
   assert.ok(f.message.includes(BUILTIN_VPN));
   assert.equal(verifyFailure(e, FINE).again, false);
-  // on cellular: installs ask for Airplane Mode
+  // on cellular: check on Wi-Fi
   const c = routeFailureOf(e, CELL);
   assert.equal(c.fix, "check");
-  assert.match(c.message, /On cellular, check on Wi-Fi\. Installs ask for Airplane Mode\./);
+  assert.match(c.message, /On cellular, check on Wi-Fi\./);
   assert.ok(!/Install Switch|Shortcut/.test(c.message));
   // the install alert and log say the same (deviceError), with the fix button
   const d = deviceError(e, "Unbound");

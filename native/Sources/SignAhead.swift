@@ -249,7 +249,7 @@ enum SignAhead {
             let spare = servers.local ? spareLink(k.output) : nil
             let keepAgain = { () -> Bool in
                 guard let s = spare else { return false }
-                guard !job.cancelled, FileManager.default.fileExists(atPath: s.path) else {
+                guard !job.cancelled || job.keeps, FileManager.default.fileExists(atPath: s.path) else {
                     try? FileManager.default.removeItem(at: s)
                     return false
                 }

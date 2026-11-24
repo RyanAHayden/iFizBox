@@ -55,7 +55,7 @@ final class SignJob {
 
     // Stops the job tagged `tag` (and any that begins under it later). False when none was running.
     @discardableResult
-    static func cancel(tag: String) -> Bool {
+    static func cancel(tag: String, keep: Bool = false) -> Bool {
         lock.lock()
         let j = tagged.removeValue(forKey: tag)
         if !cancelledTags.contains(tag) {
@@ -63,8 +63,14 @@ final class SignJob {
             if cancelledTags.count > keptTags { cancelledTags.removeFirst(cancelledTags.count - keptTags) }
         }
         lock.unlock()
+        if keep { j?.keepSigned() }
         return j?.cancel() ?? false
     }
+
+    // F417: cancelled to install it another way: the signed copy is kept (SignAhead.open).
+    private var kept = false
+    var keeps: Bool { lock.lock(); defer { lock.unlock() }; return kept }
+    private func keepSigned() { lock.lock(); kept = true; lock.unlock() }
 
     // Whether signing.cancel {tag} was asked for `tag` (a signing.progress watch under it ends).
     static func wasCancelled(tag: String) -> Bool { lock.lock(); defer { lock.unlock() }; return cancelledTags.contains(tag) }

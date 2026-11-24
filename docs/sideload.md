@@ -299,14 +299,24 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   Test Connection (`vpn.test`) before it says Paired. iOS runs one VPN at a time, so your VPN pauses for the install, and since ours keeps Settings > VPN's checkmark, a VPN that relies on On Demand stays off until you turn it on again, unless Restore My VPN is on (below).
   On cellular, iOS refuses these connections and starts no VPN without a network, but keeps one that is up. So before
   each connect, `IDevice.install` calls `LocalVPN.waitOffCellular`. The built-in VPN comes on while data is on, then the
-  path is read again for 3 s (a short Wi-Fi drop isn't cellular). Only then does the install ask "Join Wi-Fi or turn on
-  Airplane Mode", and it waits until NWPathMonitor's path has been off cellular for 1 s (Airplane Mode, or Wi-Fi
+  path is read again for 3 s (a short Wi-Fi drop isn't cellular). Only then does the install wait, its row reading
+  "Waiting to leave cellular data", until NWPathMonitor's path has been off cellular for 1 s (Airplane Mode, or Wi-Fi
   joined), up to 5 minutes ("airplane_timeout", which offers the Signing Server). Control Center over the app is not
   leaving and doesn't stop the wait. Out of the app 30 s (`awayGrace`) with the path still on cellular, the wait pauses
   (see below) and the VPN goes off; once Airplane Mode is on (not cellular) it is never dropped. The pause isn't part of
   the 5 minutes. Cancel or the timeout ends the install's hold, and the VPN goes off 3 s
   later. Once the connection opens, the install emits `airplaneOff` and the page says "You can turn Airplane Mode off".
   A reconnect with cellular data back waits again.
+  **Ask** (On Cellular, Ask Each Time; the default): while an install waits, the page shows the popup "You're on Cellular"
+  with **Use Signing Server** and **Cancel**. It is one popup for the run, not one per install, and it closes by itself
+  once the path leaves cellular (the wait ends with `offCellular`, below), or once no install waits any more. Its
+  answer holds for the rest of the run. **Use Signing Server** there: `signing.cancel {tag, keep: true}` ends the wait and
+  keeps the signed copy, and the run's remaining rows go through the user's Signing Server, one iOS prompt at a time. (A
+  single install, not through the queue, signs again for the server, since a cancelled `signing.install` keeps nothing.)
+  **Cancel**: the rows fail "not installed, still on cellular", and Try Again asks anew.
+  **Use Signing Server** as the On Cellular setting: `decideRoute` (core/installroute.js) goes to the server at once while
+  on cellular, with no popup. Code: `web/app/core/cellular.js` (the setting, its texts and the popup's buttons),
+  `web/app/signing/cellular.js` (the popup, one per run).
   With no network and our tunnel not up (Airplane Mode just turned off, Wi-Fi or cellular data still coming back),
   LocalVPN waits up to 8 s awake for one (`networkWait`, `waitForNetwork`) before it fails with `vpn_failed`, "can't start
   without a network". That wait is outside `startLock`, so `status()` and other starts aren't held up. An install waits
@@ -325,7 +335,9 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   Wi-Fi counts as joined when en0 has an IPv4 address, even if the path prefers cellular (Wi-Fi Assist, Wi-Fi without
   internet, another VPN's route). Joined Wi-Fi never waits, and joining Wi-Fi during the wait goes on by itself. The log
   records the path's interfaces where the wait begins.
-  Events: `phase` (`signing.open`) / `here` (`signing.install`) "airplane", "airplaneOff", "appWait", "networkWait". In the IPA queue, on cellular
+  Events: `phase` (`signing.open`) / `here` (`signing.install`) "airplane", "airplaneOff", "appWait", "networkWait". The wait
+  ends on cellular with `offCellular` (`phase`, and `here` in `signing.install`), which closes the popup; the row then says it is
+  connecting. In the IPA queue, on cellular
   (`idevice.status` `vpn.cellular`) `openPrepared` holds the install until every row is downloaded and signed
   (`allSigned` in `core/apprun.js`); the off line shows only when every remaining row has its connection
   (`airplaneStatus`). One app at a time: Re-sign All's direct call (`signing.resignAll`) downloads each app in turn, so

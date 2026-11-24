@@ -226,6 +226,8 @@ test("F235: a tagged job stops alone") {
     let again = SignJob.begin(tag: "a")
     check(again.cancelled, "a job begun under a cancelled tag starts cancelled")
     check(!SignJob.cancel(tag: "early") && SignJob.begin(tag: "early").cancelled, "Stop before the job began")
+    let k = SignJob.begin(tag: "k")
+    check(SignJob.cancel(tag: "k", keep: true) && k.cancelled && k.keeps && !a.keeps, "F417: cancelled, its signed copy kept")
     b.end()
     check(!SignJob.cancel(tag: "b") && !b.cancelled, "an ended job isn't cancelled")
     check(SignJob.cancelCurrent() && plain.cancelled, "the untagged job still stops")

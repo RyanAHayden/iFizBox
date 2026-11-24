@@ -13,6 +13,7 @@
 // `colors`: { [button index]: "green" | "red" } (sources.css .alert-button.green/.red): the way to go, and the one to avoid.
 // `onTap(index)` runs inside the tap's own click (before the promise resolves), for what Safari only allows from a
 // user gesture, such as opening an itms-services link.
+// F417: `signal` (an AbortSignal) closes the alert by itself: it resolves with index -1.
 // A one-button (OK) alert: title, message. `alert` swaps in another showAlert (tests pass a fake).
 //
 // F345b: in the app under the iOS 26 style (<html data-style="ios26">) the alert is
@@ -26,16 +27,26 @@ import { nativeBridge, hasNativeCall } from "../native.js";
 
 export const alertOK = (title, message, alert = showAlert) => alert({ title, message, buttons: ["OK"] });
 
+let alertIds = 0; // F417
 export function showAlert(opts = {}) {
+  if (opts.signal?.aborted) return Promise.resolve({ index: -1, value: undefined });
   const native = nativeBridge();
   if (!wantsNativeAlert(opts, native)) return cssAlert(opts);
   const { title = "", message = "", input = null, buttons = ["OK"], cancel = 0, colors = {} } = opts;
   const params = { title: String(title ?? ""), message: String(message ?? ""), buttons: buttons.map((b) => String(b)),
     cancel: buttons.length > 1 && Number.isInteger(cancel) ? cancel : -1, colors: nativeColors(colors, buttons.length) };
   if (input) params.input = { placeholder: String(input.placeholder ?? ""), value: String(input.value ?? ""), type: String(input.type || "text") };
+  const { signal = null } = opts;
+  let closing = null; // F417: ui.alertClose names the alert
+  if (signal) {
+    params.id = `a${++alertIds}`;
+    closing = () => { Promise.resolve(native.call("ui.alertClose", { id: params.id })).catch(() => {}); };
+    signal.addEventListener("abort", closing, { once: true });
+  }
   const submit = input?.pasteSubmits;
   if (Number.isInteger(submit) && submit >= 0 && submit < buttons.length) params.input.pasteSubmits = submit;
-  return native.call("ui.alert", params).then((r) => {
+  return native.call("ui.alert", params).finally(() => { if (closing) signal.removeEventListener("abort", closing); }).then((r) => {
+    if (signal && (signal.aborted || r?.closed)) return { index: -1, value: undefined };
     const index = Number.isInteger(r?.index) && r.index >= 0 && r.index < buttons.length ? r.index : (params.cancel >= 0 ? params.cancel : 0);
     let value = input ? String(r?.value ?? "") : undefined;
     // F377: the field's Paste answered for the pasteSubmits button (`pasted`). As the CSS alert's Paste, `input.paste`
@@ -47,7 +58,7 @@ export function showAlert(opts = {}) {
       value = v;
     }
     return { index, value };
-  }, () => cssAlert(opts)); // an older shell ("unknown method ui.alert") or no window to show it in
+  }, () => (signal?.aborted ? { index: -1, value: undefined } : cssAlert(opts))); // an older shell ("unknown method ui.alert") or no window to show it in
 }
 
 // The native alert only in the app (the bridge takes calls), under the native controls hook, and never for a countdown
@@ -67,7 +78,7 @@ function nativeColors(colors, count) {
 }
 
 // The CSS alert: iOS 6's UIAlertView, restyled by each era's stylesheet.
-function cssAlert({ title = "", message = "", input = null, buttons = ["OK"], cancel = 0, stacked = false, countdown = null, colors = {}, onTap = null } = {}) {
+function cssAlert({ title = "", message = "", input = null, buttons = ["OK"], cancel = 0, stacked = false, countdown = null, colors = {}, onTap = null, signal = null } = {}) {
   return new Promise((resolve) => {
     const scrim = document.createElement("div");
     scrim.className = "alert-scrim";
@@ -182,9 +193,12 @@ function cssAlert({ title = "", message = "", input = null, buttons = ["OK"], ca
     (field || [...row.children].reverse().find((b) => !b.disabled) || row.lastChild).focus({ preventScroll: true });
 
     let done = false;
+    const aborted = () => close(-1);
+    signal?.addEventListener("abort", aborted, { once: true });
     function close(index) {
       if (done) return;
       done = true;
+      signal?.removeEventListener("abort", aborted);
       if (tick) clearInterval(tick);
       document.removeEventListener("keydown", onKey);
       if (vv) { vv.removeEventListener("resize", fit); vv.removeEventListener("scroll", fit); }
@@ -192,7 +206,7 @@ function cssAlert({ title = "", message = "", input = null, buttons = ["OK"], ca
       field?.blur();
       const a = scrim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: "ease-in", fill: "forwards" });
       a.finished.then(() => scrim.remove(), () => scrim.remove());
-      onTap?.(index);
+      if (index >= 0) onTap?.(index);
       resolve({ index, value });
     }
   });

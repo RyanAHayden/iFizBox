@@ -26,7 +26,8 @@ import { recordSelfUpdate } from "../core/selfupdate.js";
 import { showAlert } from "../nav/alert.js";
 import { askInsecure, bridge, keepIpaHash, refusing, storageOf } from "./common.js";
 import { getServer, defaultServer } from "./identity.js";
-import { serverFallback, rememberRouteFailure, clearRouteFailure } from "../core/installroute.js"; // F366
+import { serverFallback, rememberRouteFailure, clearRouteFailure, storedRoute } from "../core/installroute.js"; // F366
+import { cellularStopped } from "./cellular.js"; // F417
 import { chooseRoute, holdApp } from "./route.js";
 import { withSavedIpa, customInstallSave, listedOf } from "../core/appqueue.js"; // F379
 export { hereLabel, shownName, finishHere } from "./common.js";
@@ -111,10 +112,11 @@ const dropKeptIpa = (url, file, native) => import("../core/myipas.js").then(asyn
 // F366: `server`: this row goes through the default Signing Server whatever Install Apps With says (the run's Use the
 // Signing Server). A This iPhone failure that offers it (core/installroute.js serverFallback) throws with `fallback`,
 // the failure's { title, short, fix, button }.
-export async function openPrepared(row, { tag, signal = null, progress = () => {}, log = () => {}, host = false, wait = ASK_WAIT, native, again = false, server = false, allSigned = null } = {}) {
+export async function openPrepared(row, { tag, signal = null, progress = () => {}, log = () => {}, host = false, wait = ASK_WAIT, native, again = false, server = false, allSigned = null, cell = null } = {}) {
   const name = row?.name || row?.id || "";
   let opened;
   let route = null;
+  let cellWait = null; // F417: the wait on cellular (signing/cellular.js), its popup shared by the run
   if (again && !host) {
     // B91: a row iOS didn't download, tapped: the shell's IPA (still served) gets iOS's prompt again, no new signing;
     // code "gone" when it isn't served any more
@@ -123,6 +125,7 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
   } else try {
     route = server ? {} : await chooseRoute({ native });
     if (!route) throw Object.assign(new Error("Cancelled"), { code: "cancelled" });
+    if (!route.route && !server && cell && storedRoute() === "iphone") cell.useServer(); // F417: the rest of the run too, one iOS prompt at a time
     if (route.route) host = false; // This iPhone: installd updates iFizBox in place
     // B111: This iPhone has no iOS prompt: the row shows the copy and installd's percent (herePhase), and the reply
     // comes once installd has the app
@@ -133,18 +136,26 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
     }
     if (signal?.aborted) throw Object.assign(new Error("Cancelled"), { code: "cancelled" });
     if (route.route) progress("connecting", 0); // R91: not copying until bytes go
-    opened = await abortable(native, "signing.open", { token: row.token, manifestServer: server ? defaultServer() : getServer(), ...(host ? { host: true } : {}), ...route },
+    // F417: stopped by the popup: the shell keeps the signed copy for the Signing Server, and its answer is waited for
+    // (a connection that just opened goes on)
+    if (route.route) cellWait = cell?.watch(() => { Promise.resolve(bridge(native).call("signing.cancel", { tag, ...(cell.answer === "server" ? { keep: true } : {}) })).catch(() => {}); });
+    if (cellWait) signal?.addEventListener?.("abort", () => cellWait.end(), { once: true });
+    opened = await abortable(native, "signing.open", { token: row.token, manifestServer: server && server !== "own" ? defaultServer() : getServer(), ...(host ? { host: true } : {}), ...route },
       (ev) => {
         if (ev?.log) { log(ev.log); return; }
         const p = route.route ? herePhase(ev) : null;
+        if (p && !signal?.aborted) cellWait?.phase(ev.phase); // F417
         if (p) progress(p.phase, p.fraction);
         else if (!route.route && (ev?.phase === "uploading" || ev?.phase === "handoff")) progress(ev.phase, 0); // B424: before iOS's prompt
       }, { tag, signal });
+    cellWait?.end();
     // F380: the IPA the shell kept in My IPAs for this install (keepInLibrary), for the save after it lands
     if (opened?.libraryFile) await keptIpa(row?.job?.url, opened.libraryFile);
     if (route.route) clearRouteFailure(); // B416: an install went through
     if (route.route) return { installed: opened?.installed ?? true, expires: opened?.expires ?? null };
   } catch (e) {
+    const stopped = cellWait?.end();
+    if (stopped && e?.code === "cancelled" && !signal?.aborted) throw cellularStopped(stopped); // F417
     const err = rowError(e, name);
     // F366: with idevice.status, so the failure's words follow the VPN's state
     const fallback = route ? serverFallback(e, route, await routeStatus(route, native)) : null;
@@ -195,6 +206,7 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
 // or null (not a step event). F368: "airplane" and "airplaneOff" too.
 export function herePhase(ev) {
   if (["airplane", "airplaneOff", "appWait", "networkWait"].includes(ev?.phase)) return { phase: ev.phase, fraction: 0 };
+  if (ev?.phase === "offCellular") return { phase: "connecting", fraction: 0 }; // F417
   if (ev?.phase !== "connecting" && ev?.phase !== "copying" && ev?.phase !== "installing") return null;
   const f = Number(ev.progress);
   return { phase: ev.phase, fraction: Number.isFinite(f) ? Math.max(0, Math.min(1, f)) : 0 };

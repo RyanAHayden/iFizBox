@@ -18,6 +18,7 @@ import { askInsecure, bridge, failed, stopNative, untilCancel } from "./common.j
 import { getServer } from "./identity.js";
 import { firstInstallCheck, lastDevice, openRoute } from "./device.js";
 import { chooseRoute } from "./route.js";
+import { cellularAsk } from "./cellular.js"; // F417
 
 // F243: every call but options carries Keep Bundle IDs off (withKeep), so an IPA without Sign Options of its own signs,
 // and counts as signed, the way Settings > Signing says; options sends the Sign Options page's own switch.
@@ -82,7 +83,16 @@ export async function installFromLibrary({ file, name = "", signed = false, onIn
   if (h.cancelled) return false;
   h.set(route.route ? "Connecting to this iPhone" : HANDOFF); // B424: nothing installs yet
   let result;
-  try { result = await untilCancel(h, libraryCall("install", { file, manifestServer: server, ...route }, onEvent, native)); } catch (e) { return fail(e); }
+  const wait = cellularAsk({ alert }).watch(() => stopNative(native)); // F417
+  h.onCancel?.(() => wait.end());
+  const asked = (ev) => { if (route.route) wait.phase(ev?.phase); onEvent(ev); };
+  try { result = await untilCancel(h, libraryCall("install", { file, manifestServer: server, ...route }, asked, native)); wait.end(); } catch (e) {
+    const stopped = wait.end();
+    if (!stopped || h.cancelled || e?.code !== "cancelled") return fail(e);
+    if (stopped === "cancel") { failed(h, "Not installed, still on cellular."); return false; }
+    h.set(HANDOFF);
+    try { result = await untilCancel(h, libraryCall("install", { file, manifestServer: server }, onEvent, native)); } catch (e2) { return fail(e2); }
+  }
   if (h.cancelled) return false;
   onInstalled(result);
   const followInstall = follow ?? (await import("../signing-sheet.js")).followInstall;

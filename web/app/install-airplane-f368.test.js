@@ -49,7 +49,7 @@ test("the wait, then the line that it can go off, once every app is connected", 
   const [a, b] = appRows([job("a"), job("b")]);
   Object.assign(a, { state: "installing", phase: "airplane", here: true, airplane: "on" });
   Object.assign(b, { state: "signed" });
-  assert.equal(AIRPLANE_ON, "Join Wi-Fi or turn on Airplane Mode");
+  assert.equal(AIRPLANE_ON, "Waiting to leave cellular data");
   assert.equal(rowStatus(a), AIRPLANE_ON);
   assert.equal(runStatus([a, b]), AIRPLANE_ON);
   Object.assign(a, { phase: "copying", airplane: "off", fraction: 0.4 });

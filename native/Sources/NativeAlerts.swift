@@ -3,6 +3,7 @@
 //
 //   {title, message, buttons: [String], cancel: Int (-1: none), colors: {"<index>": "red" | "green"},
 //    input?: {placeholder, value, type, pasteSubmits?: Int}}  ->  {index, value?, pasted?}
+//   ui.alertClose {id}: the alert shown with `id` goes by itself, answering {index: -1, closed: true} (F417)
 //
 // `cancel` is the .cancel action, red buttons are .destructive and the green one is the preferredAction. One text field
 // (addTextField) when `input` is given; its text comes back as `value`. The reply waits for the tap. An error only when
@@ -18,7 +19,17 @@ enum NativeAlerts {
         b.on("ui.alert") { c in
             DispatchQueue.main.async { alert(c) }
         }
+        b.on("ui.alertClose") { c in
+            DispatchQueue.main.async {
+                let close = closers.removeValue(forKey: c.params["id"] as? String ?? "")
+                close?()
+                c.reply(["closed": close != nil], nil)
+            }
+        }
     }
+
+    // F417: alerts shown with an `id`, which ui.alertClose {id} closes (the page's AbortSignal). Main thread only.
+    private static var closers = [String: () -> Void]()
 
     // Main thread only.
     private static func alert(_ c: Bridge.Call) {
@@ -35,10 +46,12 @@ enum NativeAlerts {
         let vc = UIAlertController(title: title.isEmpty ? nil : title, message: message.isEmpty ? nil : message,
                                    preferredStyle: .alert)
         var replied = false
+        let id = p["id"] as? String
         weak var shown = vc // the actions' closures must not keep the alert alive
         func answer(_ i: Int, pasted: String? = nil) {
             guard !replied else { return }
             replied = true
+            if let id { closers[id] = nil }
             var out: [String: Any] = ["index": i]
             if input != nil { out["value"] = pasted ?? shown?.textFields?.first?.text ?? "" }
             if pasted != nil { out["pasted"] = true }
@@ -76,7 +89,19 @@ enum NativeAlerts {
             if color == "green", preferred == nil { preferred = action }
         }
         if let preferred { vc.preferredAction = preferred }
-        top.present(vc, animated: true)
+        guard let id else { return top.present(vc, animated: true) }
+        var up = false, wanted = false // UIKit drops a dismiss while the alert is still coming up
+        closers[id] = {
+            guard !replied else { return }
+            replied = true
+            c.reply(["index": -1, "closed": true], nil)
+            wanted = true
+            if up { shown?.dismiss(animated: true) }
+        }
+        top.present(vc, animated: true) {
+            up = true
+            if wanted { shown?.dismiss(animated: true) }
+        }
     }
 
     // The field as nav/alert.js's <input> is: no capitals, no autocorrect, no spellcheck; the keyboard from its type.

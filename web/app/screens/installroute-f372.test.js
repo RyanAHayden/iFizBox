@@ -47,7 +47,7 @@ test("set up = paired and tested once; the footer is one hint, once set up", () 
   assert.equal(iphoneSetUp({ paired: "rp" }), false, "an older shell has no VPN to set up");
   assert.equal(setupFooter(ST()), "");
   assert.equal(setupFooter(ST({ tested: true })), "");
-  assert.equal(setupFooter(ST({ tested: true, cellular: true })), core.CELL_FOOTER);
+  assert.equal(setupFooter(ST({ tested: true, cellular: true })), "", "On Cellular's own footer says it");
   // C73: another VPN up, or chosen in Settings > VPN
   assert.equal(OTHER_VPN_LINE, "Your VPN goes off during installs. Turn it back on after.");
   assert.equal(setupFooter(ST({ tested: true, otherVPN: true, cellular: true })), OTHER_VPN_LINE);
@@ -70,7 +70,7 @@ test("F414: This iPhone's page: status and one action, the steps until they're d
   assert.deepEqual(steps(half), [["1. Pair This iPhone", true, false], [`2. Allow ${BUILTIN_VPN}`, false, true], ["3. Test Connection", false, true]]);
   const done = page(ST({ tested: true }));
   assert.deepEqual(head(done), ["Ready to Install", "Check Connection"]);
-  assert.deepEqual(last(done), ["Forget Pairing", "How It Works"]);
+  assert.deepEqual(last(done), ["On Cellular", "Forget Pairing", "How It Works"]);
   assert.match(done.at(-1).rows[0].href, /settings\/installation\/how$/);
   for (const o of [{ testing: true }, { fixing: true }, { pairChecking: true }]) {
     const [s, a] = page(ST({ tested: true }), o)[0].rows;
@@ -81,7 +81,7 @@ test("F414: This iPhone's page: status and one action, the steps until they're d
   assert.deepEqual(head(page(ST({ tested: true }), { failure: f })), ["iPhone Refused", "Fix"]);
   assert.deepEqual(head(page(ST({ tested: true }), { failure: { ...f, fix: "pair" } })), ["Pairing Lost", "Fix"]);
   assert.deepEqual(head(page(ST({}, { paired: null }), { failure: f })), ["Not Set Up", "Start Setup"], "nothing paired: setup, not a failure");
-  assert.deepEqual(subGroups(installationGroups("iphone", ST({ tested: true })), "iphone").map((g) => g.key), ["status", undefined, undefined]);
+  assert.deepEqual(subGroups(installationGroups("iphone", ST({ tested: true })), "iphone").map((g) => g.key), ["status", "cellular", undefined, undefined]);
   for (const k of ["how", "server", "iphone", "pair"]) assert.ok(SUB_TITLES[k], k);
 });
 
@@ -199,14 +199,14 @@ test("the tests' answers in words", () => {
   assert.equal(vpnTestResult(null, new Error("refused: this iPhone no longer has the pairing")).again, true);
 });
 
-test("a failed connect through the built-in VPN never says to turn on another VPN app; on cellular it says installs ask for Airplane Mode", () => {
+test("a failed connect through the built-in VPN never says to turn on another VPN app; on cellular it says check on Wi-Fi", () => {
   const st = ST({ tested: true, cellular: true });
   const why = verifyFailure(new Error("connect_failed: no answer"), st);
   assert.equal(why.title, "Couldn't Connect");
-  assert.match(why.message, /On cellular, check on Wi-Fi\. Installs ask for Airplane Mode\./);
+  assert.match(why.message, /On cellular, check on Wi-Fi\./);
   const refused = routeFailureOf(new Error("route_refused: every port"), st);
   assert.equal(refused.fix, "check");
-  assert.match(refused.message, /On cellular, check on Wi-Fi\. Installs ask for Airplane Mode\./);
+  assert.match(refused.message, /On cellular, check on Wi-Fi\./);
   assert.ok(!/Shortcut|Install Switch/i.test(JSON.stringify([why, refused])));
   assert.ok(!/LocalDevVPN|Tailscale|Turn On/.test(JSON.stringify([why, refused])));
 });
