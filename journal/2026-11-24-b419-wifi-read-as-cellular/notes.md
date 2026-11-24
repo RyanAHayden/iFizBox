@@ -13,8 +13,8 @@ what is joined. Reasoned, not measured:
 - Low Data Mode: only sets `isConstrained`, the interface stays.
 - Wi-Fi dropping for a moment (e.g. as the VPN starts): cellular for a few seconds, and the wait asked at the first read.
 
-Which one it was can't be told from the screenshot: no path was logged. It is now (status, interfaces, types used,
-expensive, Low Data Mode, en0 IPv4 yes/no).
+The screenshot can't tell which one it was, since no path was logged. The path is logged now (status,
+interfaces, types used, expensive, Low Data Mode, en0 IPv4 yes/no).
 
 Changed:
 
@@ -30,3 +30,7 @@ Changed:
   phone here runs the sideload build on cellular. Only the code's shape (test_vpn.py) and the wording are tested.
 - Whether iOS takes the install's connects while Wi-Fi Assist is using cellular with Wi-Fi joined: the task says joined
   Wi-Fi never waits; if iOS refuses, the install fails with its connect error and the log has no wait lines.
+- The row leaving the wait's line on a reconnect over Wi-Fi (the install already sent): compiled, not run.
+
+Known: a single read of `vpn.cellular` in the queue can hold a row ("Signed: Waiting to Install") until every app is
+signed; it asks nothing. Airplane Mode turned on inside the 3 s shows no "You can turn Airplane Mode off".

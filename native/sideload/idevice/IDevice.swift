@@ -962,10 +962,12 @@ enum IDevice {
                 }
                 throw f
             }
-            // Wi-Fi ended the wait as well: then there is no Airplane Mode to turn off
-            run.onConnect = waited && !LocalVPN.Path.now().wifi ? {
+            // Wi-Fi ended the wait as well: then there is no Airplane Mode to turn off, and the row leaves the wait's
+            // line (B419: a reconnect emits no .connected of its own)
+            let wifi = LocalVPN.Path.now().wifi
+            run.onConnect = waited ? {
                 note("The connection is open")
-                progress(.airplaneOff)
+                if !wifi { progress(.airplaneOff) } else if run.connected { progress(run.installSent ? .install(0) : .connected) }
             } : nil
             do {
                 try watched(attempt == 0 ? "install" : "install, connection \(attempt + 1)") { (w: Watch) -> Void in

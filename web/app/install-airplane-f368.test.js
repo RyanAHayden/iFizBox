@@ -60,7 +60,7 @@ test("the wait, then the line that it can go off, once every app is connected", 
   assert.equal(runStatus([a, b]), AIRPLANE_OFF);
 });
 
-test("B419: joining Wi-Fi ends the wait with no line about turning Airplane Mode off", () => {
+test("B419: a row copying after a wait Wi-Fi ended says nothing about turning Airplane Mode off", () => {
   const [a] = appRows([job("a")]);
   Object.assign(a, { state: "installing", phase: "copying", here: true, airplane: "on", fraction: 0.1 }); // no airplaneOff event
   assert.equal(airplaneStatus([a]), null);

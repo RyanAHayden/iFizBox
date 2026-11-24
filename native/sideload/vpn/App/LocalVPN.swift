@@ -146,6 +146,7 @@ enum LocalVPN {
     /// Throws when cancelled, after airplaneLimit, or when the VPN doesn't start; installEnded then takes it down.
     static func waitOffCellular(cancelled: () -> Bool, waiting: () -> Void) throws -> Bool {
         guard available, !failedNow(), Path.now().cellular else { return false }
+        log("on cellular before \(name) is on; path: \(Path.described())")
         try begin { _ in
             if cancelled() { throw IDevice.Failure(code: "cancelled", text: "Cancelled") } // while another install's start goes on
         }
