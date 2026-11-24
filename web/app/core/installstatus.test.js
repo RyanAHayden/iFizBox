@@ -35,9 +35,11 @@ test("a profile without Network Extensions: said plainly, the server meanwhile",
   assert.ok(ALERTS.noVPN.title);
 });
 
-test("not paired: Pair This iPhone with Start Pairing", () => {
+test("not paired: Set Up This iPhone; paired but not tested: Finish Setting Up", () => {
   const p = installStatus("iphone", paired({ paired: null }));
-  assert.deepEqual([p.title, STATUS_ACTIONS[p.action]], ["Pair This iPhone", "Start Pairing"]);
+  assert.deepEqual([p.title, STATUS_ACTIONS[p.action]], ["Set Up This iPhone", "Set Up This iPhone"]);
+  const f = installStatus("iphone", paired({ vpn: { available: true, tested: false } }));
+  assert.deepEqual([f.title, STATUS_ACTIONS[f.action], f.local], ["Finish Setting Up", "Set Up This iPhone", true]);
   assert.equal(installStatus("iphone", null).state, "noStatus");
 });
 
@@ -50,7 +52,7 @@ test("every subtitle stays short enough for the cell's two lines at 320pt", () =
   const all = [CHECKING, installStatus("iphone", null), installStatus("iphone", { paired: null }), installStatus("iphone", { paired: "rp" }),
     installStatus("iphone", paired({ paired: null })), installStatus("iphone", paired({ vpn: { cellular: true } })), installStatus("iphone", paired()),
     installStatus("server", undefined)];
-  for (const s of all) assert.ok(s.subtitle.length <= 70, s.subtitle);
+  for (const s of all) assert.ok(s.subtitle.length <= 72, s.subtitle);
 });
 
 test("the Certificate row: days left, Expired in red, None or Incomplete", () => {

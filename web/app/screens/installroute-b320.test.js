@@ -82,7 +82,7 @@ test("Fix in the alert of the main page's Check Connection opens Pairing (it pai
   AUTO_CHECK.last = Date.now();
   await page.refresh();
   await tap(withClass(page.el, "install-action")[0].children[0]);
-  assert.deepEqual(alerts.map((a) => a.buttons), [["Cancel", "Fix"]]);
+  assert.deepEqual(alerts.map((a) => a.buttons), [["Not Now", "Fix"]]);
   assert.ok(native.calls.includes("idevice.forget"));
   assert.equal(wentToPair, 1);
   clearRouteFailure();
@@ -115,9 +115,9 @@ test("leaving and coming back pairs again at once; the left visit's late answer 
   pending[1]();
 });
 
-test("Install Apps With's check of the kept pairing spins the Pairing row, not the HUD", async () => {
+test("Install Apps With's check of the kept pairing spins the action row, not the HUD", async () => {
   const { installationGroups } = await import("./installroute.js");
-  const pairingRow = (o) => installationGroups("iphone", PAIRED_TS, o).find((g) => g.header === "Set Up").rows[0];
+  const pairingRow = (o) => installationGroups("iphone", PAIRED_TS, o).find((g) => g.key === "status").rows[1];
   assert.equal(pairingRow({ pairChecking: true }).spin, true);
   assert.equal(pairingRow({}).spin, undefined);
   const src = (await import("node:fs")).readFileSync(new URL("./installroute.js", import.meta.url), "utf8");

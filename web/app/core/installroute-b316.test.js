@@ -77,7 +77,7 @@ test("a failure is kept until a check passes, and turns Ready to Install into it
   assert.ok(storage.m.has(FAILURE_KEY));
   const s = installStatus("iphone", FINE, { failure: f });
   assert.equal(s.state, "failed");
-  assert.equal(s.title, "Pair Again");
+  assert.equal(s.title, "Pairing Lost");
   assert.deepEqual([STATUS_ACTIONS[s.action], s.fix], ["Fix", "pair"]);
   assert.equal(s.red, true);
   assert.equal(s.local, false, "the Signing Server row no longer says This iPhone");

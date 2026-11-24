@@ -5,7 +5,7 @@
 //   installation/with  Install Apps With (F300): the choice (This iPhone / Signing Server, a checkmark), and under it
 //                      the chosen route's groups sliding in: This iPhone's (below) or the Signing Server's (Server,
 //                      Check Server, Run Your Own: screens/settings.js passes them as `server`)
-//   installation/iphone This iPhone: Set Up (Pair This iPhone, Test Connection) and How It Works
+//   installation/iphone This iPhone (F414): its status with one action, the Set Up steps until done, Forget Pairing, How It Works
 //   installation/pair  Pairing, one page that runs by itself (core setupState): one sentence on what it gives,
 //                      drawn at once with a spinner while it checks, then pairing starts on its own: the 6-digit code
 //                      big at the top and where to type it, a line and a screenshot a step; it keeps pairing while
@@ -21,6 +21,7 @@ import { ringStyle } from "../core/installroute.js";
 import { leaveQuestion, LEAVE } from "../core/installroute.js";
 import { installStatus, CHECKING, CHECKING_SERVER, STATUS_ACTIONS } from "../core/installroute.js";
 import { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, NO_ANSWER_FAILURE, FIX, takeFix } from "../core/installroute.js"; // B316, F409
+import { SETUP_FOOTER, setupSteps, iphoneStatus, fixQuestion } from "../core/installroute.js"; // F414
 import { builtinVPN, setupFooter, iphoneSetUp, HOW_STEPS, vpnTestResult, NO_VPN, BUILTIN_VPN } from "../core/installroute.js"; // F372
 import { NAME } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
@@ -104,11 +105,10 @@ function spinRows(frag, sections) {
 // F300: `picking`: the choice was just tapped: its row is checked at once and spins until idevice.status answers.
 // `hint`: the last idevice.status read, drawn while the page reads again.
 // F300: no Developer Mode row (an app can't open without it; an install it stops says so in its alert).
-// F301: `refreshing: {device}` the rows show the last answer (`st`, cached) with their spinner while it is read again,
-// `late: {device}` it didn't answer in time: its rows say Not Responding.
+// F301: `late: {device}` idevice.status didn't answer in time: the status says Not Responding.
 export function installationGroups(choice, st, { pick = () => {}, test = () => {},
   reading = false, picking = false, hint = null, server = () => [],
-  refreshing = {}, late = {}, testing = false, failure = null, fix = () => {}, fixing = false, pairChecking = false } = {}) {
+  late = {}, testing = false, failure = null, fix = () => {}, fixing = false, pairChecking = false, checkNow, forget, setUp } = {}) {
   const groups = [{
     header: "Install Apps With",
     rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", icon: rowIcon(ROUTE_ICON[o.value]), checked: o.value === choice, onClick: () => pick(o.value),
@@ -120,34 +120,55 @@ export function installationGroups(choice, st, { pick = () => {}, test = () => {
   if (choice !== "iphone") return [...groups, ...(server() ?? [])];
   // F372: the built-in VPN is the way in: This iPhone's page is Set Up and How It Works, drawn from the first frame
   // (rows Checking… until idevice.status answers). A profile without Network Extensions says so there (core NO_VPN).
-  return [...groups, ...localGroups(st ?? hint, { reading: reading && !hint && !st, refreshing: Boolean(refreshing.device) || pairChecking, test, testing, failure, fix, fixing, late: Boolean(late.device) })];
+  return [...groups, ...localGroups(st ?? hint, { reading: reading && !hint && !st, pairChecking, test, testing, failure, fix, fixing, checkNow, forget, setUp, late: Boolean(late.device) })];
 }
 
 // ---- F372: This iPhone with the built-in VPN (core BUILTIN_VPN; native/sideload/vpn)
-// The page (installation/iphone): Set Up (Pair This iPhone, Test Connection) with a footer that
-// says the next step (core setupFooter), then How It Works. `st` is idevice.status (its `vpn`), `reading` while the
-// first answer is out, `refreshing` while it's read again (the rows keep the last answer, Pairing spins), `late`
-// when it didn't answer. A failed check or install (B316's `failure`) is said in the footer, red, with its fix row.
-export function localGroups(st, { reading = false, refreshing = false, test = () => {}, testing = false, failure = null, fix = () => {}, fixing = false, late = false } = {}) {
-  const paired = Boolean(st?.paired), tested = Boolean(st?.vpn?.tested);
+// F414 (concept K8, option A): the page (installation/iphone) is a status cell with one action (core iphoneStatus), the
+// Set Up steps until they're done (core setupSteps: done ones checked, the next one opens), Forget Pairing and How It
+// Works. `st` is idevice.status (its `vpn`), `reading` while the first answer is out, `late` when it didn't answer,
+// `testing`/`fixing`/`pairChecking` while a test, a check or Fix runs. A failed check or install (B316's `failure`) is
+// the status, red, and its action is Fix.
+export function localGroups(st, { reading = false, pairChecking = false, test = () => {}, testing = false, failure = null, fix = () => {}, fixing = false, late = false,
+  checkNow = () => {}, forget = () => {}, setUp = () => goTo("pair") } = {}) {
   const howGroup = { rows: [{ label: "How It Works", icon: rowIcon("help"), href: route("how") }] };
   // A profile without Network Extensions: nothing to set up, and the page says so instead of the VPN's rows
   if (st && !reading && !late && !builtinVPN(st)) {
     return [{ header: "Set Up", rows: [{ label: "Network Extensions", detail: "Missing" }], footer: NO_VPN.message, warn: true }, howGroup];
   }
-  const pairRow = late ? { label: "Pair This iPhone", icon: rowIcon("pairPhone"), detail: NOT_RESPONDING, href: route("pair") }
-    : reading ? { label: "Pair This iPhone", icon: rowIcon("pairPhone"), detail: "Checking…", href: route("pair"), spin: true }
-    : { label: "Pair This iPhone", icon: rowIcon("pairPhone"), detail: paired ? "Done" : "Start", href: route("pair"), ...(refreshing ? { spin: true } : {}) };
-  const rows = [
-    pairRow,
-    reading ? { label: "Test Connection", icon: rowIcon("testConnection"), detail: "Checking…", spin: true }
-      : { label: "Test Connection", icon: rowIcon("testConnection"), onClick: test,
-        detail: testing ? "Testing…" : failure ? FAILING : tested ? "Connected" : "Test", ...(testing ? { spin: true } : {}) },
-    ...(failure && !testing ? [{ label: FIX, cls: "sign-import", onClick: fix, ...(fixing ? { spin: true } : {}) }] : []),
-  ];
-  const footer = failure ? { footer: `${failure.title}. ${failure.short}`, warn: true } : { footer: reading || late ? "" : setupFooter(st) };
-  if (!footer.footer) delete footer.footer;
-  return [{ header: "Set Up", rows, ...footer }, howGroup];
+  const s = iphoneStatus(st, { reading, running: testing || fixing || pairChecking, late, failure });
+  const acts = { check: checkNow, fix, start: setUp, test };
+  const groups = [{ key: "status", rows: [
+    { label: s.title, subtitle: s.subtitle, cls: "install-status", tone: s.tone, red: Boolean(s.red) },
+    { label: STATUS_ACTIONS[s.action], cls: "install-action", dim: Boolean(s.dim), onClick: s.busy || s.dim ? () => {} : acts[s.action], ...(s.busy || s.dim ? { spin: true } : {}) },
+  ], ...(s.state === "ready" && setupFooter(st) ? { footer: setupFooter(st) } : {}) }];
+  if (st && !iphoneSetUp(st)) {
+    groups.push({ header: "Set Up", rows: setupSteps(st).map((p) => ({ label: p.label, subtitle: p.subtitle, icon: rowIcon(STEP_ICON[p.key]),
+      ...(p.done ? { checked: true } : p.next ? { onClick: p.key === "pair" ? setUp : test, chevron: true } : {}) })), footer: SETUP_FOOTER });
+  }
+  if (st?.paired) groups.push({ rows: [{ label: "Forget Pairing", cls: "sign-import", onClick: forget }] });
+  return [...groups, howGroup];
+}
+const STEP_ICON = { pair: "pairPhone", allow: "cellular", test: "testConnection" };
+// The status cell's tile and the action's dimming on the drawn rows (as mainPage's).
+function dressStatus(frag, sections) {
+  const groups = [...frag.children];
+  sections.forEach((s, i) => {
+    if (s.key !== "status") return;
+    const ul = [...groups[i].children].find((c) => c.classList?.contains("table"));
+    s.rows.forEach((r, j) => {
+      const inner = ul?.children?.[j]?.children?.[0];
+      if (!inner) return;
+      if (r.tone) {
+        const tile = el("span", `status-icon tone-${r.tone}`);
+        tile.setAttribute("aria-hidden", "true");
+        inner.prepend(tile);
+        if (r.red) inner.querySelector(".cell-label")?.classList.add("install-red");
+      }
+      if (r.dim) { inner.classList.add("is-dim"); inner.setAttribute("aria-disabled", "true"); }
+    });
+  });
+  return frag;
 }
 
 // How It Works (installation/how): the steps of one install, a row each (core HOW_STEPS).
@@ -189,7 +210,7 @@ export async function vpnTest(native, alert, store, { ended = () => {}, onPass =
   const why = isLate(err) ? { title: NOT_RESPONDING, message: `This iPhone didn't answer in ${Math.round(TEST_MS / 1000)} seconds. Try again.` } : vpnTestResult(r, err);
   if (usedNow) why.message = "Set up. Apps now install straight onto this iPhone.";
   if (why.again) {
-    const { index } = await alert({ title: why.title, message: why.message, buttons: ["Cancel", FIX], cancel: 0 }) || {};
+    const { index } = await alert(fixQuestion(why, lastStatus)) || {};
     if (index === 1) recheckHooks.goPair();
     return r;
   }
@@ -228,6 +249,7 @@ export const subGroups = (sections, sub) => (sub === "iphone" ? sections.slice(1
 
 let picked = null; // F300: the choice just tapped, until idevice.status answers on the page it redrew
 const painting = new WeakMap(); // page element → its latest paintInstallation (an older one stops painting)
+const redraws = new WeakMap(); // F414: page element → its redraw, for refreshInstallation
 let testing = false; // F301: Test Connection runs (its row spins; a second tap waits for it)
 let fixing = false; // F409: the Fix row's check runs (its row spins)
 let pairChecking = false; // B320: Install Apps With's check of the kept pairing runs (the Pairing row spins)
@@ -237,26 +259,58 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
   const me = {};
   painting.set(el, me);
   const mine = () => painting.get(el) === me;
+  redraws.set(el, redraw);
   // F301: what the rows show (the last answer at first, then each part as it answers) and each part's state
   let view = lastStatus;
   const cached = Boolean(view);
   const got = { device: false }, late = { device: false };
   // B320: recheckPairing's spinner here: the Pairing row, not the HUD
   const pairSpin = () => { pairChecking = true; paint(); return () => { pairChecking = false; redraw(); }; };
+  // F414: the page's check: a failure paints before its question; Check Connection here keeps the pick (F392)
+  const asPicked = { get: () => "iphone", set: () => {} };
+  // Drawn again once the answer is kept, under its alert and after it; no automatic check right behind this one
+  const settled = () => { fixing = testing = false; AUTO_CHECK.last = Date.now(); redraw(); };
+  const ask = async (q) => {
+    settled();
+    const r = await alert(q);
+    if (r?.index === 1 && q.buttons?.[1] === FIX) { fixing = true; redraw(); } // Fix goes on: Checking… again
+    return r;
+  };
+  const runCheck = async (how = {}) => {
+    if (fixing || testing) return;
+    fixing = true;
+    paint();
+    try { await check(native, ask, redraw, sub === "iphone" ? asPicked : store, null, how); } finally { settled(); }
+  };
+  const runTest = async () => {
+    if (testing || fixing) return;
+    // F372: the built-in VPN's test (on, one connect with the pairing, off); not paired yet: Pairing first
+    if (!(view ?? lastStatus)?.paired) return goTo("pair");
+    testing = true;
+    paint();
+    try { await vpnTest(native, ask, store); } finally { settled(); }
+  };
   const paint = () => {
     if (!mine()) return;
     const devWait = !got.device && !late.device;
     const sections = installationGroups(choice, view, {
       reading: devWait && !cached,
-      refreshing: { device: devWait && cached }, late, testing, fixing, pairChecking,
+      late, testing, fixing, pairChecking,
       hint: lastStatus, server, picking: devWait && picked === choice,
       failure: choice === "iphone" ? routeFailure() : null, // B316
       fix: () => {
         const f = routeFailure();
         if (f?.fix === "pair" && !checking) return goTo("pair");
-        fixing = true;
-        paint();
-        return check(native, alert, redraw, store, null, { fix: true }).finally(() => { fixing = false; redraw(); });
+        if (!(view ?? lastStatus)?.vpn?.tested) return runTest(); // F414: setting up: the test again, which finishes it
+        return runCheck({ fix: true });
+      },
+      checkNow: () => runCheck(),
+      forget: async () => {
+        await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {}));
+        forgetStatus();
+        clearRouteFailure(); // the forgotten pairing's
+        store.set(ROUTE_KEY, "server");
+        redraw();
       },
       // the store's set redraws Settings' pages (this one too); a store that doesn't, redraws it here
       pick: (v) => {
@@ -264,20 +318,11 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
         picked = v; pickRoute(v, { set: (r) => store.set(ROUTE_KEY, r) }); if (mine()) redraw();
         if (v === "iphone" && v !== choice) recheckPairing(native, alert, redraw, { spin: pairSpin }); // B220: set up again, the kept pairing checked
       },
-      test: async () => {
-        if (testing) return;
-        testing = true;
-        paint();
-        // the end is drawn by the latest drawing (this one's paint does nothing once the page was drawn again)
-        const ended = () => { testing = false; if (mine()) { view = lastStatus; paint(); } else redraw(); };
-        // F372: the built-in VPN's test (on, one connect with the pairing, off); not paired yet: Pairing first
-        if (!(view ?? lastStatus)?.paired) { testing = false; paint(); return goTo("pair"); }
-        try { await vpnTest(native, alert, store, { ended }); } finally { if (testing) ended(); }
-      },
+      test: () => runTest(),
     });
     const shown = subGroups(sections, sub);
     patchGroups(el, shown, (s) => {
-      const frag = spinRows(warnFooters(s), s);
+      const frag = dressStatus(spinRows(warnFooters(s), s), s);
       for (const d of frag.querySelectorAll?.(".cell-detail") ?? []) if (d.textContent === "Another VPN" || d.textContent === NOT_RESPONDING || d.textContent === FAILING) d.classList.add("install-red");
       return frag;
     });
@@ -315,8 +360,8 @@ export function patchGroups(box, sections, build) {
     return h;
   }));
   const fresh = [...build(sections).children];
-  const keyOf = (s) => s.header || s.rows?.[0]?.label || (s.spinner ? "spinner" : "");
-  const frameOf = (s) => sigOf({ h: s.header, w: s.warn, f: Boolean(s.footer), rows: (s.rows ?? []).map((r) => [r.label, r.cls, Boolean(r.href), Boolean(r.onClick)]) });
+  const keyOf = (s) => s.key || s.header || s.rows?.[0]?.label || (s.spinner ? "spinner" : "");
+  const frameOf = (s) => sigOf({ h: s.header, w: s.warn, f: Boolean(s.footer), rows: s.key ? s.rows.length : (s.rows ?? []).map((r) => [r.label, r.cls, Boolean(r.href), Boolean(r.onClick)]) });
   fresh.forEach((g, i) => {
     const s = sections[i];
     g.__key = keyOf(s);
@@ -599,7 +644,7 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
     if (a === "fix") return fix === "pair" && !checking ? goTo("pair") : fixCheck(); // F409
     if (a === "check") return check(native, alert, after, store, checkButton).then(after);
     if (a === "checkServer") return checkServer();
-    if (a === "pair") return goTo("pair");
+    if (a === "setup") return goTo("iphone"); // F414
     if (a === "certificate") return navGo(links.certificate); // B250: the Certificate page, as its row opens
   };
   return { el: box, refresh, known: () => known, status: () => now };
@@ -975,12 +1020,13 @@ async function checkOnce(native, alert, redraw, store, mark, how) {
     if (how.quiet) { mark?.expire(); redraw(); return undefined; }
     try {
       if (how.fix && turnedDown(why, e)) return "pair";
-      if (why.fix && why.button && !how.fix) {
-        const { index } = await alert({ title: why.title, message: why.message, buttons: ["OK", why.button], cancel: 0 }) || {};
+      // F414: a failed check asks to fix; Fix checks again from the start, or pairs again
+      if (!why.again) {
+        if (how.fix) return await alert({ title: why.title, message: why.message, buttons: ["OK"] });
+        const { index } = await alert(fixQuestion(why, st)) || {};
         return index === 1 ? "fix" : undefined;
       }
-      if (!why.again) return await alert({ title: why.title, message: why.message, buttons: ["OK"] });
-      const { index } = await alert({ title: why.title, message: why.message, buttons: ["Cancel", FIX], cancel: 0 }) || {};
+      const { index } = await alert(fixQuestion(why, st)) || {};
       if (index === 1) {
         await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {}));
         forgetStatus();
@@ -1048,15 +1094,9 @@ export function checkMark(inner) {
   return { show, fix, reset, expire, spin, active: () => on, spinning: () => spinning };
 }
 
-// B148: This iPhone's page (installation/iphone) shown again, Back from Pairing: idevice.status read again and each
-// row's detail (Pairing: Paired / Not Paired) put on the row already drawn, in place.
-// Rows the fresh answer would add or drop (Developer Mode once paired) wait for the page's next full draw.
-export function installationRows(sub, st, { store } = {}) {
-  const choice = sub === "iphone" ? "iphone" : store.get(ROUTE_KEY);
-  return subGroups(installationGroups(choice, st), sub).flatMap((g) => g.rows);
-}
-export async function refreshInstallation(el, sub, { store, native = nativeBridge(), patch } = {}) {
+// B148/F414: This iPhone's page (installation/iphone) shown again, Back from Pairing: idevice.status is read again and
+// the page painted in place (patchGroups: only what changed).
+export async function refreshInstallation(el, sub) {
   if (sub === "pair" || sub === "how" || sub === "server") return; // F372: nothing read there to patch
-  const st = await status(native);
-  patch(el, installationRows(SUB_TITLES[sub] ? sub : null, st, { store }));
+  return redraws.get(el)?.();
 }

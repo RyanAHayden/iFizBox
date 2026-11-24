@@ -9,7 +9,7 @@ import { accountSection } from "./account.js";
 import { deviceSigningSection, deviceSigningDetail, siteSigningDetail, listDetail, holdsDetail, blockedDetail, settingsShown,
   certificateRows, settings } from "./settings.js";
 import { grouped } from "../nav/ui.js";
-import { refreshInstallation, installationRows } from "./installroute.js";
+import { refreshInstallation, drawInstallation } from "./installroute.js";
 import { patchDetails, cellsOf } from "../nav/pagestate.js";
 import { beforeEach, afterEach } from "node:test";
 
@@ -137,18 +137,17 @@ test("Installation & Signing: Back to the main page refreshes it in place; This 
   assert.deepEqual(calls, ["main", "main", "installation/iphone", "certificate"]);
 });
 
-test("This iPhone: paired on the Pairing page, Back: Pairing says Paired on the row already drawn", async () => {
+test("This iPhone: paired on the Pairing page, Back: the page drawn already says so", async () => {
   let paired = false;
   const native = { call: async (m) => (m === "idevice.status" ? { paired, vpn: { available: true } } : null) };
-  const store = { get: () => "iphone" };
+  const store = { get: () => "iphone", set: () => {} };
   const page = fakePage();
-  page.append(grouped([{ rows: installationRows("iphone", { paired: false, vpn: { available: true } }, { store }) }]));
-  assert.equal(detailOf(page, "Pair This iPhone"), "Start");
-  const cells = page.querySelectorAll(".cell").length;
+  await drawInstallation(page, "iphone", { store, native });
+  const said = () => cellsOf(page).map((c) => c.label);
+  assert.ok(said().includes("Not Set Up"), said().join());
   paired = true;
-  await refreshInstallation(page, "iphone", { store, native, patch: (el, rows) => patchDetails(cellsOf(el), rows) });
-  assert.equal(detailOf(page, "Pair This iPhone"), "Done");
-  assert.equal(page.querySelectorAll(".cell").length, cells, "no rows added or removed");
+  await refreshInstallation(page, "iphone");
+  assert.ok(said().includes("Almost Done"), said().join());
 });
 
 test("Certificate: rows from a fresh read; None and Incomplete without one", () => {
