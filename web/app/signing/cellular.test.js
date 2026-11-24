@@ -70,6 +70,93 @@ test("Use Signing Server chosen: no popup when the phone turns out to be on cell
   c.end();
 });
 
+// The Shortcut: run() answers `codes` in turn, and on null the waiting installs go off cellular first.
+function shortcutOf(codes, { added = false, add = [], off = () => {} } = {}) {
+  const did = [];
+  return { did, added, add: async () => { did.push("add"); return add.length ? add.shift() : true; },
+    run: async () => { did.push("run"); await tick(); const c = codes.shift() ?? null; if (c === null) off(); return c; } };
+}
+function asking(sc, choice = "ask", w = () => {}) {
+  const p = popups();
+  const kept = { choice };
+  const cell = cellularAsk({ alert: p.alert, choice: () => kept.choice, setChoice: (v) => { kept.choice = v; }, shortcut: () => sc, onServer: w });
+  return { ...p, kept, cell };
+}
+const settle = async () => { for (let i = 0; i < 5; i++) await tick(); };
+
+test("Use Shortcut runs it at once, once for every waiting install", async () => {
+  let a, b;
+  const sc = shortcutOf([], { off: () => { a.phase("offCellular"); b.phase("offCellular"); } });
+  const { shown, cell } = asking(sc, "shortcut");
+  a = cell.watch(() => {}); b = cell.watch(() => {});
+  a.phase("airplane"); b.phase("airplane"); await settle();
+  assert.deepEqual([sc.did, shown.length, cell.answer], [["run"], 0, null]);
+  a.phase("airplane"); await settle();
+  assert.deepEqual(sc.did, ["run", "run"], "cellular data back as it connects again: once more");
+});
+
+test("Set Up Shortcut in the popup: added, run, and used from then on", async () => {
+  let a;
+  const sc = shortcutOf([], { off: () => a.phase("offCellular") });
+  const { shown, cell, kept } = asking(sc);
+  a = cell.watch(() => {});
+  a.phase("airplane"); await settle();
+  assert.equal(shown[0].o.buttons[0], "Set Up Shortcut");
+  shown[0].tap(0); await settle();
+  assert.deepEqual([sc.did, kept.choice, shown.length], [["add", "run"], "shortcut", 1]);
+});
+
+test("an added one is Use Shortcut; not added: the popup again, and nothing kept", async () => {
+  const gone = asking(shortcutOf(["not_waiting"]));
+  const w = gone.cell.watch(() => {});
+  w.phase("airplane"); await settle();
+  gone.shown[0].tap(0); await tick(); w.phase("offCellular"); await settle();
+  assert.equal(gone.kept.choice, "shortcut", "set up, and the wait ended before it ran");
+  const have = asking(shortcutOf([], { added: true }));
+  have.cell.watch(() => {}).phase("airplane"); await settle();
+  assert.equal(have.shown[0].o.buttons[0], "Use Shortcut");
+  const sc = shortcutOf([], { add: [false] });
+  const { shown, cell, kept } = asking(sc);
+  cell.watch(() => {}).phase("airplane"); await settle();
+  shown[0].tap(0); await settle();
+  assert.deepEqual([sc.did, kept.choice, shown.length], [["add"], "ask", 2]);
+});
+
+test("a failed run asks: Shortcut Didn't Run; later installs of the run ask too", async () => {
+  let a;
+  const sc = shortcutOf(["not_run", null], { added: true, off: () => a.phase("offCellular") });
+  const { shown, cell } = asking(sc, "shortcut");
+  a = cell.watch(() => {});
+  a.phase("airplane"); await settle();
+  assert.deepEqual([shown[0].o.title, shown[0].o.buttons[0]], ["Shortcut Didn't Run", "Add Shortcut Again"]);
+  a.phase("offCellular"); await settle();
+  assert.equal(shown[0].o.signal.aborted, true, "off cellular by hand");
+  a.phase("airplane"); await settle();
+  assert.deepEqual([sc.did, shown.length, shown[1].o.title], [["run"], 2, "Shortcut Didn't Run"]);
+  shown[1].tap(0); await settle();
+  assert.deepEqual([sc.did, shown.length], [["run", "add", "run"], 2]);
+});
+
+test("a run that leaves an install waiting is run once more, then asked; one with nothing waiting isn't a failure", async () => {
+  const sc = shortcutOf([null, null]);
+  const { shown, cell } = asking(sc, "shortcut");
+  cell.watch(() => {}).phase("airplane"); await settle(); await settle();
+  assert.deepEqual([sc.did, shown.length], [["run", "run"], 1]);
+  const paused = shortcutOf(["not_waiting"]);
+  const p = asking(paused, "shortcut");
+  const w = p.cell.watch(() => {});
+  w.phase("airplane"); w.phase("appWait"); await settle();
+  assert.deepEqual([paused.did, p.shown.length], [["run"], 0]);
+});
+
+test("an install that ends while the Shortcut is read or run leaves no popup", async () => {
+  const sc = shortcutOf(["not_run"]);
+  const { shown, cell } = asking(sc, "shortcut");
+  const w = cell.watch(() => {});
+  w.phase("airplane"); await tick(); w.end(); await settle();
+  assert.deepEqual([sc.did.length <= 1, shown.length], [true, 0]);
+});
+
 // A phone on cellular whose This iPhone installs wait until cancelled; the Signing Server's are dismissed or installed.
 async function run(answer, { choice = null } = {}) {
   const opens = [], cancels = [], pending = new Map(), { shown, alert } = popups();

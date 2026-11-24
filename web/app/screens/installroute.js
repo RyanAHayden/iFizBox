@@ -27,7 +27,7 @@ import { builtinVPN, setupFooter, iphoneSetUp, HOW_STEPS, vpnTestResult, NO_VPN,
 import { quietCheckDue, quietCheckAllowed, markQuietCheck } from "../core/installroute.js"; // F410b
 import { onCellular, cellularCheck, connectRefused } from "../core/installroute.js"; // B428a
 import { RESTORE_VPN, restoreShown, restoreFooter, setRestoreVPN } from "../core/installroute.js"; // F412
-import { ON_CELLULAR, CELLULAR_OPTIONS, cellularFooter, onCellularChoice, setOnCellular } from "../core/cellular.js"; // F417
+import { ON_CELLULAR, cellularOptions, cellularFooter, onCellularChoice, setOnCellular, ADD_AGAIN, ADD_AGAIN_FOOTER } from "../core/cellular.js"; // F417
 import { createSwitch } from "../nav/switch.js";
 import { NAME } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
@@ -58,6 +58,9 @@ export function within(p, ms) {
   });
   return Promise.race([Promise.resolve(p), late]).finally(() => clearTimeout(t));
 }
+// F417b: Cellular Installs, adding and checking it; the last cellular.status (null: not read), and while it's being added
+const shortcutSetup = () => import("../signing/cellularsetup.js");
+let lastShortcut = null, addingShortcut = false;
 const isLate = (e) => e?.code === "not_responding";
 // idevice.status with its deadline: { st } (null when it failed) and `late` when it didn't answer in time.
 async function readStatus(native) {
@@ -126,7 +129,7 @@ function spinRows(frag, sections) {
 // F301: `late: {device}` idevice.status didn't answer in time: the status says Not Responding.
 export function installationGroups(choice, st, { pick = () => {}, test = () => {},
   reading = false, picking = false, hint = null, server = () => [],
-  late = {}, testing = false, failure = null, fix = () => {}, fixing = false, pairChecking = false, checkNow, forget, setUp, cellular, setCellular } = {}) {
+  late = {}, testing = false, failure = null, fix = () => {}, fixing = false, pairChecking = false, checkNow, forget, setUp, cellular, setCellular, shortcut, adding, addAgain } = {}) {
   const groups = [{
     header: "Install Apps With",
     rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", icon: rowIcon(ROUTE_ICON[o.value]), checked: o.value === choice, onClick: () => pick(o.value),
@@ -138,7 +141,7 @@ export function installationGroups(choice, st, { pick = () => {}, test = () => {
   if (choice !== "iphone") return [...groups, ...(server() ?? [])];
   // F372: the built-in VPN is the way in: This iPhone's page is Set Up and How It Works, drawn from the first frame
   // (rows Checking… until idevice.status answers). A profile without Network Extensions says so there (core NO_VPN).
-  return [...groups, ...localGroups(st ?? hint, { reading: reading && !hint && !st, pairChecking, test, testing, failure, fix, fixing, checkNow, forget, setUp, cellular, setCellular, late: Boolean(late.device) })];
+  return [...groups, ...localGroups(st ?? hint, { reading: reading && !hint && !st, pairChecking, test, testing, failure, fix, fixing, checkNow, forget, setUp, cellular, setCellular, shortcut, adding, addAgain, late: Boolean(late.device) })];
 }
 
 // ---- F372: This iPhone with the built-in VPN (core BUILTIN_VPN; native/sideload/vpn)
@@ -148,7 +151,7 @@ export function installationGroups(choice, st, { pick = () => {}, test = () => {
 // `testing`/`fixing`/`pairChecking` while a test, a check or Fix runs. A failed check or install (B316's `failure`) is
 // the status, red, and its action is Fix.
 export function localGroups(st, { reading = false, pairChecking = false, test = () => {}, testing = false, failure = null, fix = () => {}, fixing = false, late = false,
-  checkNow = () => {}, forget = () => {}, setUp = () => goTo("pair"), cellular = "ask", setCellular = () => {} } = {}) {
+  checkNow = () => {}, forget = () => {}, setUp = () => goTo("pair"), cellular = "ask", setCellular = () => {}, shortcut = false, adding = false, addAgain = () => {} } = {}) {
   const howGroup = { rows: [{ label: "How It Works", icon: rowIcon("help"), href: route("how") }] };
   // A profile without Network Extensions: nothing to set up, and the page says so instead of the VPN's rows
   if (st && !reading && !late && !builtinVPN(st)) {
@@ -166,9 +169,12 @@ export function localGroups(st, { reading = false, pairChecking = false, test = 
   }
   // F412: not in the row's content: a repaint keeps the row, so the knob slides (syncRestore sets it)
   if (restoreShown(st)) groups.push({ key: "restore", rows: [{ label: RESTORE_VPN, cls: "restore-vpn", icon: rowIcon("syncNow") }], footer: restoreFooter(st.vpn.restore) });
-  // F417: what an install does on cellular data
-  if (st?.paired) groups.push({ key: "cellular", header: ON_CELLULAR, footer: cellularFooter(cellular), rows: CELLULAR_OPTIONS.map((o) => ({
-    label: o.label, subtitle: o.subtitle, cls: "route-row", icon: rowIcon(o.icon), checked: o.value === cellular, onClick: () => setCellular(o.value) })) });
+  // F417: what an install does on cellular data. F417b: `shortcut`: Cellular Installs can run here; `adding`: it's being added
+  const onCell = cellular === "shortcut" && !shortcut ? "ask" : cellular;
+  if (st?.paired) groups.push({ key: "cellular", header: ON_CELLULAR, footer: cellularFooter(onCell), rows: cellularOptions(shortcut).map((o) => ({
+    label: o.label, subtitle: o.subtitle, cls: "route-row", icon: rowIcon(o.icon), checked: o.value === onCell, onClick: () => setCellular(o.value),
+    ...(adding && o.value === "shortcut" && onCell !== "shortcut" ? { spin: true } : {}) })) });
+  if (st?.paired && onCell === "shortcut") groups.push({ key: "cellshortcut", rows: [{ label: ADD_AGAIN, cls: "sign-import", onClick: addAgain, ...(adding ? { spin: true } : {}) }], footer: ADD_AGAIN_FOOTER });
   if (st?.paired) groups.push({ rows: [{ label: "Forget Pairing", cls: "sign-import", onClick: forget }] });
   return [...groups, howGroup];
 }
@@ -341,6 +347,25 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
     paint();
     try { await vpnTest(native, ask, store); } finally { settled(); }
   };
+  // F417b: Use Shortcut adds the Shortcut first, unless it's added already
+  const repaint = () => { if (mine()) paint(); else redraws.get(el)?.(); }; // drawn again meanwhile
+  const addShortcut = async () => {
+    if (addingShortcut) return false;
+    addingShortcut = true;
+    paint();
+    try { return await (await shortcutSetup()).setUpShortcut(native, { alert }); } finally { addingShortcut = false; await readShortcut(); repaint(); }
+  };
+  let cellTap = 0;
+  const pickCellular = async (v) => {
+    const tap = ++cellTap;
+    if (v === "shortcut" && v !== onCellularChoice() && !lastShortcut?.added && !(await addShortcut())) return;
+    if (tap !== cellTap) return; // another tapped meanwhile
+    setOnCellular(v);
+    repaint();
+  };
+  const readShortcut = async () => {
+    if (native?.call) lastShortcut = await (await shortcutSetup()).readShortcut(native) ?? { available: false, added: false };
+  };
   // F412: shown at once; a call that fails reads the setting again (no answer: as it was)
   restoreToggles.set(el, async (on) => {
     const st = lastStatus ?? view;
@@ -388,7 +413,9 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
       },
       test: () => runTest(),
       cellular: onCellularChoice(),
-      setCellular: (v) => { setOnCellular(v); paint(); },
+      setCellular: (v) => pickCellular(v),
+      shortcut: lastShortcut ? lastShortcut.available : onCellularChoice() === "shortcut",
+      adding: addingShortcut, addAgain: () => addShortcut(),
     });
     const shown = subGroups(sections, sub);
     const restore = Boolean((view ?? lastStatus)?.vpn?.restore);
@@ -411,6 +438,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
     }
     // B316: opened after a failure: the pairing is checked by itself; the page repaints when it passes or fails
     if (st?.paired && choice === "iphone") autoCheck(native, alert, () => { if (mine()) paint(); }, store);
+    if (st?.paired && builtinVPN(st)) readShortcut().then(() => { if (mine()) paint(); }).catch(() => {}); // F417b: after the page is painted
     const wasPicked = picked === choice;
     if (wasPicked) picked = null;
     if (choice !== "iphone" && !wasPicked) return; // nothing on the page waited on the answer
@@ -1114,6 +1142,12 @@ async function runQuietCheck(native, store, { launch = false, installing = () =>
   return "failed";
 }
 
+// F417b: what the check of Cellular Installs failed with; null: it passed, or can't run here.
+async function failedShortcut(native) {
+  const s = await shortcutSetup();
+  return (await s.readShortcut(native))?.available ? s.checkFailed(native) : null;
+}
+
 // `how` is read again once the check answers: a Fix tap may have joined it (check)
 async function checkOnce(native, alert, redraw, store, mark, how) {
   mark?.reset();
@@ -1121,9 +1155,18 @@ async function checkOnce(native, alert, redraw, store, mark, how) {
   let st = null;
   // B428a: nothing is kept and no Fix is offered; the button keeps its label
   const cellular = async (s) => {
+    const bad = await cellularInstalls(); // F417b: touches no cellular data, so there too
     stop();
     rememberStatus(s);
-    if (how.quiet) redraw(); else await alert(cellularCheck(s));
+    if (how.quiet) return redraw();
+    await alert(cellularCheck(s));
+    await repair(bad);
+  };
+  // F417b: Use Shortcut chosen: what its Shortcut's check failed with, under the same spinner (it opens Shortcuts: never by itself)
+  const cellularInstalls = async () => (how.quiet || onCellularChoice() !== "shortcut" ? null : failedShortcut(native).catch(() => null));
+  const repair = async (code, lead) => {
+    if (!code) return;
+    try { await (await shortcutSetup()).repairShortcut(native, code, { alert }, lead); } catch { /* not the connection's failure */ }
   };
   try {
     st = await status(native);
@@ -1132,12 +1175,17 @@ async function checkOnce(native, alert, redraw, store, mark, how) {
     if (st && !builtinVPN(st)) { stop(); throw Object.assign(new Error("connect_failed: no Network Extensions"), { code: "connect_failed" }); }
     await quietRun; // F410b: one at a time with the phone; this one's deadline starts after it
     await within(call(native, "idevice.verify", ...(how.quiet ? [{ quiet: true }] : [])), TIMEOUTS.verify);
+    const noShortcut = await cellularInstalls();
     stop();
     clearRouteFailure(); // B316
     const used = store.get(ROUTE_KEY) !== "iphone";
     if (used) store.set(ROUTE_KEY, "iphone"); // a set redraws Settings' pages, and the mark with them
-    mark?.show(true);
+    mark?.show(!noShortcut);
     if (how.quiet) redraw();
+    if (noShortcut) {
+      await repair(noShortcut, "This iPhone answered, but the Shortcut for cellular data failed. ");
+      mark?.expire();
+    }
   } catch (e) {
     const cell = await refusedOnCellular(native, e); // still spinning while it's read
     if (cell) return await cellular(cell);

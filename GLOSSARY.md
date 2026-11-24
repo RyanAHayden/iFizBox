@@ -250,15 +250,15 @@ _In code_: LocalVPN.restore, vpn.setRestore, giveBack
 _Avoid_: put-back, give back VPN
 
 **On Cellular**:
-What an install straight onto this iPhone does while the phone is on cellular data: ask each time, or go through the Signing Server
+What an install straight onto this iPhone does while the phone is on cellular data: ask each time, run the Shortcut, or go through the Signing Server
 _Said_: on cellular
-_On screen_: On Cellular: Ask Each Time / Use Signing Server
-_In code_: core/cellular.js, onCellularChoice
+_On screen_: On Cellular: Ask Each Time / Use Shortcut / Use Signing Server
+_In code_: core/cellular.js, onCellularChoice, signing/cellularsetup.js
 _Avoid_: cellular mode, data mode
 
 **Cellular Installs**:
 The one Shortcut that turns cellular data off while This iPhone installs connect, then on again
 _Said_: cellular installs shortcut
 _On screen_: Cellular Installs
-_In code_: CellularShortcut, cellular-installs.plist, CellularRun, cellularrun.js
+_In code_: CellularShortcut, cellular-installs.plist, CellularRun, cellularrun.js, cellularsetup.js
 _Avoid_: Install Switch, Cellular Shortcuts

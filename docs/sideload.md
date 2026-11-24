@@ -308,15 +308,25 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   later. Once the connection opens, the install emits `airplaneOff` and the page says "You can turn Airplane Mode off".
   A reconnect with cellular data back waits again.
   **Ask** (On Cellular, Ask Each Time; the default): while an install waits, the page shows the popup "You're on Cellular"
-  with **Use Signing Server** and **Cancel**. It is one popup for the run, not one per install, and it closes by itself
+  with **Set Up Shortcut** (or **Use Shortcut** once it is set up, when Cellular Installs can run here), **Use Signing Server**
+  and **Cancel**. **Set Up Shortcut** adds Cellular Installs (the share sheet, back in the app, then a run). It counts as set
+  up as its last run or check went (`localStorage` `ifizbox.cellularShortcut`), else as `cellular.status` says. Either button
+  sets On Cellular to Use Shortcut, once it was added. It is one popup for the run, not one per install, and it closes by itself
   once the path leaves cellular (the wait ends with `offCellular`, below), or once no install waits any more. Its
   answer holds for the rest of the run. **Use Signing Server** there: `signing.cancel {tag, keep: true}` ends the wait and
   keeps the signed copy, and the run's remaining rows go through the user's Signing Server, one iOS prompt at a time. (A
   single install, not through the queue, signs again for the server, since a cancelled `signing.install` keeps nothing.)
   **Cancel**: the rows fail "not installed, still on cellular", and Try Again asks anew.
+  **Use Shortcut** as the On Cellular setting: an install that waits runs Cellular Installs at once, with no popup. One run
+  serves every install waiting then, and a later wait runs it again, at most 2 runs per install; after that the popup asks.
+  `not_waiting` (none wait, or the phone is off cellular or paused) is no failure. A failed run shows the popup "Shortcut
+  Didn't Run" with **Add Shortcut Again** for `not_run`, `no_end` and `no_return`, where the Shortcut itself may be gone or
+  old, and with **Use Shortcut** for `not_opened`, `busy`, `vpn_off` and `ran_out`, where adding it again would only leave
+  two. The popup keeps that failure until one of its buttons is tapped. Check Connection checks it too (docs/settings.md).
   **Use Signing Server** as the On Cellular setting: `decideRoute` (core/installroute.js) goes to the server at once while
   on cellular, with no popup. Code: `web/app/core/cellular.js` (the setting, its texts and the popup's buttons),
-  `web/app/signing/cellular.js` (the popup, one per run).
+  `web/app/signing/cellular.js` (the popup, one per run), `web/app/signing/cellularsetup.js` (Set Up Shortcut, Add Shortcut
+  Again and the run from the popup, Use Shortcut).
   With no network and our tunnel not up (Airplane Mode just turned off, Wi-Fi or cellular data still coming back),
   LocalVPN waits up to 8 s awake for one (`networkWait`, `waitForNetwork`) before it fails with `vpn_failed`, "can't start
   without a network". That wait is outside `startLock`, so `status()` and other starts aren't held up. An install waits
@@ -366,7 +376,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   Cellular Installs ran in the app. The app judges a run by those actions, not by Shortcuts' callback
   (`ifizbox://cellular-installs`), whose error is only passed on as text. A failure answers `not_opened`, `not_run`, `no_end`,
   `no_return` or `busy` (`CellularShortcut.Verdict`). The bridge is refused in the jailbreak app and under any other bundle
-  ID. No button on screen uses it yet, only the launch put-back below runs the Shortcut.
+  ID. Check Connection and the popup's Set Up Shortcut call it too; the run is below.
   Cellular run: `cellular.run` runs the Shortcut with `{"run":1}`, only while installs wait in `waitOffCellular` with the
   built-in VPN up. It answers `not_waiting` when none wait, `vpn_off` when the VPN is down, and `busy` while another run or
   a put-back goes on. Each install counts from before its wait until its connection is open or it ended; when the last
@@ -379,8 +389,8 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   Shortcuts opens and cleared once data is on again. Found at launch, it runs the same put-back, and `cellular.putBack`
   gives the page the outcome once. The page then says "Cellular Data Is Back On" or "Check Cellular Data" (turn it on in
   Settings > Cellular); a put-back that failed after a run is tried once more at the next launch. Installs queued behind (more than 3 at
-  once) that start after the last connection wait again and need another run. The page runs it through `runCellular`
-  (`signing/cellularrun.js`); no button calls it yet.
+  once) that start after the last connection wait again and need another run. The popup and Use Shortcut run it through
+  `runCellular` (`signing/cellularrun.js`).
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`.
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and
