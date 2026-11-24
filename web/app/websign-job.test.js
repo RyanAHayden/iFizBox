@@ -173,7 +173,7 @@ test("zsign WebAssembly: a wrong password says so", { skip: !existsSync(WASM) &&
     (e) => e.code === "sign_failed" && /password/.test(e.message));
 });
 
-test("app extensions come out before zsign signs (their entitlements wouldn't match: iOS refuses the app)", async () => {
+test("removeTree takes out a folder and everything in it; one that's not there is fine", async () => {
   const { removeTree } = await import("./websign-job.js");
   const tree = { "/a/PlugIns": "dir", "/a/PlugIns/S.appex": "dir", "/a/PlugIns/S.appex/S": "file", "/a/Info.plist": "file" };
   const FS = {
@@ -185,4 +185,62 @@ test("app extensions come out before zsign signs (their entitlements wouldn't ma
   removeTree(FS, "/a/PlugIns");
   removeTree(FS, "/a/Watch"); // not there: fine
   assert.deepEqual(Object.keys(tree), ["/a/Info.plist"]);
+});
+
+// F245: the tiny IPA unpacked by the real zsign, given extensions and a Watch app before the job looks at it; `tree`
+// is the app after zsign ran (path in the app -> bytes).
+async function signWithExtensions(over = {}) {
+  const { default: real } = await import(WASM);
+  const tree = {};
+  const createZsign = async (o) => {
+    const zs = await real(o), { FS } = zs, { ccall, callMain } = zs;
+    const app = "/w/app/Payload/Tiny.app";
+    zs.ccall = (name, ...rest) => {
+      const r = ccall(name, ...rest);
+      if (name === "ifizbox_unzip") {
+        for (const [dir, id] of [["PlugIns/Share.appex", "share"], ["Extensions/Kit.appex", "kit"], ["Watch/W.app", "watch"]]) {
+          FS.mkdir(`${app}/${dir.split("/")[0]}`);
+          FS.mkdir(`${app}/${dir}`);
+          FS.writeFile(`${app}/${dir}/Tiny`, FS.readFile(`${app}/Tiny`));
+          FS.writeFile(`${app}/${dir}/Info.plist`, `<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict>`
+            + `<key>CFBundleIdentifier</key><string>com.ryha.ifizbox.${id}</string><key>CFBundleExecutable</key><string>Tiny</string></dict></plist>`);
+        }
+        FS.writeFile(`${app}/PlugIns/Share.appex/embedded.mobileprovision`, "an old profile");
+      }
+      return r;
+    };
+    zs.callMain = (args) => {
+      const walk = (p) => {
+        for (const n of FS.readdir(p)) {
+          if (n === "." || n === "..") continue;
+          const at = `${p}/${n}`;
+          if (FS.isDir(FS.stat(at).mode)) walk(at);
+          else tree[at.slice(app.length + 1)] = FS.readFile(at);
+        }
+      };
+      try { return callMain(args); } finally { walk(app); }
+    };
+    return zs;
+  };
+  const r = await runSignJob(createZsign, { ipa: fx("tiny-ifizbox.ipa"), p12: P12, profile: PROFILE, password: "hunter2", ...over });
+  return { r, tree };
+}
+const inExt = (tree) => Object.keys(tree).filter((p) => /^(PlugIns|Extensions|Watch)\//.test(p));
+
+test("zsign WebAssembly, ID kept: app extensions stay, signed, with the app's profile sealed in; the Watch app goes", { skip: !existsSync(WASM) && "no vendor/zsign" }, async () => {
+  const { r, tree } = await signWithExtensions();
+  for (const [dir, id] of [["PlugIns/Share.appex", "share"], ["Extensions/Kit.appex", "kit"]]) {
+    assert.deepEqual(tree[`${dir}/embedded.mobileprovision`], PROFILE, dir);
+    assert.ok(has(tree[`${dir}/_CodeSignature/CodeResources`], "embedded.mobileprovision"), `${dir} seals it`);
+    assert.ok(has(tree["_CodeSignature/CodeResources"], `${dir}/embedded.mobileprovision`), "the app seals it too");
+    assert.ok(has(tree[`${dir}/Tiny`], `com.ryha.ifizbox.${id}\0`), "its own ID is its code identifier");
+    assert.ok(has(tree[`${dir}/Tiny`], "<string>TESTTEAM42.com.ryha.ifizbox</string>"), "the app's entitlements");
+    assert.ok(has(r.ipa, `Payload/Tiny.app/${dir}/embedded.mobileprovision`), "in the signed IPA");
+  }
+  assert.ok(!inExt(tree).some((p) => p.startsWith("Watch/")));
+});
+
+test("zsign WebAssembly: extensions come out with Keep Bundle IDs off, or when the app is signed as another ID", { skip: !existsSync(WASM) && "no vendor/zsign" }, async () => {
+  assert.deepEqual(inExt((await signWithExtensions({ keepBundleId: false })).tree), []);
+  assert.deepEqual(inExt((await signWithExtensions({ appBundleId: "com.example.other" })).tree), []);
 });

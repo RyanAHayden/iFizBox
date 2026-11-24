@@ -51,6 +51,15 @@ export function removeTree(FS, path) {
   } else FS.unlink(path);
 }
 
+// F245: the profile into each top-level app extension, over any the IPA came with; zsign seals it.
+export function profileExtensions(FS, appDir, profile) {
+  for (const dir of ["PlugIns", "Extensions"]) {
+    let names;
+    try { names = FS.readdir(`${appDir}/${dir}`); } catch { continue; }
+    for (const n of names) if (n.endsWith(".appex")) FS.writeFile(`${appDir}/${dir}/${n}/embedded.mobileprovision`, profile);
+  }
+}
+
 // F292: the IPA's SHA-256 (lowercase hex) as it came, before anything changes it; null where the browser has no
 // crypto.subtle (an http page), which only leaves the report and the hash check without it.
 export async function ipaSha256(bytes) {
@@ -94,10 +103,13 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   // APNs delivers by the Info.plist ID, so only a copy that kept it gets push notifications. One installed earlier
   // under the profile's ID stays beside it (the app says so once, core/push.js renamedUpdateNotice).
   const { bundleId, entitlementsId } = signingIds(prof.appId, own, { keep: keepBundleId !== false });
-  // App extensions (PlugIns, a Watch app) come out: zsign gives every binary the app's own entitlements, which don't
-  // match an extension's bundle ID, and iOS then refuses the app ("its integrity could not be verified", user
-  // 2026-11-18, iFizBox's Share and Widget). The app's own Sign Options do the same with Remove App Extensions.
-  for (const dir of ["PlugIns", "Extensions", "Watch"]) removeTree(FS, `${appDir}/${dir}`);
+  // App extensions (F245): with the app's ID kept (Keep Bundle IDs on, and zsign changes no ID) they stay, each with
+  // the app's profile inside, as the app's own signer does: zsign with one profile writes none into an extension
+  // itself. With the ID changed they come out (iOS refused such an app, "its integrity could not be verified", user
+  // 2026-11-18). A Watch app always comes out.
+  const keepExtensions = keepBundleId !== false && bundleId === info.bundleId;
+  for (const dir of keepExtensions ? ["Watch"] : ["PlugIns", "Extensions", "Watch"]) removeTree(FS, `${appDir}/${dir}`);
+  if (keepExtensions) profileExtensions(FS, appDir, new Uint8Array(profile));
 
   FS.writeFile("/w/key.p12", new Uint8Array(p12));
   FS.writeFile("/w/app.mobileprovision", new Uint8Array(profile));
