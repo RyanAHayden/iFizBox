@@ -97,7 +97,28 @@ class App(unittest.TestCase):
         self.assertIn("stopNow(gen: gen)", src)  # ours is off after the last connection
         self.assertIn('s["vpn"] = LocalVPN.status()', read("idevice", "IDeviceBridge.swift", base=os.path.dirname(HERE)))
         up = src[src.index("static func up("):src.index("/// Before a connect to iOS")]
-        self.assertLess(up.index("if !Path.online() {"), up.index("var m = try manager()"))  # no network: say so at once, not after startLimit
+        self.assertLess(up.index("if !Path.online() {"), up.index("var m = try manager()"))  # no network: say so, not after startLimit
+
+    def test_no_network_waits_a_few_seconds(self):
+        """B428b: a start with no network waits for one, cancellable and without startLock; status() waits for nothing."""
+        src = read("App", "LocalVPN.swift")
+        limit = int(re.search(r"networkWait: TimeInterval = (\d+)", src).group(1))
+        self.assertTrue(3 <= limit <= 10, limit)
+        body = src[src.index("private static func waitForNetwork("):src.index("private static func noNetwork()")]
+        self.assertLess(body.index("if Path.online() || connectedNow() { return true }"), body.index("while waited < networkWait"))
+        self.assertNotIn("startLock.", body)
+        loop = body[body.index("while waited < networkWait"):]
+        self.assertLess(loop.index("try step("), loop.index("Thread.sleep(forTimeInterval: 0.25)"))  # Cancel
+        up = src[src.index("static func up("):src.index("private static func start(")]
+        self.assertLess(up.index("try waitForNetwork(step)"), up.index("startLock.lock(before:"))
+        start = src[src.index("private static func start("):src.index("/// Before a connect to iOS")]
+        self.assertNotIn("waitForNetwork", start)  # under startLock
+        wait = src[src.index("static func waitOffCellular("):src.index("// ---- The app out of sight")]
+        # an install: cancellable, then the path is read (cellular that came back asks for Airplane Mode)
+        self.assertLess(wait.index("waitForNetwork({ _ in\n                if cancelled() { throw"), wait.index("guard Path.now().cellular"))
+        status = src[src.index("static func status()"):src.index("/// The keys of")]
+        self.assertNotIn("waitForNetwork", status)
+        self.assertNotIn("connectedNow", status)
 
     def test_one_start_at_a_time(self):
         """B418: several installs at once: one start, the others find it connected; no save unless needed."""
@@ -138,7 +159,7 @@ class App(unittest.TestCase):
         self.assertIn("== AF_INET {", addr)
         self.assertIn("static let airplaneReread: TimeInterval = 3", src)
         wait = src[src.index("static func waitOffCellular("):src.index("// ---- The app out of sight")]
-        self.assertIn("!failedNow(), Path.now().cellular else { return false }", wait)
+        self.assertIn("guard Path.now().cellular else { return false }", wait)
         self.assertLess(wait.index("try hold(finishing)"), wait.index("var t0 = Date()"))
         self.assertLess(wait.index("if now.wifi && !asked {"), wait.index("waiting()\n"))
         self.assertIn("if now.cellular && !asked && Date().timeIntervalSince(t0) >= airplaneReread {", wait)

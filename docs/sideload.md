@@ -305,6 +305,11 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   the 5 minutes. Cancel or the timeout ends the install's hold, and the VPN goes off 3 s
   later. Once the connection opens, the install emits `airplaneOff` and the page says "You can turn Airplane Mode off".
   A reconnect with cellular data back waits again.
+  With no network and our tunnel not up (Airplane Mode just turned off, Wi-Fi or cellular data still coming back),
+  LocalVPN waits up to 8 s awake for one (`networkWait`, `waitForNetwork`) before it fails with `vpn_failed`, "can't start
+  without a network". That wait is outside `startLock`, so `status()` and other starts aren't held up. An install waits
+  in `waitOffCellular` before it reads the path: Cancel ends it, and cellular that comes back goes on to the Airplane Mode
+  wait. Checks wait in `up`.
   In the background the VPN starts only to finish an install already connected (`finishing`). An install not yet
   connected pauses instead (`LocalVPN.waitForApp`): its row reads "Waiting for iFizBox" (event `appWait`), its KeepAlive
   is let go so iOS may suspend the app, and it goes on when the app is opened. Opened with no network (Airplane Mode went on

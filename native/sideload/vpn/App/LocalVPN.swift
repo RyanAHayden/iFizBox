@@ -26,6 +26,7 @@ enum LocalVPN {
     static let downWait: TimeInterval = 3 // from stopVPNTunnel to disconnected
     static let downWaitOwed: TimeInterval = 10 // the same, when our configuration is removed after it (giveBack)
     static let startLimit: TimeInterval = 10 // from startVPNTunnel to connected
+    static let networkWait: TimeInterval = 8 // B428b: with no network, how long a start waits for one
     static let saveLimit: TimeInterval = 90 // the first save waits for the user's Allow on iOS's "Add VPN Configurations"
 
     static func log(_ s: String) { IDevice.ilog("vpn: \(s)") }
@@ -152,7 +153,17 @@ enum LocalVPN {
     /// B423: out of the app for awayGrace with the path still cellular, the wait pauses (pause()): its hold is let go,
     /// so the VPN goes off. Airplane Mode on isn't cellular, so the VPN is never dropped then.
     static func waitOffCellular(finishing: Bool, cancelled: () -> Bool, paused: (Pause) -> Void, waiting: () -> Void) throws -> Bool {
-        guard available, !failedNow(), Path.now().cellular else { return false }
+        guard available, !failedNow() else { return false }
+        if finishing || !mustWait() { // B428b: here too, so Cancel ends it, and cellular coming back is seen below
+            let online = try waitForNetwork({ _ in
+                if cancelled() { throw IDevice.Failure(code: "cancelled", text: "Cancelled") }
+            })
+            if !online {
+                guard !finishing, mustWait() else { throw noNetwork() }
+                try waitForApp(cancelled: cancelled, paused: paused) // left meanwhile, perhaps to turn one on
+            }
+        }
+        guard Path.now().cellular else { return false }
         log("on cellular before \(name) is on; path: \(Path.described())")
         func hold(_ finishing: Bool) throws {
             try begin(finishing: finishing) { _ in
@@ -497,6 +508,7 @@ enum LocalVPN {
                 Thread.sleep(forTimeInterval: 0.25)
                 waited += 0.25
             }
+            _ = try waitForNetwork(step) // start() says it when there is still none
             while !startLock.lock(before: Date().addingTimeInterval(1)) { try step("waiting for \(name)") }
             if finishing || !mustWait() { break } // it left while waiting for startLock: wait again
             startLock.unlock()
@@ -508,6 +520,30 @@ enum LocalVPN {
         lock.lock(); refusal = nil; lock.unlock()
     }
 
+    /// B428b: a network is there, or our tunnel is up already (it needs none). Blocking, at most networkWait awake:
+    /// after Airplane Mode, Wi-Fi or cellular data takes a few seconds to come back. Never under startLock; `step`
+    /// throws to cancel.
+    private static func waitForNetwork(_ step: (String) throws -> Void) throws -> Bool {
+        if Path.online() || connectedNow() { return true }
+        log("no network: waiting up to \(Int(networkWait)) s for one; path: \(Path.described())")
+        var waited: TimeInterval = 0
+        while waited < networkWait {
+            try step("waiting for a network")
+            Thread.sleep(forTimeInterval: 0.25)
+            waited += 0.25
+            if Path.online() {
+                log("a network after \(String(format: "%.1f", waited)) s; path: \(Path.described())")
+                return true
+            }
+        }
+        log("no network in \(Int(networkWait)) s")
+        return false
+    }
+
+    private static func noNetwork() -> IDevice.Failure {
+        IDevice.Failure(code: "vpn_failed", text: "\(name) can't start without a network: iOS starts a VPN only with Wi-Fi or cellular data on")
+    }
+
     /// up(), under startLock.
     private static func start(_ step: (String) throws -> Void) throws {
         // B375: iOS starts no VPN without a network: it goes connecting then disconnected ("No network available")
@@ -515,7 +551,7 @@ enum LocalVPN {
         // save takes the user's own VPN's place
         if !Path.online() {
             if connectedNow() { return }
-            throw IDevice.Failure(code: "vpn_failed", text: "\(name) can't start without a network: iOS starts a VPN only with Wi-Fi or cellular data on")
+            throw noNetwork()
         }
         lock.lock(); let on = cached?.connection.status == .connected; lock.unlock()
         if on { return }
