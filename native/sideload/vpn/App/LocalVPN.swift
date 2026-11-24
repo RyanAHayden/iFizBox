@@ -139,69 +139,120 @@ enum LocalVPN {
 
     // ---- The tunnel
 
-    private static let lock = NSLock()
+    private static let lock = NSLock() // held for a moment only (status() takes it): never while waiting on iOS
+    private static let startLock = NSLock() // B418: one up() at a time; held while it waits on iOS. Taken before `lock`
     private static var cached: NETunnelProviderManager? // guarded by lock
     private static var holds = 0 // guarded by lock
     private static var stopGen = 0 // guarded by lock: a scheduled stop runs only if nothing came after it
     private static var installs = 0 // guarded by lock: installs going on (installBegan): a reconnect stays in its queue
-    private static var lastFailure: Date? // guarded by lock: begin() couldn't turn it on
+    private static var refusal: (at: Date, failure: IDevice.Failure)? // guarded by lock: iOS didn't save our configuration
 
-    /// begin() failed less than a minute ago: a reconnect or the next install of a queue goes the other ways in
-    /// instead of waiting on it again. vpn.test always tries.
+    /// iOS refused our configuration less than a minute ago (the user tapped Don't Allow, or didn't answer): the rest
+    /// of a queue isn't asked again. Any other failed start fails its own install only (B418). vpn.test always tries.
     static func failedNow() -> Bool {
         lock.lock(); defer { lock.unlock() }
-        return lastFailure.map { Date().timeIntervalSince($0) < 60 } ?? false
+        return refusal.map { Date().timeIntervalSince($0.at) < 60 } ?? false
     }
 
-    /// Blocking, never on the main thread: our configuration, saved and enabled, loaded again (iOS wants a load after
-    /// a save before the tunnel starts). The first save shows iOS's "Add VPN Configurations" and waits for Allow.
-    static func manager() throws -> NETunnelProviderManager {
+    /// Blocking, never on the main thread, under startLock (up() alone calls it): our configuration as iOS has it
+    /// now, saved only when it isn't ours and enabled already. The first save shows iOS's "Add VPN Configurations"
+    /// and waits for Allow. A save iOS calls stale (the configuration changed after the load) is done once more, on
+    /// a new load.
+    private static func manager() throws -> NETunnelProviderManager {
         guard let id = providerID else { throw IDevice.Failure(code: "vpn_failed", text: "this build has no \(name)") }
         guard entitled else { throw IDevice.Failure(code: "vpn_failed", text: "the profile this app is signed with has no Network Extensions capability") }
-        lock.lock(); let have = cached; lock.unlock()
-        if let m = have, m.isEnabled { return m }
-        let found: NETunnelProviderManager? = try wait("reading the VPN configuration", 10) { done in
-            NETunnelProviderManager.loadAllFromPreferences { ms, err in
-                done(err, ms?.first { ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == id })
+        var retried = false
+        while true {
+            let found: NETunnelProviderManager? = try wait("reading the VPN configuration", 10) { done in
+                NETunnelProviderManager.loadAllFromPreferences { ms, err in
+                    done(err, ms?.first { ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == id })
+                }
             }
+            let m = found ?? NETunnelProviderManager()
+            if found == nil || !isOurs(m) {
+                let p = (m.protocolConfiguration as? NETunnelProviderProtocol) ?? NETunnelProviderProtocol()
+                p.providerBundleIdentifier = id
+                p.serverAddress = peer
+                p.disconnectOnSleep = false
+                m.protocolConfiguration = p
+                m.localizedDescription = name
+                m.isOnDemandEnabled = false
+                m.isEnabled = true
+                log(found == nil ? "saving a new configuration (iOS asks to allow it)" : "enabling the configuration")
+                var stale = false // written before done() signals the wait
+                do {
+                    let _: Bool? = try wait("saving the VPN configuration", saveLimit, refusable: true) { done in
+                        m.saveToPreferences { err in stale = isStale(err); done(err, true) }
+                    }
+                    // iOS wants a load after a save before the tunnel starts
+                    let _: Bool? = try wait("loading the VPN configuration", 10) { done in
+                        m.loadFromPreferences { err in stale = isStale(err); done(err, true) }
+                    }
+                } catch {
+                    guard stale, !retried else { throw error }
+                    retried = true
+                    log("the configuration was stale: loading it again")
+                    continue
+                }
+            }
+            lock.lock(); cached = m; lock.unlock()
+            return m
         }
-        let m = found ?? NETunnelProviderManager()
-        let p = (m.protocolConfiguration as? NETunnelProviderProtocol) ?? NETunnelProviderProtocol()
-        p.providerBundleIdentifier = id
-        p.serverAddress = peer
-        p.disconnectOnSleep = false
-        m.protocolConfiguration = p
-        m.localizedDescription = name
-        m.isOnDemandEnabled = false
-        m.isEnabled = true
-        log(found == nil ? "saving a new configuration (iOS asks to allow it)" : "enabling the configuration")
-        let _: Bool? = try wait("saving the VPN configuration", saveLimit) { done in m.saveToPreferences { done($0, true) } }
-        let _: Bool? = try wait("loading the VPN configuration", 10) { done in m.loadFromPreferences { done($0, true) } }
-        lock.lock(); cached = m; lock.unlock()
-        return m
     }
 
-    /// Runs `start` and waits for it to call `done(error, value)`, at most `limit` seconds. Blocking.
-    private static func wait<T>(_ what: String, _ limit: TimeInterval, _ start: (@escaping (Error?, T?) -> Void) -> Void) throws -> T? {
+    /// `m`, as loaded, is what manager() would save.
+    private static func isOurs(_ m: NETunnelProviderManager) -> Bool {
+        guard let p = m.protocolConfiguration as? NETunnelProviderProtocol else { return false }
+        return m.isEnabled && !m.isOnDemandEnabled && m.localizedDescription == name && p.serverAddress == peer && !p.disconnectOnSleep
+    }
+
+    private static func isStale(_ e: Error?) -> Bool {
+        guard let ns = e as NSError? else { return false }
+        return ns.domain == NEVPNErrorDomain && ns.code == NEVPNError.configurationStale.rawValue
+    }
+
+    /// Runs `start` and waits for it to call `done(error, value)`, at most `limit` seconds. Blocking. `refusable`:
+    /// iOS asks the user, and a no (or no answer in time) is kept for failedNow().
+    private static func wait<T>(_ what: String, _ limit: TimeInterval, refusable: Bool = false, _ start: (@escaping (Error?, T?) -> Void) -> Void) throws -> T? {
         let sem = DispatchSemaphore(value: 0)
         var out: T?, failure: Error?
         start { e, v in failure = e; out = v; sem.signal() }
         guard sem.wait(timeout: .now() + limit) == .success else {
-            throw IDevice.Failure(code: "vpn_failed", text: "\(what) took over \(Int(limit)) s")
+            let f = IDevice.Failure(code: "vpn_failed", text: "\(what) took over \(Int(limit)) s")
+            if refusable { refused(f) }
+            throw f
         }
         if let e = failure {
             let ns = e as NSError
             // NEVPNError.configurationReadWriteFailed with "permission denied": the user tapped Don't Allow
-            let text = ns.domain == NEVPNErrorDomain && ns.code == NEVPNError.configurationReadWriteFailed.rawValue
+            let denied = ns.domain == NEVPNErrorDomain && ns.code == NEVPNError.configurationReadWriteFailed.rawValue
+            let text = denied
                 ? "iOS didn't save the VPN configuration (\(ns.localizedDescription)). Allow it when iOS asks"
                 : "\(what): \(ns.localizedDescription)"
-            throw IDevice.Failure(code: "vpn_failed", text: text)
+            let f = IDevice.Failure(code: "vpn_failed", text: text)
+            if refusable && denied { refused(f) }
+            throw f
         }
         return out
     }
 
-    /// The tunnel up (blocking): started if it isn't, then until iOS says connected.
+    private static func refused(_ f: IDevice.Failure) { lock.lock(); refusal = (Date(), f); lock.unlock() }
+
+    /// The tunnel up (blocking): started if it isn't, then until iOS says connected. B418: one at a time, each install
+    /// of a queue calls it: a later caller waits here, then finds the tunnel connected and saves nothing, or tries
+    /// itself when the one before failed (unless iOS refused the configuration meanwhile: it isn't asked twice).
     static func up(_ step: (String) -> Void = { _ in }) throws {
+        let t0 = Date()
+        while !startLock.lock(before: Date().addingTimeInterval(1)) { step("waiting for \(name)") }
+        defer { startLock.unlock() }
+        lock.lock(); let no = refusal; lock.unlock()
+        if let no = no, no.at > t0 { throw no.failure }
+        try start(step)
+        lock.lock(); refusal = nil; lock.unlock()
+    }
+
+    /// up(), under startLock.
+    private static func start(_ step: (String) -> Void) throws {
         // B375: iOS starts no VPN without a network: it goes connecting then disconnected ("No network available")
         // faster than the loop below can see, which then waited out startLimit. Asked before manager(), whose
         // save takes the user's own VPN's place
@@ -212,19 +263,17 @@ enum LocalVPN {
         lock.lock(); let on = cached?.connection.status == .connected; lock.unlock()
         if on { return }
         // Another VPN set since disabled ours, which the kept copy doesn't say: its start gives no error and never
-        // connects. Read it again (manager() enables and saves it when off)
-        lock.lock(); cached = nil; lock.unlock()
-        let m = try manager()
+        // connects. manager() reads it again (and enables and saves it when off)
+        var m = try manager()
         if m.connection.status == .connected { return }
         step("turning on \(name)")
         let t0 = Date()
         do { try m.connection.startVPNTunnel() } catch {
-            // a configuration another app's VPN took over since: enable and save it again, then try once more
-            lock.lock(); cached = nil; lock.unlock()
-            let again = try manager()
-            do { try again.connection.startVPNTunnel() } catch { throw IDevice.Failure(code: "vpn_failed", text: "\(name) didn't start: \(error.localizedDescription)") }
+            // another app's VPN took its place since, or it changed: read it again, then try once more
+            m = try manager()
+            do { try m.connection.startVPNTunnel() } catch { throw IDevice.Failure(code: "vpn_failed", text: "\(name) didn't start: \(error.localizedDescription)") }
         }
-        let conn = try manager().connection
+        let conn = m.connection
         var seenConnecting = false
         while Date().timeIntervalSince(t0) < startLimit {
             switch conn.status {
@@ -255,11 +304,9 @@ enum LocalVPN {
         let tunnels = tunnelAddresses() // read before up() takes another VPN's place
         log("on; up tunnels: \(tunnelList(tunnels))")
         do { try up(step) } catch {
-            lock.lock(); lastFailure = Date(); lock.unlock()
             end()
             throw error
         }
-        lock.lock(); lastFailure = nil; lock.unlock()
     }
 
     /// A connection ended: the VPN goes off `linger` seconds after the last one, unless another begins first.
