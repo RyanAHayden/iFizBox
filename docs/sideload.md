@@ -291,10 +291,10 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   `networkextension` entitlement); when the app's embedded profile lacks `packet-tunnel-provider`, This iPhone isn't offered: installs go through the Signing Server after the alert "No Network Extensions". `IDevice.Session` turns the VPN on just before it connects to iOS (`LocalVPN.begin`,
   saving the configuration the first time: iOS asks to allow it) and off 3 seconds after the last connection ends (under a background task, so an app that iOS suspends meanwhile
   still takes it down),
-  so a queue of installs or a reconnect finds it on. A queue holds through an install's reconnects, however long the pauses between them (`installBegan` and `installEnded` in `IDevice.install`). The configuration is never On Demand and never removed: it
-  stays in Settings > VPN, only connected during installs, so iOS's "Add VPN Configurations" Allow comes once.
+  so a queue of installs or a reconnect finds it on. A queue holds through an install's reconnects, however long the pauses between them (`installBegan` and `installEnded` in `IDevice.install`). The configuration is never On Demand. It is removed only with Restore My VPN on (below). Otherwise it
+  stays in Settings > VPN, only connected during installs, so iOS's "Add VPN Configurations" Allow comes once, unless it is removed.
   Setting up asks it: right after pairing (or importing a pairing file), the pairing page runs the same test as
-  Test Connection (`vpn.test`) before it says Paired. iOS runs one VPN at a time, so your VPN pauses for the install, and since ours keeps Settings > VPN's checkmark, a VPN that relies on On Demand stays off until you turn it on again.
+  Test Connection (`vpn.test`) before it says Paired. iOS runs one VPN at a time, so your VPN pauses for the install, and since ours keeps Settings > VPN's checkmark, a VPN that relies on On Demand stays off until you turn it on again, unless Restore My VPN is on (below).
   On cellular, iOS refuses these connections and starts no VPN without a network, but keeps one that is up. So before
   each connect, `IDevice.install` calls `LocalVPN.waitOffCellular`. The built-in VPN comes on while data is on, then the
   path is read again for 3 s (a short Wi-Fi drop isn't cellular). Only then does the install ask "Join Wi-Fi or turn on
@@ -325,10 +325,19 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   it needs data between. Real cellular is not verified on a phone.
   `LocalVPN.begin` runs `up()`: it saves the configuration the first time (iOS asks to allow it) and connects it. The end
   takes our VPN down 3 seconds after the queue's last connection. The configuration is never On Demand. iOS runs one VPN at
-  a time, so while ours is on any other VPN is taken off, and `idevice.status`'s `vpn.otherVPN` says so. Nothing puts that VPN back
+  a time, so while ours is on any other VPN is taken off, and `idevice.status`'s `vpn.otherVPN` says so. Without Restore My VPN nothing puts that VPN back
   (whether one that relies on On Demand comes back by itself is not verified on a phone).
-  Bridge: `idevice.status`'s `vpn` is `{available, bundled, entitled, tested, on, cellular, wifi, otherVPN, name}`, and
-  `vpn.test` runs the Set Up test.
+  **Restore My VPN** is a kept setting, off by default. When it is on and another VPN was up as ours started (or our
+  configuration was removed less than 5 minutes ago, since On Demand may need 1 to 4 minutes to bring a VPN back), our
+  configuration is removed after the queue's last connection, after the 3 s linger and once ours is disconnected. It is
+  also removed when the VPN goes off because an install pauses with the app left. iOS then gives the other VPN its
+  Settings > VPN checkmark back, and its On Demand reconnects it. The pending removal is remembered in user defaults, so
+  after a killed app it is removed at the next launch or return to the app (`takeDownLeftOver`). A failed removal is
+  retried the same way. Nothing is removed when no other VPN was up, when the setting is off, or when ours is no longer
+  enabled (another VPN has the checkmark already). Turning it off forgets the pending removal. The cost: the next install
+  saves a new configuration, and iOS asks Allow again.
+  Bridge: `idevice.status`'s `vpn` is `{available, bundled, entitled, tested, on, cellular, wifi, otherVPN, restore, name}`,
+  `vpn.setRestore` `{on}` turns Restore My VPN on or off and answers the same status, and `vpn.test` runs the Set Up test.
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`.
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and

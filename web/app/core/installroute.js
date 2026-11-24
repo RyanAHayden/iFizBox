@@ -483,3 +483,6 @@ export function quietCheckAllowed(choice, st, { again = false } = {}) {
   if (otherVPNOn(st) || st.otherVPN || st.vpn.cellular || !st.vpn.wifi) return false;
   return again || !st.vpn.on;
 }
+
+// Restore My VPN (sideload, built-in VPN): the kept setting, read as idevice.status's vpn.restore. Answers that vpn status.
+export const setRestoreVPN = (native, on) => native.call("vpn.setRestore", { on: Boolean(on) });
