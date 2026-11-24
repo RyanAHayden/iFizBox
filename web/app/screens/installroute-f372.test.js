@@ -85,6 +85,65 @@ test("F414: This iPhone's page: status and one action, the steps until they're d
   for (const k of ["how", "server", "iphone", "pair"]) assert.ok(SUB_TITLES[k], k);
 });
 
+test("F412: Restore My VPN, its own group, off by default; shown only when the shell can do it", async () => {
+  const group = (st) => localGroups(st).find((g) => g.key === "restore");
+  assert.equal(group(ST({ tested: true })), undefined, "a shell without the setting");
+  assert.equal(group(ST({ available: false, restore: false })), undefined);
+  assert.equal(group(null), undefined);
+  const off = group(ST({ tested: true, restore: false }));
+  assert.deepEqual(off.rows.map((r) => r.label), ["Restore My VPN"]);
+  assert.equal(off.footer, "Your own VPN stays off after installs.");
+  assert.equal(group(ST({ tested: true, restore: true })).footer, "After installs your own VPN comes back. iOS asks to allow the app's VPN again next time.");
+  assert.equal(setupFooter(ST({ tested: true, otherVPN: true, restore: true })), "", "it comes back: not told to turn it on");
+
+  const { drawInstallation, forgetStatus, cachedStatus } = screens;
+  forgetStatus();
+  core.clearRouteFailure();
+  const sent = [];
+  let fail = false, kept = false;
+  const native = { call: async (x, p) => {
+    if (x === "idevice.status") return ST({ tested: true, restore: kept });
+    if (x !== "vpn.setRestore" || fail) throw new Error("no");
+    sent.push(p.on);
+    kept = p.on;
+    return {};
+  } };
+  const box = document.createElement("div");
+  const every = (e) => [e, ...e.children.flatMap(every)];
+  const sw = () => every(box).filter((e) => e._cls.has("switch"));
+  const on = () => sw()[0].getAttribute("aria-checked");
+  const says = (t) => every(box).some((e) => e._cls.has("group-footer") && e.textContent === t);
+  const draw = () => drawInstallation(box, "iphone", { store: { get: () => "iphone", set() {} }, native, alert: async () => ({ index: 0 }) });
+  const tap = async () => { for (const f of sw()[0].listeners.click) await f({ stopPropagation() {}, preventDefault() {} }); await new Promise((r) => setTimeout(r, 0)); };
+  await draw();
+  assert.equal(sw().length, 1);
+  assert.equal(on(), "false");
+  const first = sw()[0];
+  await tap();
+  assert.deepEqual(sent, [true]);
+  assert.equal(on(), "true");
+  assert.equal(sw()[0], first, "the row is kept, so the knob slides");
+  assert.ok(says(core.restoreFooter(true)));
+  assert.equal(cachedStatus().vpn.restore, true);
+  await draw();
+  await tap();
+  assert.deepEqual(sent, [true, false], "a redrawn page: the tap goes out once");
+  assert.ok(says(core.restoreFooter(false)));
+  fail = true;
+  await Promise.all([tap(), tap()]);
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(on(), "false", "two that fail");
+  await tap();
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(on(), "false", "a failed call puts it back");
+  assert.ok(says(core.restoreFooter(false)));
+  fail = false;
+  await tap();
+  screens.rememberStatus(ST({ tested: true, restore: false }));
+  assert.equal(cachedStatus().vpn.restore, true, "a read begun before the tap");
+  forgetStatus();
+});
+
 test("F414: a failed check asks to fix", () => {
   const q = core.fixQuestion({ title: "Pair Again", message: "x", again: true });
   assert.deepEqual([q.title, q.buttons, q.cancel], ["Pairing Lost", ["Not Now", "Fix"], 0]);

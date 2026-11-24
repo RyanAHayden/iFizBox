@@ -5,7 +5,8 @@
 //   installation/with  Install Apps With (F300): the choice (This iPhone / Signing Server, a checkmark), and under it
 //                      the chosen route's groups sliding in: This iPhone's (below) or the Signing Server's (Server,
 //                      Check Server, Run Your Own: screens/settings.js passes them as `server`)
-//   installation/iphone This iPhone (F414): its status with one action, the Set Up steps until done, Forget Pairing, How It Works
+//   installation/iphone This iPhone (F414): its status with one action, the Set Up steps until done, Restore My VPN
+//                      (F412), Forget Pairing, How It Works
 //   installation/pair  Pairing, one page that runs by itself (core setupState): one sentence on what it gives,
 //                      drawn at once with a spinner while it checks, then pairing starts on its own: the 6-digit code
 //                      big at the top and where to type it, a line and a screenshot a step; it keeps pairing while
@@ -24,6 +25,8 @@ import { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, 
 import { SETUP_FOOTER, setupSteps, iphoneStatus, fixQuestion } from "../core/installroute.js"; // F414
 import { builtinVPN, setupFooter, iphoneSetUp, HOW_STEPS, vpnTestResult, NO_VPN, BUILTIN_VPN } from "../core/installroute.js"; // F372
 import { quietCheckDue, quietCheckAllowed, markQuietCheck } from "../core/installroute.js"; // F410b
+import { RESTORE_VPN, restoreShown, restoreFooter, setRestoreVPN } from "../core/installroute.js"; // F412
+import { createSwitch } from "../nav/switch.js";
 import { NAME } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
 import { showHUD } from "../nav/hud.js";
@@ -63,8 +66,14 @@ async function status(native) { return (await readStatus(native)).st; }
 // F301: the last idevice.status answer, shown at once the next time a page draws (its rows spinning while it's read
 // again). Kept for this run of the app only: after a relaunch the VPN may well be another, so the first read waits.
 let lastStatus = null;
-export function rememberStatus(st) { if (st && typeof st === "object") { lastStatus = st; } }
-export function forgetStatus() { lastStatus = null; } // tests, and Forget Pairing
+// F412: a status read that began before a tap on Restore My VPN doesn't bring the old setting back (a read ends within TIMEOUTS.status)
+let restoreTap = null; // { on, at, was, sending }: the last tap; was = the setting before it, as last confirmed
+export function rememberStatus(st) {
+  if (!st || typeof st !== "object") return;
+  if (restoreTap && !restoreTap.sending && Date.now() - restoreTap.at > TIMEOUTS.status) restoreTap = null;
+  lastStatus = restoreTap && restoreShown(st) ? { ...st, vpn: { ...st.vpn, restore: restoreTap.on } } : st;
+}
+export function forgetStatus() { lastStatus = null; restoreTap = null; } // tests, and Forget Pairing
 export const cachedStatus = () => lastStatus;
 
 // B133: every step that waits on the phone, the network or the pairing shows iOS 6's activity indicator and what it
@@ -147,8 +156,23 @@ export function localGroups(st, { reading = false, pairChecking = false, test = 
     groups.push({ header: "Set Up", rows: setupSteps(st).map((p) => ({ label: p.label, subtitle: p.subtitle, icon: rowIcon(STEP_ICON[p.key]),
       ...(p.done ? { checked: true } : p.next ? { onClick: p.key === "pair" ? setUp : test, chevron: true } : {}) })), footer: SETUP_FOOTER });
   }
+  // F412: not in the row's content: a repaint keeps the row, so the knob slides (syncRestore sets it)
+  if (restoreShown(st)) groups.push({ key: "restore", rows: [{ label: RESTORE_VPN, cls: "restore-vpn", icon: rowIcon("syncNow") }], footer: restoreFooter(st.vpn.restore) });
   if (st?.paired) groups.push({ rows: [{ label: "Forget Pairing", cls: "sign-import", onClick: forget }] });
   return [...groups, howGroup];
+}
+// F412: the drawn Restore My VPN row's switch. `toggles` holds each page's latest handler (the row outlives a repaint).
+const restoreToggles = new WeakMap(); // page element → (on) => …
+function dressRestore(frag, page, on) {
+  const inner = frag.querySelector?.(".restore-vpn .cell-inner") ?? frag.querySelector?.(".restore-vpn")?.children?.[0];
+  if (!inner) return frag;
+  inner.append(createSwitch({ label: RESTORE_VPN, checked: on, onToggle: (v) => restoreToggles.get(page)?.(v) }));
+  inner.classList.add("has-switch");
+  return frag;
+}
+function syncRestore(page, on) {
+  const sw = page.querySelector?.(".restore-vpn .switch");
+  if (sw && sw.getAttribute("aria-checked") !== String(on)) sw.setAttribute("aria-checked", String(on));
 }
 const STEP_ICON = { pair: "pairPhone", allow: "cellular", test: "testConnection" };
 // The status cell's tile and the action's dimming on the drawn rows (as mainPage's).
@@ -292,6 +316,23 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
     paint();
     try { await vpnTest(native, ask, store); } finally { settled(); }
   };
+  // F412: shown at once; a call that fails reads the setting again (no answer: as it was)
+  restoreToggles.set(el, async (on) => {
+    const st = lastStatus ?? view;
+    if (!st) return;
+    const tap = restoreTap = { on, at: Date.now(), was: restoreTap?.sending ? restoreTap.was : Boolean(st.vpn?.restore), sending: true };
+    rememberStatus(st);
+    view = lastStatus;
+    paint();
+    try { await within(setRestoreVPN(native, on), TIMEOUTS.status); tap.sending = false; } catch {
+      const read = (await readStatus(native)).st;
+      if (restoreTap !== tap) return; // tapped again meanwhile
+      restoreTap = null;
+      if (read) rememberStatus(read);
+      else if (lastStatus) rememberStatus({ ...lastStatus, vpn: { ...lastStatus.vpn, restore: tap.was } });
+      redraw();
+    }
+  });
   const paint = () => {
     if (!mine()) return;
     const devWait = !got.device && !late.device;
@@ -323,11 +364,13 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
       test: () => runTest(),
     });
     const shown = subGroups(sections, sub);
+    const restore = Boolean((view ?? lastStatus)?.vpn?.restore);
     patchGroups(el, shown, (s) => {
-      const frag = dressStatus(spinRows(warnFooters(s), s), s);
+      const frag = dressRestore(dressStatus(spinRows(warnFooters(s), s), s), el, restore);
       for (const d of frag.querySelectorAll?.(".cell-detail") ?? []) if (d.textContent === "Another VPN" || d.textContent === NOT_RESPONDING || d.textContent === FAILING) d.classList.add("install-red");
       return frag;
     });
+    syncRestore(el, restore);
   };
   paint();
   // F301: idevice.status is read for the Signing Server choice too (the choice row's spinner waits on it)
@@ -337,7 +380,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
     late.device = !st; // failed or too slow: Not Responding (a failure says no more than that)
     if (st) {
       rememberStatus(st);
-      view = st;
+      view = lastStatus;
     }
     // B316: opened after a failure: the pairing is checked by itself; the page repaints when it passes or fails
     if (st?.paired && choice === "iphone") autoCheck(native, alert, () => { if (mine()) paint(); }, store);

@@ -92,12 +92,15 @@ The pages under it:
   first: Checking… (with a spinner), Not Set Up, Almost Done, Ready to Install, the failure (Pairing Lost or another
   red reason) or Not Responding, with one action: Start Setup, Test Connection, Check Connection or Fix. Its footer
   shows once it's ready: the other-VPN line ("Your VPN goes off during installs. Turn it back on after.") when another
-  VPN is up or chosen in Settings > VPN, else the cellular line ("On cellular, installs ask for Airplane Mode."), else
+  VPN is up or chosen in Settings > VPN and Restore My VPN is off, else the cellular line ("On cellular, installs ask for Airplane Mode."), else
   none. Until This iPhone is set up, **Set Up** has three steps: 1. Pair This iPhone (opens Pairing),
   2. Allow iFizBox VPN, 3. Test Connection. A step that's done is checked, and the next one is open. Steps 2 and 3
   are done together: `vpn.test` turns the VPN on, connects once with the pairing and turns it off, and iOS asks to
   allow the VPN configuration the first time. The footer reads "Once is enough. It stays set up after updates and
-  re-signing." Once paired, **Forget Pairing** (back to the Signing Server). Then **How It Works** › (`installation/how`:
+  re-signing." Then **Restore My VPN**, a switch in a group of its own, off by default, shown when `idevice.status`'s
+  `vpn.available` and the shell has the `restore` setting (before set-up too). Its footer reads "After installs your own VPN
+  comes back. iOS asks to allow the app's VPN again next time." when on, "Your own VPN stays off after installs." when off.
+  A tap shows at once and calls `vpn.setRestore`; a failed call puts the switch back. Once paired, **Forget Pairing** (back to the Signing Server). Then **How It Works** › (`installation/how`:
   the five steps of one install: Download, Sign, iFizBox VPN On, Install, iFizBox VPN Off; and Offline). **Signing
   Server** (`installation/server`): Server, Check Server, Run Your Own. Without Network Extensions in the app's profile,
   This iPhone's page shows the Set Up group "Network Extensions: Missing" below.
@@ -107,8 +110,8 @@ The pages under it:
   through installation_proxy never show iOS's install prompt. Under the choice, the chosen route's groups slide in:
   This iPhone's (below), or the Signing Server's (Server, Check Server, Run Your Own). A tap moves the checkmark at
   once, whether or not the iPhone is paired, and the row shows the grey spinner until `idevice.status` answers.
-- **This iPhone** (also `installation/iphone` on its own): the status group, then Set Up (until it's set up)
-  and Forget Pairing (once paired), then **How It Works**, as above. While `idevice.status` is read, the status says Checking… with a
+- **This iPhone** (also `installation/iphone` on its own): the status group, then Set Up (until it's set up),
+  Restore My VPN (when shown), Forget Pairing (once paired), then **How It Works**, as above. While `idevice.status` is read, the status says Checking… with a
   spinner, and the steps appear once it answers. The last answer of this app run shows at once while it's read again; a failed or late read (past its deadline, `TIMEOUTS`) says Not Responding, red. A profile without Network
   Extensions shows a Set Up group "Network Extensions: Missing" with the footer "This profile has no Network Extensions,
   so it can't connect. Sign with one that has them, or use the Signing Server." No Developer Mode row: an install it
