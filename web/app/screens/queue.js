@@ -819,6 +819,26 @@ export async function appSyncFirst(jobs, { ipa = null } = {}) {
   }
 }
 
+// F407: the helper calls a run has going. A row's stop or Cancel ends its row at once, but the helper finishes what it
+// has begun: idle() settles once every call has (at most `limit` ms: one that hangs can't hold the run for ever), so
+// dpkg, or the next Confirm, doesn't start beside it.
+export function helperCalls({ limit = 60_000 } = {}) {
+  const calls = new Set();
+  return {
+    track(p) {
+      const q = Promise.resolve(p).catch(() => {}).then(() => { calls.delete(q); });
+      calls.add(q);
+      return p;
+    },
+    async idle() {
+      if (!calls.size) return;
+      let t;
+      await Promise.race([Promise.all(calls), new Promise((f) => { t = setTimeout(f, limit); })]);
+      clearTimeout(t);
+    },
+  };
+}
+
 // Installed's record follows the run: an install recorded at its version (recordApp), a Remove forgotten.
 async function recordJbApp(job) {
   if (job.op !== "remove") return recordApp(job);
@@ -847,13 +867,17 @@ export async function runJailbreakApps(jobs, { queue = appQueue, prepare = appSy
     const page = await import("./apprun.js");
     let fin = finish;
     let resprung = () => {};
+    const helper = helperCalls(); // F407
     if (!lanes || !fin) {
       const [ipa, low] = await Promise.all([import("./ipa-install.js"), import("../ipa-install.js")]);
-      lanes ??= page.helperLanes({ backend: getBackend(), needs: ipa.ipaNeeds, install: (args, view, opts = {}) => {
+      const backend = getBackend();
+      const native = nativeBridge();
+      const tracked = native && { call: (...a) => helper.track(native.call(...a)) };
+      lanes ??= page.helperLanes({ backend: { uninstallApp: backend.uninstallApp && ((...a) => helper.track(backend.uninstallApp(...a))) }, needs: ipa.ipaNeeds, install: (args, view, opts = {}) => {
         // F407: Cancel or the row's stop also stops the shell's download (F196), as the single install's page does
         const stop = () => ipa.stopIpaInstall();
         opts.signal?.addEventListener?.("abort", stop, { once: true });
-        return low.runIpaInstall(args, view, opts).finally(() => opts.signal?.removeEventListener?.("abort", stop));
+        return low.runIpaInstall(args, view, { ...opts, ...(tracked ? { native: tracked } : {}) }).finally(() => opts.signal?.removeEventListener?.("abort", stop));
       } });
       resprung = () => ipa.setAppSyncRespring(false);
       fin ??= () => (ipa.appSyncRespringPending() ? ipa.ipaFinish({ ok: true }) : null);
@@ -866,6 +890,7 @@ export async function runJailbreakApps(jobs, { queue = appQueue, prepare = appSy
       start: (host) => start(helperJobs, { ...deps, host, open: () => host.page, onClose: () => { appRunning = false; updateChrome(); } }),
       finish: () => (fin?.()?.level === "restart" ? { levels: ["restart"], kinds: ["app"] } : null), // B61
       resprung,
+      idle: () => helper.idle(),
     });
     if (both) return await both;
     return await start(helperJobs, {

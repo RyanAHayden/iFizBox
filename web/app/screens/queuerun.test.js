@@ -7,6 +7,8 @@ import { runQueue } from "./queuerun.js";
 import { parseSimulation, createQueue, createRunLog } from "../core/queue.js";
 import { createAppQueue } from "../core/appqueue.js";
 import { helperLanes, runAppRun } from "./apprun.js";
+import { helperCalls } from "./queue.js";
+import { PACKAGE } from "../brand.js";
 import { fakeDocument as fakeDom } from "../fakes.test-helper.js";
 
 // A stand-in for nav/progress.js's page: records what the run asks of it.
@@ -195,7 +197,7 @@ test("F363: each pass is its own entry: the first ends Failed with its lines, Re
 // ---- F407: apps and packages in one run ---------------------------------------------------------------------------
 
 // apps: { id: "ok" | "fail" | a function () -> a promise for runIpaInstall's answer }
-function mixed(s, apps, { finish = () => null, kinds = {} } = {}) {
+function mixed(s, apps, { finish = () => null, kinds = {}, idle, jobs: js = jobs, plan: pl = plan } = {}) {
   const queue = createAppQueue();
   for (const id of Object.keys(apps)) queue.add({ id, name: id.toUpperCase(), version: "2.0", url: `https://s/${id}.ipa` });
   const order = [];
@@ -215,10 +217,10 @@ function mixed(s, apps, { finish = () => null, kinds = {} } = {}) {
   const ends = [];
   const confirms = [];
   let appClosed = 0;
-  const done = runQueue({ jobs, plan }, { backend: s.backend, catalog: s.catalog, queue: s.queue, runLogs: s.runLogs,
+  const done = runQueue({ jobs: js, plan: pl }, { backend: s.backend, catalog: s.catalog, queue: s.queue, runLogs: s.runLogs,
     names: { tweak: "Tweak", other: "Other" }, open: () => s.page, onEnd: (r) => ends.push(r), reopenConfirm: (f) => confirms.push(f),
     finishAction: async (choice) => { s.choice = choice; return false; },
-    apps: { jobs: list, finish,
+    apps: { jobs: list, finish, idle,
       start: (host) => runAppRun(list, { queue, lanes, host, open: () => host.page, record: async (j) => recorded.push(j.id), isInstalled: null,
         onClose: () => { appClosed++; } }) } });
   return { done, queue, order, recorded, ends, confirms, apps, closed: () => appClosed,
@@ -382,4 +384,39 @@ test("F407 the finish level is the highest of both halves", () => withDom(async 
   assert.deepEqual(await end({ finish: respring }), ["Restart SpringBoard", "restart", true]);
   assert.deepEqual(await end({ finish: respring, kinds: { other: { kind: "app" } } }), ["Restart SpringBoard", "restart", true]);
   assert.deepEqual(await end({ kinds: { tweak: { kind: "tweak" } } }, { a: "fail" }), ["Restart SpringBoard", "restart", false]);
+}));
+
+test("F407 a stopped app's helper call still ending holds dpkg", () => withDom(async () => {
+  const s = setup({ badLib: false });
+  const h = helperCalls();
+  let end;
+  const m = mixed(s, { a: () => h.track(new Promise((f) => { end = () => f({ ok: true }); })) }, { idle: h.idle });
+  await until(() => end);
+  m.row("A").children[1].click();
+  await settle();
+  assert.equal(m.row("A").dataset.state, "cancelled");
+  assert.deepEqual(m.order, ["app a"]);
+  end();
+  await m.done;
+  assert.deepEqual(m.order, ["app a", "lib", "tweak", "other"]);
+  const hung = helperCalls({ limit: 5 });
+  hung.track(new Promise(() => {}));
+  await hung.idle();
+}));
+
+test("F407 iFizBox's own package goes last, after the apps, and the run ends on its Close button", () => withDom(async () => {
+  const s = setup({ badLib: false });
+  const own = [{ op: "install", id: PACKAGE, mode: "upgrade" }, jobs[1]];
+  const m = mixed(s, { a: "ok" }, { jobs: own, plan: parseSimulation(`Inst ${PACKAGE} [1.0] (2.0 R [a])\nInst other (1.0 R [a])`) });
+  await m.done;
+  assert.deepEqual(m.order, ["app a", "other", PACKAGE]);
+  assert.match(s.page.finished.label, /^Close /);
+}));
+
+test("F407 the apps failing to start closes the page and runs no package", () => withDom(async () => {
+  const s = setup({ badLib: false });
+  await assert.rejects(runQueue({ jobs, plan }, { backend: s.backend, catalog: s.catalog, queue: s.queue, runLogs: s.runLogs, open: () => s.page,
+    apps: { jobs: [], start: async () => { throw new Error("no"); } } }), /no/);
+  assert.equal(s.page.closed, true);
+  assert.deepEqual(s.calls.fetch, []);
 }));

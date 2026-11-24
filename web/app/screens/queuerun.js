@@ -62,7 +62,7 @@ export async function markNeededBy(group, plan, jobs, names, catalog) {
 
 // run: Confirm's { jobs, plan }. deps: { backend, catalog, queue, runLogs, names, finishAction(choice),
 //   onEnd({ ok, stopped, installed }), apps (F407: { jobs, start(host) -> runAppRun's on that host, finish() ->
-//   { levels, kinds } the apps ask of the finish button, or null }), setBadge(text | null), open (openProgress, for tests) }
+//   { levels, kinds } the apps ask of the finish button, or null, idle() -> settles once no app's helper call is going }), setBadge(text | null), open (openProgress, for tests) }
 // -> a promise for the first end: { ok, stopped, rows }.
 export async function runQueue({ jobs, plan }, deps) {
   const { backend, catalog, queue, runLogs, finishAction = async () => false, onEnd = () => {}, setBadge = () => {},
@@ -160,6 +160,7 @@ export async function runQueue({ jobs, plan }, deps) {
   // ---- the run ----
   let levels = [];
   let apps = null;  // F407: the apps' half (apprun.js host.attach)
+  let helperBusy = false; // a stopped app's helper call may still be ending: dpkg waits for it
   let busy = false; // a pass is going, the apps' half included
   let asking = Promise.resolve();
   const canAsk = typeof backend.answerConffile === "function";
@@ -196,7 +197,7 @@ export async function runQueue({ jobs, plan }, deps) {
     rows, installed: info.installed ?? {},
     fetch: (r, hooks) => backend.queueFetch(r, hooks),
     install,
-    hold: () => Boolean(apps?.run.running),
+    hold: () => Boolean(apps?.run.running) || helperBusy,
     onChange: (r) => { draw(r); tick(); },
     onLog: ({ pkg, kind, text }) => line(kind, text, pkg),
   });
@@ -295,11 +296,6 @@ export async function runQueue({ jobs, plan }, deps) {
       onClose: (f) => page.onClose(f),
     },
   };
-  if (deps.apps) {
-    deps.apps.start(appHost);
-    openOn(page, seg, total());
-  }
-
   // ---- one pass of the run, from start or a retry, to its end ----
   let first = null;
   let latest = null;
@@ -307,7 +303,10 @@ export async function runQueue({ jobs, plan }, deps) {
   async function drive(promises) {
     going = promises;
     busy = true;
-    going.app?.then(() => run.resume());
+    if (going.app) {
+      helperBusy = true;
+      going.app = going.app.then(() => deps.apps.idle?.()).then(() => { helperBusy = false; run.resume(); });
+    }
     pass++;
     entry(); // kept as running from the pass's start, even before its first line
     page.reopen({ title: "Running", status: status() });
@@ -368,6 +367,10 @@ export async function runQueue({ jobs, plan }, deps) {
     return result;
   }
 
+  if (deps.apps) {
+    try { await deps.apps.start(appHost); } catch (e) { await page.close(); throw e; }
+    openOn(page, seg, total());
+  }
   return new Promise((resolve) => {
     const app = apps?.run.start() ?? null; // first: dpkg's lane waits for it
     drive({ app, pkg: run.start() }).then(() => resolve(first), () => resolve(first));

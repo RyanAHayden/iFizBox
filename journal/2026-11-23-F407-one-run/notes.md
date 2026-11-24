@@ -24,3 +24,8 @@
 ## Not verified
 - A real run on the iPhone 7. Chromium checks the flow; the native calls are unchanged; the task did not ask for a device run.
 - An IPA that the helper has already started installing is not stopped by Cancel, because the shell refuses `ipa.cancel` then. This is as before.
+
+## Review
+- A stopped or cancelled app's helper call may still be ending, so dpkg (and the Confirm that Cancel reopens) waits for
+  it, 60 s at most (`helperCalls` in `screens/queue.js`). Tested with `node --test`.
+- If the apps' half fails to start, the page closes and no package runs.
