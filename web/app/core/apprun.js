@@ -658,7 +658,7 @@ export function rowStatus(row, opts = {}) {
       if (row.phase === "busy") return busyText(label(row)); // B312
       if (row.phase === "hold") return "Signed: Waiting to Install"; // F368: on cellular, until every app is signed
       if (promptUp(row)) return "Tap Install on the iOS prompt";
-      return row.local && !row.phase ? "Preparing" : "Asking iOS"; // R91: nothing installs yet: This iPhone's route hasn't started, or iOS has only been asked
+      return row.local && !row.phase ? "Preparing" : "Installing"; // R91: This iPhone's route hasn't started: nothing installs yet (Signing Server wording: B424)
     case "installing":
       if (row.phase === "airplane") return AIRPLANE_ON; // F368
       if (row.phase === "appWait") return APP_WAIT; // B423
@@ -716,9 +716,11 @@ export function runStatus(rows) {
   const pos = (r) => `${rows.indexOf(r) + 1} of ${rows.length}`;
   const withIos = rows.filter((r) => WITH_IOS.has(r.state) && r.phase !== "hold");
   if (withIos.length > 1) { // F359: This iPhone rows installing together
-    const sending = (r) => r.phase === "connecting" || r.phase === "copying" || r.state === "asking";
     if (withIos.every(isCopying)) return `Copying ${withIos.length} apps to iPhone`;
-    if (withIos.every(sending)) return `Sending ${withIos.length} apps to iPhone`; // R91: none has reached installd yet
+    // R91: none has reached installd yet: connecting or copying, or the copy ended and iOS hasn't reported
+    const early = (r) => r.phase === "connecting" || r.phase === "copying";
+    if (withIos.every(early) && withIos.some((r) => r.phase === "connecting" || isCopying(r))) return `Sending ${withIos.length} apps to iPhone`;
+    if (withIos.every((r) => r.phase === "copying")) return `Copied ${withIos.length} apps to iPhone, waiting for iOS`;
     return `Installing ${withIos.length} apps`;
   }
   const ios = withIos[0];
@@ -729,7 +731,7 @@ export function runStatus(rows) {
   if (isCopying(ios)) return `Copying ${label(ios)} to iPhone (${pos(ios)})`; // B111: This iPhone
   if (ios?.phase === "copying") return `Copied ${label(ios)} to iPhone, waiting for iOS (${pos(ios)})`; // R91
   if (selfClosing(ios)) return `Installing ${label(ios)}: ${SELF_CLOSING}`;
-  if (ios?.state === "asking") return promptUp(ios) ? `Tap Install for ${label(ios)} (${pos(ios)})` : `${ios.local && !ios.phase ? "Preparing" : "Asking iOS to install"} ${label(ios)} (${pos(ios)})`; // R91
+  if (ios?.state === "asking") return promptUp(ios) ? `Tap Install for ${label(ios)} (${pos(ios)})` : `${ios.local && !ios.phase ? "Preparing" : "Installing"} ${label(ios)} (${pos(ios)})`; // R91
   if (ios) return `Installing ${label(ios)} (${pos(ios)})`;
   const s = rows.filter((r) => SIGNING.has(r.state));
   if (s.length && s.every(helperRow)) return "Preparing";

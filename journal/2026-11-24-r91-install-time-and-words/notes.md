@@ -54,7 +54,7 @@ compression does not matter. One follow-up filed for the one open question (chun
 | Run row before connecting (queue.js sent "copying" 0 before signing.open) | Copying to iPhone | Connecting to iPhone |
 | Run row copy at 100% (B421) | Installing | Copied to iPhone, waiting for iOS |
 | Run row, This iPhone route not started | Installing | Preparing |
-| Run row, iOS asked, no prompt yet (Signing Server) | Installing | Asking iOS |
+| Run line, several apps, all copied | Installing N apps | Copied N apps to iPhone, waiting for iOS |
 | Run line, one app connecting | Copying A to iPhone | Connecting to iPhone for A |
 | Run line, copy ended | Installing A | Copied A to iPhone, waiting for iOS |
 | Run line, several apps, none at installd yet | Installing N apps | Sending N apps to iPhone |

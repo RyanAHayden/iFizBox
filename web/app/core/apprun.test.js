@@ -755,7 +755,7 @@ test("B421/R91: a copying row at 100% says it waits for iOS (not Installing), on
   assert.equal(rowStatus(row("A", 0.4, { phase: "installing" })), "Installing 40%");
   assert.equal(rowStatus(row("A", 0.4)), "Copying to iPhone 40%");
   assert.equal(runStatus([row("A", 0.4)]), "Copying A to iPhone (1 of 1)");
-  assert.equal(runStatus([row("A", 1), row("B", 1)]), "Sending 2 apps to iPhone");
+  assert.equal(runStatus([row("A", 1), row("B", 1)]), "Copied 2 apps to iPhone, waiting for iOS");
   assert.equal(runStatus([row("A", 1), row("B", 0.3)]), "Sending 2 apps to iPhone");
   assert.equal(runStatus([row("A", 0.5, { phase: "installing" }), row("B", 0.3)]), "Installing 2 apps");
   assert.equal(runStatus([row("A", 0.2), row("B", 0.3)]), "Copying 2 apps to iPhone");
