@@ -13,8 +13,8 @@
 //                                           each 20 MB part, POST /sign/host/<token>/done -> {itms, ...}
 //   GET  /sign/host/<token>/manifest.plist, /sign/host/<token>/app.ipa   what that itms link fetches (each looks
 //                                           again for a few seconds before a 404: KV is eventually consistent)
-//   GET  /sign/host/<token>/status          B83: {manifest, started, finished} as /sign/up's: the app stays open
-//                                           until iOS has the whole IPA, then closes so iOS can install over it
+//   GET  /sign/host/<token>/status          B83: {manifest, asked, started, finished} as /sign/up's: the app stays open
+//                                           until iOS has begun the download, then closes so iOS can install over it
 //
 //   POST /sign/upload?bundleid=&version=&title=&size=   F93: an app the website signed in the browser (any app) ->
 //                                           {token, partSize, parts}; then PUT /sign/upload/<token>/<i> each part (KV
@@ -389,22 +389,20 @@ const upKey = (t) => `up.${t}`, partKey = (t, i) => `up.${t}.${i}`;
 // writes replace that metadata whole and would drop a mark iOS made in between. Each mark is written once
 // (read first; KV's free tier counts writes, 1,000 a day), so an install costs at most 3 writes.
 const iosKey = (t) => `up.${t}.ios`;
-export const IOS_MARKS = ["manifest", "started", "finished"];
 // B90: /sign/up's links also mark "asked": iOS's first app.ipa request (HEAD or GET, even one held while the website
 // signs), which only comes once Install was tapped in iOS's prompt. The website reads a manifest without it, after
 // the page comes back, as the prompt cancelled. A worker without it answers no "asked" key: the website carries on.
 export const UP_MARKS = ["manifest", "asked", "started", "finished"];
-// B83: iFizBox's own update (/sign/host/<t>) keeps the same marks under hostIosKey; `key` picks which.
-async function iosStatus(env, t, key = iosKey(t)) {
-  const r = await env.HOSTED.getWithMetadata(key, { type: "stream" });
+async function iosStatus(env, t) {
+  const r = await env.HOSTED.getWithMetadata(iosKey(t), { type: "stream" });
   r.value?.cancel?.();
   return r.metadata ?? {};
 }
-async function markIos(env, t, mark, ttl, key = iosKey(t)) {
+async function markIos(env, t, mark, ttl) {
   try {
-    const s = await iosStatus(env, t, key);
+    const s = await iosStatus(env, t);
     if (s[mark]) return;
-    await env.HOSTED.put(key, "", { expirationTtl: ttl + 300, metadata: { ...s, [mark]: true } });
+    await env.HOSTED.put(iosKey(t), "", { expirationTtl: ttl + 300, metadata: { ...s, [mark]: true } });
   } catch { /* a missed mark only leaves the website's log a step behind */ }
 }
 const partLen = (m, i) => (i < m.parts - 1 ? m.partSize : m.size - m.partSize * (m.parts - 1));
@@ -590,25 +588,42 @@ export async function waitFor(read, ok, ms, env = {}, sleep = (t) => new Promise
 // ---- /sign/host/<t>/...: iFizBox's own update, the IPA the phone uploaded (B83) ---------------------------------
 // manifest.plist and app.ipa look again for HOST_WAIT ms before answering 404: KV is eventually consistent, and iOS
 // asks for them seconds after the put (it gives up silently on a 404). iOS's requests leave F190's marks (manifest,
-// started, finished: app.ipa's body streamed to its end) under hostIosKey, read at GET status by the app, which
-// closes for iOS to install over it only once iOS has the whole IPA.
+// asked: app.ipa asked for, a HEAD first, which only comes once Install was tapped; started; finished: app.ipa's body
+// streamed to its end), read at GET status by the app, which closes for iOS to install over it once iOS has started.
+// B394: a key each (hostIosKey): one shared key was read, changed and put again within a second by iOS's HEAD and GETs,
+// and KV takes one write a second a key, so a mark could be lost.
 export const HOST_WAIT = 6000;
 const HOST_CHUNK = 1024 * 1024; // app.ipa goes out a MB a pull, so "finished" waits for iOS to read the last of it
-const hostIosKey = (t) => `${t}.ios`;
+const hostIosKey = (t, mark) => `${t}.ios.${mark}`;
+export const HOST_MARKS = ["manifest", "asked", "started", "finished"];
+async function hostMarked(env, t, mark) {
+  const r = await env.HOSTED.getWithMetadata(hostIosKey(t, mark), { type: "stream" });
+  r.value?.cancel?.();
+  return Boolean(r.metadata);
+}
+async function markHost(env, t, mark, ttl) {
+  try {
+    if (await hostMarked(env, t, mark)) return;
+    await env.HOSTED.put(hostIosKey(t, mark), "", { expirationTtl: ttl + 300, metadata: { on: true } });
+  } catch { /* a missed mark: the app still follows the ones after it */ }
+}
 async function hosted(req, u, env, ttl, t, what, ctx = null) {
   const gone = () => fail("gone", "That install link has expired.", 404);
   if (what === "status") {
-    const s = await iosStatus(env, t, hostIosKey(t));
-    return json(Object.fromEntries(IOS_MARKS.map((k) => [k, Boolean(s[k])])));
+    const on = await Promise.all(HOST_MARKS.map((k) => hostMarked(env, t, k)));
+    return json(Object.fromEntries(HOST_MARKS.map((k, i) => [k, on[i]])));
   }
   const get = req.method === "GET";
   // B215: the IPA is in parts (hostPartKey); the token's own key holds only its metadata, done once every part is in
   const meta = await waitFor(() => hostMeta(env, t), (m) => Boolean(m?.done), HOST_WAIT, env);
   if (!meta?.done) return gone();
   if (what === "manifest.plist") {
-    if (get) await markIos(env, t, "manifest", ttl, hostIosKey(t));
+    if (get) await markHost(env, t, "manifest", ttl);
     return plist(manifest({ url: `${u.origin}/sign/host/${t}/app.ipa`, ...meta }));
   }
+  const asked = markHost(env, t, "asked", ttl); // B394
+  ctx?.waitUntil?.(asked);
+  if (!get) await asked;
   const n = meta.size;
   let start = 0, end = n - 1, status = 200;
   const r = /^bytes=(\d*)-(\d*)$/.exec(req.headers.get("Range") ?? "");
@@ -625,7 +640,7 @@ async function hosted(req, u, env, ttl, t, what, ctx = null) {
   const body = new ReadableStream({
     async pull(c) {
       if (at > end) { c.close(); return; }
-      if (!begun) { begun = true; await markIos(env, t, "started", ttl, hostIosKey(t)); }
+      if (!begun) { begun = true; await markHost(env, t, "started", ttl); }
       const i = Math.floor(at / meta.partSize), from = i * meta.partSize;
       if (held !== i) {
         data = await env.HOSTED.get(hostPartKey(t, i), { type: "arrayBuffer" });
@@ -640,7 +655,7 @@ async function hosted(req, u, env, ttl, t, what, ctx = null) {
       // has Content-Length bytes, and Cloudflare then cancels the request with this put still pending (as F190 saw on
       // /sign/up): the mark was never written, so the app waited out its 10 minutes and never closed. waitUntil keeps it.
       if (at > end && end === n - 1) {
-        const mark = markIos(env, t, "finished", ttl, hostIosKey(t));
+        const mark = markHost(env, t, "finished", ttl);
         ctx?.waitUntil?.(mark);
         await mark;
       }

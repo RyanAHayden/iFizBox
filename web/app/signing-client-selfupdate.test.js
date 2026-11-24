@@ -32,12 +32,12 @@ test("followSelfUpdate: a line a step, and the page stays locked when iOS has it
   const { h, lines, finishes } = fakeHUD();
   lockSelfUpdate(h);
   assert.equal(finishes[0].label, CLOSING_LABEL);
-  assert.equal(await followSelfUpdate(h, { native: native(["prompt", "waiting", "waiting", "downloading", "finished"]) }), "finished");
-  assert.deepEqual(lines, [["step", SELF_UPDATE_LINES.waiting], ["step", SELF_UPDATE_LINES.downloading], ["step", SELF_UPDATE_LINES.finished]]);
+  assert.equal(await followSelfUpdate(h, { native: native(["prompt", "waiting", "waiting", "asked", "finished"]) }), "finished");
+  assert.deepEqual(lines, [["step", SELF_UPDATE_LINES.waiting], ["step", SELF_UPDATE_LINES.asked], ["step", SELF_UPDATE_LINES.finished]]);
   assert.equal(finishes.length, 1, "no Try Again");
 });
 
-for (const state of ["notStarted", "stalled"]) {
+for (const state of ["notStarted"]) {
   test(`followSelfUpdate: ${state} unlocks the page with Try Again`, async () => {
     const { h, lines, finishes } = fakeHUD();
     lockSelfUpdate(h);

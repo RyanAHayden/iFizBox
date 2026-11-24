@@ -34,7 +34,7 @@
 // B175: a finished run's page closes when iFizBox is back in front or a link comes (incoming.js, through runPage()).
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { el, barButton } from "../nav/ui.js";
-import { openProgress, openOn, rowBar, RETURN_LABEL, CLOSING_LABEL, WAITING_LABEL, TRY_AGAIN_LABEL, CLOSE_GRACE, CLOSE_BY_HAND,
+import { openProgress, openOn, rowBar, RETURN_LABEL, CLOSING_LABEL, WAITING_LABEL, UPDATING_TITLE, NOT_YET_TITLE, TRY_AGAIN_LABEL, CLOSE_GRACE, CLOSE_BY_HAND,
   RESTART_BY_HAND } from "../nav/progress.js";
 import { fitFileNames } from "../core/midtrunc.js";
 import { ipaStep } from "../core/ipainstall.js"; // B400
@@ -43,7 +43,7 @@ import { recordWhen } from "../core/apprun.js"; // B136
 import { HERE_PARALLEL } from "../core/apprun.js"; // F359
 import { listedOf } from "../core/appqueue.js"; // F400
 import { apps as appStore, undoRecord } from "../core/installed.js"; // B170
-import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, HERE_CLOSING_LINE, DOWNLOAD_HINT, DOWNLOAD_BY_HAND } from "../signing/selfupdate.js";
+import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, HERE_CLOSING_LINE, waitHints } from "../signing/selfupdate.js";
 import { nativeBridge, hasNativeCall } from "../native.js";
 import { USE_SERVER, USE_SERVER_LINE, serverStep, switchFailedAlert } from "../core/installroute.js"; // F366
 import { showAlert } from "../nav/alert.js"; // B395
@@ -526,10 +526,12 @@ export async function runAppRun(jobs, deps) {
   // B123: iFizBox's own IPA went to iOS. Hosted (iOS's prompt): the page locks on "Waiting for iOS" and follows the
   // shell's signing.selfUpdate (native CloseForUpdate), a line a step; "Closing iFizBox" only once the shell says it
   // closes (finished, or an older server's guess), and if iFizBox is still here CLOSE_GRACE later, or the shell can't
-  // be followed, the page says to close it from the app switcher. notStarted / stalled: iOS never took it, so the row
+  // be followed, the page says to close it from the app switcher. B394: no download WAIT_HINT later it unlocks with
+  // what to do, Try Again and Return, and keeps following. notStarted: iOS never took it, so the row
   // turns Failed, back in the queue, with Try Again. This iPhone: installd ends iFizBox while it installs over it, so
   // the run ending at all means it didn't: the new version is in place, close it by hand.
   let following = null; // the self row being followed (one follow per send)
+  let follows = 0;
   let selfEnd = null; // the follow's latest finish, drawn again when another row's retry ends
   const later = deps.later ?? ((f, ms) => { const t = setTimeout(f, ms); t?.unref?.(); return t; }); // node: don't hold tests
   const selfFinish = (o) => { selfEnd = o; page.finish(o); settled(); };
@@ -539,31 +541,46 @@ export async function runAppRun(jobs, deps) {
     if (following === self && selfEnd) return page.finish({ ...selfEnd, status: text });
     following = self;
     if (self.here) return followHere(self, text);
-    selfFinish({ label: WAITING_LABEL, status: text, locked: true });
+    selfFinish({ label: WAITING_LABEL, status: text, title: UPDATING_TITLE, locked: true });
     const watch = deps.selfUpdate ?? lanes.selfUpdate;
     let closing = false;
     let last = null;
-    const live = () => following === self && !page.closed;
+    const mine = ++follows; // B394: a try again follows the same row anew
+    const live = () => following === self && follows === mine && !page.closed;
     const byHand = () => {
       if (!live()) return;
       line("error", CLOSE_BY_HAND, self.id);
       selfFinish({ label: RETURN_LABEL, status: text, action: () => false });
     };
-    let hinted = false;
-    // B208: iOS is downloading it and the shell hasn't closed DOWNLOAD_HINT later: how to close it by hand, unlocked
-    // (Return), still following (a later finished/guessed locks on Closing again)
-    const hint = () => {
-      if (!live() || closing) return;
-      line("step", DOWNLOAD_BY_HAND, self.id);
-      selfFinish({ label: RETURN_LABEL, status: text, action: () => false });
+    // The row turns Failed and goes back in the queue -> true | false (it can't)
+    const giveBack = (why) => {
+      if (!run.notTaken(self.id, why)) return false;
+      following = null;
+      selfEnd = null;
+      sentSelf = false;
+      cleared.delete(self.id);
+      if (!queue.get?.(self.id)) queue.add?.(self.job, { quiet: true });
+      return true;
     };
+    // B394: Try Again while still following: signed again, and the shell hands iOS the copy already uploaded
+    const again = () => {
+      if (live() && !closing) {
+        if (giveBack(DIDNT_DOWNLOAD)) retry(self.id);
+        else line("step", `Another app is still installing. Tap ${TRY_AGAIN_LABEL} once it's done.`, self.id);
+      }
+      return true;
+    };
+    const hints = waitHints({ later, over: () => !live() || closing, show: (hint) => {
+      line("step", hint, self.id);
+      selfFinish({ label: RETURN_LABEL, status: text, title: NOT_YET_TITLE, action: () => false, also: { label: TRY_AGAIN_LABEL, action: again } });
+    } });
     const onState = (s) => {
       if (!live()) return;
       if (s && s !== last && SELF_UPDATE_LINES[s]) { last = s; line("step", SELF_UPDATE_LINES[s], self.id); }
-      if (s === "downloading" && !hinted) { hinted = true; later(hint, DOWNLOAD_HINT); }
+      hints(s);
       if ((s === "finished" || s === "guessed") && !closing) {
         closing = true;
-        selfFinish({ label: CLOSING_LABEL, status: text, locked: true });
+        selfFinish({ label: CLOSING_LABEL, status: text, title: UPDATING_TITLE, locked: true });
         later(byHand, CLOSE_GRACE);
       }
     };
@@ -572,12 +589,7 @@ export async function runAppRun(jobs, deps) {
       if (!live() || closing) return;
       if (!SELF_UPDATE_FAILED[s]) return byHand(); // an older shell, or none running: nothing will close it
       line("error", SELF_UPDATE_FAILED[s], self.id);
-      if (!run.notTaken(self.id, s === "stalled" ? "iOS stopped downloading it" : DIDNT_DOWNLOAD)) return byHand();
-      following = null;
-      selfEnd = null;
-      sentSelf = false;
-      cleared.delete(self.id);
-      if (!queue.get?.(self.id)) queue.add?.(self.job, { quiet: true });
+      if (!giveBack(DIDNT_DOWNLOAD)) return byHand();
       const now = summaryLine(rows);
       summary.textContent = now;
       page.bar({ left: closeB, right: retryAll });

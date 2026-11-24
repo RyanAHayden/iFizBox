@@ -191,7 +191,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   onInstalled(result);
   // iFizBox itself (host): iOS's Install prompt is up, and iFizBox closes once it's answered so the install finishes
   // (native CloseForUpdate): say so first (user 2026-11-18).
-  if (host) showBanner({ title: NAME, message: `Press Install and keep ${NAME} open: it closes by itself once iOS has downloaded the new version. Open it again once the new icon appears.`, wait: true });
+  if (host) showBanner({ title: NAME, message: `Press Install and keep ${NAME} open: it closes by itself once iOS starts downloading the new version. Open it again once the new icon appears.`, wait: true });
   if (after) { after(result, h); return true; }
   // F169: a plain Install ends through followInstall (signing-sheet.js): Done once iOS has the link (user 2026-11-18).
   // Not for iFizBox itself (host, or its own IPA or ID): iOS closes iFizBox while it installs over it.

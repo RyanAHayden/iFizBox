@@ -1,19 +1,21 @@
-"""B208: iFizBox's own update through the Signing Server (hosted, iOS's prompt) stuck on "Finishing the update" and
-never closed. Checked as text (UIKit only builds with the iOS SDK, and the route only runs on a phone): native
-CloseForUpdate can't stay in .prompt (promptLimit begins the wait whatever iFizBox heard), and once the server says
-iOS started the download it closes after downloadGuess even if the finished mark never comes, instead of waiting out
-finishLimit (10 minutes). The worker side (the finished mark kept with ctx.waitUntil) is in worker/test.mjs."""
+"""iFizBox's own update through the Signing Server (hosted, iOS's prompt). Checked as text (UIKit only builds with the
+iOS SDK, and the route only runs on a phone): native CloseForUpdate polls from the prompt on and can't stay in .prompt
+(B208), closes only once iOS began the download (B394: `asked` alone can still be cancelled), follows the link for its
+whole life, and hands iOS the last upload again instead of uploading a duplicate. The worker side is in worker/test.mjs."""
 import os
-import re
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
-def cfu():
+def side():
     with open(os.path.join(HERE, "Sources", "Sideload.swift"), encoding="utf-8") as f:
-        side = f.read()
-    return side[side.index("enum CloseForUpdate"):side.index("final class HereClose")]
+        return f.read()
+
+
+def cfu():
+    src = side()
+    return src[src.index("enum CloseForUpdate"):src.index("final class HereClose")]
 
 
 def body(src, head):
@@ -22,28 +24,33 @@ def body(src, head):
 
 
 class HostedSelfUpdate(unittest.TestCase):
-    def test_prompt_limit_begins_the_wait(self):
-        src = cfu()
-        limit = float(re.search(r"static let promptLimit: TimeInterval = (\d+)", src).group(1))
-        start = float(re.search(r"startLimit: TimeInterval = (\d+)", src).group(1))
-        self.assertLess(limit, start)
-        after = body(src, "static func afterPrompt")
+    def test_polls_from_the_prompt_and_cannot_stay_in_it(self):
+        after = body(cfu(), "static func afterPrompt")
+        self.assertLess(after.index("poll(h, run: mine, misses: 0)"), after.index("let begin = {"))
         self.assertIn("asyncAfter(deadline: .now() + promptLimit) { begin() }", after)
         # begin still acts only from .prompt, so the limit can't restart a wait already running
         self.assertIn("guard mine == run, state == .prompt else { return }", after)
 
-    def test_download_without_finished_closes_in_a_minute(self):
-        src = cfu()
-        guess = float(re.search(r"static let downloadGuess: TimeInterval = (\d+)", src).group(1))
-        finish = float(re.search(r"finishLimit: TimeInterval = (\d+)", src).group(1))
-        self.assertLessEqual(guess, 60)
-        self.assertLess(guess, finish)
-        poll = body(src, "private static func poll(")
-        self.assertIn("downloadingSince = Date(); set(.downloading)", poll)
-        g = poll.index("timeIntervalSince(d) > downloadGuess")
-        self.assertIn("return guess()", poll[g:g + 300])
-        # the finished mark still wins when it comes
-        self.assertLess(poll.index("return finish()"), g)
+    def test_closes_at_the_download_not_before(self):
+        poll = body(cfu(), "private static func poll(")
+        self.assertIn('if known, mark("started") || mark("finished") {', poll)
+        asked = poll[poll.index('if known, mark("asked")'):]
+        asked = asked[:asked.index("set(.asked)")]
+        self.assertNotIn("finish()", asked)
+        self.assertNotIn("guess()", asked)
+
+    def test_follows_the_link_for_its_life(self):
+        self.assertIn("if h.age > h.life { return giveUp() }", body(cfu(), "private static func poll("))
+
+    def test_second_try_reuses_the_upload(self):
+        host = side()
+        host = body(host, "static func hostAndOpen(")
+        self.assertLess(host.index("CloseForUpdate.reusable(record, server: server)"), host.index("HostUpload("))
+        reuse = body(cfu(), "static func reusable(")
+        for k in ("sha256", "bundleID", "version", "appID", "expires", "options", "server"):
+            self.assertIn(k, reuse)
+        self.assertIn("h.age < h.life - reuseSpare", reuse)
+        self.assertIn("hosted = nil", body(cfu(), "private static func giveUp("))
 
 
 if __name__ == "__main__":

@@ -321,15 +321,23 @@ which copy iOS fetched.
 iFizBox opens an Install prompt by itself only until one was shown for that IPA (again when iOS refuses the link, or
 shows nothing within 8 s). Once a prompt was shown and closed, only the user's tap opens another.
 
-iOS won't install the new iFizBox over the running one, so iFizBox closes itself, but only once iOS has the whole
-IPA: after the Install prompt is answered it stays alive (silent audio) and polls `GET /sign/host/<token>/status`;
-when iOS has fetched `app.ipa` to its end it exits, with no notification (the progress page has said it will close;
-the icon badge drops this update as it goes). The This iPhone route closes the same way, without a notification, once
-installd has accepted the IPA. If iOS hasn't
-started the download within 2 minutes, iFizBox stays open and the progress page offers Try Again
-(`signing.selfUpdate`). Once iOS has started it, iOS downloads from the server, so iFizBox closing can't break it: if
-the server hasn't said `finished` a minute after the start, iFizBox closes anyway, and from 15 s after the start the
-progress page says to close it from the app switcher if the new iFizBox is already installing on the Home Screen.
+iOS won't install the new iFizBox over the running one, so iFizBox closes itself once iOS has started the download.
+From the moment the Install prompt opens, iFizBox stays alive (silent audio) and polls `GET /sign/host/<token>/status`
+(`signing.selfUpdate`): every second for 30 s, then every 2 s, for the link's whole 10 minutes, then `notStarted`. The
+status answers `{manifest, asked, started, finished}`, each mark in its own KV key. `asked` is iOS's first request for
+`app.ipa` (a HEAD), which only comes once Install was tapped; iOS may still ask a second question (Low Data Mode,
+cellular) that can be cancelled, so iFizBox doesn't close on `asked`. `started` is iOS's download beginning, so iOS has
+accepted the install: iFizBox closes 0.6 s later, and the download goes on in iOS's own background session. `finished`
+is the last byte of `app.ipa`; nothing waits for it. The This iPhone route closes the same way, without a notification,
+once installd has accepted the IPA.
+
+The progress page locks on "Waiting for iOS" while the prompt is up, titled Updating, with the summary "1 sent to iOS"
+(not installed). If iOS hasn't started the download 8 s after the prompt opened (the prompt cancelled or unanswered),
+the page unlocks with a hint on what to do, Try Again and Return, and keeps following, so a late start still turns it
+to closing. Try Again (or starting the same update again) signs again on the phone, but reopens the link of the copy
+already uploaded, with no second upload, when that copy is the same IPA, options, certificate and server and its link
+has more than 30 s left. Leaving iFizBox during the upload is fine: the prompt opens once it is in front again.
+
 The server keeps the `finished` mark's write alive past the response (`ctx.waitUntil`), since Cloudflare cancels the
 request the moment iOS has every byte. The version handed to iOS is remembered, and if the next launch is
 still the older version, a banner says the update didn't finish, with Try Again.

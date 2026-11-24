@@ -110,7 +110,7 @@ Then put that `https://` address in **Settings > Installation & Signing > Signin
 | `POST /sign/host?bundleid=&version=&title=` (body: the IPA, up to 95 MB) | `{itms, manifest, expiresIn}` |
 | `POST /sign/host?bundleid=&version=&title=&size=` (no body) | `{token, partSize, parts}`: then `PUT /sign/host/<token>/<i>` each 20 MB part and `POST /sign/host/<token>/done` → `{itms, manifest, expiresIn}` (the app sends it so; KV holds 25 MB a value) |
 | `GET /sign/host/<token>/manifest.plist`, `/app.ipa` | what that link fetches (each looks again for a few seconds before a 404, as KV is eventually consistent) |
-| `GET /sign/host/<token>/status` | `{manifest, started, finished}`: what iOS has fetched; the app closes for iOS to install over it only once `finished` |
+| `GET /sign/host/<token>/status` | `{manifest, asked, started, finished}`: what iOS has done, each mark in its own KV key. `asked`: iOS's first request for `app.ipa` (Install was tapped; a second question can still be cancelled). `started`: iOS's download began, so the app closes for iOS to install over it. `finished`: the last byte of `app.ipa` |
 | `GET /apple/status` | `{"on":true}` with `APPLE_RELAY` on, else a 404 |
 | `/apple/<host>/<path>` | the Apple relay above: the free Apple ID hosts with `APPLE_RELAY` on, App Store Connect always |
 | `GET /repo/<file>` | iFizBox's own APT repo (`Release`, `Packages`, `Packages.gz`, `*.deb`): the latest GitHub release's asset, fetched here so clients get no redirect (Zebra can't take GitHub's). `IFIZBOX_REPO` (owner/name) for another repo's releases |

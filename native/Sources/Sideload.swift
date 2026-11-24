@@ -19,7 +19,8 @@
 //   signing.reprompt {bundleId} -> {reopened}: B85, opens that app's install link again (its IPA still served; B91:
 //        the Signing Server's link once iOS froze iFizBox). Only the user's tap: iFizBox never re-opens by itself
 //   signing.selfUpdate (stream: {state}) -> {state}: B83, iFizBox's own update after iOS's prompt (CloseForUpdate):
-//        prompt | waiting | downloading, then finished (it exits) | notStarted | stalled | guessed; null: none running
+//        prompt | waiting | asked (iOS asked for the IPA), then finished (iOS began the download: it exits) |
+//        notStarted | guessed; null: none running
 //   signing.installed            -> {apps: [record], next: {expires, apps} | null, signer: {version, groupFix}}
 //        (B259: each record's `signer` is the stamp it was signed with, the top one this build's: SignerStamp.swift)
 //   signing.openApp {bundleId}   -> {opened: true | false}: F155, launches an installed app (the progress page's Open)
@@ -458,41 +459,69 @@ enum Sideload {
     // unfetched: false). Runs on SignBridge.queue.
     // iFizBox's own update: upload the IPA signed here to the server, which holds it for its 10 minutes and answers the
     // itms-services link; then iOS installs from the server, unaffected by iFizBox closing.
+    // B394: the same IPA handed over again (Try Again, or the update started again) while the link of the last upload
+    // still lives opens that link: iOS may still take it, and a second copy on the server would only be a duplicate.
     static func hostAndOpen(_ output: URL, server: String, app: SignedApp, record: SignedRecord, job: SignJob? = nil,
                             log: ((String) -> Void)? = nil, opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void, served: ((Bool) -> Void)?) {
-        // The Worker (worker/src/index.js) doesn't open the IPA: the app says what it is. B215: sent in parts (HostUpload).
-        let upload = HostUpload(output, server: server, app: app) { res in
-            try? FileManager.default.removeItem(at: output)
-            job?.end()
-            if job?.cancelled == true { opened(.failure(SignJob.cancelledError)); served?(false); return } // F196
-            let json: [String: Any]
-            switch res {
-            case .failure(let e): opened(.failure(e)); served?(false); return
-            case .success(let j): json = j
+        let hand = { (h: CloseForUpdate.Hosted, saved: Bool) in
+            if saved {
+                SignBridge.queue.async {
+                    saveRecords(SignedRecords.adding(record, to: records()))
+                    reschedule()
+                    BackgroundCheck.appHandedOff(ids: [record.bundleID, record.originalBundleID], version: record.version) // B264
+                }
             }
-            guard let link = (json["itms"] as? String).flatMap({ URL(string: $0) }) else {
-                opened(.failure(Failed(text: "server: it gave no install link"))); served?(false)
-                return
-            }
-            SignBridge.queue.async {
-                saveRecords(SignedRecords.adding(record, to: records()))
-                reschedule()
-                BackgroundCheck.appHandedOff(ids: [record.bundleID, record.originalBundleID], version: record.version) // B264
-            }
-            // B83: the link's status route, which says when iOS has the whole IPA (CloseForUpdate)
-            let status = (json["manifest"] as? String).flatMap { m in
-                m.hasSuffix("/manifest.plist") ? URL(string: String(m.dropLast("manifest.plist".count)) + "status") : nil
-            }
-            // B178: iFizBox closes itself once iOS has the IPA, with no notification (the progress page says so)
-            DispatchQueue.main.async {
-                UIApplication.shared.open(link)
-                CloseForUpdate.afterPrompt(status: status, app: app)
+            // B178: iFizBox closes itself once iOS has begun the download, with no notification (the progress page says so)
+            CloseForUpdate.inFront {
+                guard h.age < h.life - CloseForUpdate.reuseSpare else { // came back too late
+                    opened(.failure(Failed(text: "server: the install link expired while \(Brand.name) was in the background. Try again.")))
+                    served?(false)
+                    return
+                }
+                UIApplication.shared.open(h.link)
+                CloseForUpdate.afterPrompt(h, app: app)
                 opened(.success((app, record)))
                 served?(true)
             }
         }
-        job?.onCancel { upload.cancel() } // F196
-        upload.start()
+        DispatchQueue.main.async {
+            if let h = CloseForUpdate.reusable(record, server: server) {
+                try? FileManager.default.removeItem(at: output)
+                job?.end()
+                if job?.cancelled == true { opened(.failure(SignJob.cancelledError)); served?(false); return }
+                log?("\(app.name) is already on \(server) from the last try: asking iOS again, nothing uploaded")
+                hand(h, false)
+                return
+            }
+            // The Worker (worker/src/index.js) doesn't open the IPA: the app says what it is. B215: sent in parts (HostUpload).
+            log?("Uploading to \(server)/sign/host (\(app.name) replaces this app, so iOS installs it from the server)")
+            let upload = HostUpload(output, server: server, app: app) { res in
+                try? FileManager.default.removeItem(at: output)
+                job?.end()
+                if job?.cancelled == true { opened(.failure(SignJob.cancelledError)); served?(false); return } // F196
+                let json: [String: Any]
+                switch res {
+                case .failure(let e): opened(.failure(e)); served?(false); return
+                case .success(let j): json = j
+                }
+                guard let link = (json["itms"] as? String).flatMap({ URL(string: $0) }) else {
+                    opened(.failure(Failed(text: "server: it gave no install link"))); served?(false)
+                    return
+                }
+                // B83: the link's status route, which says what iOS has asked the server for (CloseForUpdate)
+                let status = (json["manifest"] as? String).flatMap { m in
+                    m.hasSuffix("/manifest.plist") ? URL(string: String(m.dropLast("manifest.plist".count)) + "status") : nil
+                }
+                let h = CloseForUpdate.Hosted(link: link, status: status, record: record, server: server, at: Date(),
+                                              life: (json["expiresIn"] as? Double) ?? 600)
+                DispatchQueue.main.async {
+                    CloseForUpdate.hosted = h
+                    hand(h, true)
+                }
+            }
+            job?.onCancel { upload.cancel() } // F196
+            upload.start()
+        }
     }
 
     static func signAndOpen(_ input: URL, url: String, id: SecIdentity, profile: Profile, options: SignOptions, servers: Servers,
@@ -548,7 +577,6 @@ enum Sideload {
         }
         emit("installing", 0)
         if let host = servers.host { // B64: this call's own choice, made when it started
-            log?("Uploading to \(host)/sign/host (\(app.name) replaces this app, so iOS installs it from the server)")
             hostAndOpen(output, server: host, app: app, record: record, job: job, log: log, opened: answered, served: served)
             return
         }
@@ -1475,20 +1503,24 @@ enum Workspace {
 }
 
 // iOS doesn't finish installing a new iFizBox over the one that's running (user 2026-11-18: the update waited until
-// iFizBox was closed by hand), so iFizBox closes itself for its own update, but only once iOS has the whole new IPA.
+// iFizBox was closed by hand), so iFizBox closes itself for its own update, but only once iOS has accepted the install.
 // B83: closing on a fixed 8 s guess lost updates (user 2026-11-19, 0.9.8 to 0.9.9 while another app installed: the
 // notification came before iOS had downloaded the IPA, the user opened the old iFizBox, and iOS wouldn't install over
 // it). Now, once iOS's "would like to install" prompt is answered (iFizBox active again), iFizBox stays alive
-// (KeepAlive's silent audio) and polls the Signing Server's GET /sign/host/<t>/status (worker/src/index.js): when iOS
-// has streamed app.ipa to its end it exits so the install finishes (B178: with no notification; the progress page says so). If iOS hasn't begun
-// the download within `startLimit` (the prompt was cancelled, the link failed) or not finished it within
-// `finishLimit` (the link's TTL), it doesn't exit: the progress page (signing.selfUpdate) offers Try Again.
+// (KeepAlive's silent audio) and polls the Signing Server's GET /sign/host/<t>/status (worker/src/index.js).
+// B394: what iOS 27 does (measured on the 15 Pro): Install -> HEAD app.ipa (`asked`) -> maybe one more question (Low Data
+// Mode, cellular; cancelling that one ends the install) -> it registers the install, asks for iFizBox to be ended (refused
+// while it is in front, done while it isn't) -> GET app.ipa (`started`), from its own background session. So `started` is
+// the first moment iOS has accepted the install and no longer needs iFizBox: it closes then (B178: with no notification;
+// the progress page says so) instead of waiting for the last byte. Until then it stays open, whatever the prompt's answer.
+// The link lives `life` s; iFizBox follows it that long (the page offers Try Again and Return after seconds), then says
+// notStarted.
 // A server without the status route (404 three times) gets the old 8 s close.
 // State on the main queue.
 enum CloseForUpdate {
     enum State: String {
-        case prompt, waiting, downloading, finished, notStarted, stalled, guessed
-        var ends: Bool { [.finished, .notStarted, .stalled, .guessed].contains(self) }
+        case prompt, waiting, asked, finished, notStarted, guessed
+        var ends: Bool { [.finished, .notStarted, .guessed].contains(self) }
     }
     static var token: NSObjectProtocol?
     private static var resignToken: NSObjectProtocol?
@@ -1498,20 +1530,61 @@ enum CloseForUpdate {
     private(set) static var state: State?
     private static var sinks = [(State?) -> Bool]() // signing.selfUpdate watches; false: done with it
     private static var run = 0 // each afterPrompt bumps it: an older run's polls stop
-    private static var downloadingSince: Date? // B208: when the server first said iOS started the download
-    static let startLimit: TimeInterval = 120, finishLimit: TimeInterval = 600, pollEvery: TimeInterval = 2
+    static let pollEvery: TimeInterval = 2
+    static let quickPoll: TimeInterval = 1, quickFor: TimeInterval = 30 // B394: the first half minute
+
+    // B394: the last upload and its install link, which the same IPA handed over again reuses. Main queue.
+    struct Hosted: Codable {
+        let link: URL, status: URL?, record: SignedRecord, server: String, at: Date, life: TimeInterval
+        var again = false // reused: its `asked` mark may be the try before's, so it says nothing
+        var age: TimeInterval { Date().timeIntervalSince(at) }
+    }
+    // Kept across a close by hand; dropped once iOS has begun the download or the link has died.
+    private static let hostedKey = "ifizbox.selfUpdateHosted"
+    static var hosted: Hosted? {
+        get { UserDefaults.standard.data(forKey: hostedKey).flatMap { try? JSONDecoder().decode(Hosted.self, from: $0) } }
+        set { UserDefaults.standard.set(newValue.flatMap { try? JSONEncoder().encode($0) }, forKey: hostedKey) }
+    }
+    private static var held = false // KeepAlive, once however often the prompt is opened again
+    static let reuseSpare: TimeInterval = 30 // of the link's life, for the tap and iOS's requests
+    static func reusable(_ r: SignedRecord, server: String) -> Hosted? {
+        guard var h = hosted, h.age < h.life - reuseSpare, h.server == server else { return nil }
+        let o = h.record
+        h.again = true
+        let same = o.sha256 != nil && r.sha256 != nil ? o.sha256 == r.sha256 : o.url == r.url
+        return same && o.bundleID == r.bundleID && o.version == r.version && o.appID == r.appID
+            && o.expires == r.expires && o.options == r.options ? h : nil
+    }
+
+    // B394: iOS drops an itms-services link opened while iFizBox isn't in front (left during the upload): `go` runs now,
+    // or once it is back. Main queue.
+    private static var frontToken: NSObjectProtocol?
+    static func inFront(_ go: @escaping () -> Void) {
+        frontToken.map(NotificationCenter.default.removeObserver); frontToken = nil
+        if UIApplication.shared.applicationState != .background { return go() }
+        IDevice.ilog("self-update: uploaded in the background; the prompt opens once \(Brand.name) is in front")
+        frontToken = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+            frontToken.map(NotificationCenter.default.removeObserver); frontToken = nil
+            go()
+        }
+    }
 
     // B124: the update being handed off (its IDs and version), for the icon badge when iFizBox closes
     private static var handing: (ids: Set<String>, version: String)?
 
-    // `status`: the link's GET status URL (nil: the old 8 s close). Main queue.
-    static func afterPrompt(status: URL?, app: SignedApp? = nil) {
+    // `h.status`: the link's GET status URL (nil: the old 8 s close). Main queue.
+    static func afterPrompt(_ h: Hosted, app: SignedApp? = nil) {
         handing = app.map { ([$0.bundleID, $0.originalBundleID], $0.version) }
         run += 1
         let mine = run
         set(.prompt)
         var resigned = false
         let nc = NotificationCenter.default
+        // B394: the polls start now, so an Install tapped at once is seen at once
+        if h.status != nil {
+            if !held { held = true; KeepAlive.shared.begin() }
+            poll(h, run: mine, misses: 0)
+        }
         // B123: the wait starts once the prompt is answered (active again after resigning), or when iFizBox goes to
         // the background (Install, then Home: KeepAlive keeps the polls going), or when iOS's prompt never made
         // iFizBox resign active within `promptGrace` (it was left in .prompt for ever, the page locked, nothing closing)
@@ -1520,13 +1593,15 @@ enum CloseForUpdate {
             token.map(nc.removeObserver); token = nil
             resignToken.map(nc.removeObserver); resignToken = nil
             backgroundToken.map(nc.removeObserver); backgroundToken = nil
-            guard let status = status else { return guess() }
-            KeepAlive.shared.begin()
+            IDevice.ilog("self-update: waiting (resigned \(resigned), state \(UIApplication.shared.applicationState.rawValue))")
+            guard h.status != nil else { return guess() }
             set(.waiting)
-            poll(status, run: mine, since: Date(), misses: 0)
         }
         resignToken.map(nc.removeObserver)
-        resignToken = nc.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { _ in resigned = true }
+        resignToken = nc.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { _ in
+            resigned = true
+            IDevice.ilog("self-update: resigned active")
+        }
         token.map(nc.removeObserver)
         token = nc.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
             guard resigned else { return } // the prompt hasn't shown yet
@@ -1542,10 +1617,6 @@ enum CloseForUpdate {
 
     // B208: how long after the prompt opened the wait begins whatever iFizBox heard (begin only acts from .prompt)
     static let promptLimit: TimeInterval = 30
-    // B208: once iOS has begun the download (it fetches from the server, not from iFizBox, so closing can't break it),
-    // how long iFizBox waits for the server's finished mark before it closes anyway (guessed). It used to wait the
-    // whole `finishLimit` (10 minutes), the page locked, when the mark never came.
-    static let downloadGuess: TimeInterval = 60
 
     // signing.selfUpdate: `sink` gets the state now (nil: no self-update running) and each change after; it answers
     // false once it is done listening.
@@ -1558,37 +1629,37 @@ enum CloseForUpdate {
         sinks = sinks.filter { $0(s) }
     }
 
-    private static func poll(_ url: URL, run mine: Int, since: Date, misses: Int) {
-        guard mine == run else { return }
+    private static func poll(_ h: Hosted, run mine: Int, misses: Int) {
+        guard mine == run, let url = h.status else { return }
         let req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
         URLSession.shared.dataTask(with: req) { data, resp, _ in
             let code = (resp as? HTTPURLResponse)?.statusCode
             let marks = (data.flatMap { try? JSONSerialization.jsonObject(with: $0) }) as? [String: Any]
             DispatchQueue.main.async {
                 guard mine == run else { return }
+                let mark = { (k: String) in marks?[k] as? Bool == true }
                 let known = code == 200 && marks?["finished"] != nil
-                if known, marks?["finished"] as? Bool == true { return finish() }
-                if known, marks?["started"] as? Bool == true, state != .downloading { downloadingSince = Date(); set(.downloading) }
-                // B208: iOS is downloading, but the finished mark hasn't come within downloadGuess: close anyway
-                if state == .downloading, let d = downloadingSince, Date().timeIntervalSince(d) > downloadGuess {
-                    IDevice.ilog("self-close: iOS began the download \(Int(downloadGuess)) s ago and the server never said finished; closing")
-                    return guess()
+                if known, mark("started") || mark("finished") {
+                    IDevice.ilog("self-close: iOS began the download (finished \(mark("finished")))")
+                    return finish()
+                }
+                if known, mark("asked"), state != .asked, !h.again {
+                    IDevice.ilog("self-update: iOS asked for the IPA (Install was tapped)")
+                    set(.asked)
                 }
                 // an older Signing Server, without the status route: the old guess
                 let miss = !known && code == 404 ? misses + 1 : (known ? 0 : misses)
                 if miss >= 3, state == .waiting { return guess() }
-                let waited = Date().timeIntervalSince(since)
-                if state == .downloading ? waited > finishLimit : waited > startLimit {
-                    return giveUp(state == .downloading ? .stalled : .notStarted)
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + pollEvery) { poll(url, run: mine, since: since, misses: miss) }
+                if h.age > h.life { return giveUp() }
+                DispatchQueue.main.asyncAfter(deadline: .now() + (h.age < quickFor ? quickPoll : pollEvery)) { poll(h, run: mine, misses: miss) }
             }
         }.resume()
     }
 
-    // iOS has the whole IPA: out, so iOS installs over this one. B178: no notification (user 2026-11-20); the
+    // iOS has accepted the install: out, so iOS installs over this one. B178: no notification (user 2026-11-20); the
     // progress page already says iFizBox closes.
     private static func finish() {
+        hosted = nil
         set(.finished)
         closeWith()
     }
@@ -1652,13 +1723,14 @@ enum CloseForUpdate {
         }
     }
 
-    // Not started, or stalled: iFizBox stays open (the page offers Try Again); from the background, a notification says so.
-    private static func giveUp(_ s: State) {
-        set(s)
-        KeepAlive.shared.end()
+    // Not started: iFizBox stays open (the page offers Try Again); from the background, a notification says so.
+    private static func giveUp() {
+        hosted = nil
+        set(.notStarted)
+        if held { held = false; KeepAlive.shared.end() }
         guard UIApplication.shared.applicationState != .active else { return }
         let c = UNMutableNotificationContent()
-        c.title = s == .stalled ? "The \(Brand.name) Update Didn't Finish" : "The \(Brand.name) Update Didn't Start"
+        c.title = "The \(Brand.name) Update Didn't Start"
         c.body = "Open \(Brand.name) to try again."
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "ifizbox.updating", content: c, trigger: nil))
     }

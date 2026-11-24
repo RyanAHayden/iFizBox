@@ -406,7 +406,8 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`.
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and
-  held on the Signing Server for iOS to fetch.
+  held on the Signing Server for iOS to fetch. iFizBox closes once iOS has started that download, and the download goes
+  on without it (docs/signing.md, "What leaves the phone, and when").
 - **The IPA itself** is built unsigned, then signed ad hoc (`codesign -s -`/`ldid -S`), as Feather's `Makefile`
   does. The way in is the website's **Install iFizBox Lite** (Home), which signs this IPA in the browser with the
   user's certificate and hands that certificate, sources and settings to the installed app, so it signs other IPAs

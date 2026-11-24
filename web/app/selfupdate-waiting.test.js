@@ -39,7 +39,7 @@ test("followSelfUpdate waiting: Closing only at finished, then the instruction i
   const timers = [];
   const order = [];
   const wrapped = { async call(m, p, onEvent) {
-    return native(["prompt", "waiting", "downloading", "finished"]).call(m, p, (ev) => { order.push([ev.state, finishes.at(-1).label]); onEvent(ev); });
+    return native(["prompt", "waiting", "asked", "finished"]).call(m, p, (ev) => { order.push([ev.state, finishes.at(-1).label]); onEvent(ev); });
   } };
   assert.equal(await followSelfUpdate(h, { native: wrapped, waiting: true, later: (f, ms) => timers.push({ f, ms }) }), "finished");
   // the label while each state came in (before it was handled)
@@ -47,7 +47,7 @@ test("followSelfUpdate waiting: Closing only at finished, then the instruction i
   assert.deepEqual([finishes.at(-1).label, finishes.at(-1).locked], [CLOSING_LABEL, true]);
   assert.equal(finishes.length, 2);
   assert.ok(lines.some(([, t]) => t === SELF_UPDATE_LINES.finished));
-  const grace = timers.find((t) => t.ms === CLOSE_GRACE); // B208: beside downloading's hint timer
+  const grace = timers.find((t) => t.ms === CLOSE_GRACE); // beside the wait hint's timers
   assert.ok(grace);
   grace.f();
   assert.deepEqual(lines.at(-1), ["error", CLOSE_BY_HAND]);
