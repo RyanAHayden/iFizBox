@@ -168,7 +168,7 @@ extension's own ID is the correct signature all the same. To fakesign one by han
 `application-identifier` `<TEAM>.<bundle id>` and `com.apple.developer.team-identifier` `<TEAM>`, any 10
 characters), zip it back into `Payload/<Name>.app/`, and serve it as in "Serving a test repo" above.
 `ifizbox://install?url=…&name=…` installs it through the helper and remembers it in Installed > Apps. Uninstall a
-test app afterwards (Installed > Apps, swipe, Delete).
+test app afterwards (Installed > Apps, swipe, Delete). Time installs with the screen on: with it off, installd takes about three times as long.
 
 Launching such an app also needs AppSync's **FrontBoard** hook in SpringBoard, which only loads after a respring
 following AppSync's install: until then SpringBoard logs "signature state: Generic … No code signature found" and

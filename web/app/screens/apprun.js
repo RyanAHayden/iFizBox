@@ -37,6 +37,7 @@ import { el, barButton } from "../nav/ui.js";
 import { openProgress, openOn, rowBar, RETURN_LABEL, CLOSING_LABEL, WAITING_LABEL, TRY_AGAIN_LABEL, CLOSE_GRACE, CLOSE_BY_HAND,
   RESTART_BY_HAND } from "../nav/progress.js";
 import { fitFileNames } from "../core/midtrunc.js";
+import { ipaStep } from "../core/ipainstall.js"; // B400
 import { appRows, createAppRun, rowStatus, helperRow, summaryLine, runStatus, runPercent, ended, isSelf, DIDNT_DOWNLOAD, barOf } from "../core/apprun.js";
 import { recordWhen } from "../core/apprun.js"; // B136
 import { HERE_PARALLEL } from "../core/apprun.js"; // F359
@@ -118,7 +119,7 @@ export function phoneLanes(sc, { native, run = laneRunId() } = {}) {
 // B71a: the jailbreak app's side of a run: no signing. The "sign" lane only checks the IPA's own MinimumOSVersion
 // (ipa-install.js ipaNeeds, B72: nothing is downloaded for an app this iPhone's iOS can't run); the install lane hands
 // the IPA to the helper's install-ipa (ipa-install.js runIpaInstall: the shell downloads it, installd installs it, its
-// lines and percent on the row) or a Remove to the helper's uninstall-app (backend.uninstallApp, the Installed tab's
+// lines, steps and percent on the row) or a Remove to the helper's uninstall-app (backend.uninstallApp, the Installed tab's
 // Delete). Rows' jobs carry `helper: true` (core/apprun.js helperRow: its words). Every call can be stood in for (tests).
 export function helperLanes({ backend, install, needs, native } = {}) {
   return {
@@ -130,8 +131,8 @@ export function helperLanes({ backend, install, needs, native } = {}) {
       return { token: r.job?.op === "remove" ? "remove" : r.job?.url || "ipa", bundleId: r.id };
     },
     install: async (r, { signal, progress }, log = () => {}) => {
-      progress("installing", 0);
       if (r.job?.op === "remove") {
+        progress("installing", 0);
         if (typeof backend?.uninstallApp !== "function") throw new Error("This build can't delete apps.");
         await backend.uninstallApp(r.id, (ev) => {
           const line = String(ev?.line ?? "").trim();
@@ -141,10 +142,16 @@ export function helperLanes({ backend, install, needs, native } = {}) {
         });
         return { installed: true };
       }
+      // B400: the step runIpaInstall is at (core/ipainstall.js ipaStep) and its own percent, on the row and in the Log
+      // (core/apprun.js logs each step once); the bar is the whole install's.
+      let bar = 0;
+      let step = { word: "Preparing", percent: null };
+      const show = () => progress("installing", bar, null, step);
+      show();
       const view = {
         line: (type, text) => { if (type !== "status") log(type === "error" ? `E: ${text}` : text); },
-        status: () => {},
-        progress: (pct) => progress("installing", Math.min(99, Number(pct) || 0) / 100),
+        status: (text, percent = null) => { const word = ipaStep(text); if (word) { step = { word, percent }; show(); } },
+        progress: (pct) => { bar = Math.max(bar, Math.min(99, Number(pct) || 0) / 100); show(); },
       };
       const res = await install({ url: r.job.url, name: r.name, ...listedOf(r.job) }, view, { ...(native ? { native } : {}), signal });
       if (res?.cancelled) throw new Error("cancelled");

@@ -29,6 +29,10 @@ int helper_ipa_bundle_id_ok(const char *s);
  * any plist format, other systems the XML one only. */
 int helper_ipa_plist_id(const char *data, size_t len, char *out, size_t size);
 
+/* B400: a zip's central directory (fd): 0 with the bytes everything in it unpacks to and whether every entry was made
+ * on Unix or macOS; -1 (and 0, 0) when it can't be read (not a zip, zip64). */
+int helper_ipa_zip(int fd, long long *total, int *on_unix);
+
 /* B59: 1 if s is a team id the fakesign reuses (10 of [A-Z0-9]); 1 if s is a CFBundleExecutable the helper signs
  * (a plain name: no "/", not "." or "..", helper_app_value_ok). */
 int helper_ipa_team_ok(const char *s);

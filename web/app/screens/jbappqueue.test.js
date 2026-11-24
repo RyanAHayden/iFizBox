@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createAppQueue, appPlan } from "../core/appqueue.js";
-import { appRows, rowStatus, summaryLine, runStatus } from "../core/apprun.js";
+import { appRows, rowStatus, summaryLine, runStatus, barOf } from "../core/apprun.js";
 import { helperLanes, runAppRun } from "./apprun.js";
 import { runJailbreakApps, afterApps, appSyncFirst } from "./queue.js";
 import { rowMenuItems, rowSwipeAction, jbModifyQueue } from "./browse.js";
@@ -69,6 +69,15 @@ test("the helper's rows read Installing / Removing, never Signed or the iOS prom
   for (const state of ["waiting", "signed"]) assert.equal(rowStatus({ ...a, state }), "Waiting");
   assert.equal(rowStatus({ ...a, state: "asking" }), "Installing");
   assert.equal(rowStatus({ ...a, state: "installing", fraction: 0.4 }), "Installing 40%");
+  // B400: the helper's step and that step's own percent; the bar is the whole install's, with no half for signing
+  const at = (word, wordPercent, fraction = 0.3) => ({ ...a, state: "installing", word, wordPercent, fraction });
+  assert.equal(rowStatus(at("Downloading", 40)), "Downloading 40%");
+  assert.equal(rowStatus(at("Unpacking", null)), "Unpacking");
+  assert.equal(rowStatus(at("Installing", 60)), "Installing 60%");
+  assert.equal(runStatus([at("Downloading", 40)]), "Downloading A 40% (1 of 1)");
+  assert.equal(runStatus([at("Unpacking", null)]), "Unpacking A (1 of 1)");
+  assert.equal(barOf(at("Unpacking", null)), 0.3);
+  assert.equal(barOf({ ...a, state: "signed", fraction: 1 }), 0);
   assert.equal(rowStatus({ ...b, state: "installing" }), "Removing");
   assert.equal(rowStatus({ ...a, state: "installed" }), "Installed");
   assert.equal(rowStatus({ ...b, state: "installed" }), "Removed");
@@ -82,11 +91,11 @@ test("helperLanes: a Remove goes to the helper's uninstall, an IPA to install-ip
   const removed = [];
   const installs = [];
   const backend = { uninstallApp: async (id, on) => { removed.push(id); on({ line: "pmstatus:x:50:Removing" }); on({ line: "removed it" }); } };
-  const install = async (args, view, opts) => { installs.push({ args, signal: Boolean(opts.signal) }); view.progress(60); view.line("info", "installd"); return { ok: true }; };
+  const install = async (args, view, opts) => { installs.push({ args, signal: Boolean(opts.signal) }); view.status("Downloading", 40); view.progress(60); view.progress(50); view.status("Done"); view.line("info", "installd"); return { ok: true }; };
   const lanes = helperLanes({ backend, install, needs: async (url) => (url.includes("new") ? { min: "17.0", ios: "15.8.8" } : null) });
   const progress = [];
   const logs = [];
-  const hooks = { signal: new AbortController().signal, progress: (ph, f) => progress.push([ph, f]) };
+  const hooks = { signal: new AbortController().signal, progress: (ph, f, step, info) => progress.push([ph, f, ...(info ? [`${info.word} ${info.percent}`] : [])]) };
   const rem = { id: "com.x.a", name: "A", job: { op: "remove", id: "com.x.a" } };
   assert.equal((await lanes.sign(rem)).token, "remove");
   assert.deepEqual(await lanes.install(rem, hooks, (t) => logs.push(t)), { installed: true });
@@ -96,6 +105,9 @@ test("helperLanes: a Remove goes to the helper's uninstall, an IPA to install-ip
   const ipa = { id: "com.x.b", name: "B", job: { op: "install", url: "https://s/b.ipa" } };
   assert.equal((await lanes.sign(ipa)).token, "https://s/b.ipa");
   assert.deepEqual(await lanes.install(ipa, hooks, (t) => logs.push(t)), { installed: true });
+  // B400: the step and its percent; the bar never goes back
+  assert.deepEqual(progress.slice(2), [["installing", 0, "Preparing null"], ["installing", 0, "Downloading 40"],
+    ["installing", 0.6, "Downloading 40"], ["installing", 0.6, "Downloading 40"]]);
   assert.deepEqual(installs, [{ args: { url: "https://s/b.ipa", name: "B" }, signal: true }]);
   await assert.rejects(lanes.sign({ id: "n", job: { op: "install", url: "https://s/new.ipa" } }), /needs iOS 17\.0/);
   const failing = helperLanes({ backend, install: async () => ({ ok: false, error: { message: "installd refused it" } }) });
@@ -110,15 +122,22 @@ test("a run on the helper's lanes installs and removes in turn, clears the queue
     const recorded = [];
     const page = fakePage();
     const backend = { uninstallApp: async () => {} };
-    const lanes = helperLanes({ backend, install: async () => ({ ok: true }) });
+    // B400: the Log names each step once, the row says it with its percent, and the bar only goes forward
+    const rowsOf = () => page.lines.filter((l) => l.kind === "step").map((l) => l.text);
+    const install = async (args, view) => {
+      view.status("Preparing");
+      for (const [bar, text, step] of [[0, "Downloading"], [8, "Downloading", 40], [21, "Copying the IPA"], [40, "Unpacking"],
+        [60, "Installing (AppSync Unified)"], [84, "Installing", 60], [80, "Installing", 60]]) { view.progress(bar); view.status(text, step); }
+      return { ok: true };
+    };
+    const lanes = helperLanes({ backend, install });
     const res = await runAppRun(q.list().map((j) => ({ ...j, helper: true })), { queue: q, lanes, open: () => page,
       record: async (job) => recorded.push([job.op, job.id]), finish: () => ({ label: "Restart SpringBoard" }) });
     await settle();
     assert.equal(res.ok, true);
     assert.equal(q.size, 0);
     assert.deepEqual(recorded, [["install", "com.x.a"], ["remove", "com.x.b"]]);
-    const steps = page.lines.filter((l) => l.kind === "step").map((l) => l.text);
-    assert.deepEqual(steps, ["Installing A", "Installed A", "Removing B", "Removed B", "1 installed, 1 removed"]);
+    assert.deepEqual(rowsOf(), ["Downloading A", "Copying A", "Unpacking A", "Installing A", "Installed A", "Removing B", "Removed B", "1 installed, 1 removed"]);
     assert.equal(page.finished.label, "Restart SpringBoard");
   });
 });

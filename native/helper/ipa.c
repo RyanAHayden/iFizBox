@@ -8,15 +8,19 @@
  *   2. unzip runs as that user (not root) into pkg/ beside the copy, so a hostile zip (symlinks, "../") can only
  *      write where the user already can. CFBundleIdentifier comes from Payload/<one>.app/Info.plist, read with
  *      O_NOFOLLOW. An app whose MinimumOSVersion is above this iPhone's iOS stops here, saying both (B72).
- *   3. With AppSync Unified (installd takes any signature): install the root-owned copy, as appinst does; but
- *      installd still wants an application-identifier entitlement (B59), so a binary without one (the main one or an
- *      extension's, B72) is fakesigned with `ldid -M -S`, the .app sealed with `ldid -s` (as the user) and the
- *      unpacked .app installed instead. installd's refusal ends the last stderr line, in its own words.
+ *   3. With AppSync Unified (installd takes any signature): install the unpacked .app (PackageType Developer), which
+ *      installd moves into place instead of unpacking the IPA a second time (B400: about half the time on the
+ *      iPhone 7). The root-owned copy goes to installd as it is, as appinst does, when unzip may unpack it other than
+ *      installd would (a warning from unzip, a zip not made on Unix: names and modes) or it has an App Store
+ *      iTunesMetadata.plist, which only an IPA install keeps. installd still wants an application-identifier
+ *      entitlement (B59), so a binary without one (the main one or an extension's, B72) is fakesigned with `ldid -M
+ *      -S` and the .app sealed with `ldid -s` (as the user). installd's refusal ends the last stderr line, in its own words.
  *      Without it: ad hoc sign the .app with ldid (as TrollStore Lite does: `ldid -s`, keeping the entitlements, run
  *      as the user too) and install the unpacked .app (PackageType Developer). No ldid, or installd refuses the ad
  *      hoc app: exit HELPER_EX_ADHOC with a line saying the jailbreak can't install ad hoc apps without AppSync.
  *
- * Progress goes to fd 3 (when open) as pmstatus:<bundle id or "ipa">:<percent>:<text>, like apt's.
+ * Progress goes to fd 3 (when open) as pmstatus:<bundle id or "ipa">:<percent>:<text>, like apt's. B400: the percent
+ * never goes back and moves within the copy, unzip and installd's own percents, which end the text ("Installing 40%").
  * Off iOS (the tests) the last step only prints what it would install; the rest runs as on the phone.
  * SPDX-License-Identifier: GPL-3.0-or-later */
 #include "ipa.h"
@@ -26,12 +30,14 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #ifdef __APPLE__
@@ -48,16 +54,63 @@ void objc_autoreleasePoolPop(void *pool);
 
 static int status_fd = -1;
 
+/* B400: one line per new percent or text, never back; installd's block may call this from another thread. A percent
+ * already passed is sent as the highest one when its text is new. */
+static int shown_pct = -1;
+static char shown_text[HELPER_NAME_MAX + 64];
+static pthread_mutex_t shown_lock = PTHREAD_MUTEX_INITIALIZER;
+
 static void progress(const char *id, int pct, const char *text) {
     if (status_fd < 0) return;
-    dprintf(status_fd, "pmstatus:%s:%d:%s\n", id && *id ? id : "ipa", pct, text);
+    pthread_mutex_lock(&shown_lock);
+    if (pct > shown_pct || strcmp(text, shown_text)) {
+        if (pct > shown_pct) shown_pct = pct;
+        snprintf(shown_text, sizeof shown_text, "%s", text);
+        dprintf(status_fd, "pmstatus:%s:%d:%s\n", id && *id ? id : "ipa", shown_pct, text);
+    }
+    pthread_mutex_unlock(&shown_lock);
+}
+
+/* B400: `done` of `of` bytes into a step that takes the bar from `from` to `to`. */
+static void part(long long done, long long of, int from, int to, const char *text) {
+    if (of <= 0 || done < 0) return;
+    if (done > of) done = of;
+    progress(NULL, from + (int)((to - from) * done / of), text);
 }
 
 static int fail(const char **err, const char *msg) { *err = msg; return HELPER_EX_IOERR; }
 
+/* B400: the bytes of the plain files under path (lstat: no link is followed). */
+static long long tree_size(const char *path) {
+    struct stat st;
+    if (lstat(path, &st)) return 0;
+    if (S_ISREG(st.st_mode)) return st.st_size;
+    if (!S_ISDIR(st.st_mode)) return 0;
+    long long sum = 0;
+    DIR *d = opendir(path);
+    if (!d) return 0;
+    struct dirent *de;
+    while ((de = readdir(d))) {
+        if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")) continue;
+        char p[PATH_MAX];
+        if ((size_t)snprintf(p, sizeof p, "%s/%s", path, de->d_name) < sizeof p) sum += tree_size(p);
+    }
+    closedir(d);
+    return sum;
+}
+
+/* B400: what run_as shows while its child (unzip) fills a directory: the bar from `from` to `to`. */
+struct grows { const char *dir; long long total; int from, to; const char *text; };
+
+static double now(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return (double)t.tv_sec + (double)t.tv_nsec / 1e9;
+}
+
 /* Run argv[0] (an absolute path) as uid/gid with the helper's clean environment; its stdout/stderr are the
- * console. Returns its exit status, or -1 when it couldn't start. */
-static int run_as(uid_t uid, gid_t gid, const char *cwd, char *const env[], const char *const argv[]) {
+ * console. Returns its exit status, or -1 when it couldn't start. `g` (or NULL): see above. */
+static int run_as(uid_t uid, gid_t gid, const char *cwd, char *const env[], const char *const argv[], const struct grows *g) {
     pid_t pid = fork();
     if (pid < 0) return -1;
     if (pid == 0) {
@@ -71,8 +124,21 @@ static int run_as(uid_t uid, gid_t gid, const char *cwd, char *const env[], cons
         _exit(126);
     }
     int st;
-    while (waitpid(pid, &st, 0) < 0)
-        if (errno != EINTR) return -1;
+    double look = now() + 0.3; /* the directory is measured about twice a second, less often when that takes long */
+    for (;;) {
+        pid_t got = waitpid(pid, &st, g && g->total > 0 ? WNOHANG : 0);
+        if (got == pid) break;
+        if (got < 0 && errno != EINTR) return -1;
+        if (got != 0) continue;
+        double t = now();
+        if (t >= look) {
+            part(tree_size(g->dir), g->total, g->from, g->to, g->text);
+            double took = now() - t;
+            look = now() + (took > 0.05 ? took * 10 : 0.5);
+        }
+        struct timespec nap = {0, 50 * 1000 * 1000};
+        nanosleep(&nap, NULL);
+    }
     return WIFEXITED(st) ? WEXITSTATUS(st) : 128 + WTERMSIG(st);
 }
 
@@ -173,8 +239,19 @@ int helper_ipa_appsync(const char *prefix) {
            exists(prefix, "/usr/lib/TweakInject/AppSyncUnified-installd.dylib");
 }
 
-/* The last step: installd. 0, or -1 with the reason in why. */
-static int install(const char *path, const char *bundle, int developer, char *why, size_t size) {
+#ifdef __APPLE__
+/* B400: the percent in one of installd's status dictionaries ({"PercentComplete": 40, "Status": ...}), or -1. */
+static int installd_percent(id info) {
+    if (!info || CFGetTypeID((CFTypeRef)info) != CFDictionaryGetTypeID()) return -1;
+    CFTypeRef v = CFDictionaryGetValue((CFDictionaryRef)info, CFSTR("PercentComplete"));
+    int pct = -1;
+    if (v && CFGetTypeID(v) == CFNumberGetTypeID() && !CFNumberGetValue((CFNumberRef)v, kCFNumberIntType, &pct)) pct = -1;
+    return pct;
+}
+#endif
+
+/* The last step: installd. 0, or -1 with the reason in why. Its own percents go on from `base`. */
+static int install(const char *path, const char *bundle, int developer, int base, char *why, size_t size) {
 #ifdef __APPLE__
     void *pool = objc_autoreleasePoolPush();
     int rc = -1;
@@ -191,8 +268,27 @@ static int install(const char *path, const char *bundle, int developer, char *wh
         CFDictionaryRef opts = CFDictionaryCreate(NULL, keys, vals, developer ? 2 : 1, &kCFTypeDictionaryKeyCallBacks,
                                                   &kCFTypeDictionaryValueCallBacks);
         id error = nil;
-        BOOL ok = ((BOOL(*)(id, SEL, id, id, id *))objc_msgSend)(
-            w, sel_registerName("installApplication:withOptions:error:"), (id)url, (id)opts, &error);
+        BOOL ok;
+        SEL with_block = sel_registerName("installApplication:withOptions:error:usingBlock:");
+        if (((BOOL(*)(id, SEL, SEL))objc_msgSend)(w, sel_registerName("respondsToSelector:"), with_block)) {
+            /* B400: installd's own percents; its block is called while the call below waits. */
+            static char name[HELPER_NAME_MAX + 1]; /* static: a late call of the block may come after this returned */
+            static int told = -1;
+            snprintf(name, sizeof name, "%s", bundle);
+            const char *named = name;
+            void (^said)(id) = ^(id info) {
+                int pct = installd_percent(info);
+                char text[32];
+                if (pct <= told || pct > 100) return; /* never back */
+                told = pct;
+                snprintf(text, sizeof text, "Installing %d%%", pct);
+                progress(named, base + (99 - base) * pct / 100, text);
+            };
+            ok = ((BOOL(*)(id, SEL, id, id, id *, void (^)(id)))objc_msgSend)(w, with_block, (id)url, (id)opts, &error, said);
+        } else {
+            ok = ((BOOL(*)(id, SEL, id, id, id *))objc_msgSend)(
+                w, sel_registerName("installApplication:withOptions:error:"), (id)url, (id)opts, &error);
+        }
         if (ok) rc = 0;
         else if (error) {
             CFStringRef s = (CFStringRef)((id(*)(id, SEL))objc_msgSend)(error, sel_registerName("localizedDescription"));
@@ -210,6 +306,11 @@ static int install(const char *path, const char *bundle, int developer, char *wh
     /* The tests' stand-in for installd: says what it would install; a bundle id ending in ".refused" fails. */
     printf("install %s %s%s\n", developer ? "app" : "ipa", bundle, developer ? " (PackageType Developer)" : "");
     (void)path;
+    for (int pct = 20; pct <= 60; pct += 40) {
+        char text[32];
+        snprintf(text, sizeof text, "Installing %d%%", pct);
+        progress(bundle, base + (99 - base) * pct / 100, text);
+    }
     size_t n = strlen(bundle);
     if (n >= 8 && !strcmp(bundle + n - 8, ".refused")) { snprintf(why, size, "test installd refused it"); return -1; }
     return 0;
@@ -371,7 +472,7 @@ static int sign_binary(const char *ldid, uid_t uid, gid_t gid, const char *pkg, 
     snprintf(sopt, sizeof sopt, "-S%s", ent);
     const char *sign[] = {ldid, "-M", sopt, bin, NULL};
     fflush(stdout);
-    if (run_as(uid, gid, pkg, env, sign)) {
+    if (run_as(uid, gid, pkg, env, sign, NULL)) {
         *err = "ldid couldn't add the application-identifier entitlement";
         return HELPER_EX_ADHOC;
     }
@@ -435,7 +536,7 @@ static int fakesign(const char *ldid, uid_t uid, gid_t gid, const char *pkg, con
     progress(id, 48, "Sealing the app (ldid)");
     const char *seal[] = {ldid, "-s", app, NULL};
     fflush(stdout);
-    if (run_as(uid, gid, pkg, env, seal)) { *err = "ldid couldn't seal the fakesigned app"; return HELPER_EX_ADHOC; }
+    if (run_as(uid, gid, pkg, env, seal, NULL)) { *err = "ldid couldn't seal the fakesigned app"; return HELPER_EX_ADHOC; }
     return 1;
 }
 
@@ -519,6 +620,50 @@ static int os_check(const char *prefix, const char *app, const char **err) {
     return 0;
 }
 
+/* B400: a zip's central directory, read from fd: 0 with the size of everything in it unpacked (*total) and whether
+ * each entry was made on Unix or macOS (*on_unix: unzip then takes names and modes as they are, as installd does), or
+ * -1 when it isn't one that can be read (installd and unzip judge the IPA; only the bar and the short way need this). */
+static unsigned long le(const unsigned char *p, int n) {
+    unsigned long v = 0;
+    while (n--) v = v << 8 | p[n];
+    return v;
+}
+
+int helper_ipa_zip(int fd, long long *total, int *on_unix) {
+    enum { EOCD = 22, ENTRY = 46, TAIL = 65535 + EOCD, CD_MAX = 64 << 20 };
+    *total = 0;
+    *on_unix = 1;
+    struct stat st;
+    if (fstat(fd, &st) || st.st_size < EOCD) return -1;
+    size_t tail = st.st_size < TAIL ? (size_t)st.st_size : TAIL;
+    unsigned char *buf = malloc(tail), *cd = NULL;
+    int rc = -1;
+    if (!buf || pread(fd, buf, tail, st.st_size - (off_t)tail) != (ssize_t)tail) goto out;
+    size_t at = tail - EOCD;
+    while (memcmp(buf + at, "PK\5\6", 4))
+        if (at-- == 0) goto out;
+    unsigned long count = le(buf + at + 10, 2), size = le(buf + at + 12, 4), off = le(buf + at + 16, 4);
+    /* zip64 (0xffff...) too: rare in an IPA, and installd unpacks it as it did */
+    if (count == 0xffff || off == 0xffffffff || size > CD_MAX || size < ENTRY || (off_t)(off + size) > st.st_size) goto out;
+    if (!(cd = malloc(size)) || pread(fd, cd, size, (off_t)off) != (ssize_t)size) goto out;
+    size_t p = 0;
+    for (; count; count--) {
+        if (size - p < ENTRY || memcmp(cd + p, "PK\1\2", 4)) goto out;
+        unsigned long plain = le(cd + p + 24, 4);
+        size_t len = ENTRY + le(cd + p + 28, 2) + le(cd + p + 30, 2) + le(cd + p + 32, 2);
+        if (plain == 0xffffffff || len > size - p) goto out;
+        if (cd[p + 5] != 3 && cd[p + 5] != 19) *on_unix = 0; /* made by: 3 Unix, 19 macOS */
+        *total += (long long)plain;
+        p += len;
+    }
+    rc = 0;
+out:
+    free(buf);
+    free(cd);
+    if (rc) { *total = 0; *on_unix = 0; }
+    return rc;
+}
+
 static int do_install(const char *prefix, const char *ipa, char *const env[], const char *work, const char **err) {
     /* 1. The caller's IPA: its directory is the real one (iOS's /var -> /private/var aside, no link on the way), the
      * file a plain one of the user who owns that directory. */
@@ -541,7 +686,7 @@ static int do_install(const char *prefix, const char *ipa, char *const env[], co
     uid_t uid = st.st_uid;
     gid_t gid = st.st_gid;
 
-    progress(NULL, 5, "Copying the IPA");
+    progress(NULL, 0, "Copying the IPA");
     char copy[PATH_MAX], pkg[PATH_MAX];
     if ((size_t)snprintf(copy, sizeof copy, "%s/app.ipa", work) >= sizeof copy ||
         (size_t)snprintf(pkg, sizeof pkg, "%s/pkg", work) >= sizeof pkg)
@@ -554,17 +699,26 @@ static int do_install(const char *prefix, const char *ipa, char *const env[], co
     while ((n = read(in, buf, sizeof buf)) > 0) {
         total += n;
         if (total > IPA_MAX_SIZE || write(out, buf, (size_t)n) != n) { n = -1; break; }
+        part(total, st.st_size, 0, 5, "Copying the IPA");
     }
     close(in);
-    if (n < 0 || fsync(out) || close(out)) return fail(err, "can't copy the IPA");
+    /* no fsync (B400): the copy is read back through the same cache and deleted, never after a restart */
+    if (close(out) || n < 0) return fail(err, "can't copy the IPA");
+    long long plain = 0;
+    int on_unix = 0, zip = open(copy, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    if (zip >= 0) {
+        if (helper_ipa_zip(zip, &plain, &on_unix)) plain = 2 * total; /* a guess: Unpacking still moves */
+        close(zip);
+    }
 
     /* 2. Unpacked by the user, not root. */
-    progress(NULL, 20, "Unpacking");
+    progress(NULL, 5, "Unpacking");
     if (mkdir(pkg, 0755) || chown(pkg, uid, gid)) return fail(err, "can't make the unpack directory");
     char unzip[PATH_MAX];
     if ((size_t)snprintf(unzip, sizeof unzip, "%s/usr/bin/unzip", prefix) >= sizeof unzip) return fail(err, "prefix too long");
     const char *uz[] = {unzip, "-qq", "-o", copy, "-d", pkg, NULL};
-    int rc = run_as(uid, gid, pkg, env, uz);
+    const struct grows filling = {pkg, plain, 5, 40, "Unpacking"};
+    int rc = run_as(uid, gid, pkg, env, uz, &filling);
     if (rc < 0 || rc == 126) return fail(err, "can't run unzip (the jailbreak's unzip package)");
     if (rc != 0 && rc != 1) { *err = "unzip couldn't unpack the IPA"; return HELPER_EX_USAGE; }
     char payload[PATH_MAX], app[PATH_MAX], id[HELPER_NAME_MAX + 1];
@@ -572,6 +726,11 @@ static int do_install(const char *prefix, const char *ipa, char *const env[], co
     if (find_app(payload, app, sizeof app)) { *err = "not an IPA: no single Payload/<name>.app"; return HELPER_EX_USAGE; }
     if (read_plist(app, id, sizeof id)) { *err = "no usable CFBundleIdentifier in the app's Info.plist"; return HELPER_EX_USAGE; }
     if (os_check(prefix, app, err)) return 1; /* B72 */
+    char meta[PATH_MAX];
+    struct stat mst;
+    /* B400: installd may take the unpacked .app: unpacked without a warning, a zip made on Unix, no App Store metadata */
+    int as_unpacked = rc == 0 && on_unix && (size_t)snprintf(meta, sizeof meta, "%s/iTunesMetadata.plist", pkg) < sizeof meta &&
+                      lstat(meta, &mst) != 0;
 
     /* 3. installd. */
     static char why[512], refused[640];
@@ -580,7 +739,8 @@ static int do_install(const char *prefix, const char *ipa, char *const env[], co
     if ((size_t)snprintf(ldid, sizeof ldid, "%s/usr/bin/ldid", prefix) >= sizeof ldid) return fail(err, "prefix too long");
     if (helper_ipa_appsync(prefix)) {
         /* B59: AppSync takes any signature but installd still wants application-identifier: fakesign the binary
-         * when it lacks one and install the unpacked .app (there's no zip to pack it back); otherwise the IPA. */
+         * when it lacks one and install the unpacked .app (there's no zip to pack it back). B400: without
+         * that too, unless installd should unpack the IPA itself (as_unpacked). */
         int signed_app = 0;
         if (!access(ldid, X_OK)) {
             rc = fakesign(ldid, uid, gid, pkg, work, app, id, env, err);
@@ -588,7 +748,7 @@ static int do_install(const char *prefix, const char *ipa, char *const env[], co
             signed_app = rc == 1;
         }
         progress(id, 50, "Installing (AppSync Unified)");
-        if (install(signed_app ? app : copy, id, signed_app, why, sizeof why)) {
+        if (install(signed_app || as_unpacked ? app : copy, id, signed_app || as_unpacked, 50, why, sizeof why)) {
             /* B72: installd's own words on the last line, the one the app's alert shows */
             helper_ipa_why_clean(why);
             snprintf(refused, sizeof refused, "installd refused the app: %s", why);
@@ -603,12 +763,12 @@ static int do_install(const char *prefix, const char *ipa, char *const env[], co
         }
         progress(id, 40, "Signing ad hoc (ldid)");
         const char *ld[] = {ldid, "-s", app, NULL};
-        rc = run_as(uid, gid, pkg, env, ld);
+        rc = run_as(uid, gid, pkg, env, ld, NULL);
         if (rc) { *err = "ldid couldn't sign the app ad hoc"; return HELPER_EX_ADHOC; }
         rc = fakesign(ldid, uid, gid, pkg, work, app, id, env, err); /* B59 */
         if (rc > 1) return rc;
         progress(id, 60, "Installing (ad hoc signed)");
-        if (install(app, id, 1, why, sizeof why)) {
+        if (install(app, id, 1, 60, why, sizeof why)) {
             helper_ipa_why_clean(why);
             fprintf(stderr, "ifizbox-helper: installd: %s\n", why);
             *err = "installd refused the ad hoc signed app: this jailbreak can't install ad hoc apps without AppSync "
@@ -623,6 +783,7 @@ static int do_install(const char *prefix, const char *ipa, char *const env[], co
 
 int helper_install_ipa(const char *prefix, const char *ipa, int fd3, char *const env[], const char **err) {
     status_fd = fd3;
+    shown_pct = -1;
     char work[PATH_MAX];
     if ((size_t)snprintf(work, sizeof work, "%s/ifizbox-ipa.XXXXXX", HELPER_IPA_WORK) >= sizeof work)
         return fail(err, "work path too long");

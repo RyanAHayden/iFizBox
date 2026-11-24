@@ -44,7 +44,7 @@ export async function installIpa(url, onEvent = null, { native = nativeBridge(),
 
 // The console's run, without the DOM (screens/ipa-install.js draws `view`; the tests bring their own):
 //   view.line(type, text)   type "info" | "status" | "error" | "warning": one console line
-//   view.status(text)       the white line over the bar
+//   view.status(text, step) the white line over the bar; step: that step's own percent, or null (B400)
 //   view.progress(percent)  0..100
 // Resolves { ok, bundleId, error: core/ipainstall.js ipaError's answer or null, log: the console's text, cancelled }.
 // F188: `signal` (the page's Cancel) ends the run at once: it resolves { ok: false, cancelled: true } without waiting
@@ -85,7 +85,7 @@ export async function runIpaInstall({ url, name = "", keep = false, listed = nul
         if (!s) { line("info", text); return; }
         if (s.error) { line("error", s.text); return; }
         if (s.percent != null) view.progress(s.percent);
-        view.status(s.text);
+        view.status(s.text, s.step ?? null); // B400: the step's own percent, when it has one
         if (s.text !== lastStatus) line("status", s.text); // installd repeats "Installing" with each percent
         lastStatus = s.text;
         return;

@@ -6,7 +6,8 @@
 //   ipaUrl(text)              -> the http(s) URL typed or pasted ("example.com/a.ipa" gets https://), or null
 //   looksLikeIpa(url)         -> true when a link's path ends in .ipa (a tapped link offers Install IPA)
 //   ipaName(url)              -> the file's name without .ipa, for the console's title ("App" when there's none)
-//   ipaStatus(line)           -> { text, percent } for one status-fd line (dlstatus / pmstatus / pmerror), or null
+//   ipaStatus(line)           -> { text, percent, step? (B400: the step's own percent) } for one status-fd line (dlstatus / pmstatus / pmerror), or null
+//   ipaStep(text)             -> the row's word for a status text (B400), or null
 //   ipaError(err, name)       -> { code, title, message, detail: the shell's own words, lines: [help lines] } for an ipa.install error
 //   needsNewerIos, needsIosText  B72: an IPA's MinimumOSVersion above this iPhone's iOS, and what to say
 //   IPA_FOOTER, NO_ADHOC_HELP  the words the screens show
@@ -53,7 +54,19 @@ export function ipaStatus(line) {
   const [, kind, , pct, text] = m;
   const p = Math.max(0, Math.min(100, Number(pct) || 0));
   if (kind === "pmerror") return { text: text.trim(), percent: null, error: true };
-  return { text: text.trim() || (kind === "dlstatus" ? "Downloading" : "Installing"), percent: kind === "dlstatus" ? p / 5 : 20 + p * 0.8 };
+  const said = text.trim() || (kind === "dlstatus" ? "Downloading" : "Installing");
+  if (kind === "dlstatus") return { text: said, percent: p / 5, ...(p > 0 ? { step: Math.floor(p) } : {}) };
+  // B400: installd's own percent ends the helper's text ("Installing 40%"); the line's percent is the whole bar's
+  const own = said.match(/^(.*?) (\d{1,3})%$/);
+  return { text: own ? own[1] : said, percent: 20 + p * 0.8, ...(own ? { step: Math.min(100, Number(own[2])) } : {}) };
+}
+
+// B400: the one word a queue row and its Log say for a status text (ipaStatus's, or runIpaInstall's own), or null for
+// one that is no step ("Done", an alert's title).
+export function ipaStep(text) {
+  const t = String(text ?? "");
+  if (/^(Adding the application-identifier|Sealing|Signing)/.test(t)) return "Signing";
+  return t.match(/^(Preparing|Downloading|Copying|Unpacking|Installing)\b/)?.[1] ?? null;
 }
 
 // F189: one line (the ldid and sign-it-yourself options are gone): AppSync Unified is installed for the first IPA
