@@ -147,7 +147,7 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
     const err = rowError(e, name);
     // F366: with idevice.status, so the failure's words follow the VPN's state
     const fallback = route ? serverFallback(e, route, await routeStatus(route, native)) : null;
-    if (fallback?.fix === "pair") rememberRouteFailure(fallback); // B416: Pair Again's page checks it, then pairs
+    if (fallback?.fix) rememberRouteFailure(fallback); // B416: Pairing checks it, then pairs; F409: the status cell says Fix
     throw fallback ? Object.assign(err, { fallback }) : err;
   }
   progress("asking", 0);

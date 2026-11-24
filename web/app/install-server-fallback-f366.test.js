@@ -147,9 +147,9 @@ test("the queue run: a This iPhone failure offers its fix and Use the Signing Se
     assert.equal(r.ok, false);
     assert.equal(page.finished.also?.label, USE_SERVER, "the bottom offers it above Return");
     const labels = page.helps.map((h) => h.label);
-    assert.equal(labels.filter((l) => l === "Pair Again").length, 2, "each failed app's fix");
+    assert.equal(labels.filter((l) => l === "Fix").length, 2, "each failed app's fix");
     assert.equal(labels.at(-1), USE_SERVER, "the Log's row offers it");
-    page.helps.find((h) => h.label === "Pair Again").action();
+    page.helps.find((h) => h.label === "Fix").action();
     assert.deepEqual(fixes, ["pair"]);
 
     page.finished.also.action();

@@ -265,7 +265,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   starts on its own, the 6-digit code big at the top and where to type it, a short line a step with a ringed screenshot
   of the Settings row (Privacy & Security, Developer Mode, "Pair with iFizBox"; `web/app/img/pair/`, the user's own iPhone
   screenshots, named in Credits). Pairing keeps listening while the page is open, and ends when it's left. Paired:
-  "Paired" with a check, Check Connection (`idevice.verify`, Pair Again when the pairing is refused) and Forget Pairing.
+  "Paired" with a check, Check Connection (`idevice.verify`, Fix while it fails) and Forget Pairing.
   Before iOS 27 a pairing file made on a computer is imported instead. Settings shows no Developer Mode row (iOS needs it
   for every kind of profile, iOS 27's Ad Hoc too, and an app can't open without it): an install that fails because of it
   says so in its alert, with the steps to turn it on (core/installroute.js `developerModeFailure`). Each install
@@ -278,7 +278,8 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   Server besides the fix: in the install's alert and its log, and on the IPA queue run's Log (each failed app's fix, then
   Use the Signing Server) and at its bottom. It runs the same install, or the same failed apps, again through the default
   Signing Server for that install or run only; Install Apps With stays This iPhone. The queue's fix row for a failed app
-  reads `idevice.status` first, so a failure through the built-in VPN offers Check Again and Use the Signing Server.
+  reads `idevice.status` first, so a failure through the built-in VPN offers Fix and Use the Signing Server. In the install run's Log and install failure alerts, Fix opens Pairing, or
+  Installation & Signing, which runs the check at once.
 - **This iPhone with the built-in VPN** (`native/sideload/vpn/`): the sideload IPA carries its own packet tunnel,
   `PlugIns/iFizBoxVPN.appex` (`com.ryha.ifizbox.vpn`), the loopback idea of StosVPN: the phone is
   10.7.0.0 on the tunnel, only 10.7.0.1 is routed into it (no default route), and every packet is written back with

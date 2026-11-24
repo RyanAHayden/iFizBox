@@ -17,11 +17,11 @@ test("vpn_failed reads as the built-in VPN's own error, not a connect failure", 
   assert.doesNotMatch(`${why.title} ${why.message}`, /socket|Pair/);
 });
 
-test("vpn_failed is a route failure: Check Again as the fix, a short line for the status cell", () => {
+test("vpn_failed is a route failure: Fix checks again, a short line for the status cell", () => {
   const f = routeFailureOf(noNetwork(), ST);
   assert.ok(f);
   assert.equal(f.fix, "check");
-  assert.equal(f.button, "Check Again");
+  assert.equal(f.button, "Fix");
   assert.match(f.short, /Wi-Fi or cellular data/);
 });
 

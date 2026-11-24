@@ -70,9 +70,9 @@ _In code_: segments(), .scope-segments, ui.segments, NativeSegments
 _Avoid_: tab bar, filter tabs
 
 **Route Failure**:
-The last check or install on This iPhone couldn't reach the phone; it is shown as the broken state, with its fix, until a check passes
+The last check or install on This iPhone couldn't reach the phone; it is shown as the broken state, with its Fix button, until a check passes
 _Said_: installs being refused, pairing broken
-_On screen_: iPhone Refused / Couldn't Connect / Pair Again / No Network Extensions (red status, Home tile: Installs are failing · Fix in Settings)
+_On screen_: iPhone Refused / Couldn't Connect / Pair Again / No Network Extensions (red status, Fix button, Home tile: Installs are failing · Fix in Settings)
 _In code_: routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, ifizbox.routeFailure
 _Avoid_: pairing error, connection error
 

@@ -47,7 +47,7 @@ test("B416: a queue row whose first connect was reset: the red line, Pair Again,
   const err = await openPrepared({ id: "a", name: "Feather", token: "t", bundleId: "a" }, { tag: "a#1", native }).then(() => null, (x) => x);
   assert.equal(err.message, "This iPhone isn't paired with iFizBox any more. Pair again.");
   assert.equal(err.fallback.fix, "pair");
-  assert.equal(err.fallback.button, "Pair Again");
+  assert.equal(err.fallback.button, "Fix");
   assert.equal(JSON.parse(store.get("ifizbox.routeFailure")).fix, "pair");
   // an install that goes through clears it
   const ok = { call: async (m) => (m === "idevice.status" ? BUILTIN : m === "signing.open" ? { installed: true } : null) };
@@ -58,6 +58,8 @@ test("B416: a queue row whose first connect was reset: the red line, Pair Again,
     const bad = { call: async (m) => { if (m === "idevice.status") return BUILTIN; if (m === "signing.open") throw Object.assign(new Error(text), { code }); return null; } };
     const x = await openPrepared({ id: "a", name: "Feather", token: "t", bundleId: "a" }, { tag: "a#3", native: bad }).then(() => null, (y) => y);
     assert.doesNotMatch(`${x.message} ${JSON.stringify(x.fallback ?? {})}`, /pair|Socket/i);
-    assert.equal(store.has("ifizbox.routeFailure"), false);
+    // F409: kept too when it is the route's (the status cell says Fix)
+    assert.equal(JSON.parse(store.get("ifizbox.routeFailure") ?? "null")?.fix, x.fallback?.fix);
+    store.delete("ifizbox.routeFailure");
   }
 });
