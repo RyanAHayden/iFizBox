@@ -597,7 +597,8 @@ export function routeTile(mode, failure, choice) {
   if (mode !== "sideload" || choice !== "iphone" || !failure?.title) return null;
   return { stage: "close", kind: "route", title: failure.title, subtitle: ROUTE_TILE_SUBTITLE };
 }
-export function slotOrRoute(t, route) { return t?.stage === "gone" ? t : route ?? t; }
+// B396: the Install Switch's update (amber, installs still work) also gives way to a red one.
+export function slotOrRoute(t, route) { return t?.stage === "gone" || (t?.stage === "close" && route?.kind === "switch") ? t : route ?? t; }
 // F372 (user 2026-11-22): This iPhone in use, the phone on cellular and the Cellular Shortcuts not added (core
 // cellularWarning, from vpn.status `vpn`): the slot says so and opens Cellular Shortcuts. A failed install (routeTile)
 // says more, so it comes first.
@@ -610,7 +611,7 @@ export function cellularTile(mode, choice, vpn) {
 export const SWITCH_TILE_SUBTITLE = "An older one is in Shortcuts · Update"; // fits the tile at 320pt
 export function switchTile(mode, choice, vpn) {
   if (mode !== "sideload" || !switchOutdated(choice, { vpn })) return null;
-  return { stage: "close", kind: "switch", title: SWITCH_OLD.title, subtitle: SWITCH_TILE_SUBTITLE, href: format(settingsRoute(["installation", "shortcuts"])) };
+  return { stage: "soon", kind: "switch", title: SWITCH_OLD.title, subtitle: SWITCH_TILE_SUBTITLE, href: format(settingsRoute(["installation", "shortcuts"])) };
 }
 // vpn.status for the slot, only when This iPhone is the way in use (null otherwise, or when the shell has none)
 export async function slotVPN(mode, choice, native = nativeBridge()) {

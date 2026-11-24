@@ -133,7 +133,7 @@ test("B397: Test Connection's row stops on the page drawn again while it ran", a
 // B396: an outdated Install Switch (added, not yet known to do one trip) is offered up front; a current one or none never.
 const OLD = { switch: true }, NOW = { switch: true, trip: true, idle: true };
 const memory = (o = {}) => { const m = new Map(Object.entries(o)); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, v), removeItem: (k) => m.delete(k) }; };
-const { switchTile } = await import("./home.js");
+const { switchTile, slotOrRoute } = await import("./home.js");
 const { offerSwitchUpdate, mainPage, vpnTest, rememberStatus } = await import("./installroute.js");
 const { installOnDevice } = await import("../signing/route.js");
 
@@ -146,6 +146,8 @@ test("B396: Home, the status cell and Set Up: old says Update; current and none 
   assert.equal(core.installStatus("iphone", old, { failure: { title: "Pair Again", short: "x", fix: "pair" } }).state, "failed", "a failed check says more");
   const t = switchTile("sideload", "iphone", old.vpn);
   assert.equal(t.kind, "switch");
+  assert.equal(slotOrRoute({ stage: "soon" }, t), t);
+  for (const stage of ["close", "gone"]) assert.equal(slotOrRoute({ stage }, t).stage, stage, "a red signing warning first");
   assert.match(t.subtitle, /Update/);
   assert.match(t.href, /settings\/installation\/shortcuts$/);
   assert.equal(switchTile("sideload", "server", old.vpn), null);
@@ -196,7 +198,7 @@ test("B396: the rows that choose This iPhone offer it, and the status's action o
   globalThis.location = { hash: "" };
   try {
     for (const [shortcuts, n] of [[OLD, 1], [NOW, 0], [{}, 0]]) {
-      for (const where of ["main", "with", "test"]) {
+      for (const where of ["main", "with", "test", "pair"]) {
         forgetStatus();
         globalThis.localStorage = memory();
         const kept = { installRoute: "server" }, asked = [], calls = [];
@@ -212,7 +214,8 @@ test("B396: the rows that choose This iPhone offer it, and the status's action o
           const box = document.createElement("div");
           await drawInstallation(box, "with", { store: pickStore, native, alert });
           cell(box, "This iPhone").listeners.click.forEach((f) => f({}));
-        } else await vpnTest(native, alert, pickStore);
+        } else if (where === "pair") await drawInstallation(document.createElement("div"), "pair", { store: pickStore, native, alert }); // already paired
+        else await vpnTest(native, alert, pickStore);
         await flush();
         assert.equal(kept.installRoute, "iphone", where);
         assert.equal(asked.filter((t) => t === "Update Install Switch").length, n, `${where} ${JSON.stringify(shortcuts)}`);

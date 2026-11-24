@@ -995,9 +995,11 @@ async function drawPair(box, { store, native, alert, redraw }) {
       AUTO_CHECK.last = 0; // B316: paired again: the paired page checks at once and goes green on its own
       const test = visit === v && needsTestAfterPairing(lastStatus ?? await status(native)); // no remembered answer: read it
       if (test) v.testing = true; // before the store's set redraws the page
+      const used = store.get(ROUTE_KEY) !== "iphone";
       store.set(ROUTE_KEY, "iphone");
       if (test) return finishSetup(v, native, alert, store, redraw);
       if (visit === v) redraw();
+      if (used && visit === v) offerSwitchUpdate(alert, lastStatus ?? await status(native)); // B396: no test follows, which would offer it
     } catch (e) {
       if (visit !== v) return;
       pairing = null;
@@ -1026,7 +1028,7 @@ async function drawPair(box, { store, native, alert, redraw }) {
       store.set(ROUTE_KEY, "server"); v.started = false; recheck();
     },
   });
-  if (state === "paired" && store.get(ROUTE_KEY) !== "iphone") store.set(ROUTE_KEY, "iphone"); // picked This iPhone, already paired
+  if (state === "paired" && store.get(ROUTE_KEY) !== "iphone") { store.set(ROUTE_KEY, "iphone"); offerSwitchUpdate(alert, st); } // picked This iPhone, already paired
   const frag = pairSections(sections);
   const ci = sections.findIndex((s) => s.rows?.some((r) => r.label === STATUS_ACTIONS.check));
   if (ci >= 0) {
@@ -1045,9 +1047,11 @@ async function drawPair(box, { store, native, alert, redraw }) {
         await busy("Importing", () => call(native, "idevice.import", { data }));
         const test = visit === v && needsTestAfterPairing(lastStatus ?? await status(native));
         if (test) v.testing = true;
+        const used = store.get(ROUTE_KEY) !== "iphone";
         store.set(ROUTE_KEY, "iphone");
         if (test) return finishSetup(v, native, alert, store, recheck);
         recheck();
+        if (used && visit === v) offerSwitchUpdate(alert, lastStatus ?? await status(native)); // B396
       } catch (e) {
         alert({ title: "Not a Pairing File", message: e?.message || "That file isn't a pairing for this iPhone.", buttons: ["OK"] });
       }

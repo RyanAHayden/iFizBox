@@ -66,7 +66,7 @@ rows or change footers. Top to bottom:
   Checking… (Check Connection, dimmed); Pair This iPhone with Start Pairing; Pair Again (a check the phone turned down)
   opens Pairing, which starts pairing at once; No Network Extensions (the app's profile lacks them, so installs go
   through the Signing Server); Couldn't Connect and iPhone Refused, red, with their fix (Check Connection, Pairing, or the
-  Install Switch page). A pairing the phone dropped is redone on Pairing by itself. With Signing Server chosen: Ready to
+  Install Switch page). On This iPhone with the built-in VPN and an added Install Switch that is outdated (core `switchOutdated`; a state with no check run yet counts as outdated), the cell reads Update Install Switch, "The one in Shortcuts is an older one.", and its action Update Install Switch opens `installation/shortcuts`; a failed check takes priority over it. Home's warning slot shows it too, amber, until it's updated (a red signing warning comes first). A pairing the phone dropped is redone on Pairing by itself. With Signing Server chosen: Ready to
   Install through the server, Check Server.
   With the built-in VPN (the app's profile has Network Extensions): Ready to Install, "Straight onto this iPhone,
   through iFizBox VPN"; on cellular with the Install Switch not added, Add the Install Switch with Add Install
@@ -89,11 +89,11 @@ The pages under it:
   Pair This iPhone (Start / Done, opens Pairing), Test Connection (Test / Testing… / Connected: `vpn.test` turns
   the VPN on, connects once with the pairing and turns it off; the first time, iOS asks to allow the VPN
   configuration; Pairing runs it by itself right after pairing, with a "Testing the Connection…" spinner, before it
-  says Paired, so setup asks that once), Install Switch (Add / Checking… / Done, "Optional: cellular, and your VPN
-  back after"; Add opens Shortcuts' Add Shortcut directly with the iCloud link, and Done shows only once it has run;
+  says Paired, so setup asks that once), Install Switch (Add / Checking… / Update / Done, "Optional: cellular, and your VPN
+  back after"; Add opens Shortcuts' Add Shortcut directly with the iCloud link, Update (an older one) opens Install Switch's page, and Done shows only once it has run;
   Share Shortcut File and the "Shortcut Not Added" alert's Share File share the signed file instead), with a footer that says
-  the next step (pair, test, or add the Install Switch) or that it's set up. A failed check or install is
-  said there instead, red, with its fix row. Then **How It Works** › (`installation/how`: the six steps of one install
+  the next step (pair, test, or add the Install Switch) or that it's set up (or that the Install Switch is an older one). A failed check or install is
+  said there instead, red, with its fix row. Choosing This iPhone (a row tap on either page, Pairing, the first Test Connection that passes, or Check Connection that switches to it) asks once when the Install Switch is outdated: Later or Update, the text saying to delete the old one in Shortcuts first; Update opens the Install Switch page. An install that would run it (`switchWouldRun`) asks before it starts: Later goes on, Update stops and opens the page. Later is kept in localStorage `ifizbox.switchLater`: `choose` (only the next install that would run it asks) or `install` (no question again), removed once the Install Switch is current. Someone without an Install Switch never sees any of this. Then **How It Works** › (`installation/how`: the six steps of one install
   and Offline). **Install Switch** (`installation/shortcuts`, titled Install Switch): an Added row, a Share Shortcut File
   row while the Install Switch isn't added or needs Update (the signed file, as a backup), and Test Install
   Switch (`vpn.testSwitch` runs its start and end, turning cellular data off and back on and the VPN with it; its row's subtitle says which step it is on, and if the Install Switch doesn't run the test fails and your VPN stays on). Phones
