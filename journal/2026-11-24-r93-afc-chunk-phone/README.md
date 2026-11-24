@@ -14,3 +14,5 @@ No MB/s measured. Nothing new beyond R91: desktop USB 150 MB/s, the phone's own 
 
 ## Not verified
 - Every variant (4 MB, 8 MB, pipelined) on the phone: no build possible (MBA unreachable, and no switch exists yet).
+
+R93 itself stays the measuring task: it waits for T79 (`--after T79`), and needs the MBA for the build.
