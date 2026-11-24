@@ -149,7 +149,7 @@ test("Check Connection: a connect failure names the VPN; early eof is Pair Again
   assert.equal(eof.title, "Pair Again");
   assert.equal(eof.again, true);
   assert.ok(!eof.unusable, "an early eof offers Pair Again but doesn't forget the pairing by itself");
-  assert.ok(eof.message.includes(BUILTIN_VPN));
+  assert.match(eof.message, /isn't paired with .* any more\. Pair again\.$/);
   assert.ok(earlyEOF("Socket(UnexpectedEof)"));
   assert.equal(verifyFailure(cf("Socket(Kind(UnexpectedEof))")).title, "Pair Again");
   const c = verifyFailure(cf("timeout"), ST);

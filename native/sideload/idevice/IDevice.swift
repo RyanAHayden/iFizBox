@@ -651,8 +651,11 @@ enum IDevice {
     /// Socket(UnexpectedEof "early eof") from tunnel_create_rppairing; remotepairingd's verifyManualPairing dropping
     /// it, R55 on the iPhone 15 Pro): a pairing it no longer accepts. Matched as the page does (core/installroute.js
     /// earlyEOF). Not folded into connectFailure: on a reconnect mid-install it stays a drop that is tried again.
+    /// B416: a reset is the same: with no host paired, remotepairingd takes the TCP connection, then resets it
+    /// (Socket(Os { code: 54, kind: ConnectionReset, … })); the page's connectReset.
     static func isEarlyEOF(_ e: Failure) -> Bool {
-        e.code == "connect_failed" && (e.text.contains("UnexpectedEof") || e.text.localizedCaseInsensitiveContains("early eof"))
+        e.code == "connect_failed" && (e.text.contains("UnexpectedEof") || e.text.localizedCaseInsensitiveContains("early eof")
+            || e.text.contains("ConnectionReset") || e.text.localizedCaseInsensitiveContains("connection reset by peer"))
     }
 
     /// B274: the install's first connect ending in isEarlyEOF, in the words Check Connection uses for it (Pair Again).
@@ -979,6 +982,7 @@ enum IDevice {
                 // B274: Pair Again, not the socket error (the row and its log say what to do)
                 let via = LocalVPN.name
                 ilog("first connect reset during pair-verify through \(via): \(f.text); the pairing is stale")
+                note("The first connection closed: \(f.errorDescription ?? f.text)") // B416: the raw text, grey
                 throw pairAgain(f, via: via)
             } catch let f as Failure where run.connected && HereRecheck.shouldReconnect(code: f.code, lib: f.lib, reconnecting: firstDrop != nil) {
                 attempt += 1

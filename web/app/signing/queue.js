@@ -26,7 +26,7 @@ import { recordSelfUpdate } from "../core/selfupdate.js";
 import { showAlert } from "../nav/alert.js";
 import { askInsecure, bridge, keepIpaHash, refusing, storageOf } from "./common.js";
 import { getServer, defaultServer } from "./identity.js";
-import { serverFallback } from "../core/installroute.js"; // F366
+import { serverFallback, rememberRouteFailure, clearRouteFailure } from "../core/installroute.js"; // F366
 import { chooseRoute, holdApp } from "./route.js";
 import { withSavedIpa, customInstallSave, listedOf } from "../core/appqueue.js"; // F379
 export { hereLabel, shownName, finishHere } from "./common.js";
@@ -141,11 +141,13 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
       }, { tag, signal });
     // F380: the IPA the shell kept in My IPAs for this install (keepInLibrary), for the save after it lands
     if (opened?.libraryFile) await keptIpa(row?.job?.url, opened.libraryFile);
+    if (route.route) clearRouteFailure(); // B416: an install went through
     if (route.route) return { installed: opened?.installed ?? true, expires: opened?.expires ?? null };
   } catch (e) {
     const err = rowError(e, name);
     // F366: with idevice.status, so the failure's words follow the VPN's state
     const fallback = route ? serverFallback(e, route, await routeStatus(route, native)) : null;
+    if (fallback?.fix === "pair") rememberRouteFailure(fallback); // B416: Pair Again's page checks it, then pairs
     throw fallback ? Object.assign(err, { fallback }) : err;
   }
   progress("asking", 0);

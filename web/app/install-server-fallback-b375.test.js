@@ -38,3 +38,26 @@ test("openPrepared: a This iPhone row that failed reads idevice.status for its f
   assert.equal(err.fallback.fix, "check");
   assert.ok(calls.lastIndexOf("idevice.status") > calls.indexOf("signing.open"), "read after the failure");
 });
+
+test("B416: a queue row whose first connect was reset: the red line, Pair Again, and the kept failure", async () => {
+  forgetRoute();
+  store.delete("ifizbox.routeFailure");
+  const e = Object.assign(new Error('Socket(Os { code: 54, kind: ConnectionReset, message: "Connection reset by peer" }) (1)'), { code: "connect_failed" });
+  const native = { call: async (m) => { if (m === "idevice.status") return BUILTIN; if (m === "signing.open") throw e; return null; } };
+  const err = await openPrepared({ id: "a", name: "Feather", token: "t", bundleId: "a" }, { tag: "a#1", native }).then(() => null, (x) => x);
+  assert.equal(err.message, "This iPhone isn't paired with iFizBox any more. Pair again.");
+  assert.equal(err.fallback.fix, "pair");
+  assert.equal(err.fallback.button, "Pair Again");
+  assert.equal(JSON.parse(store.get("ifizbox.routeFailure")).fix, "pair");
+  // an install that goes through clears it
+  const ok = { call: async (m) => (m === "idevice.status" ? BUILTIN : m === "signing.open" ? { installed: true } : null) };
+  await openPrepared({ id: "a", name: "Feather", token: "t", bundleId: "a" }, { tag: "a#2", native: ok });
+  assert.equal(store.has("ifizbox.routeFailure"), false);
+  // a timeout, a mid-install drop: not the pairing
+  for (const [code, text] of [["connect_failed", "Socket(Kind(TimedOut)) (1)"], ["upload_failed", e.message], ["timeout", "no answer from iOS for 30 s"]]) {
+    const bad = { call: async (m) => { if (m === "idevice.status") return BUILTIN; if (m === "signing.open") throw Object.assign(new Error(text), { code }); return null; } };
+    const x = await openPrepared({ id: "a", name: "Feather", token: "t", bundleId: "a" }, { tag: "a#3", native: bad }).then(() => null, (y) => y);
+    assert.doesNotMatch(`${x.message} ${JSON.stringify(x.fallback ?? {})}`, /pair|Socket/i);
+    assert.equal(store.has("ifizbox.routeFailure"), false);
+  }
+});

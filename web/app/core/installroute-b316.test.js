@@ -5,8 +5,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { verifyFailure, routeFailureOf, installStatus, routeFailure, rememberRouteFailure, clearRouteFailure,
-  failureStatus, FAILURE_KEY, BUILTIN_VPN } from "./installroute.js";
-import { deviceError } from "./signing.js";
+  failureStatus, FAILURE_KEY, BUILTIN_VPN, PAIR_AGAIN_LINE, LOST_LINE, hasSocketText, plainSocket, pairFooter, vpnTestResult, serverFallback } from "./installroute.js";
+import { deviceError, loggedBridge } from "./signing.js";
 
 const refused = Object.assign(new Error("refused: this iPhone refused RemotePairing on port 49152: it no longer has this pairing. Pair again"), { code: "refused" });
 const FINE = { paired: "rp", otherVPN: false, vpn: { available: true, tested: true, cellular: false } };
@@ -99,4 +99,75 @@ test("every failure's status subtitle fits two lines at 320pt", () => {
       assert.ok(f.short.length <= 70, `${f.short} (${f.short.length})`);
     }
   }
+});
+
+// ---- B416: a first connect the phone resets: no pairing any more. Raw socket text stays in the grey log lines.
+const RESET = 'Socket(Os { code: 54, kind: ConnectionReset, message: "Connection reset by peer" }) (1)';
+const coded = (code, text, prefix = true) => Object.assign(new Error(prefix ? `${code}: ${text}` : text), { code });
+
+test("B416: the first connect reset: the red line, the alert, the kept failure and fix=pair", () => {
+  for (const e of [coded("connect_failed", RESET), coded("connect_failed", RESET, false),
+    coded("pair_again", "this iPhone answered through the VPN, then closed the connection")]) {
+    const d = deviceError(e, "Feather"); // the row's red line (signing/queue.js rowError) and the alert
+    assert.equal(d.message, PAIR_AGAIN_LINE);
+    assert.equal(d.title, "Pair Again");
+    assert.equal(d.fix, "pair");
+    assert.equal(d.button, "Pair Again");
+    const storage = memory();
+    rememberRouteFailure(routeFailureOf(e, FINE), { storage });
+    const f = routeFailure(storage);
+    assert.deepEqual([f.title, f.message, f.fix, f.button], ["Pair Again", PAIR_AGAIN_LINE, "pair", "Pair Again"]);
+    assert.equal(failureStatus(f).action, "pair");
+    assert.ok(!hasSocketText(JSON.stringify(f)) && f.short.length <= 70);
+    assert.equal(serverFallback(e, { route: "idevice" }, FINE).button, "Pair Again");
+    assert.equal(verifyFailure(e, FINE).again, true);
+    assert.ok(!verifyFailure(e, FINE).unusable, "checked once more before it is forgotten");
+    assert.equal(vpnTestResult(null, e).title, "Pair Again");
+  }
+});
+
+test("B416: a timeout or a mid-install drop never says Pair Again", () => {
+  const errs = [coded("connect_failed", "Socket(Kind(TimedOut)) (1)"), coded("timeout", "no answer from iOS for 30 s"),
+    coded("upload_failed", RESET), coded("install_failed", RESET), coded("install_failed", "Socket(Kind(UnexpectedEof)) (1)"),
+    coded("service_failed", RESET),
+    coded("upload_failed", `lost the connection to iOS during the copy (102.0 MB of 351.5 MB) and couldn't get it back (${RESET})`)];
+  for (const e of errs) {
+    for (const words of [deviceError(e, "Feather"), verifyFailure(e, FINE), routeFailureOf(e, FINE) ?? {}, vpnTestResult(null, e)]) {
+      const s = JSON.stringify(words);
+      assert.doesNotMatch(s, /pair/i, `${e.message}: ${s}`);
+      assert.ok(!hasSocketText(s), s);
+    }
+  }
+});
+
+test("B416: no raw socket text in a red line or an alert, whatever the socket error", () => {
+  const raws = [RESET, "Socket(Kind(UnexpectedEof)) (1)", 'Socket(Os { code: 32, kind: BrokenPipe, message: "Broken pipe" }) (1)',
+    'Socket(Os { code: 65, kind: HostUnreachable, message: "No route to host" }) (1)', 'InternalError("connect: Operation Timeout") (16)',
+    "InternalError(\"connect: device socket io failed\") (16)", "RemotePairing(Socket(Kind(TimedOut))) (103)"];
+  for (const code of ["connect_failed", "refused", "pairing_rejected", "bad_pairing", "upload_failed", "install_failed", "service_failed", "timeout"]) {
+    for (const raw of raws) {
+      for (const text of [raw, `it broke (${raw}). Try again`]) {
+        for (const e of [coded(code, text), coded(code, text, false)]) {
+          for (const w of [deviceError(e, "Feather"), routeFailureOf(e, FINE) ?? {}, verifyFailure(e, FINE), vpnTestResult(null, e)]) {
+            assert.ok(!hasSocketText(`${w.title} ${w.message} ${w.short}`), JSON.stringify(w));
+          }
+        }
+      }
+      assert.ok(!hasSocketText(pairFooter({ error: raw })));
+    }
+  }
+  assert.equal(plainSocket(RESET), LOST_LINE);
+  assert.equal(plainSocket(`Lost the connection during the copy (102.0 MB of 351.5 MB) and couldn't get it back (${RESET}). iOS may still have installed it`),
+    "Lost the connection during the copy (102.0 MB of 351.5 MB) and couldn't get it back. iOS may still have installed it");
+  assert.equal(plainSocket("iOS refused to install it (203)"), "iOS refused to install it (203)");
+});
+
+test("B416: a kept log keeps the raw text in a plain line, with the Error line in words", async () => {
+  const lines = [];
+  const store = { start: () => ({ line: (l) => lines.push(l), set() {}, end() {} }) };
+  const e = coded("connect_failed", RESET, false);
+  const native = loggedBridge({ call: () => Promise.reject(e) }, store);
+  await assert.rejects(native.call("signing.install", { url: "x" }));
+  assert.ok(lines.includes(RESET));
+  assert.ok(lines.includes(`Error: ${PAIR_AGAIN_LINE}`));
 });

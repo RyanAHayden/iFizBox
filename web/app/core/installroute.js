@@ -227,7 +227,7 @@ export const pinText = (pin) => (/^\d{6}$/.test(pin || "") ? `${pin.slice(0, 3)}
 
 // The step or error line under Cancel while pairing waits.
 export function pairFooter(p) {
-  if (p.error) return `That try didn't pair: ${p.error} Tap Pair on the iPhone to try again.`;
+  if (p.error) return `That try didn't pair: ${plainSocket(p.error)} Tap Pair on the iPhone to try again.`;
   return p.text || "Starting…";
 }
 
@@ -236,6 +236,33 @@ export function pairFooter(p) {
 // says Paired (R54, iPhone 15 Pro). Unlike a refusal it isn't certain (a tunnel reset for another
 // reason reads the same), so it offers Pair Again without forgetting the pairing by itself (no `unusable`).
 export const earlyEOF = (raw) => /UnexpectedEof|early eof/i.test(raw);
+// B416: the same with a reset: no host paired, remotepairingd takes the TCP connection, then resets it (B246).
+export const connectReset = (raw) => /ConnectionReset|connection reset by peer/i.test(raw);
+// A first connect the phone answered and then dropped: the pairing is gone. Only the connect's own code: a drop
+// mid-install has the code of its step.
+export const droppedPairing = (code, raw) => code === "pair_again" || (code === "connect_failed" && (earlyEOF(raw) || connectReset(raw)));
+export const PAIR_AGAIN_LINE = `This iPhone isn't paired with ${NAME} any more. Pair again.`;
+
+// B416: idevice's own socket text (Rust debug: Socket(Os { code: 54, … }), Socket(Kind(TimedOut)), InternalError("…"))
+// never shows in a red line or an alert: the grey log lines keep it. plainSocket(text) is `text` without it: a
+// parenthesis around it goes ("lost the connection … (Socket(…) (1)). iOS may …"); nothing but it becomes LOST_LINE.
+export const LOST_LINE = "The connection to this iPhone was lost. Try again.";
+const SOCKET = /\b(?:Socket|InternalError|RemotePairing|CdTunnel)\(|\bOs \{|\bKind\(|UnexpectedEof|\bearly eof\b|\bos error \d+|connection (?:reset|refused|closed|aborted)\b|broken pipe|no route to host|network is (?:unreachable|down)|operation timed? ?out/i;
+export const hasSocketText = (text) => SOCKET.test(String(text ?? ""));
+export function plainSocket(text) {
+  const t = String(text ?? "");
+  if (!hasSocketText(t)) return t;
+  let out = "";
+  for (let i = 0; i < t.length; i++) {
+    if (t[i] === "(" && (i === 0 || /\s/.test(t[i - 1]))) {
+      let end = i, depth = 0;
+      for (; end < t.length; end++) { if (t[end] === "(") depth++; else if (t[end] === ")" && --depth === 0) break; }
+      if (hasSocketText(t.slice(i + 1, end))) { out = out.trimEnd(); i = end; continue; }
+    }
+    out += t[i];
+  }
+  return hasSocketText(out) || !out.trim() ? LOST_LINE : out.trim();
+}
 
 // ---- B316: a broken route, said for what it is and kept until a check passes
 // The codes a connect to this iPhone fails with (IDevice.swift).
@@ -265,7 +292,7 @@ export function routeFailureOf(err, st = null) {
   if (developerModeFailure(err)) return null;
   const why = verifyFailure(err, st);
   const fix = why.fix ?? (why.again ? "pair" : "check");
-  const short = why.short ?? (why.again ? "Installs are refused. Pair again." : "Installs can't reach this iPhone.");
+  const short = why.short ?? (droppedPairing(code, raw) && why.again ? "Not paired any more. Pair again." : why.again ? "Installs are refused. Pair again." : "Installs can't reach this iPhone.");
   const button = why.button ?? (fix === "pair" ? "Pair Again" : "Check Again");
   return { title: why.title, message: why.message, short, fix, button };
 }
@@ -322,14 +349,15 @@ export function verifyFailure(err, st = null) {
   if (code === "refused" || code === "pairing_rejected" || (code === "connect_failed" && /connection refused/i.test(raw))) {
     return { title: "Pair Again", message: `This iPhone no longer accepts ${NAME}'s pairing, so every connection is refused. Pair again.`, again: true, unusable: true };
   }
-  if (code === "connect_failed" && earlyEOF(raw)) {
-    // (an EOF is read on a socket that was open: the TCP connect to RemotePairing had worked, so the route did too)
-    return { title: "Pair Again", message: `This iPhone answered through ${BUILTIN_VPN}, then closed the connection: it no longer accepts ${NAME}'s pairing. Pair again.`, again: true };
+  if (droppedPairing(code, raw)) {
+    // (an EOF or a reset comes on a socket that was open: the TCP connect to RemotePairing had worked, so the route did too)
+    return { title: "Pair Again", message: PAIR_AGAIN_LINE, again: true };
   }
-  if (code === "connect_failed") { // F372: the shell had its own VPN on; nothing to turn on
+  // B416: a timeout, or a socket that failed any other way, isn't the pairing's fault
+  if (code === "connect_failed" || code === "timeout" || (code !== "bad_pairing" && hasSocketText(raw))) { // F372: the shell had its own VPN on; nothing to turn on
     return { title: "Couldn't Connect", message: `${BUILTIN_VPN} was on, but ${NAME} couldn't reach this iPhone through it. Try again.${st?.vpn?.cellular ? ` ${CELL_LINE}` : ""}`, again: false };
   }
-  return { title: "Pairing Didn't Work", message: `This iPhone didn't accept the pairing (${raw || "no answer"}). Pair again.`, again: true };
+  return { title: "Pairing Didn't Work", message: `This iPhone didn't accept the pairing (${hasSocketText(raw) ? "the connection was lost" : raw || "no answer"}). Pair again.`, again: true };
 }
 
 // Leaving This iPhone's page while a step runs asks first (screens/installroute.js guards Back, the tab bar and the

@@ -9,7 +9,7 @@ const mem = new Map();
 globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
 globalThis.document = fakeDocument();
 
-const { mainPage, recheckPairing, recheckHooks, hudHooks, turnedDown, AUTO_CHECK, forgetStatus } = await import("./installroute.js");
+const { mainPage, recheckPairing, recheckHooks, hudHooks, turnedDown, rechecksPairing, AUTO_CHECK, forgetStatus } = await import("./installroute.js");
 const { clearRouteFailure, verifyFailure } = await import("../core/installroute.js");
 const huds = [];
 hudHooks.show = (l) => { huds.push(l); return () => {}; };
@@ -37,8 +37,10 @@ test("turnedDown: refused, pair_again, an early EOF or an invalidated channel; n
   const again = fail("pair_again: this iPhone answered through the VPN, then closed the connection", "pair_again");
   assert.equal(turnedDown(why(again), again), true);
   assert.equal(turnedDown(why(INVALIDATED), INVALIDATED), true);
+  const reset = fail('Socket(Os { code: 54, kind: ConnectionReset, message: "Connection reset by peer" }) (1)', "connect_failed"); // B416
+  assert.equal(turnedDown(why(reset), reset), true);
   const timeout = fail("timeout: no answer from iOS for 30 s", "timeout");
-  assert.equal(turnedDown(why(timeout), timeout), false, "Pairing Didn't Work's catch-all, but not the pairing's fault");
+  assert.equal(turnedDown(why(timeout), timeout), false, "not the pairing's fault");
   assert.equal(turnedDown({ late: true }, null), false);
   assert.equal(turnedDown(null, null), false);
 });
@@ -120,4 +122,12 @@ test("Install Apps With's check of the kept pairing spins the Pairing row, not t
   assert.equal(pairingRow({}).spin, undefined);
   const src = (await import("node:fs")).readFileSync(new URL("./installroute.js", import.meta.url), "utf8");
   assert.match(src, /if \(v === "iphone" && v !== choice\) recheckPairing\(native, alert, redraw, \{ spin: pairSpin[, ]/);
+});
+
+test("B416: Pairing checks the kept pairing first only when the last failure was the pairing's, once a visit", () => {
+  assert.equal(rechecksPairing({}, { fix: "pair" }), true);
+  assert.equal(rechecksPairing({}, { fix: "check" }), false);
+  assert.equal(rechecksPairing({}, null), false);
+  assert.equal(rechecksPairing({ rechecked: true }, { fix: "pair" }), false);
+  assert.equal(rechecksPairing({ started: true }, { fix: "pair" }), false, "it just paired");
 });
