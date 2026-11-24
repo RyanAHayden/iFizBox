@@ -819,7 +819,7 @@ function drawAppList(appView) {
 }
 
 // The apps list's table: the sections' rows, F91's extra rows, then `more` (the site's dpkg row). B36: every app row
-// is a link (the package page or the installed-app page, so it highlights on press), carries its signing.installed
+// is a link (its Details, so it highlights on press), carries its signing.installed
 // record, swipes to Delete (not iFizBox's own) and holds for the sheet (`hold`: attachRowHold's options).
 // F222: `manage` (the root without a jailbreak) gives each row Manage can pick its select circle.
 // `view`: the page's apps view (C25), whose Edit, Manage and picks the rows follow.
