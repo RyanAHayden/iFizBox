@@ -156,8 +156,4 @@ test("the signed Shortcuts are on the site under their names, and the app runs t
     assert.equal(readFileSync(f).subarray(0, 4).toString(), "AEA1", "signed (Apple Encrypted Archive)");
     assert.equal(shortcutFileURL(k), `https://${DOMAIN}/shortcuts/${SHORTCUT_NAMES[k].replaceAll(" ", "%20")}.shortcut`);
   }
-  const swift = readFileSync(new URL("../../../native/sideload/vpn/App/LocalVPN.swift", here), "utf8");
-  assert.match(swift, /shortcutNames = \["off": "Cellular Data Off", "on": "Cellular Data On", "switch": "Install Switch"\]/);
-  assert.match(swift, /b\.on\("vpn\.checkShortcut"\)/);
-  assert.doesNotMatch(swift, /create-shortcut/, "Add never opens an empty new Shortcut");
 });

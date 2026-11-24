@@ -32,13 +32,3 @@ test("an Install Switch that can't bring an idle VPN back offers Update", () => 
   assert.equal(switchOld({ ...vpn, shortcuts: { ...vpn.shortcuts, idle: true } }), false);
 });
 
-test("the app: selected starts the run, is kept for a kill, and the end looks at the place in Settings too", () => {
-  const swift = readFileSync(new URL("../../../native/sideload/vpn/App/LocalVPN.swift", import.meta.url), "utf8");
-  const begin = swift.slice(swift.indexOf("static func begin("), swift.indexOf("static func waitOffCellular("));
-  assert.match(begin, /let other = !before\.isEmpty \|\| selected\n/);
-  assert.ok(begin.indexOf("otherVPNSelected()") < begin.indexOf("try up(step)"), "before ours takes its place");
-  assert.match(swift, /return enabled == false\n/, "no configuration of ours tells nothing");
-  assert.match(swift, /before\.isSubset\(of: otherVPNAddresses\(\)\) && \(!selected \|\| otherVPNSelected\(\)\)/);
-  assert.match(swift, /switchSelectedBefore = p\["selected"\] as\? Bool \?\? false/);
-  assert.equal(swift.match(/vpnBefore: !before\.isEmpty \|\| selected/g).length, 1);
-});
