@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "0.29.0",
+          "date": "2026-11-24T17:01:26Z",
+          "localizedDescription": "Installing on This iPhone now says what it is doing at each step.\nA lost pairing is spotted early, with a Fix and Pair Again.\nHome shows a Pair This iPhone tile until you pair.\nRestore My VPN brings your own VPN back after installs.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.29.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.29.0/iFizBox.ipa",
+          "size": 31878891,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.28.0",
           "date": "2026-11-24T13:15:40Z",
           "localizedDescription": "On cellular, installs ask for Airplane Mode after signing.\nInstall on an app's page goes straight to the queue.\nConfirm runs apps and tweaks together in one go.\nApps signed here no longer crash when started while locked.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.28.0",
@@ -250,14 +258,6 @@
           "localizedDescription": "Fixes installs and updates stuck on a blank Running page.\nIn the sideload app every install, update and re-sign run stopped on \"Preparing\" with no buttons. If 0.17.1 or 0.17.2 hangs updating itself, install this version from ifizbox.com in Safari.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.17.3",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.17.3/iFizBox.ipa",
           "size": 28499056,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.17.2",
-          "date": "2026-11-20T22:31:21Z",
-          "localizedDescription": "Fixes popup menus (Modify and others) whose buttons did nothing.\nAction sheets in 0.17.1 stayed on screen with dead buttons after a tap, and a second tap stacked another one. Also includes everything merged since 0.17.1.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.17.2",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.17.2/iFizBox.ipa",
-          "size": 28497479,
           "minOSVersion": "15.0"
         }
       ]
