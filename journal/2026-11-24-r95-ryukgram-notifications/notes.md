@@ -6,6 +6,7 @@ Question: RyukGram (Instagram 456, SideDrop ad hoc, App ID com.ryha.sideload) sh
 - Suspect 2 (keychain) is ruled out on this setup. Both app and extension end up in the same keychain group.
 - Suspect 1 (app group files and suite) is the likely cause. The data placement shows it, but no extension process ran and no real push was sent, so it is not observed.
 - Fix to file: keep the app's own container as master and mirror what the extension reads into the place zxPluginsInject gives it.
+- Limits of that verdict (spec review): "likely" is a hypothesis, not a finding. The shim plist on this phone already holds the keys the extension names (auth device storage, device ID, mobile config) because this task's own zx-only runs (N, K) wrote it; so P5.txt shows divergence only for keys that look unrelated to push (install date, cleanup flag, revert-checker cache; usdid and privacy_flow_detection in the family suite). That a fresh install under the group fix leaves the shim plist without the auth keys follows from the code (the app writes only its own suite) but was not run. The mirror's compatibility with B227, B327 and B393 is by design (own container stays master, isolate pin unchanged), not tested. The follow-up must therefore start with a real push on a phone, with and without the mirror, before it is called fixed.
 
 ## Method
 - Phone: iPhone 15 Pro, iOS 27.0.1. Instagram 456 signed in to the owner's own account. Nothing signed out. Only counts, key names and paths were read, never values.
