@@ -691,7 +691,6 @@ enum IDevice {
         private let second: Bool // a second look beside the install's own session: rides on its VPN
         let kind: Kind
         private var builtIn = false // through the built-in VPN, held (LocalVPN.begin) until deinit
-        private var dataOff = false // Cellular Data Off ran for this connect; On runs once connected
         var via: String { LocalVPN.name }
 
         /// Where to connect for `port`: the built-in VPN turns on here and the connect goes to 10.7.0.1 through it. A
@@ -704,7 +703,7 @@ enum IDevice {
             watch.begin("turning on \(LocalVPN.name)", Limit.tunnel)
             let w = watch
             do {
-                dataOff = try LocalVPN.begin { w.alive($0) }
+                try LocalVPN.begin { w.alive($0) }
                 builtIn = true
                 return (address, port)
             } catch {
@@ -775,8 +774,6 @@ enum IDevice {
                 ilog("lockdown connected, heartbeat on")
                 startHeartbeat()
             }
-            // F372: connected: Cellular Data back on (an open connection keeps going, R72)
-            if dataOff { LocalVPN.connected(dataOff: true); dataOff = false }
         }
 
         /// "RSD <uuid>, 63 services; AFC on 52012, installation_proxy on 52040", for the log.
@@ -860,7 +857,7 @@ enum IDevice {
             if let h = handshake { rsd_handshake_free(h) }
             if let a = adapter { adapter_free(a) }
             if let p = provider { idevice_provider_free(p) }
-            if builtIn { LocalVPN.connected(dataOff: dataOff); LocalVPN.end() } // F372: data back on if a connect failed
+            if builtIn { LocalVPN.end() }
         }
     }
 
@@ -943,7 +940,7 @@ enum IDevice {
         let run = HereRun(ipa: ipa, size: size, remote: "\(stagingDir)/\(UUID().uuidString).ipa", bundleID: bundleID, version: version)
         var attempt = 0
         var firstDrop: Failure?
-        LocalVPN.installBegan() // B395: its reconnects share one queue, so one run of the Install Switch
+        LocalVPN.installBegan() // B395: its reconnects share one queue, so the VPN stays on through them
         defer { LocalVPN.installEnded() }
         while true {
             do {

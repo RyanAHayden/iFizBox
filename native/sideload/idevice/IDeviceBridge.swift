@@ -147,9 +147,7 @@ enum IDeviceBridge {
             if let e = earlier { Apt.reply(e, nil, "canceled: pairing stopped") }
             Apt.reply(c, ["ok": true], nil)
         }
-        // B395: `quiet`: a check nobody tapped never opens Shortcuts
         b.on("idevice.verify") { c in run(c) {
-            if c.params["quiet"] as? Bool == true, LocalVPN.switchWouldRun() { throw IDevice.Failure(code: "switch_needed", text: "it would open Shortcuts") }
             return ["ok": true, "kind": try IDevice.verify().rawValue]
         } }
         b.on("idevice.forget") { c in
