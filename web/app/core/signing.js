@@ -421,7 +421,7 @@ export function deviceSummary(identity, { now = new Date(), locale, timeZone } =
 // app's own IPA to the server) and "handoff" (the install link going to iOS): nothing installs yet, so neither says so.
 export const HANDOFF = "Handing to iOS", UPLOADING = "Uploading";
 const PHASES = { downloading: "Downloading", reading: "Reading", signing: "Signing", installing: "Installing",
-  uploading: UPLOADING, handoff: HANDOFF,
+  uploading: UPLOADING, handoff: HANDOFF, prompt: "Waiting for iOS",
   here: "Connecting to this iPhone", airplane: AIRPLANE_ON, airplaneOff: AIRPLANE_OFF, appWait: APP_WAIT, networkWait: NETWORK_WAIT };
 export function phaseLabel(ev) {
   const name = PHASES[ev?.phase];
@@ -679,6 +679,7 @@ export function resignLabel(ev) {
   if (!ev || ev.count == null) return null;
   const which = `${ev.name || "App"} (${Number(ev.index) + 1} of ${ev.count})`;
   if (ev.phase === "handoff") return `Handing ${which.replace(/( \(\d+ of \d+\))$/, " to iOS$1")}`; // B424
+  if (ev.phase === "prompt") return `Waiting for iOS: ${which}`;
   return `${phaseLabel(ev) ?? "Re-signing"} ${which}`;
 }
 
@@ -724,7 +725,7 @@ export function callWithStall(native, method, params, onEvent = () => {}, { limi
       if (over) return;
       if (ev?.phase) {
         last = ev;
-        if (ev.phase === "installing" || ev.phase === "handoff" || ev.phase === "uploading" || ev.phase === "airplane" || ev.phase === "appWait" || ev.phase === "networkWait") stop(); else arm(); // F368: the shell times the airplane wait
+        if (ev.phase === "installing" || ev.phase === "handoff" || ev.phase === "prompt" || ev.phase === "uploading" || ev.phase === "airplane" || ev.phase === "appWait" || ev.phase === "networkWait") stop(); else arm(); // F368: the shell times the airplane wait
       }
       onEvent(ev);
     })).then((r) => { if (!over) { over = true; stop(); resolve(r); } },

@@ -116,7 +116,7 @@ test("callWithStall: iOS's install isn't timed, the next app's download is, and 
   const native = { call: (m, p, on) => { push = on; return new Promise((r) => { answer = r; }); } };
   const run = callWithStall(native, "signing.resignAll", {}, () => {}, { later: t.later, clear: t.clear });
   await Promise.resolve();
-  for (const phase of ["uploading", "handoff", "installing"]) {
+  for (const phase of ["uploading", "handoff", "prompt", "installing"]) {
     push({ index: 0, count: 2, name: "A", phase, progress: 0 });
     assert.equal(t.list.size, 0, phase);
   }

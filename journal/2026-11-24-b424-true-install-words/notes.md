@@ -20,6 +20,8 @@
 |---|---|---|
 | HUD at the handoff (Signing Server route, before the link) | Installing | Handing to iOS |
 | Re-sign All step at the handoff | Installing X (i of n) | Handing X to iOS (i of n) |
+| Re-sign All once iOS has the link (phase "prompt") | Installing X (i of n) | Waiting for iOS: X (i of n) |
+| Install server log, whole IPA served | iOS has the whole IPA | The whole IPA is sent to iOS |
 | iFizBox's own update upload (hostAndOpen) | Installing | Uploading |
 | HUD once the install link is open | Installing | Waiting for iOS |
 | My IPAs, signed copy starts | Installing | Preparing |

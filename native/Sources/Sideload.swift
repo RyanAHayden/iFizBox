@@ -572,9 +572,10 @@ enum Sideload {
         // F343: an install that fails drops the IPA staged for it; the one kept before stays
         let answered = { (r: Result<(SignedApp, SignedRecord), Error>) in
             if case .failure = r { SignBridge.queue.async { dropOriginal(app.bundleID, sha256: record.sha256) } }
+            else if !servers.local { emit("prompt", 0) } // B424: iOS has the link; Re-sign All waits here
             opened(r)
         }
-        if servers.local { // "Installing on this iPhone" (phase "here"), not iOS's own install
+        if servers.local { // installd through the built-in VPN (phase "here"), not iOS's own install
             installHere(output, app: app, record: record, emit: emit, log: log, job: job, opened: answered, served: served, step: step)
             return
         }
@@ -791,7 +792,7 @@ enum Sideload {
             served?(ok)
         }
         var route = InstallServer.Route(type: "application/octet-stream", body: .file(output), log: serverLog,
-                                        onServed: { serverLog("iOS has the whole IPA"); Handoff.served(bid); end(true) })
+                                        onServed: { serverLog("The whole IPA is sent to iOS"); Handoff.served(bid); end(true) })
         // B89: iOS froze iFizBox while it served: the IPA goes to the Signing Server too, and iOS gets that link
         let note = { (s: String) in InstallLog.say(bid, s) }
         route.note = note

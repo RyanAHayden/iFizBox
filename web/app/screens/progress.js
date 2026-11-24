@@ -11,8 +11,8 @@
 //   log.cancel()                    drops the frame (the page closed)
 //   log.pending                     lines waiting
 //
-// A raw line that repeats the one before it with only its numbers changed ("Sent bytes 0-65535; iOS has 65536 of
-// 40000000 bytes", "Downloading 45%") replaces it: in the queue if it hasn't gone out, else the line on screen gets
+// A raw line that repeats the one before it with only its numbers changed ("Sent bytes 0-65535; 65536 of
+// 40000000 bytes sent to iOS","Downloading 45%") replaces it: in the queue if it hasn't gone out, else the line on screen gets
 // the new text (one text node, on the frame). While held() is true (a selection in the log: selectionIn) nothing is
 // appended or changed; release() sends it all in one go once the selection ends. No layout reads here.
 // SPDX-License-Identifier: GPL-3.0-or-later

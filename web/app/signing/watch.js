@@ -28,7 +28,7 @@ export const installSteps = (app) => [
 export const installStage = (s) => (s?.finished || s?.started ? 2 : s?.manifest ? 1 : 0);
 // B424: no word from the Worker on what iOS asked for: only the upload is known.
 export const UPLOADED_TEXT = "Uploaded. Tap Install if iOS asks.";
-export const notAskedText ="iOS didn't ask for the app. Tap Install again.";
+export const notAskedText = "iOS didn't ask for the app. Tap Install again.";
 
 // F236/F252: `cause` (core/signing.js notLandedText, "Not on the Home Screen?": the website couldn't check this
 // iPhone's UDID) goes under the last step as a grey line with Help (page.help; `help(page)` opens Guides > "An app
