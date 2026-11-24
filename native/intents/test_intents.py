@@ -37,7 +37,7 @@ SWIFTC = toolchain()
 JAILBREAK = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent", "InstallAllUpdatesIntent",
              "RespringIntent", "UserspaceRebootIntent", "ExportPackagesIntent"}
 CELLULAR = ["OpenForInstallIntent", "WaitForInstallIntent", "FinishInstallsIntent"]  # F417a: Cellular Installs' actions
-RESTORE = ["RememberedVPNIntent", "RestoringVPNIntent", "FinishRestoreIntent"]  # F418: Restore My VPN's actions
+RESTORE = ["RememberedVPNIntent", "FinishRestoreIntent"]  # F418: Restore My VPN's actions
 SIDELOAD = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent", *CELLULAR, *RESTORE}
 
 

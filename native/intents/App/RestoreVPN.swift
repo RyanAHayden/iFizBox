@@ -11,17 +11,8 @@ struct RememberedVPNIntent: AppIntent {
     static let description = IntentDescription("Used by Restore My VPN: tells the app your VPN is remembered.")
 
     func perform() async throws -> some IntentResult {
+        // one action for both kinds, so iOS asks for it once; each counts only in its own kind of run
         RestoreShortcut.remembered()
-        return .result()
-    }
-}
-
-@available(iOS 16.0, *)
-struct RestoringVPNIntent: AppIntent {
-    static let title: LocalizedStringResource = "Restoring VPN"
-    static let description = IntentDescription("Used by Restore My VPN: tells the app your VPN is being turned on again.")
-
-    func perform() async throws -> some IntentResult {
         RestoreShortcut.restoring()
         return .result()
     }

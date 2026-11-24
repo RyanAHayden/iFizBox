@@ -15,8 +15,7 @@ iFizBox's actions for Shortcuts, Siri, Spotlight and the Action button, with not
 | Open for Install | sideload | opens iFizBox (`openAppWhenRun`) and tells `CellularShortcut` the run's Open came; no data | – |
 | Wait for Install | sideload | waits until the waiting installs are connected, 20 seconds at most; touches no data | – |
 | Finish Cellular Installs | sideload | tells `CellularShortcut` the Shortcut got to its end | – |
-| Remembered VPN | sideload | tells `RestoreShortcut` a VPN was current and is kept | – |
-| Restoring VPN | sideload | tells `RestoreShortcut` a kept VPN was found; Set VPN comes next | – |
+| Remembered VPN | sideload | tells `RestoreShortcut` a store run kept the current VPN, or a back run found the kept one and Set VPN comes next | – |
 | Finish Restore My VPN | sideload | tells `RestoreShortcut` the Shortcut got to its end | – |
 
 - `Core.swift`: what each does, Foundation only, tested on Linux (`test_intents.py` builds `tests/main.swift` with it
@@ -29,7 +28,7 @@ iFizBox's actions for Shortcuts, Siri, Spotlight and the Action button, with not
 - `App/CellularInstalls.swift`: the three actions of the Cellular Installs Shortcut
   (`tools/shortcuts/cellular-installs.plist`), sideload IPA only. They report to `../sideload/vpn/App/CellularShortcut.swift`
   and return nothing, because a Shortcut whose last action has output makes iOS ask over the app.
-- `App/RestoreVPN.swift`: the three actions of the Restore My VPN Shortcut (`tools/shortcuts/restore-vpn.plist`),
+- `App/RestoreVPN.swift`: the two actions of the Restore My VPN Shortcut (`tools/shortcuts/restore-vpn.plist`),
   sideload IPA only. They report to `../sideload/vpn/App/RestoreShortcut.swift` and return nothing. None opens the app:
   Shortcuts' callback does, also when Set VPN ends the run early. Nothing on screen runs it yet.
 - AppIntents is weak-linked (`-weak_framework AppIntents`) so iFizBox still launches on iOS 15; `build.sh` fails if
@@ -41,7 +40,7 @@ iOS reads an app's intents from `iFizBox.app/Metadata.appintents/` (`extract.act
 Xcode's macOS-only `appintentsmetadataprocessor` writes. On Linux: `build.sh` compiles with
 `-emit-const-values-path build/iFizBox.swiftconstvalues` and `-const-gather-protocols-file intents/protocols.json`
 (the swift.org toolchain has both), and `metadata.py build` turns that JSON into the two files. The sideload IPA gets
-`--only CheckForUpdatesIntent,AddSourceIntent,RestorePackagesIntent,OpenForInstallIntent,WaitForInstallIntent,FinishInstallsIntent,RememberedVPNIntent,RestoringVPNIntent,FinishRestoreIntent`
+`--only CheckForUpdatesIntent,AddSourceIntent,RestorePackagesIntent,OpenForInstallIntent,WaitForInstallIntent,FinishInstallsIntent,RememberedVPNIntent,FinishRestoreIntent`
 (`build.sh` `SIDELOAD_INTENTS`), so the jailbreak-only intents and their App Shortcuts never show there, and the jailbreak
 app gets `JAILBREAK_INTENTS`; `mkipa.py check` refuses an IPA with another set.
 

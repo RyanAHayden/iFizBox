@@ -229,7 +229,7 @@ def check(path):
 # extension without controls (no intents of its own) and without jailbreak entitlements.
 SIDELOAD_INTENTS = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent",
                     "OpenForInstallIntent", "WaitForInstallIntent", "FinishInstallsIntent",  # F417a: Cellular Installs' actions
-                    "RememberedVPNIntent", "RestoringVPNIntent", "FinishRestoreIntent"}  # F418: Restore My VPN's
+                    "RememberedVPNIntent", "FinishRestoreIntent"}  # F418: Restore My VPN's
 WIDGET = APP + "PlugIns/%sWidget.appex/" % NAME
 
 

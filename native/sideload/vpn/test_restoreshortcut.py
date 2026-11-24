@@ -40,10 +40,13 @@ class Source(unittest.TestCase):
             if short == "conditional":
                 if p["WFControlFlowMode"] == 0:
                     self.assertEqual(p["WFCondition"], 100)  # has any value: "contains" loses its text on import
-                    short = "if " + names[p["WFInput"]["Variable"]["Value"]["OutputUUID"]]
+                    v = p["WFInput"]["Variable"]["Value"]
+                    short = "if " + (v["VariableName"] if v["Type"] == "Variable" else names[v["OutputUUID"]])
                 else:
                     self.assertEqual(p["WFControlFlowMode"], 2)  # no Otherwise
                     short = "end"
+            elif short == "setvariable":
+                short = "%s = %s" % (p["WFVariableName"], names[p["WFInput"]["Value"]["OutputUUID"]])
             elif short == "getvalueforkey":
                 names[p["UUID"]] = p["WFDictionaryKey"]
                 short = "key " + p["WFDictionaryKey"]
@@ -60,14 +63,26 @@ class Source(unittest.TestCase):
 
     def test_steps(self):
         self.assertEqual(self.steps(), [
-            "detect.dictionary", "key store", "key back", "key check",
-            "if store", "vpn.get", "if vpn.get", "setstoredcontent", "RememberedVPNIntent", "end", "FinishRestoreIntent", "end",
-            "if back", "getstoredcontent", "if getstoredcontent", "RestoringVPNIntent", "vpn.set", "end", "FinishRestoreIntent", "end",
-            "if check", "FinishRestoreIntent", "end",
+            "detect.dictionary", "key store", "key back",
+            "if store", "vpn.get", "if vpn.get", "setstoredcontent", "Ready = store", "end", "end",
+            "if back", "getstoredcontent", "if getstoredcontent", "Ready = back", "end", "end",
+            "if Ready", "RememberedVPNIntent", "if back", "vpn.set", "end", "end",
+            "FinishRestoreIntent",
             "nothing",  # R100b: no output, or iOS asks over the app
         ])
         keys = [s[4:] for s in self.steps() if s.startswith("key ")]
-        self.assertEqual(keys, re.search(r"enum Kind: String { case (.+) }", self.swift).group(1).split(", "))
+        kinds = re.search(r"enum Kind: String { case (.+) }", self.swift).group(1).split(", ")
+        self.assertEqual(keys + ["check"], kinds)  # check has no step of its own: it touches no VPN
+
+    def test_groups(self):
+        """Every If has one end, and no two Ifs share a group."""
+        ends, begins = [], []
+        for a in self.wf["WFWorkflowActions"]:
+            p = a["WFWorkflowActionParameters"]
+            if a["WFWorkflowActionIdentifier"].endswith(".conditional"):
+                (begins if p["WFControlFlowMode"] == 0 else ends).append(p["GroupingIdentifier"])
+        self.assertEqual(sorted(begins), sorted(ends))
+        self.assertEqual(len(set(begins)), len(begins))
 
     def test_one_stored_key(self):
         keys = {a["WFWorkflowActionParameters"]["WFStoredContentKey"] for a in self.wf["WFWorkflowActions"]
@@ -77,7 +92,7 @@ class Source(unittest.TestCase):
     def test_names_our_actions(self):
         env = read("brand.env", base=NATIVE)
         own = [a for a in self.wf["WFWorkflowActions"] if not a["WFWorkflowActionIdentifier"].startswith("is.workflow.")]
-        self.assertEqual(len(own), 5)
+        self.assertEqual(len(own), 2)  # each once, for every kind of run: iOS asks for each anew (F418b)
         for a in own:
             d = a["WFWorkflowActionParameters"]["AppIntentDescriptor"]
             self.assertIn("struct %s: AppIntent" % d["AppIntentIdentifier"], self.intents)
