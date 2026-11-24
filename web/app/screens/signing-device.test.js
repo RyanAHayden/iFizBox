@@ -8,6 +8,7 @@ import { deviceCheckText, IN_PROFILE_TEXT, notLandedText, NOT_LANDED_TEXT, SENT_
 import { answerFor, appHelpHref, openAppHelp, APP_HELP } from "./guides.js";
 import { siteCause } from "../signing-client.js";
 import { followInstall } from "../signing-sheet.js";
+import { FIRST_LAUNCH_HINT } from "../core/installroute.js"; // F415: ends every install
 
 const UDID = "00008030-0011223344556677";
 
@@ -68,7 +69,7 @@ test("the app's install: 'Sent to iOS', and the grey help line only when its che
     let helped = null;
     await followInstall(null, "com.example.app", h, { name: "Example", device: { state, count: 2 }, help: (p) => { helped = p; } });
     assert.deepEqual(h.sets, [SENT_TO_IOS]);
-    assert.equal(h.lines.length, 1, state);
+    assert.deepEqual(h.lines.map((l) => l[1]), ["Not on the Home Screen?", FIRST_LAUNCH_HINT], state);
     assert.equal(h.lines[0][0], "help");
     assert.equal(h.lines[0][1], "Not on the Home Screen?");
     assert.ok(!h.lines.some((l) => l[0] === "warning"), "no yellow paragraph any more");
@@ -79,7 +80,7 @@ test("the app's install: 'Sent to iOS', and the grey help line only when its che
   for (const device of [{ state: "in", count: 2 }, { state: "skip", count: 0 }, null]) {
     const ok = hud();
     await followInstall(null, "com.example.app", ok, { name: "Example", device });
-    assert.deepEqual(ok.lines, [], JSON.stringify(device));
+    assert.deepEqual(ok.lines.map((l) => l[1]), [FIRST_LAUNCH_HINT], JSON.stringify(device));
   }
 });
 
@@ -109,6 +110,6 @@ test("the website's watch: the cause under the last step once iOS has the app, a
       sleep: async (ms) => { now += ms; }, askWithin: 10 ** 9, upTo }).end;
     return { end, lines };
   };
-  assert.deepEqual(await run({ manifest: true, started: true, finished: true }, 60000), { end: "installed", lines: [["help", "CAUSE", true]] });
+  assert.deepEqual(await run({ manifest: true, started: true, finished: true }, 60000), { end: "installed", lines: [["help", "CAUSE", true], ["help", FIRST_LAUNCH_HINT, false]] });
   assert.deepEqual(await run({ manifest: true, started: false, finished: false }, 5000), { end: "timeout", lines: [["help", "CAUSE", true]] });
 });

@@ -74,6 +74,7 @@
 // percents only move the row's bar and the bottom status.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { AIRPLANE_ON, AIRPLANE_OFF, APP_WAIT, NETWORK_WAIT } from "./installroute.js"; // F368
+import { FIRST_LAUNCH_HINT } from "./installroute.js"; // F415
 import { runOrder, sizeText, SELF_ID } from "./appqueue.js";
 import { NAME } from "../brand.js";
 import { isNewer } from "./selfupdate.js"; // B159: staleSelf
@@ -798,3 +799,8 @@ function beforePrompt(row) {
   if (row.phase === "uploading") return UPLOADING;
   return row.local && row.phase !== "handoff" ? "Preparing" : HANDOFF;
 }
+
+// F415: a run's FIRST_LAUNCH_HINT: null unless an app signed with a profile installed (not the jailbreak's helper, which
+// needs no profile, and not our own IPA, whose page closes).
+export const firstLaunchHint = (rows) =>
+  (rows.some((r) => r.state === "installed" && r.mode !== "remove" && !helperRow(r) && !isSelf(r)) ? FIRST_LAUNCH_HINT : null);

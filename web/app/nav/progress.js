@@ -242,7 +242,7 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
       log.push({ kind: ["step", "raw", "error", "warning"].includes(kind) ? kind : "raw", text: t, pkg: pkg || null });
     },
     // F252: a grey line with a bar button at its right (the IPA install's "Not on the Home Screen?" and Help).
-    // action(page) runs on the button's tap.
+    // action(page) runs on the button's tap; label "" draws no button (F415).
     help(text, { label = "Help", action = null } = {}) {
       const t = String(text ?? "");
       if (!t || closed) return;
@@ -414,9 +414,11 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
 function helpLine(text, label, action) {
   const d = el("div", "pl pl-help");
   d.setAttribute("role", "note");
+  d.append(el("span", "pl-help-text", text));
+  if (label === "") return d; // F415: a line with nothing to tap
   const b = barButton(label || "Help", "pl-help-button");
   b.addEventListener("click", () => action?.());
-  d.append(el("span", "pl-help-text", text), b);
+  d.append(b);
   return d;
 }
 
