@@ -291,8 +291,17 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   stays in Settings > VPN, only connected during installs, so iOS's "Add VPN Configurations" Allow comes once.
   Setting up asks it: right after pairing (or importing a pairing file), the pairing page runs the same test as
   Test Connection (`vpn.test`) before it says Paired. iOS runs one VPN at a time, so your VPN pauses for the install, and since ours keeps Settings > VPN's checkmark, a VPN that relies on On Demand stays off until you turn it on again.
-  On cellular (cellular in use, no Wi-Fi joined) iOS can refuse these connections while cellular data is on, and the
-  page says "On cellular, join Wi-Fi.". Nothing turns cellular data off or on.
+  On cellular, iOS refuses these connections and starts no VPN without a network, but keeps one that is up. So before
+  each connect `IDevice.install` calls `LocalVPN.waitOffCellular`: the built-in VPN comes on while data is on, then the
+  install waits until NWPathMonitor's path has been off cellular for 1 s (Airplane Mode, or Wi-Fi joined), up to 5
+  minutes ("airplane_timeout", which offers the Signing Server). The wait runs under KeepAlive, so Control Center over
+  the app doesn't end it. Cancel or the timeout ends the install's hold and the VPN goes off 3 s later. After the
+  connection opens it emits `airplaneOff` and the page says "You can turn Airplane Mode off". A reconnect with cellular
+  data back waits again. Events: `phase` (`signing.open`) / `here` (`signing.install`) "airplane", "airplaneOff". In the
+  IPA queue, on cellular (`idevice.status` `vpn.cellular`) `openPrepared` holds the install until every row is
+  downloaded and signed (`allSigned` in `core/apprun.js`); the off line shows only when every remaining row has its
+  connection (`airplaneStatus`). One app at a time: Re-sign All's direct call (`signing.resignAll`) downloads each app
+  in turn, so it needs data between. Real cellular is not verified on a phone.
   `LocalVPN.begin` runs `up()`: it saves the configuration the first time (iOS asks to allow it) and connects it. The end
   takes our VPN down 3 seconds after the queue's last connection. The configuration is never On Demand. iOS runs one VPN at
   a time, so while ours is on any other VPN is taken off, and `idevice.status`'s `vpn.otherVPN` says so. Nothing puts that VPN back

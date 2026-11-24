@@ -510,6 +510,7 @@ enum IDevice {
         var lastLanded: Date?   // B293: when the last chunk landed, kept across reconnects for the speed summary
         var installSent = false // installation_proxy got the install
         var askUntil: Date?     // after a drop, how long to keep asking iOS for the app (one deadline per install)
+        var onConnect: (() -> Void)? // after an airplane wait: what to say once the connection is open
         var lookedInstalled = false // B251: a second look found the new copy while installd's step was quiet
         init(ipa: URL, size: Int, remote: String, bundleID: String?, version: String?) {
             self.ipa = ipa; self.size = size; self.remote = remote; self.bundleID = bundleID; self.version = version
@@ -921,7 +922,8 @@ enum IDevice {
 
     // ---- Installing
 
-    enum Step { case connected, upload(Double), install(Double) }
+    /// airplane: on cellular, waiting for Airplane Mode; airplaneOff: connected after that wait, so it can go off.
+    enum Step { case airplane, airplaneOff, connected, upload(Double), install(Double) }
 
     private final class ProgressBox { let f: (UInt64) -> Void; init(_ f: @escaping (UInt64) -> Void) { self.f = f } }
 
@@ -933,7 +935,7 @@ enum IDevice {
     /// front, the tunnel reset) connects again, up to HereRecheck.reconnects times: during the copy it
     /// carries on from the end of iOS's file; once the install was sent, it asks iOS for the app and reports it
     /// installed when iOS lists the new copy. Only installd's own error (or a drop that never reconnects) fails.
-    static func install(_ ipa: URL, bundleID: String? = nil, version: String? = nil,
+    static func install(_ ipa: URL, bundleID: String? = nil, version: String? = nil, cancelled: () -> Bool = { false },
                         note: @escaping (String) -> Void = { _ in }, progress: @escaping (Step) -> Void) throws {
         let size = (try? ipa.resourceValues(forKeys: [.fileSizeKey]).fileSize).flatMap { $0 } ?? 0
         ilog("installing \(ipa.lastPathComponent) (\(mb(size)))\(bundleID.map { " as \($0) \(version ?? "?")" } ?? "")")
@@ -943,6 +945,25 @@ enum IDevice {
         LocalVPN.installBegan() // B395: its reconnects share one queue, so the VPN stays on through them
         defer { LocalVPN.installEnded() }
         while true {
+            // a reconnect waits again when cellular data is back
+            let waited: Bool
+            do {
+                waited = try LocalVPN.waitOffCellular(cancelled: cancelled) {
+                    note("On cellular: turn on Airplane Mode to install")
+                    progress(.airplane)
+                }
+            } catch let f as Failure {
+                if f.code == "vpn_failed" { Session.keepVPNFailure(f) }
+                if f.code == "airplane_timeout", run.installSent {
+                    throw Failure(code: f.code, text: "lost the connection to iOS while it was installing, and Airplane Mode wasn't turned on to ask it. iOS may still have installed it: look on the Home Screen")
+                }
+                throw f
+            }
+            // Wi-Fi ended the wait as well: then there is no Airplane Mode to turn off
+            run.onConnect = waited && !LocalVPN.Path.now().wifi ? {
+                note("The connection is open")
+                progress(.airplaneOff)
+            } : nil
             do {
                 try watched(attempt == 0 ? "install" : "install, connection \(attempt + 1)") { (w: Watch) -> Void in
                     try installTry(run, watch: w, note: note, progress: progress)
@@ -982,6 +1003,8 @@ enum IDevice {
     private static func installTry(_ run: HereRun, watch w: Watch, note: @escaping (String) -> Void,
                                    progress: @escaping (Step) -> Void) throws {
         let s = try Session(watch: w)
+        run.onConnect?()
+        run.onConnect = nil
         let route = s.kind == .remotePairing ? "\(s.via) (RemotePairing tunnel)" : "\(s.via) (lockdown)"
         if !run.connected {
             note("Connected to iOS through \(route)")

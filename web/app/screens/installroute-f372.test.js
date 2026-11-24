@@ -47,7 +47,7 @@ test("set up = paired and tested once; the footer says the next step", () => {
   assert.equal(setupFooter(ST()), "Test the connection to finish setting up.");
   const set = "Set up. Apps install straight onto this iPhone, on Wi-Fi or offline.";
   assert.equal(setupFooter(ST({ tested: true })), set);
-  assert.equal(setupFooter(ST({ tested: true, cellular: true })), set, "cellular says nothing here until its own task");
+  assert.equal(setupFooter(ST({ tested: true, cellular: true })), `${set} ${core.CELL_FOOTER}`);
   // C73: another VPN up, or chosen in Settings > VPN: one short line, no Install Switch to offer
   assert.equal(OTHER_VPN_LINE, "Your VPN goes off during installs. Turn it back on after.");
   assert.equal(setupFooter(ST({ tested: true, otherVPN: true })), `${set} ${OTHER_VPN_LINE}`);
@@ -102,14 +102,14 @@ test("the tests' answers in words", () => {
   assert.equal(vpnTestResult(null, new Error("refused: this iPhone no longer has the pairing")).again, true);
 });
 
-test("a failed connect through the built-in VPN never says to turn on another VPN app; on cellular it says to join Wi-Fi", () => {
+test("a failed connect through the built-in VPN never says to turn on another VPN app; on cellular it says installs ask for Airplane Mode", () => {
   const st = ST({ tested: true, cellular: true });
   const why = verifyFailure(new Error("connect_failed: no answer"), st);
   assert.equal(why.title, "Couldn't Connect");
-  assert.match(why.message, /On cellular, join Wi-Fi\./);
+  assert.match(why.message, /On cellular, check on Wi-Fi\. Installs ask for Airplane Mode\./);
   const refused = routeFailureOf(new Error("route_refused: every port"), st);
   assert.equal(refused.fix, "check");
-  assert.match(refused.message, /On cellular, join Wi-Fi\./);
+  assert.match(refused.message, /On cellular, check on Wi-Fi\. Installs ask for Airplane Mode\./);
   assert.ok(!/Shortcut|Install Switch/i.test(JSON.stringify([why, refused])));
   assert.ok(!/LocalDevVPN|Tailscale|Turn On/.test(JSON.stringify([why, refused])));
 });
