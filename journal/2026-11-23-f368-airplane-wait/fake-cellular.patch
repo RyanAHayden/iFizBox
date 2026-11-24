@@ -1,0 +1,13 @@
+diff --git i/native/sideload/vpn/App/LocalVPN.swift w/native/sideload/vpn/App/LocalVPN.swift
+index ff8254f1..0cbbec7d 100644
+--- i/native/sideload/vpn/App/LocalVPN.swift
++++ w/native/sideload/vpn/App/LocalVPN.swift
+@@ -88,7 +88,7 @@ enum LocalVPN {
+             plock.lock(); let p = path; plock.unlock()
+             guard let p = p, p.status == .satisfied else { return (false, false) }
+             let wifi = p.usesInterfaceType(.wifi)
+-            return (p.usesInterfaceType(.cellular) && !wifi, wifi)
++            return (wifi, false) // FAKE
+         }
+ 
+         /// B375: some network is up (Wi-Fi, cellular data, wired), so iOS can start a VPN. True before the first

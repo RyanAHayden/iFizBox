@@ -954,10 +954,14 @@ enum IDevice {
                 }
             } catch let f as Failure {
                 if f.code == "vpn_failed" { Session.keepVPNFailure(f) }
+                if f.code == "airplane_timeout", run.installSent {
+                    throw Failure(code: f.code, text: "lost the connection to iOS while it was installing, and Airplane Mode wasn't turned on to ask it. iOS may still have installed it: look on the Home Screen")
+                }
                 throw f
             }
-            run.onConnect = waited ? {
-                note("The connection is open: you can turn Airplane Mode off")
+            // Wi-Fi ended the wait as well: then there is no Airplane Mode to turn off
+            run.onConnect = waited && !LocalVPN.Path.now().wifi ? {
+                note("The connection is open")
                 progress(.airplaneOff)
             } : nil
             do {

@@ -66,7 +66,7 @@ rows or change footers. Top to bottom:
   Checking… (Check Connection, dimmed); Pair This iPhone with Start Pairing; Pair Again (a check the phone turned down)
   opens Pairing, which starts pairing at once; No Network Extensions (the app's profile lacks them, so installs go
   through the Signing Server); Couldn't Connect and iPhone Refused, red, with their fix (Check Connection or Pairing).
-  On cellular, those two messages add "On cellular, join Wi-Fi." A pairing the phone dropped is redone on Pairing by
+  On cellular, those two messages add "On cellular, check on Wi-Fi. Installs ask for Airplane Mode." A pairing the phone dropped is redone on Pairing by
   itself. With Signing Server chosen: Ready to Install through the server, Check Server.
   With the built-in VPN (the app's profile has Network Extensions): Ready to Install, "Straight onto this iPhone,
   through iFizBox VPN".
@@ -89,7 +89,7 @@ The pages under it:
   the VPN on, connects once with the pairing and turns it off; the first time, iOS asks to allow the VPN
   configuration; Pairing runs it by itself right after pairing, with a "Testing the Connection…" spinner, before it
   says Paired, so setup asks that once). The footer names the next step (pair or test); once paired and tested it reads
-  "Set up. Apps install straight onto this iPhone, on Wi-Fi or offline.", and when another VPN is up or chosen in
+  "Set up. Apps install straight onto this iPhone, on Wi-Fi or offline." On cellular it adds "On cellular, installs ask for Airplane Mode.", and when another VPN is up or chosen in
   Settings > VPN it adds "Your VPN goes off during installs. Turn it back on after." A failed check or install is
   said there instead, red, with its fix row. Then **How It Works** › (`installation/how`: the five steps of one install:
   Download, Sign, iFizBox VPN On, Install, iFizBox VPN Off; and Offline). **Signing Server** (`installation/server`): Server,

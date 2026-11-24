@@ -9,7 +9,7 @@
 //
 // Everything here reads bytes (Uint8Array or ArrayBuffer) and never leaves the phone.
 
-import { AIRPLANE_ON, AIRPLANE_OFF } from "./installroute.js"; // F368
+import { AIRPLANE_ON, AIRPLANE_OFF, AIRPLANE_TIMEOUT } from "./installroute.js"; // F368
 import { DOMAIN, SIGN_HOST, NAME, BUNDLE_ID } from "../brand.js";
 import { isAts, ATS_TITLE, atsText, INSECURE_IPA_ALERT, insecureText } from "./insecureipa.js"; // B104
 import { signingPage } from "./signingpage.js"; // C15: the sideload build's page is Installation & Signing
@@ -455,6 +455,8 @@ export function deviceError(err, name = "") {
     // The download needs the internet (Airplane Mode, no Wi-Fi): the native text says so and what to do.
     return { title: "No Internet Connection", open: null, message };
   }
+  // F368: the airplane wait ran out (the shell's sentence)
+  if (code === "airplane_timeout") return { title: AIRPLANE_TIMEOUT.title, open: null, message };
   if (code === "no_manifest") {
     // B30: the app fetched the install manifest itself before handing iOS the link (iOS shows nothing when it can't).
     // The native text names the host and why; a Signing Server set by hand may be the cause, so say where it is.

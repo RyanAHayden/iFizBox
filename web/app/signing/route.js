@@ -52,7 +52,7 @@ import { SELF_RESTART } from "../core/apprun.js";
 import { KNOWN_MALWARE, askInsecure, bridge, failed, keepIpaHash, refusing, stopNative, storageOf,
   untilCancel } from "./common.js";
 import { getServer, defaultServer } from "./identity.js";
-import { serverFallback, USE_SERVER, USE_SERVER_LINE } from "../core/installroute.js"; // F366
+import { serverFallback, USE_SERVER, USE_SERVER_LINE, AIRPLANE_OFF } from "../core/installroute.js"; // F366
 import { isSelfIpa, finishHere, hereLabel, shownName } from "./common.js";
 import { lastDevice, openRoute } from "./device.js";
 import { followHereSelf, followSelfUpdate } from "./selfupdate.js";
@@ -108,6 +108,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   const h = hud("Downloading");
   h.onCancel?.(() => stopNative(native));
   let lastHere = null;
+  let airplaneOff = ""; // F368
   let rate = 0; // B262
   let result;
   try {
@@ -122,7 +123,8 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
           lastHere = ev.here;
           if (ev.here === "installing" && self) h.page?.step?.(SELF_RESTART);
         }
-        h.set(here.label);
+        if (ev.here === "airplaneOff") airplaneOff = `. ${AIRPLANE_OFF}`;
+        h.set(ev.here === "copying" ? here.label + airplaneOff : here.label); // F368: said for the whole copy
         return;
       }
       if (route.route && lastHere && ["here", "airplane", "airplaneOff"].includes(ev?.phase)) return; // a newer shell sends both: {here} wins

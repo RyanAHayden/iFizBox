@@ -280,7 +280,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       else if (phase === "asking") log(r, "step", `Asked iOS to install ${label(r)}`);
       else if (phase === "copying") log(r, "step", copyingText(r)); // B111: This iPhone
       else if (phase === "airplane") log(r, "step", AIRPLANE_ON); // F368
-      else if (phase === "airplaneOff") log(r, "step", `Connected to iOS. ${AIRPLANE_OFF}`);
+      else if (phase === "airplaneOff") log(r, "step", "Connected to iOS"); // the status says it can go off (airplaneStatus)
       else if (phase === "installing" && r.here) {
         log(r, "step", `Installing ${label(r)}`);
         if (isSelf(r)) log(r, "step", SELF_CLOSING); // B173: installd accepted it: the shell closes iFizBox now

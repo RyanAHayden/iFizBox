@@ -213,3 +213,10 @@ _Said_: the error sheet when queuing
 _On screen_: Cannot Comply; Close; Remove <name> from Queue
 _In code_: openConfirm, refusedGroups, unqueueGroup, helperRefusal, refusalIds
 _Avoid_: error sheet, failed Confirm
+
+**Airplane wait**:
+On cellular, a This iPhone install holds after signing until the phone leaves cellular
+_Said_: the airplane wait
+_On screen_: Turn on Airplane Mode to install
+_In code_: LocalVPN.waitOffCellular, AIRPLANE_ON, airplaneStatus
+_Avoid_: cellular pause, data off wait
