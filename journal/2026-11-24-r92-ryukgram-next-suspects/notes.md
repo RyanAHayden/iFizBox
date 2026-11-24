@@ -26,10 +26,11 @@ Question: R89 disproved the locked write as the cause of the lasting RyukGram se
 
 ## (b) RyukGram Backup & restore, Reset, Replace (run on the phone)
 - Profiles screen: "Default profile", "All other accounts", "3 changed". Baseline: 204 keys in the plist, 76 of them RyukGram's snake_case keys.
-- Backup & Profiles > Reset, ticking only Settings ("972 preferences"), confirm "Reset selected data? This can't be undone", then Restart. The plist went from 212 to 209 keys. Only 3 were removed: reels_limit_mode_migrated, ryg_devicespoof_device_id, shortcut_inbox_seen. That matches "3 changed". After relaunch the app wrote back to 212 keys and nothing else was removed. The 8 keys added between baseline and this step were first-run keys: RyukGramFirstRun, ryg_active_profile, ryg_whatsnew_seen, and per-account chat_bg_*, lock_chats_* and share_sheet_* keys.
+- Backup & Profiles > Reset, ticking only Settings ("972 preferences"), confirm "Reset selected data? This can't be undone", then Restart. The plist went from 212 to 209 keys. Only 3 were removed: reels_limit_mode_migrated, ryg_devicespoof_device_id, shortcut_inbox_seen. That is the same number as "3 changed", but the keys look like internal flags (a migration marker, a device-ID spoof value, a seen marker), not settings anyone set. The count also moved from 204 (baseline) to 212 before this step, and from 212 to 214 before the import; both are the app's own writes (first-run and per-account keys), and the later one was not itemised. After relaunch the app wrote back to 212 keys and nothing else was removed. The 8 keys added between baseline and this step were first-run keys: RyukGramFirstRun, ryg_active_profile, ryg_whatsnew_seen, and per-account chat_bg_*, lock_chats_* and share_sheet_* keys.
 - Export of Settings only: saved as a 39 KB json into Instagram's Documents folder through the Files picker, named RyukGram-v1.6.0-backup-20261124-114449.json. It was left there on the phone.
 - Import with Replace, "Current settings", then Apply. Before: 214 keys. Right after: 1183 keys (1052 snake_case), with 0 removed and 969 added. That is the whole 972-preference registry written out with values. The same 1183 after a restart. Instagram stayed signed in.
-- So neither Reset nor Replace emptied the preferences here. Replace "clears then applies", but the net result was a superset.
+- So neither Reset nor Replace emptied the preferences here. Replace "clears then applies", but the net result was a superset. Limits: the backup was exported seconds before, from the same state, so Replace applied the same settings back. This does not show whether a Replace with a backup that lacks keys, or an older backup, clears keys the backup does not hold. Only the global Reset (Settings ticked) was run, not a Reset inside one menu.
+- The phone was left with 1183 keys (the registry's defaults written out) and the export json in Instagram's Documents. Neither is harmful, and neither was put back.
 - Not run: device-ID "Clear device & relaunch", "Mask everything & relaunch" and "Roll + clear IG data". These clear saved logins and cookies, and this is the person's account. Earlier evidence in journal/2026-11-23-b390-ryukgram: "Mask everything & relaunch" cleared sign-in but kept settings.
 - First-run prompts on the phone (Enjoying RyukGram?, ATT) were answered "Maybe later" and "Ask App Not to Track".
 
@@ -37,7 +38,7 @@ Question: R89 disproved the locked write as the cause of the lasting RyukGram se
 - Counter fields: pre_main_crash_count, post_main_crash_count, early_crash_count, last_timestamp, safe_mode_enable_count, safe_mode_actually_applied_in_past, safe_mode_actually_applied_successfully. They sit in memory-mapped "crash_counter" and "crash_counter_metadata" files (FBInstacrashCounter; GetPostMainCrashCount, Get/SetSafeModeEnableCount).
 - IGSafeModeChecker is built with initWithInstacrashCounterProvider:crashThreshold:. A crashThresholdMinutes value exists, and IGAppServicesPossibleInstacrashThreshold is a separate threshold. The numeric values are in code or remote config, not in strings, so they were not found.
 - The safe-mode screen (IGSafeModeAppDelegate, IGSafeModeMainViewController) has no readable text in the binary.
-- Recovery strings: instacrash_recovery_clear_cache, instacrash_recovery_from_backup, "Instacrash loop detected", instacrash_mitigated. They sit next to MobileConfig params-map strings (UFS-%@, copyFromPreviousFlatBufferToMemory). That suggests recovery acts on Instagram's MobileConfig store and caches, not on the app's NSUserDefaults.
+- Recovery strings: instacrash_recovery_clear_cache, instacrash_recovery_from_backup, "Instacrash loop detected", instacrash_mitigated. They sit next to MobileConfig params-map strings (UFS-%@, copyFromPreviousFlatBufferToMemory). That suggests, from where the strings sit only, that recovery acts on Instagram's MobileConfig store and caches rather than the app's NSUserDefaults. This is an inference, not shown, and the clearUserDefaults: selector below weakens it.
 - clearUserDefaults: is a selector in the binary. Its caller is unknown; it sits among tab-bar selectors, so it may be unrelated UI.
 - RyukGram's own text: "Disable safe mode: Prevents Instagram from resetting settings after crashes (at your own risk)". "Disable all tweak options: Instagram runs stock while this is on. Turn it back off to restore your settings." Its MobileConfig overrides say "If Instagram crashes on launch three times in a row, your changes are switched off, not deleted." and "Disabled after repeated crashes." Nothing in the strings says safe mode deletes RyukGram's preference keys.
 - Not run through the UI. A crash loop on the signed-in account was not forced.
@@ -49,7 +50,7 @@ Question: R89 disproved the locked write as the cause of the lasting RyukGram se
 None. No B. Nothing shown is broken.
 
 ## Next step
-- The reporter's group-fix log decides the next case. Same container id and a falling key count with no "8 preferences" line means the app cleared its own preferences. A new container id or "container made" time means a reinstall.
+- The reporter's group-fix log decides the next case. Same container id and a falling key count with no "8 preferences ..." line (the group fix's own line, which R89 matched to the report) means the app cleared its own preferences. A new container id or "container made" time means a reinstall.
 - Also ask which profile is active in RyukGram's Backup & Profiles.
 
 ## Not verified
@@ -59,4 +60,5 @@ None. No B. Nothing shown is broken.
 - Numeric safe-mode thresholds, and what the safe-mode screen resets: not found.
 - Whether Instagram's crash counter would count a crash loop: not forced.
 - SideDrop's behaviour when its App ID or BUNDLE_ID changes: read from code only. Nothing was changed in SideDrop.
-- Whether the reporter's install was a reinstall: not known from the report.
+- Whether the reporter's install was a reinstall: not known from the report. The group fix log's container id and "container made" time were not checked, since only the reporter's phone has them.
+- Replace with a backup that lacks keys or is older; a Reset inside a single menu.
