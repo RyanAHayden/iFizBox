@@ -181,7 +181,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
     } else later(() => (h.done ? h.done("Done") : h.hide()), 1200);
     return true;
   }
-  h.set("Installing");
+  h.set(WAITING_LABEL); // B424: iOS has the install link, nothing more
   onInstalled(result);
   // iFizBox itself (host): iOS's Install prompt is up, and iFizBox closes once it's answered so the install finishes
   // (native CloseForUpdate): say so first (user 2026-11-18).

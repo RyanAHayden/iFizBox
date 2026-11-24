@@ -294,7 +294,8 @@ enum SignAhead {
                 return
             }
             if let host = servers.host {
-                Sideload.hostAndOpen(k.output, server: host, app: k.app, record: k.record, job: job, log: log, opened: opened, served: nil)
+                Sideload.hostAndOpen(k.output, server: host, app: k.app, record: k.record, job: job, log: log, opened: opened, served: nil,
+                                     phase: { c.emitOnMain([["phase": $0, "progress": 0]]) }) // B424
                 return
             }
             Sideload.serveAndOpen(k.output, server: servers.manifest, app: k.app, record: k.record, log: log, job: job, opened: opened, served: nil)

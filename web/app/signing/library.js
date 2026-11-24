@@ -10,7 +10,7 @@
 //                                      F241: with the Signing Server reachable the IPA page queues the file instead
 //                                      (screens/myipas.js queueLibraryInstall, prepareParams's `library` above); this
 //                                      stays the offline path and Sign (n)'s.
-import { phaseLabel, deviceError } from "../core/signing.js";
+import { phaseLabel, deviceError, HANDOFF } from "../core/signing.js";
 import { withKeep } from "../core/keepid.js";
 import { progressHUD } from "../nav/progress.js";
 import { showAlert } from "../nav/alert.js";
@@ -54,7 +54,7 @@ export async function installFromLibrary({ file, name = "", signed = false, onIn
   }
   const server = getServer();
   // The first step the shell will report: a placeholder "Signing" put Signing, Reading, Signing on the log (user 2026-11-18).
-  const h = hud(signed ? "Installing" : "Reading");
+  const h = hud(signed ? "Preparing" : "Reading");
   h.onCancel?.(() => stopNative(native));
   const onEvent = (ev) => {
     if (ev?.log) h.page?.raw?.(ev.log); // B29: the shell's console lines (MyIPAs.swift install's log)
@@ -80,7 +80,7 @@ export async function installFromLibrary({ file, name = "", signed = false, onIn
     return "offline";
   }
   if (h.cancelled) return false;
-  h.set("Installing");
+  h.set(route.route ? "Connecting to this iPhone" : HANDOFF); // B424: nothing installs yet
   let result;
   try { result = await untilCancel(h, libraryCall("install", { file, manifestServer: server, ...route }, onEvent, native)); } catch (e) { return fail(e); }
   if (h.cancelled) return false;

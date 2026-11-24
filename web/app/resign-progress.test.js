@@ -28,7 +28,7 @@ function eventsFor(name, index, count) {
   for (let i = 0; i <= 100; i += 1) out.push({ index, count, name, phase: "downloading", progress: i / 100 });
   for (let i = 0; i <= 100; i += 5) out.push({ index, count, name, phase: "reading", progress: i / 100 });
   for (const f of [0.25, 0.5, 0.75, 1]) out.push({ index, count, name, phase: "signing", progress: f });
-  out.push({ index, count, name, phase: "installing", progress: 0 });
+  out.push({ index, count, name, phase: "handoff", progress: 0 });
   return out;
 }
 
@@ -48,7 +48,8 @@ test("Re-sign All over 3 apps through progressHUD: one step line per phase per a
   h.done("Done");
   const expected = ["Re-signing"];
   names.forEach((n, i) => {
-    for (const ph of ["Downloading", "Reading", "Signing", "Installing"]) expected.push(`${ph} ${n} (${i + 1} of 3)`);
+    for (const ph of ["Downloading", "Reading", "Signing"]) expected.push(`${ph} ${n} (${i + 1} of 3)`);
+    expected.push(`Handing ${n} to iOS (${i + 1} of 3)`);
   });
   expected.push("Done");
   assert.deepEqual(page.steps, expected);
@@ -60,14 +61,14 @@ test("a queue Re-sign (1 of 1, the suffix stripped) logs one line per phase", ()
   const page = fakePage();
   const h = progressHUD("Re-signing", { open: () => page });
   for (const ev of eventsFor("Partyboard", 0, 1)) { const t = resignLabel(ev); if (t) h.set(t.replace(/ \(1 of 1\)$/, "")); }
-  assert.deepEqual(page.steps, ["Re-signing", "Downloading Partyboard", "Reading Partyboard", "Signing Partyboard", "Installing Partyboard"]);
+  assert.deepEqual(page.steps, ["Re-signing", "Downloading Partyboard", "Reading Partyboard", "Signing Partyboard", "Handing Partyboard to iOS"]);
 });
 
 test("an IPA install's events (phaseLabel) log one line per phase", () => {
   const page = fakePage();
   const h = progressHUD("Downloading", { open: () => page });
   for (const ev of eventsFor("X", 0, 1)) { const t = phaseLabel(ev); if (t) h.set(t); }
-  assert.deepEqual(page.steps, ["Downloading", "Reading", "Signing", "Installing"]);
+  assert.deepEqual(page.steps, ["Downloading", "Reading", "Signing", "Handing to iOS"]);
 });
 
 test("bulkHud (Manage, My IPAs) logs each phase once, not each percent", () => {
@@ -75,7 +76,7 @@ test("bulkHud (Manage, My IPAs) logs each phase once, not each percent", () => {
   const make = bulkHud((t) => progressHUD(t, { open: () => page }), { verb: "Re-signing", name: "Partyboard", i: 1, n: 3 });
   const h = make("Re-signing");
   for (const ev of eventsFor("Partyboard", 0, 1)) { const t = resignLabel(ev); if (t) h.set(t.replace(/ \(1 of 1\)$/, "")); }
-  assert.deepEqual(page.raws, ["Downloading Partyboard", "Reading Partyboard", "Signing Partyboard", "Installing Partyboard"]);
+  assert.deepEqual(page.raws, ["Downloading Partyboard", "Reading Partyboard", "Signing Partyboard", "Handing Partyboard to iOS"]);
   assert.deepEqual(page.steps, ["Re-signing Partyboard (1 of 3)"]);
 });
 
@@ -115,8 +116,10 @@ test("callWithStall: iOS's install isn't timed, the next app's download is, and 
   const native = { call: (m, p, on) => { push = on; return new Promise((r) => { answer = r; }); } };
   const run = callWithStall(native, "signing.resignAll", {}, () => {}, { later: t.later, clear: t.clear });
   await Promise.resolve();
-  push({ index: 0, count: 2, name: "A", phase: "installing", progress: 0 });
-  assert.equal(t.list.size, 0);
+  for (const phase of ["uploading", "handoff", "installing"]) {
+    push({ index: 0, count: 2, name: "A", phase, progress: 0 });
+    assert.equal(t.list.size, 0, phase);
+  }
   push({ index: 1, count: 2, name: "B", phase: "downloading", progress: 0.1 });
   assert.equal(t.list.size, 1);
   answer({ done: ["a", "b"], failed: [] });

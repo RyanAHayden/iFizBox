@@ -77,7 +77,7 @@ import { AIRPLANE_ON, AIRPLANE_OFF, APP_WAIT, NETWORK_WAIT } from "./installrout
 import { runOrder, sizeText, SELF_ID } from "./appqueue.js";
 import { NAME } from "../brand.js";
 import { isNewer } from "./selfupdate.js"; // B159: staleSelf
-import { rateText, busyText } from "./signing.js"; // B262; B312
+import { rateText, busyText, HANDOFF, UPLOADING } from "./signing.js"; // B262; B312; B424
 
 // B136: an install that failed must not leave the app recorded as installed (Installed's record decides the Search
 // row's swipe: a recorded, up-to-date app has none). recordWhen(row, onPhone) says when a row's app goes into that
@@ -585,7 +585,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       set(r, { ...retryPatch(r), state: "waiting", again: false, fraction: 0, progress: 0, bundleId: null });
       // B153: logged after start(), so a new pass's clean log opens with it
       const p = running ? endPromise : start();
-      log(r, "step", `Installing ${label(r)} with its own bundle ID`);
+      log(r, "step", `Trying ${label(r)} again with its own bundle ID`);
       if (running) pump();
       return p;
     },
@@ -632,7 +632,7 @@ function helperStatus(row) {
   switch (row.state) {
     case "waiting": case "signed": return "Waiting";
     case "downloading": case "signing": return "Checking";
-    case "asking": return verb;
+    case "asking": return "Preparing"; // B424: the helper hasn't started
     case "installing": return p > 0 && p < 100 ? `${verb} ${p}%` : verb;
     case "installed": return row.mode === "remove" ? "Removed" : "Installed";
     default: return null;
@@ -658,7 +658,7 @@ export function rowStatus(row, opts = {}) {
       if (row.phase === "busy") return busyText(label(row)); // B312
       if (row.phase === "hold") return "Signed: Waiting to Install"; // F368: on cellular, until every app is signed
       if (promptUp(row)) return "Tap Install on the iOS prompt";
-      return row.local && !row.phase ? "Preparing" : "Installing"; // R91: This iPhone's route hasn't started: nothing installs yet (Signing Server wording: B424)
+      return beforePrompt(row); // R91, B424: nothing installs yet
     case "installing":
       if (row.phase === "airplane") return AIRPLANE_ON; // F368
       if (row.phase === "appWait") return APP_WAIT; // B423
@@ -725,13 +725,15 @@ export function runStatus(rows) {
   }
   const ios = withIos[0];
   if (ios && helperRow(ios) && ios.state === "installing" && ios.word) return `${ios.word} ${label(ios)}${wordPercent(ios)} (${pos(ios)})`; // B400
+  if (ios && helperRow(ios) && ios.state === "asking") return `Preparing ${label(ios)} (${pos(ios)})`; // B424
   if (ios && helperRow(ios)) return `${ios.mode === "remove" ? "Removing" : "Installing"} ${label(ios)} (${pos(ios)})`;
   if (ios?.phase === "busy") return busyText(label(ios)); // B312
   if (ios?.phase === "connecting") return `Connecting to iPhone for ${label(ios)} (${pos(ios)})`; // R91
   if (isCopying(ios)) return `Copying ${label(ios)} to iPhone (${pos(ios)})`; // B111: This iPhone
   if (ios?.phase === "copying") return `Copied ${label(ios)} to iPhone, waiting for iOS (${pos(ios)})`; // R91
   if (selfClosing(ios)) return `Installing ${label(ios)}: ${SELF_CLOSING}`;
-  if (ios?.state === "asking") return promptUp(ios) ? `Tap Install for ${label(ios)} (${pos(ios)})` : `${ios.local && !ios.phase ? "Preparing" : "Installing"} ${label(ios)} (${pos(ios)})`; // R91
+  if (ios?.state === "asking") return promptUp(ios) ? `Tap Install for ${label(ios)} (${pos(ios)})`
+    : beforePrompt(ios) === HANDOFF ? `Handing ${label(ios)} to iOS (${pos(ios)})` : `${beforePrompt(ios)} ${label(ios)} (${pos(ios)})`; // R91, B424
   if (ios) return `Installing ${label(ios)} (${pos(ios)})`;
   const s = rows.filter((r) => SIGNING.has(r.state));
   if (s.length && s.every(helperRow)) return "Preparing";
@@ -789,5 +791,10 @@ export function staleSelf(row, res) {
 
 // B137: whether an "asking" row has iOS's Install prompt to tap. A row on the This iPhone route (`local`, from
 // createAppRun's local(row)) has none while its route is settled (idevice.status, the route alert); it says
-// Installing. Its install going through the Signing Server after all sends phase "asking": the prompt is up then.
-export const promptUp = (row) => !row?.local || row.phase === "asking";
+// Preparing. B424: on the Signing Server route too, the prompt is up only from phase "asking" (signing.open answered:
+// the link is with iOS); before that the row says Handing to iOS, or Uploading (iFizBox's own IPA to the server).
+export const promptUp = (row) => row?.phase === "asking" || (!row?.local && row?.phase === "busy");
+function beforePrompt(row) {
+  if (row.phase === "uploading") return UPLOADING;
+  return row.local && row.phase !== "handoff" ? "Preparing" : HANDOFF;
+}

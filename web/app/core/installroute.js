@@ -451,7 +451,7 @@ export function keepRoute({ settings, native = null, storage = globalThis.localS
 //                                `st`: idevice.status read after the failure
 export const USE_SERVER = "Use the Signing Server";
 export const USE_SERVER_LINE = `${DOMAIN} can install it instead, this time only.`;
-export const serverStep = (name) => `Installing ${name || "the app"} through the Signing Server`;
+export const serverStep = (name) => `Trying ${name || "the app"} through the Signing Server`;
 export function serverFallback(err, route = { route: "idevice" }, st = null) {
   if (route?.route !== "idevice" || err?.code === "cancelled") return null;
   if (airplaneTimeout(err)) return AIRPLANE_TIMEOUT; // F368

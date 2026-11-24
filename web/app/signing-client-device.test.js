@@ -124,12 +124,12 @@ test("first install: a signer that doesn't answer counts as no certificate", asy
   assert.equal(await firstInstallCheck({ native: n, server: "https://ifizbox.com", go: (p) => went.push(p), alert: async () => ({ index: 1 }), wait: async () => {} }), "certificate");
 });
 
-test("Install: the HUD follows the phases, then Installing, and records the app", async () => {
+test("Install: the HUD follows the phases, then Waiting for iOS, and records the app", async () => {
   const done = { bundleId: "com.x", name: "X", version: "1.0", removed: [] };
   const n = fakeNative({
     "signing.install": async (params, onEvent) => {
       for (const ev of [{ phase: "downloading", progress: 0.5 }, { phase: "downloading", progress: 1 }, { phase: "reading", progress: 0 },
-        { phase: "signing", progress: 0.25 }, { phase: "installing", progress: 0 }]) onEvent(ev);
+        { phase: "signing", progress: 0.25 }, { phase: "handoff", progress: 0 }]) onEvent(ev);
       return done;
     },
   });
@@ -139,7 +139,7 @@ test("Install: the HUD follows the phases, then Installing, and records the app"
   assert.deepEqual(n.calls[0], { method: "signing.hold", params: { on: true } }); // B252: held from Confirm
   assert.deepEqual(n.calls[1], { method: "signing.install", params: { url: "https://e.example/x.ipa", manifestServer: "https://sign.ifizbox.com" } }); // the manifest from the signing server
   assert.deepEqual(n.calls[2], { method: "signing.hold", params: { on: false } });
-  assert.deepEqual(ui.labels, ["Downloading", "Downloading 50%", "Downloading", "Reading", "Signing 25%", "Installing", "Installing"]);
+  assert.deepEqual(ui.labels, ["Downloading", "Downloading 50%", "Downloading", "Reading", "Signing 25%", "Handing to iOS", "Waiting for iOS"]);
   assert.equal(recorded, done);
   assert.equal(ui.alerts.length, 0);
   assert.equal(ui.hidden, 0);

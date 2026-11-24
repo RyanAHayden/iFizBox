@@ -138,6 +138,7 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
         if (ev?.log) { log(ev.log); return; }
         const p = route.route ? herePhase(ev) : null;
         if (p) progress(p.phase, p.fraction);
+        else if (!route.route && (ev?.phase === "uploading" || ev?.phase === "handoff")) progress(ev.phase, 0); // B424: before iOS's prompt
       }, { tag, signal });
     // F380: the IPA the shell kept in My IPAs for this install (keepInLibrary), for the save after it lands
     if (opened?.libraryFile) await keptIpa(row?.job?.url, opened.libraryFile);

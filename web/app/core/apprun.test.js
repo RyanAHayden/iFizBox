@@ -43,6 +43,11 @@ test("signs ahead (2 at a time), installs one at a time in order, iFizBox last",
   await flush();
   // a goes to iOS; c starts signing in a's place
   assert.deepEqual(ph.events.slice(2), ["sign:c", "install:a"]);
+  assert.equal(rowStatus(rows[0]), "Handing to iOS"); // B424: no prompt until signing.open answers
+  ph.pending.install.get("a").hooks.progress("uploading", 0);
+  assert.equal(rowStatus(rows[0]), "Uploading");
+  assert.equal(runStatus(rows), "Uploading A (1 of 4)");
+  ph.pending.install.get("a").hooks.progress("asking", 0);
   assert.equal(rowStatus(rows[0]), "Tap Install on the iOS prompt");
   ph.signed("b");
   ph.signed("c");
@@ -260,6 +265,8 @@ test("status and percent while it runs", () => {
   rows[0].state = "asking";
   rows[1].state = "signing";
   rows[1].fraction = 0.5;
+  assert.equal(runStatus(rows), "Handing A to iOS (1 of 2)"); // B424
+  rows[0].phase = "asking";
   assert.equal(runStatus(rows), "Tap Install for A (1 of 2)");
   assert.equal(runPercent(rows), Math.round(((0.5 + 0.375) / 2) * 100));
   rows[0].state = "installed";
@@ -337,6 +344,7 @@ test("B85/B91: a dismissed prompt fails that app only (iOS didn't download it); 
   // b gets its own prompt
   assert.deepEqual(ph.events.filter((e) => e.startsWith("install")), ["install:a", "install:b"]);
   assert.equal(run.current?.id, "b");
+  ph.pending.install.get("b").hooks.progress("asking", 0);
   assert.equal(rowStatus(rows[1]), "Tap Install on the iOS prompt");
   ph.installed("b");
   await end;
@@ -397,6 +405,7 @@ test("B91: Try Again on a row iOS didn't download goes back to iOS's prompt with
   assert.deepEqual(ph.events, ["sign:a", "install:a", "install:a"]); // no second sign
   assert.equal(ph.pending.install.get("a").hooks.again, true);
   assert.equal(rows[0].state, "asking");
+  ph.pending.install.get("a").hooks.progress("asking", 0);
   assert.equal(rowStatus(rows[0]), "Tap Install on the iOS prompt");
   ph.installed("a");
   await again;
@@ -452,6 +461,8 @@ test("B85: the asking row's reprompt asks the phone again and logs it; only whil
   ph.signed("a"); ph.signed("b");
   await flush();
   assert.equal(await run.reprompt("b"), false); // b waits its turn (signed)
+  assert.equal(await run.reprompt("a"), false); // B424: the link isn't with iOS yet: no prompt
+  ph.pending.install.get("a").hooks.progress("asking", 0);
   assert.equal(await run.reprompt("a"), true);
   assert.deepEqual(asked, ["a"]);
   assert.equal(lines.at(-1), "Asked iOS again to install A");
@@ -505,6 +516,7 @@ test("B137: rowStatus and runStatus per route: local says Installing, the server
   await flush();
   // b: the Signing Server route keeps iOS's prompt words
   assert.equal(rows[1].local, false);
+  ph.pending.install.get("b").hooks.progress("asking", 0);
   assert.equal(rowStatus(rows[1]), "Tap Install on the iOS prompt");
   assert.equal(runStatus(rows), "Tap Install for B (2 of 2)");
   ph.installed("b");
@@ -516,8 +528,8 @@ test("B137: a local row whose install goes through the Signing Server after all 
   Object.assign(rows[0], { state: "asking", local: true, phase: "asking" });
   assert.equal(rowStatus(rows[0]), "Tap Install on the iOS prompt");
   assert.equal(runStatus(rows), "Tap Install for A (1 of 2)");
-  rows[0].local = false; rows[0].phase = null; // no local hint (website, tests): the old words
-  assert.equal(rowStatus(rows[0]), "Tap Install on the iOS prompt");
+  rows[0].local = false; rows[0].phase = null; // B424: the Signing Server route before its prompt
+  assert.equal(rowStatus(rows[0]), "Handing to iOS");
 });
 
 // B151: the user's error from the This iPhone route (installd), as the row's failure reached the run.
@@ -563,7 +575,7 @@ test("B151: the App Store's install coordinator (IX Code 46) reads in plain word
   assert.ok(again);
   assert.equal(r.busy, false);
   assert.equal(r.job.options.edits.keepBundleId, false);
-  assert.ok(lines.some((l) => l.text === "Installing X with its own bundle ID"));
+  assert.ok(lines.some((l) => l.text === "Trying X again with its own bundle ID"));
   await flush();
   assert.equal(r.state, "downloading");
   ph.signed("com.atebits.Tweetie2", { bundleId: "com.atebits.Tweetie2.ABCDE12345" });
@@ -619,7 +631,7 @@ test("B153: each start of an idle run is a new pass, told before its first line"
   events.length = 0;
   const again = run.ownIdRetry("com.atebits.Tweetie2");
   assert.ok(again);
-  assert.deepEqual(events, ["pass 2", "Installing X with its own bundle ID"]);
+  assert.deepEqual(events, ["pass 2", "Trying X again with its own bundle ID"]);
   assert.equal(run.pass, 2);
   run.stop("com.atebits.Tweetie2");
   await again;
