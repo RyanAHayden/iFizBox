@@ -227,8 +227,7 @@ def check(path):
 
 # N8: the IPA carries the intents that work without a jailbreak (native/build.sh SIDELOAD_INTENTS), and a widget
 # extension without controls (no intents of its own) and without jailbreak entitlements.
-SIDELOAD_INTENTS = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent",
-                    "ConnectVPNIntent", "OpenForInstallIntent", "WaitForInstallIntent"}  # F394: the Install Switch's
+SIDELOAD_INTENTS = {"CheckForUpdatesIntent", "AddSourceIntent", "RestorePackagesIntent"}
 WIDGET = APP + "PlugIns/%sWidget.appex/" % NAME
 
 

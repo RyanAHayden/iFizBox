@@ -29,11 +29,6 @@ test("a second Add or Update while a check runs starts nothing; a passed one cle
   assert.equal(core.routeFailure(), null);
 });
 
-test("the shell runs one check at most twice", () => {
-  const swift = readFileSync(new URL("../../../native/sign/SwitchOpens.swift", import.meta.url), "utf8");
-  assert.match(swift, /static let checkLimit = 2\b/);
-});
-
 test("switch_failed: Update and the Signing Server, in one alert with Cancel", async () => {
   const f = core.serverFallback(failed(), { route: "idevice" }, null);
   assert.equal(f.code, "switch_failed");

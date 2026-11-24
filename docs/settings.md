@@ -100,6 +100,7 @@ The pages under it:
   that added the older Cellular Data Off and Cellular Data On Shortcuts still have them to run, but this page no
   longer lists them. **Signing Server** (`installation/server`): Server,
   Check Server, Run Your Own. Without Network Extensions in the app's profile, This iPhone's page shows the Set Up group "Network Extensions: Missing" below.
+  The native side no longer runs Shortcuts for This iPhone installs; the Install Switch rows described above are web UI only (docs/sideload.md).
 - **Install Apps With** (`installation/with`, the older page): This iPhone (installd over the built-in VPN, docs/sideload.md) or Signing Server
   (the manifest and iOS's Install prompt, the default), with a checkmark, each subtitle a short point per line,
   wrapped. This iPhone's says Built-in VPN / No server, no install popup / Updates itself: installs
