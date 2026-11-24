@@ -3,16 +3,19 @@
 the focused field, Home and Wake. For a person helping an agent past a login: actions borrow whoever holds the
 ui-15.sh lock (the agent waiting on them), or take it as USER when it is free (and give it back after 5 idle min).
   tools/remote-15.py [PORT]     serves http://<this machine's Tailscale IP>:PORT (default 8098)
+While a task holds the phone, actions are refused until the person presses "Use it anyway" for that holder (a new holder asks again).
+SIGTERM (the Tools page's Stop) frees the lock only when it is held as USER, then exits 0. Started while already serving, it says so and exits 0.
 Bound to the Tailscale IP only: anyone on the tailnet can drive the phone while it runs. Ctrl-C to stop."""
-import base64, io, json, os, subprocess, sys, threading, time, urllib.request
+import base64, io, json, os, signal, subprocess, sys, threading, time, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-UI = os.path.join(HERE, "ui-15.sh")
-LOCK = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "ifizbox-15-ui.lock")
+UI = os.environ.get("IFIZBOX_UI_SCRIPT") or os.path.join(HERE, "ui-15.sh")  # the env names are for test_remote_15.py
+LOCK = os.environ.get("IFIZBOX_UI_LOCK") or os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "ifizbox-15-ui.lock")
 WDA = "http://127.0.0.1:8100"
 ME = "USER"
 last_action = [0.0]
+allowed = [None]  # the task holder the person pressed "Use it anyway" for
 
 PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
 <title>iPhone 15 remote</title><style>
@@ -25,12 +28,17 @@ img{max-width:100%;max-height:calc(100vh - 90px);touch-action:none;user-select:n
 <button onclick="go({cmd:'type',text:t.value+(nl.checked?'\\n':'')}).then(()=>t.value='')">Type</button>
 <label><input type=checkbox id=nl style="flex:0;min-width:0">⏎</label>
 <button onclick="go({cmd:'home'})">Home</button><button onclick="go({cmd:'wake'})">Wake</button>
+<span id=who></span><button id=ua hidden onclick="go({cmd:'allow'})">Use it anyway</button>
 <div id=st></div></div><img id=s draggable=false>
 <script>
 const s=document.getElementById('s'),st=document.getElementById('st');let down=null;
 const W=1179,H=2556; // ui-15.sh's screenshot pixels; the stream is scaled, so map to these
 function px(e){const r=s.getBoundingClientRect();return[Math.round((e.clientX-r.left)*W/r.width),Math.round((e.clientY-r.top)*H/r.height)]}
-async function go(a){st.textContent='…';const r=await fetch('act',{method:'POST',body:JSON.stringify(a)});st.textContent=await r.text()}
+async function go(a){st.textContent='…';const r=await fetch('act',{method:'POST',body:JSON.stringify(a)});st.textContent=await r.text();who()}
+async function who(){try{const j=await (await fetch('who')).json();
+ document.getElementById('who').textContent=j.holder?(j.holder==='USER'?'You hold the phone':j.holder+' holds the phone'+(j.allowed?' (allowed)':'')):'Phone is free';
+ document.getElementById('ua').hidden=!(j.holder&&j.holder!=='USER'&&!j.allowed)}catch(e){}}
+who();setInterval(who,3000);
 s.onpointerdown=e=>{down=[px(e),Date.now()];e.preventDefault()};
 s.onpointerup=e=>{if(!down)return;const[a,t0]=down,b=px(e);down=null;
  if(Math.hypot(b[0]-a[0],b[1]-a[1])<30)go({cmd:'tap',x:a[0],y:a[1]});
@@ -51,8 +59,23 @@ def holder():
         return None
 
 
+def is_allowed(who):
+    """Free or ours: yes. A task's lock: only after "Use it anyway" for that same holder."""
+    return who in (None, ME) or allowed[0] == who
+
+
+def allow():
+    who = holder()
+    if who and who != ME:
+        allowed[0] = who
+    return f"ok using the phone anyway (held by {who})" if who else "ok the phone is free"
+
+
 def ui(*args):
     who = holder()
+    if not is_allowed(who):
+        allowed[0] = None
+        return f"refused: {who} holds the phone; press 'Use it anyway' to use it"
     if not who:
         subprocess.run([UI, "lock", ME], check=True, capture_output=True)
         who = ME
@@ -111,6 +134,9 @@ class H(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if self.path.startswith("/who"):
+            who = holder()
+            return self.send(200, json.dumps({"holder": who, "allowed": bool(who) and is_allowed(who)}).encode(), "application/json")
         if self.path.startswith("/frame"):
             return self.next_frame()
         if self.path.startswith("/shot"):
@@ -145,6 +171,8 @@ class H(BaseHTTPRequestHandler):
                 out = ui("swipe", *(int(a[k]) for k in ("x1", "y1", "x2", "y2")), float(a["secs"]))
             elif c == "type":
                 out = ui("type", str(a["text"]))
+            elif c == "allow":
+                out = allow()
             elif c in ("home", "wake"):
                 out = ui(c)
             else:
@@ -154,10 +182,29 @@ class H(BaseHTTPRequestHandler):
         self.send(200, out.encode(), "text/plain; charset=utf-8")
 
 
-if __name__ == "__main__":
-    ip = subprocess.run(["tailscale", "ip", "-4"], capture_output=True, text=True).stdout.split()[0]
+def stop(*_):  # SIGTERM/SIGINT: free the lock only if it is ours (USER), never a task's
+    if holder() == ME:
+        subprocess.run([UI, "unlock", ME])
+    os._exit(0)
+
+
+def main():
+    ip = os.environ.get("IFIZBOX_REMOTE_IP") or subprocess.run(["tailscale", "ip", "-4"], capture_output=True, text=True).stdout.split()[0]
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8098
+    try:
+        server = ThreadingHTTPServer((ip, port), H)
+    except OSError as e:
+        if e.errno == 98 or e.errno == 48:
+            print(f"already serving on http://{ip}:{port}/", flush=True)
+            return 0
+        raise
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
     threading.Thread(target=grabber, daemon=True).start()
     threading.Thread(target=idle_release, daemon=True).start()
     print(f"http://{ip}:{port}/", flush=True)
-    ThreadingHTTPServer((ip, port), H).serve_forever()
+    server.serve_forever()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
