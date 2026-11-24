@@ -16,4 +16,5 @@
 
 ## Not verified
 - The dialog itself: R96 couldn't reproduce it, and reproducing needs an un-validated profile.
-- Appearance in a real browser or on a phone: unit tests with the fake DOM only.
+- Headless Chromium showed the iOS 6 style's Log line and Apps list line as meant. The iOS 26 style's colours were not
+  judged (the scratch page loaded only part of its CSS). Nothing on a phone, and no real install was run.

@@ -787,8 +787,8 @@ against this phone (`native/sign/DeviceCheck.swift`, and the same check and sent
 - **First launch.** Every signed install's end also shows a grey line with the text of `FIRST_LAUNCH_HINT` in
   `web/app/core/firstlaunch.js`: an app run's Log and under its Apps list, a single install on This iPhone, the
   Signing Server's "Sent to iOS" ending, and the website once iOS starts the download. iOS checks a new or regenerated
-  profile online on an app's first launch, so the line says what to do if that check fails. It is not shown for
-  iFizBox's own IPA, the jailbreak helper's installs, removals, or a run where nothing installed or it was cancelled.
+  profile online on an app's first launch, so the line says what to do if that check fails. It is not shown when
+  iFizBox updates itself, for the jailbreak helper's installs, removals, or a run where nothing installed or it was cancelled.
 
 #### The website's UDID, through a configuration profile
 
