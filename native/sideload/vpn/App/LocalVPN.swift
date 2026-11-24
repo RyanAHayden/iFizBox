@@ -763,6 +763,7 @@ enum LocalVPNBridge {
     static func register(_ b: Bridge) {
         LocalVPN.Path.start()
         LocalVPN.clearOldKeys()
+        CellularShortcutBridge.register(b) // cellular.*
         DispatchQueue.main.async { IDevice.AppFront.watch() }
         LocalVPN.takeDownLeftOver() // B423: a killed app's
         b.on("vpn.setRestore") { c in

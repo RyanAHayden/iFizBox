@@ -359,6 +359,14 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   setting off nothing is removed. The cost: the next install saves a new configuration, and iOS asks Allow again.
   Bridge: `idevice.status`'s `vpn` is `{available, bundled, entitled, tested, on, cellular, wifi, otherVPN, restore, name}`,
   `vpn.setRestore` `{on}` turns Restore My VPN on or off and answers the same status, and `vpn.test` runs the Set Up test.
+  Cellular Installs bridge: `cellular.status` is `{available, bundled, added}`: whether the signed Shortcut is in this build
+  and its last check passed. `cellular.add` opens the signed Shortcut (made by `tools/shortcuts/sign.sh`) in a share sheet,
+  where Shortcuts opens it on Add Shortcut; it reports only that the sheet closed, since Shortcuts never says it was added.
+  `cellular.check` runs the Shortcut with `{"check":1}`, which touches no cellular data, and passes only when its Finish
+  Cellular Installs ran in the app. The app judges a run by those actions, not by Shortcuts' callback
+  (`ifizbox://cellular-installs`), whose error is only passed on as text. A failure answers `not_opened`, `not_run`, `no_end`,
+  `no_return` or `busy` (`CellularShortcut.Verdict`). The bridge is refused in the jailbreak app and under any other bundle
+  ID. Nothing on screen uses it yet.
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`.
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and
