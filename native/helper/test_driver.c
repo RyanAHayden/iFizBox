@@ -20,6 +20,8 @@
  *   test_driver spawn <helper> [args]...       spawn helper, print its streams as "1: ...", "2: ...", "3: ..."
  *   test_driver spawn-ask keep|close <helper> [args]...   the same with a stdin pipe carrying $TEST_ANSWERS (F63)
  *                                              lines, then "exit: <code>"
+ *   test_driver spawn-replaced hold|keep <helper> [args]...  B414: hold-self on first (hold), then <own path>.new renamed
+ *                                              over the own binary, as dpkg does, then spawn helper
  *   test_driver spawn-quit <helper> [args]...  B84: spawn helper, read its stdout until a line holding "QUIT", then
  *                                              exit at once without waiting (the app closed mid-run); prints "quit"
  * SPDX-License-Identifier: GPL-3.0-or-later */
@@ -203,6 +205,16 @@ int main(int argc, char **argv) {
         else printf("ok\n");
     } else if (!strcmp(cmd, "spawn") && argc >= 3) {
         return spawn(argc - 2, argv + 2, NULL);
+    } else if (!strcmp(cmd, "spawn-replaced") && argc >= 5) {
+        if (strcmp(argv[2], "keep")) {
+            char *hold[] = {argv[3], "hold-self", "on"};
+            char *args[] = {hold[0], hold[1], hold[2], NULL};
+            if (spawn(3, args, NULL)) return 1;
+        }
+        char next[4096];
+        snprintf(next, sizeof next, "%s.new", argv[0]);
+        if (rename(next, argv[0])) { perror("rename"); return 1; }
+        return spawn(argc - 3, argv + 3, NULL);
     } else if (!strcmp(cmd, "spawn-quit") && argc >= 3) {
         return spawn_quit(argv + 2);
     } else if (!strcmp(cmd, "spawn-ask") && argc >= 4) {

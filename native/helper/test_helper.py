@@ -712,6 +712,63 @@ class Helper(unittest.TestCase):
         self.assertEqual(r.returncode, 100)
         self.assertIn("Problem with MergeList", r.stderr)
 
+    def held_prefix(self):
+        """B414: b84_prefix with a new app binary waiting beside the app's, and sbreload, launchctl and uicache that log."""
+        p, app, helper = self.b84_prefix('echo "ran: $(basename $0)"\n')
+        os.makedirs(os.path.join(p, "var/lib/ifizbox"), exist_ok=True)
+        shutil.copy(app, app + ".new")
+        for tool in ("sbreload", "launchctl", "uicache"):
+            path = os.path.join(p, "usr/bin", tool)
+            with open(path, "w") as f:
+                f.write('#!/bin/sh\necho "ran: $(basename $0) $*"\n')
+            os.chmod(path, 0o755)
+        return p, app, helper, os.path.join(p, "var/lib/ifizbox/held")
+
+    def test_chain_replaced_app_held(self):
+        """B414: the held app, its binary replaced by dpkg, still gets its finish button's verb (and any other); a
+        userspace reboot registers the new copy first."""
+        for verb, ran in ((["respring"], ["1: ran: sbreload "]),
+                          (["userspace-reboot"], ["1: ran: uicache -p {p}/Applications/iFizBox.app", "1: ran: launchctl reboot userspace"]),
+                          (["apply", "com.repo.tweak"], ["1: ran: apt-get"])):
+            with self.subTest(verb=verb[0]):
+                p, app, helper, held = self.held_prefix()
+                out = self.run_driver("spawn-replaced", "hold", helper, *verb, driver=app)
+                self.assertEqual([l for l in out if "ran: " in l], [r.format(p=p) for r in ran], out)
+                self.assertEqual(out[-1], "exit: 0")
+                with open(held) as f:
+                    self.assertRegex(f.read(), r"^\d+ \d+\n$")
+
+    def test_chain_replaced_app_not_held(self):
+        """B414: a replaced binary is refused without a record, and with one that names another process, or another
+        process of that number; hold-self itself needs the installed app."""
+        for record in (None, "1 1\n", "PID 1\n", "x\n", ""):
+            with self.subTest(record=record):
+                p, app, helper, held = self.held_prefix()
+                if record is not None:
+                    with open(held, "w") as f:
+                        f.write(record.replace("PID", str(os.getpid())))
+                for verb in (["respring"], ["hold-self", "on"]):
+                    shutil.copy(app, app + ".new")
+                    out = self.run_driver("spawn-replaced", "keep", helper, *verb, driver=app)
+                    self.assertIn("2: ifizbox-helper: can't identify the calling process", out)
+                    self.assertEqual(out[-1], "exit: 77")
+
+    def test_chain_hold_self(self):
+        p, app, helper, held = self.held_prefix()
+        self.assertEqual(self.run_driver("spawn", helper, "hold-self", "on", driver=app)[-1], "exit: 0")
+        self.assertTrue(os.path.exists(held))
+        self.assertEqual(self.run_driver("spawn", helper, "hold-self", "off", driver=app)[-1], "exit: 0")
+        self.assertFalse(os.path.exists(held))
+        self.assertEqual(self.run_driver("spawn", helper, "hold-self", "off", driver=app)[-1], "exit: 0")
+        for words in ([], ["maybe"], ["on", "x"]):
+            self.assertEqual(self.run_driver("spawn", helper, "hold-self", *words, driver=app)[-1], "exit: 64")
+        # a closed app's record doesn't hold the next app's run; nor does it make a reboot register anything
+        self.run_driver("spawn", helper, "hold-self", "on", driver=app)
+        out = self.run_driver("spawn", helper, "userspace-reboot", driver=app)
+        self.assertFalse([l for l in out if "uicache" in l], out)
+        self.run_driver("spawn", helper, "apply", "com.repo.tweak", driver=app)
+        self.assertFalse(os.path.exists(held))
+
     def test_chain_helper_pid(self):
         """B84: IFIZBOX_HELPER_PID is the pid the app waits on (the postinst holds uicache until it is gone), only for
         verbs that run dpkg; the apt-get child runs in a session of its own, away from the app's process group."""
@@ -2044,7 +2101,8 @@ class Postinst(unittest.TestCase):
         with open(os.path.join(HERE, "..", "deb", "postinst")) as f:
             self.script = os.path.join(self.tmp, "postinst")
             with open(self.script, "w") as out:
-                out.write(f.read().replace("$(BRAND_NAME)", "TestApp"))
+                self.held = os.path.join(self.tmp, "held")
+                out.write(f.read().replace("$(BRAND_NAME)", "TestApp").replace("/var/jb/var/lib/ifizbox/held", self.held))
 
     def tool(self, name, body):
         path = os.path.join(self.bin, name)
@@ -2080,6 +2138,53 @@ class Postinst(unittest.TestCase):
         self.assertEqual(self.uicache_calls(), ["-p /var/jb/Applications/TestApp.app"])
         self.run_postinst({"IFIZBOX_HELPER_PID": "12x"})  # not a pid: as outside the app
         self.assertEqual(len(self.uicache_calls()), 2)
+
+    def held_run(self, record):
+        """B414: the postinst after a run whose helper has ended, with `record` in the hold file."""
+        helper = subprocess.Popen(["true"])
+        helper.wait()
+        with open(self.held, "w") as f:
+            f.write(record)
+        self.assertLess(self.run_postinst({"IFIZBOX_HELPER_PID": str(helper.pid)}), 5)
+
+    def wait_registered(self, seconds=10):
+        deadline = time.monotonic() + seconds
+        while not self.uicache_calls() and time.monotonic() < deadline:
+            time.sleep(0.1)
+        self.assertEqual(self.uicache_calls(), ["-p /var/jb/Applications/TestApp.app"])
+
+    def test_waits_for_the_held_app(self):
+        """B414: the run ended on a button that waits for the tap: uicache runs once the app lets go, or has closed."""
+        for end in ("released", "closed"):
+            with self.subTest(end=end):
+                if os.path.exists(self.log):
+                    os.unlink(self.log)
+                app = subprocess.Popen(["sleep", "60"])
+                self.addCleanup(app.wait)
+                self.addCleanup(app.kill)
+                self.held_run(f"{app.pid} 123\n")
+                time.sleep(2.5)
+                self.assertEqual(self.uicache_calls(), [])
+                if end == "released":
+                    os.unlink(self.held)
+                else:
+                    app.kill()
+                    app.wait()
+                self.wait_registered()
+
+    def test_bad_hold_file(self):
+        for record in ("", "x 1\n", "-1 1\n"):
+            with self.subTest(record=record):
+                if os.path.exists(self.log):
+                    os.unlink(self.log)
+                self.held_run(record)
+                self.wait_registered()
+
+    def test_outside_the_app_ignores_the_hold(self):
+        with open(self.held, "w") as f:
+            f.write(f"{os.getpid()} 1\n")
+        self.run_postinst({})
+        self.assertEqual(len(self.uicache_calls()), 1)
 
     def test_waits_for_the_helper(self):
         helper = subprocess.Popen(["sleep", "30"])

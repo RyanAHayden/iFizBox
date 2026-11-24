@@ -64,6 +64,8 @@ export async function markNeededBy(group, plan, jobs, names, catalog) {
 //   onEnd({ ok, stopped, installed }), apps (F407: { jobs, start(host) -> runAppRun's on that host, finish() ->
 //   { levels, kinds } the apps ask of the finish button, or null, idle() -> settles once no app's helper call is going }), setBadge(text | null), open (openProgress, for tests) }
 // -> a promise for the first end: { ok, stopped, rows }.
+export const TAP_LEVELS = ["restart", "reload", "reboot"]; // B414: finish buttons that wait for the tap
+
 export async function runQueue({ jobs, plan }, deps) {
   const { backend, catalog, queue, runLogs, finishAction = async () => false, onEnd = () => {}, setBadge = () => {},
     open = openProgress, alert = showAlert } = deps;
@@ -296,6 +298,20 @@ export async function runQueue({ jobs, plan }, deps) {
       onClose: (f) => page.onClose(f),
     },
   };
+  // ---- B414: iFizBox held open ----
+  // A run that installs iFizBox itself may end on a button that waits for the tap (Restart or Reload SpringBoard,
+  // Reboot Device), known only at its end: the app doesn't close itself over its new copy until the run ended clean
+  // on Close iFizBox, or the page closes (the button, Close, Cancel). One hold at a time, in order.
+  const ownOf = (state) => selfLevels([...rows.map((r) => ({ id: r.id, op: r.op, state: r.state })),
+    ...(apps?.rows ?? []).map((r) => ({ id: r.id, op: r.mode === "remove" ? "remove" : "install", state: r.state }))]
+    .filter((r) => !state || r.state === state)).length > 0;
+  let held = false;
+  const hold = async (on) => {
+    if (held === on) return;
+    held = on;
+    try { await backend.holdSelf?.(on); } catch { /* an older shell or helper: it closes itself as before */ }
+  };
+  page.onClose(() => hold(false));
   // ---- one pass of the run, from start or a retry, to its end ----
   let first = null;
   let latest = null;
@@ -361,6 +377,7 @@ export async function runQueue({ jobs, plan }, deps) {
       return result;
     }
     page.bar(clean ? {} : { left: closeB, right: retryAll });
+    if (clean && ownOf("installed") && !TAP_LEVELS.includes(choice.level)) hold(false);
     page.finish({ label: choice.label, status: text, action: () => finishAction(choice) });
     if (page.hidden) strip.update();
     apps?.settled();
@@ -371,6 +388,7 @@ export async function runQueue({ jobs, plan }, deps) {
     try { await deps.apps.start(appHost); } catch (e) { await page.close(); throw e; }
     openOn(page, seg, total());
   }
+  if (ownOf()) await hold(true); // before dpkg can start
   return new Promise((resolve) => {
     const app = apps?.run.start() ?? null; // first: dpkg's lane waits for it
     drive({ app, pkg: run.start() }).then(() => resolve(first), () => resolve(first));

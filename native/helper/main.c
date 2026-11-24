@@ -7,6 +7,7 @@
  *                                                               temp sources file; the other lists stay; update_source)
  *   ifizbox-helper simulate <item>... | apply <item>... | respring      (N4: the install queue; item: name,
  *                                                                        name=version or -name)
+ *   ifizbox-helper hold-self on | off          (B414: the app held open through a run that installs it; held.h)
  *   ifizbox-helper apply-ask <item>...        (F63: apply, but dpkg asks about changed conffiles; answers "Y"/"N"
  *                                             lines on stdin, relayed to apt-get by ask_relay below; F64: a "C"
  *                                             line is Cancel, SIGINT to apt-get)
@@ -49,6 +50,7 @@
 #include "launch.h"
 #include "ownicon.h" /* F329 */
 #include "decrypt.h" /* F374 */
+#include "held.h"    /* B414 */
 
 #include <dirent.h>
 #include <errno.h>
@@ -497,17 +499,51 @@ static void repair_dpkg(const char *prefix, int status_fd, char *const env[]) {
     if (rc) fprintf(stderr, "ifizbox-helper: dpkg --configure -a exited %d\n", rc);
 }
 
+/* B414: the held app's new copy, registered before a userspace reboot, which ends the postinst's waiting job. iOS
+ * closes the app as uicache runs: the helper leaves its session and ignores its closed pipes (execve keeps that). */
+static void register_held(const char *prefix, char *const env[]) {
+    static char tool[PATH_MAX], app[PATH_MAX];
+    snprintf(tool, sizeof tool, "%s/usr/bin/uicache", prefix);
+    snprintf(app, sizeof app, "%s/Applications/iFizBox.app", prefix);
+    setsid();
+    signal(SIGPIPE, SIG_IGN);
+    signal(SIGHUP, SIG_IGN);
+    pid_t pid = fork();
+    if (pid == 0) {
+        char *const argv[] = {"uicache", "-p", app, NULL};
+        execve(tool, argv, env);
+        _exit(HELPER_EX_EXEC);
+    }
+    while (pid > 0 && waitpid(pid, NULL, 0) < 0 && errno == EINTR) {}
+}
+
 int main(int argc, char *argv[]) {
     const char *prefix = IFIZBOX_PREFIX, *err = NULL;
     char parent[PATH_MAX], expected[PATH_MAX];
 
     snprintf(expected, sizeof expected, "%s/Applications/iFizBox.app/iFizBox", prefix);
-    if (helper_caller_ok(getuid(), geteuid(), IFIZBOX_ROOT_UID, parent_exe(parent, sizeof parent) ? NULL : parent,
-                         expected, &err)) {
+    int unnamed = parent_exe(parent, sizeof parent); /* B414: no path, or one that is gone: its binary was replaced */
+    struct stat exe;
+    int replaced = unnamed || (stat(parent, &exe) && errno == ENOENT);
+    if (helper_caller_ok(getuid(), geteuid(), IFIZBOX_ROOT_UID, unnamed ? NULL : parent, expected, &err) &&
+        !(getuid() == IFIZBOX_ROOT_UID && geteuid() == IFIZBOX_ROOT_UID && replaced && helper_held_by(prefix, getppid()))) {
         fprintf(stderr, "ifizbox-helper: %s\n", err);
         return HELPER_EX_NOPERM;
     }
 
+    if (argc >= 2 && !strcmp(argv[1], "hold-self")) { /* B414: held.h; runs nothing */
+        int on = argc == 3 && !strcmp(argv[2], "on");
+        if (!on && !(argc == 3 && !strcmp(argv[2], "off"))) {
+            fprintf(stderr, "ifizbox-helper: hold-self takes on or off\n");
+            return HELPER_EX_USAGE;
+        }
+        if (!on) helper_held_clear(prefix, getppid(), 1);
+        else if (helper_held_set(prefix, getppid(), &err)) {
+            fprintf(stderr, "ifizbox-helper: hold-self: %s\n", err);
+            return HELPER_EX_IOERR;
+        }
+        return 0;
+    }
     /* F236: udid reads one value and runs nothing: no plan, no clean-up for a child. */
     if (argc >= 2 && !strcmp(argv[1], "udid")) {
         if (argc != 2) { fprintf(stderr, "ifizbox-helper: udid takes no arguments\n"); return HELPER_EX_USAGE; }
@@ -686,6 +722,7 @@ int main(int argc, char *argv[]) {
     char *env[] = {path_env, "HOME=/var/root", "USER=root", "LOGNAME=root", "LANG=C", "DEBIAN_FRONTEND=noninteractive",
                    dpkg_verb ? pid_env : cydia_env, dpkg_verb ? cydia_env : NULL, NULL};
     if (dpkg_verb) {
+        helper_held_clear(prefix, getppid(), 0); /* B414: a closed app's record must not hold this run's postinst */
         if (outlive_caller(status_fd, answers)) return HELPER_EX_EXEC;
         if (plan.verb != HV_CONFIGURE) repair_dpkg(prefix, status_fd, env);
     }
@@ -712,6 +749,7 @@ int main(int argc, char *argv[]) {
         return rc;
     }
     if (plan.verb == HV_APPLY_ASK) return ask_relay(&plan, env, answers);
+    if (plan.verb == HV_USERSPACE_REBOOT && helper_held_by(prefix, getppid())) register_held(prefix, env);
     execve(plan.path, (char *const *)plan.argv, env);
     fprintf(stderr, "ifizbox-helper: %s: %s\n", plan.path, strerror(errno));
     return HELPER_EX_EXEC;

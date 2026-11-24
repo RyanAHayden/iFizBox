@@ -420,3 +420,85 @@ test("F407 the apps failing to start closes the page and runs no package", () =>
   assert.equal(s.page.closed, true);
   assert.deepEqual(s.calls.fetch, []);
 }));
+
+// ---- B414: iFizBox open until the tap ----
+
+// A run of iFizBox and Other with `levels` asked for by Other's scripts; calls: the hold on / off and dpkg's installs, in order.
+async function ownRun(finishLine, { ids = [PACKAGE, "other"], fail = null, holdSelf } = {}) {
+  const s = setup({ badLib: false });
+  const calls = [];
+  s.backend.holdSelf = holdSelf ?? (async (on) => { await settle(); calls.push(on ? "hold" : "release"); });
+  s.backend.queueInstall = async (r, { onEvent }) => {
+    calls.push(r.id);
+    if (r.id === "other" && finishLine) onEvent({ fd: "status", line: finishLine });
+    return r.id === s.fail ? { code: 100, stdout: "", stderr: "E: no" } : { code: 0, stdout: "", stderr: "" };
+  };
+  s.fail = fail;
+  const js = ids.map((id) => ({ op: "install", id, mode: "upgrade" }));
+  const pl = parseSimulation(ids.map((id) => `Inst ${id} [1.0] (2.0 R [a])`).join("\n"));
+  const confirms = [];
+  await runQueue({ jobs: js, plan: pl }, { backend: s.backend, catalog: s.catalog, queue: s.queue, runLogs: s.runLogs,
+    open: () => s.page, reopenConfirm: (f) => confirms.push(f) });
+  await settle();
+  await settle();
+  return { s, calls, confirms };
+}
+
+for (const level of ["restart", "reload", "reboot"]) {
+  test(`B414 iFizBox in a run ending on ${level}: held before dpkg starts until the page closes`, () => withDom(async () => {
+    const { s, calls } = await ownRun(`finish:${level}`);
+    assert.match(s.page.finished.label, level === "reboot" ? /^Reboot Device/ : /SpringBoard$/);
+    assert.deepEqual(calls, ["hold", "other", PACKAGE], "still held with the button up");
+    s.page.close(); // the button's action, Close or Later
+    await settle();
+    await settle();
+    assert.deepEqual(calls, ["hold", "other", PACKAGE, "release"]);
+  }));
+}
+
+test("B414 a run ending on Close iFizBox lets go at its end", () => withDom(async () => {
+  for (const ids of [[PACKAGE], [PACKAGE, "other"]]) {
+    const { s, calls } = await ownRun("", { ids });
+    assert.match(s.page.finished.label, /^Close /);
+    assert.equal(calls[0], "hold");
+    assert.equal(calls.at(-1), "release");
+    s.page.close();
+    await settle();
+    assert.equal(calls.filter((c) => c === "release").length, 1);
+  }
+}));
+
+test("B414 a run without iFizBox holds nothing", () => withDom(async () => {
+  const { calls } = await ownRun("finish:restart", { ids: ["other"] });
+  assert.deepEqual(calls, ["other"]);
+}));
+
+test("B414 something failed: held while Retry All is there, through the retry", () => withDom(async () => {
+  const { s, calls } = await ownRun("finish:restart", { fail: PACKAGE });
+  assert.ok(!calls.includes("release"));
+  s.fail = null;
+  s.page.bars.at(-1).right.click();
+  await until(() => s.page.finished && calls.filter((c) => c === PACKAGE).length === 2);
+  await settle();
+  assert.equal(s.page.finished.label, "Restart SpringBoard");
+  assert.ok(!calls.includes("release"));
+}));
+
+test("B414 Cancel lets go", () => withDom(async () => {
+  let page;
+  const s = setup({ badLib: false });
+  const calls = [];
+  s.backend.holdSelf = async (on) => { calls.push(on); };
+  s.backend.queueInstall = async (r) => { page ??= s.page.bars.at(-1).left.click() ?? true; return { code: 0, stdout: "", stderr: "" }; };
+  await runQueue({ jobs: [{ op: "install", id: PACKAGE, mode: "upgrade" }], plan: parseSimulation(`Inst ${PACKAGE} [1.0] (2.0 R [a])\nInst other (1.0 R [a])`) },
+    { backend: s.backend, catalog: s.catalog, queue: s.queue, runLogs: s.runLogs, open: () => s.page });
+  await settle();
+  assert.equal(s.page.closed, true);
+  assert.deepEqual(calls, [true, false]);
+}));
+
+test("B414 a shell that can't hold runs as before", () => withDom(async () => {
+  const { s, calls } = await ownRun("finish:restart", { holdSelf: async () => { throw new Error("no such method"); } });
+  assert.deepEqual(calls, ["other", PACKAGE]);
+  assert.equal(s.page.finished.label, "Restart SpringBoard");
+}));

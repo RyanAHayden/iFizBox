@@ -370,6 +370,9 @@ function queueCalls(backend, q, call) {
       if (!ids?.length) return false;
       try { return (await backend.helper(["auto", ...ids])).code === 0; } catch { return false; }
     },
+    // B414: the app held open through a run that installs iFizBox itself (app.holdSelf): its Replaced watcher and the
+    // postinst's uicache wait until the hold is let go or the app closes.
+    holdSelf: (on) => call("app.holdSelf", { on }),
     // A fetched file the run won't install (cancelled, skipped).
     queueDiscard: (file) => call("share.discard", { file, kind: "deb" }).catch(() => {}),
     // F63: the Configuration Upgrade answer for the running apply: "keep" (Keep My Old Copy) or "new".

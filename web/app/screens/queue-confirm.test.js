@@ -3,7 +3,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
-import { confirmCancel, openAppConfirm, openConfirm, initQueue } from "./queue.js";
+import { confirmCancel, openAppConfirm, openConfirm, initQueue, runRollback } from "./queue.js";
+import { PACKAGE } from "../brand.js";
 import { helperRefusal, refusalIds } from "../core/queuerefusal.js";
 import { parseSimulation } from "../core/queue.js";
 import { getBackend } from "../backend.js";
@@ -251,3 +252,53 @@ test("refusalIds: the queued packages apt's refusal names", () => {
   assert.deepEqual(ids(" com.a:iphoneos-arm64 : Depends: com.gone but it is not installable"), ["com.a"]);
   assert.deepEqual(ids("E: Could not get lock"), []);
 });
+
+// B414: no queued app (Confirm's apps: []) is a packages run, not a run with an empty apps half.
+confirmCase("Confirm with only packages queued starts their run", async () => answer(true, PLAN), async (c) => {
+  appQueue.clearAll();
+  installQueue.clear("com.x.bad");
+  await settle();
+  const backend = getBackend();
+  const fetched = [];
+  const raf = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = (f) => { queueMicrotask(f); return 1; };
+  backend.queueFetch = async (r) => { fetched.push(r.id); throw new Error("no network"); };
+  backend.queueInstall = async () => ({ code: 1, stdout: "", stderr: "E: no" });
+  try {
+    c.ok().click();
+    for (const end = Date.now() + 5000; !fetched.length && Date.now() < end;) await new Promise((r) => setTimeout(r, 10)); // the sheet slides away first
+    assert.deepEqual(fetched, ["com.x.good"]);
+    await settle();
+    find(globalThis.document.body, (e) => e.tagName === "BUTTON" && e.textContent === "Close")?.click();
+    await settle();
+  } finally {
+    globalThis.requestAnimationFrame = raf;
+    delete backend.queueFetch;
+    delete backend.queueInstall;
+  }
+});
+
+// B414: Roll Back (the console, not the queue run) of iFizBox itself is held too while its button waits (the page stays up: last test).
+for (const [line, left] of [["finish:restart", ["hold", "run"]]]) {
+  test(`a rollback of iFizBox ending on Restart SpringBoard stays held`, withDom(async () => {
+    const raf = globalThis.requestAnimationFrame;
+    globalThis.requestAnimationFrame = (f) => { queueMicrotask(f); return 1; };
+    const saved = { queueInfo: catalog.queueInfo, reloadInstalled: catalog.reloadInstalled };
+    Object.assign(catalog, { queueInfo: async () => ({}), reloadInstalled: async () => {} });
+    const backend = getBackend();
+    const calls = [];
+    backend.holdSelf = async (on) => { calls.push(on ? "hold" : "release"); };
+    backend.rollback = async (id, version, onEvent) => { calls.push("run"); if (line) onEvent({ fd: "status", line }); return { code: 0, stdout: "", stderr: "" }; };
+    try {
+      assert.equal(runRollback({ id: PACKAGE, version: "1.0", name: "Own" }), true);
+      const button = () => find(globalThis.document.body, (e) => e.tagName === "BUTTON" && e._cls.has("progress-finish") && !e.hidden);
+      for (const end = Date.now() + 5000; !button() && Date.now() < end;) await new Promise((r) => setTimeout(r, 10));
+      assert.deepEqual(calls, left);
+      await new Promise((r) => setTimeout(r, 600));
+    } finally {
+      for (const k of ["holdSelf", "rollback"]) delete backend[k];
+      Object.assign(catalog, saved);
+      globalThis.requestAnimationFrame = raf;
+    }
+  }));
+}
