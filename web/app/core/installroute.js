@@ -457,3 +457,29 @@ export function serverFallback(err, route = { route: "idevice" }, st = null) {
   if (airplaneTimeout(err)) return AIRPLANE_TIMEOUT; // F368
   return routeFailureOf(err, st);
 }
+
+// ---- F410b: the Quiet Pairing Check ----------------------------------------------------------------------------
+// With This iPhone chosen and paired, the pairing is checked in the background (idevice.verify), so Home's tile says
+// Pair Again before an install fails: at most once a day, at launch or on coming back, and at each launch while a
+// failure is kept. A verify turns the built-in VPN on, which takes another VPN off and may not bring it back, so it
+// runs only where that can't hurt (quietCheckAllowed). screens/installroute.js quietPairingCheck runs it.
+export const QUIET_KEY = "ifizbox.quietPairingCheck"; // when the last one ran (ms)
+export const QUIET_EVERY = 24 * 60 * 60 * 1000;
+export function quietCheckDue({ launch = false, storage = globalThis.localStorage, now = Date.now() } = {}) {
+  if (launch && routeFailure(storage)) return true;
+  let last;
+  try { last = Number(storage?.getItem(QUIET_KEY) ?? 0); } catch { return false; } // not known: no check rather than one at every return
+  return !(last > 0) || now - last >= QUIET_EVERY || last > now; // `last` ahead: the clock was set back
+}
+// Kept as the check starts; false when it can't be kept.
+export function markQuietCheck({ storage = globalThis.localStorage, now = Date.now() } = {}) {
+  try { storage.setItem(QUIET_KEY, String(now)); return true; } catch { return false; }
+}
+// `st` is idevice.status. Set up (a VPN not tested yet would make iOS ask to allow it), no other VPN up, not on
+// cellular, on Wi-Fi (with no network the VPN can't start), and the built-in VPN not on already (an install or a test
+// holds it; `again`: the check's own second try, seconds after its first, whose VPN may still be on).
+export function quietCheckAllowed(choice, st, { again = false } = {}) {
+  if (choice !== "iphone" || !iphoneSetUp(st)) return false;
+  if (otherVPNOn(st) || st.otherVPN || st.vpn.cellular || !st.vpn.wifi) return false;
+  return again || !st.vpn.on;
+}

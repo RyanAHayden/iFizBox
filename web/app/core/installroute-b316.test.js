@@ -5,7 +5,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { verifyFailure, routeFailureOf, installStatus, routeFailure, rememberRouteFailure, clearRouteFailure,
-  failureStatus, FAILURE_KEY, BUILTIN_VPN, PAIR_AGAIN_LINE, LOST_LINE, hasSocketText, plainSocket, pairFooter, vpnTestResult, serverFallback, STATUS_ACTIONS } from "./installroute.js";
+  failureStatus, FAILURE_KEY, BUILTIN_VPN, PAIR_AGAIN_LINE, LOST_LINE, hasSocketText, plainSocket, pairFooter, vpnTestResult, serverFallback, STATUS_ACTIONS,
+  quietCheckDue, quietCheckAllowed, markQuietCheck, QUIET_EVERY } from "./installroute.js";
 import { deviceError, loggedBridge } from "./signing.js";
 
 const refused = Object.assign(new Error("refused: this iPhone refused RemotePairing on port 49152: it no longer has this pairing. Pair again"), { code: "refused" });
@@ -170,4 +171,40 @@ test("B416: a kept log keeps the raw text in a plain line, with the Error line i
   await assert.rejects(native.call("signing.install", { url: "x" }));
   assert.ok(lines.includes(RESET));
   assert.ok(lines.includes(`Error: ${PAIR_AGAIN_LINE}`));
+});
+
+// ---- F410b: when the Quiet Pairing Check runs (screens/installroute-f410b.test.js: what it does)
+test("F410b: at most once a day, and at each launch while a failure is kept", () => {
+  const storage = memory();
+  const now = 1_800_000_000_000;
+  assert.equal(quietCheckDue({ storage, now }), true, "never ran");
+  assert.equal(markQuietCheck({ storage, now }), true);
+  for (const launch of [true, false]) {
+    assert.equal(quietCheckDue({ launch, storage, now: now + QUIET_EVERY - 1 }), false);
+    assert.equal(quietCheckDue({ launch, storage, now: now + QUIET_EVERY }), true);
+    assert.equal(quietCheckDue({ launch, storage, now: now - 1 }), true, "the clock was set back");
+  }
+  rememberRouteFailure(routeFailureOf(refused, FINE), { storage });
+  assert.equal(quietCheckDue({ launch: true, storage, now: now + 1 }), true);
+  assert.equal(quietCheckDue({ launch: false, storage, now: now + 1 }), false, "coming back: the day's only");
+  const off = { getItem() { throw new Error("off"); }, setItem() { throw new Error("off"); } };
+  assert.equal(quietCheckDue({ launch: true, storage: off, now }), false);
+  assert.equal(markQuietCheck({ storage: off, now }), false);
+});
+
+test("F410b: only set up, on Wi-Fi, with no VPN on", () => {
+  const ok = { paired: "rp", otherVPN: false, vpn: { available: true, tested: true, wifi: true, cellular: false, otherVPN: false, on: false } };
+  const vpn = (o) => ({ ...ok, vpn: { ...ok.vpn, ...o } });
+  assert.equal(quietCheckAllowed("iphone", ok), true);
+  assert.equal(quietCheckAllowed("server", ok), false);
+  assert.equal(quietCheckAllowed("iphone", null), false);
+  assert.equal(quietCheckAllowed("iphone", { ...ok, paired: null }), false);
+  assert.equal(quietCheckAllowed("iphone", vpn({ available: false })), false);
+  assert.equal(quietCheckAllowed("iphone", vpn({ tested: false })), false, "iOS would ask Allow");
+  assert.equal(quietCheckAllowed("iphone", vpn({ otherVPN: true })), false);
+  assert.equal(quietCheckAllowed("iphone", { ...ok, otherVPN: true }), false);
+  assert.equal(quietCheckAllowed("iphone", vpn({ cellular: true, wifi: false })), false);
+  assert.equal(quietCheckAllowed("iphone", vpn({ wifi: false })), false, "no network: the VPN can't start");
+  assert.equal(quietCheckAllowed("iphone", vpn({ on: true })), false, "an install or a test holds it");
+  assert.equal(quietCheckAllowed("iphone", vpn({ on: true }), { again: true }), true, "its own second try");
 });

@@ -72,6 +72,7 @@ import { followHereSelf, followSelfUpdate } from "./selfupdate.js";
 // (core/signing.js installParams); `after(result, h)` runs with the HUD still up once iOS has the link (the sheet
 // follows iOS's own progress there) and hides it itself.
 let installing = false; // one install at a time: a second tap (or a doubled handler) while one runs is dropped
+export const installingNow = () => installing; // F410b
 export async function installOnDevice(opts, deps) {
   if (installing) return false;
   installing = true;

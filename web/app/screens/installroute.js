@@ -23,6 +23,7 @@ import { installStatus, CHECKING, CHECKING_SERVER, STATUS_ACTIONS } from "../cor
 import { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, NO_ANSWER_FAILURE, FIX, takeFix } from "../core/installroute.js"; // B316, F409
 import { SETUP_FOOTER, setupSteps, iphoneStatus, fixQuestion } from "../core/installroute.js"; // F414
 import { builtinVPN, setupFooter, iphoneSetUp, HOW_STEPS, vpnTestResult, NO_VPN, BUILTIN_VPN } from "../core/installroute.js"; // F372
+import { quietCheckDue, quietCheckAllowed, markQuietCheck } from "../core/installroute.js"; // F410b
 import { NAME } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
 import { showHUD } from "../nav/hud.js";
@@ -433,6 +434,7 @@ export async function recheckPairing(native, alert, redraw, { spin = null } = {}
   const st = await status(native);
   if (!st?.paired || !builtinVPN(st)) return "skipped";
   const verify = async () => {
+    await quietRun; // F410b
     try { await within(call(native, "idevice.verify"), TIMEOUTS.verify); return null; } catch (e) { lastErr = e; return isLate(e) ? { late: true } : verifyFailure(e, st); }
   };
   let lastErr = null; // B316: what the failed check is kept as
@@ -996,6 +998,46 @@ export function autoCheck(native, alert, redraw, store, mark = null, now = Date.
   // the gap counts from the end too: a slow check (up to TIMEOUTS.verify) isn't followed by another at once
   return check(native, alert, redraw, store, mark, { quiet: true }).finally(() => { AUTO_CHECK.last = Math.max(AUTO_CHECK.last, Date.now()); });
 }
+
+// F410b: the Quiet Pairing Check (core quietCheckDue, quietCheckAllowed): app.js runs it a moment after launch
+// (`launch`) and after coming back. Keeps or clears the Route Failure and nothing else: no alert, no spinner, it never
+// opens Pairing and never forgets a pairing. Only an answer about the pairing, or every connection refused, is kept,
+// and only when a second try says it too (remotepairingd restarting refuses for a moment); a timeout or a VPN that
+// didn't start shows no warning. Not while an install runs (`installing()`), the app is away (`visible()`), or a
+// check, a test or pairing runs here, the Pairing page included; a check the user starts meanwhile waits for it.
+// Answers what it did (tests): "off", "ok", "failed" or "unknown".
+let quietRun = null; // the one that runs; a promise that never rejects
+export async function quietPairingCheck(native, store, opts = {}) {
+  if (quietRun) return "off";
+  const run = runQuietCheck(native, store, opts).catch(() => "unknown");
+  quietRun = run;
+  try { return await run; } finally { quietRun = null; }
+}
+async function runQuietCheck(native, store, { launch = false, installing = () => false, visible = () => true, storage = globalThis.localStorage, now = Date.now } = {}) {
+  const clear = () => visible() && !installing() && !checking && !pairing && !visit && !testing && !fixing && !pairChecking;
+  const choice = () => store.get(ROUTE_KEY);
+  if (choice() !== "iphone" || !quietCheckDue({ launch, storage, now: now() }) || !clear()) return "off";
+  // Status, then the conditions, then the verify: nothing waits in between
+  const st = await status(native);
+  if (!quietCheckAllowed(choice(), st) || !clear() || !markQuietCheck({ storage, now: now() })) return "off";
+  const verify = async () => { try { await within(call(native, "idevice.verify", { quiet: true }), TIMEOUTS.verify); return null; } catch (e) { return e; } };
+  const broken = (e) => !isLate(e) && (e?.code === "route_refused" || /^route_refused:/.test(e?.message ?? "") || turnedDown(verifyFailure(e, st), e));
+  let err = await verify();
+  if (err && broken(err)) {
+    await new Promise((r) => setTimeout(r, recheckHooks.retryMs));
+    if (!clear()) return "unknown";
+    const again = await status(native);
+    if (!quietCheckAllowed(choice(), again, { again: true }) || !clear()) return "unknown";
+    err = await verify();
+  }
+  if (choice() !== "iphone" || pairing || visit?.started || !visible()) return "unknown"; // changed or left meanwhile: not the pairing's answer
+  if (!err) { clearRouteFailure(storage); return "ok"; }
+  const f = broken(err) ? routeFailureOf(err, st) : null;
+  if (!f) return "unknown";
+  rememberRouteFailure(f, { storage, now: now() });
+  return "failed";
+}
+
 // `how` is read again once the check answers: a Fix tap may have joined it (check)
 async function checkOnce(native, alert, redraw, store, mark, how) {
   mark?.reset();
@@ -1005,6 +1047,7 @@ async function checkOnce(native, alert, redraw, store, mark, how) {
     st = await status(native);
     rememberStatus(st);
     if (st && !builtinVPN(st)) { stop(); throw Object.assign(new Error("connect_failed: no Network Extensions"), { code: "connect_failed" }); }
+    await quietRun; // F410b: one at a time with the phone; this one's deadline starts after it
     try { await within(call(native, "idevice.verify", ...(how.quiet ? [{ quiet: true }] : [])), TIMEOUTS.verify); } finally { stop(); }
     clearRouteFailure(); // B316
     const used = store.get(ROUTE_KEY) !== "iphone";

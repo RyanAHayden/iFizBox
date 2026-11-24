@@ -26,7 +26,7 @@ import { pageOpened, pageShown } from "./nav/pagestate.js";
 import { createHomeTop, homeRootOf, createReturnHome, userTouch, untilNotTyping } from "./nav/hometop.js";
 import * as home from "./screens/home.js";
 import * as settingsScreen from "./screens/settings.js";
-import { pendingStep, askLeave, guardHooks } from "./screens/installroute.js"; // F373: settings.js loads it at startup already
+import { pendingStep, askLeave, guardHooks, quietPairingCheck } from "./screens/installroute.js"; // F373: settings.js loads it at startup already
 import { popupOpen, whenNoPopup } from "./nav/popups.js"; // F373
 import { sourceFilter } from "./core/sources.js";
 import { getBackend } from "./backend.js";
@@ -678,6 +678,26 @@ if (nativeBridge()) {
     const native = { call: (m, p) => (m === "push.register" ? untilNotTyping() : Promise.resolve()).then(() => nativeBridge().call(m, p)) };
     setTimeout(() => Promise.all([import("./core/push.js"), import("./signing/identity.js")])
       .then(([p, s]) => p.autoEnablePush({ native, server: s.getServer() })).catch(() => {}), 3000);
+  }
+  // F410b: the pairing of This iPhone, checked in the background at launch and on coming back (screens/installroute.js
+  // quietPairingCheck says when it runs). A moment after, so a link or a tap that starts an install goes first.
+  if (detectMode() === "sideload") {
+    const visible = () => document.visibilityState === "visible";
+    let launch = true; // until the launch's own, once the app is in front
+    let soon = null;
+    const checkPairing = () => {
+      clearTimeout(soon);
+      if (!visible()) return;
+      soon = setTimeout(() => import("./signing/route.js").then((r) => {
+        if (!visible()) return; // back again later
+        const first = launch;
+        launch = false;
+        return quietPairingCheck(nativeBridge(), settingsScreen.settings, { launch: first, visible,
+          installing: () => r.installingNow() || Boolean(loadedScreen("queue")?.appQueueRunning()) });
+      }).catch(() => {}), launch ? 5000 : 2000);
+    };
+    checkPairing();
+    document.addEventListener("visibilitychange", checkPairing);
   }
   // The first launch after iFizBox updated itself (iOS closed the old one as it installed this one). F183: no note
   // pops up (the banner went with the update popups); the version line at the bottom of Home and Settings shows it.
