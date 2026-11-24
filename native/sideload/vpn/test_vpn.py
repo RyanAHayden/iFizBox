@@ -97,7 +97,35 @@ class App(unittest.TestCase):
         self.assertIn("if stop { down() }", src)  # ours is off after the last connection
         self.assertIn('s["vpn"] = LocalVPN.status()', read("idevice", "IDeviceBridge.swift", base=os.path.dirname(HERE)))
         up = src[src.index("static func up("):src.index("static func down(")]
-        self.assertLess(up.index("if !Path.online() {"), up.index("try manager()"))  # no network: say so at once, not after startLimit
+        self.assertLess(up.index("if !Path.online() {"), up.index("var m = try manager()"))  # no network: say so at once, not after startLimit
+
+    def test_one_start_at_a_time(self):
+        """B418: several installs at once: one start, the others find it connected; no save unless needed."""
+        src = read("App", "LocalVPN.swift")
+        up = src[src.index("static func up("):src.index("private static func start(")]
+        self.assertLess(up.index("startLock.lock(before:"), up.index("try start(step)"))
+        self.assertIn("defer { startLock.unlock() }", up)
+        start = src[src.index("private static func start("):src.index("static func down(")]
+        self.assertLess(start.index("if on { return }"), start.index("try manager()"))
+        manager = src[src.index("static func manager()"):src.index("private static func isOurs")]
+        self.assertLess(manager.index("loadAllFromPreferences"), manager.index("if found == nil || !isOurs(m) {"))
+        self.assertLess(manager.index("if found == nil || !isOurs(m) {"), manager.index("saveToPreferences"))
+        self.assertIn("guard stale, !retried else { throw error }", manager)  # once, on a new load
+        self.assertIn("NEVPNError.configurationStale.rawValue", src)
+        # the only two callers hold startLock, and nothing else saves
+        self.assertEqual(src.count("try manager()"), start.count("try manager()"))
+        self.assertEqual(src.count("saveToPreferences"), 1)
+        # status() never waits behind a start
+        self.assertNotIn("startLock", src[src.index("static func status()"):src.index("/// The keys of")])
+
+    def test_one_failed_start_fails_one_install(self):
+        """B418: only iOS's refusal of the configuration is kept for the rest of a queue, not any failed start."""
+        src = read("App", "LocalVPN.swift")
+        self.assertNotIn("lastFailure", src)
+        failed = src[src.index("static func failedNow()"):src.index("static func manager()")]
+        self.assertIn("refusal.map", failed)
+        self.assertEqual(re.findall(r"if (.*?) \{ refused\(f\) \}", src), ["refusable", "refusable && denied"])
+        self.assertEqual(src.count("refusable: found == nil"), 1)  # the first save alone: the one iOS asks about
 
     def test_status_is_plain(self):
         src = read("App", "LocalVPN.swift")
