@@ -620,6 +620,7 @@ enum Sideload {
         DispatchQueue.main.async { KeepAlive.shared.begin(); IDevice.AppFront.watch() }
         HereLane.run { // F359: up to HereLane.width at once (SignBridge.swift)
             let result: Result<Void, Error>
+            var held = true // KeepAlive
             do {
                 try job?.check()
                 log?("Copying the IPA to iOS (\(Sideload.size(output))), then iOS installs it")
@@ -629,6 +630,11 @@ enum Sideload {
                     switch st {
                     case .airplane: emit?("airplane", 0); step?("airplane", 0)
                     case .airplaneOff: emit?("airplaneOff", 0); step?("airplaneOff", 0)
+                    case .appWait(let p): // B423: paused, iOS may suspend the app (held: once each way)
+                        if p == .over { if !held { held = true; KeepAlive.shared.begin() } }
+                        else if held { held = false; KeepAlive.shared.end() }
+                        if p == .app { emit?("appWait", 0); step?("appWait", 0) }
+                        if p == .network { emit?("networkWait", 0); step?("networkWait", 0) }
                     case .connected: emit?("here", 0.02); step?("copying", 0)
                     case .upload(let p): emit?("here", 0.02 + p * 0.28); step?("copying", p); if p >= 1 { closer?.copied() }
                     case .install(let p): emit?("here", 0.3 + p * 0.7); step?("installing", p); closer?.installd(p)

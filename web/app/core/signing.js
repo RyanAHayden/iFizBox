@@ -9,7 +9,7 @@
 //
 // Everything here reads bytes (Uint8Array or ArrayBuffer) and never leaves the phone.
 
-import { AIRPLANE_ON, AIRPLANE_OFF, AIRPLANE_TIMEOUT } from "./installroute.js"; // F368
+import { AIRPLANE_ON, AIRPLANE_OFF, AIRPLANE_TIMEOUT, APP_WAIT, NETWORK_WAIT } from "./installroute.js"; // F368
 import { DOMAIN, SIGN_HOST, NAME, BUNDLE_ID } from "../brand.js";
 import { isAts, ATS_TITLE, atsText, INSECURE_IPA_ALERT, insecureText } from "./insecureipa.js"; // B104
 import { signingPage } from "./signingpage.js"; // C15: the sideload build's page is Installation & Signing
@@ -419,7 +419,7 @@ export function deviceSummary(identity, { now = new Date(), locale, timeZone } =
 // upload, then installd through the built-in VPN, Sideload.swift installHere), with its percentage, so a page waiting
 // offline at Downloading can't be taken for one waiting on the phone.
 const PHASES = { downloading: "Downloading", reading: "Reading", signing: "Signing", installing: "Installing",
-  here: "Installing on this iPhone", airplane: AIRPLANE_ON, airplaneOff: AIRPLANE_OFF };
+  here: "Installing on this iPhone", airplane: AIRPLANE_ON, airplaneOff: AIRPLANE_OFF, appWait: APP_WAIT, networkWait: NETWORK_WAIT };
 export function phaseLabel(ev) {
   const name = PHASES[ev?.phase];
   if (!name) return null;
@@ -709,7 +709,7 @@ export function callWithStall(native, method, params, onEvent = () => {}, { limi
       if (over) return;
       if (ev?.phase) {
         last = ev;
-        if (ev.phase === "installing" || ev.phase === "airplane") stop(); else arm(); // F368: the shell times the airplane wait
+        if (ev.phase === "installing" || ev.phase === "airplane" || ev.phase === "appWait" || ev.phase === "networkWait") stop(); else arm(); // F368: the shell times the airplane wait
       }
       onEvent(ev);
     })).then((r) => { if (!over) { over = true; stop(); resolve(r); } },

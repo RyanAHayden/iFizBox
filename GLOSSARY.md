@@ -227,3 +227,10 @@ _Said_: set up steps, setup steps
 _On screen_: This iPhone > Set Up
 _In code_: setupSteps, SETUP_FOOTER, iphoneStatus
 _Avoid_: setup checklist, wizard
+
+**App wait**:
+A This iPhone install paused because the app is in the background; it goes on when the app is opened
+_Said_: waiting for iFizBox
+_On screen_: Waiting for iFizBox
+_In code_: APP_WAIT, appWait, LocalVPN.pause
+_Avoid_: paused install, background wait

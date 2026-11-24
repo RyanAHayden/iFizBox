@@ -1,6 +1,6 @@
 // Signing's shared helpers (signing-client.js re-exports the public ones): the bridge, the build checks, the
 // insecure-download alert, the malware hash, and the progress page's Cancel.
-import { AIRPLANE_ON, AIRPLANE_OFF } from "../core/installroute.js"; // F368
+import { AIRPLANE_ON, AIRPLANE_OFF, APP_WAIT, NETWORK_WAIT } from "../core/installroute.js"; // F368
 import { detectMode } from "../core/settings.js";
 import { showAlert } from "../nav/alert.js";
 import { isInsecure, INSECURE_IPA_ALERT, INSTALL_ANYWAY } from "../core/insecureipa.js";
@@ -151,7 +151,7 @@ export function setServer(s) {
 // B111: signing.install's {here: "copying" | "installing", progress} event (This iPhone) -> { label } for the page's
 // step and bar ("Copying to iPhone 40%", "Installing 75%"), or null. F368: "airplane" and "airplaneOff" too.
 export function hereLabel(ev) {
-  const air = { airplane: AIRPLANE_ON, airplaneOff: AIRPLANE_OFF }[ev?.here];
+  const air = { airplane: AIRPLANE_ON, airplaneOff: AIRPLANE_OFF, appWait: APP_WAIT, networkWait: NETWORK_WAIT }[ev?.here];
   if (air) return { label: air };
   const word = { copying: "Copying to iPhone", installing: "Installing" }[ev?.here];
   if (!word) return null;

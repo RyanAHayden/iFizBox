@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { appRows, createAppRun, rowStatus, runStatus, rowProgress, airplaneStatus } from "./core/apprun.js";
-import { AIRPLANE_ON, AIRPLANE_OFF, AIRPLANE_TIMEOUT, serverFallback, routeFailureOf } from "./core/installroute.js";
+import { AIRPLANE_ON, AIRPLANE_OFF, AIRPLANE_TIMEOUT, APP_WAIT, NETWORK_WAIT, serverFallback, routeFailureOf } from "./core/installroute.js";
 import { hereLabel } from "./signing/common.js";
 import { openPrepared, herePhase } from "./signing/queue.js";
 import { callWithStall } from "./core/signing.js";
@@ -105,4 +105,18 @@ test("a re-sign's stall limit leaves the airplane wait to the shell", async () =
   const native = { call: async (m, p, on) => { on({ phase: "airplane", progress: 0 }); await tick(); fired += timers.size; return "ok"; } };
   await callWithStall(native, "signing.resignAll", {}, () => {}, { later: () => { const t = {}; timers.add(t); return t; }, clear: (t) => timers.delete(t) });
   assert.equal(fired, 0);
+});
+
+test("B423: a wait paused in the background reads Waiting for the app on the row, the run and a single install", () => {
+  const [a] = appRows([{ name: "A", bundleId: "a.b" }, { name: "B", bundleId: "b.c" }], []);
+  Object.assign(a, { state: "installing", phase: "appWait", here: true, fraction: 0 });
+  assert.equal(APP_WAIT, "Waiting for iFizBox");
+  assert.equal(rowStatus(a), APP_WAIT);
+  assert.equal(runStatus([a]), APP_WAIT);
+  assert.equal(rowProgress(a), 0.5);
+  assert.deepEqual(herePhase({ phase: "appWait", progress: 0 }), { phase: "appWait", fraction: 0 });
+  assert.deepEqual(hereLabel({ here: "appWait" }), { label: APP_WAIT });
+  a.phase = "networkWait";
+  assert.equal(rowStatus(a), NETWORK_WAIT);
+  assert.equal(runStatus([a]), NETWORK_WAIT);
 });
