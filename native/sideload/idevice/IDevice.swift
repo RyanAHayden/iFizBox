@@ -1275,16 +1275,20 @@ enum IDevice {
         let total = run.size, remote = run.remote
         // connections and open files first, one after another (the session is not for several threads)
         var clients: [OpaquePointer?] = [first], files: [OpaquePointer?] = [firstFile]
-        defer { for (i, c) in clients.enumerated() where i > 0 { afc_file_close(files[i]).map(idevice_error_free); afc_client_free(c) } }
+        defer {
+            for (i, c) in clients.enumerated() where i > 0 {
+                if i < files.count { afc_file_close(files[i]).map(idevice_error_free) }
+                afc_client_free(c)
+            }
+        }
         for _ in 1..<count {
             let c = try s.afc()
             clients.append(c)
             var f: OpaquePointer?
-            files.append(nil)
             try check(afc_file_open(c, remote, AfcRw, &f), "upload_failed") // r+: the first one made the file
-            files[files.count - 1] = f
+            files.append(f)
         }
-        let per = (total / count + chunk - 1) / chunk * chunk
+        let per = ((total + count - 1) / count + chunk - 1) / chunk * chunk // count ranges cover the whole file
         ilog("AFC: test switch: \(count) connections, \(per >> 20) MB each, \(chunk >> 20) MB chunks")
         final class Shared: @unchecked Sendable {
             let lock = NSLock()
@@ -1333,6 +1337,7 @@ enum IDevice {
         }
         run.sent = shared.sent
         if let e = shared.failure { afc_file_close(firstFile).map(idevice_error_free); throw e }
+        guard shared.sent == total else { afc_file_close(firstFile).map(idevice_error_free); throw Failure(code: "upload_failed", text: "sent \(shared.sent) of \(total) bytes") }
         let secs = max(Date().timeIntervalSince(t0), 0.001)
         ilog("AFC: copied \(mb(shared.sent)) in \(String(format: "%.1f", secs)) s (this run \(String(format: "%.1f", Double(shared.sent) / 1_048_576 / secs)) MB/s, \(count) connections, \(chunk >> 20) MB chunks)")
     }
