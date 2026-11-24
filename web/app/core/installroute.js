@@ -48,10 +48,10 @@ export const airplaneTimeout = (err) => (err?.code ?? String(err?.message ?? err
 // C73: another VPN is up (or chosen in Settings > VPN): iOS runs one at a time, so an install turns it off.
 export const otherVPNOn = (st) => builtinVPN(st) && Boolean(st.vpn.otherVPN || st.vpn.otherVPNSelected);
 export const OTHER_VPN_LINE = "Your VPN goes off during installs. Turn it back on after.";
-// F414: the status group's footer once This iPhone is set up: one hint, or none.
+// F414: the status group's footer once This iPhone is set up: one hint, or none. F412: with Restore My VPN on, its own footer says what becomes of the other VPN.
 export function setupFooter(st) {
   if (!iphoneSetUp(st)) return "";
-  if (otherVPNOn(st)) return OTHER_VPN_LINE;
+  if (otherVPNOn(st) && !st.vpn.restore) return OTHER_VPN_LINE;
   return st.vpn.cellular ? CELL_FOOTER : "";
 }
 // F414: setting up, as rows: what each is and whether it's done (`next`: a tap does it). The test is when iOS asks to
@@ -485,4 +485,10 @@ export function quietCheckAllowed(choice, st, { again = false } = {}) {
 }
 
 // Restore My VPN (sideload, built-in VPN): the kept setting, read as idevice.status's vpn.restore. Answers that vpn status.
+export const RESTORE_VPN = "Restore My VPN";
+// F412: shown when the shell can run the built-in VPN and knows the setting
+export const restoreShown = (st) => builtinVPN(st) && typeof st.vpn.restore === "boolean";
+export const restoreFooter = (on) => (on
+  ? "After installs your own VPN comes back. iOS asks to allow the app's VPN again next time."
+  : "Your own VPN stays off after installs.");
 export const setRestoreVPN = (native, on) => native.call("vpn.setRestore", { on: Boolean(on) });
