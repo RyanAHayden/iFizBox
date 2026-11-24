@@ -272,13 +272,15 @@ static int install(const char *path, const char *bundle, int developer, int base
         SEL with_block = sel_registerName("installApplication:withOptions:error:usingBlock:");
         if (((BOOL(*)(id, SEL, SEL))objc_msgSend)(w, sel_registerName("respondsToSelector:"), with_block)) {
             /* B400: installd's own percents; its block is called while the call below waits. */
-            char name[HELPER_NAME_MAX + 1];
+            static char name[HELPER_NAME_MAX + 1]; /* static: a late call of the block may come after this returned */
+            static int told = -1;
             snprintf(name, sizeof name, "%s", bundle);
             const char *named = name;
             void (^said)(id) = ^(id info) {
                 int pct = installd_percent(info);
                 char text[32];
-                if (pct < 0 || pct > 100) return;
+                if (pct <= told || pct > 100) return; /* never back */
+                told = pct;
                 snprintf(text, sizeof text, "Installing %d%%", pct);
                 progress(named, base + (99 - base) * pct / 100, text);
             };
@@ -704,7 +706,10 @@ static int do_install(const char *prefix, const char *ipa, char *const env[], co
     if (close(out) || n < 0) return fail(err, "can't copy the IPA");
     long long plain = 0;
     int on_unix = 0, zip = open(copy, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
-    if (zip >= 0) { helper_ipa_zip(zip, &plain, &on_unix); close(zip); }
+    if (zip >= 0) {
+        if (helper_ipa_zip(zip, &plain, &on_unix)) plain = 2 * total; /* a guess: Unpacking still moves */
+        close(zip);
+    }
 
     /* 2. Unpacked by the user, not root. */
     progress(NULL, 5, "Unpacking");

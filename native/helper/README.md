@@ -51,7 +51,7 @@ executable failing is an error.
 | `simulate`  | `apt-get -s --reinstall --allow-downgrades --allow-unauthenticated install <items>`: the Confirm sheet's plan (below)    |
 | `apply`     | `apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold --reinstall --allow-downgrades --allow-unauthenticated [-o APT::Keep-Fds::=3 -o APT::Status-Fd=3] install <items>`, with `CYDIA=3 1` in its environment when fd 3 is open (below) |
 | `apply-ask` | `apt-get -y --reinstall --allow-downgrades --allow-unauthenticated -o APT::Keep-Fds::=3 -o APT::Status-Fd=3 install <items>` (no conffile options; refused without fd 3), `CYDIA=3 1`, as a child whose stdin is a pipe the helper feeds (below) |
-| `install-ipa` | runs no apt: installs one IPA through `LSApplicationWorkspace installApplication:withOptions:error:` as AppSync's `appinst` does (`ipa.c`; below) |
+| `install-ipa` | runs no apt: installs one IPA through `LSApplicationWorkspace installApplication:withOptions:error:` (`usingBlock:` for installd's percents where it has it), as AppSync's `appinst` does, or installs the unpacked `.app` where installd may take it (`ipa.c`; below) |
 | `rollbacks` | runs nothing: `<version> <file>` per line for each .deb of the package the daemon kept in `/var/jb/var/cache/ifizbox/rollback/<pkg>/` that `rollback` would take (below) |
 | `notifications` | runs nothing: `off` creates `/var/jb/var/lib/ifizbox/upgrades.off` (empty, 0644; the folder 0755 if missing), `on` deletes it (Settings' Upgrade Notifications; the daemon reads it, `../daemon/quiet.h`). A symlink or anything but a regular file there is refused (exit 74), never followed. Prints `Upgrade notifications on\|off` |
 | `app-versions` | runs nothing: `<id>\t<short>\t<build>\t<store>` per app installd put in `/var/containers/Bundle/Application` (`HELPER_APPS_DIR`): `<UUID>/<the one>.app/Info.plist`'s CFBundleIdentifier, CFBundleShortVersionString and CFBundleVersion, and `<UUID>/iTunesMetadata.plist`'s bundleShortVersionString (App Store apps). Real directories and regular files only (`lstat`, `O_NOFOLLOW`, at most 4 MiB), a bundle id `[A-Za-z0-9.-]`, a value with a control character or over 255 bytes printed empty, at most 4096 apps. A missing folder lists nothing (exit 0), an unreadable one is exit 74 (`ipa.c`) |
@@ -145,15 +145,27 @@ or `nothing to change`; exit 0, 64 refused, 74 couldn't write.
 (`HELPER_IPA_DIR`, where Apt.swift's `ipa.install` downloads; name `[A-Za-z0-9][A-Za-z0-9._-]*.ipa`, at most 255
 bytes). `ipa.c` opens it with `O_NOFOLLOW` through the real directory (iOS's `/var` -> `/private/var` aside, no
 link), and wants a plain file with one link, owned by the directory's owner and not root, at most 8 GiB. It copies it
-into a root-owned `/var/tmp/ifizbox-ipa.XXXXXX/app.ipa` (`HELPER_IPA_WORK`), and `<prefix>/usr/bin/unzip` unpacks that
-**as the file's owner** (mobile, never root) into `pkg/`, so a hostile zip's links or `../` can only write where mobile
-can. The bundle id comes from `Payload/<the one>.app/Info.plist` (`O_NOFOLLOW`, CFPropertyList, `[A-Za-z0-9.-]`). With
-AppSync Unified (its installd dylib in `Library/MobileSubstrate/DynamicLibraries` or `usr/lib/TweakInject`), installd
-gets the root-owned copy with `{CFBundleIdentifier}`, as appinst. Without it, `<prefix>/usr/bin/ldid -s` signs the
-`.app` ad hoc (as TrollStore Lite; also as mobile) and installd gets the unpacked `.app` with `PackageType: Developer`;
-that tree is mobile's, the same trust as mobile running appinst. No ldid, or installd refuses the ad hoc app: exit
-**69** with a line saying to install AppSync Unified (or ldid), or to sign the IPA for this iPhone. Progress on fd 3
-as `pmstatus:<id>:<percent>:<text>`, `Installed <id>` on stdout. The helper is signed with `entitlements.plist` here
+into a root-owned `/var/tmp/ifizbox-ipa.XXXXXX/app.ipa` (`HELPER_IPA_WORK`, not fsynced: it is read back and deleted,
+never after a restart), and `<prefix>/usr/bin/unzip` unpacks that **as the file's owner** (mobile, never root) into
+`pkg/`, so a hostile zip's links or `../` can only write where mobile can. The bundle id comes from
+`Payload/<the one>.app/Info.plist` (`O_NOFOLLOW`, CFPropertyList, `[A-Za-z0-9.-]`). With AppSync Unified (its installd
+dylib in `Library/MobileSubstrate/DynamicLibraries` or `usr/lib/TweakInject`), installd takes the unpacked `.app`
+with `PackageType: Developer` when unzip exited 0 (no warning), every zip entry was made on Unix or macOS, the
+central directory could be read, and the IPA has no top-level `iTunesMetadata.plist`: installd then moves that tree
+into place instead of unpacking the IPA a second time (about half the time on the iPhone 7). Otherwise, when
+unzip gave a warning (exit 1), an entry was not made on Unix/macOS or the central directory can't be read (zip64
+included), or there is a top-level `iTunesMetadata.plist` (which only an IPA install keeps), installd gets the
+root-owned copy with `{CFBundleIdentifier}`, as appinst. That unpacked tree is mobile's until installd takes it, as
+for the ad hoc and fakesigned apps, so mobile could change it in between; the root-owned copy is still what gets
+unpacked, and unzip still runs as mobile. Without AppSync, `<prefix>/usr/bin/ldid -s` signs the `.app` ad hoc (as
+TrollStore Lite; also as mobile) and installd gets the unpacked `.app` with `PackageType: Developer`; that tree is
+mobile's, the same trust as mobile running appinst. No ldid, or installd refuses the ad hoc app: exit **69** with a
+line saying to install AppSync Unified (or ldid), or to sign the IPA for this iPhone. installd is called through
+`installApplication:withOptions:error:usingBlock:` where it exists (else the plain call), and its percents move the
+bar. Progress on fd 3 as `pmstatus:<id>:<percent>:<text>`, never back: the copy (0 to 5) and unzip (5 to 40) move
+with bytes, unzip's total being the zip's central directory and the tree it fills measured about twice a second;
+installd's install runs from 50 (ad hoc 60) to 99, following its own percent, and its text ends in it
+("Installing 40%"). `Installed <id>` on stdout. The helper is signed with `entitlements.plist` here
 (appinst's: `allowedSPI` Install and InstallForLaunchServices, installd's mach-lookup, `platform-application`).
 
 **Paid packages:** `install-paid <path> <pkg> <version>` takes one file,

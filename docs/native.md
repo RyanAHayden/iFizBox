@@ -22,7 +22,7 @@ native/             Swift shell, root helper, daemon
 The UI never knows which backend it has. Both expose the same calls (`sources()`, `refresh()`, `packages()`,
 `installed()`, `queue()`, ...). On the site, raw `Packages` files come through the Worker's proxy (`/api/fetch`). In the app they
 come from apt's own lists on disk (after `apt-get update` through the helper), and installing goes through the
-helper. Parsing, Changes, upgrades and search all run in `core/` in both places.
+helper. Parsing, Changes, upgrades and search all run in `core/` in both places. The jailbreak app plays silent audio (`UIBackgroundModes` audio, with KeepAlive held from `ipa.install`'s call to its answer), so leaving the app doesn't freeze an IPA's download or install.
 
 **The status bar.** In the iOS 6 era the strip above the nav bar is plain black in every theme, with white
 status-bar text (`preferredStatusBarStyle`), and the nav bar is its own 44 pt bar under it. The page lays its top
