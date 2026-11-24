@@ -20,8 +20,7 @@
 ## Decisions
 - A new file, not `LocalVPN.swift`: `CellularShortcut.swift` stays Foundation-only so Linux can test it, and
   `LocalVPN.swift` stays free of Shortcuts.
-- The callback never decides. It only ends the wait, after a 3 s grace, because iOS 27 gives a run the previous
-  run's error.
+- The callback never decides. At most it starts the count of time back in front (see Review).
 - The check's limit is 60 s, because the first run waits for the user's Allow.
 - No automatic retry. Every retry is another hop to Shortcuts.
 - A check that never opened Shortcuts (`not_opened`) leaves `added` as it was. Every other failure except `busy`
