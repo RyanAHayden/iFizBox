@@ -241,3 +241,10 @@ _Said_: quiet pairing check
 _On screen_: (none: only Home's red tile)
 _In code_: quietPairingCheck, quietCheckDue, quietCheckAllowed, ifizbox.quietPairingCheck
 _Avoid_: background verify, auto check
+
+**Restore My VPN**:
+Optional, off by default: after an install, the built-in VPN's configuration is removed so the VPN it took the place of comes back; iOS asks to allow the built-in VPN again next time
+_Said_: Restore My VPN switch
+_On screen_: Restore My VPN
+_In code_: LocalVPN.restore, vpn.setRestore, noteOther, giveBack
+_Avoid_: put-back, give back VPN
