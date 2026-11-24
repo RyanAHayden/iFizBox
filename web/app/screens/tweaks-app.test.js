@@ -73,6 +73,16 @@ test("Install on an app with kept tweaks queues at once and asks nothing; the ke
   assert.equal(opened.length, 1);
   const p = await keptTweakParams({ url: "https://s/t.ipa" }, { id: "com.x.tube" }, { store, ellekit: async () => fx("ellekit.deb"), toBase64: (b) => `b64:${b.length}` });
   assert.deepEqual(p.tweaks.names, ["com.me.fixture_9.deb"]);
+  // tweaks made for it (cached checks, none added), and a Version History row (`version`): also at once, nothing asked
+  const s = storage();
+  s.setItem("ifizbox.tweakInfo", JSON.stringify({ "com.t.yt@2": { ok: true, bundles: ["com.x.tube"], anyApp: false } }));
+  for (const version of [null, "2"]) {
+    const q2 = createAppQueue();
+    assert.equal(await appPageAction(pkg, null, { queue: q2, add, mode: "sideload", ready: async () => true, store: async () => ({ all: async () => [] }), version,
+      ask: async () => assert.fail("no popup") }), true);
+    assert.ok(q2.get("com.x.tube"));
+  }
+  assert.equal(opened.length, 3);
   const src = readFileSync(new URL("./tweaks.js", import.meta.url), "utf8");
   assert.doesNotMatch(src, /installTweaksChoice|pushAddTweaksUntilBack|openAddTweaks|showPushedPage/);
 });
