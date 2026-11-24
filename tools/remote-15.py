@@ -194,7 +194,11 @@ def main():
     try:
         server = ThreadingHTTPServer((ip, port), H)
     except OSError as e:
-        if e.errno == 98 or e.errno == 48:
+        if e.errno in (98, 48):
+            try:  # only our own page counts as "already serving"
+                urllib.request.urlopen(f"http://{ip}:{port}/who", timeout=5).read()
+            except Exception:
+                raise e
             print(f"already serving on http://{ip}:{port}/", flush=True)
             return 0
         raise
