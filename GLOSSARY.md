@@ -198,7 +198,7 @@ _Avoid_: cached IPA, pending IPA
 Another app's VPN that is selected in Settings > VPN with Connect On Demand on, but not connected right now
 _Said_: selected but idle On Demand VPN
 _On screen_: idle VPN
-_In code_: LocalVPN.otherVPNSelected, shortcuts.idle, vpnIdle
+_In code_: LocalVPN.otherVPNSelected, otherVPNOn
 _Avoid_: sleeping VPN, inactive VPN
 
 **Dark cover**:

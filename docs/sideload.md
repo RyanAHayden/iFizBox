@@ -297,8 +297,6 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   takes our VPN down 3 seconds after the queue's last connection. The configuration is never On Demand. iOS runs one VPN at
   a time, so while ours is on any other VPN is taken off, and `vpn.status`'s `otherVPN` says so. Nothing puts that VPN back
   (whether one that relies on On Demand comes back by itself is not verified on a phone).
-  On launch the app clears the keys of the removed Shortcut features once (`ifizbox.vpn.shortcut.*`, `ifizbox.vpn.switch.pending`,
-  `ifizbox.vpn.lost`, `ifizbox.vpn.leftOff`).
   Bridge calls: `vpn.status` (also `idevice.status`'s `vpn`) answers `{available, bundled, entitled, tested, on, cellular,
   wifi, otherVPN, name}`, and `vpn.test` runs the Set Up test.
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
