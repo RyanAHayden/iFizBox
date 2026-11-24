@@ -73,6 +73,7 @@
 // app (Downloading Delta 48 MB, Signed Delta, Asked iOS to install Delta, Installed Delta / the reason it failed);
 // percents only move the row's bar and the bottom status.
 // SPDX-License-Identifier: GPL-3.0-or-later
+import { AIRPLANE_ON, AIRPLANE_OFF } from "./installroute.js"; // F368
 import { runOrder, sizeText, SELF_ID } from "./appqueue.js";
 import { NAME } from "../brand.js";
 import { isNewer } from "./selfupdate.js"; // B159: staleSelf
@@ -278,6 +279,8 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       else if (phase === "signing") log(r, "step", `Signing ${label(r)}`);
       else if (phase === "asking") log(r, "step", `Asked iOS to install ${label(r)}`);
       else if (phase === "copying") log(r, "step", copyingText(r)); // B111: This iPhone
+      else if (phase === "airplane") log(r, "step", AIRPLANE_ON); // F368
+      else if (phase === "airplaneOff") log(r, "step", `Connected to iOS. ${AIRPLANE_OFF}`);
       else if (phase === "installing" && r.here) {
         log(r, "step", `Installing ${label(r)}`);
         if (isSelf(r)) log(r, "step", SELF_CLOSING); // B173: installd accepted it: the shell closes iFizBox now
@@ -289,6 +292,10 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     if (word.word && word.word !== r.word && word.word !== "Preparing") log(r, "step", `${word.word} ${label(r)}`);
     const settled = !r.here && phase === "copying"; // F359: its This iPhone route is settled: others may join it
     const here = r.here || phase === "copying";
+    if (phase === "airplane" || phase === "airplaneOff") { // F368: This iPhone's wait on cellular, and its end
+      set(r, { phase, state: "installing", here: true, fraction: 0, airplane: phase === "airplane" ? "on" : "off" });
+      return;
+    }
     const state = phase === "copying" ? "installing" : SIGNING.has(phase) || WITH_IOS.has(phase) ? phase : r.state;
     let frac = Math.max(0, Math.min(1, Number(fraction) || 0));
     if (phase === "signing" && SIGN_STEPS[step]) frac = SIGN_STEPS[step][0] + (SIGN_STEPS[step][1] - SIGN_STEPS[step][0]) * frac;
@@ -372,14 +379,25 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     pump();
   }
 
+  // F368: resolves once no row has a download or signing ahead (on cellular nothing downloads in Airplane Mode), or
+  // the waiting install is stopped
+  const signWaits = new Set();
+  const signsLeft = () => rows.some((o) => o.state === "waiting" || SIGNING.has(o.state));
+  const allSigned = (signal) => new Promise((resolve) => {
+    if (!signsLeft() || signal.aborted) return resolve();
+    const done = () => { signWaits.delete(done); resolve(); };
+    signWaits.add(done);
+    signal.addEventListener("abort", done, { once: true });
+  });
+
   async function startInstall(r) {
     const f = fly(r);
     const again = Boolean(r.again);
     const reinstall = Boolean(r.reinstall); // B337: installAgain's row
-    set(r, { state: "asking", phase: null, fraction: 0, word: null, wordPercent: null, again: false, reinstall: false, here: false, local: localRoute(r) });
+    set(r, { state: "asking", phase: null, fraction: 0, word: null, wordPercent: null, again: false, reinstall: false, here: false, airplane: null, local: localRoute(r) });
     let res;
     try {
-      res = await install(r, { signal: f.ctl.signal, progress: progressOf(r, f), ...(again ? { again: true } : {}) });
+      res = await install(r, { signal: f.ctl.signal, progress: progressOf(r, f), allSigned: () => allSigned(f.ctl.signal), ...(again ? { again: true } : {}) });
     } catch (e) {
       if (f.why || ended(r)) return;
       if (reinstall && e?.code === "gone") {
@@ -451,6 +469,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
         if (r.state === "waiting") { busy++; startSign(r); }
       }
       // the install lane: one row with iOS at a time, or (F359) up to `parallel` This iPhone rows (installLaneStart)
+      if (signWaits.size && !signsLeft()) for (const done of [...signWaits]) done();
       const next = installLaneStart(rows, { parallel, local: localRoute });
       if (next) startInstall(next);
     }
@@ -629,8 +648,11 @@ export function rowStatus(row, opts = {}) {
     case "signed": return "Signed: Waiting to Install"; // F391: only while it waits its turn
     case "asking":
       if (row.phase === "busy") return busyText(label(row)); // B312
+      if (row.phase === "hold") return "Signed: Waiting to Install"; // F368: on cellular, until every app is signed
       return promptUp(row) ? "Tap Install on the iOS prompt" : "Installing"; // B137: This iPhone has no prompt
     case "installing":
+      if (row.phase === "airplane") return AIRPLANE_ON; // F368
+      if (row.phase === "airplaneOff") return "Connected to iOS";
       if (row.phase === "copying") return p > 0 && p < 100 ? `Copying to iPhone ${p}%` : "Copying to iPhone";
       if (selfClosing(row)) return SELF_CLOSING;
       return p > 0 && p < 100 ? `Installing ${p}%` : "Installing";
@@ -659,9 +681,20 @@ export function summaryLine(rows) {
   return parts.length ? parts.map(([c, w]) => `${c} ${w}`).join(", ") : "Nothing to do";
 }
 
+// F368: what a run on This iPhone says about Airplane Mode: AIRPLANE_ON while a row waits for it; AIRPLANE_OFF once
+// every row still going has its connection (a row yet to connect would wait again); null otherwise
+export function airplaneStatus(rows) {
+  const going = rows.filter((r) => !ended(r));
+  if (going.some((r) => r.state === "installing" && r.phase === "airplane")) return AIRPLANE_ON;
+  const open = (r) => r.state === "installing" && r.here && (r.airplane === "off" || r.phase === "installing" || r.fraction > 0);
+  return going.length && rows.some((r) => r.airplane === "off") && going.every(open) ? AIRPLANE_OFF : null;
+}
+
 export function runStatus(rows) {
+  const air = airplaneStatus(rows); // F368
+  if (air) return air;
   const pos = (r) => `${rows.indexOf(r) + 1} of ${rows.length}`;
-  const withIos = rows.filter((r) => WITH_IOS.has(r.state));
+  const withIos = rows.filter((r) => WITH_IOS.has(r.state) && r.phase !== "hold");
   if (withIos.length > 1) { // F359: This iPhone rows installing together
     return withIos.every((r) => r.phase === "copying") ? `Copying ${withIos.length} apps to iPhone` : `Installing ${withIos.length} apps`;
   }

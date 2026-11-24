@@ -111,7 +111,7 @@ const dropKeptIpa = (url, file, native) => import("../core/myipas.js").then(asyn
 // F366: `server`: this row goes through the default Signing Server whatever Install Apps With says (the run's Use the
 // Signing Server). A This iPhone failure that offers it (core/installroute.js serverFallback) throws with `fallback`,
 // the failure's { title, short, fix, button }.
-export async function openPrepared(row, { tag, signal = null, progress = () => {}, log = () => {}, host = false, wait = ASK_WAIT, native, again = false, server = false } = {}) {
+export async function openPrepared(row, { tag, signal = null, progress = () => {}, log = () => {}, host = false, wait = ASK_WAIT, native, again = false, server = false, allSigned = null } = {}) {
   const name = row?.name || row?.id || "";
   let opened;
   let route = null;
@@ -126,6 +126,12 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
     if (route.route) host = false; // This iPhone: installd updates iFizBox in place
     // B111: This iPhone has no iOS prompt: the row shows the copy and installd's percent (herePhase), and the reply
     // comes once installd has the app
+    // F368: on cellular the install asks for Airplane Mode, so the run's other downloads end first (allSigned)
+    if (route.route && allSigned && (await routeStatus(route, native))?.vpn?.cellular) {
+      progress("hold", 0);
+      await allSigned();
+    }
+    if (signal?.aborted) throw Object.assign(new Error("Cancelled"), { code: "cancelled" });
     if (route.route) progress("copying", 0);
     opened = await abortable(native, "signing.open", { token: row.token, manifestServer: server ? defaultServer() : getServer(), ...(host ? { host: true } : {}), ...route },
       (ev) => {
@@ -183,8 +189,9 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
 }
 
 // B111: signing.open's event on the This iPhone route -> the run's { phase: "copying" | "installing", fraction 0..1 },
-// or null (not a step event)
+// or null (not a step event). F368: "airplane" and "airplaneOff" too.
 export function herePhase(ev) {
+  if (ev?.phase === "airplane" || ev?.phase === "airplaneOff") return { phase: ev.phase, fraction: 0 };
   if (ev?.phase !== "copying" && ev?.phase !== "installing") return null;
   const f = Number(ev.progress);
   return { phase: ev.phase, fraction: Number.isFinite(f) ? Math.max(0, Math.min(1, f)) : 0 };

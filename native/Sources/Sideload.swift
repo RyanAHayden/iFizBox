@@ -213,7 +213,7 @@ enum Sideload {
         let emit = { (phase: String, p: Double) in
             if throttle.pass(phase, p) { c.emitOnMain([["phase": phase, "progress": p]]) }
         }
-        // B111: This iPhone's steps on their own: {here: "copying" | "installing", progress} (signing-client.js hereLabel)
+        // B111: This iPhone's steps on their own: {here: "airplane" | "airplaneOff" | "copying" | "installing", progress} (signing-client.js hereLabel)
         let stepThrottle = Throttle()
         let step = { (phase: String, p: Double) in
             if stepThrottle.pass(phase, p) { c.emitOnMain([["here": phase, "progress": p]]) }
@@ -624,8 +624,11 @@ enum Sideload {
                 try job?.check()
                 log?("Copying the IPA to iOS (\(Sideload.size(output))), then iOS installs it")
                 // B246: the bundle ID and version let a dropped connection ask iOS for the app instead of failing
-                try IDevice.install(output, bundleID: app.bundleID, version: app.version, note: { log?($0) }) { st in
+                try IDevice.install(output, bundleID: app.bundleID, version: app.version, cancelled: { job?.cancelled == true },
+                                    note: { log?($0) }) { st in
                     switch st {
+                    case .airplane: emit?("airplane", 0); step?("airplane", 0)
+                    case .airplaneOff: emit?("airplaneOff", 0); step?("airplaneOff", 0)
                     case .connected: emit?("here", 0.02); step?("copying", 0)
                     case .upload(let p): emit?("here", 0.02 + p * 0.28); step?("copying", p); if p >= 1 { closer?.copied() }
                     case .install(let p): emit?("here", 0.3 + p * 0.7); step?("installing", p); closer?.installd(p)

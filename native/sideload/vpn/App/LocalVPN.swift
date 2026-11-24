@@ -101,6 +101,42 @@ enum LocalVPN {
         }
     }
 
+    // ---- The airplane wait
+    // On cellular iOS refuses the connects an install needs, starts no VPN without a network, and keeps one that is up
+    // when the network goes. So our VPN comes on first, then the install waits for the path to leave cellular.
+
+    static let airplaneLimit: TimeInterval = 300 // how long an install waits for Airplane Mode
+    static let airplaneSettle: TimeInterval = 1  // off cellular for this long: a passing gap isn't Airplane Mode
+
+    /// Blocking: true once the path has left cellular (the VPN on, kept by installBegan), false when it wasn't on
+    /// cellular. Polled through NWPathMonitor's last path, so Control Center over the app changes nothing.
+    /// Throws when cancelled, after airplaneLimit, or when the VPN doesn't start; installEnded then takes it down.
+    static func waitOffCellular(cancelled: () -> Bool, waiting: () -> Void) throws -> Bool {
+        guard available, !failedNow(), Path.now().cellular else { return false }
+        try begin()
+        defer { end() }
+        log("on cellular: waiting for Airplane Mode")
+        waiting()
+        let t0 = Date()
+        var left: Date?
+        while true {
+            if cancelled() {
+                log("the airplane wait was cancelled")
+                throw IDevice.Failure(code: "cancelled", text: "Cancelled")
+            }
+            if Path.now().cellular { left = nil } else if left == nil { left = Date() }
+            if let l = left, Date().timeIntervalSince(l) >= airplaneSettle {
+                log("off cellular after \(Int(Date().timeIntervalSince(t0))) s")
+                return true
+            }
+            if Date().timeIntervalSince(t0) > airplaneLimit {
+                log("no Airplane Mode in \(Int(airplaneLimit)) s")
+                throw IDevice.Failure(code: "airplane_timeout", text: "Airplane Mode wasn't turned on in \(Int(airplaneLimit / 60)) minutes, so nothing was installed")
+            }
+            Thread.sleep(forTimeInterval: 0.25)
+        }
+    }
+
     // ---- The tunnel
 
     private static let lock = NSLock()

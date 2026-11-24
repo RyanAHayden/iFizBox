@@ -84,11 +84,11 @@ export function phoneLanes(sc, { native, run = laneRunId() } = {}) {
   let server = false;
   return {
     sign: (r, { signal, progress }, log = () => {}) => sc.prepareOnDevice(r.job, { tag: tagOf(r), signal, progress, log, native }),
-    install: (r, { signal, progress, again = false }, log = () => {}) => {
+    install: (r, { signal, progress, again = false, allSigned = null }, log = () => {}) => {
       const tag = (again && served.get(r.id)) || tagOf(r);
       served.set(r.id, tag);
       fallbacks.delete(r.id);
-      return Promise.resolve(sc.openPrepared(r, { tag, signal, progress, log, host: isSelf(r), native, ...(again ? { again: true } : {}),
+      return Promise.resolve(sc.openPrepared(r, { tag, signal, progress, log, host: isSelf(r), native, allSigned, ...(again ? { again: true } : {}),
         ...(server ? { server: true } : {}) })).catch((e) => {
         if (e?.fallback && !server) fallbacks.set(r.id, e.fallback);
         throw e;

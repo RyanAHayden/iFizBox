@@ -29,6 +29,16 @@ export const NO_VPN = {
 };
 // This iPhone is set up: paired, and with the built-in VPN tested once (vpn.test). Using it waits for that.
 export const iphoneSetUp = (st) => Boolean(st?.paired) && builtinVPN(st) && Boolean(st.vpn.tested);
+// F368: on cellular iOS refuses the connects an install needs, so the install waits for Airplane Mode (LocalVPN.swift
+// waitOffCellular). AIRPLANE_ON: the wait; AIRPLANE_OFF: the connection is open; CELL_LINE: a failed check there.
+export const AIRPLANE_ON = "Turn on Airplane Mode to install";
+export const AIRPLANE_OFF = "You can turn Airplane Mode off";
+export const CELL_LINE = "On cellular, check on Wi-Fi. Installs ask for Airplane Mode.";
+export const CELL_FOOTER = "On cellular, installs ask for Airplane Mode.";
+// The wait ran out: not a broken route, so it isn't remembered as one; the Signing Server works on cellular.
+export const AIRPLANE_TIMEOUT = { title: "Airplane Mode Not On", message: "Airplane Mode wasn't turned on, so nothing was installed. Try again.",
+  short: "Airplane Mode wasn't turned on." };
+export const airplaneTimeout = (err) => (err?.code ?? String(err?.message ?? err ?? "").split(":")[0]) === "airplane_timeout";
 // C73: another VPN is up (or chosen in Settings > VPN): iOS runs one at a time, so an install turns it off.
 export const otherVPNOn = (st) => builtinVPN(st) && Boolean(st.vpn.otherVPN || st.vpn.otherVPNSelected);
 export const OTHER_VPN_LINE = "Your VPN goes off during installs. Turn it back on after.";
@@ -37,7 +47,7 @@ export function setupFooter(st) {
   if (st && !builtinVPN(st)) return NO_VPN.message;
   if (!st?.paired) return "Pair this iPhone once to install straight onto it.";
   if (!st.vpn.tested) return "Test the connection to finish setting up.";
-  const set = "Set up. Apps install straight onto this iPhone, on Wi-Fi or offline.";
+  const set = `Set up. Apps install straight onto this iPhone, on Wi-Fi or offline.${st.vpn.cellular ? ` ${CELL_FOOTER}` : ""}`;
   return otherVPNOn(st) ? `${set} ${OTHER_VPN_LINE}` : set;
 }
 // How It Works: the steps of one install, a row each.
@@ -45,7 +55,7 @@ export const HOW_STEPS = [
   { label: "1. Download", subtitle: "The app downloads over Wi-Fi or cellular." },
   { label: "2. Sign", subtitle: "Signed on this iPhone with your certificate." },
   { label: `3. ${BUILTIN_VPN} On`, subtitle: "iOS runs one VPN at a time, so yours pauses." },
-  { label: "4. Install", subtitle: "Copied straight to iOS. No internet needed." },
+  { label: "4. Install", subtitle: "Copied straight to iOS. On cellular, turn on Airplane Mode when asked." },
   { label: `5. ${BUILTIN_VPN} Off`, subtitle: "Turn yours back on after." },
 ];
 // vpn.test's answer, or its error, as the alert's words.
@@ -237,11 +247,10 @@ const CONNECT_CODES = new Set(["refused", "pairing_rejected", "pair_again", "con
 // The phone refused every connection through the VPN, lockdown's port too (the shell's route_refused): not the
 // pairing. On cellular, iOS takes RemotePairing (49152) and lockdownd (62078) only while data is off (R72).
 export function routeRefused(st = null) {
-  // C73: on cellular the words stay "On cellular, join Wi-Fi." until the cellular task replaces them
   const cell = Boolean(st?.vpn?.cellular);
   return { title: "iPhone Refused", again: false, fix: "check", button: "Check Again",
-    message: `This iPhone refused every connection through ${BUILTIN_VPN}, so it isn't the pairing. ${cell ? "On cellular, join Wi-Fi." : "Try again."}`,
-    short: cell ? "Every connection was refused. On cellular, join Wi-Fi." : "Every connection was refused. Try again." };
+    message: `This iPhone refused every connection through ${BUILTIN_VPN}, so it isn't the pairing. ${cell ? CELL_LINE : "Try again."}`,
+    short: cell ? `Refused. ${CELL_FOOTER}` : "Every connection was refused. Try again." };
 }
 
 // A failed connect (idevice.verify, an install on this iPhone, vpn.test) as a remembered failure
@@ -318,7 +327,7 @@ export function verifyFailure(err, st = null) {
     return { title: "Pair Again", message: `This iPhone answered through ${BUILTIN_VPN}, then closed the connection: it no longer accepts ${NAME}'s pairing. Pair again.`, again: true };
   }
   if (code === "connect_failed") { // F372: the shell had its own VPN on; nothing to turn on
-    return { title: "Couldn't Connect", message: `${BUILTIN_VPN} was on, but ${NAME} couldn't reach this iPhone through it. Try again.${st?.vpn?.cellular ? " On cellular, join Wi-Fi." : ""}`, again: false };
+    return { title: "Couldn't Connect", message: `${BUILTIN_VPN} was on, but ${NAME} couldn't reach this iPhone through it. Try again.${st?.vpn?.cellular ? ` ${CELL_LINE}` : ""}`, again: false };
   }
   return { title: "Pairing Didn't Work", message: `This iPhone didn't accept the pairing (${raw || "no answer"}). Pair again.`, again: true };
 }
@@ -369,5 +378,6 @@ export const USE_SERVER_LINE = `${DOMAIN} can install it instead, this time only
 export const serverStep = (name) => `Installing ${name || "the app"} through the Signing Server`;
 export function serverFallback(err, route = { route: "idevice" }, st = null) {
   if (route?.route !== "idevice" || err?.code === "cancelled") return null;
+  if (airplaneTimeout(err)) return AIRPLANE_TIMEOUT; // F368
   return routeFailureOf(err, st);
 }
