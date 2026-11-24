@@ -100,6 +100,11 @@ The generator (`gen.py`) should add one `act("nothing")` at the end of the actio
 
 Alternative, untested: report only through the app's own intents (the restore-app variant's OpenForInstall and FinishInstalls intents) and run with no x-success. In the restore-app variant, Back's inner If never reaches those intents.
 
+Plist keys (restore-plain.plist, action indexes 0-based; "action 13" in the error is Set VPN):
+`WFWorkflowActionIdentifier` values in order: `is.workflow.actions.detect.dictionary` (WFInput Type ExtensionInput), three `getvalueforkey` (WFDictionaryKey store/back/check, WFGetDictionaryValueType Value, CustomOutputName), `conditional` (WFControlFlowMode 0, WFCondition 100, GroupingIdentifier), `vpn.get`, `conditional`, `setstoredcontent` (WFStoredContentKey "own VPN"), two closing `conditional` (mode 2), the Back group with `getstoredcontent` and `vpn.set` (WFVPNOperation Connect, WFVPN), the Check group with `nothing`, and the new last `is.workflow.actions.nothing`.
+
+Scope notes: the task said to build the Shortcut by hand; R100a showed hand-built Store Content does not carry a VPN across runs, so this used the signed draft (and duplicates of it edited in the Shortcuts editor). The F418 text prefers the app variant with our own intents and no callback; this journal found the plain variant works with x-callback only with the final `nothing`, and the app variant was not imported. "Error 2 in half the runs" is 2 of 4, too few for a rate. The deleted-VPN test turned Restore My VPN on briefly and re-created our configuration (new ID, stored VPN IDs from before no longer match); it was turned off again. R99, R76, R77, F386 and F394 were read for context (Install Switch's Set VPN, error 2, stale x-error). Leftover on the phone: "R100 Store" and "R100 Back" from R100a.
+
 ## Recommendation for F418
 
 - Run Back only from the app after use. Treat the return (x-success or x-error) as the end of the trip. Do not judge by the callback type.
