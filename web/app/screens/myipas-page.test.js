@@ -180,7 +180,7 @@ test("F224: Sign (n): only signable picks, one after another; the first that doe
   // the run itself
   const runs = [];
   const labels = [];
-  const out = await signMany(rows.filter((r) => r.file !== "Broken.ipa"), { isSite: false,
+  const out = await signMany(rows.filter((r) => r.file !== "Broken.ipa"), { isSite: false, reachable: async () => false, // offline (F416)
     hudFor: (name, i, n) => { labels.push(`Signing ${name} (${i} of ${n})`); return () => ({}); },
     install: async ({ file }) => { runs.push(file); return file === "Alpha.ipa" ? "offline" : "installed"; } });
   assert.deepEqual(runs, ["Delta.ipa", "Alpha.ipa"]);
@@ -252,7 +252,7 @@ test("B80: a shared bundle ID: only the IPA Installed's record names is Installe
   assert.equal(await confirmReplace(RYUK[2], { shared, alert: () => assert.fail("asked") }), true);
   // Sign (n): a cancelled replace skips that IPA and the run goes on
   const runs = [];
-  const out = await signMany([RYUK[1], RYUK[2]], { isSite: false, hudFor: () => () => ({}), confirm: (e) => confirmReplace(e, { shared, alert: async () => ({ index: 0 }) }),
+  const out = await signMany([RYUK[1], RYUK[2]], { isSite: false, reachable: async () => false, hudFor: () => () => ({}), confirm: (e) => confirmReplace(e, { shared, alert: async () => ({ index: 0 }) }),
     install: async ({ file }) => { runs.push(file); return "installed"; } });
   assert.deepEqual(runs, ["Delta.ipa"]);
   assert.deepEqual(out, ["cancelled", "installed"]);

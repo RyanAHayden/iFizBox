@@ -666,11 +666,13 @@ export async function runManage(kind, { rows = manageRows(), selected = lib.stat
   return true;
 }
 
-// Sign (n): each picked IPA signed and installed in turn (installFromLibrary; the website signs a kept file in this
-// browser), its progress page labelled "Signing Delta (1 of 3)" (Installed's bulkHud). The first that doesn't install
+// Sign (n): in the sideload app the picked IPAs go into the IPA queue together and Confirm opens (F416, queueMany).
+// Offline, and on the website (it signs a kept file in this browser), each is signed and installed in turn
+// (installFromLibrary), its progress page labelled "Signing Delta (1 of 3)" (Installed's bulkHud). The first that doesn't install
 // (an error, already shown; no connection; the walkthrough) stops the run.
 export async function signMany(picked, { isSite = site(), install = installFromLibrary, siteInstall = siteFileInstall, hudFor = null,
-  confirm = confirmReplace } = {}) {
+  confirm = confirmReplace, reachable = serverReachable, queue = queueMany } = {}) {
+  if (!isSite && await Promise.resolve().then(() => reachable()).catch(() => false)) return queue(picked);
   const n = picked.length;
   const out = [];
   for (let i = 0; i < n; i++) {
@@ -687,6 +689,21 @@ export async function signMany(picked, { isSite = site(), install = installFromL
     out.push(r);
     if (isSite ? r === false : r !== "installed") break;
   }
+  return out;
+}
+
+// F416: Sign (n) through the IPA queue's run (as an IPA page's Install, queueLibraryInstall), so installs on This iPhone
+// overlap (core/apprun.js HERE_PARALLEL). Every Replace App? ask comes first (Cancel skips that IPA), then all are
+// queued at once: Confirm never opens under an ask or with part of the pick. Picks with one bundle ID are one job, the
+// last one's (it is what the phone would end up with). -> "queued" | "cancelled" | false (unreadable) for each pick.
+export async function queueMany(picked, { add = queueApp, ...deps } = {}) {
+  const jobs = [];
+  const out = [];
+  for (const e of picked) {
+    const r = await queueLibraryInstall(e, { ...deps, reachable: async () => true, add: (j) => jobs.push(j) });
+    out.push(r === true ? "queued" : r);
+  }
+  for (const j of jobs) add(j);
   return out;
 }
 
