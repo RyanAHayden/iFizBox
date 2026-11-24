@@ -1257,6 +1257,86 @@ enum IDevice {
         #endif
     }
 
+    /// T80: the test switch for concurrent writes. Only a debug build reads it (the setting `afcParallel`: 2 to 8
+    /// AFC connections, each writing its own range of the file at once); a release build always uses one.
+    static var parallelWrites: Int {
+        #if DEBUG
+        let n = UserDefaults.standard.integer(forKey: "afcParallel")
+        return n >= 2 && n <= 8 ? n : 1
+        #else
+        return 1
+        #endif
+    }
+
+    /// T80: copies the whole IPA with `count` AFC connections at once, one range of the file each (a fresh copy only;
+    /// the first connection has the file open already). A range that fails fails the copy.
+    private static func uploadParallel(_ run: HereRun, first: OpaquePointer?, firstFile: OpaquePointer?, session s: Session,
+                                       watch w: Watch, count: Int, chunk: Int, progress: (Step) -> Void) throws {
+        let total = run.size, remote = run.remote
+        // connections and open files first, one after another (the session is not for several threads)
+        var clients: [OpaquePointer?] = [first], files: [OpaquePointer?] = [firstFile]
+        defer { for (i, c) in clients.enumerated() where i > 0 { afc_file_close(files[i]).map(idevice_error_free); afc_client_free(c) } }
+        for _ in 1..<count {
+            let c = try s.afc()
+            clients.append(c)
+            var f: OpaquePointer?
+            files.append(nil)
+            try check(afc_file_open(c, remote, AfcRw, &f), "upload_failed") // r+: the first one made the file
+            files[files.count - 1] = f
+        }
+        let per = (total / count + chunk - 1) / chunk * chunk
+        ilog("AFC: test switch: \(count) connections, \(per >> 20) MB each, \(chunk >> 20) MB chunks")
+        final class Shared: @unchecked Sendable {
+            let lock = NSLock()
+            var sent = 0
+            var failure: Error?
+        }
+        let shared = Shared()
+        let group = DispatchGroup()
+        let t0 = Date()
+        w.begin("copying the IPA to iOS (AFC)", Limit.upload)
+        run.copyStart = run.copyStart ?? t0
+        for i in 0..<count {
+            let start = i * per, end = min(total, start + per)
+            if start >= end { continue }
+            let f = files[i], url = run.ipa
+            group.enter()
+            DispatchQueue.global().async {
+                defer { group.leave() }
+                do {
+                    let fh = try FileHandle(forReadingFrom: url)
+                    defer { try? fh.close() }
+                    try fh.seek(toOffset: UInt64(start))
+                    var pos: Int64 = 0
+                    if start > 0 { try check(afc_file_seek(f, Int64(start), 0, &pos), "upload_failed") }
+                    var at = start
+                    while at < end {
+                        shared.lock.lock(); let bad = shared.failure != nil; shared.lock.unlock()
+                        if bad { return }
+                        guard let d = try fh.read(upToCount: min(chunk, end - at)), !d.isEmpty else { throw Failure(code: "upload_failed", text: "the file ended early") }
+                        try d.withUnsafeBytes { try check(afc_file_write(f, $0.baseAddress?.assumingMemoryBound(to: UInt8.self), d.count), "upload_failed") }
+                        at += d.count
+                        shared.lock.lock(); shared.sent += d.count; shared.lock.unlock()
+                    }
+                } catch {
+                    shared.lock.lock(); shared.failure = shared.failure ?? error; shared.lock.unlock()
+                }
+            }
+        }
+        var counted = 0
+        while group.wait(timeout: .now() + 0.25) == .timedOut {
+            shared.lock.lock(); let sent = shared.sent; shared.lock.unlock()
+            if sent > counted { run.speed.add(sent - counted, 0.25, front: AppFront.now); counted = sent }
+            run.sent = sent
+            w.alive("\(mb(sent)) of \(mb(total)) copied")
+            progress(.upload(total > 0 ? Double(sent) / Double(total) : 0))
+        }
+        run.sent = shared.sent
+        if let e = shared.failure { afc_file_close(firstFile).map(idevice_error_free); throw e }
+        let secs = max(Date().timeIntervalSince(t0), 0.001)
+        ilog("AFC: copied \(mb(shared.sent)) in \(String(format: "%.1f", secs)) s (this run \(String(format: "%.1f", Double(shared.sent) / 1_048_576 / secs)) MB/s, \(count) connections, \(chunk >> 20) MB chunks)")
+    }
+
     static func mb(_ n: Int) -> String { String(format: "%.1f MB", Double(n) / 1_048_576) }
 
     /// Copies the IPA to PublicStaging. B246: after a drop it carries on from the end of iOS's file (a whole chunk
@@ -1266,6 +1346,7 @@ enum IDevice {
                                note: (String) -> Void, progress: (Step) -> Void) throws {
         let total = run.size, remote = run.remote
         let (chunk, pipelined) = copySwitch
+        let parallel = parallelWrites
         if chunk != Self.chunk || pipelined { ilog("AFC: test switch: \(chunk >> 20) MB chunks, \(pipelined ? "pipelined" : "one at a time")") }
         let fh = try FileHandle(forReadingFrom: run.ipa)
         defer { try? fh.close() }
@@ -1295,6 +1376,14 @@ enum IDevice {
         } else {
             try check(afc_file_open(afc, remote, AfcWrOnly, &file), "upload_failed")
             note("Copying the IPA to iOS: \(mb(total)) to send")
+        }
+        if from == 0, parallel > 1 {
+            // T80: debug-only test: the file in `parallel` ranges, each on its own AFC connection
+            try uploadParallel(run, first: afc, firstFile: file, session: s, watch: w, count: parallel, chunk: chunk, progress: progress)
+            w.begin("closing \(remote) on iOS (AFC)", Limit.afcStep)
+            try check(afc_file_close(file), "upload_failed")
+            note("Copied \(mb(run.sent)) to iOS")
+            return
         }
         w.begin("copying the IPA to iOS (AFC)", Limit.upload)
         var sent = from, logged = from
