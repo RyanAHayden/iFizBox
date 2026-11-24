@@ -220,3 +220,10 @@ _Said_: the airplane wait
 _On screen_: Join Wi-Fi or turn on Airplane Mode
 _In code_: LocalVPN.waitOffCellular, AIRPLANE_ON, airplaneStatus
 _Avoid_: cellular pause, data off wait
+
+**App wait**:
+A This iPhone install paused because the app is in the background; it goes on when the app is opened
+_Said_: waiting for iFizBox
+_On screen_: Waiting for iFizBox
+_In code_: APP_WAIT, appWait, LocalVPN.pause
+_Avoid_: paused install, background wait

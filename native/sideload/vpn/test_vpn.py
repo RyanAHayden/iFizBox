@@ -160,8 +160,8 @@ class App(unittest.TestCase):
         self.assertLess(pause.index("end()"), pause.index("try pause("))
         self.assertLess(pause.index("try pause("), pause.index("try hold(false)"))
         body = src[src.index("private static func pause("):src.index("static func takeDownLeftOver()")]
-        self.assertLess(body.index("installEnded()"), body.index("while !IDevice.AppFront.now"))
-        self.assertIn("defer { installBegan(); paused(false) }", body)
+        self.assertLess(body.index("installEnded()"), body.index("while !IDevice.AppFront.now || !Path.online()"))
+        self.assertIn("defer { installBegan(); paused(.over) }", body)
         self.assertIn("if !run.connected { try LocalVPN.waitForApp(", idev)
         self.assertIn("Session(watch: w, finishing: run.connected)", idev)
         self.assertEqual(idev.count("finishing: run.connected"), 2)
@@ -174,7 +174,7 @@ class App(unittest.TestCase):
         self.assertIn("LocalVPN.takeDownLeftOver()", src[src.index("static func register("):])
         self.assertIn("LocalVPN.takeDownLeftOver()", idev[idev.index("willEnterForegroundNotification"):])
         sideload = read("Sources", "Sideload.swift", base=NATIVE)
-        self.assertIn('if on { KeepAlive.shared.end(); emit?("appWait", 0)', sideload)
+        self.assertIn('else if held { held = false; KeepAlive.shared.end() }', sideload)
 
     def test_tunnel_stops_itself(self):
         """B423: a killed app's tunnel: 60 s awake with no packet; the app's beat is well inside it."""

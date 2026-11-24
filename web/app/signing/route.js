@@ -136,7 +136,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
         h.set(ev.here === "copying" ? here.label + airplaneOff : here.label); // F368: said for the whole copy
         return;
       }
-      if (route.route && lastHere && ["here", "airplane", "airplaneOff", "appWait"].includes(ev?.phase)) return; // a newer shell sends both: {here} wins
+      if (route.route && lastHere && ["here", "airplane", "airplaneOff", "appWait", "networkWait"].includes(ev?.phase)) return; // a newer shell sends both: {here} wins
       const t = phaseLabel(ev);
       // B262: the download's last MB/s (the shell's once-a-second {rate}) stays on the label between its ticks
       if (ev?.phase === "downloading" && ev.rate != null) rate = Number(ev.rate) || 0;

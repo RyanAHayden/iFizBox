@@ -287,7 +287,8 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   as from a peer. Nothing leaves the phone and no internet is needed. It needs the Network Extensions capability on
   the App ID (iFizBox's own App IDs get it, `APP_ID_CAPS`; the app and the extension are signed with the profile's
   `networkextension` entitlement); when the app's embedded profile lacks `packet-tunnel-provider`, This iPhone isn't offered: installs go through the Signing Server after the alert "No Network Extensions". `IDevice.Session` turns the VPN on just before it connects to iOS (`LocalVPN.begin`,
-  saving the configuration the first time: iOS asks to allow it) and off 3 seconds after the last connection ends,
+  saving the configuration the first time: iOS asks to allow it) and off 3 seconds after the last connection ends (under a background task, so an app that iOS suspends meanwhile
+  still takes it down),
   so a queue of installs or a reconnect finds it on. A queue holds through an install's reconnects, however long the pauses between them (`installBegan` and `installEnded` in `IDevice.install`). The configuration is never On Demand and never removed: it
   stays in Settings > VPN, only connected during installs, so iOS's "Add VPN Configurations" Allow comes once.
   Setting up asks it: right after pairing (or importing a pairing file), the pairing page runs the same test as
@@ -296,14 +297,26 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   each connect, `IDevice.install` calls `LocalVPN.waitOffCellular`. The built-in VPN comes on while data is on, then the
   path is read again for 3 s (a short Wi-Fi drop isn't cellular). Only then does the install ask "Join Wi-Fi or turn on
   Airplane Mode", and it waits until NWPathMonitor's path has been off cellular for 1 s (Airplane Mode, or Wi-Fi
-  joined), up to 5 minutes ("airplane_timeout", which offers the Signing Server). The wait runs under KeepAlive, so
-  Control Center over the app doesn't end it. Cancel or the timeout ends the install's hold, and the VPN goes off 3 s
+  joined), up to 5 minutes ("airplane_timeout", which offers the Signing Server). Control Center over the app is not
+  leaving and doesn't stop the wait. Out of the app 30 s (`awayGrace`) with the path still on cellular, the wait pauses
+  (see below) and the VPN goes off; once Airplane Mode is on (not cellular) it is never dropped. The pause isn't part of
+  the 5 minutes. Cancel or the timeout ends the install's hold, and the VPN goes off 3 s
   later. Once the connection opens, the install emits `airplaneOff` and the page says "You can turn Airplane Mode off".
   A reconnect with cellular data back waits again.
+  In the background the VPN starts only to finish an install already connected (`finishing`). An install not yet
+  connected pauses instead (`LocalVPN.waitForApp`): its row reads "Waiting for iFizBox" (event `appWait`), its KeepAlive
+  is let go so iOS may suspend the app, and it goes on when the app is opened. Opened with no network (Airplane Mode went on
+  meanwhile), the row reads "Turn Airplane Mode off for a moment" (`networkWait`) until there is one. Checks (verify, `vpn.test`) wait for the
+  app the same way, up to 5 minutes awake (`awayLimit`), then fail with `vpn_failed`.
+  A killed or suspended app can't turn its tunnel off, so two things stop it. At launch and when the app comes back to
+  the front, `LocalVPN.takeDownLeftOver` takes our tunnel down when nothing holds it. And the extension
+  (`PacketTunnelProvider`) stops itself after 60 s awake (`quietLimit`) with no packet for the peer. While anything
+  holds the VPN, the app sends one UDP byte to 10.7.0.1:9 every 15 s (`beat`). `sendProviderMessage` isn't used: on
+  iOS 27 it answers nil and never reaches the extension.
   Wi-Fi counts as joined when en0 has an IPv4 address, even if the path prefers cellular (Wi-Fi Assist, Wi-Fi without
   internet, another VPN's route). Joined Wi-Fi never waits, and joining Wi-Fi during the wait goes on by itself. The log
   records the path's interfaces where the wait begins.
-  Events: `phase` (`signing.open`) / `here` (`signing.install`) "airplane", "airplaneOff". In the IPA queue, on cellular
+  Events: `phase` (`signing.open`) / `here` (`signing.install`) "airplane", "airplaneOff", "appWait", "networkWait". In the IPA queue, on cellular
   (`idevice.status` `vpn.cellular`) `openPrepared` holds the install until every row is downloaded and signed
   (`allSigned` in `core/apprun.js`); the off line shows only when every remaining row has its connection
   (`airplaneStatus`). One app at a time: Re-sign All's direct call (`signing.resignAll`) downloads each app in turn, so

@@ -701,6 +701,7 @@ enum IDevice {
         private let finishing: Bool // B423: an install already connected: the VPN may start in the background
         private let second: Bool // a second look beside the install's own session: rides on its VPN
         let kind: Kind
+        private var awake: LocalVPN.BackgroundHold? // B423: a check has no KeepAlive: leaving the app lets it end
         private var builtIn = false // through the built-in VPN, held (LocalVPN.begin) until deinit
         var via: String { LocalVPN.name }
 
@@ -716,6 +717,7 @@ enum IDevice {
             do {
                 try LocalVPN.begin(finishing: finishing) { w.alive($0) }
                 builtIn = true
+                awake = LocalVPN.BackgroundHold("\(LocalVPN.name) on")
                 return (address, port)
             } catch {
                 let failure = (error as? Failure) ?? Failure(code: "vpn_failed", text: "\(LocalVPN.name) didn't start: \(error.localizedDescription)")
@@ -869,7 +871,8 @@ enum IDevice {
             if let h = handshake { rsd_handshake_free(h) }
             if let a = adapter { adapter_free(a) }
             if let p = provider { idevice_provider_free(p) }
-            if builtIn { LocalVPN.end() }
+            if builtIn { LocalVPN.end() } // its own background task first
+            awake?.end()
         }
     }
 
@@ -935,7 +938,7 @@ enum IDevice {
 
     /// airplane: on cellular, waiting for Airplane Mode; airplaneOff: connected after that wait, so it can go off.
     /// B423: appWait(true): paused until the app is opened (its KeepAlive is let go); appWait(false): going on.
-    enum Step { case airplane, airplaneOff, appWait(Bool), connected, upload(Double), install(Double) }
+    enum Step { case airplane, airplaneOff, appWait(LocalVPN.Pause), connected, upload(Double), install(Double) }
 
     private final class ProgressBox { let f: (UInt64) -> Void; init(_ f: @escaping (UInt64) -> Void) { self.f = f } }
 
@@ -956,10 +959,11 @@ enum IDevice {
         var firstDrop: Failure?
         LocalVPN.installBegan() // B395: its reconnects share one queue, so the VPN stays on through them
         defer { LocalVPN.installEnded() }
-        let paused = { (on: Bool) -> Void in // B423
-            if on { note("Waiting for \(Brand.name): open it to go on") }
-            progress(.appWait(on))
-            if !on { progress(run.installSent ? .install(0) : .connected) } // the row leaves that line
+        let paused = { (p: LocalVPN.Pause) -> Void in // B423
+            if p == .app { note("Waiting for \(Brand.name): open it to go on") }
+            if p == .network { note("No network: iOS starts a VPN only with one. Turn Airplane Mode off for a moment, or join Wi-Fi") }
+            progress(.appWait(p))
+            if p == .over, !cancelled() { progress(run.installSent ? .install(0) : .connected) } // the row leaves that line
         }
         while true {
             if !run.connected { try LocalVPN.waitForApp(cancelled: cancelled, paused: paused) }

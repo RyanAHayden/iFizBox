@@ -148,7 +148,7 @@ enum LocalVPN {
     /// Throws when cancelled, after airplaneLimit, or when the VPN doesn't start; installEnded then takes it down.
     /// B423: out of the app for awayGrace with the path still cellular, the wait pauses (pause()): its hold is let go,
     /// so the VPN goes off. Airplane Mode on isn't cellular, so the VPN is never dropped then.
-    static func waitOffCellular(finishing: Bool, cancelled: () -> Bool, paused: (Bool) -> Void, waiting: () -> Void) throws -> Bool {
+    static func waitOffCellular(finishing: Bool, cancelled: () -> Bool, paused: (Pause) -> Void, waiting: () -> Void) throws -> Bool {
         guard available, !failedNow(), Path.now().cellular else { return false }
         log("on cellular before \(name) is on; path: \(Path.described())")
         func hold(_ finishing: Bool) throws {
@@ -219,19 +219,26 @@ enum LocalVPN {
     }
 
     /// Before an install's first connect: blocking until the app is in front, when the VPN would have to start.
-    static func waitForApp(cancelled: () -> Bool, paused: (Bool) -> Void) throws {
+    static func waitForApp(cancelled: () -> Bool, paused: (Pause) -> Void) throws {
         guard available, mustWait() else { return }
         log("in the background: the install waits for the app to be opened")
         try pause(cancelled: cancelled, paused: paused)
     }
 
-    /// An install waits, blocking, for the app to be in front; it holds nothing meanwhile. `paused(true)` lets go of
+    /// app: waiting for the app to be opened; network: opened, but with none (Airplane Mode went on meanwhile) iOS
+    /// starts no VPN; over: going on, or cancelled.
+    enum Pause { case app, network, over }
+
+    /// An install waits, blocking, for the app to be in front; it holds nothing meanwhile. `paused(.app)` lets go of
     /// its KeepAlive too, so iOS can suspend the app; no time limit.
-    private static func pause(cancelled: () -> Bool, paused: (Bool) -> Void) throws {
-        paused(true)
+    private static func pause(cancelled: () -> Bool, paused: (Pause) -> Void) throws {
+        paused(.app)
         installEnded()
-        defer { installBegan(); paused(false) }
-        while !IDevice.AppFront.now {
+        defer { installBegan(); paused(.over) }
+        var offline = false
+        while !IDevice.AppFront.now || !Path.online() {
+            let off = IDevice.AppFront.now // in front, so it is the network that is missing
+            if off != offline { offline = off; paused(off ? .network : .app) }
             if cancelled() { throw IDevice.Failure(code: "cancelled", text: "Cancelled") }
             Thread.sleep(forTimeInterval: 0.25)
         }
@@ -520,11 +527,11 @@ enum LocalVPN {
     }
 
     /// One background task, ended once; `expiring` runs first when iOS ends it early.
-    private final class BackgroundHold {
+    final class BackgroundHold {
         private let lock = NSLock()
         private var id = UIBackgroundTaskIdentifier.invalid
         private var ended = false
-        init(_ name: String, expiring: @escaping () -> Void) {
+        init(_ name: String, expiring: @escaping () -> Void = {}) {
             let task = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
                 expiring()
                 self?.end()

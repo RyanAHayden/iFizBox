@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { appRows, createAppRun, rowStatus, runStatus, rowProgress, airplaneStatus } from "./core/apprun.js";
-import { AIRPLANE_ON, AIRPLANE_OFF, AIRPLANE_TIMEOUT, APP_WAIT, serverFallback, routeFailureOf } from "./core/installroute.js";
+import { AIRPLANE_ON, AIRPLANE_OFF, AIRPLANE_TIMEOUT, APP_WAIT, NETWORK_WAIT, serverFallback, routeFailureOf } from "./core/installroute.js";
 import { hereLabel } from "./signing/common.js";
 import { openPrepared, herePhase } from "./signing/queue.js";
 import { callWithStall } from "./core/signing.js";
@@ -116,4 +116,7 @@ test("B423: a wait paused in the background reads Waiting for the app on the row
   assert.equal(rowProgress(a), 0.5);
   assert.deepEqual(herePhase({ phase: "appWait", progress: 0 }), { phase: "appWait", fraction: 0 });
   assert.deepEqual(hereLabel({ here: "appWait" }), { label: APP_WAIT });
+  a.phase = "networkWait";
+  assert.equal(rowStatus(a), NETWORK_WAIT);
+  assert.equal(runStatus([a]), NETWORK_WAIT);
 });
