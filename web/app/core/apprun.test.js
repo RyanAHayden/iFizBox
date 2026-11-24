@@ -744,3 +744,19 @@ test("B236: a retried row starts unfetched", async () => {
   run.cancel();
   await again;
 });
+
+test("B421: a copying row at 100% says Installing, one row, several rows, and the own row", () => {
+  const row = (id, fraction, extra = {}) => ({ id, name: id, state: "installing", phase: "copying", here: true, fraction, ...extra });
+  const one = [row("A", 1), row("B", 0, { state: "waiting", phase: null, here: false })];
+  assert.equal(rowStatus(one[0]), "Installing");
+  assert.equal(runStatus(one), "Installing A (1 of 2)");
+  assert.equal(rowStatus(row("A", 0.4)), "Copying to iPhone 40%");
+  assert.equal(runStatus([row("A", 0.4)]), "Copying A to iPhone (1 of 1)");
+  assert.equal(runStatus([row("A", 1), row("B", 1)]), "Installing 2 apps");
+  assert.equal(runStatus([row("A", 1), row("B", 0.3)]), "Installing 2 apps");
+  assert.equal(runStatus([row("A", 0.2), row("B", 0.3)]), "Copying 2 apps to iPhone");
+  const own = row(SELF_ID, 1);
+  assert.equal(rowStatus(own), "Installing");
+  assert.equal(runStatus([own]).includes("closing"), false);
+  assert.equal(rowStatus({ ...own, phase: "installing" }).includes("losing"), true);
+});

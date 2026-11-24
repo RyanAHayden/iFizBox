@@ -653,7 +653,7 @@ export function rowStatus(row, opts = {}) {
     case "installing":
       if (row.phase === "airplane") return AIRPLANE_ON; // F368
       if (row.phase === "airplaneOff") return "Connected to iOS";
-      if (row.phase === "copying") return p > 0 && p < 100 ? `Copying to iPhone ${p}%` : "Copying to iPhone";
+      if (isCopying(row)) return p > 0 && p < 100 ? `Copying to iPhone ${p}%` : "Copying to iPhone";
       if (selfClosing(row)) return SELF_CLOSING;
       return p > 0 && p < 100 ? `Installing ${p}%` : "Installing";
     case "installed":
@@ -665,6 +665,10 @@ export function rowStatus(row, opts = {}) {
     default: return "";
   }
 }
+
+// B421: the copy is still going: phase "copying" below fraction 1. At 100% the IPA is with iOS and installd's first
+// percent may take long: the row already says Installing (its own row says it is closing only once installd took it).
+const isCopying = (row) => row?.phase === "copying" && !((Number(row.fraction) || 0) >= 1);
 
 export function summaryLine(rows) {
   const n = (f) => rows.filter(f).length;
@@ -696,13 +700,13 @@ export function runStatus(rows) {
   const pos = (r) => `${rows.indexOf(r) + 1} of ${rows.length}`;
   const withIos = rows.filter((r) => WITH_IOS.has(r.state) && r.phase !== "hold");
   if (withIos.length > 1) { // F359: This iPhone rows installing together
-    return withIos.every((r) => r.phase === "copying") ? `Copying ${withIos.length} apps to iPhone` : `Installing ${withIos.length} apps`;
+    return withIos.every(isCopying) ? `Copying ${withIos.length} apps to iPhone` : `Installing ${withIos.length} apps`;
   }
   const ios = withIos[0];
   if (ios && helperRow(ios) && ios.state === "installing" && ios.word) return `${ios.word} ${label(ios)}${wordPercent(ios)} (${pos(ios)})`; // B400
   if (ios && helperRow(ios)) return `${ios.mode === "remove" ? "Removing" : "Installing"} ${label(ios)} (${pos(ios)})`;
   if (ios?.phase === "busy") return busyText(label(ios)); // B312
-  if (ios?.phase === "copying") return `Copying ${label(ios)} to iPhone (${pos(ios)})`; // B111: This iPhone
+  if (isCopying(ios)) return `Copying ${label(ios)} to iPhone (${pos(ios)})`; // B111: This iPhone
   if (selfClosing(ios)) return `Installing ${label(ios)}: ${SELF_CLOSING}`;
   if (ios) return ios.state === "asking" && promptUp(ios) ? `Tap Install for ${label(ios)} (${pos(ios)})` : `Installing ${label(ios)} (${pos(ios)})`;
   const s = rows.filter((r) => SIGNING.has(r.state));
