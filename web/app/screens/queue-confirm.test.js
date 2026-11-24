@@ -251,3 +251,28 @@ test("refusalIds: the queued packages apt's refusal names", () => {
   assert.deepEqual(ids(" com.a:iphoneos-arm64 : Depends: com.gone but it is not installable"), ["com.a"]);
   assert.deepEqual(ids("E: Could not get lock"), []);
 });
+
+// B414: no queued app (Confirm's apps: []) is a packages run, not a run with an empty apps half.
+confirmCase("Confirm with only packages queued starts their run", async () => answer(true, PLAN), async (c) => {
+  appQueue.clearAll();
+  installQueue.clear("com.x.bad");
+  await settle();
+  const backend = getBackend();
+  const fetched = [];
+  const raf = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = (f) => { queueMicrotask(f); return 1; };
+  backend.queueFetch = async (r) => { fetched.push(r.id); throw new Error("no network"); };
+  backend.queueInstall = async () => ({ code: 1, stdout: "", stderr: "E: no" });
+  try {
+    c.ok().click();
+    for (const end = Date.now() + 5000; !fetched.length && Date.now() < end;) await new Promise((r) => setTimeout(r, 10)); // the sheet slides away first
+    assert.deepEqual(fetched, ["com.x.good"]);
+    await settle();
+    find(globalThis.document.body, (e) => e.tagName === "BUTTON" && e.textContent === "Close")?.click();
+    await settle();
+  } finally {
+    globalThis.requestAnimationFrame = raf;
+    delete backend.queueFetch;
+    delete backend.queueInstall;
+  }
+});

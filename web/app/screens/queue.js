@@ -787,7 +787,7 @@ function appNames(jobs) {
 
 // Confirm's Confirm: apps and packages in one run (F407), or just the one kind queued.
 function runConfirmed(run) {
-  const apt = (r) => (typeof getBackend().queueFetch === "function" ? runQueueRun(r) : runConsole(r));
+  const apt = (r) => (typeof getBackend().queueFetch === "function" ? runQueueRun({ ...r, apps: null }) : runConsole(r)); // apps: [] is no apps half
   if (!run.apps?.length) return run.jobs.length ? apt(run) : undefined;
   return runJailbreakApps(run.apps, { after: run.jobs.length ? () => afterApps(run, apt) : null,
     together: run.jobs.length && typeof getBackend().queueFetch === "function" ? (apps) => (samePackages(run) ? runQueueRun({ ...run, apps }) : null) : null });
