@@ -6,6 +6,7 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
 
     ifizbox-helper update | upgrade | configure | install <pkg>... | remove <pkg>...
     ifizbox-helper hold <pkg>... | unhold <pkg>... | showhold
+    ifizbox-helper hold-self on | off                                                   (the app held open; below)
     ifizbox-helper auto <pkg>...                                            (apt-mark auto)
     ifizbox-helper addsource <uri> <suite> [component...] | removesource <uri> <suite>
     ifizbox-helper update-source <uri> <suite> [component...]              (apt-get update for one source)
@@ -45,6 +46,7 @@ executable failing is an error.
 | `unhold`    | `apt-mark unhold <pkg>...`                                                                  |
 | `auto`      | `apt-mark auto <pkg>...` (the queue run installs one package at a time, which marks each manual; the ones apt only pulled in get their Auto-Installed mark back). Installed packages only |
 | `showhold`  | `apt-mark showhold`: the held packages on stdout, one per line                              |
+| `hold-self on\|off` | runs nothing: records or deletes the calling app's hold in `<prefix>/var/lib/ifizbox/held` (above). Exit 74: the record couldn't be written |
 | `addsource` | runs nothing: writes a deb822 stanza (`Types: deb`, `URIs:`, `Suites:`, `Components:`) into `/var/jb/etc/apt/sources.list.d/ifizbox.sources` (below) |
 | `removesource` | runs nothing: drops the stanza for that URI and suite from `ifizbox.sources`              |
 | `update-source` | `apt-get -o Acquire::AllowInsecureRepositories=true -o Dir::Etc::SourceList=<temp> -o Dir::Etc::SourceParts=/dev/null -o APT::Get::List-Cleanup=0 [-o APT::Status-Fd=3] update`: that one source alone, for a failed Sources row's Retry. Same URI/suite/component checks as `addsource` (the source needn't be in `ifizbox.sources`); `<temp>` is `/var/jb/etc/apt/ifizbox-update-source.XXXXXX` (mkstemp, 0600) holding `deb <uri> <suite> [component...]`, made before and deleted after apt-get, which runs as a child. List-Cleanup off keeps the other sources' lists. Exit 74: the temp file couldn't be made |
@@ -103,7 +105,16 @@ app nothing changes. Once the child has ended it reads what is already in the pi
 script's background job holding an fd doesn't keep it waiting. These verbs also put `IFIZBOX_HELPER_PID=<that
 process>` in apt's environment: iFizBox's own postinst (`native/deb/postinst`) then runs its `uicache -p` in a
 background job (all fds let go) that waits until that pid is gone, at most 10 minutes, so the app is only closed once
-the run has ended; installed by anything else (no variable), it runs `uicache -p` at once.
+the run has ended and it is not held (below); installed by anything else (no variable), it runs `uicache -p` at once.
+The queue run that installs iFizBox itself holds the app open: from its start, while the app's binary is still in
+place, the app calls `hold-self on` through the shell bridge (app.holdSelf), which also stops the app's Replaced
+watcher. `hold-self on` records the calling app, `<pid> <start time>`, in `<prefix>/var/lib/ifizbox/held` (root's,
+0644). While that record is there and the process lives: the postinst's `uicache -p` keeps waiting after the run has
+ended, with no time limit; the helper accepts the app's calls even once dpkg has replaced its binary, when the path
+the app ran from no longer exists (pid and start time must both match); and `userspace-reboot` runs `uicache -p` first,
+since the reboot ends the postinst's job. The app lets go with `hold-self off` when the run ends clean on Close
+iFizBox, or when its Running page closes (the button, Close, Cancel or Later). A record left behind is cleared by the
+next verb that runs dpkg, when that verb's caller is not the recorded app.
 Before their own command, the same verbs (but `configure`) look for an interrupted dpkg: files named only by digits
 in `<prefix>/var/lib/dpkg/updates/` (dpkg's journal, which is what apt checks). If there are any, the helper says
 `ifizbox-helper: dpkg was interrupted: running dpkg --configure -a first` on stderr and runs the `configure` verb's
