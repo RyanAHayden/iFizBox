@@ -50,7 +50,7 @@ import * as why from "./why.js"; // F303: Why <NAME> (#/home/why)
 import { NAME } from "../brand.js";
 import { rowIcon, PAGE_ICONS } from "../icons/rowicons.js";
 import { nativeBridge } from "../native.js";
-import { routeFailure, ROUTE_KEY } from "../core/installroute.js"; // B316
+import { routeFailure, needsPairing, ROUTE_KEY } from "../core/installroute.js"; // B316
 
 export const title = "Home";
 
@@ -590,10 +590,22 @@ export const CERT_STEP_LEFT = "Import your certificate to install"; // fits the 
 // Signing, where the status says it with the fix. A signing problem that stops every install (gone) stays first; a
 // coming expiry gives way to it.
 export const ROUTE_TILE_SUBTITLE = "Installs are failing · Fix in Settings"; // fits the tile at 320pt
-export function routeTile(mode, failure, choice) {
-  if (mode !== "sideload" || choice !== "iphone" || !failure?.title) return null;
+// F410a: not paired (`st`, idevice.status) comes before a failure: Pair This iPhone, opening Pairing, amber (installs
+// go through the Signing Server meanwhile).
+export const PAIR_TILE = { stage: "soon", kind: "pair", title: "Pair This iPhone", subtitle: "Installs use the server until then" };
+const PAIR_HREF = () => format(settingsRoute(["installation", "pair"]));
+export function routeTile(mode, failure, choice, st = null) {
+  if (mode !== "sideload") return null;
+  if (needsPairing(choice, st)) return { ...PAIR_TILE, href: PAIR_HREF() };
+  if (choice !== "iphone" || !failure?.title) return null;
   return { stage: "close", kind: "route", title: failure.title, subtitle: ROUTE_TILE_SUBTITLE };
 }
+// idevice.status for the tile: null when it isn't asked (another build or route) or the shell can't say.
+export async function phoneStatus(mode, choice, native = nativeBridge()) {
+  if (mode !== "sideload" || choice !== "iphone" || !native?.call) return null;
+  try { return (await native.call("idevice.status", {})) ?? null; } catch { return null; }
+}
+let lastPhone = null; // the last answer: Home drawn again shows it from its first paint
 export function slotOrRoute(t, route) { return t?.stage === "gone" ? t : route ?? t; }
 // The Signing Server when installs can use it (an https:// address, as screens/signing.js serverReady), else null.
 // Settings > Signing has two steps (certificate, server), so with this set, not set up means no certificate.
@@ -603,20 +615,31 @@ export function httpsServer(server) {
 }
 // The tile, kept up to date: Home showing again (Back from Settings > Signing), the app coming back, Settings'
 // Expiry Warning, Show Expiry Warning and Re-sign Reminder, and Settings > Signing's status ("ifizbox:signing-status",
-// its identity as the detail) after an import or removal. Stops once the row leaves the page.
+// its identity as the detail) after an import or removal; This iPhone's pairing (phoneStatus) and Install Apps With. Stops once the row leaves the page.
 function certRow() {
   const row = tileRow("stack cert", tile({ label: "", subtitle: " ", href: format(settingsRoute(["signing"])), glyph: "failed" }));
   row.hidden = true;
   if (!showsSigningSlot(settings.mode)) return row;
   let seq = 0;
   let last = null;
-  const routeNow = () => routeTile(settings.mode, routeFailure(), settings.get(ROUTE_KEY));
+  const routeNow = () => routeTile(settings.mode, routeFailure(), settings.get(ROUTE_KEY), lastPhone);
   const draw = (slot) => {
     seq++; last = slot;
     paintCert(row, slotOrRoute(slotTile(settings.mode, slot), routeNow())); // B316
   };
-  const onRoute = () => { if (alive()) { seq++; paintCert(row, slotOrRoute(slotTile(settings.mode, last), routeNow())); } };
+  const paintRoute = () => paintCert(row, slotOrRoute(slotTile(settings.mode, last), routeNow()));
+  const onRoute = () => { if (alive()) { seq++; paintRoute(); } };
+  // F410a: on its own, so the Signing Server's answer (seconds, when it's down) doesn't hold it back
+  let phoneSeq = 0;
+  const readPhone = async () => {
+    const mine = ++phoneSeq;
+    const st = await phoneStatus(settings.mode, settings.get(ROUTE_KEY));
+    if (mine !== phoneSeq || !alive()) return;
+    lastPhone = st;
+    if (last) paintRoute(); // before the slot's first answer, draw() paints it: a signing problem comes first
+  };
   const check = async () => {
+    readPhone();
     const mine = ++seq;
     const slot = await signingSlot(settings.mode);
     if (mine === seq && alive()) draw(slot);
@@ -630,6 +653,7 @@ function certRow() {
     check();
   };
   const offSettings = settings.onChange((key) => {
+    if (key === ROUTE_KEY && alive()) { if (last) paintRoute(); readPhone(); } // F410a: also the kept route, taken at launch
     if (["showExpiryWarning", "expiryWarning", "resignReminder"].includes(key) && alive()) draw(last);
   });
   let seen = false; // on the page at least once: not connected before then is "not drawn yet", after it is "gone"

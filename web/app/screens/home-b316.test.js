@@ -9,7 +9,7 @@ import { fakeDocument } from "../fakes.test-helper.js";
 const store = new Map();
 globalThis.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) };
 globalThis.document ??= fakeDocument();
-const { routeTile, slotOrRoute, slotTile, ROUTE_TILE_SUBTITLE } = await import("./home.js");
+const { routeTile, slotOrRoute, slotTile, phoneStatus, paintCert, PAIR_TILE, ROUTE_TILE_SUBTITLE } = await import("./home.js");
 const { routeWords } = await import("../signing/route.js");
 const { routeFailure, clearRouteFailure } = await import("../core/installroute.js");
 
@@ -50,4 +50,45 @@ test("the slot follows the failure as it's set or cleared, and the install clear
   const route = src("../signing/route.js");
   assert.match(route, /if \(route\.route\) why = await routeWords\(e, why, native\)/);
   assert.match(route, /if \(route\.route\) clearRouteFailure\(\)/);
+});
+
+test("F410a: This iPhone, not paired: Pair This iPhone, opening Pairing, before a failure; paired or not known: not", () => {
+  const f = { title: "iPhone Refused", short: "x", fix: "check" };
+  const t = routeTile("sideload", f, "iphone", { paired: null });
+  assert.equal(t.title, "Pair This iPhone");
+  assert.match(t.href, /settings\/installation\/pair$/);
+  assert.equal(routeTile("sideload", null, "iphone", { paired: false }).kind, "pair");
+  assert.equal(routeTile("sideload", null, "iphone", { paired: "rp" }), null);
+  assert.equal(routeTile("sideload", f, "iphone", { paired: "rp" }).kind, "route");
+  assert.equal(routeTile("sideload", null, "iphone", null), null, "no answer: no warning");
+  assert.equal(routeTile("sideload", null, "server", { paired: null }), null);
+  for (const mode of ["site", "jailbreak"]) assert.equal(routeTile(mode, null, "iphone", { paired: null }), null);
+  const setup = { stage: "gone", kind: "setup", title: "Signing Needs Setup", subtitle: "y" };
+  assert.equal(slotOrRoute(setup, t).kind, "setup", "signing that stops everything stays first");
+  const row = { hidden: true, classList: { toggle() {} }, parts: {}, querySelector(s) { return (this.parts[s] ??= {}); } };
+  paintCert(row, t);
+  assert.equal(row.hidden, false);
+  assert.equal(row.parts[".home-tile"].href, t.href, "a tap opens Pairing");
+  assert.equal(row.parts[".cell-subtitle"].textContent, PAIR_TILE.subtitle);
+  paintCert(row, routeTile("sideload", f, "iphone", { paired: "rp" }));
+  assert.match(row.parts[".home-tile"].href, /settings\/signing$/, "a failure opens Installation & Signing again");
+});
+
+test("F410a: idevice.status alone is asked, and only by the sideload app on This iPhone", async () => {
+  const calls = [];
+  const n = { call: async (m) => { calls.push(m); return { paired: null }; } };
+  assert.equal(await phoneStatus("site", "iphone", n), null);
+  assert.equal(await phoneStatus("sideload", "server", n), null);
+  assert.deepEqual(calls, []);
+  assert.deepEqual(await phoneStatus("sideload", "iphone", n), { paired: null });
+  assert.deepEqual(calls, ["idevice.status"], "no verify: no VPN");
+  assert.equal(await phoneStatus("sideload", "iphone", { call: async () => { throw new Error("no"); } }), null);
+  assert.equal(await phoneStatus("sideload", "iphone", undefined), null);
+});
+
+test("F410a: read at launch and on coming back: with the slot's check", () => {
+  const home = src("./home.js");
+  assert.match(home, /const check = async \(\) => \{\n\s+readPhone\(\);/);
+  assert.match(home, /visibilityState !== "hidden"\) check\(\)/);
+  assert.match(home, /key === ROUTE_KEY && alive\(\)/);
 });

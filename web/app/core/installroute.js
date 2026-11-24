@@ -360,6 +360,8 @@ export const NO_ANSWER_FAILURE = { title: "Not Responding", message: "This iPhon
   short: "This iPhone didn't answer the last check.", fix: "check", button: FIX };
 
 export const PAIRING_LOST = "Pairing Lost";
+// F410a: This iPhone is chosen and idevice.status answered that it isn't paired (no VPN needed to know).
+export const needsPairing = (choice, st) => choice === "iphone" && Boolean(st) && !st.paired;
 // The status cell for a remembered failure: red, with Fix as its action row (`fix`: what it does).
 export function failureStatus(f) {
   const lost = f.fix === "pair"; // F414
