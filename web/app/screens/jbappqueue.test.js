@@ -164,6 +164,32 @@ test("runJailbreakApps: AppSync's step stopping it runs nothing; else the helper
   assert.equal(afters.length, 1);
 });
 
+test("F407 runJailbreakApps: `together` gets the prepared apps for the packages' run; when it has none the apps run alone, then `after`", async () => {
+  const q = createAppQueue();
+  q.add(ipaJob("com.x.a", "A"));
+  const got = [];
+  const ran = [];
+  const run = async (jobs, d) => { ran.push(d); return { ok: true }; };
+  const opts = { queue: q, prepare: async () => ({ installed: true }), run, lanes: {}, safety: async () => true };
+  const afters = [];
+  const res = await runJailbreakApps(q.list(), { ...opts, finish: () => ({ level: "restart" }), after: (r) => afters.push(r),
+    together: (apps) => { got.push(apps); return Promise.resolve({ ok: true, both: true }); } });
+  assert.equal(res.both, true);
+  assert.equal(ran.length, 0, "the host starts it");
+  assert.deepEqual(got[0].jobs.map((j) => [j.id, j.helper]), [["com.x.a", true]]);
+  assert.deepEqual(got[0].finish(), { levels: ["restart"], kinds: ["app"] });
+  const host = { page: {} };
+  await got[0].start(host);
+  assert.equal(ran[0].host, host);
+  assert.equal(ran[0].open(), host.page);
+  ran[0].onClose({ ok: true }); // the page closes: the next run can start
+  assert.equal(afters.length, 0);
+  await runJailbreakApps(q.list(), { ...opts, finish: () => null, after: (r) => afters.push(r), together: () => null });
+  assert.equal(ran[1].host, undefined);
+  ran[1].onClose({ ok: true });
+  assert.equal(afters.length, 1);
+});
+
 test("afterApps: the packages Confirm agreed to run while the queue still holds just those; else Confirm asks apt again", () => {
   const queue = (ids) => ({ size: ids.length, get: (id) => (ids.includes(id) ? { id } : null) });
   const run = { jobs: [{ id: "p1" }, { id: "p2" }] };

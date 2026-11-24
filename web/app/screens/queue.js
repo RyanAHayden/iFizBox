@@ -149,7 +149,7 @@ export function openConfirm({ footer = null } = {}) {
     if (!ready) return;
     const run = ready;
     // F234: the queue run where one failure doesn't stop the rest, where the backend can fetch each package
-    // B71a: queued apps go first (their run, then the packages'), so a package's respring can't cut them off
+    // B71a: queued apps go first, so a package's respring can't cut them off
     close().then(() => runConfirmed(run));
   });
 
@@ -771,7 +771,8 @@ export async function runAppQueueRun(jobs, { queue = appQueue, record = recordAp
 // root helper instead: AppSync Unified first when an install needs it (ipa-install.js ensureAppSync: its own apt
 // Confirm, then on), then the black page with rows (screens/apprun.js runAppRun on helperLanes): each IPA to the
 // helper's install-ipa, each Remove to its uninstall-app, one at a time. Confirm (openConfirm) lists the apps beside
-// apt's packages and runs them first; the packages' run follows once the apps' page closes.
+// apt's packages and one run does both, apps first (F407: runConfirmed, screens/queuerun.js); after an AppSync Unified run
+// that changed the packages queued, or on a backend without queueFetch, the packages wait for the apps' page to close.
 
 let appPreparing = false; // AppSync Unified is being got for a jailbreak app run: its own Confirm leaves the apps out
 
@@ -784,18 +785,21 @@ function appNames(jobs) {
   return out;
 }
 
-// Confirm's Confirm: the apps' run, then the packages' (when apt agreed to some).
+// Confirm's Confirm: apps and packages in one run (F407), or just the one kind queued.
 function runConfirmed(run) {
   const apt = (r) => (typeof getBackend().queueFetch === "function" ? runQueueRun(r) : runConsole(r));
   if (!run.apps?.length) return run.jobs.length ? apt(run) : undefined;
-  return runJailbreakApps(run.apps, { after: run.jobs.length ? () => afterApps(run, apt) : null });
+  return runJailbreakApps(run.apps, { after: run.jobs.length ? () => afterApps(run, apt) : null,
+    together: run.jobs.length && typeof getBackend().queueFetch === "function" ? (apps) => (samePackages(run) ? runQueueRun({ ...run, apps }) : null) : null });
 }
+
+// The queue still holds just the packages Confirm agreed to (AppSync Unified's run may have taken some).
+const samePackages = (run, queue = installQueue) => queue.size === run.jobs.length && run.jobs.every((j) => queue.get(j.id));
 
 // Once the apps' page closes: the packages Confirm agreed to, while the queue still holds just those; else (AppSync's
 // run took them, or the queue changed) Confirm asks apt again for what is left.
 export function afterApps(run, apt, { queue = installQueue, open = openConfirm } = {}) {
-  const same = queue.size === run.jobs.length && run.jobs.every((j) => queue.get(j.id));
-  if (same) return apt(run);
+  if (samePackages(run, queue)) return apt(run);
   if (queue.size) open();
   return undefined;
 }
@@ -823,10 +827,11 @@ async function recordJbApp(job) {
 }
 
 // The jailbreak app's run of queued apps. `after(result)`: once its page closes, unless it was cancelled (Cancel
-// reopens Confirm with what finished cleared). Stand-ins for tests: prepare (appSyncFirst), run (runAppRun), lanes,
+// reopens Confirm with what finished cleared). `together(apps)` (F407): the packages' run with these apps in it (a
+// promise for its first end), or null when the packages queued have changed: the apps then run alone, `after` next. Stand-ins for tests: prepare (appSyncFirst), run (runAppRun), lanes,
 // record. -> runAppRun's first end, or null when it didn't start (a run is up, or AppSync's step stopped it).
 export async function runJailbreakApps(jobs, { queue = appQueue, prepare = appSyncFirst, run = null, lanes = null, record = recordJbApp,
-  after = null, finish = null, safety = async (j) => (await import("./safety.js")).installSafety(j) } = {}) {
+  after = null, together = null, finish = null, safety = async (j) => (await import("./safety.js")).installSafety(j) } = {}) {
   if (appRunning || appPreparing || running) return null;
   // F291: Known Malware and reported versions ask first here too (the jailbreak build skips the iOS-version alert)
   try { if (!(await safety(jobs))) return null; } catch { /* the check failing never blocks an install */ }
@@ -841,13 +846,30 @@ export async function runJailbreakApps(jobs, { queue = appQueue, prepare = appSy
   try {
     const page = await import("./apprun.js");
     let fin = finish;
+    let resprung = () => {};
     if (!lanes || !fin) {
       const [ipa, low] = await Promise.all([import("./ipa-install.js"), import("../ipa-install.js")]);
-      lanes ??= page.helperLanes({ backend: getBackend(), install: low.runIpaInstall, needs: ipa.ipaNeeds });
+      lanes ??= page.helperLanes({ backend: getBackend(), needs: ipa.ipaNeeds, install: (args, view, opts = {}) => {
+        // F407: Cancel or the row's stop also stops the shell's download (F196), as the single install's page does
+        const stop = () => ipa.stopIpaInstall();
+        opts.signal?.addEventListener?.("abort", stop, { once: true });
+        return low.runIpaInstall(args, view, opts).finally(() => opts.signal?.removeEventListener?.("abort", stop));
+      } });
+      resprung = () => ipa.setAppSyncRespring(false);
       fin ??= () => (ipa.appSyncRespringPending() ? ipa.ipaFinish({ ok: true }) : null);
     }
-    return await (run ?? page.runAppRun)(queued.map((j) => ({ ...j, helper: true })), {
-      queue, record, lanes, finish: fin,
+    const helperJobs = queued.map((j) => ({ ...j, helper: true }));
+    const start = run ?? page.runAppRun;
+    const deps = { queue, record, lanes };
+    const both = together?.({
+      jobs: helperJobs,
+      start: (host) => start(helperJobs, { ...deps, host, open: () => host.page, onClose: () => { appRunning = false; updateChrome(); } }),
+      finish: () => (fin?.()?.level === "restart" ? { levels: ["restart"], kinds: ["app"] } : null), // B61
+      resprung,
+    });
+    if (both) return await both;
+    return await start(helperJobs, {
+      ...deps, finish: fin,
       onClose: (result) => { appRunning = false; updateChrome(); if (!result?.stopped) after?.(result); },
       reopenConfirm: (footer) => { appRunning = false; openConfirm({ footer }); },
     });
@@ -882,13 +904,19 @@ export function runPaidInstall({ id, version, name = "", run }) {
 // F234: Confirm's run on screens/queuerun.js: downloads 3 at a time, one dpkg lane, a failure skips only what needs
 // it. What installed leaves the queue as it goes; failed, skipped and cancelled packages stay queued. F189's waiters
 // get each package's own outcome once the page closes.
-async function runQueueRun({ jobs, plan, ids }) {
+// F407: `apps` (runJailbreakApps) runs in it too.
+async function runQueueRun({ jobs, plan, ids, apps = null }) {
   running = true;
   updateChrome();
   const waiters = takeWaiters(ids);
   const names = await namesFor(ids);
   return runQueue({ jobs, plan }, {
-    backend: getBackend(), catalog, queue: installQueue, runLogs, names, finishAction,
+    backend: getBackend(), catalog, queue: installQueue, runLogs, names, apps,
+    finishAction: async (choice) => {
+      const keep = await finishAction(choice);
+      if (!keep && (choice.level === "restart" || choice.level === "reload")) apps?.resprung();
+      return keep;
+    },
     setBadge: (text) => ctxRef?.setBadge?.("installed", text),
     onEnd: (result) => countAfterRun((result?.rows ?? []).filter((r) => r.state === "installed").map((r) => r.id)), // B310
     onClose: (result) => {

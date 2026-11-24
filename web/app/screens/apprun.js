@@ -32,6 +32,8 @@
 // An app handed to iOS while iFizBox was in the background ends "Sent to iOS", and turns Installed once iOS says it has
 // it when iFizBox is back in front (followHandoff, B76).
 // B175: a finished run's page closes when iFizBox is back in front or a link comes (incoming.js, through runPage()).
+// F407: with packages queued too (the jailbreak app), this run is a guest on the queue run's page (screens/queuerun.js;
+// deps.host): its rows and log lines go there, and the host starts it, cancels it, retries it and ends it.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { el, barButton } from "../nav/ui.js";
 import { openProgress, openOn, rowBar, RETURN_LABEL, CLOSING_LABEL, WAITING_LABEL, UPDATING_TITLE, NOT_YET_TITLE, TRY_AGAIN_LABEL, CLOSE_GRACE, CLOSE_BY_HAND,
@@ -232,7 +234,8 @@ export function followHandoff(run, rows, { isInstalled, doc = globalThis.documen
 //   record(job) (Installed's record of an install), reopenConfirm(footer), onClose(result), open (openProgress, tests),
 //   stallMs, later, clear (tests), finish(result) (B71a: { label, action } for the bottom button, or null),
 //   onAppEnd(row, recorded) (B264: an app's install or re-sign has just ended: the badge counts again; `recorded`
-//   settles once Installed's record of it is written, null when none is) } ->a promise for the first end: { ok, stopped, rows, installed }.
+//   settles once Installed's record of it is written, null when none is), host (F407, screens/queuerun.js appHost: the
+//   run is put on its page through host.attach and nothing starts here; returns null) } ->a promise for the first end: { ok, stopped, rows, installed }.
 export async function runAppRun(jobs, deps) {
   const { queue, lanes, record = async () => {}, reopenConfirm = () => {}, open = openProgress, onAppEnd = () => {} } = deps;
   const page = open({ title: "Running" });
@@ -269,8 +272,8 @@ export async function runAppRun(jobs, deps) {
     li.append(main, act);
     list.append(li);
     main.addEventListener("click", () => {
-      if (!run.running && r.state === "failed" && r.busy) ownId(r.id); // B151: the App Store holds its bundle ID
-      else if (!run.running && (r.state === "failed" || r.state === "cancelled")) retry(r.id);
+      if (idle() && r.state === "failed" && r.busy) ownId(r.id); // B151: the App Store holds its bundle ID
+      else if (idle() && (r.state === "failed" || r.state === "cancelled")) retry(r.id);
       else if (r.state === "asking" && lanes.reprompt) run.reprompt(r.id); // B85: the prompt again
       else showLog(r.id);
     });
@@ -399,6 +402,7 @@ export async function runAppRun(jobs, deps) {
       // B264: after the record above is asked for (`recorded`: its promise, when one was written), so the count sees it
       if (endedNow) try { onAppEnd(r, recorded.get(r.id) ?? null); } catch { /* the badge counts again on the next open */ }
       tick();
+      deps.host?.changed();
     },
     onLog: ({ id, kind, text }) => line(kind, text, id),
     // B153: a new pass on this page starts with a clean log; B337: not the Signing Server Fallback's (keep)
@@ -432,8 +436,10 @@ export async function runAppRun(jobs, deps) {
   });
   closeB.addEventListener("click", () => page.close());
   retryAll.addEventListener("click", () => { const p = run.retryAll(); if (p) drive(p); });
-  const retry = (id) => { const p = run.retry(id); if (p) drive(p); };
-  const ownId = (id) => { const p = run.ownIdRetry(id); if (p) drive(p); };
+  const idle = () => !run.running && !deps.host?.busy; // F407: the packages' half of the run counts too
+  const go = (p) => (deps.host ? deps.host.drive(p) : drive(p));
+  const retry = (id) => { const p = run.retry(id); if (p) go(p); };
+  const ownId = (id) => { const p = run.ownIdRetry(id); if (p) go(p); };
 
   let first = null;
   let latest = null;
@@ -628,7 +634,7 @@ export async function runAppRun(jobs, deps) {
 
   // B175: this page as runPage() hands it out while it is up
   const waiters = [];
-  const busy = () => !page.closed && (run.running || run.stopping || Boolean(selfEnd?.locked && following));
+  const busy = () => !page.closed && (run.running || run.stopping || Boolean(deps.host?.busy) || Boolean(selfEnd?.locked && following));
   settled = () => { if (!busy()) for (const f of waiters.splice(0)) f(); };
   let closing = null;
   const handle = {
@@ -647,6 +653,18 @@ export async function runAppRun(jobs, deps) {
 
   // every row starts drawn
   for (const r of rows) draw(r);
+  if (deps.host) { // F407: the queue run starts it, and ends it with its packages
+    deps.host.attach({
+      run, rows, redraw: () => { for (const r of rows) draw(r); },
+      status: () => runStatus(rows), percent: () => runPercent(rows), left: () => rows.filter((r) => !ended(r)).length,
+      end(stopped) {
+        latest = { ok: rows.every((r) => r.state === "installed"), stopped, rows, installed: rows.filter((r) => r.state === "installed").length };
+        return latest;
+      },
+      settled: () => settled(),
+    });
+    return null;
+  }
   const p = run.start();
   return drive(p).then(() => first, () => first);
 }

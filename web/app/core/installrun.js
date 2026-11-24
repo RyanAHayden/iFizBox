@@ -13,7 +13,8 @@
 //   neededBy(plan, jobs, info)  -> { id: [ids] }  Confirm's "needed by X" under a package apt added
 //   deadRows(rows, installed)  -> Map(id -> cause id)  the rows that can't install any more because something they
 //                                         need failed (or was skipped, or cancelled): each with the failure at its root
-//   createInstallRun({ rows, installed, fetch, install, downloads = 3, onChange, onLog })
+//   createInstallRun({ rows, installed, fetch, install, downloads = 3, hold, onChange, onLog })
+//       hold() -> true       F407: the dpkg lane waits (downloads go on) until it says false and .resume() is called
 //       fetch(row, hooks)   -> { file } | { viaApt: true }   the download (hooks: { signal, progress(fraction 0..1) });
 //                              viaApt: the shell couldn't fetch it, so the install step lets apt download it
 //       install(row, hooks) -> { ok, error? }                 dpkg's turn (hooks: { log(kind, text) })
@@ -139,7 +140,7 @@ export function deadRows(rows, installed = {}) {
   return dead;
 }
 
-export function createInstallRun({ rows, installed = {}, fetch, install, downloads = 3, onChange = () => {}, onLog = () => {} }) {
+export function createInstallRun({ rows, installed = {}, fetch, install, downloads = 3, hold = () => false, onChange = () => {}, onLog = () => {} }) {
   const fetching = new Map(); // id -> AbortController-like { aborted, abort() }
   let lane = null;            // the row dpkg is on
   let stopping = false;
@@ -231,7 +232,7 @@ export function createInstallRun({ rows, installed = {}, fetch, install, downloa
     }
     for (const r of rows) if (r.state === "waiting" && r.op === "remove") set(r, "ready");
     // the dpkg lane: the first row not ended, once it is ready
-    if (!lane) {
+    if (!lane && !hold()) {
       const next = rows.find((r) => !ended(r));
       if (next?.state === "ready") runLane(next);
     }
@@ -259,6 +260,7 @@ export function createInstallRun({ rows, installed = {}, fetch, install, downloa
       pump();
       return p;
     },
+    resume() { if (finish) pump(); }, // F407: hold() has changed its mind
     // Cancel: downloads stop now, rows not started are cancelled, dpkg finishes the package it is on.
     cancel() {
       if (!finish || stopping) return false;
