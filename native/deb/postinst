@@ -3,6 +3,11 @@
 # Installed from inside the app (ifizbox-helper sets IFIZBOX_HELPER_PID, the process the app waits on), uicache
 # would close the running app while apt and dpkg are still at work, so it waits in the background until that run
 # has ended (at most 10 minutes). Its fds are all let go, so neither dpkg nor the helper waits for it.
+# B414: a run may end on Restart SpringBoard, Reload SpringBoard or Reboot Device, which wait for the tap: while the
+# app is held (ifizbox-helper hold-self, "<pid> <start time>" in $held) and alive, uicache waits on, however long. It
+# runs once the app lets go (the file is gone) or has closed.
+held=/var/jb/var/lib/ifizbox/held
+holding() { p=; s=; read -r p s <"$held" && case "$p" in '' | *[!0-9]*) false ;; *) kill -0 "$p" ;; esac; }
 register() { uicache -p /var/jb/Applications/$(BRAND_NAME).app; }
 case "$IFIZBOX_HELPER_PID" in
 '' | *[!0-9]*) register || true ;;
@@ -10,6 +15,7 @@ case "$IFIZBOX_HELPER_PID" in
     (
         n=0
         while [ "$n" -lt 600 ] && kill -0 "$IFIZBOX_HELPER_PID" 2>/dev/null; do sleep 1; n=$((n + 1)); done
+        while [ -e "$held" ] && holding; do sleep 1; done
         register
     ) </dev/null >/dev/null 2>&1 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- &
     ;;

@@ -550,6 +550,9 @@ enum Replaced {
     static let running = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "",
                           Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "")
     static var timer: Timer?
+    // B414: a run that installs iFizBox is on the page (app.holdSelf, Bridge.swift): it may end on Restart or Reload
+    // SpringBoard or Reboot Device, which wait for the tap.
+    static var held = false
 
     static func onDisk() -> (String, String)? {
         let url = Bundle.main.bundleURL.appendingPathComponent("Info.plist")
@@ -560,6 +563,7 @@ enum Replaced {
     static func watch() {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
+            if held { return }
             let now = onDisk()
             if let now, now == running { return }
             timer?.invalidate()

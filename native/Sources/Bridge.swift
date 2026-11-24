@@ -259,6 +259,7 @@ enum Theme {
 
 // F72: links outside the web view. (F61's selfupdate.download and app.quit went with F183's silent update, C8.)
 //   app.openURL {url} -> {opened}
+//   app.holdSelf {on} -> nil
 enum SelfUpdate {
     static func register(_ b: Bridge) {
         // F72: open a link outside the web view (iFizBox's own update: the Signing Server's itms-services link, or
@@ -269,6 +270,23 @@ enum SelfUpdate {
                 return Apt.reply(c, nil, "bad_url: not a URL another app can open")
             }
             LinkOut.open(url) { ok in c.reply(["opened": ok], nil) }
+        }
+        // B414: the queue run holds iFizBox open from its start when it installs iFizBox itself, until it ends
+        // without needing the tap or its page closes: Replaced's watcher and, through ifizbox-helper hold-self, the
+        // postinst's uicache. Both or neither: without the helper's record the app's later calls would be refused.
+        b.on("app.holdSelf") { c in
+            let on = (c.params["on"] as? Bool) ?? false
+            DispatchQueue.main.async {
+                if on { Replaced.held = true }
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let r = try? Helper.run(["hold-self", on ? "on" : "off"], emit: nil)
+                    let ok = r?["code"] as? Int == 0
+                    DispatchQueue.main.async {
+                        if !on || !ok { Replaced.held = false }
+                        c.reply(nil, ok ? nil : "helper: hold-self \(r?["stderr"] as? String ?? "couldn't run")")
+                    }
+                }
+            }
         }
     }
 }
