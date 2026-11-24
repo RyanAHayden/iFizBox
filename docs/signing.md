@@ -661,7 +661,10 @@ Notifications:
 - Warnings (`core/keepid.js profileNotes`, under the switch and in Custom Install): a wildcard profile (Apple gives
   it no Push), a development one (sandbox push only), an App ID without Push, and an explicit App ID's shared
   App Groups (each app keeps its own keychain group first, but apps signed with one App ID share the profile's App
-  Groups folders; their notifications are not affected). Custom Install also warns when the original (same ID, not signed by iFizBox:
+  Groups folders; their notifications are not affected). Custom Install also says when the app has a notification
+  service extension, its signature asks for App Groups or Communication Notifications, and a profile with production
+  Push has none of them (`notifyNote`; `signing.inspect` sends `profileGroups`, as a profile's group list can be there
+  and empty): its notifications may not show. It also warns when the original (same ID, not signed by iFizBox:
   `apps.isInstalled`, `signing.installed`) is on the phone: iOS refuses to put a signed app over the App Store copy,
   which must be deleted first. None of these falls back to the old way: every profile kind installs with the ID kept.
   A plain Install (`signAndInstall`, when the app's bundle ID is known) asks the same before it signs

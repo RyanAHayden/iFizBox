@@ -54,6 +54,9 @@ struct Profile {
     // development one), or nil when its App ID has no Push (every wildcard profile).
     var pushEnvironment: String? { (entitlements["aps-environment"] as? String).flatMap { $0.isEmpty ? nil : $0 } }
 
+    // F413: the profile's App Groups; [] too when its App ID has App Groups with none assigned.
+    var groups: [String] { entitlements["com.apple.security.application-groups"] as? [String] ?? [] }
+
     // F237 (R25's verdict): the IDs one app is signed with. `keep` (Keep Bundle IDs, on by default): Info.plist and
     // the code signature keep the app's own ID (or the one the user typed), and only the entitlements'
     // application-identifier and keychain group take the profile's App ID (explicit, or the wildcard narrowed:

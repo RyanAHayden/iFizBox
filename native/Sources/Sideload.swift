@@ -7,7 +7,7 @@
 //   signing.inspect {url} (stream: {phase: "downloading", progress})
 //        -> {token, app: {name, bundleId, version, minimumOS, size, entitlements, permissions, extensions},
 //            icon (base64 PNG, may be Apple's CgBI form) | null, missing: [entitlement], signsAs, profileKind,
-//            appIdAs, keepBundleId, push, wildcard, profileAppId}   (params keepBundleId?: Keep Bundle IDs, absent on)
+//            appIdAs, keepBundleId, push, wildcard, profileAppId, profileGroups}   (params keepBundleId?: Keep Bundle IDs, absent on)
 //   signing.install {url | token, name?, bundleId?, icon?, removeExtensions?, fixArm64e?, keepBundleId?} (stream as I6)
 //        -> I6's reply + {fixedArm64e, expires}
 //   signing.progress {bundleId} (stream: {phase: "installing", progress}, {served: true} once iOS has the whole IPA)
@@ -154,7 +154,7 @@ enum Sideload {
                     Apt.reply(c, ["token": tok, "app": d.json, "icon": icon, "missing": d.missing(from: profile),
                                   "signsAs": ids.bundleID, "appIdAs": ids.entitlementsID, "keepBundleId": o.keepBundleID,
                                   "push": profile.pushEnvironment ?? NSNull(), "wildcard": profile.isWildcard, "profileAppId": profile.appID,
-                                  "profileKind": profile.kind.rawValue], nil)
+                                  "profileGroups": profile.groups, "profileKind": profile.kind.rawValue], nil) // profileGroups: F413
                 } catch {
                     try? FileManager.default.removeItem(at: file)
                     IPAFetch.damaged(error, source: url.absoluteString) // F400
