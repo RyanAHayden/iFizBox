@@ -294,13 +294,14 @@ signed by the same team. What picks it out (its certificate's SHA-256) and the p
 generic-password items (service `com.ryha.ifizbox.signing.setup`, `...ThisDeviceOnly`; neither is a secret), so a
 reinstall comes back with its certificate and profile (`SignStore.restored`, once per launch).
 
-The sideload build also looks once at launch at the file inside it, `ifizbox-identity.plist`, remembered by its digest.
-With nothing held in the Keychain, the file's identity is imported, so a certificate the user removed does not come
-back from the same file. With a certificate held, only the file's profile can replace the held profile, never the
+The sideload build looks once, at launch, at the file inside it, `ifizbox-identity.plist`, remembered by its digest, so
+a certificate the user removed doesn't come back from the same file. With nothing held in the Keychain, the file's
+identity is imported. With a certificate held, only the file's profile can replace the held profile, never the
 certificate, and only when the file's `.p12` holds the same certificate, the profile lists that certificate, it has the
 same team and App ID, a strictly newer CreationDate, it has not expired, and it does not leave this iPhone out (a
 profile that lists devices without this one is refused; an unknown device is allowed, and a profile with no devices at
-all never is). Otherwise what is held stays, including a newer profile imported by hand. The digest of the file last
+all never is). Otherwise what is held stays, including a newer profile imported by hand. While the
+held profile can't be read, or the new one can't be written, the next launch looks again. The digest of the file last
 compared is kept in UserDefaults key `ifizbox.bundledProfile`, separate from `ifizbox.bundledIdentity` (the files whose
 certificate was looked at). Each replacement logs one line naming both profiles with their dates
 (`BundledIdentity.replacesProfile`, `SignStore.replaceProfile`).
