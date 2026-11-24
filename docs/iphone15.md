@@ -41,6 +41,11 @@ and forwards taps, drags, typing, Home and Wake. Use it when a login or other pe
 page's actions borrow whoever holds the UI lock, so the person types while the agent waits. With the lock free it
 takes it as `USER` and gives it back after 5 idle minutes. Anyone on the tailnet can drive the phone while it runs.
 
+The page shows who holds the phone. While a task holds it, taps, swipes, typing, Home and Wake are refused until the
+person presses "Use it anyway" for that holder; a new holder asks again. SIGTERM (the Tools page's Stop) frees the
+lock only when it is held as `USER`, then exits 0. Started while already serving, it says so and exits 0.
+`tools/test_remote_15.py` checks this with a fake `ui-15.sh` and lock folder (no phone).
+
 ## Rig files
 
 In `$IFIZBOX_15_RIG` (default `~/.local/share/ifizbox-rig/`), never in the repo:
