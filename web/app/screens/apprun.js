@@ -8,7 +8,7 @@
 //     round stop button on a working row: it cancels only that app (its download, its signing or iOS's prompt) and the
 //     next goes on. A failed or cancelled row's tap retries it once the run has ended; a "Tap Install on the iOS
 //     prompt" row's tap shows iOS's prompt for it again (B85, signing.reprompt: the user dismissed it); any other row
-//     opens the Log with that app's lines only. A prompt that closed without iOS asking for the IPA (the user's Cancel,
+//     opens the Log: one Log of every app's lines, at its newest line (B422). A prompt that closed without iOS asking for the IPA (the user's Cancel,
 //     or iOS couldn't reach iFizBox: it can't tell which) ends its row "Failed: iOS didn't download it" and the next
 //     app goes on; that row's tap (Try Again) asks iOS again with the IPA still served (B91: the Signing Server's copy
 //     after a freeze), and only that tap opens a new prompt. A row the App Store's install coordinator blocked (IX
@@ -251,10 +251,10 @@ export async function runAppRun(jobs, deps) {
   pane.append(list);
   page.pane(pane);
   const seg = page.segmented(["Apps", "Log"], (i) => {
-    if (i === 0) { page.filter(null); page.view("pane"); } else page.view("log");
+    page.view(i === 0 ? "pane" : "log");
   });
   openOn(page, seg, rows.length); // F247: one app opens on the Log
-  const showLog = (id) => { seg.select(1); page.filter(id); page.view("log"); };
+  const showLog = () => { seg.select(1); page.view("log"); }; // B422: one Log of everything, never filtered
 
   const views = new Map();
   for (const r of rows) {
@@ -274,7 +274,7 @@ export async function runAppRun(jobs, deps) {
       if (idle() && r.state === "failed" && r.busy) ownId(r.id); // B151: the App Store holds its bundle ID
       else if (idle() && (r.state === "failed" || r.state === "cancelled")) retry(r.id);
       else if (r.state === "asking" && lanes.reprompt) run.reprompt(r.id); // B85: the prompt again
-      else showLog(r.id);
+      else showLog();
     });
     act.addEventListener("click", () => run.stop(r.id));
     views.set(r.id, { li, status, bar, setBar, act });
