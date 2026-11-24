@@ -177,14 +177,15 @@ class App(unittest.TestCase):
         self.assertIn('if on { KeepAlive.shared.end(); emit?("appWait", 0)', sideload)
 
     def test_tunnel_stops_itself(self):
-        """B423: a killed app's tunnel: 60 s awake with no packet and no message; the app's beat is well inside it."""
+        """B423: a killed app's tunnel: 60 s awake with no packet; the app's beat is well inside it."""
         ext = read("Extension", "PacketTunnelProvider.swift")
         self.assertIn("static let quietLimit = 60", ext)
         self.assertIn("self.cancelTunnelWithError(nil)", ext)
-        self.assertIn("heard()", ext[ext.index("handleAppMessage"):ext.index("override func startTunnel")])
+        self.assertIn("self.heard()", ext[ext.index("private func loop()"):ext.index("static func reflect(")])
         src = read("App", "LocalVPN.swift")
         every = int(re.search(r"beatEvery: TimeInterval = (\d+)", src).group(1))
         self.assertLessEqual(every * 3, 60)
+        self.assertIn("sendto(fd, ", src[src.index("func beatPacket()"):])
         self.assertIn("let go = holds > 0 || installs > 0", src)
 
     def test_status_is_plain(self):

@@ -14,7 +14,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     static let peerAddress = "10.7.0.1"
 
     /// B423: an app that was killed can't turn the tunnel off, so it stops itself after this long awake without a
-    /// packet for the peer or a message from the app (LocalVPN.beat, while it holds the tunnel).
+    /// packet for the peer. The app sends one now and then while it holds the tunnel (LocalVPN.beat).
     static let quietLimit = 60
     private static let tickEvery = 5
     private let ticks = DispatchQueue(label: "ifizbox.vpn.quiet")
@@ -40,11 +40,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             self.timer = t
             t.resume()
         }
-    }
-
-    override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)?) {
-        heard()
-        completionHandler?(nil)
     }
 
     override func startTunnel(options: [String: NSObject]?, completionHandler: @escaping (Error?) -> Void) {

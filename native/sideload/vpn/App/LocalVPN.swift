@@ -268,7 +268,8 @@ enum LocalVPN {
     }
 
     /// The tunnel stops itself after a minute without packets (PacketTunnelProvider), for an app that was killed.
-    /// While anything holds it, a message every beatEvery says the app is still there.
+    /// While anything holds it, a packet every beatEvery says the app is still there (a provider message doesn't:
+    /// on iOS 27 sendProviderMessage answers nil and never reaches the extension).
     static let beatEvery: TimeInterval = 15
     private static var beating = false // guarded by lock
     private static func beat() {
@@ -280,12 +281,28 @@ enum LocalVPN {
             lock.lock()
             let go = holds > 0 || installs > 0
             beating = go
-            let conn = cached?.connection as? NETunnelProviderSession
+            let on = cached?.connection.status == .connected
             lock.unlock()
             guard go else { return }
-            if let c = conn, c.status == .connected { try? c.sendProviderMessage(Data([1])) }
+            if on { beatPacket() }
             beatLater()
         }
+    }
+
+    /// One UDP byte to the peer's discard port, through the tunnel's route.
+    private static func beatPacket() {
+        let fd = socket(AF_INET, SOCK_DGRAM, 0)
+        guard fd >= 0 else { return }
+        defer { close(fd) }
+        var a = sockaddr_in()
+        a.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        a.sin_family = sa_family_t(AF_INET)
+        a.sin_port = UInt16(9).bigEndian
+        a.sin_addr.s_addr = inet_addr(peer)
+        let sent = withUnsafePointer(to: &a) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { sendto(fd, [UInt8(1)], 1, 0, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
+        }
+        if sent < 0 { log("the packet that keeps \(name) on wasn't sent: \(String(cString: strerror(errno)))") }
     }
 
     // ---- The tunnel
