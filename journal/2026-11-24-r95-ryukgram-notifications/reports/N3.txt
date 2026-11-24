@@ -1,0 +1,76 @@
+r95 t80 at 2026-11-24T17:57:45Z (com.burbn.instagram 456.0.0)
+keychain S8NFX3A2LT.com.burbn.instagram: generic passwords 38, zxPluginsInjectGenericEntry 1
+  zx entry created 2026-11-23T19:19:28Z modified 2026-11-24T17:56:25Z accessible cku
+keychain S8NFX3A2LT.com.ryha.sideload: generic passwords 16, zxPluginsInjectGenericEntry 1
+  zx entry created 2026-11-23T19:33:53Z modified 2026-11-24T17:56:25Z accessible cku
+  S8NFX3A2LT.com.burbn.instagram service com.instagram.notifications.hpke: accessible dku, created 2026-11-24T02:41:21Z, modified 2026-11-24T02:41:21Z
+  S8NFX3A2LT.com.burbn.instagram class keys: 0
+  S8NFX3A2LT.com.burbn.instagram class inet: 0
+  S8NFX3A2LT.com.burbn.instagram class cert: 0
+  S8NFX3A2LT.com.burbn.instagram class idnt: 0
+  S8NFX3A2LT.com.ryha.sideload class keys: 0
+  S8NFX3A2LT.com.ryha.sideload class inet: 0
+  S8NFX3A2LT.com.ryha.sideload class cert: 0
+  S8NFX3A2LT.com.ryha.sideload class idnt: 0
+keychain MH9GU9K5PX.shared (the original group, not in the entitlements): refused
+keychain MH9GU9K5PX.platformFamily (the original group, not in the entitlements): refused
+keychain MH9GU9K5PX.com.burbn.instagram (the original group, not in the entitlements): refused
+group-less read of the zx entry (what zxPluginsInject's start-up does): S8NFX3A2LT.com.burbn.instagram
+group-less read, all matches by group: {
+    "S8NFX3A2LT.com.burbn.instagram" = 1;
+    "S8NFX3A2LT.com.ryha.sideload" = 1;
+}
+app's own Library/AppGroups (the group fix's place):
+  AppGroups: AppGroups — 88 files, 12621204 bytes; top level (
+    "group.com.burbn.instagram",
+    "group.com.facebook.family",
+    "group.com.burbn.family"
+)
+containerURL for group.com.burbn.instagram as the app gets it: /private/var/mobile/Containers/Shared/AppGroup/531F199D-DE93-4F08-8581-803876CFE1CC/group.com.burbn.instagram
+  tree: group.com.burbn.instagram — 26 files, 2059453 bytes; top level (
+    TerminationReporter,
+    Documents,
+    ReinstallDetection,
+    Library,
+    CrossAppFetch,
+    "ryspy.txt",
+    "fba_extentions_event_store"
+)
+    Library/Preferences group.com.burbn.instagram.plist: 13 keys
+containerURL for group.com.facebook.family as the app gets it: /private/var/mobile/Containers/Shared/AppGroup/531F199D-DE93-4F08-8581-803876CFE1CC/group.com.facebook.family
+  tree: group.com.facebook.family — 2 files, 830 bytes; top level (
+    FDID,
+    Library,
+    "ryspy.txt"
+)
+    Library/Preferences group.com.facebook.family.plist: 7 keys
+containerURL for group.com.burbn.family as the app gets it: /private/var/mobile/Containers/Shared/AppGroup/531F199D-DE93-4F08-8581-803876CFE1CC/group.com.burbn.family
+  tree: group.com.burbn.family — 2 files, 80 bytes; top level (
+    Library,
+    "ryspy.txt"
+)
+    Library/Preferences group.com.burbn.family.plist: 1 keys
+profile groups (what an extension without the group fix reaches through zxPluginsInject):
+  group.com.ryha.sideload.1: group.com.ryha.sideload.1 — 4 files, 387 bytes; top level (
+    RyukGram,
+    "zx-real-file.txt",
+    "probe-marker.txt"
+)
+  group.com.ryha.sideload.2: group.com.ryha.sideload.2 — 0 files, 0 bytes; top level (
+)
+  group.com.ryha.sideload.3: group.com.ryha.sideload.3 — 0 files, 0 bytes; top level (
+)
+  group.com.ryha.sideload.4: group.com.ryha.sideload.4 — 0 files, 0 bytes; top level (
+)
+  group.com.ryha.sideload.5: group.com.ryha.sideload.5 — 0 files, 0 bytes; top level (
+)
+suite domain group.com.burbn.instagram: 10 keys
+  names: FBMobileConfigStartupConfigs-124024574287414, FBTelemetryLogReportAppExtensionPluginEnabled, bsl_datastore_instagram_reader_capability, com.burbn.instagram.IGdeviceID, com.instagram.app-version, ig-device-id-saved-into-access-library, ig-machine-id-saved-into-access-library, instagram.app.auth.device.storage, lastKnownNotifSettingsState, mobileconfig_value_revert_checker_cache
+suite domain ifizbox.appgroup.group.com.burbn.instagram: 364 keys
+  names matching push/user/key (164 of 364): 'f'IGPushReachabilityUpsellManager22impressionCount, 'f'IGPushReachabilityUpsellManager22lastShownDate, 'f'IGPushReachabilityUpsellManagerAnyShown, 11062026IGPushReachabilityUpsellManagerV222ImpressionHistory, 11062026IGPushReachabilityUpsellManagerV222ImpressionHistory, 11062026IGPushReachabilityUpsellManagerV222LegacyImpressionB, 11062026IGPushReachabilityUpsellManagerV222LegacyImpressionB, 11062026IGPushReachabilityUpsellManagerV222impressionCount, 11062026IGPushReachabilityUpsellManagerV222impressionCount_3, 11062026IGPushReachabilityUpsellManagerV222lastShownDate, 11062026IGPushReachabilityUpsellManagerV222lastShownDate_317, 11062026IGPushReachabilityUpsellManagerV244ImpressionHistory, 11062026IGPushReachabilityUpsellManagerV244ImpressionHistory, 11062026IGPushReachabilityUpsellManagerV244LegacyImpressionB, 11062026IGPushReachabilityUpsellManagerV244LegacyImpressionB, 11062026IGPushReachabilityUpsellManagerV2DialogueBucketLastS, 11062026IGPushReachabilityUpsellManagerV2MegaphoneBucketLast, 11062026IGPushReachabilityUpsellManagerV2MegaphoneBucketLast, 11062026IGPushReachabilityUpsellManagerV3HighlyIntrusiveBuck, 11062026IGPushReachabilityUpsellManagerV3HighlyIntrusiveBuck, 11062026IGPushReachabilityUpsellManagerV3UserScopedSeededPer, 11062026IGPushReachabilityUpsellManagerV3UserScopedSeededPer, 11062026IGPushReachabilityUpsellManagerV3UserScopedSeededPer, 11062026IGPushReachabilityUpsellManagerV3UserScopedSeededSha, 11062026IGPushReachabilityUpsellManagerV3UserScopedSeededV3S, 3170903903-BigFootAppJobStart_UserPreferences_Last_Report_Da, 3170903903-DeviceInsightsAttributionExpiryKeyOneDay, 3170903903-DeviceInsightsPreviousAuthorizationStatusKey, 3170903903-DeviceInsightsPreviousFBAARTPermissionStatusKey, 3170903903-DeviceInsightsTrackingEnabledKey, 3170903903-FXCachingCommon.linkedAccountsData, 3170903903-FXCachingCommon.linkedAccountsDataSource, 3170903903-FXCachingCommon.linkedAccountsTimestamp, 3170903903-IGBTPSurfaceTimestampsStoriesInfoKey, 3170903903-IGBackgroundPrefetchLoggerFeedBgPrefetchRunCountK, 3170903903-IGBackgroundPrefetchLoggerLastAppStartKey, 3170903903-IGBackgroundPrefetchLoggerLastFeedBgPrefetchSched, 3170903903-IGBackgroundPrefetchLoggerLastFeedBgPrefetchUuidK, 3170903903-IGDataUserDefaultsStorageCleanupJobLastRunTimesta, 3170903903-IGDirectSQLiteKitCacheIsMETAKeyedArchiverEnabled, 3170903903-IGMQTTRegionHintUserDefaultsKey, 3170903903-PushTokenRegistrationStatus, 3170903903-direct-msys-mailbox-report, 3170903903-direct_inapp_notification_settings, 3170903903-enigma_query_time_key, 3170903903-enigma_updated_schema_dict_key, 3170903903-focus-mode-has-seen-key, 3170903903-friendsLaneLastEntrypointTapTimestampKey, 3170903903-friendsLaneReceivedEmptyResponseKey, 3170903903-fx_igpc_is_user_from_aymh_key, 3170903903-fx_igpc_is_user_from_switcher_key, 3170903903-geckolight_key_status_default, 3170903903-has-seen-stories-tray-key, 3170903903-http_ds_user_id_header, 3170903903-ig_direct_notes_last_ambient_data_update_timestam, 3170903903-ig_direct_notes_last_fetch_time, 3170903903-ig_explore_feeds_topics_and_for_you_feed-cache-se, 3170903903-ig_feed_deferred_response_applied, 3170903903-ig_feed_deferred_response_discarded, 3170903903-ig_feed_has_rendered_content, 3170903903-ig_feed_head_load_response_received, 3170903903-ig_feed_last_usage_strategy, 3170903903-ig_feed_response_was_deferred, 3170903903-ig_feed_shimmer_start_time, 3170903903-ig_feed_tail_load_blocked_by_head_load, 3170903903-ig_feed_tail_load_ever_triggered, 3170903903-ig_feed_tail_load_succeeded, 3170903903-ig_feed_video_currently_stalling, 3170903903-ig_feed_video_playback_failed, 3170903903-ig_feed_video_was_stalling, 3170903903-ig_feed_was_showing_shimmer, 3170903903-ig_ios_base_fetcher_last_successful_head_load_fet, 3170903903-ig_ios_base_fetcher_last_successful_head_load_fet, 3170903903-ig_ios_base_fetcher_last_successful_head_load_fet, 3170903903-ig_ios_feed_network_source_core_/clips/discover/s, 3170903903-ig_ios_feed_network_source_core_/clips/discover/s, 3170903903-ig_ios_feed_network_source_core_/feed/timeline/, 3170903903-ig_ios_fetcher_gql_last_successful_head_load_fetc, 3170903903-ig_knots_iab_dwell_time_cs_increment, 3170903903-ig_knots_iab_dwell_time_cs_multiplier, 3170903903-ig_knots_iab_navigation_cs_increment, 3170903903-ig_knots_iab_navigation_cs_multiplier, 3170903903-ig_knots_iab_organic_dwell_time_cs_increment, 3170903903-ig_knots_iab_organic_dwell_time_cs_multiplier, 3170903903-ig_knots_pixel_event_scores, 3170903903-ig_knots_signal_type_scores, 3170903903-ig_knots_url_keyword_tiers, 3170903903-ig_last_client_ipv4_address, 3170903903-ig_last_cohort_offsite_event_sync_timestamp, 3170903903-ig_last_dual_ip_event_timestamp, 3170903903-ig_last_knots_confidence_scores_sync_timestamp, 3170903903-ig_last_log_wca_event_stat_timestamp, 3170903903-ig_meta_ai_prewarmed_non_canonical_thread, 3170903903-ig_oba_opt_out_status, 3170903903-ig_odml_ads_swipe_up_feature_value, 3170903903-ig_odml_ads_swipe_up_feature_value_ttl, 3170903903-ig_odml_ads_tooltip_feature_value_v2, 3170903903-ig_odml_ads_tooltip_feature_value_v2_ttl, 3170903903-ig_press_ip_data, 3170903903-ig_re_nux_push_opt_in_dialog_last_user_session_ad, 3170903903-ig_reachability_upsell_impression_uuids, 3170903903-ig_screen_time_service_enabled_day, 3170903903-ig_show_nux_request_timestamp, 3170903903-ig_wca_cohort_id_key_3170903903, 3170903903-ig_wca_cohort_version_key_3170903903, 3170903903-kCXPNoticeSyncWithServerTimestampKey, 3170903903-kFriendsLaneDidSeeInitialLoadMediaKey, 3170903903-kHasLoggedODNCImpressionKey, 3170903903-kIGFullScreenVideoHintsLastSeenDateKey, 3170903903-kIGFullScreenVideoHintsSeenCountKey, 3170903903-kIGLastReportedResurrectionDateKey, 3170903903-kIGMainFeedCacheMetadataKey, 3170903903-kIGMainFeedPHLCacheMetadataKey, 3170903903-kIGPrivacyFlowTtlKey, 3170903903-kIGProcessContactPointSignalsLastSendDateKey, 3170903903-kIGProject92NumberActivityFeedNotifications, 3170903903-kIGProject92NumberActivityFeedNotificationsShowDo, 3170903903-kIGQuickSnapCornerStackPromptsKey, 3170903903-kIGQuickSnapCornerStackPromptsLastFetchTimeKey, 3170903903-kIGQuickSnapCornerStackPromptsVersionKey, 3170903903-kIGQuickSnapLastOpenedDateKey, 3170903903-kIGStoryTrayPHLCacheMetadataKey, 3170903903-kIGSundialXARDisclosureImpressionCountKey, 3170903903-kIGSundialXARDisclosureImpressionVersionKey, 3170903903-kIdentifierForClientCacheLinkedAccounts, 3170903903-kIdentifierForClientCacheLinkedBadgeAccounts, 3170903903-kLastConsistencyCheckTimeKey, 3170903903-kLoomLastConfigFetchKey, 3170903903-kPrivacyFlowSessionCounterKey, 3170903903-kPrivacyFlowSessionCounterNextResetTimeKey, 3170903903-madrid_message_notification_destination_last_sync, 3170903903-mobileconfig_value_revert_checker_cache-user-info, 3170903903-name-updated-in-focus-mode-key, 3170903903-profile-photo-updated-in-focus-mode-key, 3170903903-story-tray-personalization-is-high-me-user, 3170903903-story-tray-session-ranking-token, 3170903903-suggested-user-fetch-time, 3170903903-transport_type_account, 3170903903-users-auto-complete-cache-last-sync-time, IGPushReachabilityUpsellManager2impressionCount, IGPushReachabilityUpsellManager2lastShownDate, IGPushReachabilityUpsellManagerAnyShown, IGPushReachabilityUpsellManagerV22impressionCount, IGPushReachabilityUpsellManagerV22lastShownDate, IGPushReachabilityUpsellManagerV2GlobalTotalImpressionCount, all-logged-in-users-account-linking-infos, extension_mc_proxy.IGMCBridge:103429.0.device_id_key, extension_mc_proxy.IGMCBridge:103429.4.device_id_key, extension_mc_proxy.IGMCBridge:103429.5.device_id_key, extension_mc_proxy.IGMCBridge:66091.0.device_id_key, extension_mc_proxy.IGMCBridge:70484.1.device_id_key, extension_mc_proxy.IGMCBridge:75418.0.device_id_key, extension_mc_proxy.IGMCBridge:95474.17.device_id_key, extension_mc_proxy.IGMCBridge:95474.23.device_id_key, extension_mc_proxy.cs_eligible_notif_types.3170903903, extension_mc_proxy.igd_notification_throttling_duration.3170, extension_mc_proxy.igd_notification_throttling_should_thrott, extension_mc_proxy.igd_notification_throttling_window.317090, extension_mc_proxy.igd_notification_throttling_window_freque, extension_mc_proxy.notification_deduplication_store_limit_pa, ig_direct_badge_cache, lastKnownNotifSettingsState, mobileconfig_value_revert_checker_cache, nse_ig_ios_direct_prod_debuggability.enable_msys_error_loggi
+suite domain group.com.facebook.family: 6 keys
+  names: FBCloudTrustTokenStore.TokenSharedStorageKey, FDID_Synced.com.burbn.instagram, PhoneID, bundle-info://com.burbn.instagram, privacy_flow_detection, usdid
+suite domain ifizbox.appgroup.group.com.facebook.family: 9 keys
+  names: FBCloudTrustTokenStore.TokenSharedStorageKey, FDID_Synced.com.burbn.instagram, PhoneID, bundle-info://com.burbn.instagram, ifizbox.groupfix.copied, kIGAppQPPersistedCounterDataKey-3170903903, privacy_flow_detection, probe.marker, usdid
+initWithSuiteName:group.com.burbn.instagram dictionary count 1119
+initWithSuiteName:group.com.facebook.family dictionary count 1115
