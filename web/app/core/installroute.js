@@ -495,7 +495,7 @@ export function markQuietCheck({ storage = globalThis.localStorage, now = Date.n
 // holds it; `again`: the check's own second try, seconds after its first, whose VPN may still be on).
 export function quietCheckAllowed(choice, st, { again = false } = {}) {
   if (choice !== "iphone" || !iphoneSetUp(st)) return false;
-  if (st.vpn.restore) return false; // B427a: its configuration never stays, so each check would make iOS ask to allow it
+  if (st.vpn.restore) return false; // F419: each check would need a trip to Shortcuts to bring the other VPN back
   if (otherVPNOn(st) || st.otherVPN || st.vpn.cellular || !st.vpn.wifi) return false;
   return again || !st.vpn.on;
 }

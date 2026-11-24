@@ -55,10 +55,11 @@ class RestoreBridge(unittest.TestCase):
 
     def test_is_down(self):
         """Our tunnel counts as up when its state isn't known, while it comes or goes, and while something holds it."""
-        down = part(read("App", "LocalVPN.swift"), "static func isDown()", "\n    }\n")
+        down = part(read("App", "LocalVPN.swift"), "static func isDown()", "/// Our configuration as iOS has it")
         self.assertIn("holds > 0 || installs > 0", down)
-        self.assertIn("guard let s = savedStatus() else { return false }", down)
-        self.assertIn("[.disconnected, .invalid].contains(s)", down)
+        self.assertIn("guard let s = saved() else { return nil }", down)
+        self.assertIn("state()?.down ?? false", down)
+        self.assertIn("[.disconnected, .invalid].contains(s.status)", down)
 
 
 if __name__ == "__main__":

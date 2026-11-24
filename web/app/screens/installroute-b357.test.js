@@ -1,7 +1,7 @@
 // B357 (iPhone 15 Pro, Lite): with the built-in VPN, setting up ends with its test. Pairing (or a pairing file) is
 // followed at once by vpn.test, as Test Connection runs it: that first test is when iOS asks to add the VPN
 // configuration, so the page says Paired only after it. Without the built-in VPN, or once tested, pairing ends as
-// before. The shell keeps the configuration saved (LocalVPN.swift removes it only for Restore My VPN), so later installs ask nothing.
+// before. The shell keeps the configuration saved, so later installs ask nothing.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -114,8 +114,6 @@ test("without the built-in VPN: the page says Network Extensions are missing, an
 
 test("the shell keeps its VPN configuration: no removal after an install, so iOS asks Allow once", () => {
   const src = readFileSync(new URL("../../../native/sideload/vpn/App/LocalVPN.swift", import.meta.url), "utf8");
-  // F411: removed only for Restore My VPN (off by default)
-  assert.equal(src.split("removeFromPreferences").length, 2);
-  assert.match(src, /func giveBack\([^{]*\{\n\s*guard restore,/);
+  assert.doesNotMatch(src, /removeFromPreferences/); // F419: not for Restore My VPN either
   assert.doesNotMatch(src, /otherWasOn/);
 });
