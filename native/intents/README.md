@@ -28,7 +28,7 @@ iFizBox's actions for Shortcuts, Siri, Spotlight and the Action button, with not
 - `App/CellularInstalls.swift`: the three actions of the Cellular Installs Shortcut
   (`tools/shortcuts/cellular-installs.plist`), sideload IPA only. They report to `../sideload/vpn/App/CellularShortcut.swift`
   and return nothing, because a Shortcut whose last action has output makes iOS ask over the app.
-- `App/RestoreVPN.swift`: the three actions of the Restore My VPN Shortcut (`tools/shortcuts/restore-vpn.plist`),
+- `App/RestoreVPN.swift`: the two actions of the Restore My VPN Shortcut (`tools/shortcuts/restore-vpn.plist`),
   sideload IPA only. They report to `../sideload/vpn/App/RestoreShortcut.swift` and return nothing. None opens the app:
   Shortcuts' callback does, also when Set VPN ends the run early. Nothing on screen runs it yet.
 - AppIntents is weak-linked (`-weak_framework AppIntents`) so iFizBox still launches on iOS 15; `build.sh` fails if
