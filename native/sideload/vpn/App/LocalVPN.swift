@@ -385,9 +385,10 @@ enum LocalVPN {
 
     // ---- The tunnel
 
-    private static let lock = NSLock() // held for a moment only (status() takes it): never while waiting on iOS
+    static let lock = NSLock() // held for a moment only (status() takes it): never while waiting on iOS
     private static let startLock = NSLock() // B418: one up() at a time; held while it waits on iOS. Taken before `lock`
-    private static var cached: NETunnelProviderManager? // guarded by lock
+    private(set) static var cached: NETunnelProviderManager? // guarded by lock
+    static var closing = false // guarded by lock: downToClose (VPNClose.swift)
     private static var holds = 0 // guarded by lock
     private static var stopGen = 0 // guarded by lock: a scheduled stop runs only if nothing came after it
     private static var installs = 0 // guarded by lock: installs going on (installBegan): a reconnect stays in its queue
@@ -629,22 +630,6 @@ enum LocalVPN {
         lock.lock(); let over = holds == 0 && installs == 0 && (gen == nil || gen == stopGen); lock.unlock()
         if over { RestoreBack.look() } // else what came after it looks, at its own end
     }
-
-    /// B440: iFizBox closes for its own update, whatever holds the tunnel: down now, and no start after it. While our
-    /// extension runs iOS doesn't replace the app ("plugins are busy"), and it would run on for up to a minute after
-    /// the exit (PacketTunnelProvider.quietLimit). Blocking, downWait at most. True when it was up.
-    static func downToClose() -> Bool {
-        lock.lock(); closing = true; let m = cached; lock.unlock()
-        guard let m = m, ![.disconnected, .invalid].contains(m.connection.status) else { return false }
-        m.connection.stopVPNTunnel()
-        let t0 = Date()
-        while ![.disconnected, .invalid].contains(m.connection.status), Date().timeIntervalSince(t0) < downWait {
-            Thread.sleep(forTimeInterval: 0.05)
-        }
-        log("off (closing for the update) in \(String(format: "%.2f", Date().timeIntervalSince(t0))) s")
-        return true
-    }
-    private static var closing = false // guarded by lock
 
     /// One background task, ended once; `expiring` runs first when iOS ends it early, off the main thread (downIfIdle
     /// blocks), for expireLimit at most: iOS ends an app that keeps an expired task.

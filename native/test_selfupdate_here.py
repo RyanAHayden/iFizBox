@@ -54,13 +54,31 @@ class HereSelfClose(unittest.TestCase):
         self.assertIn("sinks = sinks.filter { $0(nil) }", ended)  # signing.selfUpdate answers null
         close = block(self.side, "private static func closeWith")
         self.assertIn("exit(0)", close)
-        self.assertIn("deadline: .now() + exitAfter", close)
+        self.assertIn("DispatchQueue.global(", close)  # the exit itself is off the main queue too
+        self.assertIn("deadline: .now() + wait", close)
         # B173: the exit doesn't hang on the notification's completion or the main queue (every route: the hosted
         # finish/guess close through closeWith too)
         self.assertIn("exitBackstop(", close)
         back = block(self.side, "static func exitBackstop(")
         self.assertIn("DispatchQueue.global(", back)
         self.assertIn("exit(0)", back)
+
+    def test_vpn_goes_off_before_the_exit(self):
+        # B440: iOS doesn't replace the app while its VPN extension runs, and asks again every 6 s
+        close = block(self.side, "private static func closeWith")
+        self.assertIn("LocalVPN.downToClose() ? max(exitAfter, vpnAsk) : exitAfter", close)
+        self.assertLess(close.index("KeepAlive.shared.begin()"), close.index("LocalVPN.downToClose()"))
+        self.assertIn("exitBackstop(\"closeWith\", after: LocalVPN.downWait + vpnAsk + 1)", close)  # never before the polite exit
+        self.assertIn("backstop: TimeInterval = LocalVPN.downWait + vpnAsk + 2", self.side)
+        back = block(self.side, "static func exitBackstop(")
+        self.assertLess(back.index("LocalVPN.downToClose()"), back.index("exit(0)"))
+        vpn = read("sideload", "vpn", "App", "LocalVPN.swift")
+        down = block(read("sideload", "vpn", "App", "VPNClose.swift"), "static func downToClose()")
+        self.assertIn("closing = true", down)
+        self.assertIn("stopVPNTunnel()", down)
+        self.assertNotIn("holds", down)  # whatever holds it
+        up = block(vpn, "static func up(")
+        self.assertLess(up.index("if over { throw"), up.index("try start("))  # no start after it
 
     def test_close_within_a_couple_of_seconds(self):
         clock = read("sign", "SelfCloseClock.swift")
