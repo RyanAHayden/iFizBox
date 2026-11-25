@@ -41,7 +41,7 @@ iOS's install prompt.
      part (a 200, or a `Content-Range` starting elsewhere) starts again from byte 0. Cancel isn't retried. When it
      gives up, the alert says "The app's download broke off before the end. Check the connection and tap Install
      again." (`CUT_TEXT`).
-  2. *Signing*: `signing-worker.js` (a module Web Worker) runs `websign-job.js`: unzip, read `Info.plist`, the
+  2. *Signing*: `signing-worker.js` (a module Web Worker) runs `websign-job.js`: unzip, then `websign-seal.js prepareSeal` drops and renames what iOS refuses in a seal (0xe8008017): old `_CodeSignature` folders, `CodeResources` and `_MASReceipt` at a bundle's root, files named `*.DS_Store`, a name spelled both NFC and NFD made one, and a non-ASCII executable's name (with its folders and `Info.plist`) decomposed; same rules as `native/sign/SealPath.swift`. It runs again after the tweaks' files go in. Then read `Info.plist`, the
      IDs (`core/websign.js signingIds`, see "Keep Bundle IDs" below), the profile's entitlements narrowed to the
      profile's App ID (`appEntitlements`, never `get-task-allow`), the app's injected tweaks (see "Tweak injection"
      below: `websign-job.js putTweaks` writes their files into the folder and the weak load commands into the
