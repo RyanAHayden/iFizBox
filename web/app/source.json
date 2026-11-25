@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "0.34.0",
+          "date": "2026-11-25T06:41:25Z",
+          "localizedDescription": "Browse's New and Top 25 now have a Filter button.\nThe iOS 26 app icon is darker on a dark Home Screen.\nSearch keeps the keyboard up when you pick a category.\nBrowse's New and Top 25 have a Filter button, to filter and sort them as you can the other lists.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.34.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.34.0/iFizBox.ipa",
+          "size": 31827025,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.33.0",
           "date": "2026-11-25T06:03:02Z",
           "localizedDescription": "Hide an install run and follow it in a strip under the bar.\nRestore My VPN asks before turning your VPN back on.\niFizBox's own update finishes by itself, with no swipe.\nBrowse lists get Search's scope bar, Filter and sorting.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.33.0",
@@ -250,14 +258,6 @@
           "localizedDescription": "Re-sign without downloading again: each app keeps the IPA it was installed from, and Add Tweaks lists only tweaks for that app.\nRe-sign, Re-sign All and the queue sign from the IPA kept at install when it still matches, and each app goes to iOS as soon as it is signed.\nAdd Tweaks lists tweaks made for the app first (Works in: <app>), then ones for every app; paid Havoc and Chariz tweaks find their seller.\nHold Install on a package or app page to pick which version to install.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.18.4",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.18.4/iFizBox.ipa",
           "size": 35781116,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.18.3",
-          "date": "2026-11-21T06:42:57Z",
-          "localizedDescription": "Installs on This iPhone survive a dropped connection: the copy resumes and a finished install counts as installed.\nLeaving the app, locking it or a VPN blip during an install no longer ends in \"failed\".\nTailscale's Test Connection says Not Paired Yet with a Pair button instead of No Answer.\nApps from a source keep the source's name (RyukGram, not Instagram).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.18.3",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.18.3/iFizBox.ipa",
-          "size": 35701097,
           "minOSVersion": "15.0"
         }
       ]
