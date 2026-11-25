@@ -193,8 +193,8 @@ html[data-style="ios26"] .search-field { padding: 0; }
 html[data-style="ios26"] .search-field input { padding: revert; padding-right: 30px; }
 /* the drawn clear button (below) inside the capsule's right end: WebKit on iOS draws none of its own */
 html[data-style="ios26"] .search-field::after { margin: 0 6px 0 -25px; }
-/* its tap area (nav/searchbar.js clearTap), raised over the input: the x lies on the input, and WebKit hands the input
-   the tap, as its text scrolls in a layer of its own */
+/* its tap area (nav/searchbar.js clearTap), raised over the input: the x lies on the input, and WebKit on iOS moves
+   a finger's tap on it to the input beside it */
 html[data-style="ios26"] .search-field { position: relative; }
 html[data-style="ios26"] .search-field:has(input:not(:placeholder-shown))::before {
   content: ""; position: absolute; z-index: 1; top: 0; right: 0; bottom: 0; width: 32px;
