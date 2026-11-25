@@ -56,7 +56,7 @@ export function parseEndpoint(text) {
 const JSON_HEADERS = { "Content-Type": "application/json", Accept: "application/json" };
 
 // B453: these vendors' payment APIs know a package only by its ID in lowercase (com.thetimeloop.EchoUI as listed is
-// Not Found; both checked live 2026-11-25). Any other vendor is asked for the ID as listed. Only the request path
+// Not Found; price lookup checked live on both 2026-11-25). Any other vendor is asked for the ID as listed. Only the request path
 // changes: the apt package ID stays as listed everywhere else, and the downloaded .deb must match that one.
 const LOWERCASE_ID_HOSTS = new Set(["havoc.app", "chariz.com"]);
 

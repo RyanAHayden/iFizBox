@@ -164,7 +164,9 @@ it out.
 callback. Every POST but sign-out carries `udid` and `device`, and `authorize_download` the package's
 `architecture`, so a vendor serving rootful and rootless .debs picks the right one. Keychain items use
 `.userPresence`/`WhenPasscodeSetThisDeviceOnly` and fall back to plain items when the phone has no passcode.
-Havoc's and Chariz's payment APIs know packages only by lowercase ID, so requests to havoc.app and chariz.com lowercase it in the path (`core/payment.js`); other vendors get it as listed, and the apt package ID stays as listed everywhere else.
+Havoc's and Chariz's payment APIs know packages only by lowercase ID, so requests to havoc.app and chariz.com
+lowercase it in the path (`core/payment.js`); other vendors get it as listed, and the apt package ID stays as
+listed everywhere else.
 
 **Checking it on a phone:**
 - After a purchase, the vendor's purchase and download records show the right device.
