@@ -519,6 +519,7 @@ enum IDevice {
         var askUntil: Date?     // after a drop, how long to keep asking iOS for the app (one deadline per install)
         var onConnect: (() -> Void)? // after an airplane wait: what to say once the connection is open
         var lookedInstalled = false // B251: a second look found the new copy while installd's step was quiet
+        var cancelled: () -> Bool = { false } // B443: a first connect's VPN start ends on Cancel
         var plain = false       // B433: iOS refused the Developer package; the one retry goes without it
         func copyAgainPlain() {
             plain = true; copied = false; installSent = false; sent = 0
@@ -705,6 +706,7 @@ enum IDevice {
         private var beating = false
         private let watch: Watch
         private let finishing: Bool // B423: an install already connected: the VPN may start in the background
+        private let cancelled: () -> Bool // B443: asked while the VPN starts
         private let second: Bool // a second look beside the install's own session: rides on its VPN
         let kind: Kind
         private var awake: LocalVPN.BackgroundHold? // B423: a check has no KeepAlive: leaving the app lets it end
@@ -721,13 +723,16 @@ enum IDevice {
             watch.begin("turning on \(LocalVPN.name)", Limit.tunnel)
             let w = watch
             do {
-                try LocalVPN.begin(finishing: finishing) { w.alive($0) }
+                try LocalVPN.begin(finishing: finishing) {
+                    w.alive($0)
+                    if self.cancelled() { throw Failure(code: "cancelled", text: "Cancelled") }
+                }
                 builtIn = true
                 awake = LocalVPN.BackgroundHold("\(LocalVPN.name) on")
                 return (address, port)
             } catch {
                 let failure = (error as? Failure) ?? Failure(code: "vpn_failed", text: "\(LocalVPN.name) didn't start: \(error.localizedDescription)")
-                Session.keepVPNFailure(failure)
+                if failure.code != "cancelled" { Session.keepVPNFailure(failure) }
                 throw failure
             }
         }
@@ -740,8 +745,9 @@ enum IDevice {
             failureLock.lock(); defer { failureLock.unlock() }
             return vpnFailure ?? Failure(code: "vpn_failed", text: "\(LocalVPN.name) didn't start a moment ago")
         }
-        init(watch: Watch, second: Bool = false, finishing: Bool = false) throws {
+        init(watch: Watch, second: Bool = false, finishing: Bool = false, cancelled: @escaping () -> Bool = { false }) throws {
             self.watch = watch
+            self.cancelled = cancelled
             self.finishing = finishing
             self.second = second
             guard let (kind, data) = IDevice.pairing() else {
@@ -956,11 +962,12 @@ enum IDevice {
     /// front, the tunnel reset) connects again, up to HereRecheck.reconnects times: during the copy it
     /// carries on from the end of iOS's file; once the install was sent, it asks iOS for the app and reports it
     /// installed when iOS lists the new copy. Only installd's own error (or a drop that never reconnects) fails.
-    static func install(_ ipa: URL, bundleID: String? = nil, version: String? = nil, cancelled: () -> Bool = { false },
+    static func install(_ ipa: URL, bundleID: String? = nil, version: String? = nil, cancelled: @escaping () -> Bool = { false },
                         note: @escaping (String) -> Void = { _ in }, progress: @escaping (Step) -> Void) throws {
         let size = (try? ipa.resourceValues(forKeys: [.fileSizeKey]).fileSize).flatMap { $0 } ?? 0
         ilog("installing \(ipa.lastPathComponent) (\(mb(size)))\(bundleID.map { " as \($0) \(version ?? "?")" } ?? "")")
         let run = HereRun(ipa: ipa, size: size, remote: "\(stagingDir)/\(UUID().uuidString).ipa", bundleID: bundleID, version: version)
+        run.cancelled = cancelled
         var attempt = 0
         var firstDrop: Failure?
         LocalVPN.installBegan() // B395: its reconnects share one queue, so the VPN stays on through them
@@ -1037,7 +1044,7 @@ enum IDevice {
     /// after a drop, ask iOS whether the install it was sent landed.
     private static func installTry(_ run: HereRun, wait: UUID, watch w: Watch, note: @escaping (String) -> Void,
                                    progress: @escaping (Step) -> Void) throws {
-        let s = try Session(watch: w, finishing: run.connected)
+        let s = try Session(watch: w, finishing: run.connected, cancelled: run.connected ? { false } : run.cancelled)
         CellularShortcut.connected(wait)
         run.onConnect?()
         run.onConnect = nil

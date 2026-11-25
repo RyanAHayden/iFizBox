@@ -310,8 +310,14 @@ enum LocalVPN {
         startLock.lock()
         defer { startLock.unlock() }
         guard idle(), ![.disconnected, .invalid].contains(m.connection.status) else { return }
+        takeDown(m) { log("off (\(why)); the configuration stays") }
+    }
+
+    /// Blocking, under startLock: `m`'s tunnel stopped, until iOS says it is off (downWait at most). Nothing when it is.
+    private static func takeDown(_ m: NETunnelProviderManager, _ stopped: () -> Void = {}) {
+        guard ![.disconnected, .invalid].contains(m.connection.status) else { return }
         m.connection.stopVPNTunnel()
-        log("off (\(why)); the configuration stays")
+        stopped()
         let t0 = Date()
         while m.connection.status != .disconnected, m.connection.status != .invalid, Date().timeIntervalSince(t0) < downWait {
             Thread.sleep(forTimeInterval: 0.05)
@@ -511,7 +517,7 @@ enum LocalVPN {
         defer { startLock.unlock() }
         lock.lock(); let no = refusal; lock.unlock()
         if let no = no, no.at > t0 { throw no.failure }
-        try start(step)
+        try start(finishing: finishing, step)
         lock.lock(); refusal = nil; lock.unlock()
     }
 
@@ -540,7 +546,7 @@ enum LocalVPN {
     }
 
     /// up(), under startLock.
-    private static func start(_ step: (String) throws -> Void) throws {
+    private static func start(finishing: Bool, _ step: (String) throws -> Void) throws {
         // B375: iOS starts no VPN without a network: it goes connecting then disconnected ("No network available")
         // faster than the loop below can see, which then waited out startLimit. Asked before manager(), whose
         // save takes the user's own VPN's place
@@ -550,34 +556,55 @@ enum LocalVPN {
         }
         lock.lock(); let on = cached?.connection.status == .connected; lock.unlock()
         if on { return }
-        // Another VPN set since disabled ours, which the kept copy doesn't say: its start gives no error and never
-        // connects. manager() reads it again (and enables and saves it when off)
-        RestoreBack.note()
-        var m = try manager()
-        if m.connection.status == .connected { return }
-        try step("turning on \(name)")
-        let t0 = Date()
-        do { try m.connection.startVPNTunnel() } catch {
-            // another app's VPN took its place since, or it changed: read it again, then try once more
+        var m: NETunnelProviderManager!
+        // B443: a start that stalls is done once more, on a fresh read: the next row of a queue got through that way
+        let stall = try VPNStart.twice({ attempt in
+            // Another VPN set since disabled ours, which the kept copy doesn't say: its start gives no error and never
+            // connects. manager() reads it again (and enables and saves it when off)
             RestoreBack.note()
             m = try manager()
-            do { try m.connection.startVPNTunnel() } catch { throw IDevice.Failure(code: "vpn_failed", text: "\(name) didn't start: \(error.localizedDescription)") }
-        }
-        let conn = m.connection
-        var seenConnecting = false
-        while Date().timeIntervalSince(t0) < startLimit {
-            switch conn.status {
-            case .connected:
-                log("on in \(String(format: "%.2f", Date().timeIntervalSince(t0))) s")
-                return
-            case .connecting, .reasserting: seenConnecting = true
-            case .disconnected, .invalid:
-                if seenConnecting { throw IDevice.Failure(code: "vpn_failed", text: "\(name) turned off as it started") }
-            default: break
+            if m.connection.status == .connected { return nil }
+            try step("turning on \(name)")
+            let t0 = Date()
+            do { try m.connection.startVPNTunnel() } catch {
+                // another app's VPN took its place since, or it changed: read it again, then try once more
+                RestoreBack.note()
+                m = try manager()
+                do { try m.connection.startVPNTunnel() } catch { throw IDevice.Failure(code: "vpn_failed", text: "\(name) didn't start: \(error.localizedDescription)") }
             }
-            Thread.sleep(forTimeInterval: 0.05)
+            let conn = m.connection
+            let stall = try VPNStart.watch(limit: startLimit, quiet: VPNStart.quiet(attempt, limit: startLimit),
+                                           state: { stateOf(conn.status) }) { try step("turning on \(name)") }
+            let took = String(format: "%.2f", Date().timeIntervalSince(t0))
+            if let s = stall {
+                log("start \(attempt) \(s.rawValue): \(stateOf(conn.status).rawValue) (status \(conn.status.rawValue)) after \(took) s; enabled \(m.isEnabled)")
+            } else {
+                log("on in \(took) s\(attempt > 1 ? " (start \(attempt))" : "")")
+            }
+            return stall
+        }, again: { stall in
+            log("\(name) \(stall.rawValue); path: \(Path.described()); up tunnels: \(tunnelList(tunnelAddresses()))")
+            guard finishing || !mustWait() else { return false } // B423: no start once the app was left
+            try step("turning on \(name) again")
+            if m.connection.status == .connected { return true } // since: the next read finds it
+            if !Path.online() { throw noNetwork() }
+            takeDown(m) // stuck on its way up: a start would be ignored
+            return true
+        })
+        switch stall {
+        case nil: return
+        case .turnedOff?: throw IDevice.Failure(code: "vpn_failed", text: "\(name) turned off as it started")
+        default: throw IDevice.Failure(code: "vpn_failed", text: "\(name) didn't connect in \(Int(startLimit)) s")
         }
-        throw IDevice.Failure(code: "vpn_failed", text: "\(name) didn't connect in \(Int(startLimit)) s")
+    }
+
+    private static func stateOf(_ s: NEVPNStatus) -> VPNStart.State {
+        switch s {
+        case .connected: return .on
+        case .connecting, .reasserting: return .starting
+        case .disconnected, .invalid: return .off
+        default: return .other
+        }
     }
 
     /// Before a connect to iOS (blocking, on IDevice.queue): the VPN on, held until end().
