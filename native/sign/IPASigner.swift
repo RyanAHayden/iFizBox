@@ -114,7 +114,8 @@ final class IPASigner {
             guard SealPath.inside(name, appDir) else { return false }
             let rel = SealPath.relative(name, to: appDir)
             if rel.contains("com.apple.WatchPlaceholder/") || rel.hasSuffix("SignedByEsign") { return true }
-            if rel.hasSuffix("_CodeSignature/CodeResources") || rel.hasSuffix("_CodeSignature/") { return true }
+            // B432: the whole folder: iOS refuses a bundle (0xe8008001) with any other file in it
+            if rel.hasPrefix("_CodeSignature/") || rel.contains("/_CodeSignature/") { return true }
             if rel.hasSuffix("embedded.mobileprovision") { return true }
             return false
         }

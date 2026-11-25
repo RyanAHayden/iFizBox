@@ -422,6 +422,7 @@ class OnDeviceSigner(unittest.TestCase):
         with zipfile.ZipFile(path) as z:  # written once, in the short form
             names = z.namelist()
         self.assertEqual(len(names), len(set(names)))
+        self.assertEqual([n for n in names if "/_CodeSignature/" in n and not n.endswith("/CodeResources")], [])
         self.assertFalse([n for n in names if "//" in n or "/./" in n])
 
 
