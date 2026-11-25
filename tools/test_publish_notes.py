@@ -15,7 +15,6 @@ import publish_notes  # noqa: E402
 GOOD = """- Install apps straight from a source's page.
 - Updates keep downloading when you leave the app.
 - Search finds packages by their author, e.g. Saurik.
-
 - Smaller fixes: long package names wrap, and Sources no longer jumps.
 """
 
@@ -41,7 +40,7 @@ class Format(unittest.TestCase):
 
     def test_good(self):
         self.assertEqual(publish_notes.problems(GOOD), [])
-        for ok in ("- Smaller fixes and improvements.", "- Downloads resume after a restart.",
+        for ok in ("- Smaller fixes and improvements.", "- Downloads resume after a restart.", "- Opening a .deb file shows its details.",
                    "- iOS 26.1 works, and ifizbox.com loads faster.", "- " + "x" * 99 + "."):
             self.assertEqual(publish_notes.problems(ok + "\n"), [], ok)
 
@@ -50,6 +49,7 @@ class Format(unittest.TestCase):
 
     def test_one_list(self):
         self.bad("Install apps from a source.\n\n- Tap Get on an app.\n", 1, "not a")
+        self.bad("- Icons load.\n\n- Search is faster.\n", 3, "one list")
         self.bad("## New\n- Tap Get on an app.\n", 1, "not a")
         self.bad("- Tap Get\n  on an app.\n", 2, "not a")
         self.bad("* Tap Get on an app.\n", 1, "not a")
@@ -72,12 +72,13 @@ class Format(unittest.TestCase):
         self.bad("- Smaller fixes: icons.\n- Smaller fixes: names wrap.\n", 2, "second Smaller fixes")
 
     def test_linked(self):
-        for text in ("See https://example.org.", "Read [the notes](notes).", "Go to www.example.org."):
+        for text in ("See https://example.org.", "Read [the notes](notes).", "Go to www.example.org.", "Go to github.com/x."):
             self.bad("- %s\n" % text, 1, "link")
 
     def test_download_text(self):
         for text in (publish_notes.NAME + ".ipa is unsigned.", "Download the latest %s." % publish_notes.NAME,
-                     "Download the IPA to update."):
+                     "Download the IPA to update.", "Get the .deb for jailbroken phones.",
+                     "Download the app from GitHub.", "Take the IPA from the release page."):
             self.bad("- %s\n" % text, 1, "download text")
 
 

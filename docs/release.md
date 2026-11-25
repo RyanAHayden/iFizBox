@@ -89,7 +89,7 @@ sentence (what a user notices or must do; no task IDs, file/API names or interna
 merges never clash.
 
 The release reads only `release-notes/*.md` (not the commits). The notes it publishes are one list of `- `
-bullets, with no summary block and no headings:
+bullets, with no summary block, headings or blank lines between them:
 
 - 1 to 6 bullets, the most important first. The app shows the first 4; the first is the upgrade row's short line.
 - Each is one short sentence, at most 100 characters after `- `, ending with a full stop, about one topic.

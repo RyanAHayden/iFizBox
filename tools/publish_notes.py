@@ -4,7 +4,7 @@ commit:
 
   python3 tools/publish_notes.py FILE     prints each problem with its line, exit 1; nothing and exit 0 when good
 
-One list of "- " bullets and nothing else (blank lines are fine): 1-6 of them, each one sentence of at most 100
+One list of "- " bullets and nothing else (no blank line between them): 1-6 of them, each one sentence of at most 100
 characters, no links or download text, one "Smaller fixes" bullet at most, no bullet said twice."""
 import os
 import re
@@ -19,9 +19,10 @@ MAX_CHARS = 100
 REPEAT = 0.8  # of the shorter bullet's words are in the other one: the same thing said twice
 STOP = {"a", "an", "the", "now"}
 
-LINK = re.compile(r"[a-z][a-z0-9+.-]*://|\bwww\.|\bmailto:|\]\(|\]\[|<a\b", re.I)
-DOWNLOAD = re.compile(r"\w\.(?:ipa|deb)\b|\bdownload\s+(?:(?:it|the|this)\s+)?(?:latest\s+|new\s+)?"
-                      r"(?:%s\b|\.?ipa\b|\.?deb\b|release\b|from\s+github\b)" % re.escape(NAME), re.I)
+LINK = re.compile(r"[a-z][a-z0-9+.-]*://|\bwww\.|\bgithub\.com\b|\bmailto:|\]\(|\]\[|<a\b", re.I)
+DOWNLOAD = re.compile(r"\w\.(?:ipa|deb)\b|\bfrom\s+(?:github|the\s+release)\b|"
+                      r"\b(?:download|get|grab)\s+(?:(?:it|the|this)\s+)?(?:latest\s+|new\s+)?"
+                      r"(?:%s\b|\.?ipa\b|\.?deb\b|release\b)" % re.escape(NAME), re.I)
 ABBREVIATION = re.compile(r"\b(e\.g|i\.e|vs|etc)\.", re.I)
 SENTENCE_BREAK = re.compile(r"[.!?][\"'”’)]*\s+\S")
 
@@ -39,14 +40,18 @@ def repeats(a, b):
 
 def problems(text):
     """What is wrong with the notes, as (line number, message); [] when nothing is."""
-    out, bullets = [], []
-    for n, raw in enumerate(text.splitlines(), 1):
+    out, bullets, last = [], [], 0
+    lines = text.splitlines()
+    for n, raw in enumerate(lines, 1):
         line = raw.rstrip()
         if not line.strip():
             continue
         if not re.match(r"- \S", line):
             out.append((n, 'not a "- " bullet: the notes are one list, no summary, headings or wrapped lines'))
             continue
+        if last and n > last + 1 and not any(l.strip() for l in lines[last:n - 1]):
+            out.append((n, "a blank line before it: the notes are one list"))
+        last = n
         body = line[2:].strip()
         if len(body) > MAX_CHARS:
             out.append((n, "%d characters, at most %d: shorten it" % (len(body), MAX_CHARS)))
