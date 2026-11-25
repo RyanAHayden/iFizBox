@@ -107,3 +107,13 @@ stalled plain ones succeeded in 1 s). iFizBox's own Cancel button on the run pag
   enterprise IPA.
 - The user's actual YouMod row words (not known).
 - A suspended-by-iOS iFizBox during the copy: it was not the cause here, but it was not forced either.
+
+## Review corrections
+- "Resistance follows the process state, not the audio alone" is measured only for: background suspended (ended),
+  background playing audio, foreground playing audio and foreground with no audio (all refused). Pausing audio and PiP
+  were not run.
+- The 180 s limit ending the install, and the closed connection then cancelling it, were not seen in iFizBox; they come
+  from the code and from the desktop client's timeout. The in-app run was ended by hand at 129 s.
+- "The list grows with the phone's developer state" is a guess from two dates (76 on 2026-11-21, 85 now); nothing tested it.
+- PackageType=Developer was measured from the desktop (Developer Mode on, disk image mounted) only. B433 must prove it
+  in-app and with Developer Mode off before it counts as the fix; "unnecessary" above means "if it holds".
