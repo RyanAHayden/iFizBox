@@ -109,7 +109,7 @@ class InstallServerSource(unittest.TestCase):
         # B215: through HostUpload, which posts to /sign/host in parts
         self.assertIn("HostUpload(file, server: server, app: app)", body(self.sideload, "static func uploadHosted(", "\n    }\n\n"))
         self.assertIn('server + "/sign/host"', body(self.sideload, "final class HostUpload {", "\n}\n"))
-        self.assertIn("InstallPrompt.heard(bid)", body(self.sideload, "private static func pollHosted(", "\n    }\n\n"))
+        self.assertIn("InstallPrompt.heard(bid, hold: state.hold)", body(self.sideload, "private static func pollHosted(", "\n    }\n\n"))
 
     def test_freeze_after_the_prompt_closed_opens_no_prompt(self):
         """B91: iFizBox can't tell the user's Cancel from a frozen server, so a freeze after the prompt was shown and

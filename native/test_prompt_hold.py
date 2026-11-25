@@ -62,19 +62,22 @@ class Wiring(unittest.TestCase):
         self.assertEqual(serve.count("hold.start()"), 1)
         self.assertEqual(serve.count("hold.over()"), 2)  # after the grace, and on Cancel
         self.assertIn("if hold.slept(from: f.from)", serve)  # our own sleep uploads nothing
-        self.assertIn("hold.requested(); InstallPrompt.heard(bid)", serve)
+        self.assertIn("InstallPrompt.heard(bid, hold: hold)", serve)
         # the expiry's own line isn't iOS asking for the IPA
         self.assertNotIn('serverLog("iOS didn\'t fetch', serve)
 
     def test_upload_keeps_the_hold(self):
         host = body(read("Sideload.swift"), "static func hostAfterFreeze(", "\n    }\n\n")
-        self.assertLess(host.index("state.uploading(true)"), host.index("state.uploading(false)"))
+        self.assertLess(host.index("state.hold.uploading(true)"), host.index("state.hold.uploading(false)"))
 
     def test_prompt_feeds_the_hold(self):
         prompt = read("InstallPrompt.swift")
         self.assertIn("e.hold.opened()", body(prompt, "private static func attempt(", "\n    }\n"))
         self.assertIn("e.hold.dismissed()", body(prompt, "private static func observe(", "\n    }\n\n"))
-        self.assertIn("e.hold.requested()", body(prompt, "static func heard(", "\n    }\n"))
+        heard = body(prompt, "static func heard(", "\n    }\n")
+        self.assertIn("hold.requested()", heard)
+        self.assertIn("e.hold === hold", heard)  # an earlier install of the same app leaves this one alone
+        self.assertIn("e.hold.opened()", body(prompt, "static func reprompt(", "\n    }\n"))
         awake = prompt[prompt.index("final class Awake"):]
         self.assertEqual(awake.count("KeepAlive.shared.begin()"), 1)
         self.assertEqual(awake.count("KeepAlive.shared.end()"), 1)

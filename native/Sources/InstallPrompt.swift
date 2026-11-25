@@ -10,7 +10,7 @@
 //                                     any more, or iOS already asked for it)
 //   rehost(bundleID, link)             B91: the IPA is served from another link too (the Signing Server's, after iOS
 //                                     froze iFizBox): the next reprompt opens that one. Opens nothing by itself
-//   heard(bundleID)                    the install server saw iOS ask for the IPA: Install was tapped
+//   heard(bundleID, hold)              the install server saw iOS ask for this hold's IPA: Install was tapped
 //   end(bundleID, link)                the IPA is no longer served (fetched, expired or cancelled)
 //   dismissed(bundleID) -> Bool        the prompt was shown and closed, then nothing for `dismissQuiet` s with iFizBox in
 //                                     front: Cancel, or iOS couldn't reach the IPA (signing.progress answers dismissed)
@@ -147,6 +147,7 @@ enum InstallPrompt {
         guard let e = entries[bid], !e.ended, !e.requested else { return false }
         e.gone = false
         e.reopened = true
+        e.hold.opened() // B435: the hold again
         e.shownAt = nil
         e.answeredAt = nil
         say(bid, "Asked iOS again to install \(e.name)" + (e.links.count > 1 ? " (from the Signing Server)" : ""))
@@ -164,11 +165,12 @@ enum InstallPrompt {
         }
     }
 
-    static func heard(_ bid: String) {
+    static func heard(_ bid: String, hold: Awake) {
+        hold.requested()
         DispatchQueue.main.async {
-            guard let e = entries[bid] else { return }
+            // B435: an earlier install of the same app, still served, isn't this prompt's
+            guard let e = entries[bid], e.hold === hold else { return }
             e.requested = true
-            e.hold.requested()
         }
     }
 

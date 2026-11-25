@@ -764,7 +764,7 @@ enum Sideload {
                                      served: ((Bool) -> Void)?) {
         let once = Once()
         let hold = InstallPrompt.Awake(bundleID: app.bundleID, name: app.name) // B435: KeepAlive
-        let fallback = HostFallback(uploading: hold.uploading) // B89
+        let fallback = HostFallback(hold: hold) // B89
         hold.start()
         // B29: the bundle ID iOS is told to install (the manifest's, the signed Info.plist's) and what the
         // server sends, in the install log; the server's lines reach the page through signing.progress.
@@ -775,7 +775,7 @@ enum Sideload {
         let bid = app.bundleID
         let iosLink = URL(string: link)!
         // B85: any line from the IPA's route is iOS asking for it: Install was tapped (InstallPrompt.heard)
-        let serverLog = { (s: String) in hold.requested(); InstallPrompt.heard(bid); InstallLog.say(bid, s) }
+        let serverLog = { (s: String) in InstallPrompt.heard(bid, hold: hold); InstallLog.say(bid, s) }
         let end = { (ok: Bool) in
             guard once.first() else { return }
             fallback.finish() // B89
@@ -920,8 +920,8 @@ enum Sideload {
     final class HostFallback {
         private let lock = NSLock()
         private var begun = false, ended = false, up = false
-        let uploading: (Bool) -> Void // B435: the hold stays while the upload runs
-        init(uploading: @escaping (Bool) -> Void) { self.uploading = uploading }
+        let hold: InstallPrompt.Awake // B435: stays held while the upload runs
+        init(hold: InstallPrompt.Awake) { self.hold = hold }
         var hosting: Bool { lock.lock(); defer { lock.unlock() }; return up }
         var over: Bool { lock.lock(); defer { lock.unlock() }; return ended }
         func begin() -> Bool {
@@ -948,9 +948,9 @@ enum Sideload {
             state.dropped()
             return note("Couldn't copy the IPA for the upload (\(error.localizedDescription)); it stays served here only")
         }
-        state.uploading(true)
+        state.hold.uploading(true)
         uploadHosted(copy, server: remote, app: app) { res in
-            state.uploading(false)
+            state.hold.uploading(false)
             try? FileManager.default.removeItem(at: copy)
             switch res {
             case .failure(let e):
@@ -1010,7 +1010,7 @@ enum Sideload {
                 if ok, marks?["finished"] as? Bool == true { return step(true, true) }
                 let now = ok && marks?["started"] as? Bool == true
                 if now && !started {
-                    InstallPrompt.heard(bid) // the prompt was answered with Install
+                    InstallPrompt.heard(bid, hold: state.hold) // the prompt was answered with Install
                     step(false, true)
                 }
                 if Date().timeIntervalSince(since) > hostedLimit { return step(false, false) }
