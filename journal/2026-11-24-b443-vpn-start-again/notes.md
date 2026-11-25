@@ -11,7 +11,7 @@ the VPN again. Why the first start stalled is not known. The log now says what i
 - `LocalVPN.start()`: on a stall (never left off for 3 s, turned off as it started, not connected in 10 s) it logs the
   status and the path, reads the manager again and starts once more. The second start has the whole 10 s: the first
   one's 3 s is a guess, and a slow phone must not be worse off than before.
-- A tunnel stuck on its way up is stopped first (`takeDown`, shared with `downIfIdle`): iOS ignores a start of one (not checked on a phone).
+- A tunnel stuck on its way up is stopped first (`takeDown`, shared with `downIfIdle`): iOS ignores a start of one.
 - No second start once the app was left (B423), unless it finishes an install; none without a network; a refused
   configuration throws out of `manager()` as before, and isn't asked again.
 - `step` runs every second of the wait; Cancel ends it in `waitOffCellular`, and now also in a first connect on Wi-Fi:
