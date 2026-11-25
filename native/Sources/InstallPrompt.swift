@@ -192,7 +192,7 @@ enum InstallPrompt {
         return true
     }
 
-    // B438: this install's prompt isn't known to be dismissed (its signing.progress watch goes on), nor another's by now.
+    // B438: this install's prompt isn't known to be dismissed (which ends its signing.progress watch), nor another's by now.
     private static func undecided(_ bid: String, hold: Awake) -> Bool {
         guard let e = entries[bid], e.hold === hold else { return false }
         return !e.gone
