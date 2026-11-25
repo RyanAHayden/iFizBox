@@ -58,6 +58,8 @@ tools/ui-7.sh unlock $ID              # always, also after a failure: closes eve
 - Tapping a notification in Notification Centre through phonectl does nothing; a person checks notification taps.
 - `lock-button` presses the side button (sleeps or wakes the screen). If a screenshot is all black, the screen is
   asleep: `home` wakes it. The phone has no passcode, so `home` again opens it from the lock screen.
+- When `lock` fails because another task holds it, don't poll: `tools/ui-7.sh state` exits 0 free, 75 busy (line 1
+  names the holder), 69 missing, and `agent-runner run wait-for iphone7` ends your session until the phone is free.
 - A lock unused for 30 minutes is stale and can be taken over. Give it back as soon as you're done (in a script,
   `trap 'tools/ui-7.sh unlock $ID' EXIT` after `lock`); when a runner session ends or is dropped, the runner frees
   every phone lock its task holds (`runner.toml` `on_exit` runs `tools/ui-release.sh`).

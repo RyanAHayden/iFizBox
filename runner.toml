@@ -32,3 +32,20 @@ land_edited = "wip"
 [models.kinds]
 T = "sonnet"
 V = "sonnet"
+
+# The test phones, shared tools: a task that finds one busy or missing runs `run wait-for <name>`, and its session
+# goes on once the phone is free. Each check is the script's `state` command (0 free, 75 busy, 69 missing).
+[run.tools.iphone15]
+check = "tools/ui-15.sh state"
+label = "iPhone 15 Pro"
+description = "Test phone for the sideload build (Lite IPA), on this desktop's USB; drive it only through tools/ui-15.sh."
+
+[run.tools.iphone7]
+check = "tools/ui-7.sh state"
+label = "iPhone 7"
+description = "Test phone for the jailbreak build (.deb); drive its screen only through tools/ui-7.sh."
+
+[run.tools.iphone4s]
+check = "tools/ui-4s.sh state"
+label = "iPhone 4S"
+description = "Old-iOS reference phone (Cydia look); drive its screen only through tools/ui-4s.sh."
