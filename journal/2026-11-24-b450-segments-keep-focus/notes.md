@@ -10,7 +10,7 @@
 - Test: `web/app/nav/ui-segments-focus.test.js`. It passes with the existing segments tests.
 - Release note: `release-notes/B450.md`.
 - `native/Sources/NativeSegments.swift` is not changed. By reading, a `UISegmentedControl` is a subview of the
-  `WKWebView` itself, and nothing in `native/Sources` resigns first responder. Not proven until the phone check.
+  `WKWebView` itself, and nothing in `native/Sources` resigns first responder. The phone check (see Phone) confirms it.
 
 ## Chromium
 
@@ -26,9 +26,27 @@
 
 - The 15 Pro was held by B443, then by B445 when tried.
 - The Lite IPA is built: `native/build/iFizBox.ipa`, with the change.
+- The 15 Pro (Lite, iOS 27) ran the Lite IPA with the change, on Search, 2026-11-25. Chromium has no keyboard and no
+  native control, so this is the only check of both.
+- iOS 26 style (WDA's tree shows a real `UISegmentedControl`):
+  - Unfocused, a tap on Apps picks it and no keyboard comes up.
+  - Field focused and empty, a tap on Apps: the keyboard stays.
+  - Typed "a", tap All then Apps: the keyboard stays and the results change. Typing "b" then goes into the field
+    ("ab").
+  - So a tap leaves the web view first responder. `NativeSegments.swift` needed no change.
+- iOS 6 style (CSS bar): same results. Its unfocused tap ran with the Filter panel open, because a stray tap of the test
+  had opened it. No keyboard came up.
+- The style was set back to iOS 26, and the phone was unlocked via `ui-15.sh`.
+- The old build's behaviour was not re-tried on the phone.
 
 ## Not verified
 
-- The keyboard on the 15 Pro (Lite): the iOS 26 style with its native control, and the iOS 6 style. Pending; the phone
-  is busy.
 - Installed's scope bar in Chromium: its list never drew with the fake bridge. It runs the same `segments()` code.
+- Changes' and Installed's scope bars on the phone: same code, not tried.
+- The iOS 7 and iOS 13 styles on the phone: not tried.
+
+## Gate
+
+- The first two `done` runs failed on `web/app/core/blocked.test.js`: its fixed date fell out of Changes' 7-day window
+  when the day rolled over to 2026-11-25. Main already had the fix; the same edit is made here so this branch's gate
+  passes and the hunks merge.
