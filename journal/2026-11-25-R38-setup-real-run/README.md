@@ -16,3 +16,7 @@ No code changed.
 - Universal macOS build, ad hoc signature accepted: no Mac run.
 - Windows 11 x64 and ARM64 (Apple Devices driver on 27015, Store link 9NP83LWLPZ9K, no window closing under `iex`): no Windows machine.
 - The first setup release: needs the user's OK to publish.
+
+## Update (answer: Re-queue the page)
+
+The person chose to re-queue the website's computer-install code page. Filed as F436 (replaces the dropped F254f). R38 now waits for F436; the real run (release, iPhone 15, Mac, Windows) starts after it lands. No code changed.
