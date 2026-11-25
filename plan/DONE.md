@@ -1176,6 +1176,7 @@
 - [x] **R45** (follow-up, low) On the sideload IPA, on the iPhone 15 Pro (owner is signed in to Chariz since 2026-11-23): check the package page's Add to an App group shows the Buy row, and that a signed-in betterAlarm download (priced FREE) works. Do not inject a paid tweak (betterAlarm and Glint cannot be injected: Home Screen or system app) and do not buy one; the end-to-end paid inject stays unverified. Earlier runs: journal/2026-11-21-r45-iphone15-chariz. | files: journal/r101-r45/** | after: T58
 - [x] **B429** (follow-up, low) On the sideload IPA the Chariz source page lists 0 packages with default Source Filters (App Tweaks Only hides every jailbreak tweak), so paid tweaks like Glint and betterAlarm are reachable only by ifizbox://package?id=; also the Works on My Phone switch on a source's page changes the All Sources filter, not that source. Decide whether either is intended, fix or document it. | files: web/app/screens/sources.js
 - [x] **C75** (follow-up, low) Add reviews.db to .gitignore (node worker/node.mjs recreates it untracked) | files: .gitignore
+- [x] **C74** (follow-up, low) Add reviews.db to .gitignore (running worker/node.mjs from a checkout creates it). | files: .gitignore
 
 ### Parked
 - [x] **F12** (follow-up, later) Widget-only IPA (WidgetKit 'n upgrades' + local notifications), only if F10's Web Push proves unreliable on real phones. Needs an explicit App ID with Push/App Groups and its own ad hoc profile in sidedrop. See docs/ipa.md | files: ipa/** — dropped: superseded: the IPA build (I2-I3) and N8's widget cover it
