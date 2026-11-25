@@ -147,6 +147,8 @@ export function segments(values, labels, current, onPick) {
   const buttons = values.map((v) => {
     const b = Object.assign(document.createElement("button"), { type: "button", className: "scope-segment", textContent: labels[v] ?? v });
     b.setAttribute("role", "tab");
+    // B450: a tap leaves the focus where it is, so the search field above keeps its keyboard; the click still lands.
+    for (const t of ["pointerdown", "mousedown"]) b.addEventListener(t, (e) => e.preventDefault());
     b.addEventListener("click", () => {
       if (b.classList.contains("selected")) return;
       select(v);
