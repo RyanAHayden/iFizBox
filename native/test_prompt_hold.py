@@ -114,5 +114,22 @@ class Wiring(unittest.TestCase):
         self.assertIn("Sideload.yieldPageHold { frontToken != nil && frontRun == mine }", front[rest:])
 
 
+    def test_own_update_after_its_prompt(self):  # B445: cancelled or left unanswered
+        side = read("Sideload.swift")
+        cfu = body(side, "enum CloseForUpdate", "final class HereClose")
+        self.assertNotIn("KeepAlive.shared", cfu)  # the Awake takes and gives back, once each
+        keep = body(cfu, "private static func keep(", "\n    }\n")
+        self.assertLess(keep.index("new?.start()"), keep.index("old?.over()"))
+        after = body(cfu, "static func afterPrompt(", "\n    }\n")
+        self.assertLess(after.index("keep(InstallPrompt.Awake("), after.index("poll(h, run: mine"))
+        self.assertIn("if mine == run { hold?.dismissed() }", after)
+        poll = body(cfu, "private static func poll(", "\n    }\n")
+        self.assertNotIn("requested()", poll)  # iOS's second question can be cancelled after `asked`
+        self.assertIn("giveUp(late: h.age > h.life + lateBy)", poll)
+        for start in ("private static func giveUp(", "static func hereBegan("):
+            self.assertIn("keep(nil)", body(cfu, start, "\n    }\n"))
+        self.assertIn("if let waiting = waiting { return asleep && waiting() }", read("InstallPrompt.swift"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -40,7 +40,7 @@ class HostedSelfUpdate(unittest.TestCase):
         self.assertNotIn("guess()", asked)
 
     def test_follows_the_link_for_its_life(self):
-        self.assertIn("if h.age > h.life { return giveUp() }", body(cfu(), "private static func poll("))
+        self.assertIn("if h.age > h.life { return giveUp(", body(cfu(), "private static func poll("))
 
     def test_second_try_reuses_the_upload(self):
         host = side()
@@ -50,6 +50,7 @@ class HostedSelfUpdate(unittest.TestCase):
         for k in ("sha256", "bundleID", "version", "appID", "expires", "options", "server"):
             self.assertIn(k, reuse)
         self.assertIn("h.age < h.life - reuseSpare", reuse)
+        self.assertIn("guard h.by == Bundle.main.bundlePath", reuse)  # B445: not once the update is in
         self.assertIn("hosted = nil", body(cfu(), "private static func giveUp("))
 
 

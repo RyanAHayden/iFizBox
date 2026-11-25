@@ -1582,6 +1582,7 @@ enum CloseForUpdate {
     // B394: the last upload and its install link, which the same IPA handed over again reuses. Main queue.
     struct Hosted: Codable {
         let link: URL, status: URL?, record: SignedRecord, server: String, at: Date, life: TimeInterval
+        var by: String? = Bundle.main.bundlePath // B445: the copy of iFizBox that uploaded it; each install has a path of its own
         var again = false // reused: its `asked` mark may be the try before's, so it says nothing
         var age: TimeInterval { Date().timeIntervalSince(at) }
     }
@@ -1591,10 +1592,23 @@ enum CloseForUpdate {
         get { UserDefaults.standard.data(forKey: hostedKey).flatMap { try? JSONDecoder().decode(Hosted.self, from: $0) } }
         set { UserDefaults.standard.set(newValue.flatMap { try? JSONEncoder().encode($0) }, forKey: hostedKey) }
     }
-    private static var held = false // KeepAlive, once however often the prompt is opened again
+    // B445: the run's KeepAlive hold, one whatever Try Again does. Given back PromptHold.quiet s after the prompt was
+    // dismissed, or after iFizBox went to the background, also when iOS asked for the IPA by then (its second
+    // question, for Low Data Mode, can be cancelled too). The self-close isn't lost: iOS's prompt stays over the Home
+    // Screen, and an Install tapped there ends a suspended iFizBox; in front, the polls go on and close it.
+    private static var hold: InstallPrompt.Awake?
+    private static func keep(_ new: InstallPrompt.Awake?) {
+        let old = hold
+        hold = new
+        new?.start() // before the old one goes, so the audio doesn't stop in between
+        old?.over()
+    }
     static let reuseSpare: TimeInterval = 30 // of the link's life, for the tap and iOS's requests
     static func reusable(_ r: SignedRecord, server: String) -> Hosted? {
         guard var h = hosted, h.age < h.life - reuseSpare, h.server == server else { return nil }
+        // B445: this copy is the installed update (iOS ended the last one while suspended, so `hosted` was never dropped):
+        // its `started` mark would close iFizBox at once
+        guard h.by == Bundle.main.bundlePath else { return nil }
         let o = h.record
         h.again = true
         let same = o.sha256 != nil && r.sha256 != nil ? o.sha256 == r.sha256 : o.url == r.url
@@ -1636,8 +1650,10 @@ enum CloseForUpdate {
         let nc = NotificationCenter.default
         // B394: the polls start now, so an Install tapped at once is seen at once
         if h.status != nil {
-            if !held { held = true; KeepAlive.shared.begin() }
+            keep(InstallPrompt.Awake(bundleID: h.record.bundleID, name: h.record.name) { mine == run && state?.ends == false })
             poll(h, run: mine, misses: 0)
+        } else {
+            keep(nil)
         }
         // B123: the wait starts once the prompt is answered (active again after resigning), or when iFizBox goes to
         // the background (Install, then Home: KeepAlive keeps the polls going), or when iOS's prompt never made
@@ -1659,6 +1675,7 @@ enum CloseForUpdate {
         token.map(nc.removeObserver)
         token = nc.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
             guard resigned else { return } // the prompt hasn't shown yet
+            if mine == run { hold?.dismissed() } // B445
             begin()
         }
         backgroundToken.map(nc.removeObserver)
@@ -1704,7 +1721,7 @@ enum CloseForUpdate {
                 // an older Signing Server, without the status route: the old guess
                 let miss = !known && code == 404 ? misses + 1 : (known ? 0 : misses)
                 if miss >= 3, state == .waiting { return guess() }
-                if h.age > h.life { return giveUp() }
+                if h.age > h.life { return giveUp(late: h.age > h.life + lateBy) }
                 DispatchQueue.main.asyncAfter(deadline: .now() + (h.age < quickFor ? quickPoll : pollEvery)) { poll(h, run: mine, misses: miss) }
             }
         }.resume()
@@ -1732,6 +1749,7 @@ enum CloseForUpdate {
         run += 1
         for t in [token, resignToken, backgroundToken] { t.map(NotificationCenter.default.removeObserver) }
         token = nil; resignToken = nil; backgroundToken = nil
+        keep(nil) // B445: the hosted run's polls stop, and installHere holds on its own
         set(.waiting)
     }
 
@@ -1778,11 +1796,13 @@ enum CloseForUpdate {
     }
 
     // Not started: iFizBox stays open (the page offers Try Again); from the background, a notification says so.
-    private static func giveUp() {
+    // B445: `late`: iFizBox was suspended past the link's life and is being opened now: the page says it, no notification.
+    static let lateBy: TimeInterval = 30 // longer than one poll
+    private static func giveUp(late: Bool) {
         hosted = nil
         set(.notStarted)
-        if held { held = false; KeepAlive.shared.end() }
-        guard UIApplication.shared.applicationState != .active else { return }
+        keep(nil)
+        guard !late, UIApplication.shared.applicationState != .active else { return }
         let c = UNMutableNotificationContent()
         c.title = "The \(Brand.name) Update Didn't Start"
         c.body = "Open \(Brand.name) to try again."

@@ -213,7 +213,9 @@ enum InstallPrompt {
         private var observers = [NSObjectProtocol]()
         private var timed: Date? // the release a timer waits for
 
-        init(bundleID: String, name: String) { bid = bundleID; self.name = name }
+        // `waiting`: B445, whether a prompt that isn't in `entries` (iFizBox's own update, CloseForUpdate) still waits
+        init(bundleID: String, name: String, waiting: (() -> Bool)? = nil) { bid = bundleID; self.name = name; self.waiting = waiting }
+        private let waiting: (() -> Bool)?
 
         // The hold is taken now. Kept alive by its observers until over().
         func start() {
@@ -257,6 +259,7 @@ enum InstallPrompt {
         // B437, B438: the prompt waits for the app in front, or for its answer, and the hold was given back. Main queue.
         private var waits: Bool {
             lock.lock(); let asleep = rule.asleep; lock.unlock()
+            if let waiting = waiting { return asleep && waiting() }
             return asleep && InstallPrompt.undecided(bid, hold: self)
         }
 
