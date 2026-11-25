@@ -11,6 +11,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
+- [ ] **D35** Drop the showcase MP4: README shows only the webp, no MP4 links; the release asset is deleted (user: it looks bad) | files: README.md
 ### Research (any time, parallel)
 
 ### Native jailbreak app (shape decided: docs/native.md)
