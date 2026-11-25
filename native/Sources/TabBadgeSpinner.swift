@@ -28,6 +28,7 @@ final class TabBadgeSpinner {
                 let t = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in self?.place() }
                 RunLoop.main.add(t, forMode: .common) // while a finger scrolls too
                 timer = t
+                bar?.layoutIfNeeded() // the new badge, so it is never seen blank
             }
             place()
         }
@@ -40,10 +41,7 @@ final class TabBadgeSpinner {
                 if let l = s as? UILabel, l.text == Self.mark { labels.append(l) } else { walk(s) }
             }
         }
-        if spinning, let bar {
-            bar.layoutIfNeeded()
-            walk(bar)
-        }
+        if spinning, let bar { walk(bar) }
         let badges = labels.compactMap(\.superview)
         for s in spinners.allObjects where !badges.contains(where: { $0 === s.superview }) {
             s.removeFromSuperview()

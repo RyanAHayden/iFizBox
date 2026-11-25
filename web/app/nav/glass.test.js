@@ -164,6 +164,12 @@ test("titles and buttons follow the page; a badge and the chosen tab update the 
   sources.querySelector(".badge")._text = "2";
   syncGlass(doc, native, win);
   assert.equal(calls.at(-1).tabbar.items[1].badge, "2", "then the failure count");
+  sources.querySelector(".badge").classList.add("spinning");
+  syncGlass(doc, native, win);
+  sources.querySelector(".badge").classList.remove("spinning");
+  sources.querySelector(".badge").hidden = true;
+  syncGlass(doc, native, win);
+  assert.equal(calls.at(-1).tabbar.items[1].badge, null, "or nothing");
 });
 
 test("a card sheet scaling the page back (the tab bar too) hides the UITabBar until it is still", () => {
