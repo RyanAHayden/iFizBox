@@ -86,7 +86,7 @@ let restoreTap = null; // { on, at, was, sending }: the last tap; was = the sett
 export function rememberStatus(st) {
   if (!st || typeof st !== "object") return;
   if (restoreTap && !restoreTap.sending && Date.now() - restoreTap.at > TIMEOUTS.status) restoreTap = null;
-  lastStatus = restoreTap && restoreShown(st) ? { ...st, vpn: { ...st.vpn, restore: restoreTap.on } } : st;
+  lastStatus = restoreTap && restoreShown(st) ? { ...st, vpn: { ...st.vpn, restore: restoreTap.on, restoreNever: false } } : st; // F428a: off clears Don't Ask Again
 }
 export function forgetStatus() { lastStatus = null; restoreTap = null; } // tests, and Forget Pairing
 export const cachedStatus = () => lastStatus;
@@ -398,7 +398,8 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
   restoreToggles.set(el, async (on) => {
     const st = lastStatus ?? view;
     if (!st) return;
-    const tap = restoreTap = { on, at: Date.now(), was: restoreTap?.sending ? restoreTap.was : Boolean(st.vpn?.restore), sending: true };
+    const tap = restoreTap = { on, at: Date.now(), was: restoreTap?.sending ? restoreTap.was : Boolean(st.vpn?.restore), sending: true,
+      never: restoreTap?.sending ? restoreTap.never : st.vpn?.restoreNever };
     rememberStatus(st);
     view = lastStatus;
     paint();
@@ -407,7 +408,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
       if (restoreTap !== tap) return; // tapped again meanwhile
       restoreTap = null;
       if (read) rememberStatus(read);
-      else if (lastStatus) rememberStatus({ ...lastStatus, vpn: { ...lastStatus.vpn, restore: tap.was } });
+      else if (lastStatus) rememberStatus({ ...lastStatus, vpn: { ...lastStatus.vpn, restore: tap.was, restoreNever: tap.never } });
       redraw();
       return;
     }
