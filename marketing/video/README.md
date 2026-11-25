@@ -32,9 +32,11 @@ marks, world updates) is in `capture.mjs`'s header.
 - `render.mjs` unpacks the recordings' frames into `OUT_DIR/frames/` (about 0.5 GB; it can be deleted, and is unpacked
   again when a recording is newer). It serves the repo and `OUT_DIR` on 127.0.0.1, and stops at the first unpack error.
 - `video.html` draws the phones (a plain rounded frame, no device artwork, and the status bar: 12:30 and the signal and
-  battery marks), the two phone labels (in the opening only), the captions, the zooms and the end card. The background
-  is the pinstripe ground of `web/app/ios6.css`, drawn at a 3x phone's size, with its text colours and emboss read from
-  the same file. The name and domain come from `web/app/brand.js`.
+  battery marks), the splash, the captions, the zooms and the end card. The background is the
+  pinstripe ground of `web/app/ios6.css`, drawn at a 3x phone's size, with its text colours and emboss read from the
+  same file. The name and domain come from `web/app/brand.js`.
+- The splash (about 3 s) is the app icon, the name and one line. It is whole on the first frame, so that is the poster
+  frame too. Then the icon opens into the no-jailbreak phone (`OPEN` in `video.html` is when).
 - `MAP` in `video.html` is the timing: `LITE` and `JAIL`, each `{ from, to, cuts }`. Each recording plays at its own
   speed (1x) from mark to mark. Each cut `[from, to]` is in seconds of the recording and drops part of a wait on the
   install screen; nothing is sped up. If the recordings are made again with different timing, check the cuts.
@@ -51,7 +53,7 @@ marks, world updates) is in `capture.mjs`'s header.
 | `finger.js` | what the recording shows of the person holding the phone: a soft touch dot and a plain keyboard |
 | `shots-lite.json`, `shots-jailbreak.json` | each recording's script: the steps, in the order `capture.mjs`'s header lists them |
 | `render.mjs` | the cut's renderer: unpacks the frames, serves the page, steps its clock and pipes the frames to ffmpeg (H.264, 60 fps, no audio) |
-| `video.html` | the cut as one page: the phones, the status bar, the captions (`say()`), the timing (`MAP`), the zooms and the end card |
+| `video.html` | the cut as one page: the splash, the phones, the status bar, the captions (`say()`), the timing (`MAP`), the zooms and the end card |
 
 Re-render one cut from the recordings already in `OUT_DIR`:
 
