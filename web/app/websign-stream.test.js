@@ -110,6 +110,8 @@ test("a path out of the app is left out, a later entry of a name wins; encrypted
   const locked = zipOf(stored("a", bytes("1")));
   locked[locked.length - 22 - 47 + 8] |= 1; // the directory entry's flags
   await assert.rejects(opened(locked));
+  const long = await opened(zipOf({ ...packed("a", noise(5000)), size: 4000 }));
+  assert.throws(() => long.FS.readFile("/w/app/a"));
   const short = await opened(zipOf({ ...packed("a", noise(5000)), size: 9000 }));
   assert.throws(() => short.FS.readFile("/w/app/a"));
   assert.equal(short.s.damaged, true);

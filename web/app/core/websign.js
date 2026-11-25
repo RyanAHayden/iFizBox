@@ -28,9 +28,9 @@ export const siteMB = (n) => Math.round(Number(n) / 1048576);
 export const SITE_LIMIT_TEXT = `The website signs apps up to ${siteMB(IPA_MAX)} MB.`;
 export const overSiteLimit = (size, max = IPA_MAX) => Number.isFinite(Number(size)) && Number(size) > max;
 
-// F261: what this browser learnt about its own memory. zsign holds the IPA, the unpacked app and the signed output at
-// once, so how big an app a phone can sign depends on its RAM (an iPhone 7, 2 GB: 70 MB signs, 100 MB mostly runs out;
-// an 8 GB phone far more), and Safari has no navigator.deviceMemory and the same screen and UA for 2-4 GB models. So
+// F261: what this browser learnt about its own memory. The signer holds the IPA and its biggest
+// executable (F265: an iPhone 7, 2 GB, signed a 327 MB app with an 80 MB one), so how big an app a phone can sign
+// depends on its RAM, and Safari has no navigator.deviceMemory and the same screen and UA for 2-4 GB models. So
 // IPA_MAX stays the one global cap, and each browser remembers the smallest IPA that ran zsign out of memory: an app
 // listed at that size or more opens the Too Big alert (with Try Anyway) instead of failing again. An IPA that size or
 // bigger that then signs forgets it (the failure was the phone's memory at that moment).

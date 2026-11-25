@@ -185,7 +185,21 @@ export function ipaStream(zs, root = "/w/app") {
     r.crc = zs._ifizbox_crc(r.crc, OUT, got) >>> 0;
     r.pos += got;
     // read to its end: the checksum the signed IPA carries is this data's own (a wrong one in the IPA was never an error)
-    if (r.pos === p.size) p.crc = r.crc;
+    if (r.pos === p.size) {
+      p.crc = r.crc;
+      // data that goes on past the size the IPA names would be sealed short and shipped whole
+      if (p.whole && p.method === 8) {
+        for (let more = 0; more !== -2;) {
+          const part = zs._ifizbox_inflate_left() === 0 ? nextInput() : null;
+          if (part) put(IN, part);
+          const left = zs._ifizbox_inflate_left();
+          more = zs._ifizbox_inflate(part?.length ?? 0, 1);
+          if (more > 0 || more === -1) throw damaged();
+          if (more === 0 && !part && left === 0) break; // no end marker: nothing more either
+        }
+        reader = null;
+      }
+    }
     return got;
   };
   const readAt = (p, buffer, offset, length, position) => {
