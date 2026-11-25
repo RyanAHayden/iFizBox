@@ -21,8 +21,10 @@
 //   signing.selfUpdate (stream: {state}) -> {state}: B83, iFizBox's own update after iOS's prompt (CloseForUpdate):
 //        prompt | waiting | asked (iOS asked for the IPA), then finished (iOS began the download: it exits) |
 //        notStarted | guessed; null: none running
-//   signing.installed            -> {apps: [record], next: {expires, apps} | null, signer: {version, groupFix}}
-//        (B259: each record's `signer` is the stamp it was signed with, the top one this build's: SignerStamp.swift)
+//   signing.installed            -> {apps: [record], next: {expires, apps} | null,
+//        signer: {version, groupFix, groupFixRevision, reach: {all: [version], groupFix: [version]}}}
+//        (B259: each record's `signer` is the stamp it was signed with, the top one this build's, with the apps each
+//        version reaches: SignerStamp.swift)
 //   signing.openApp {bundleId}   -> {opened: true | false}: F155, launches an installed app (the progress page's Open)
 //   signing.forget {bundleId}    -> {apps}
 //   signing.isInstalled {bundleIds} -> {installed: {bundleId: true | false | null}}: B46, what iOS has now
@@ -1331,7 +1333,7 @@ enum Sideload {
         if let (x, names) = SignedRecords.nextExpiry(list) {
             out["next"] = ["expires": ISO8601DateFormatter().string(from: x), "apps": names]
         } else { out["next"] = NSNull() }
-        out["signer"] = SignerStamp.now.json // B259: records with an older stamp are listed under Needs Re-sign
+        out["signer"] = SignerStamp.currentJSON // B259: records with an older stamp are listed under Needs Re-sign
         return out
     }
 

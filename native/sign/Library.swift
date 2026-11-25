@@ -190,7 +190,7 @@ struct IPALibrary {
         guard s.sourceSize == size, IPALibrary.same(s.sourceModified, modified), s.certificate == IPALibrary.hex(sha1(cert)),
               s.options == options(file, keep: keep).stored else { return nil }
         if let x = s.expires, x <= now { return nil }
-        guard let stamp = s.signer, !stamp.isStale() else { return nil } // B259: an older signer's copy is signed again
+        guard let stamp = s.signer, !stamp.isStale() else { return nil } // B259: an older signer's copy, or one with another group fix dylib (any revision), is signed again
         return s
     }
 
