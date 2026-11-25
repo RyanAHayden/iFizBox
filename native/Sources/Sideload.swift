@@ -331,7 +331,8 @@ enum Sideload {
     }
 
     // B437: an install's prompt waits for the app in front and its own hold was given back (InstallPrompt.Awake): the
-    // page's hold, whose signing.install or signing.open can't answer until then, goes too once it is the only one left
+    // page's hold, whose signing.install or signing.open can't answer until then, goes too once it is the only one left;
+    // B438: so it does while an opened prompt is unanswered, which the queue's install lane awaits (signing.progress)
     // (PageYield: an app being signed holds on its own). `waiting`: the prompt still does. The page's next
     // {on: true} takes it again. Main queue.
     static func yieldPageHold(_ yield: PageYield = PageYield(), waiting: @escaping () -> Bool) {
@@ -339,7 +340,7 @@ enum Sideload {
         var y = yield
         let alone = pageHold != nil && KeepAlive.shared.holds == 1 && UIApplication.shared.applicationState == .background
         if y.step(alone: alone, at: Date()) {
-            DeviceLog.say("\(Brand.name) KeepAlive: the page's hold let go, an Install prompt waits for the app in front")
+            DeviceLog.say("\(Brand.name) KeepAlive: the page's hold let go, an Install prompt waits")
             pageHold?.release(); pageHold = nil
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + PageYield.poll) { yieldPageHold(y, waiting: waiting) }
