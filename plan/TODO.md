@@ -11,7 +11,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
-- [ ] **D32** Put the showcase video on the GitHub README (moving picture that links to the MP4 on the v1.0.0 release), keep web/app/source.json and the APT repo from listing releases before 1.0.0, 1.0.0 release notes. Check: the gate; README renders on GitHub | files: README.md, docs/img/showcase.webp, web/app/source.json, docs/release.md
 ### Research (any time, parallel)
 
 ### Native jailbreak app (shape decided: docs/native.md)
