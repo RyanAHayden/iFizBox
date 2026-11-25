@@ -591,7 +591,8 @@ export async function runAppRun(jobs, deps) {
   let follows = 0;
   let selfEnd = null; // the follow's latest finish, drawn again when another row's retry ends
   const later = deps.later ?? ((f, ms) => { const t = setTimeout(f, ms); t?.unref?.(); return t; }); // node: don't hold tests
-  const selfFinish = (o) => { selfEnd = o; page.finish(o); settled(); };
+  const comeBack = () => { if (page.hidden && !put) page.show?.(); }; // B452: put aside (Open Now) while locked: back with the follow's news
+  const selfFinish = (o) => { selfEnd = o; page.finish(o); comeBack(); settled(); };
   function followSelf(text) {
     const self = rows.find((r) => isSelf(r) && r.state === "installed");
     if (!self) return page.finish({ label: RETURN_LABEL, status: text, action: () => false });
@@ -651,6 +652,7 @@ export async function runAppRun(jobs, deps) {
       sumUp(now, firstLaunchHint(rows));
       page.bar({ left: closeB, right: retryAll });
       page.finish({ label: TRY_AGAIN_LABEL, status: now, title: "Not Updated", action: () => { retry(self.id); return true; } });
+      comeBack();
       settled();
     };
     if (typeof watch !== "function") return onState("guessed"); // no shell to follow: Closing, then by hand if it didn't
@@ -696,7 +698,7 @@ export async function runAppRun(jobs, deps) {
       if (!closing) { winding = true; closing = Promise.resolve(page.close()).catch(() => {}); }
       return closing;
     },
-    // Open Now: the page slides away while the run goes on (end() brings it back)
+    // Open Now: the page slides away while the run goes on (end() brings it back; a follow's new finish too, comeBack)
     putAside() { page.hide?.(); },
   };
   shown = handle;
