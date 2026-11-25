@@ -579,3 +579,18 @@ test("B337: a Signing Server Fallback row whose signed IPA the shell no longer k
   assert.ok(page.lines.some((x) => x.text === "The signed copy of Alpha is gone; signing it again"));
   assert.equal(r.rows[0].state, "installed");
 }));
+
+// F422: "Copied to iPhone, waiting for iOS" (phase copying, fraction 1) draws the striped bar; the fill returns at installd's first percent
+test("the row bar is striped at the end of the copy and back to the fill at installd's percent", () => withDom(async () => {
+  const s = setup([app("a", "Alpha")]);
+  let prog;
+  s.l.install = (r, { progress }) => new Promise(() => { prog = progress; progress("copying", 0.4); });
+  runAppRun(s.queue.list(), { queue: s.queue, lanes: s.l, record: async () => {}, open: () => s.page, reopenConfirm: () => {} });
+  await settle();
+  const bar = () => rowsOf(s.page)[0].children[0].children[2];
+  assert.ok(!bar().classList.contains("is-waiting"), "copying below 100%");
+  prog("copying", 1); await settle();
+  assert.ok(bar().classList.contains("is-waiting"), "copied, waiting for iOS");
+  prog("installing", 0.2); await settle();
+  assert.ok(!bar().classList.contains("is-waiting"), "installd's first percent");
+}));
