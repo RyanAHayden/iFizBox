@@ -154,4 +154,19 @@ test("B446: an APT source just added loads at once, and one added during a Refre
   await until(3);
   assert.deepEqual(w.asked[2], { keys: [two], retry: true });
   await loadNew(w.ctx);
+
+  // Cancelling the Refresh doesn't drop it either.
+  let cancel;
+  w.ctx.reloadBar = (text, { onCancel }) => { cancel = onCancel; return { set() {}, hide() {} }; };
+  w.gates.push(new Promise((r) => { release = r; }));
+  const stopped = refreshInBackground(w.ctx);
+  await until(4);
+  const three = w.add("three");
+  sourcesChanged(w.ctx);
+  cancel();
+  assert.equal(await stopped, "cancelled");
+  release();
+  await until(5);
+  assert.deepEqual(w.asked[4], { keys: [three], retry: true });
+  await loadNew(w.ctx);
 });

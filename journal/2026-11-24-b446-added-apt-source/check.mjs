@@ -152,7 +152,8 @@ console.log(await ev("document.body.innerText.match(/Cannot Comply|doesn.t know 
 console.log("Confirm:", await clickText("Confirm"));
 await sleep(4000);
 await say("done");
-console.log(await native.call("apt.dpkgStatus").then((s) => /Package: com\.one\.tweak/.test(s) ? "PASS: installed, no Refresh" : "not installed"));
+const ok = /Package: com\.one\.tweak/.test(await native.call("apt.dpkgStatus"));
+console.log(ok ? "PASS: installed, no Refresh" : "FAIL: not installed");
 if (pageErrors.length) console.log("page errors:", pageErrors);
 await cleanup();
-process.exit(0);
+process.exit(ok ? 0 : 1);

@@ -306,7 +306,8 @@ function runAgain(ctx, cancelled = false) {
   state.again = false;
   const retry = state.againRetry;
   state.againRetry = null;
-  if (cancelled) return;
+  // B446: an APT source added meanwhile still loads: it was no part of what Cancel stopped.
+  if (cancelled && !getBackend().addedSources?.().length) return;
   loadNew(ctx ?? state.ctx, retry ? { retry } : {});
 }
 
