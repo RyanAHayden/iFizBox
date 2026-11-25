@@ -135,7 +135,7 @@ function moving(el, doc) {
 const weightOf = (cs) => parseInt(cs?.fontWeight, 10) || (cs?.fontWeight === "bold" ? 700 : 400);
 
 // F369: the tab bar as the shell's real UITabBar shows it: each tab's id, title, glyphs (icons/rowicons.js: the era's
-// outline glyph, its filled one for the chosen tab), badge ("" for the refreshing spinner: a dot), and which tab is
+// outline glyph, its filled one for the chosen tab), badge ("spinner" while sources refresh, as tabbar.js setBadge), and which tab is
 // chosen. Search is the UITabBar's search tab. Hidden while a popup is up, one of the page's sheets covers the bar, or
 // the page moves it (a card sheet scales the page behind it back, the tab bar too).
 function tabbarSnapshot(doc, win, popup) {
@@ -151,7 +151,7 @@ function tabbarSnapshot(doc, win, popup) {
     return {
       id, title, selected: a.classList.contains("active"), search: id === FLOAT_OWN_TAB,
       icon: tabIcon(icon("tabsOutline", id, style), win), selectedIcon: tabIcon(icon("tabsSelected", id, style), win),
-      badge: shows(badge) ? (badge.classList.contains("spinning") ? "" : badge.textContent) : null,
+      badge: shows(badge) ? (badge.classList.contains("spinning") ? "spinner" : badge.textContent) : null,
     };
   });
   return { hidden: popup || moving(bar, doc) || covered(bar, doc), items };

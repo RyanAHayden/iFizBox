@@ -23,7 +23,7 @@
 //   icons: {key: "data:image/png;base64,…"}   icons not sent before, drawn by the page (icons/rowicons.js)
 //   colors: {text, active}              CSS colours: an unselected tab's, the chosen tab's (the tab bar's tint)
 //   tabbar: {hidden: Bool, items: [{id, title, selected: Bool, search: Bool, icon: key, selectedIcon: key?,
-//            badge: String?}]} | null
+//            badge: String? ("spinner": a spinner in the badge, TabBadgeSpinner)}]} | null
 //   buttons: [{id, rect, kind: "back" | "done" | "plain", title, size, weight, color, tint?, disabled: Bool,
 //              icon: {key, rect, template: Bool}?}]
 //   buttonsHidden: Bool
@@ -284,6 +284,7 @@ private final class NativeTabs: NSObject, UITabBarControllerDelegate {
     private weak var overlay: UIView?
     private var attached = false
     private var pick: DispatchWorkItem?
+    private lazy var spinner = TabBadgeSpinner(bar: controller.tabBar)
 
     init(emit: @escaping (String) -> Void) {
         self.emit = emit
@@ -315,6 +316,7 @@ private final class NativeTabs: NSObject, UITabBarControllerDelegate {
     // The web view back on the root view, under everything, with its own safe area again; the controller gone.
     func detach() {
         pick?.cancel()
+        spinner.spinning = false
         if let web, let host {
             host.insertSubview(web, at: 0)
             web.frame = host.bounds
@@ -385,15 +387,19 @@ private final class NativeTabs: NSObject, UITabBarControllerDelegate {
             controller.setTabs(list, animated: false)
         }
         var chosen: UITab?
+        var spinning = false
         for item in items {
             guard let id = item["id"] as? String, let tab = byId[id] else { continue }
             tab.title = item["title"] as? String ?? tab.title
             if let key = item["icon"] as? String, let img = images[key] { tab.image = img }
             if #available(iOS 26.1, *), let key = item["selectedIcon"] as? String, let img = images[key] { tab.selectedImage = img }
-            let badge = item["badge"] as? String
+            let spins = item["badge"] as? String == "spinner" // B441: a spinner in the badge
+            spinning = spinning || spins
+            let badge = spins ? TabBadgeSpinner.mark : item["badge"] as? String
             if tab.badgeValue != badge { tab.badgeValue = badge }
             if item["selected"] as? Bool ?? false { chosen = tab }
         }
+        spinner.spinning = spinning
         controller.tabBar.tintColor = colors.active
         controller.tabBar.unselectedItemTintColor = colors.text
         if let chosen, controller.selectedTab !== chosen {
