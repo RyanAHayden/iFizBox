@@ -179,8 +179,14 @@ export function createVList(scroller, { items = [], rowHeight = 58, headerHeight
     setItems,
     refresh: () => { for (const [i, n] of live) if (items[i].header == null) bindRow(n, items[i], i); },
     // Each header's text and the scrollTop that puts it at the top of the window (the section index jumps there).
-    // Measured now and kept, so the rows and the sticky header are placed from the same offset after the jump.
-    headerTops: () => { offset = listTop(); return headers.map((i) => ({ text: items[i].header, top: offset + tops[i] })); },
+    // Measured now and kept, so the rows and the sticky header are placed from the same offset after the jump, also
+    // when the jump ends where the list already is and no scroll event comes.
+    headerTops: () => {
+      const was = offset;
+      offset = listTop();
+      if (was !== null && was !== offset) update();
+      return headers.map((i) => ({ text: items[i].header, top: offset + tops[i] }));
+    },
     destroy() {
       scroller.removeEventListener("scroll", onScroll);
       ro?.disconnect();

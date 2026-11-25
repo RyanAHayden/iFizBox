@@ -102,4 +102,12 @@ test("a jump re-reads where the list starts: the bar above it grew since", (t) =
   p.press("C");
   assert.equal(p.firstShown(), "C");
   assert.equal(p.sticky.textContent, "C");
+  p.lift();
+  const at = p.scroller.scrollTop;
+  p.list.el.offsetTop += 44;
+  p.scroller.scrollTop = at + 44; // already where C's jump lands: no scroll event follows it
+  p.press("C");
+  assert.equal(p.scroller.scrollTop, at + 44);
+  assert.equal(p.firstShown(), "C");
+  assert.equal(p.sticky.style.transform, "translateY(0px)");
 });

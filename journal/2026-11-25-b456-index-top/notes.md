@@ -11,8 +11,8 @@ Fix: vlist listTop() is offsetTop minus the scroller's padding-top, and is used 
 and headerTops. headerTops re-measures the cached offset at each jump. nav/sectionindex.js sends # and the first
 section (and the letters before it) to scrollTop 0.
 
-Ruled out: overflow hidden and the last-letter guard were not the cause, and both are unchanged. Row order against
-indexLetter is fine.
+Suspects: the screenshot arithmetic and Chromium explain the mismatch without overflow hidden or the last-letter guard,
+so both are unchanged (not tried on iOS). Row order against indexLetter is fine.
 
 Checks:
 - web/app/nav/sectionindex.test.js: 5 tests, fake DOM.
@@ -20,7 +20,8 @@ Checks:
   fake bridge, iOS 6/7/13/26 dark. The index is dragged from Z to #, down to Z and back (80 letters), at rest and
   started during a smooth scroll, in Top 25, New and a list opened from Browse. Old code: 94 disagreements per run in
   each of Top 25 and New, ending at scrollTop 107. A list from Browse (its own scroller, no padding): 0. New code: 0
-  everywhere, ending at 0.
+  everywhere, ending at 0. The script compares positions between the two ends; at the top there is no pinned header, and
+  at the bottom the last letters share the final position.
 - No iPhone 15 Pro run: Chromium reproduced the mismatch.
 
 Not verified:
