@@ -39,13 +39,44 @@ V = "sonnet"
 check = "tools/ui-15.sh state"
 label = "iPhone 15 Pro"
 description = "Test phone for the sideload build (Lite IPA), on this desktop's USB; drive it only through tools/ui-15.sh."
+page = ":8098"  # its remote (tools/remote-15.py): Use opens it, Start serves it, Stop frees a lock it took as USER
+start = "tools/remote-15.py 15"
+
+[[run.tools.iphone15.buttons]]
+label = "Home"
+cmd = "tools/ui-15.sh lock USER && tools/ui-15.sh USER home; r=$?; IFIZBOX_UI_TIDY=0 tools/ui-15.sh unlock USER; exit $r"
+
+[[run.tools.iphone15.buttons]]
+label = "Wake"
+cmd = "tools/ui-15.sh lock USER && tools/ui-15.sh USER wake; r=$?; IFIZBOX_UI_TIDY=0 tools/ui-15.sh unlock USER; exit $r"
+
+[[run.tools.iphone15.buttons]]
+label = "Reboot"
+cmd = "tools/ui-15.sh lock USER && tools/ui-15.sh USER reboot; r=$?; IFIZBOX_UI_TIDY=0 tools/ui-15.sh unlock USER; exit $r"
+confirm = "Reboot the iPhone 15 Pro? It is back in about 3 minutes."
 
 [run.tools.iphone7]
 check = "tools/ui-7.sh state"
 label = "iPhone 7"
 description = "Test phone for the jailbreak build (.deb); drive its screen only through tools/ui-7.sh."
+page = ":8099"  # its remote (tools/remote-15.py): Use opens it, Start serves it, Stop frees a lock it took as USER
+start = "tools/remote-15.py 7"
+
+[[run.tools.iphone7.buttons]]
+label = "Home"
+cmd = "tools/ui-7.sh lock USER && tools/ui-7.sh USER home; r=$?; IFIZBOX_UI_TIDY=0 tools/ui-7.sh unlock USER; exit $r"
+
+[[run.tools.iphone7.buttons]]
+label = "Lock"
+cmd = "tools/ui-7.sh lock USER && tools/ui-7.sh USER lock-button; r=$?; IFIZBOX_UI_TIDY=0 tools/ui-7.sh unlock USER; exit $r"
 
 [run.tools.iphone4s]
 check = "tools/ui-4s.sh state"
 label = "iPhone 4S"
 description = "Old-iOS reference phone (Cydia look); drive its screen only through tools/ui-4s.sh."
+page = ":8101"  # its remote (tools/remote-15.py): Use opens it, Start serves it, Stop frees a lock it took as USER
+start = "tools/remote-15.py 4s"
+
+[[run.tools.iphone4s.buttons]]
+label = "Home"
+cmd = "tools/ui-4s.sh lock USER && tools/ui-4s.sh USER home; r=$?; IFIZBOX_UI_TIDY=0 tools/ui-4s.sh unlock USER; exit $r"
