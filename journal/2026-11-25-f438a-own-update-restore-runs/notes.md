@@ -18,7 +18,7 @@ Build: main after F438, unchanged. iPhone 15 Pro, iOS 27. Phone needed: real ins
 
 - The diagnostic build wrote owed (UserDefaults) at launch and exit, to a file, plus a marker file written by the setter. Runs y1-y16, 15 valid: exit always owed false. In 3 of 15, the new copy's (0.99.0) first launch, and the rig build's after it, read owed true while the marker file read 0 in all of them.
 - So the UserDefaults write was lost across the update. Why iOS loses it was not found.
-- An earlier 3+3 comparison: with CFPreferencesAppSynchronize still 1 of 3 (there the first copy could say it was the rig build, as the 0.99.0 copy had no diagnostics); without it, 0 of 3. With each set logged to a file (x1-x3), 0 of 3.
+- An earlier 3+3 comparison: with CFPreferencesAppSynchronize still 1 of 3 (read in the rig build reinstalled after it, as the 0.99.0 copies had no diagnostics there); without it, 0 of 3. With each set logged to a file (x1-x3), 0 of 3.
 
 ## Fix
 
@@ -45,7 +45,7 @@ Build: main after F438, unchanged. iPhone 15 Pro, iOS 27. Phone needed: real ins
 
 - The fix through own updates (F438a1).
 - Other UserDefaults keys written shortly before an own update may be lost the same way (not looked at).
-- A new copy with a working VPN extension.
+- A new copy with a working VPN extension: the asking in left1-2 and on11 was seen in the rig build reinstalled over it.
 - Setting off and no-VPN runs on the fixed build.
 - Whether the mark is lost in updates on iOS below 27.
 - Exit timing of left runs on the fixed build.

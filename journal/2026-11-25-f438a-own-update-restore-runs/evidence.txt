@@ -214,3 +214,10 @@ Shortcut runs in the log: 1; last VPN states:
 11:37:47.923350 iFizBox{iFizBox}[3068] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
 11:37:47.923370 iFizBox{iFizBox}[3068] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
 11:37:51.174846 iFizBox{iFizBox}[3068] <NOTICE>: iFizBox install: self-close: exit
+## Readings printed by run.sh and again.sh for these runs (copied from the session's output)
+on1: version 0.99.0; Shortcut runs 1; Tailscale connected
+left1 (home), left2 (late): version 0.99.0; Shortcut runs 0; then the rig build: otherVPN false, restore true, due true; restore.answer on: ok, otherVPN true after
+off1, off2, off3: version 0.99.0; Shortcut runs 0; then the rig build: otherVPN false, restore false, due false
+none1, none2, none3: version 0.99.0; Shortcut runs 0; then the rig build: otherVPN false, restore true, due false
+on11: version 0.99.0; Shortcut runs 1; Settings: VPN, Connected; Tailscale off and iFizBox VPN selected, then the rig build: otherVPN false, restore true, due true
+d5 (before the y runs): the rig build's launch after d4's update: DBG launch owed true (d4: DBG exit owed false)
