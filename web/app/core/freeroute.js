@@ -17,6 +17,7 @@
 //   freeEntitlements(appEnts, profile)   zsign's entitlements for an app on this route: get-task-allow as the
 //                                        profile allows (R32: false gave "integrity could not be verified"), no
 //                                        aps-environment (Personal Teams have no Push), the profile's keychain group
+//                                        (F436: a TEAM.* one narrowed to the app's own, which native OwnKeychain looks for)
 //   FREE_EXPIRY_WARNING                  3 days: "Expiring soon" on this route (not the certificate route's setting)
 //   freeExpiry(expires, now)             { state: "ok" | "soon" | "expired", days }
 //   setupError(e)                        an alert { title, message } for a setup step that failed
@@ -146,7 +147,12 @@ export function freeEntitlements(appEnts = {}, profile) {
   const out = { ...appEnts };
   delete out["aps-environment"];
   out["get-task-allow"] = pe["get-task-allow"] === true;
-  if (pe["keychain-access-groups"]) out["keychain-access-groups"] = pe["keychain-access-groups"];
+  const groups = pe["keychain-access-groups"], id = out["application-identifier"];
+  if (groups) {
+    const covers = typeof id === "string" && Array.isArray(groups)
+      && groups.some((g) => typeof g === "string" && (g === id || (g.endsWith("*") && id.startsWith(g.slice(0, -1)))));
+    out["keychain-access-groups"] = covers ? [id] : groups;
+  }
   return out;
 }
 

@@ -95,6 +95,9 @@ test("free entitlements: get-task-allow as the profile allows, no push, the prof
   assert.deepEqual(freeEntitlements({ "aps-environment": "production", "get-task-allow": false, "x": 1 }, profile),
     { "get-task-allow": true, "keychain-access-groups": ["T.*"], x: 1 });
   assert.equal(freeEntitlements({}, { entitlements: {} })["get-task-allow"], false);
+  // F436: a team-wide group is narrowed to the app's own; a group that doesn't cover the app is kept as the profile has it
+  assert.deepEqual(freeEntitlements({ "application-identifier": "T.com.example.x.T" }, profile)["keychain-access-groups"], ["T.com.example.x.T"]);
+  assert.deepEqual(freeEntitlements({ "application-identifier": "U.com.example.x" }, profile)["keychain-access-groups"], ["T.*"]);
 });
 
 test("expiry: soon 3 days before the 7-day profile ends", () => {

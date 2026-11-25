@@ -26,6 +26,7 @@ import { storedZip } from "../core/freecert.js";
 import { parseProfile } from "../core/signing.js";
 import { storedUdid } from "./signing.js";
 import { MERGED_PAGE } from "../core/signingpage.js";
+import { computerInstallBlock, resetComputerInstall } from "./computer-install.js"; // F436
 import { loadStyle } from "../nav/motion.js";
 import { easeOut, TOP_MS } from "../nav/tabbar.js";
 
@@ -434,6 +435,7 @@ async function setup(ctx) {
     const r = await runSetup({ portal: flow.portal, teamId: flow.team.teamId, phone: flow.phone, saved, bundleId: BUNDLE_ID, appName: NAME,
       onStep: (s) => { flow.steps[s.id] = s; ctx.redraw(); }, askRevoke: (certs) => askRevoke(ctx, certs) });
     saveFreeIdentity({ ...r.identity, teamName: flow.team.name ?? null, profile: r.profile.data, appId: r.appId }, ctx.store);
+    resetComputerInstall(); // F436: signed with the profile before this one
     flow.view = "ready";
     ctx.redraw();
     ctx.onChange();
@@ -465,8 +467,8 @@ function setupView(ctx) {
 }
 
 // ---- ready ----
-function download(bytes, name) {
-  const url = URL.createObjectURL(new Blob([bytes], { type: "application/zip" }));
+function download(bytes, name, type = "application/zip") {
+  const url = URL.createObjectURL(new Blob([bytes], { type }));
   const a = Object.assign(document.createElement("a"), { href: url, download: name });
   document.body.append(a);
   a.click();
@@ -495,19 +497,24 @@ function readyView(ctx, saved) {
   const setupDone = checklist(flow.steps).every((s) => s.state === "done");
   const out = [grouped(readySections(rows, setupDone ? flow.steps : {}))];
   out.push(button("Save for the App", () => download(handoffZip(saved), `${NAME} Free Apple ID.zip`), "free-primary", FREE_ZIP_FOOTER));
+  const renew = () => (flow.portal ? setup(ctx) : signOut(ctx));
+  const renewLabel = flow.portal ? "Refresh Profile" : "Sign In Again";
+  out.push(computerInstallBlock({ id: saved, expired: !prof || exp.state === "expired", ask: ctx.ask, save: download, // F436
+    fix: { label: renewLabel, onClick: renew } }));
   // F254i: the Developer Mode + Trust steps, a page of their own; gone once an app on this route installed fine
   if (!freeInstalled(ctx.store)) {
     out.push(grouped([{ header: "Before the First Install",
       rows: [{ label: "Developer Mode and Trust", onClick: () => { flow.view = "devmode"; ctx.redraw(); }, chevron: true }],
       footer: "iOS 16 and later: a few steps in Settings on the iPhone, once." }]));
   }
-  out.push(button(flow.portal ? "Refresh Profile" : "Sign In Again", () => (flow.portal ? setup(ctx) : signOut(ctx)), "", FREE_RENEW_FOOTER));
+  out.push(button(renewLabel, renew, "", FREE_RENEW_FOOTER));
   out.push(button("Forget Free Apple ID", async () => {
     const { index } = await ctx.ask({ title: "Forget Free Apple ID?",
       message: "This removes the certificate and key from this browser. Apple keeps the certificate (it isn't revoked); a new one "
         + "can be made next time.", buttons: ["Cancel", "Forget"], cancel: 0, colors: { 1: "red" } });
     if (index !== 1) return;
     forgetFreeIdentity(ctx.store);
+    resetComputerInstall(); // F436: the signed IPA holds the identity
     signOut(ctx);
     flow.open = false;
     ctx.redraw();

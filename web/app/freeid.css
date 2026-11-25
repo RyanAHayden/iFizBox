@@ -16,6 +16,8 @@
 /* B369: Cancel | Sign In (and Cancel | Verify) as one grouped table split in two halves, like Home's Settings | Theme. */
 .table.grouped.free-split { display: flex; }
 .free-split > .cell { flex: 1 1 0; min-width: 0; }
+/* F436: the computer install's code, to read off and type (or copy) */
+.free-setup-code .cell-detail { -webkit-user-select: text; user-select: text; }
 
 /* ==== look-only { ==== the checklist's marks, fields and buttons */
 :root {
