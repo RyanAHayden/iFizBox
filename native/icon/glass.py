@@ -4,8 +4,9 @@ refraction, and the Home Screen's Default, Dark, Clear and Tinted looks.
 An .icon is a folder: icon.json (the background fill and the layer groups, front first) and Assets/ (one SVG per
 layer). Xcode 26's actool compiles it into Assets.car beside the asset catalog's PNG set of the same name
 (icon/assets.sh). An .icon replaces a same-named .appiconset's PNGs whole, and costs ~3 MB of renders per set, so
-only CAR_SETS go into the .car: the Glass icon (alternates.GLASS_SET, Classic in Light and Gunmetal in Dark), an
-extra choice in Theme > App Icon with no PNG set (iOS 15-25 show actool's flat render of it). Every theme's set stays
+only CAR_SETS go into the .car: the Glass icon (alternates.GLASS_SET, Classic in Light, Gunmetal's globe on iOS's own
+dark tile in Dark), an extra choice in Theme > App Icon with no PNG set (iOS 15-25 show actool's flat render of it).
+Every theme's set stays
 the PNGs (iOS 26 makes their Clear and Tinted looks itself). `write` still makes a document for every set, for the
 tests and for trying one.
 
@@ -131,11 +132,16 @@ def specialized(key, light, dark):
     return {key + "-specializations": [{"value": light}, {"appearance": "dark", "value": dark}]}
 
 
-def document(light, dark):
-    """icon.json for a set whose light appearance is icon `light` and dark is icon `dark`."""
+SYSTEM_DARK = "system-dark"  # icon.json's fill for the near-black tile iOS draws under Mail, Photos, ... in Dark
+SYSTEM_DARK_FILL = ["1f1f1f", "0f0f0f"]  # that tile's top and bottom as iOS 27 draws it, for the flat thumbnail
+
+
+def document(light, dark, system_dark=False):
+    """icon.json for a set whose light appearance is icon `light` and dark is icon `dark`; `system_dark`: the dark
+    appearance is that icon's globe alone, on iOS's own dark tile."""
     cl, cd = colours(light), colours(dark)
     doc = specialized("fill", {"linear-gradient": [srgb(x) for x in cl["fill"]]},
-                      {"linear-gradient": [srgb(x) for x in cd["fill"]]})
+                      SYSTEM_DARK if system_dark else {"linear-gradient": [srgb(x) for x in cd["fill"]]})
 
     def layer(name):
         out = {"glass": True, "name": name, "position": {"scale": 1, "translation-in-points": [0, 0]}}
@@ -161,7 +167,7 @@ def write_icon(dest, name, light, dark):
             with open(os.path.join(folder, "Assets", "%s-%s.svg" % (icon, layer)), "w") as f:
                 f.write(text)
     with open(os.path.join(folder, "icon.json"), "w") as f:
-        json.dump(document(light, dark), f, indent=2, sort_keys=True)
+        json.dump(document(light, dark, name == alternates.GLASS_SET), f, indent=2, sort_keys=True)
         f.write("\n")
     return folder
 
@@ -181,20 +187,21 @@ def all_sets():
 # The sets whose .icon goes into Assets.car (icon/assets.sh). Only the Glass icon's (user 2026-11-21): actool drops a
 # same-named .appiconset's PNGs for the .icon (iOS 15-25 would get actool's flattened render, no LITE sash) and
 # stores ~3 MB of 1024 px renders per set, so every theme's set stays a PNG set and the glass one is an extra choice,
-# a set of its own with no PNG set (alternates.GLASS_SET): Classic in Light, Gunmetal in Dark. iOS 15-25 show
-# actool's flat render of it.
+# a set of its own with no PNG set (alternates.GLASS_SET): Classic in Light, Gunmetal's globe on iOS's dark tile in Dark.
+# iOS 15-25 show actool's flat render of it.
 CAR_SETS = (alternates.GLASS_SET,)
 
 
-def flat_svg(icon):
-    """One icon's layers on its fill as a single flat picture (no system glass): the 180 px thumbnail the page shows
+def flat_svg(icon, fill=None):
+    """One icon's layers on its fill (or `fill`, its top and bottom colours) as a single flat picture (no system glass):
+    the 180 px thumbnail the page shows
     for the Glass icon (icon/glass/AppIcon60x60@3x.png, `glass.py thumb`)."""
     c = colours(icon)
     inner = lambda s: s.split("\n", 1)[1].rsplit("\n</svg>", 1)[0]  # noqa: E731
     layers = layer_svgs(icon)
     grad = ('  <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#%s"/>'
             '<stop offset="1" stop-color="#%s"/></linearGradient></defs>\n'
-            '  <rect width="1024" height="1024" fill="url(#bg)"/>' % tuple(c["fill"]))
+            '  <rect width="1024" height="1024" fill="url(#bg)"/>' % tuple(fill or c["fill"]))
     return svg("\n".join([grad, inner(layers["rim"]), inner(layers["sphere"]), inner(layers["grid"])]))
 
 
@@ -204,13 +211,15 @@ THUMB = os.path.join(ICON, "glass", "AppIcon60x60@3x.png")
 def thumb():
     """icon/glass/AppIcon60x60@3x.png from flat_svg (needs rsvg-convert): the Glass icon's light look, the same in
     both builds (no LITE sash: the .icon is one picture for both). F371: and AppIconDark60x60@3x.png
-    (alternates.GLASS_DARK_THUMB), its dark (Gunmetal) look, for Dark's grid and Home's header in dark mode."""
+    (alternates.GLASS_DARK_THUMB), its dark look (Gunmetal's globe on iOS's dark tile), for Dark's grid
+    and Home's header in dark mode."""
     import subprocess
     import tempfile
     os.makedirs(os.path.dirname(THUMB), exist_ok=True)
-    for icon, out in ((alternates.PRIMARY[0], THUMB), (alternates.PRIMARY[1], alternates.GLASS_DARK_THUMB)):
+    for icon, fill, out in ((alternates.PRIMARY[0], None, THUMB),
+                            (alternates.PRIMARY[1], SYSTEM_DARK_FILL, alternates.GLASS_DARK_THUMB)):
         with tempfile.NamedTemporaryFile("w", suffix=".svg", delete=False) as f:
-            f.write(flat_svg(icon))
+            f.write(flat_svg(icon, fill))
         try:
             subprocess.run(["rsvg-convert", "-w", "180", "-h", "180", f.name, "-o", out], check=True)
         finally:
