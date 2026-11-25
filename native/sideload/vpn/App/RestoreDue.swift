@@ -1,5 +1,6 @@
 // Restore My VPN: when the back run (RestoreShortcutBridge) is due. LocalVPN says when ours takes another VPN's place;
-// once nothing uses ours any more, the Shortcut sets that VPN again, once for the whole queue.
+// once nothing uses ours any more, the Shortcut sets that VPN again, once for the whole queue: unasked while the app
+// stayed in front, else only after the person's answer.
 // Foundation only: ../tests/restoredue/main.swift tests it on Linux.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
@@ -14,16 +15,38 @@ enum RestoreDue {
         var otherVPN = false    // another VPN is up
         var down: Bool? = true  // ours: nothing uses it and iOS says it is off; nil: not read
         var replaced = false    // another VPN has Settings > VPN's checkmark since
+        var left = false        // the app was left or killed since ours took that VPN's place
+        var never = false       // the person said: no more asking on a return
+        var going: Bool { waiting || down == false } // an install or ours goes on
     }
 
     /// drop: nothing to bring back any more. later: look again in a few seconds, the app still in front. back: run it.
-    enum Step: Equatable { case drop, later, onReturn, back }
+    /// ask: run it only when the person says so.
+    enum Step: Equatable { case drop, later, onReturn, back, ask }
 
     static func step(_ n: Now) -> Step {
+        if n.never, n.left { return .drop }
         if n.waiting || n.down != true { return n.front ? .later : .onReturn }
         if n.otherVPN || n.replaced { return .drop }
         guard n.front else { return .onReturn }
-        return n.active && n.online ? .back : .later
+        guard n.active, n.online else { return .later }
+        return n.left ? .ask : .back
+    }
+
+    /// The person's answer while it is held.
+    enum Answer: String { case on, notNow, never }
+
+    /// What an answer does to it, by the step it is at. run: the back run now. approve: they said yes, but not now: it
+    /// runs unasked once it can, the app in front until then. keep: still to be answered.
+    enum Outcome: Equatable { case run, approve, drop, keep }
+    static func outcome(_ a: Answer, _ s: Step) -> Outcome {
+        guard a == .on else { return .drop }
+        switch s {
+        case .ask, .back: return .run
+        case .later: return .approve
+        case .drop: return .drop
+        case .onReturn: return .keep
+        }
     }
 
     /// After a back run: still due. Only when Shortcuts wasn't opened at all; a run that was, however it ended, was the

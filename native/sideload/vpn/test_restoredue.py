@@ -35,12 +35,14 @@ class Due(unittest.TestCase):
 
     def test_nothing_without_another_vpn(self):
         note = self.part("static func note()")
-        self.assertOrder(note, ["guard LocalVPN.restore, !owed, LocalVPN.otherVPNUp()", "guard remembered", "owed = true"])
+        self.assertOrder(note, ["guard LocalVPN.restore, !owed || held, LocalVPN.otherVPNUp()", "guard remembered", "setLeft(", "owed = true"])
 
     def test_once_per_queue(self):
         """Cleared before Shortcuts opens, with no start in between; due again only when Shortcuts wasn't opened."""
         back = self.part("case .back:", "private static func done()")
-        self.assertOrder(back, ["LocalVPN.withNoStart", "RestoreDue.step(now()) == .back", "owed = false", "RestoreShortcutBridge.back()", "RestoreDue.stillDue(", "owed = true"])
+        self.assertOrder(back, ["LocalVPN.withNoStart", "RestoreDue.step(now()) == .back", "run().due"])
+        run = self.part("private static func run()")
+        self.assertOrder(run, ["owed = false", "RestoreShortcutBridge.back()", "RestoreDue.stillDue(", "owed = true"])
         drop = self.part("case .drop:", "case .onReturn:")
         self.assertOrder(drop, ["LocalVPN.withNoStart", "RestoreDue.step(now()) == .drop", "owed = false"])
         look = self.part("static func look()")
@@ -48,11 +50,23 @@ class Due(unittest.TestCase):
         self.assertIn("UserDefaults", self.part("private static var owed", "/// A store run"))  # a killed app's, at its next launch
         self.assertIn("LocalVPN.takeDownLeftOver()", read("App", "LocalVPN.swift").split("enum LocalVPNBridge")[1])
 
+    def test_asks_once_left(self):
+        """F427: owed at launch counts as left, as does the background (not a Cellular Installs trip); the answers."""
+        self.assertIn("private static var left = true", self.src)
+        self.assertOrder(self.part("static func watch()"), ["didEnterBackgroundNotification", "if away() { setLeft(true) }"])
+        self.assertIn("RestoreBack.watch()", read("App", "LocalVPN.swift").split("enum LocalVPNBridge")[1])
+        self.assertNotIn("run()", self.part("case .ask:", "case .back:"))
+        answer = self.part("static func answer(")
+        self.assertOrder(answer, ["forKey: neverKey", "LocalVPN.withNoStart", "guard owed, held, LocalVPN.restore", "RestoreDue.outcome("])
+        self.assertEqual(self.src.count("run()"), 3)  # its own, right after the queue, and the answer's
+        self.assertIn("forKey: neverKey", self.part("static func forget()"))
+        self.assertIn('"restoreNever": RestoreBack.never', read("App", "LocalVPN.swift"))
+
     def test_remembered(self):
         src = read("App", "RestoreShortcutBridge.swift")
         self.assertIn("if k == .store { RestoreBack.stored() }", src)
         self.assertIn('if code == "not_stored" { RestoreBack.notStored() }', src)
-        self.assertIn('refusal == nil ? run(.back).error : "unavailable"', src)
+        self.assertIn('refusal == nil ? run(.back) : ("unavailable", nil)', src)
 
     @unittest.skipUnless(SWIFTC, "no Swift toolchain (SWIFT_TOOLCHAIN or swiftc on PATH): RestoreDue.swift not tested")
     def test_rules(self):
