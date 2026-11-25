@@ -250,6 +250,6 @@ test("zsign WebAssembly signs with a .p12 from makeP12", async (t) => {
   assert.equal(await runPasswordCheck(createZsign, { p12, password: "nope", profile }), false);
   const quiet = (o) => createZsign({ ...o, print: () => {}, printErr: () => {} });
   const r = await runSignJob(quiet, { ipa: fx("tiny-ifizbox.ipa"), p12, password: "abc123", profile });
-  assert.equal(r.ipa[0], 0x50);
+  assert.equal(r.ipa[0][0], 0x50);
   assert.equal(r.bundleId, "com.ryha.ifizbox");
 });

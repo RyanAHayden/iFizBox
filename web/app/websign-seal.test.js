@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync, existsSync } from "node:fs";
 import { runSignJob } from "./websign-job.js";
+import { afterOpen } from "./stream.test-helper.js";
 import { withExecutable } from "./websign-seal.js";
 import { parseBplist } from "./core/ipainfo.js";
 import { parsePlist } from "./core/signing.js";
@@ -25,7 +26,7 @@ async function signed(edit, over = {}) {
   const { default: real } = await import(WASM);
   const tree = {};
   const createZsign = async (o) => {
-    const zs = await real(o), { FS } = zs, { ccall, callMain } = zs;
+    const zs = await real(o), { FS } = zs, { callMain } = zs;
     const write = (path, data) => {
       let at = "";
       for (const p of path.split("/").filter(Boolean).slice(0, -1)) {
@@ -34,11 +35,7 @@ async function signed(edit, over = {}) {
       }
       FS.writeFile(path, data);
     };
-    zs.ccall = (name, ...rest) => {
-      const r = ccall(name, ...rest);
-      if (name === "ifizbox_unzip") edit(FS, `${PAYLOAD}/Tiny.app`, write);
-      return r;
-    };
+    afterOpen(zs, () => edit(FS, `${PAYLOAD}/Tiny.app`, write));
     zs.callMain = (args) => {
       try { return callMain(args); } finally {
         const walk = (p) => {

@@ -1,4 +1,5 @@
 // B413: the website's sign job reads the app's original data protection from its executable before zsign signs it.
+import { fakeStream } from "./stream.test-helper.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -34,8 +35,9 @@ async function signed(value, config = null) {
       open: get, close() {},
       read: (s, buf, o, len, pos) => { const part = s.subarray(pos, pos + len); buf.set(part, o); return part.length; },
     },
-    ccall: (name) => (name === "ifizbox_unzip" ? 0 : JSON.stringify({ CFBundleIdentifier: "x.delta", CFBundleExecutable: "Delta" })),
-    callMain: () => { files.set("/w/out.ipa", new Uint8Array([0x50, 0x4b])); return 0; },
+    ipaStream: fakeStream(),
+    ccall: () => JSON.stringify({ CFBundleIdentifier: "x.delta", CFBundleExecutable: "Delta" }),
+    callMain: () => { return 0; },
   });
   await runSignJob(create, { ipa: new Uint8Array([0x50, 0x4b, 3, 4]).buffer, p12: fx("test.p12"), profile: PROFILE, password: "hunter2" });
   return parsePlist(String(files.get("/w/ents.plist")))[K];

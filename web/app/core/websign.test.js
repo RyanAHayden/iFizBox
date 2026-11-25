@@ -63,9 +63,9 @@ test("XML plists read back (core/signing.js parsePlist), data and escapes includ
 });
 
 test("zsign's command line; its errors as one sentence", () => {
-  assert.deepEqual(zsignArgs({ p12: "k", password: "", profile: "m", input: "in", output: "o", temp: "t" }),
-    ["-f", "-k", "k", "-p", "", "-m", "m", "-t", "t", "-z", "1", "-o", "o", "in"]);
-  assert.deepEqual(zsignArgs({ p12: "k", profile: "m", entitlements: "e", bundleId: "a.b", input: "in", output: "o", temp: "t" }).slice(-5),
+  assert.deepEqual(zsignArgs({ p12: "k", password: "", profile: "m", input: "in", temp: "t" }),
+    ["-f", "-k", "k", "-p", "", "-m", "m", "-t", "t", "in"]);
+  assert.deepEqual(zsignArgs({ p12: "k", profile: "m", entitlements: "e", bundleId: "a.b", input: "in", temp: "t" }).slice(-5),
     ["-b", "a.b", "-e", "e", "in"]);
   assert.equal(zsignError([">>> Signing: x", "\x1b[31m>>> Invalid mach-o file!\x1b[0m"]), "zsign: Invalid mach-o file.");
   assert.match(zsignError(["\x1b[31m>>> Can't load p12 or private key file. Please input the correct file and password!"]), /password/);

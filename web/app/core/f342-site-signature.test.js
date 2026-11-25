@@ -1,5 +1,7 @@
 // F342: the website's install records keep the signature's end and the website signer's stamp, and Installed and
 // Changes read them as the app reads signing.installed.
+import { fakeStream } from "../stream.test-helper.js";
+import { joinPieces } from "./pieces.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
@@ -43,8 +45,9 @@ test("the sign job returns its stamp and the signature's end", async () => {
       writeFile: (p, d) => files.set(p, d), readFile: (p) => { if (!files.has(p)) throw new Error("ENOENT"); return files.get(p); },
       unlink: (p) => files.delete(p), readdir: () => [".", "..", "Delta.app"],
     },
-    ccall: (name) => (name === "ifizbox_unzip" ? 0 : JSON.stringify({ CFBundleIdentifier: "io.github.x.delta", CFBundleName: "Delta" })),
-    callMain: (args) => { files.set(args[args.indexOf("-o") + 1], new Uint8Array([0x50, 0x4b, 9, 9])); return 0; },
+    ipaStream: fakeStream(),
+    ccall: () => JSON.stringify({ CFBundleIdentifier: "io.github.x.delta", CFBundleName: "Delta" }),
+    callMain: (args) => { return 0; },
   });
   const r = await runSignJob(create, { ipa: new Uint8Array([0x50, 0x4b, 3, 4]), p12: P12, profile: PROFILE, groupFix: DYLIB });
   assert.deepEqual(r.signer, { version: WEB_SIGNER_VERSION, groupFix: null }, "no fix injected: no hash");
@@ -56,7 +59,7 @@ test("an app that got the group fix carries the dylib's hash", { skip: !existsSy
   const base = { p12: P12, profile: PROFILE, password: "hunter2", groupFix: DYLIB };
   const first = await runSignJob(real, { ...base, ipa: fx("tiny-ifizbox.ipa"), appBundleId: "com.example.box" });
   assert.equal(first.signer.groupFix, null);
-  const r = await runSignJob(real, { ...base, ipa: first.ipa, appBundleId: "com.example.box" });
+  const r = await runSignJob(real, { ...base, ipa: joinPieces(first.ipa), appBundleId: "com.example.box" });
   assert.deepEqual(r.injected, [GROUPFIX.inject]);
   assert.equal(r.signer.groupFix, await groupFixHash(DYLIB));
 });

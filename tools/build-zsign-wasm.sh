@@ -90,8 +90,8 @@ exec 9>&-
 fetch "https://github.com/zhlynn/zsign/archive/$ZSIGN_COMMIT.tar.gz" "$ZSIGN_SHA256" "$CACHE/zsign-$ZSIGN_COMMIT.tar.gz"
 tar xzf "$CACHE/zsign-$ZSIGN_COMMIT.tar.gz" -C "$WORK"
 SRC=$WORK/zsign-$ZSIGN_COMMIT/src
-# Patches for the WebAssembly build (tools/zsign-wasm/*.patch, in name order): fs-mmap keeps a mapped file's fd open
-# until munmap, which is when emscripten writes the signed Mach-O back.
+# Patches for the WebAssembly build (tools/zsign-wasm/*.patch, in name order): skip-missing-exe seals a nested bundle
+# without its executable as files; stream-files hashes files in pieces and maps executables into one reserved buffer (F265).
 for p in tools/zsign-wasm/*.patch; do patch -s -d "$WORK/zsign-$ZSIGN_COMMIT" -p1 <"$p"; done
 OBJ=$WORK/obj
 mkdir -p "$OBJ"
@@ -109,14 +109,16 @@ for f in "$SRC"/*.cpp "$SRC"/common/*.cpp tools/zsign-wasm/ifizbox.cpp; do
   objs+=("$o")
 done
 
+EXPORTS=(_main _ifizbox_{plist_json,buffer,reserve,inflate_start,inflate,inflate_left,deflate_start,deflate,crc}
+  _ifizbox_sha256_{start,add,end})
 mkdir -p "$OUT"
 # One module per signing job (signing-worker.js makes a fresh one each time: main() keeps globals), files in MEMFS,
 # memory that grows up to what the browser allows. ES module so a module Web Worker imports it.
 em++ "${objs[@]}" "$SSL_PREFIX/lib/libcrypto.a" -o "$OUT/zsign.js" \
   -O2 -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createZsign -sENVIRONMENT=worker,node \
   -sINVOKE_RUN=0 -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sMAXIMUM_MEMORY=4GB -sSTACK_SIZE=4MB \
-  -sFORCE_FILESYSTEM=1 -sEXPORTED_RUNTIME_METHODS=callMain,FS,ccall -sNO_DISABLE_EXCEPTION_CATCHING \
-  -sEXPORTED_FUNCTIONS=_main,_ifizbox_unzip,_ifizbox_plist_json
+  -sFORCE_FILESYSTEM=1 -sEXPORTED_RUNTIME_METHODS=callMain,FS,ccall,HEAPU8 -sNO_DISABLE_EXCEPTION_CATCHING \
+  -sEXPORTED_FUNCTIONS="$(IFS=,; echo "${EXPORTS[*]}")"
 
 chmod 644 "$OUT/zsign.wasm" "$OUT/zsign.js"
 cp "$WORK/zsign-$ZSIGN_COMMIT/LICENSE" "$OUT/LICENSE.zsign"
