@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "0.32.0",
+          "date": "2026-11-25T02:53:20Z",
+          "localizedDescription": "Pairing on This iPhone now stops by itself.\nInstall bars show stripes while iOS gets ready.\nTweak sources YTLite and SCInsta no longer pre-added.\nA stuck update now tells you what to do.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.32.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.32.0/iFizBox.ipa",
+          "size": 32002169,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.31.0",
           "date": "2026-11-25T00:19:29Z",
           "localizedDescription": "Restore My VPN turns your own VPN back on after installs.\nInstall several IPAs at once from Confirm, up to three together.\nCellular installs can use a Shortcut or your Signing Server.\nNotification fixes for tweaked apps such as RyukGram.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.31.0",
@@ -250,14 +258,6 @@
           "localizedDescription": "iFizBox keeps its own secrets out of reach of other sideloaded apps\nYour signing certificate, App Store Connect key and sign-ins are saved where only iFizBox can read them, even when other apps share its signing profile.\nRe-signed apps keep their own keychain and app-group data (from 0.18.1).\nThe website warns before signing an app it can't update without losing data (from 0.18.1).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.18.2",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.18.2/iFizBox.ipa",
           "size": 35415563,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.18.1",
-          "date": "2026-11-21T02:33:41Z",
-          "localizedDescription": "Re-signed apps keep their data: each app gets its own keychain, so apps like RyukGram stay signed in.\nApps signed under one App ID no longer share a keychain, where one app signing out signed the others out.\nEach app keeps its own app-group folder under any profile, and an older sign's data is copied in once.\nWebsite signing warns before Install when a profile group the app used is gone, or the app was signed under another ID.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.18.1",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.18.1/iFizBox.ipa",
-          "size": 35403898,
           "minOSVersion": "15.0"
         }
       ]
