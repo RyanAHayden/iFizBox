@@ -37,6 +37,7 @@ test("the share sheet closed, or never back: nothing more; refused: says so, and
   assert.deepEqual((await run({ back: false })).calls, ["add"]);
   localStorage.clear();
   const r = await run({ add: new Error("unavailable: the Shortcut needs iOS 16") });
+  assert.equal((await run({ add: new Error("no screen to show the share sheet on") })).answer, true, "only for now: it stays on");
   assert.deepEqual([r.answer, r.said, r.kept], [false, [["Couldn't Add Shortcut", ["OK"]]], null]);
 });
 

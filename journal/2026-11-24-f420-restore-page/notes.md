@@ -32,3 +32,7 @@
 - A deleted Shortcut on a phone.
 - Added by the share sheet but cancelled in Shortcuts with the VPN off: shown as added until a store run doesn't find it.
 - Lost browser storage with the Shortcut still there: Add Shortcut is offered again if nothing is remembered.
+
+## Review
+Fixed: a switch already on where the Shortcut can't run goes off from the row too; a failed share sheet alone no longer
+turns it off. Kept: Remember VPN Again in a group of its own (one footer a group); any completed share counts as added.

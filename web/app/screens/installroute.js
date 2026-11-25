@@ -378,7 +378,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
     if (native?.call) lastShortcut = await (await shortcutSetup()).readShortcut(native) ?? { available: false, added: false };
   };
   // F420: adds the Shortcut unless it's added, then its store run remembers the VPN that is on
-  const setUpRestore = async ({ turnedOn = false } = {}) => {
+  const setUpRestore = async (turnedOn = false) => {
     if (settingRestore || typeof (lastStatus ?? view)?.vpn?.remembered !== "boolean") return; // an older shell
     settingRestore = true;
     repaint();
@@ -392,7 +392,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
       can = await (await restoreSetup()).setUpRestore(native, { alert, status: fresh, turnedOn });
       await fresh();
     } finally { settingRestore = false; redraws.get(el)?.(); }
-    if (!can && turnedOn) await restoreToggles.get(el)?.(false); // it can't run here
+    if (!can) await restoreToggles.get(el)?.(false); // it can't run here
   };
   // F412: shown at once; a call that fails reads the setting again (no answer: as it was)
   restoreToggles.set(el, async (on) => {
@@ -411,7 +411,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
       redraw();
       return;
     }
-    if (on && restoreTap === tap) await setUpRestore({ turnedOn: true });
+    if (on && restoreTap === tap) await setUpRestore(true);
   });
   const paint = () => {
     if (!mine()) return;

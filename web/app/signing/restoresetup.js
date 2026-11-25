@@ -9,12 +9,12 @@ import { alertOK, showAlert } from "../nav/alert.js";
 const BUSY = { tries: 6, ms: 2000 }; // a run that ended early blocks the next for 10 s (native RestoreShortcut.settle)
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// "added", "closed" (the share sheet, or never back) or "refused" (it can't be added here).
+// "added", "closed" (the share sheet, or never back) or "refused" (no Shortcut in this app or on this iOS).
 async function add(native, { alert, whenBack }) {
   let o;
   try { o = await addRestoreShortcut(native); } catch (e) {
     await alertOK("Couldn't Add Shortcut", String(e?.message ?? e), alert);
-    return "refused";
+    return ["unavailable", "missing"].includes(e?.code ?? String(e?.message ?? e).split(":")[0]) ? "refused" : "closed";
   }
   if (!o?.opened) return "closed";
   keepRestore("1"); // what it remembered before may be gone with the old one
