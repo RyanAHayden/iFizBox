@@ -639,8 +639,9 @@ enum Sideload {
             IDevice.ilog("This iPhone: \(why); closing \(Brand.name) so installd can finish")
             log?("iOS has the new \(app.name) (\(why)): closing \(Brand.name) so iOS can finish installing it")
             SignBridge.queue.async { opened(.success((app, record))); served?(true) }
+            let spare = CloseForUpdate.restoreSpare // read before the close clears what is owed
             DispatchQueue.main.async { CloseForUpdate.hereReady() }
-            CloseForUpdate.exitBackstop("This iPhone self-update", after: CloseForUpdate.backstop + CloseForUpdate.restoreSpare)
+            CloseForUpdate.exitBackstop("This iPhone self-update", after: CloseForUpdate.backstop + spare)
         } : nil
         if isSelf { DispatchQueue.main.async { CloseForUpdate.hereBegan(app: app) } }
         DispatchQueue.main.async { KeepAlive.shared.begin(); IDevice.AppFront.watch() }

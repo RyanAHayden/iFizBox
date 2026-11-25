@@ -37,7 +37,7 @@ class HereSelfClose(unittest.TestCase):
         # answer doesn't answer it twice
         fire = here[here.index("HereClose(job: job, log: log) {"):here.index("} : nil")]
         self.assertLess(fire.index("opened(.success((app, record)))"), fire.index("CloseForUpdate.hereReady()"))
-        self.assertIn('CloseForUpdate.exitBackstop("This iPhone self-update", after: CloseForUpdate.backstop + CloseForUpdate.restoreSpare)', fire)
+        self.assertIn('CloseForUpdate.exitBackstop("This iPhone self-update", after: CloseForUpdate.backstop + spare)', fire)
         self.assertIn("IDevice.ilog(", fire)  # logged
         self.assertIn("if closer?.end() == true { return }", here)
         self.assertIn("CloseForUpdate.hereEnded()", here)
