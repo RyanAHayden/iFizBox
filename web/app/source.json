@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "0.33.0",
+          "date": "2026-11-25T06:03:02Z",
+          "localizedDescription": "Hide an install run and follow it in a strip under the bar.\nRestore My VPN asks before turning your VPN back on.\niFizBox's own update finishes by itself, with no swipe.\nBrowse lists get Search's scope bar, Filter and sorting.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.33.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.33.0/iFizBox.ipa",
+          "size": 32033173,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.32.0",
           "date": "2026-11-25T02:53:20Z",
           "localizedDescription": "Pairing on This iPhone now stops by itself.\nInstall bars show stripes while iOS gets ready.\nTweak sources YTLite and SCInsta no longer pre-added.\nA stuck update now tells you what to do.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.32.0",
@@ -250,14 +258,6 @@
           "localizedDescription": "Installs on This iPhone survive a dropped connection: the copy resumes and a finished install counts as installed.\nLeaving the app, locking it or a VPN blip during an install no longer ends in \"failed\".\nTailscale's Test Connection says Not Paired Yet with a Pair button instead of No Answer.\nApps from a source keep the source's name (RyukGram, not Instagram).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.18.3",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.18.3/iFizBox.ipa",
           "size": 35701097,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.18.2",
-          "date": "2026-11-21T02:45:32Z",
-          "localizedDescription": "iFizBox keeps its own secrets out of reach of other sideloaded apps\nYour signing certificate, App Store Connect key and sign-ins are saved where only iFizBox can read them, even when other apps share its signing profile.\nRe-signed apps keep their own keychain and app-group data (from 0.18.1).\nThe website warns before signing an app it can't update without losing data (from 0.18.1).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.18.2",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.18.2/iFizBox.ipa",
-          "size": 35415563,
           "minOSVersion": "15.0"
         }
       ]
