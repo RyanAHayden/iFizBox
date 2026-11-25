@@ -24,8 +24,6 @@ export const APP_SOURCE_DIRECTORY = [
     why: "Geode: the mod loader for Geometry Dash, from the Geode team." },
   { kind: "source", name: "uYouEnhanced", tag: "modded", url: "https://raw.githubusercontent.com/arichornlover/arichornlover.github.io/main/apps.json",
     why: "uYouEnhanced: YouTube with uYou's downloads, background play and ad blocking, from its maintainer." },
-  { kind: "source", name: "YTLitePlus", tag: "modded", url: "https://raw.githubusercontent.com/Balackburn/YTLitePlusAltstore/main/apps.json",
-    why: "YTLitePlus: YouTube with YTLite's ad blocking, background play and downloads, from its maintainer." },
 ];
 
 const urlKey = (u) => String(u ?? "").trim().toLowerCase().replace(/\/+$/, "");
