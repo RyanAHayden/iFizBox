@@ -21,8 +21,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
-- [ ] **B457** (follow-up, low) keep Cellular Installs' owed mark (ifizbox.cellular.owed) in a file like RestoreBack.owed (F438a): UserDefaults' last write before iFizBox's own update can be lost, then the new copy's launch could open Shortcuts unasked to turn cellular data on when it reads off; not seen, found by reading the code. | files: native/sideload/vpn/App/CellularRun.swift, native/sideload/vpn/test_vpn.py
-
 ### Parked
 
 - [ ] **F107** (later, when the jailbreakme.dev exploit is ready) Upgrading & Jailbreaking Help stays unlocked on the website's locked Home (user 2026-11-18: 'we will not have the jailbreak tutorial thing locked when jailbreakme.dev exploit is ready, thats for later'): leave that row out of websign-gate's browsingLocked set in screens/home.js and point it at the jailbreak guide. | files: web/app/screens/home.js

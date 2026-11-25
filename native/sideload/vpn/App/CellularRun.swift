@@ -12,10 +12,16 @@ import Network
 enum CellularRun {
     /// Set from just before Shortcuts is opened until cellular data is known to be on: an app killed in between
     /// finds it at its next launch.
-    private static let owedKey = "ifizbox.cellular.owed"
+    /// A file, not UserDefaults, as RestoreBack's: after iFizBox's own update the new copy sometimes read UserDefaults'
+    /// value from before the close, and would open Shortcuts unasked at its launch.
+    private static let owedFile = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("ifizbox.cellular.owed")
     private static var owed: Bool {
-        get { UserDefaults.standard.bool(forKey: owedKey) }
-        set { UserDefaults.standard.set(newValue, forKey: owedKey) }
+        get { (try? Data(contentsOf: owedFile)) == Data("1".utf8) }
+        set {
+            try? FileManager.default.createDirectory(at: owedFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+            do { try Data((newValue ? "1" : "0").utf8).write(to: owedFile, options: .atomic) } catch { log("owed not kept: \(error)") }
+        }
     }
 
     static func register(_ b: Bridge) {

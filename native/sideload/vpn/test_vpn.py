@@ -369,6 +369,11 @@ class CellularInstalls(unittest.TestCase):
         self.assertIn('if back != "failed" { owed = false }', run)
         self.assertLess(run.index("begin(.run"), run.index("releaseIfNone()"))
         self.assertIn("guard owed, CellularShortcutBridge.available", src)
+        # B457: UserDefaults' last write before iFizBox's own update may be lost
+        owed = src[src.index("private static var owed: Bool"):src.index("static func register(")]
+        self.assertIn("contentsOf: owedFile", owed)
+        self.assertIn("write(to: owedFile, options: .atomic)", owed)
+        self.assertNotIn("UserDefaults.standard", src)
         vpn = read("App", "LocalVPN.swift")
         self.assertIn("CellularRun.register(b)", vpn)
         wait = vpn[vpn.index("static func waitOffCellular("):vpn.index("// ---- The app out of sight")]

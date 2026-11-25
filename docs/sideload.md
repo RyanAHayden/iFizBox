@@ -414,7 +414,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   a check; `no_end` when no report comes for 30 s (10 s once the waits may end); `ran_out` when the Shortcut reached its end
   with installs not connected, so nothing is put back. After a failed run, cellular data seen on (a cellular-only
   NWPathMonitor path satisfied for 10 s) means nothing to put back; otherwise the app runs `{"on":1}`, once it is in front.
-  The answer's `putBack` is `null`, `"on"` or `"failed"`. `ifizbox.cellular.owed` in UserDefaults is set just before
+  The answer's `putBack` is `null`, `"on"` or `"failed"`. `ifizbox.cellular.owed` (a file in Application Support, as `ifizbox.vpn.backOwed`) is set just before
   Shortcuts opens and cleared once data is on again. Found at launch, it runs the same put-back, and `cellular.putBack`
   gives the page the outcome once. The page then says "Cellular Data Is Back On" or "Check Cellular Data" (turn it on in
   Settings > Cellular); a put-back that failed after a run is tried once more at the next launch. Installs queued behind (more than 3 at
