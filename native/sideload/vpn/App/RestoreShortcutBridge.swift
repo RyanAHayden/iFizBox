@@ -4,7 +4,12 @@
 //   restore.store  remembers the VPN that is on, while another VPN is up and ours is down: {ok, error, text}
 //   restore.back   sets the remembered VPN, once ours is down; ok when another VPN is up: {ok, error, text}
 //                  error: a begin refusal (RestoreShortcut.begin), RestoreShortcut.Verdict's code, or not_opened
-// All three are refused with "unavailable: …" (the jailbreak app, another bundle ID, before iOS 16) or, while the signed
+//   restore.due    a stream (one at a time; the call settles when a newer one takes its place): {due}, at once and on
+//                  every change: a back run from before the app was left or killed waits for an answer
+//   restore.answer {answer}: on (runs it), notNow (drops it), never (drops it; no later return asks or runs):
+//                  {ok, error, text}. error, only for on: not_due, later (runs unasked once it can, the app in front
+//                  until then), or as restore.back's
+// The first three are refused with "unavailable: …" (the jailbreak app, another bundle ID, before iOS 16) or, while the signed
 // file isn't in this build, "missing: …".
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
@@ -29,6 +34,19 @@ enum RestoreShortcutBridge {
             if let e = refusal { return Apt.reply(c, nil, e) }
             answer(c, .back)
         }
+        b.on("restore.due") { c in DispatchQueue.main.async { follow(c) } }
+        b.on("restore.answer") { c in
+            guard let a = (c.params["answer"] as? String).flatMap(RestoreDue.Answer.init) else { return Apt.reply(c, nil, "bad_params: answer") }
+            DispatchQueue.global(qos: .userInitiated).async { reply(c, RestoreBack.answer(a)) }
+        }
+    }
+
+    private static var follower: Bridge.Call? // on the main thread
+    private static func follow(_ c: Bridge.Call) {
+        follower?.reply(nil, nil)
+        follower = c
+        RestoreBack.onAsking = { c.emit([["due": $0]]) }
+        c.emit([["due": RestoreBack.isAsking]])
     }
 
     /// Its actions are in the builds and under the bundle ID where Cellular Installs' are.
@@ -60,13 +78,15 @@ enum RestoreShortcutBridge {
     }
 
     /// Blocking: the back run after a queue (RestoreBack). The error's code, "unavailable" where it can't run.
-    static func back() -> String? { refusal == nil ? run(.back).error : "unavailable" }
+    static func back() -> (error: String?, text: String?) { refusal == nil ? run(.back) : ("unavailable", nil) }
 
     private static func answer(_ c: Bridge.Call, _ k: RestoreShortcut.Kind) {
         DispatchQueue.global(qos: .userInitiated).async {
-            let r = run(k)
-            Apt.reply(c, ["ok": r.error == nil, "error": (r.error as Any?) ?? NSNull(), "text": (r.text as Any?) ?? NSNull()], nil)
+            reply(c, run(k))
         }
+    }
+    private static func reply(_ c: Bridge.Call, _ r: (error: String?, text: String?)) {
+        Apt.reply(c, ["ok": r.error == nil, "error": (r.error as Any?) ?? NSNull(), "text": (r.text as Any?) ?? NSNull()], nil)
     }
 
     /// Blocking. error: nil when it passed.

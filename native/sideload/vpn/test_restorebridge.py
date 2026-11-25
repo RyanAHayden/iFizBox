@@ -26,7 +26,7 @@ class RestoreBridge(unittest.TestCase):
         self.assertEqual(sorted(steps, key=text.index), steps)
 
     def test_calls(self):
-        self.assertEqual(sorted(re.findall(r'b\.on\("([^"]+)"', self.src)), ["restore.add", "restore.back", "restore.store"])
+        self.assertEqual(sorted(re.findall(r'b\.on\("([^"]+)"', self.src)), ["restore.add", "restore.answer", "restore.back", "restore.due", "restore.store"])
         self.assertIn("RestoreShortcutBridge.register(b)", read("App", "LocalVPN.swift"))
         self.assertIn("if RestoreShortcutBridge.receive(url) { return }", read("Sources", "App.swift", base=NATIVE))
         self.assertIn('"restore-vpn"', self.src)

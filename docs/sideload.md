@@ -374,18 +374,27 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   Settings > VPN (measured on an iPhone 15 Pro, iOS 27.0; connecting it in its own app is not verified).
   **Restore My VPN** is a kept setting, off by default, set with the switch on This iPhone's page (docs/settings.md). Our configuration
   is never removed, so it stays in Settings > VPN and iOS asks Allow once. With the switch on, the other VPN is brought back after the queue.
-  Before ours starts, if another VPN is up and one is remembered (a `restore.store` passed; `vpn.remembered` in `idevice.status`), it is
-  noted as owed (UserDefaults `ifizbox.vpn.backOwed`); with none remembered, nothing is owed and the log says so. After the queue's last
-  connection (the 3 s linger over, ours down, no install waiting and no app being downloaded, signed or installed, the app in front, a
-  network there), the Restore My VPN Shortcut's back run opens once, under the start lock, so an install that starts meanwhile waits.
-  Shortcuts shows for about 3-4 s and returns. A look that has to wait looks again every 2 s while the app is in front; if the app was
-  left or killed, it is done at its return or next launch. Owed is cleared before Shortcuts opens. Nothing runs when no other VPN was up,
-  none was remembered, another VPN came up or took Settings > VPN's checkmark meanwhile, iOS is below 16, or the bundle ID is not the
-  app's own. Success is judged by another VPN being up, not by Set VPN's error. A run that failed is not repeated; only `not_opened`,
-  `busy` and `vpn_on` are tried again. `not_stored` clears `remembered`. With the switch off nothing is brought back. The log lines
-  "vpn: Restore My VPN: ..." say what was decided and why. Code: `RestoreBack.swift` (the looks and the back run), `RestoreDue.swift`
-  (when a run is due).
-  Bridge: `idevice.status`'s `vpn` is `{available, bundled, entitled, tested, on, cellular, wifi, otherVPN, restore, remembered, name}`,
+  Before ours starts, if another VPN is up and one is remembered (a `restore.store` passed; `vpn.remembered` in
+  `idevice.status`), it is noted as owed (UserDefaults `ifizbox.vpn.backOwed`); with none remembered, nothing is owed and the
+  log says so. After the queue's last connection (the 3 s linger over, ours down, no install waiting and no app being
+  downloaded, signed or installed, a network there), the Restore My VPN Shortcut's back run opens once, under the start lock, so
+  an install that starts meanwhile waits. Shortcuts shows for about 3-4 s and returns. Unasked, it runs only while the app
+  stayed in front since ours took the other VPN's place: leaving the app or it being killed counts, but a Cellular Installs trip
+  to Shortcuts does not while that run goes on and the app is back within 60 s. Once it was left or killed with a run owed, the run is held: the page is told by the `restore.due`
+  stream (`{due: true}`, only while the app is in front, online and nothing going on), and `restore.answer` `{answer}` decides.
+  `on` runs it; `notNow` drops it; `never` drops it and is kept (UserDefaults `ifizbox.vpn.backNever`, `restoreNever` in `vpn`
+  status), so a later return neither asks nor runs, while a run right after an install still goes on. Turning Restore My VPN off
+  clears `never`. A held run is dropped unasked when another VPN is up or took Settings > VPN's checkmark. An install starting
+  while it waits withdraws the question until the queue ends; if another VPN was up again at that start, it counts anew. `on`
+  during an install, or offline, answers `later` and runs unasked once it can, the app in front until then. No page asks yet, so
+  a held run just waits. A look that has to wait looks again every 2 s, also while it asks, so the question is withdrawn if
+  another VPN comes up. Owed is cleared before Shortcuts opens. Nothing runs when no other VPN was up, none was remembered,
+  another VPN came up or took Settings > VPN's checkmark meanwhile, iOS is below 16, or the bundle ID is not the app's own.
+  Success is judged by another VPN being up, not by Set VPN's error. A run that failed is not repeated; only `not_opened`,
+  `busy` and `vpn_on` are tried again. `not_stored` clears `remembered`. With the switch off nothing is brought back. The log
+  lines "vpn: Restore My VPN: ..." say what was decided and why. Code: `RestoreBack.swift` (the looks, the question and the back
+  run), `RestoreDue.swift` (when a run is due).
+  Bridge: `idevice.status`'s `vpn` is `{available, bundled, entitled, tested, on, cellular, wifi, otherVPN, restore, remembered, restoreNever, name}`,
   `vpn.setRestore` `{on}` turns Restore My VPN on or off and answers the same status, and `vpn.test` runs the Set Up test.
   Cellular Installs bridge: `cellular.status` is `{available, bundled, added}`: whether the signed Shortcut is in this build
   and its last check passed. `cellular.add` opens the signed Shortcut (made by `tools/shortcuts/sign.sh`) in a share sheet,
@@ -409,16 +418,22 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   Settings > Cellular); a put-back that failed after a run is tried once more at the next launch. Installs queued behind (more than 3 at
   once) that start after the last connection wait again and need another run. The popup and Use Shortcut run it through
   `runCellular` (`signing/cellularrun.js`).
-  Restore My VPN Shortcut bridge: `restore.add` opens the signed Shortcut (`web/app/shortcuts/Restore My VPN.shortcut`) in a share sheet, where Shortcuts opens it on Add Shortcut; it answers `{opened}`. `restore.store`
-  and `restore.back` answer `{ok, error, text}`. Store remembers the VPN that is on: only while another VPN is up and the
-  built-in VPN is down (`no_vpn` or `vpn_on` otherwise), so Shortcuts never saves the built-in VPN.
-  Back sets that VPN on again: only with the built-in VPN down (`vpn_on`) and no other VPN up (`on_already`).
-  For both, down means no install or connection uses it and iOS says disconnected; a failed read counts as up. It passes as soon as `otherVPN` is true, whatever
-  Shortcuts' callback (`ifizbox://restore-vpn`) says, since Set VPN often ends with error 2 after switching. `busy`: another
-  run, or one that ended under 10 s ago before its Shortcut did. Run failures: `not_opened`, `not_run`, `no_vpn` (Shortcuts
-  found none), `not_stored`, `not_back`, `no_end`, `no_return` (`RestoreShortcut.Verdict`). All three are refused with
-  `unavailable: …` in the jailbreak app, under another bundle ID and before iOS 16, and with `missing: …` while the signed file
-  is not in the build. This iPhone's page calls add and store (`web/app/signing/restoresetup.js`); back is still only the app's own run (Restore My VPN above). Code: `RestoreShortcutBridge.swift`, `web/app/core/restoreshortcut.js`, `RestoreBack.swift`, `RestoreDue.swift`.
+  Restore My VPN Shortcut bridge: `restore.add` opens the signed Shortcut (`web/app/shortcuts/Restore My VPN.shortcut`) in a
+  share sheet, where Shortcuts opens it on Add Shortcut; it answers `{opened}`. `restore.store` and `restore.back` answer `{ok,
+  error, text}`. Store remembers the VPN that is on: only while another VPN is up and the built-in VPN is down (`no_vpn` or
+  `vpn_on` otherwise), so Shortcuts never saves the built-in VPN. Back sets that VPN on again: only with the built-in VPN down
+  (`vpn_on`) and no other VPN up (`on_already`). For both, down means no install or connection uses it and iOS says
+  disconnected; a failed read counts as up. It passes as soon as `otherVPN` is true, whatever Shortcuts' callback
+  (`ifizbox://restore-vpn`) says, since Set VPN often ends with error 2 after switching. `busy`: another run, or one that ended
+  under 10 s ago before its Shortcut did. Run failures: `not_opened`, `not_run`, `no_vpn` (Shortcuts found none), `not_stored`,
+  `not_back`, `no_end`, `no_return` (`RestoreShortcut.Verdict`). Add, store and back are refused with `unavailable: …` in the
+  jailbreak app, under another bundle ID and before iOS 16, and with `missing: …` while the signed file is not in the build; due
+  and answer are not. This iPhone's page calls add and store (`web/app/signing/restoresetup.js`); back is still only the app's
+  own run (Restore My VPN above). `restore.due` is a stream (one at a time; a newer call takes its place): `{due}` at once and
+  on every change, `true` while a held back run waits for an answer. `restore.answer` `{answer}`: `on` runs it, `notNow` drops
+  it, `never` drops it and keeps it (above). It answers `{ok, error, text}`; `error` only for `on`: `not_due`, `later`,
+  `not_opened` while the app is not in front, or the back run's code. Code: `RestoreShortcutBridge.swift`,
+  `web/app/core/restoreshortcut.js`, `RestoreBack.swift`, `RestoreDue.swift`.
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`. Until iOS asks for the IPA, the silent audio is given back 60 s after the prompt is dismissed, or after the app goes to the background with the prompt unanswered (`native/sign/PromptHold.swift`); opening the install link (Try Again) or iOS's first request takes it again. A suspension after that isn't treated as a freeze, so nothing is uploaded; the IPA stays served for 15 minutes. When signing ends in the background, so the prompt waits for the app in front, the install call's hold ends as serving begins, the serving hold is given back 60 s later, and the page's hold (`signing.hold`) about 10-15 s after that once no other hold is left (apps still being signed keep it); the page's hold is given back the same way while an opened prompt is unanswered in the background, or was closed and the watch hasn't ended yet. The install link opens once iFizBox is in front, within the 15 minutes the IPA is served. iFizBox's own update through the Signing Server, uploaded while the app is in the background, works the same way: the install call's hold is given back 60 s after the upload ended, and the page's hold about 10-20 s later once no other hold is left, so iFizBox may stop running; the link opens once iFizBox is in front, while it lives (10 minutes). Once iFizBox's own update's Install prompt has been opened, its hold is given back 60 s after the prompt is dismissed, or after iFizBox goes to the background, even if iOS has asked for the IPA by then (its second question can be cancelled too). iOS's prompt stays over the Home Screen: an Install tapped there ends a suspended iFizBox and installs the update, and in front the polls go on and iFizBox closes itself. Retrying the same IPA reuses the uploaded link only within the same installed copy, not after the update landed. If the link died while iFizBox was suspended, no notification is posted; the page says so when it is opened.
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and

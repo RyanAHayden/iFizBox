@@ -3,11 +3,12 @@
 // connects to iOS and off a moment after the last connection ends (`linger`, so a queue of installs or a reconnect
 // keeps it). The configuration stays saved. iOS takes another app's VPN off while ours
 // is on, so the status says `otherVPN` and the page says it. Whether that VPN comes back by itself (its On Demand) is
-// iOS's and that app's business, unless Restore My VPN is on: then its Shortcut sets that VPN again after the queue
+// iOS's and that app's business, unless Restore My VPN is on: then its Shortcut sets that VPN again after the queue,
+// or asks first once the app was left
 // (RestoreBack.swift).
 // B423: in the background it starts only to finish an install already connected; anything else waits for the app.
 //   idevice.status      carries the VPN's state as `vpn`: {available, bundled, entitled, tested, on, cellular, wifi,
-//                       otherVPN, restore, remembered, name}
+//                       otherVPN, restore, remembered, restoreNever, name}
 //   vpn.setRestore      {on}: Restore My VPN (kept; off by default) -> the status' vpn
 //   vpn.test           the VPN on, one connect to iOS with the pairing (idevice.verify), the VPN off: {ok, ms, kind};
 //                       a pass marks This iPhone tested (set up)
@@ -56,7 +57,7 @@ enum LocalVPN {
         lock.lock(); let on = cached?.connection.status == .connected; lock.unlock()
         return ["available": available, "bundled": providerID != nil, "entitled": entitled, "tested": tested, "on": on,
                 "cellular": path.cellular, "wifi": path.wifi, "otherVPN": otherVPNUp(), "restore": restore,
-                "remembered": RestoreBack.remembered, "name": name]
+                "remembered": RestoreBack.remembered, "restoreNever": RestoreBack.never, "name": name]
     }
 
     /// The keys of features this build no longer has: removed once at launch.
@@ -767,7 +768,7 @@ enum LocalVPNBridge {
         CellularShortcutBridge.register(b) // cellular.*
         RestoreShortcutBridge.register(b) // restore.*
         CellularRun.register(b) // cellular.run, and the put-back after a killed app
-        DispatchQueue.main.async { IDevice.AppFront.watch() }
+        DispatchQueue.main.async { RestoreBack.watch(); IDevice.AppFront.watch() }
         LocalVPN.takeDownLeftOver() // B423: a killed app's
         b.on("vpn.setRestore") { c in
             guard let on = c.params["on"] as? Bool else { return Apt.reply(c, nil, "bad_params: on") }
