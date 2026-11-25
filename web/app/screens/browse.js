@@ -2441,7 +2441,7 @@ function scopeOf(page) {
   if (id === "featured") return null;
   if (page.scopes[id]) return page.scopes[id];
   const scope = page.scopes[id] = listScope({ order: page.view.order, withSegments: false, rows: page.view.all ? () => page.view.all() : null,
-    changed: () => drawFilterList(page, ++page.turn, true) });
+    changed: () => { if (page.scope === scope) drawFilterList(page, ++page.turn, true, true); } }); // a closed panel may still say so
   scope.el.classList.add("browse-scope");
   // The panel drops from under the bar, so the bar is brought into place first (packages.css keeps it there).
   scope.el.querySelector(".scope-filter").addEventListener("click", () => { body.scrollTop = 0; });
@@ -2514,8 +2514,8 @@ function drawBrowseHome(page) {
   return featured ? drawFeatured(page, turn) : drawFilterList(page, turn);
 }
 
-// `again`: the list is on screen and a filter, the sort or a setting changed, so only its rows do.
-async function drawFilterList(page, turn, again = false) {
+// `again`: the list is on screen and a filter, the sort or a setting changed, so only its rows do; `top`: from the top.
+async function drawFilterList(page, turn, again = false, top = false) {
   const { body, route, view: v, scope } = page;
   const clear = () => { dropBrowseList(page); for (const n of [...body.children]) if (n !== page.bar) n.remove(); };
   if (!again) body.append(placeholder("list", 8));
@@ -2544,7 +2544,7 @@ async function drawFilterList(page, turn, again = false) {
   } else {
     rememberNames(rows);
     page.list.setItems(items);
-    body.scrollTop = 0;
+    if (top) body.scrollTop = 0;
   }
   page.list.el.classList.add(v.ranked ? "browse-ranked" : "browse-new");
   if (page.list.footer) page.list.footer.hidden = !own; // it explains the ranks
