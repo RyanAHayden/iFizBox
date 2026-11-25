@@ -2,19 +2,19 @@
 
 Evidence file beside this note: evidence.txt (runs on1-on10, off, none, left). Rig scripts beside it: run.sh, one.sh, set.sh, strong.sh, mark.sh, extra.sh, ver.sh, vpn.py.
 
-Build: main at 44dd6b05 (F438a merged), unchanged. The signed copy is 0.99.0, from Documents as F438a1.ipa. The rig build is 0.34.0. iPhone 15 Pro, iOS 27. Phone needed: real installd, VPN, Shortcuts.
+Build: main at 44dd6b05 (F438a merged), unchanged. base.ipa is native/build/iFizBox.ipa built here by `native/build.sh ipa` (sha256 64d139fe4a84); F438a1.ipa is it with the version bumped by bump.py (sha256 678953886f7e). The signed copy is 0.99.0, from Documents as F438a1.ipa. The rig build is 0.34.0. iPhone 15 Pro, iOS 27. Phone needed: real installd, VPN, Shortcuts.
 
 The owed mark is read from the phone without opening iFizBox: `pymobiledevice3 apps pull` of `Library/Application Support/ifizbox.vpn.backOwed`, and `Library/Preferences/com.ryha.ifizbox.plist`. Every run reads it before the new copy's first launch and after it. This is new in this rig, and a stronger check than restore.due.
 
 ## Phone runs
 
-- on1-on10: 10 of 10 in front, setting on, VPN remembered, Tailscale up before. 0.99.0 was read before any reopen or swipe. One Shortcut run. Back run 3.7-4.5 s. Tailscale connected per SpringBoard after the exit; in on2-on9 Settings > VPN also said Connected with Tailscale selected. Owed file 0 before and after the new copy's first launch. New copy restore.due false.
+- on1-on10: 10 of 10 in front, setting on, VPN remembered, Tailscale up before. 0.99.0 was read before any reopen or swipe. One Shortcut run. Back run 3.7-4.5 s. Tailscale connected per SpringBoard after the exit; in on2-on9 Settings > VPN also said Connected with Tailscale selected. Owed file 0 before and after the new copy's first launch. New copy restore.due false, which proves nothing (in left it is false too with the mark 1: that copy lacks Network Extensions); the file and the strong check carry the result.
 - Strong check (after the new copy was opened and read: the rig build installed over it and not yet opened, Tailscale off and iFizBox VPN selected in Settings, then opened). Valid in 9 of 10 (on1-on9): otherVPN false, restore true, due false twice, owed file 0.
 - on10's strong check is invalid: the script did not find Settings' VPN page (cause not looked at), so Tailscale stayed on (otherVPN true). Its owed file read 0 all the same.
 - off (setting off, Tailscale before): installed, no Shortcut, owed 0, due false.
 - none (setting on, no VPN before): installed, no Shortcut, owed 0, due false.
 - left (Home about 1 s after the call): installed, no Shortcut. Owed file 1 through the update, and the rig build asked (due true). Answer on: ok, Tailscale back (otherVPN true), owed 0. This is the positive control: the file does read 1, and the check does ask when it is owed.
-- BackgroundCheck's pageCount/pageKeys/foundKeys, lowered at the hand-off, were kept in the new copy in 7 of 7 runs that had something to lower (on4-on10: 21 to 20, same at its first launch).
+- BackgroundCheck's pageCount/pageKeys/foundKeys, lowered at the hand-off, were kept in the new copy in 7 of 7 runs that had something to lower (on4-on10: 21 to 20; count and keys the same at its first launch, where the page removes foundKeys as it always does).
 
 ## Finding
 
