@@ -44,6 +44,24 @@ class UiState(unittest.TestCase):
         t = time.time() - age_min * 60
         os.utime(d / "owner", (t, t))
 
+    def test_hung_phone_answers_within_timeout(self):
+        for script in PHONES:
+            for name in ("ssh", "ios"):
+                p = self.bin / name
+                p.write_text("#!/bin/sh\nsleep 60\n")
+                p.chmod(0o755)
+            t = time.time()
+            r = self.state(script)
+            self.assertEqual(r.returncode, 69, script)
+            self.assertLess(time.time() - t, 12, script)
+
+    def test_ownerless_lock_is_busy(self):
+        self.phone(True)
+        for script, lockname in PHONES.items():
+            (self.dir / lockname).mkdir()
+            r = self.state(script)
+            self.assertEqual((r.returncode, r.stdout.splitlines()[0]), (75, "?"), script)
+
     def test_each(self):
         for script, lockname in PHONES.items():
             with self.subTest(script=script, case="free"):

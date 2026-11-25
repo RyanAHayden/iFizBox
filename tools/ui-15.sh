@@ -34,10 +34,10 @@ stale=30
 holder() { cat "$lock/owner" 2>/dev/null || echo '?'; }
 case $1 in
   state)  # for agents polling: 0 free, 75 busy (line 1 = holder), 69 missing (line 1 = why). No lock, no change.
-    if [ -d "$lock" ] && [ -n "$(find "$lock/owner" -mmin -$stale 2>/dev/null)" -o ! -e "$lock/owner" -a -d "$lock" ]; then
+    if [ -d "$lock" ] && [ -z "$(find "$lock/owner" -mmin +$stale 2>/dev/null)" ]; then  # the same stale rule as lock
       echo "$(holder)"; echo "iPhone 15 UI is locked by $(holder)"; exit 75
     fi
-    (cd "$rig" 2>/dev/null && timeout 10 ios list 2>/dev/null | grep -q "$udid") ||
+    t=$(mktemp -d) && (cd "$t" && timeout 10 ios list 2>/dev/null | grep -q "$udid"); r=$?; rm -rf "$t"; [ $r = 0 ] ||
       { echo "the iPhone 15 ($udid) isn't on USB, or isn't trusted"; exit 69; }
     echo free; exit 0 ;;
   lock)
