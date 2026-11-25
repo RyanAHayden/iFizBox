@@ -16,10 +16,12 @@ enum SealPath {
     static func short(_ name: String) -> String {
         guard name.utf8.contains(UInt8(ascii: ".")) || name.utf8.contains(UInt8(ascii: "/")) else { return name }
         let parts = name.unicodeScalars.split(separator: "/", omittingEmptySubsequences: false)
-        guard parts.dropLast().contains(where: { $0.isEmpty || $0.elementsEqual(["."]) }) else { return name }
+        guard parts.enumerated().contains(where: { i, p in p.elementsEqual(["."]) || (p.isEmpty && i < parts.count - 1) }) else { return name }
         var kept = [String]()
         for (i, p) in parts.enumerated() {
-            if i < parts.count - 1 && (p.elementsEqual(["."]) || (p.isEmpty && i > 0)) { continue }
+            let last = i == parts.count - 1
+            if p.elementsEqual(["."]) { if last { kept.append("") }; continue } // "a/." is the folder "a/"
+            if p.isEmpty && i > 0 && !last { continue }
             kept.append(String(p))
         }
         let s = kept.joined(separator: "/")

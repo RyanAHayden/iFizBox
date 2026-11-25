@@ -209,10 +209,20 @@ def seal_problems(files, bundle):
     seal = plistlib.loads(here["_CodeSignature/CodeResources"])["files2"]
     disk = {p: d for p, d in here.items() if p not in (exe, "Info.plist", "PkgInfo") and p.split("/")[-1] != ".DS_Store"
             and p.split("/")[0] not in ("_CodeSignature", "CodeResources", "_MASReceipt")}
-    return (sorted("added " + p for p in disk.keys() - seal.keys())
-            + sorted("deleted " + p for p in seal.keys() - disk.keys() if not seal[p].get("optional"))
-            + sorted("modified " + p for p in disk.keys() & seal.keys()
-                     if seal[p]["hash2"] != hashlib.sha256(disk[p]).digest()))
+    seal1 = plistlib.loads(here["_CodeSignature/CodeResources"])["files"]
+    out = sorted("added " + p for p in disk.keys() - seal.keys())
+    out += sorted("deleted " + p for p in seal.keys() - disk.keys() if not seal[p].get("optional"))
+    for p in sorted(disk.keys() & seal.keys()):
+        e, old = seal[p], seal1.get(p)
+        if "symlink" in e:
+            ok = e["symlink"].encode() == disk[p] and old is None
+        else:
+            sha1 = hashlib.sha1(disk[p]).digest()
+            ok = (e["hash2"], e["hash"]) == (hashlib.sha256(disk[p]).digest(), sha1)
+            ok = ok and (old["hash"] if isinstance(old, dict) else old) == sha1
+        if not ok:
+            out.append("modified " + p)
+    return out
 
 
 def small_zip(files):
@@ -386,6 +396,26 @@ class OnDeviceSigner(unittest.TestCase):
             self.assertEqual(entry["hash"], hashlib.sha1(files[A + rel]).digest(), rel)
         self.assertEqual(files[A + "embedded.mobileprovision"], self.profile)
 
+    def test_swift_signed_ipas_sealed(self):
+        """B432: no file changed after it was hashed, in every IPA the Swift tests signed (name, icon, tweaks, group
+        fix, arm64e, big binaries): each bundle against its CodeResources, both ways."""
+        checked = 0
+        for name in sorted(os.listdir(self.work)):
+            if not name.endswith(".ipa"):
+                continue
+            with zipfile.ZipFile(os.path.join(self.work, name)) as z:
+                if len([n for n in z.namelist() if n.endswith(".app/_CodeSignature/CodeResources")]) != 1:
+                    continue
+            files = phone_files(os.path.join(self.work, name))
+            if b"old seal" in files.values():  # a test's input, not yet signed
+                continue
+            for seal in [p for p in files if p.endswith("/_CodeSignature/CodeResources")]:
+                bundle = seal[:-len("_CodeSignature/CodeResources")]
+                with self.subTest(ipa=name, bundle=bundle):
+                    self.assertEqual(seal_problems(files, bundle), [])
+                checked += 1
+        self.assertGreater(checked, 10)
+
     def test_tweaked_ipa(self):
         """F288: the IPA test_swift signed with tweaks (work/tweaked.ipa; test_swift runs first, by name): the main
         executable lists the injected dylibs as weak loads with the Frameworks rpath, read here as otool -l would,
@@ -411,7 +441,7 @@ class OnDeviceSigner(unittest.TestCase):
         self.assertIsNone(self.build_error, self.build_error)
         if not os.path.exists(path):  # test_swift signs it, and runs after this one, by name
             env = disktmp.swift_env(dict(os.environ), self.tmp)
-            subprocess.run([self.binary, self.fx, self.work], capture_output=True, timeout=600, env=env)
+            subprocess.run([self.binary, self.fx, self.work], check=True, capture_output=True, timeout=600, env=env)
         files = phone_files(path)
         app = "Payload/Odd.app/"
         for bundle in (app, app + "Frameworks/Kit.framework/"):
