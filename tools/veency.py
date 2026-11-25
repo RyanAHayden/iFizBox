@@ -49,14 +49,16 @@ class Veency:
         self.p.stdin.write(struct.pack(fmt, *a))
 
     def open(self, accept):
-        """Connect; accept() presses the phone's Accept, only when Veency is waiting for it (no password set)."""
-        for _ in range(3):  # no greeting: an earlier prompt is still up, and answering it lets Veency go on
-            if self.ready(5):
-                break
-            accept()
+        """Connect; accept() presses the phone's Accept, only when Veency stays silent as it does while it waits for it
+        (the screen can't be read yet). With Veency off, or ssh failing, the pipe ends instead and nothing is pressed."""
+        if not self.ready(12):  # no greeting: an earlier prompt is still up, and answering it lets Veency go on
+            for _ in range(3):
+                accept()
+                if self.ready(5):
+                    break
         self.read(12, 5)
         self.send(">12s", b"RFB 003.008\n")
-        if not self.ready(2):  # silent until someone answers its prompt, which takes a moment to slide in
+        if not self.ready(3):  # silent until someone answers its prompt, which takes a moment to slide in
             for _ in range(2):
                 accept()
                 if self.ready(5):

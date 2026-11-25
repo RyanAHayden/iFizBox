@@ -23,10 +23,11 @@
 - Live: the 7 and the 4S on their default ports (home, swipe; the 7 got a tap over the page, the 4S's taps were exercised by Accept). The 15 on spare port 8103, because a person's own page was serving 8098 (wake, home, swipe). All three locks were free afterwards.
 - Pages for all three phones in Chromium: only the right buttons show.
 - The 4S Camera Roll count was 118 before and after a remote session. My own test shots from `ui-4s.sh` added about 7, and those stay.
-- `tools/test_remote_15.py`: 10 tests, using fakes.
+- `tools/test_remote_15.py`: 11 tests, using fakes.
 
 ## Not verified
 - The Tools page's own entries for the 7 and 4S (not in this repo's task).
 - The 4S in landscape (Accept would be elsewhere).
 - The page on a real iPhone browser with the 7 or the 4S.
 - Tap and typing on the 15 through the page this time: their code path is unchanged; only Wake, Home and swipe were tried live.
+- The Accept tap is blind: with a Veency that is only slow (12 s no greeting, 3 s no answer) it would land in the app in front.

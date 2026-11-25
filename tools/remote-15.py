@@ -6,7 +6,7 @@ free (and give it back after 5 idle min).
   tools/remote-15.py [15|7|4s] [PORT]     serves http://<this machine's Tailscale IP>:PORT
 15 (the default): iPhone 15 Pro, ui-15.sh, port 8098. 7: iPhone 7, ui-7.sh, 8099. 4s: iPhone 4S, ui-4s.sh, 8101 (8100 is WDA's).
 The 15's and 7's screens need no lock. The 4S's comes from Veency (tools/veency.py), which prompts on the phone, so it
-starts with "Show screen", under the lock like an action; it keeps nothing on the phone.
+starts with "Show screen", under the lock like an action; it keeps no shot on the phone (only Veency's arrow tip, bottom right).
 While a task holds the phone, actions are refused until the person presses "Use it anyway" for that holder (a new holder asks again).
 SIGTERM (the Tools page's Stop) frees the lock only when it is held as USER, then exits 0. Started while already serving, it says so and exits 0.
 Bound to the Tailscale IP only: anyone on the tailnet can drive the phone while it runs. Ctrl-C to stop."""

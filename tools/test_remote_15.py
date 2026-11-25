@@ -141,6 +141,34 @@ class Rig(unittest.TestCase):
         a, b = (b"\x89PNG" + bytes([n]) * 99 + self.m.PNG_END for n in (1, 2))
         self.assertEqual(list(self.m.pngs(io.BufferedReader(io.BytesIO(a + b + a[:20])))), [a, b])
 
+    def jpeg(self, base):
+        end = time.time() + 20
+        while time.time() < end:
+            try:
+                with urllib.request.urlopen(base + "frame?after=-1", timeout=20) as r:
+                    return r.read()
+            except urllib.error.HTTPError as e:
+                e.close()
+                time.sleep(.2)
+        self.fail("no frame")
+
+    @unittest.skipUnless(importlib.util.find_spec("PIL"), "the live screen needs Pillow")
+    def test_live_screen_of_the_7_and_4s(self):
+        from PIL import Image
+        png = os.path.join(self.tmp.name, "red.png")
+        Image.new("RGB", (75, 133), (255, 0, 0)).save(png)
+        self.fake_ssh(f"#!/bin/sh\ncat {png}\nexec sleep 30\n")
+        im = Image.open(io.BytesIO(self.jpeg(self.serve("7"))))
+        self.assertEqual(im.size, (75, 133))
+        r, g, b = im.getpixel((30, 60))
+        self.assertTrue(r > 240 and g < 15 and b < 15, (r, g, b))
+        self.assertEqual(self.calls(), [])  # watching takes no lock
+        self.fake_ssh(FAKE_VNC.replace('b"abcdefgh"', r'b"\x00\xf8" * 4').replace('b"ZZ"', r'b"\x00\xf8"'))  # RGB565 red
+        base = self.serve("4s")
+        self.assertIn("the screen is on", self.act(base, cmd="screen"))
+        r, g, b = Image.open(io.BytesIO(self.jpeg(base))).getpixel((0, 0))
+        self.assertTrue(r > 240 and g < 15 and b < 15, (r, g, b))
+
     def test_4s_frames_after_accept(self):
         self.fake_ssh(FAKE_VNC)
         v = self.m.Veency("4s")
