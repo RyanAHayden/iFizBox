@@ -3,10 +3,12 @@
 #
 #   tools/publish.sh X.Y.Z [--notes FILE] [--minimum X.Y.Z] [--dry-run]
 #
-#   1. checks: on main, no uncommitted changes, up to date with origin, X.Y.Z newer than the last v* tag
+#   1. checks: on main, no uncommitted changes, up to date with origin, X.Y.Z newer than the last v* tag; the --notes
+#      file is in the notes format (tools/publish_notes.py; docs/release.md, "Release notes"), and there is one when
+#      release-notes/*.md has notes waiting (a dry run without --notes prints those as a raw list)
 #   2. writes native/VERSION and the Tweak Index file (web/app/tweak-index.json from the live index, tools/
-#      tweak-index.mjs; the last one stays when that fails), deletes release-notes/*.md (README.md stays; a copy is the
-#      default notes), commits "Version X.Y.Z" and pushes it
+#      tweak-index.mjs; the last one stays when that fails), deletes release-notes/*.md (README.md stays; a dry run's
+#      raw list is made from a copy), commits "Version X.Y.Z" and pushes it
 #   3. builds that commit in a clean temporary worktree and publishes it with tools/release.sh --tag-source:
 #      iFizBox.ipa, the .debs and iFizBox's own APT repo, as the repo owner's GitHub account, under tag vX.Y.Z on a
 #      commit that adds the updated AltStore source (web/app/source.json, the built-in source) to the built one
@@ -25,10 +27,10 @@ die() { echo "publish: $*" >&2; exit 1; }
 
 version="${1:-}"; shift || true
 [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "usage: tools/publish.sh X.Y.Z [--notes FILE] [--minimum X.Y.Z] [--dry-run]"
-pass=() dry=0
+pass=() dry=0 notes=
 while [ $# -gt 0 ]; do
   case "$1" in
-    --notes) [ -f "${2:-}" ] || die "--notes needs a file"; pass+=(--notes "$(realpath "$2")"); shift 2 ;;
+    --notes) [ -f "${2:-}" ] || die "--notes needs a file"; notes=$(realpath "$2"); pass+=(--notes "$notes"); shift 2 ;;
     --minimum) pass+=(--minimum "${2:-}"); shift 2 ;;
     --dry-run) dry=1; pass+=(--dry-run); shift ;;
     *) die "unknown option $1" ;;
@@ -45,6 +47,15 @@ git pull -q --ff-only origin main || die "main can't fast-forward to origin/main
 last=$(git tag -l 'v[0-9]*' | sed 's/^v//' | sort -V | tail -n1)
 newest=$(printf '%s\n%s\n' "${last:-0.0.0}" "$version" | sort -V | tail -n1)
 [ "$version" != "${last:-}" ] && [ "$newest" = "$version" ] || die "$version isn't newer than the last release (${last:-none})"
+notefiles=() # committed ones only: an untracked file is someone's unfinished work, left alone
+while IFS= read -r f; do
+  if [ "$f" != release-notes/README.md ]; then notefiles+=("$f"); fi
+done < <(git ls-files -- 'release-notes/*.md')
+if [ -n "$notes" ]; then
+  python3 tools/publish_notes.py "$notes" || die "fix the notes (above; docs/release.md, \"Release notes\")"
+elif [ $dry = 0 ] && [ ${#notefiles[@]} != 0 ]; then
+  die "${#notefiles[@]} release note(s) wait in release-notes/: merge and shorten them into one file and pass it with --notes (docs/release.md, \"Release notes\")"
+fi
 if [ $dry = 0 ]; then
   # release.sh publishes as the repo's owner (gh auth token --user), whichever gh account is active; its
   # --check-auth makes the same check now, so a missing login stops here before the version commit is pushed.
@@ -56,12 +67,8 @@ tmp=$(mktemp -d)
 trap 'git worktree remove --force "$tmp/w" >/dev/null 2>&1 || true; rm -rf "$tmp"; [ $dry = 1 ] && git checkout -q -- native/VERSION' EXIT
 
 # D27: the release notes waiting in release-notes/*.md (one per task; README.md stays). release.sh reads a copy of
-# them as the default notes (when no --notes), and the version commit deletes them, so the next release starts empty.
+# them as a dry run's notes (when no --notes), and the version commit deletes them, so the next release starts empty.
 mkdir "$tmp/release-notes"
-notefiles=() # committed ones only: an untracked file is someone's unfinished work, left alone
-while IFS= read -r f; do
-  if [ "$f" != release-notes/README.md ]; then notefiles+=("$f"); fi
-done < <(git ls-files -- 'release-notes/*.md')
 [ ${#notefiles[@]} = 0 ] || cp "${notefiles[@]}" "$tmp/release-notes/"
 echo "publish: ${#notefiles[@]} release note(s) in release-notes/"
 

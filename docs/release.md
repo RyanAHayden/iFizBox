@@ -7,7 +7,7 @@ for a release.
 ## What a release is
 
 - Tag `vX.Y.Z`, where X.Y.Z is `native/VERSION`, on `RyanAHayden/iFizBox`, at a commit that is already pushed.
-- Title `iFizBox X.Y.Z`. The app keeps the first 4 lines of the notes (Markdown taken off) and shows the first as
+- Title `iFizBox X.Y.Z`. The app keeps the first 4 bullets of the notes (Markdown taken off) and shows the first as
   the short line of its upgrade row in Changes, so the most important change goes first.
 - Assets, under the names the app looks for:
 
@@ -88,28 +88,40 @@ Notes are kept as we go: a task that changes something users see adds `release-n
 sentence (what a user notices or must do; no task IDs, file/API names or internal terms). One file per task, so
 merges never clash.
 
-The release reads only `release-notes/*.md` (not the commits) and writes the notes from them:
+The release reads only `release-notes/*.md` (not the commits). The notes it publishes are one list of `- `
+bullets, with no summary block and no headings:
 
-- 4 short summary lines first, each under about 60 characters, the most important first (the app shows these).
-- Then at most 6 bullets, one sentence each. Small fixes go together in one "Smaller fixes" bullet.
-- Internal-only changes are left out.
+- 1 to 6 bullets, the most important first. The app shows the first 4; the first is the upgrade row's short line.
+- Each is one short sentence, at most 100 characters after `- `, ending with a full stop, about one topic.
+- Related changes are merged into one bullet. Small fixes go together in one "Smaller fixes" bullet, last.
+- No links or download text: no file names such as the IPA or .deb, and nothing on where to get it.
+- Internal-only changes are left out, and each thing is said once.
 
-Example:
+The waiting files are raw material. Before a release, the release session makes the notes from them, because the
+check can't judge topic, importance or merging:
+
+1. Read the waiting `release-notes/*.md` files, merge related ones and shorten them into the format above, in a
+   file outside the repo.
+2. Reread that file once as a user would: is each bullet clear without knowing the code, said once, and worth
+   reading? Fix what fails.
+3. Publish with `tools/publish.sh X.Y.Z --notes FILE` ("Cutting one" below). Published releases are not edited.
+
+While notes are waiting, `publish.sh` needs `--notes` (a dry run without it prints the raw list, one bullet per file).
+It checks the `--notes` file before its version commit, dry run included. It refuses notes that break the
+format or repeat a bullet (near-identical wording counts), and names the line. `python3 tools/publish_notes.py FILE`
+runs the same check alone.
+
+Example, which passes the check:
 
 ```
-Install apps straight from a source's page.
-Updates now download in the background.
-Search finds packages by their author.
-Faster start on older iPhones.
-
 - Tap Get on any app in a source to sign and install it on the phone.
 - Updates keep downloading when you leave the app, and Changes shows their progress.
+- Search finds packages by their author.
 - Smaller fixes: the Sources list no longer jumps when it reloads, and long package names wrap.
 ```
 
-Pass that file as `--notes`. Without `--notes`, `release.sh` makes the notes from the same files, one bullet per
-file. `publish.sh` deletes the committed files (all but `release-notes/README.md`) in its version commit, so the
-next release starts empty.
+`publish.sh` deletes the committed files (all but `release-notes/README.md`) in its version commit, so the next
+release starts empty.
 
 ## Tweak Index file
 
@@ -122,8 +134,9 @@ D1 directly.
 
 ## Cutting one
 
-One command does all of it: `tools/publish.sh X.Y.Z [--notes FILE] [--minimum X.Y.Z] [--dry-run]`. It checks main is
-clean and current and the version is new, writes the Tweak Index file, commits and pushes `native/VERSION` and that file, builds that exact commit in a clean
+Do the simplify step in "Release notes" first, so the notes file exists. One command does all of it:
+`tools/publish.sh X.Y.Z [--notes FILE] [--minimum X.Y.Z] [--dry-run]`. It checks main is
+clean and current and the version is new, checks the `--notes` file, writes the Tweak Index file, commits and pushes `native/VERSION` and that file, builds that exact commit in a clean
 temporary worktree, publishes it with `tools/release.sh` as the repo owner's GitHub account (whichever gh account
 is active; `tools/release.sh --check-auth` runs first, so a missing login stops it before the version commit is
 pushed; `tools/deploy.sh --check-auth` checks wrangler's login the same way), tags a commit that adds the updated
@@ -136,7 +149,7 @@ iOS SDK, which can't go on a hosted runner. The steps below are what it runs.
 
 
 1. Bump `native/VERSION` (it is X.Y.Z: the script refuses a tag that already exists), commit it and push to main.
-2. Write the notes in a file. The first line is the one Changes shows.
+2. Write the notes in a file (the simplify step in "Release notes"). The first bullet is the one Changes shows.
 3. Look at the plan first: `tools/release.sh --dry-run --notes notes.md`. That builds `native/` (it needs the
    toolchain from `docs/native.md`: `SWIFT_TOOLCHAIN`, `IOS_SDK`), runs mkdeb/mkipa's checks, and prints the tag,
    the asset names and the notes. It publishes nothing and makes no network calls.
@@ -197,9 +210,9 @@ Options:
 - `--dist DIR`: publish `DIR/iFizBox.deb` and `DIR/iFizBox.ipa` as they are, without building.
 - `--draft`: create a draft. The app ignores drafts (and GitHub's `releases/latest` doesn't return them) until it
   is published on the site.
-- Without `--notes`, the notes are one bullet per `release-notes/*.md` ("Release notes" above), or, when there are
-  none, "Smaller fixes and improvements.", followed by the standard footer about the two files. The commit subjects
-  are never used. Write the notes from those files for a real release.
+- Without `--notes`, `release.sh` makes one bullet per `release-notes/*.md` file, or, when there are none,
+  "Smaller fixes and improvements.". The commit subjects are never used. `publish.sh` allows no `--notes` only when
+  nothing is waiting or in a dry run. For a real release, use the simplified notes ("Release notes" above).
 - `IFIZBOX_RELEASE_REPO=owner/name` publishes somewhere else, for a trial run on a fork.
 - `--minimum X.Y.Z`: the oldest iFizBox that may keep running without upgrading first (above).
 - `--out DIR`: also leave `Packages`, `Packages.gz`, `Release`, the notes and the updated `source.json` in DIR. With

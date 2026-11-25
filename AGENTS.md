@@ -95,6 +95,8 @@ UI concepts (a screen proposed before it's built) go through the concept skill, 
 - Write findings worth keeping to `journal/<ID>/notes.md`.
 - A task that changes something users see adds `release-notes/<ID>.md`: one plain sentence on what a user notices or
   must do, no task IDs, file/API names or internal terms (`release-notes/README.md`).
+- Before a release, merge and shorten the waiting `release-notes/*.md` (format: `docs/release.md`, "Release notes"),
+  reread once as a user would, then `tools/publish.sh X.Y.Z --notes FILE`.
 
 ## Usage
 
