@@ -11,7 +11,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
-- [ ] **D36** Remove the animated showcase from the README and delete docs/img/showcase.webp (user: remove the animated one too) | files: README.md, docs/img/showcase.webp
 ### Research (any time, parallel)
 
 ### Native jailbreak app (shape decided: docs/native.md)
