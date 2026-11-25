@@ -32,3 +32,7 @@
 - Chromium, `shot.mjs` with the fake bridge (402x874, served from `web/app`): the question shows; Turn VPN On with
   a failed run shows "VPN Not Turned On" and `on` is sent; typing holds the question, and it asks again once the
   field is gone; `due: false` withdraws it; Don't Ask Again sends `never`. Screenshot: 1-question.png.
+
+## The gate at midnight
+`web/app/core/blocked.test.js` used a fixed date but today's clock for Changes' 7-day window, so from 2026-11-25 it
+failed for everyone. It now passes its own `now`.
