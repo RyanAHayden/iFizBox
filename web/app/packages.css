@@ -391,7 +391,8 @@ html[data-sheet="card"] { --sheet-radius: 10px; }
   flex: 1; min-width: 0; height: 30px; padding: 0 4px; margin: 0; cursor: pointer; touch-action: manipulation;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.scope-filter { flex: none; width: 56px; } /* B455: one width for Filter, the bolder Filter of a chosen Sort (iOS 13, 26) and Done */
+.scope-filter { flex: none; padding: 0 10px; }
+.list-scope > .scope-filter { width: 56px; padding: 0 4px; } /* B455: one width for Filter, the bolder Filter of a chosen Sort (iOS 13, 26) and Done */
 .scope-filter:only-child { margin-left: auto; } /* F426c: a list already of one kind has no segments */
 /* ==== look-only { ==== Search's scope bar */
 .search-bar.has-scope { background: var(--search-bar-scoped); }
@@ -584,12 +585,12 @@ html[data-theme="dark"] .price-btn.version-mark.added { color: var(--subtitle); 
 /* B455: Browse's bars keep their width under every Sort, so there the index starts 6px below them (44px each) and stays
    there when Browse's own bar scrolls away. With the queue run's strip the bars sit 30px lower (queue.css). */
 .page-body:has(> .browse-scope) ~ .section-index { top: calc(var(--nav-h) + var(--strip-room, 0px) + 44px + 6px); }
-.search-root:has(> .search-scope:not(.installed-scope)) > .section-index { top: calc(var(--nav-h) + var(--strip-room, 0px) + 88px + 6px); }
+.search-root:has(> .list-scope) > .section-index { top: calc(var(--nav-h) + var(--strip-room, 0px) + 88px + 6px); }
 body.qr-stripped .section-index { --strip-room: 30px; }
 /* On a phone on its side there is no room for 27 letters below the bars: they close up, inside the index's touch area. */
-.section-index > span { min-height: 0; }
+:is(.page-body:has(> .browse-scope) ~ .section-index, .search-root:has(> .list-scope) > .section-index) > span { min-height: 0; }
 @media (max-height: 460px) {
-  :is(.page-body:has(> .browse-scope) ~ .section-index, .search-root:has(> .search-scope:not(.installed-scope)) > .section-index) { font-size: 7px; }
+  :is(.page-body:has(> .browse-scope) ~ .section-index, .search-root:has(> .list-scope) > .section-index) { font-size: 7px; }
 }
 html.has-reload .section-index { bottom: calc(var(--tab-h) + 44px + 6px); }
 :is(.page-body, .search-results)[data-section-index] .pkg-row > .cell-inner { padding-right: 26px; } /* rows end before the index, as UITableView's */

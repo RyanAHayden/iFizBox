@@ -57,7 +57,7 @@ export function listNote({ count, total, filters, query, empty }) {
 export function listScope({ order, withSegments = true, rows, changed }) {
   const filters = { ...emptyFilters(), sort: null };
   let drop = null;
-  const scope = el("div", "search-scope");
+  const scope = el("div", "search-scope list-scope");
   const seg = withSegments ? segments(SCOPES, {}, null, (name) => {
     filters.section = name === SCOPES[0] ? null : `group:${name}`;
     draw();

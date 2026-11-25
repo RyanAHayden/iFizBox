@@ -131,11 +131,11 @@ test("B455: a Sort never resizes Browse's bars: no rule of theirs depends on the
     const at = css.indexOf(`\n${sel} {`);
     return Number(/[{;]\s*height: (\d+)px/.exec(css.slice(at, css.indexOf("}", at)))[1]);
   };
-  assert.match(css, /\n\.scope-filter \{ flex: none; width: \d+px; \}/, "Filter and Done, one width");
+  assert.match(css, /\n\.list-scope > \.scope-filter \{ width: \d+px;/, "Filter and Done, one width");
   const scope = height(".search-scope"), search = height(".search-bar");
   const top = (sel) => css.slice(css.indexOf(`\n${sel} {`)).split("}")[0].split("{")[1].trim();
   assert.equal(top(".page-body:has(> .browse-scope) ~ .section-index"),
     `top: calc(var(--nav-h) + var(--strip-room, 0px) + ${scope}px + 6px);`);
-  assert.equal(top(".search-root:has(> .search-scope:not(.installed-scope)) > .section-index"),
+  assert.equal(top(".search-root:has(> .list-scope) > .section-index"),
     `top: calc(var(--nav-h) + var(--strip-room, 0px) + ${search + scope}px + 6px);`);
 });
