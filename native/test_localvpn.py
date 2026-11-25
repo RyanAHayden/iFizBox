@@ -26,7 +26,7 @@ class Start(unittest.TestCase):
         again = self.start[self.start.index("again: {"):]
         # the status is logged; no second start in the background, cancelled or without a network; the old one is off first
         self.assertOrder(again, ["log(", "guard finishing || !mustWait() else { return false }", "try step(",
-                                 "if !Path.online() { throw noNetwork() }", "takeDown("])
+                                 "if m.connection.status == .connected { return true }", "if !Path.online() { throw noNetwork() }", "takeDown("])
         attempt = self.start[self.start.index("VPNStart.twice("):self.start.index("again: {")]
         self.assertOrder(attempt, ["RestoreBack.note()", "try manager()", "VPNStart.watch("])  # read again at each start
 

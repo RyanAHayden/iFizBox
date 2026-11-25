@@ -586,6 +586,7 @@ enum LocalVPN {
             log("\(name) \(stall.rawValue); path: \(Path.described()); up tunnels: \(tunnelList(tunnelAddresses()))")
             guard finishing || !mustWait() else { return false } // B423: no start once the app was left
             try step("turning on \(name) again")
+            if m.connection.status == .connected { return true } // since: the next read finds it
             if !Path.online() { throw noNetwork() }
             takeDown(m) // stuck on its way up: a start would be ignored
             return true

@@ -195,7 +195,7 @@ class App(unittest.TestCase):
         back = body[body.index("defer {"):body.index("var offline")]
         self.assertLess(back.index("installBegan()"), back.index("paused(.over)"))
         self.assertIn("if !run.connected { try LocalVPN.waitForApp(", idev)
-        self.assertIn("Session(watch: w, finishing: run.connected)", idev)
+        self.assertIn("Session(watch: w, finishing: run.connected, cancelled: ", idev)
         self.assertEqual(idev.count("finishing: run.connected"), 2)
         stop = src[src.index("private static func stopLater()"):src.index("private static func stopNow(")]
         self.assertLess(stop.index("BackgroundHold("), stop.index("asyncAfter"))
@@ -377,7 +377,7 @@ class CellularInstalls(unittest.TestCase):
         idev = read("idevice", "IDevice.swift", base=os.path.dirname(HERE))
         self.assertLess(idev.index("CellularShortcut.connects(wait)"), idev.index("try LocalVPN.waitOffCellular("))
         self.assertIn("defer { CellularShortcut.connected(wait) }", idev)  # failed or cancelled
-        self.assertLess(idev.index("try Session(watch: w, finishing: run.connected)"), idev.index("        CellularShortcut.connected(wait)\n        run.onConnect"))
+        self.assertLess(idev.index("try Session(watch: w, finishing: run.connected, cancelled: "), idev.index("        CellularShortcut.connected(wait)\n        run.onConnect"))
 
     @unittest.skipUnless(SWIFTC, "no Swift toolchain (SWIFT_TOOLCHAIN or swiftc on PATH): CellularShortcut.swift not tested")
     def test_state(self):
