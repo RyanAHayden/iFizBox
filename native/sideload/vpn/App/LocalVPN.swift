@@ -351,6 +351,12 @@ enum LocalVPN {
         startLock.lock(); defer { startLock.unlock() }
         return f()
     }
+    /// Nothing when a start isn't over by then.
+    static func withNoStart(before t: Date, _ f: () -> Void) {
+        guard startLock.lock(before: t) else { return }
+        defer { startLock.unlock() }
+        f()
+    }
 
     /// The tunnel stops itself after a minute without packets (PacketTunnelProvider), for an app that was killed.
     /// While anything holds it, a packet every beatEvery says the app is still there (a provider message doesn't:
@@ -742,7 +748,7 @@ enum LocalVPN {
     /// couldn't be read. Blocking, read only.
     static func state() -> (down: Bool, replaced: Bool)? {
         lock.lock(); let used = holds > 0 || installs > 0; lock.unlock()
-        if used { return (false, false) }
+        if used, !RestoreBack.isClosing { return (false, false) } // closing: it is off for good
         guard let s = saved() else { return nil }
         return ([.disconnected, .invalid].contains(s.status), s.enabled == false)
     }

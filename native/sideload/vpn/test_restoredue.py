@@ -59,7 +59,7 @@ class Due(unittest.TestCase):
         self.assertNotIn("run()", self.part("case .ask:", "case .back:"))
         answer = self.part("static func answer(")
         self.assertOrder(answer, ["forKey: neverKey", "LocalVPN.withNoStart", "guard owed, held, LocalVPN.restore", "RestoreDue.outcome("])
-        self.assertEqual(self.src.count("run()"), 3)  # its own, right after the queue, and the answer's
+        self.assertEqual(self.src.count("run()"), 4)  # its own, right after the queue, before the close, and the answer's
         self.assertIn("forKey: neverKey", self.part("static func forget()"))
         self.assertIn('"restoreNever": RestoreBack.never', read("App", "LocalVPN.swift"))
 

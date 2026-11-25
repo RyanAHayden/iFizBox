@@ -243,7 +243,7 @@ _In code_: quietPairingCheck, quietCheckDue, quietCheckAllowed, ifizbox.quietPai
 _Avoid_: background verify, auto check
 
 **Restore My VPN**:
-Optional, off by default: after the queue's last install or check, once nothing uses the built-in VPN, the Restore My VPN Shortcut turns on the other VPN that was up before it (remembered by a store run), once for the queue. Unasked only while the app stayed in front; once it was left or killed, the page is asked (`restore.due`) and answers (`restore.answer`: on, not now or never). The built-in VPN's configuration stays, so iOS asks to allow it only once
+Optional, off by default: after the queue's last install or check, once nothing uses the built-in VPN (for iFizBox's own update, just before iFizBox closes), the Restore My VPN Shortcut turns on the other VPN that was up before it (remembered by a store run), once for the queue. Unasked only while the app stayed in front; once it was left or killed, the page is asked (`restore.due`) and answers (`restore.answer`: on, not now or never). The built-in VPN's configuration stays, so iOS asks to allow it only once
 _Said_: Restore My VPN switch
 _On screen_: Restore My VPN, Turn Your VPN Back On?
 _In code_: LocalVPN.restore, vpn.setRestore, RestoreBack, RestoreBack.never, RestoreDue, restore.due, restore.answer, askRestore, restoreask.js

@@ -373,7 +373,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   a time, so while ours is on any other VPN is taken off, and `idevice.status`'s `vpn.otherVPN` says so. Without Restore My VPN, nothing puts that VPN back by itself: iOS leaves it disabled, On Demand or not, until you open
   Settings > VPN (measured on an iPhone 15 Pro, iOS 27.0; connecting it in its own app is not verified).
   **Restore My VPN** is a kept setting, off by default, set with the switch on This iPhone's page (docs/settings.md). Our configuration
-  is never removed, so it stays in Settings > VPN and iOS asks Allow once. With the switch on, the other VPN is brought back after the queue.
+  is never removed, so it stays in Settings > VPN and iOS asks Allow once. With the switch on, the other VPN is brought back after the queue. For iFizBox's own This iPhone update, the back run goes just before iFizBox closes, after the built-in VPN is off; the same conditions as the unasked run below apply, and it waits at most 15 s.
   Before ours starts, if another VPN is up and one is remembered (a `restore.store` passed; `vpn.remembered` in
   `idevice.status`), it is noted as owed (UserDefaults `ifizbox.vpn.backOwed`); with none remembered, nothing is owed and the
   log says so. After the queue's last connection (the 3 s linger over, ours down, no install waiting and no app being

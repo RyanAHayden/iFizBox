@@ -37,7 +37,7 @@ class HereSelfClose(unittest.TestCase):
         # answer doesn't answer it twice
         fire = here[here.index("HereClose(job: job, log: log) {"):here.index("} : nil")]
         self.assertLess(fire.index("opened(.success((app, record)))"), fire.index("CloseForUpdate.hereReady()"))
-        self.assertIn('CloseForUpdate.exitBackstop("This iPhone self-update")', fire)
+        self.assertIn('CloseForUpdate.exitBackstop("This iPhone self-update", after: CloseForUpdate.backstop + spare)', fire)
         self.assertIn("IDevice.ilog(", fire)  # logged
         self.assertIn("if closer?.end() == true { return }", here)
         self.assertIn("CloseForUpdate.hereEnded()", here)
@@ -46,7 +46,7 @@ class HereSelfClose(unittest.TestCase):
         ready = block(self.side, "static func hereReady()")
         self.assertIn("guard state != .finished", ready)  # B173: no other state keeps iFizBox open
         self.assertIn("set(.finished)", ready)
-        self.assertIn("closeWith(exitAfter: hereExit)", ready)  # B178: no notification
+        self.assertIn("closeWith(exitAfter: hereExit, restore: true)", ready)  # B178: no notification
         began = block(self.side, "static func hereBegan(")
         self.assertIn("run += 1", began)  # an older hosted run's polls stop
         self.assertIn("set(.waiting)", began)
@@ -55,7 +55,7 @@ class HereSelfClose(unittest.TestCase):
         close = block(self.side, "private static func closeWith")
         self.assertIn("exit(0)", close)
         self.assertIn("DispatchQueue.global(", close)  # the exit itself is off the main queue too
-        self.assertIn("deadline: .now() + wait", close)
+        self.assertIn("deadline: at", close)
         # B173: the exit doesn't hang on the notification's completion or the main queue (every route: the hosted
         # finish/guess close through closeWith too)
         self.assertIn("exitBackstop(", close)
@@ -68,7 +68,7 @@ class HereSelfClose(unittest.TestCase):
         close = block(self.side, "private static func closeWith")
         self.assertIn("LocalVPN.downToClose() ? max(exitAfter, vpnAsk) : exitAfter", close)
         self.assertLess(close.index("KeepAlive.shared.begin()"), close.index("LocalVPN.downToClose()"))
-        self.assertIn("exitBackstop(\"closeWith\", after: LocalVPN.downWait + vpnAsk + 1)", close)  # never before the polite exit
+        self.assertIn("exitBackstop(\"closeWith\", after: LocalVPN.downWait + vpnAsk + 1 + spare)", close)  # never before the polite exit
         self.assertIn("backstop: TimeInterval = LocalVPN.downWait + vpnAsk + 2", self.side)
         back = block(self.side, "static func exitBackstop(")
         self.assertLess(back.index("LocalVPN.downToClose()"), back.index("exit(0)"))
@@ -79,6 +79,16 @@ class HereSelfClose(unittest.TestCase):
         self.assertNotIn("holds", down)  # whatever holds it
         up = block(vpn, "static func up(")
         self.assertLess(up.index("if over { throw"), up.index("try start("))  # no start after it
+
+    def test_restore_my_vpn_runs_before_the_close(self):
+        # F438: the back run, after our VPN went off and within a limit; nothing owed adds nothing to B440's close
+        close = block(self.side, "private static func closeWith")
+        self.assertIn("restore: Bool = false", close)  # the Signing Server route never runs it
+        self.assertIn("let spare = restore ? restoreSpare : 0", close)
+        self.assertIn("max(off + wait, spare > 0 ? .now() + backIn : off)", close)
+        order = ["LocalVPN.downToClose() ?", "RestoreBack.closing()", "over.wait(timeout: off + spare)", "exit(0)"]
+        self.assertEqual(sorted(order, key=close.index), order)
+        self.assertIn("RestoreBack.mayClose ? RestoreBack.closeLimit : 0", self.side)
 
     def test_close_within_a_couple_of_seconds(self):
         clock = read("sign", "SelfCloseClock.swift")

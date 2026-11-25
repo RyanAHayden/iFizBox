@@ -1,0 +1,84 @@
+## r4
+10:46:50.374534 iFizBox{iFizBox}[2386] <NOTICE>: iFizBox install: This iPhone: com.ryha.ifizbox 0.99.0, 32.3 MB
+10:46:50.411302 iFizBox{iFizBox}[2386] <NOTICE>: iFizBox install: vpn: on; up tunnels: utun0 link, utun0 IPv6 fe80::8e02:bdd8:aee5:e400, ipsec0 link, ipsec1 link, utun1 link, utun1 IPv6 fe80::6058:c1b1:fa1e:2549, utun2 
+10:46:50.413182 iFizBox{iFizBox}[2386] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+10:46:50.523815 iFizBox{iFizBox}[2386] <NOTICE>: iFizBox install: vpn: enabling the configuration
+10:46:50.547815 SpringBoard{NetworkExtension}[37] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is connected
+10:46:50.547840 SpringBoard{NetworkExtension}[37] <NOTICE>: VPN iFizBox VPN (79E4AE2C-B593-494A-887D-727387AAE7CE) is disconnected
+10:46:50.746388 SpringBoard{NetworkExtension}[37] <NOTICE>: VPN iFizBox VPN (79E4AE2C-B593-494A-887D-727387AAE7CE) is connected
+10:46:50.799549 iFizBox{iFizBox}[2386] <NOTICE>: iFizBox install: vpn: on in 0.26 s
+10:46:51.021322 SpringBoard{NetworkExtension}[37] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is disconnected
+10:46:52.436879 iFizBox{iFizBox}[2386] <NOTICE>: iFizBox install: self-close: IPA copied; closing in 10 s unless installd answers sooner
+10:46:52.441376 iFizBox{iFizBox}[2386] <NOTICE>: iFizBox install: installd: install asked, package type plain
+10:46:54.983947 installcoordinationd{RunningBoardServices}[271] <INFO>: Received terminate request response: <Error Domain=RBSRequestErrorDomain Code=5 "Error acquiring hold on plugins" UserInfo={NSLocalizedFailureReaso
+10:47:03.143289 iFizBox{iFizBox}[2386] <NOTICE>: iFizBox install: This iPhone: installd sent no status 10 s after the copy; closing iFizBox so installd can finish
+10:47:03.311181 iFizBox{iFizBox}[2386] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.16 s
+10:47:06.973862 installcoordinationd{RunningBoardServices}[271] <INFO>: Received terminate request response: <Error Domain=RBSRequestErrorDomain Code=4 "Target process has a higher termination resistance than the termin
+10:47:07.298678 iFizBox{iFizBox}[2386] <NOTICE>: iFizBox install: vpn: Restore My VPN Shortcut: back done
+10:47:07.298720 iFizBox{iFizBox}[2386] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 4.0 s
+10:47:07.298731 iFizBox{iFizBox}[2386] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+10:47:07.298746 iFizBox{iFizBox}[2386] <NOTICE>: iFizBox install: self-close: exiting in 6.5 s
+10:47:09.947274 iFizBox{iFizBox}[2386] <NOTICE>: iFizBox install: self-close: exit
+10:47:10.091171 installcoordinationd{RunningBoardServices}[271] <INFO>: Received terminate request response: <Error Domain=RBSRequestErrorDomain Code=3 "No such process found" UserInfo={NSLocalizedFailureReason=No such 
+## f1
+10:49:34.406896 iFizBox{iFizBox}[2418] <NOTICE>: iFizBox install: This iPhone: com.ryha.ifizbox 0.99.0, 32.3 MB
+10:49:34.445180 iFizBox{iFizBox}[2418] <NOTICE>: iFizBox install: vpn: on; up tunnels: utun0 link, utun0 IPv6 fe80::8e02:bdd8:aee5:e400, ipsec0 link, ipsec1 link, utun1 link, utun1 IPv6 fe80::6058:c1b1:fa1e:2549, utun2 
+10:49:34.446924 iFizBox{iFizBox}[2418] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+10:49:34.548365 iFizBox{iFizBox}[2418] <NOTICE>: iFizBox install: vpn: enabling the configuration
+10:49:34.582201 SpringBoard{NetworkExtension}[37] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is connected
+10:49:34.582902 SpringBoard{NetworkExtension}[37] <NOTICE>: VPN iFizBox VPN (79E4AE2C-B593-494A-887D-727387AAE7CE) is disconnected
+10:49:34.586795 SpringBoard{NetworkExtension}[37] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is disconnected
+10:49:34.790826 SpringBoard{NetworkExtension}[37] <NOTICE>: VPN iFizBox VPN (79E4AE2C-B593-494A-887D-727387AAE7CE) is connected
+10:49:34.830650 iFizBox{iFizBox}[2418] <NOTICE>: iFizBox install: vpn: on in 0.27 s
+10:49:36.441694 iFizBox{iFizBox}[2418] <NOTICE>: iFizBox install: self-close: IPA copied; closing in 10 s unless installd answers sooner
+10:49:36.446121 iFizBox{iFizBox}[2418] <NOTICE>: iFizBox install: installd: install asked, package type plain
+10:49:39.038872 installcoordinationd{RunningBoardServices}[271] <INFO>: Received terminate request response: <Error Domain=RBSRequestErrorDomain Code=5 "Error acquiring hold on plugins" UserInfo={NSLocalizedFailureReaso
+10:49:46.761533 iFizBox{iFizBox}[2418] <NOTICE>: iFizBox install: This iPhone: installd sent no status 10 s after the copy; closing iFizBox so installd can finish
+10:49:46.876966 iFizBox{iFizBox}[2418] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.11 s
+10:49:51.024506 installcoordinationd{RunningBoardServices}[271] <INFO>: Received terminate request response: <Error Domain=RBSRequestErrorDomain Code=4 "Target process has a higher termination resistance than the termin
+10:49:51.163465 iFizBox{iFizBox}[2418] <NOTICE>: iFizBox install: vpn: Restore My VPN Shortcut: back done
+10:49:51.163498 iFizBox{iFizBox}[2418] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 4.3 s
+10:49:51.163546 iFizBox{iFizBox}[2418] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+10:49:51.163583 iFizBox{iFizBox}[2418] <NOTICE>: iFizBox install: self-close: exiting in 6.5 s
+10:49:53.503729 iFizBox{iFizBox}[2418] <NOTICE>: iFizBox install: self-close: exit
+10:49:53.668353 installcoordinationd{RunningBoardServices}[271] <INFO>: Received terminate request response: <Error Domain=RBSRequestErrorDomain Code=3 "No such process found" UserInfo={NSLocalizedFailureReason=No such 
+## f2
+10:50:47.487196 iFizBox{iFizBox}[2448] <NOTICE>: iFizBox install: This iPhone: com.ryha.ifizbox 0.99.0, 32.3 MB
+10:50:47.522249 iFizBox{iFizBox}[2448] <NOTICE>: iFizBox install: vpn: on; up tunnels: utun0 link, utun0 IPv6 fe80::8e02:bdd8:aee5:e400, ipsec0 link, ipsec1 link, utun1 link, utun1 IPv6 fe80::6058:c1b1:fa1e:2549, utun2 
+10:50:47.524566 iFizBox{iFizBox}[2448] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+10:50:47.627016 iFizBox{iFizBox}[2448] <NOTICE>: iFizBox install: vpn: enabling the configuration
+10:50:47.662393 SpringBoard{NetworkExtension}[37] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is connected
+10:50:47.662457 SpringBoard{NetworkExtension}[37] <NOTICE>: VPN iFizBox VPN (79E4AE2C-B593-494A-887D-727387AAE7CE) is disconnected
+10:50:47.666965 SpringBoard{NetworkExtension}[37] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is disconnected
+10:50:47.867977 SpringBoard{NetworkExtension}[37] <NOTICE>: VPN iFizBox VPN (79E4AE2C-B593-494A-887D-727387AAE7CE) is connected
+10:50:47.907821 iFizBox{iFizBox}[2448] <NOTICE>: iFizBox install: vpn: on in 0.27 s
+10:50:49.601379 iFizBox{iFizBox}[2448] <NOTICE>: iFizBox install: self-close: IPA copied; closing in 10 s unless installd answers sooner
+10:50:49.606572 iFizBox{iFizBox}[2448] <NOTICE>: iFizBox install: installd: install asked, package type plain
+10:50:52.160956 installcoordinationd{RunningBoardServices}[271] <INFO>: Received terminate request response: <Error Domain=RBSRequestErrorDomain Code=5 "Error acquiring hold on plugins" UserInfo={NSLocalizedFailureReaso
+10:50:59.687192 iFizBox{iFizBox}[2448] <NOTICE>: iFizBox install: This iPhone: installd sent no status 10 s after the copy; closing iFizBox so installd can finish
+10:50:59.860379 iFizBox{iFizBox}[2448] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.16 s
+10:51:04.090384 iFizBox{iFizBox}[2448] <NOTICE>: iFizBox install: vpn: Restore My VPN Shortcut: back done
+10:51:04.090491 iFizBox{iFizBox}[2448] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 4.2 s
+10:51:04.090532 iFizBox{iFizBox}[2448] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+10:51:04.090633 iFizBox{iFizBox}[2448] <NOTICE>: iFizBox install: self-close: exiting in 6.5 s
+10:51:04.166593 installcoordinationd{RunningBoardServices}[271] <INFO>: Received terminate request response: <Error Domain=RBSRequestErrorDomain Code=4 "Target process has a higher termination resistance than the termin
+10:51:06.500935 iFizBox{iFizBox}[2448] <NOTICE>: iFizBox install: self-close: exit
+10:51:06.645195 installcoordinationd{RunningBoardServices}[271] <INFO>: Received terminate request response: <Error Domain=RBSRequestErrorDomain Code=3 "No such process found" UserInfo={NSLocalizedFailureReason=No such 
+## off1
+10:51:54.376123 iFizBox{iFizBox}[2478] <NOTICE>: iFizBox install: This iPhone: com.ryha.ifizbox 0.99.0, 32.3 MB
+10:51:54.405626 iFizBox{iFizBox}[2478] <NOTICE>: iFizBox install: vpn: on; up tunnels: utun0 link, utun0 IPv6 fe80::8e02:bdd8:aee5:e400, ipsec0 link, ipsec1 link, utun1 link, utun1 IPv6 fe80::6058:c1b1:fa1e:2549, utun2 
+10:51:54.552044 iFizBox{iFizBox}[2478] <NOTICE>: iFizBox install: vpn: enabling the configuration
+10:51:54.564620 SpringBoard{NetworkExtension}[37] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is connected
+10:51:54.564668 SpringBoard{NetworkExtension}[37] <NOTICE>: VPN iFizBox VPN (79E4AE2C-B593-494A-887D-727387AAE7CE) is disconnected
+10:51:54.576884 SpringBoard{NetworkExtension}[37] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is disconnected
+10:51:54.760337 SpringBoard{NetworkExtension}[37] <NOTICE>: VPN iFizBox VPN (79E4AE2C-B593-494A-887D-727387AAE7CE) is connected
+10:51:54.807404 iFizBox{iFizBox}[2478] <NOTICE>: iFizBox install: vpn: on in 0.27 s
+10:51:56.433350 iFizBox{iFizBox}[2478] <NOTICE>: iFizBox install: self-close: IPA copied; closing in 10 s unless installd answers sooner
+10:51:56.438448 iFizBox{iFizBox}[2478] <NOTICE>: iFizBox install: installd: install asked, package type plain
+10:51:58.997844 installcoordinationd{RunningBoardServices}[271] <INFO>: Received terminate request response: <Error Domain=RBSRequestErrorDomain Code=5 "Error acquiring hold on plugins" UserInfo={NSLocalizedFailureReaso
+10:52:07.123459 iFizBox{iFizBox}[2478] <NOTICE>: iFizBox install: This iPhone: installd sent no status 10 s after the copy; closing iFizBox so installd can finish
+10:52:07.241184 iFizBox{iFizBox}[2478] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.11 s
+10:52:07.241338 iFizBox{iFizBox}[2478] <NOTICE>: iFizBox install: self-close: exiting in 6.5 s
+10:52:11.008215 installcoordinationd{RunningBoardServices}[271] <INFO>: Received terminate request response: <Error Domain=RBSRequestErrorDomain Code=4 "Target process has a higher termination resistance than the termin
+10:52:14.162626 iFizBox{iFizBox}[2478] <NOTICE>: iFizBox install: self-close: exit
+10:52:14.310864 installcoordinationd{RunningBoardServices}[271] <INFO>: Received terminate request response: <Error Domain=RBSRequestErrorDomain Code=3 "No such process found" UserInfo={NSLocalizedFailureReason=No such 
