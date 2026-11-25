@@ -19,7 +19,7 @@ export function runFailed(code) {
 }
 
 // Nothing in the way: in front, no alert, sheet or menu up, and no keyboard.
-const pageClear = (doc = globalThis.document) => doc.visibilityState === "visible" && !popupOpen(doc) && !nativeAlertUp()
+export const pageClear = (doc = globalThis.document) => doc.visibilityState === "visible" && !popupOpen(doc) && !nativeAlertUp()
   && !doc.querySelector(".menu, .filter-drop") && !typing(doc);
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -52,6 +52,10 @@ export function askRestore(native, { alert = showAlert, clear = pageClear, wait 
   async function answer(pick) {
     let r;
     try { r = await answerRestore(native, pick); } catch { r = { ok: false, error: "" }; }
+    if (pick === "never" && r?.ok === false) {
+      await whenClear(() => true);
+      await alertOK("Couldn't Save That", "You may be asked again.", alert);
+    }
     if (pick !== "on" || r?.ok || NO_FAILURE.includes(r?.error)) return false;
     if (r?.error === "not_opened" && due) return true;
     const f = runFailed(r?.error);

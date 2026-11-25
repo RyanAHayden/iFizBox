@@ -5,7 +5,7 @@ import { fakeDocument, fakeNative, memStorage, tick } from "../fakes.test-helper
 
 globalThis.document ??= fakeDocument();
 globalThis.localStorage = memStorage();
-const { askRestore, runFailed, QUESTION } = await import("./restoreask.js");
+const { askRestore, pageClear, runFailed, QUESTION } = await import("./restoreask.js");
 
 // The shell: say(due) tells the stream; reply answers restore.answer. The alert: tap(index) taps its button.
 function rig({ reply = { ok: true }, clear = () => true } = {}) {
@@ -113,6 +113,20 @@ test("withdrawn: the alert goes unanswered; due again, it asks", async () => {
   r.tell(false); r.tell(true); // at once
   await settle();
   assert.deepEqual([r.alerts.length, r.alerts[2].open, r.taps], [3, true, []]);
+});
+
+test("clear: in front, no popup or menu up, not typing", () => {
+  const doc = ({ state = "visible", popup = false, menu = false, field = false } = {}) => ({ visibilityState: state,
+    activeElement: { matches: () => field }, querySelectorAll: () => (popup ? [{}] : []), querySelector: () => (menu ? {} : null) });
+  assert.equal(pageClear(doc()), true);
+  for (const no of [{ state: "hidden" }, { popup: true }, { menu: true }, { field: true }]) assert.equal(pageClear(doc(no)), false, JSON.stringify(no));
+});
+
+test("Don't Ask Again that isn't kept says so", async () => {
+  const r = rig({ reply: new Error("gone") });
+  await r.say(true);
+  await r.tap(2);
+  assert.equal(r.alerts[1].title, "Couldn't Save That");
 });
 
 test("the next queue's, due while a failure is up, is asked after it", async () => {

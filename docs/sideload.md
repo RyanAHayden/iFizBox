@@ -387,7 +387,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   clears `never`. A held run is dropped unasked when another VPN is up or took Settings > VPN's checkmark. An install starting
   while it waits withdraws the question until the queue ends; if another VPN was up again at that start, it counts anew. `on`
   during an install, or offline, answers `later` and runs unasked once it can, the app in front until then. The page asks
-  with "Turn Your VPN Back On?", 1.5 s after the app is in front with no alert, sheet, menu or keyboard up; a question the shell withdraws (`due` false) closes
+  with "Turn Your VPN Back On?", 1.5 s after the app is in front with no alert, sheet, menu or keyboard up (the iOS 26 style's own menus and action sheets are not waited for); a question the shell withdraws (`due` false) closes
   unanswered. A failed run shows "VPN Not Turned On" (`later`, `on_already` and `not_due` are no failure); `not_opened` while still due
   asks again. A look that has to wait looks again every 2 s, also while it asks, so the question is withdrawn if
   another VPN comes up. Owed is cleared before Shortcuts opens. Nothing runs when no other VPN was up, none was remembered,

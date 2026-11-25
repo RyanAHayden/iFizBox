@@ -20,7 +20,7 @@
 - After Turn VPN On answers `later`, the shell asks again if the app is left once more before the run. This is the
   native F427 design; the page can't tell it apart from a new queue.
 - `never` is kept by the shell; the page only sends the answer.
-- Only native alerts are waited for. Native action sheets and menus are not, since the page can't see them.
+- Only native alerts are waited for. Native action sheets and menus are not, as the task says alert and they are not counted.
 
 ## Not verified
 - On a real phone with the real shell and Shortcuts. The Chromium check used a fake bridge; the native side was F427's.
@@ -28,7 +28,7 @@
 - Native action sheets and menus: the page doesn't wait for them, only for native alerts.
 
 ## Checks
-- `node --test web/app/signing/restoreask.test.js`: 9 pass, 0 fail.
+- `node --test web/app/signing/restoreask.test.js`: 11 pass, 0 fail.
 - Chromium, `shot.mjs` with the fake bridge (402x874, served from `web/app`): the question shows; Turn VPN On with
   a failed run shows "VPN Not Turned On" and `on` is sent; typing holds the question, and it asks again once the
   field is gone; `due: false` withdraws it; Don't Ask Again sends `never`. Screenshot: 1-question.png.
