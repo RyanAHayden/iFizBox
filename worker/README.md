@@ -15,6 +15,22 @@ only), package reviews (the `REVIEWS` D1 database, tokens and addresses hashed) 
 they follow (the `PUSH` D1 database). The tweak index (the `TWEAKS` D1 database) keeps only public facts about public
 Tweak Sources' packages, nothing about who asked. It logs no request bodies. iFizBox uses `https://sign.ifizbox.com` unless you set your own.
 
+## What it serves
+
+| Path | What it does |
+|---|---|
+| `/` | the website: `web/app/` as static assets, revalidated on every load |
+| `/api/fetch` | the website's fetch proxy (APT repos and AltStore sources don't let a page read them), kept off private addresses: Cloudflare's fetch can't reach private or loopback ones, and literal private hosts and `localhost` are refused up front (a self-hosted `node.mjs` also resolves and checks every host and redirect itself), with time limits and a 64 MB cap on plain fetches (IPAs up to `MAX_UPLOAD_MB`). A GitHub repo's details and releases (a repo added as a source) go through GitHub's API with the server's token, kept 10 minutes |
+| `/api/applookup`, `/api/appreviews`, `/api/ipainfo` | App Store details and reviews for an app, and an IPA's `Info.plist` (supported iOS versions) |
+| `/sign/status` | tells the sideload app's Settings > Installation & Signing the server answers |
+| `/sign/manifest`, `/sign/host/*` | the install manifest iOS needs when the app signs on the phone, and iFizBox's own update held for 10 minutes while iOS replaces the app |
+| `/sign/upload`, `/sign/up/*` | an app the website signed in the browser, held for 10 minutes for iOS's install prompt |
+| `/repo/` | iFizBox's flat APT repo, served from the latest GitHub release's assets |
+| `/repo/source.json` | iFizBox's AltStore source |
+| `/apple/*` | the website's App Store Connect calls with your own API key (Apple sends no CORS headers), and the free Apple ID sign-in relay where a deploy turns it on; allow-listed hosts and paths, nothing logged |
+| `/api/account/*` | iFizBox Account ([docs/account.md](../docs/account.md)) |
+| `/reviews/*` | package reviews (Cloudflare D1) |
+
 ## Host your own (free, about a minute)
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/RyanAHayden/iFizBox/tree/main/worker)
