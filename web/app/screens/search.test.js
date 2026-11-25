@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SCOPES, scopesFor, searchFilters, scopeIndex, sheetActive } from "./search.js";
+import { SCOPES, scopesFor, scopeIndex, sheetActive } from "./search.js";
+import { searchFilters } from "./filterpanel.js";
 
 test("F35: the scope bar's segments and what the catalog is asked", () => {
   assert.deepEqual(SCOPES, ["All", "Tweaks", "Themes", "Apps"]);
@@ -23,7 +24,7 @@ test("F41: Not Jailbroken hides the Tweaks and Themes segments", () => {
 });
 
 test("F53: the Filter panel's Source rows follow the device type, by the Sources tab's names", async () => {
-  const { sourceChoices } = await import("./search.js");
+  const { sourceChoices } = await import("./filterpanel.js");
   const list = [
     { key: "apt:bigboss", uri: "http://apt.thebigboss.org/repofiles/cydia/", name: "BigBoss" },
     { key: "apt:chariz", uri: "https://repo.chariz.com/", origin: "Chariz" },
