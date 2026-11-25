@@ -86,6 +86,10 @@ export function createVList(scroller, { items = [], rowHeight = 58, headerHeight
     (node.classList.contains("vlist-header") ? headPool : rowPool).push(node);
   }
 
+  // The scrollTop at which the list's top meets the top of the window. The window starts below the scroller's padding
+  // (a page's is its nav bar, and the sticky header sits under that), which offsetTop counts in.
+  const listTop = () => el.offsetTop - (parseFloat(globalThis.getComputedStyle?.(scroller).paddingTop) || 0);
+
   function update() {
     frame = 0;
     if (!items.length) {
@@ -94,9 +98,9 @@ export function createVList(scroller, { items = [], rowHeight = 58, headerHeight
       sticky.hidden = true;
       return;
     }
-    // The list's top inside the scroller, cached: reading offsetTop right after moving rows forced a full layout
+    // Where the list starts (listTop), cached: reading offsetTop right after moving rows forced a full layout
     // every frame of a fling. Re-read only when sizes change (onResize) or the items do.
-    offset ??= el.offsetTop;
+    offset ??= listTop();
     const top = scroller.scrollTop - offset;
     viewH ||= scroller.clientHeight;
     const first = indexAt(Math.max(0, top - OVERSCAN));
@@ -128,7 +132,7 @@ export function createVList(scroller, { items = [], rowHeight = 58, headerHeight
   function settle() {
     idleTimer = 0;
     if (!idle) return;
-    offset ??= el.offsetTop;
+    offset ??= listTop();
     const top = scroller.scrollTop - offset;
     for (const [i, n] of live) {
       if (items[i].header == null && tops[i] + rowHeight > top && tops[i] < top + viewH) idle(n, items[i]);
@@ -174,8 +178,9 @@ export function createVList(scroller, { items = [], rowHeight = 58, headerHeight
     el,
     setItems,
     refresh: () => { for (const [i, n] of live) if (items[i].header == null) bindRow(n, items[i], i); },
-    // Each header's text and where it starts in the scroller's content (the section index jumps there).
-    headerTops: () => { const off = el.offsetTop; return headers.map((i) => ({ text: items[i].header, top: off + tops[i] })); },
+    // Each header's text and the scrollTop that puts it at the top of the window (the section index jumps there).
+    // Measured now and kept, so the rows and the sticky header are placed from the same offset after the jump.
+    headerTops: () => { offset = listTop(); return headers.map((i) => ({ text: items[i].header, top: offset + tops[i] })); },
     destroy() {
       scroller.removeEventListener("scroll", onScroll);
       ro?.disconnect();

@@ -26,7 +26,8 @@ export function createSectionIndex(scroller, list) {
     // that letter's section, else the next one after it, else the last
     const want = LETTERS.indexOf(last);
     const h = heads.find((x) => LETTERS.indexOf(x.text) >= want) ?? heads[heads.length - 1];
-    const to = Math.min(h.top, scroller.scrollHeight - scroller.clientHeight);
+    // # and the first section are the page's top: whatever is above the list (Browse's bar) shows again
+    const to = want === 0 || h === heads[0] ? 0 : Math.min(h.top, scroller.scrollHeight - scroller.clientHeight);
     if (to !== scroller.scrollTop) haptic(); // a tick for each new letter the list lands on
     scroller.scrollTop = to;
   };
