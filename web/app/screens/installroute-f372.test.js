@@ -93,7 +93,7 @@ test("F412: Restore My VPN, its own group, off by default; shown only when the s
   const off = group(ST({ tested: true, restore: false }));
   assert.deepEqual(off.rows.map((r) => r.label), ["Restore My VPN"]);
   assert.equal(off.footer, "Your own VPN stays off after installs.");
-  assert.equal(group(ST({ tested: true, restore: true })).footer, "After installs your own VPN comes back once you open Settings > VPN.");
+  assert.equal(group(ST({ tested: true, restore: true })).footer, "After installs, Shortcuts opens for a moment and turns your VPN back on.");
   assert.equal(setupFooter(ST({ tested: true, otherVPN: true, restore: true })), "", "it comes back: not told to turn it on");
 
   const { drawInstallation, forgetStatus, cachedStatus } = screens;
@@ -123,12 +123,12 @@ test("F412: Restore My VPN, its own group, off by default; shown only when the s
   assert.deepEqual(sent, [true]);
   assert.equal(on(), "true");
   assert.equal(sw()[0], first, "the row is kept, so the knob slides");
-  assert.ok(says(core.restoreFooter(true)));
+  assert.ok(says(core.restoreFooter(ST({ restore: true }))));
   assert.equal(cachedStatus().vpn.restore, true);
   await draw();
   await tap();
   assert.deepEqual(sent, [true, false], "a redrawn page: the tap goes out once");
-  assert.ok(says(core.restoreFooter(false)));
+  assert.ok(says(core.restoreFooter(ST({ restore: false }))));
   fail = true;
   await Promise.all([tap(), tap()]);
   await new Promise((r) => setTimeout(r, 5));
@@ -136,11 +136,83 @@ test("F412: Restore My VPN, its own group, off by default; shown only when the s
   await tap();
   await new Promise((r) => setTimeout(r, 5));
   assert.equal(on(), "false", "a failed call puts it back");
-  assert.ok(says(core.restoreFooter(false)));
+  assert.ok(says(core.restoreFooter(ST({ restore: false }))));
   fail = false;
   await tap();
   screens.rememberStatus(ST({ tested: true, restore: false }));
   assert.equal(cachedStatus().vpn.restore, true, "a read begun before the tap");
+  forgetStatus();
+});
+
+test("F420: the switch's group says what is left, with its row; then remembering again", async () => {
+  mem.clear();
+  const st = (o = {}) => ST({ tested: true, restore: true, remembered: false, otherVPN: true, ...o });
+  const show = (x, kept) => {
+    if (kept) core.keepRestore(kept); else mem.delete(core.RESTORE_KEY);
+    const gs = localGroups(x), g = gs.find((q) => q.key === "restore"), again = gs.find((q) => q.key === "remember");
+    return [g.rows.map((r) => r.label).slice(1).join(), g.footer, again?.rows[0].label ?? null];
+  };
+  const works = "After installs, Shortcuts opens for a moment and turns your VPN back on.";
+  assert.deepEqual(show(st()), ["Add Shortcut", "Add its Shortcut to finish.", null]);
+  assert.deepEqual(show(st(), "1"), ["Remember My VPN", "Let the Shortcut remember your VPN to finish.", null]);
+  assert.deepEqual(show(st({ otherVPN: false }), "1"), ["Remember My VPN", "Turn your VPN on, then remember it here.", null]);
+  assert.deepEqual(show(st({ remembered: true })), ["", works, "Remember VPN Again"], "kept by the shell alone");
+  assert.deepEqual(show(st({ remembered: true }), "2"), ["", works, "Remember VPN Again"]);
+  assert.deepEqual(show(st({ remembered: true }), "1"), ["Remember My VPN", "Let the Shortcut remember your VPN to finish.", null], "added anew");
+  assert.deepEqual(show(st({ remembered: true }), "0"), ["Add Shortcut", "Add its Shortcut to finish.", null], "a run didn't find it");
+  assert.deepEqual(show(st({ remembered: false }), "2"), ["Remember My VPN", "Let the Shortcut remember your VPN to finish.", null], "a back run found none");
+  assert.deepEqual(show(st({ restore: false })), ["", "Your own VPN stays off after installs.", null]);
+
+  // the page: the switch adds the Shortcut, then remembers; its knob's row stays the same element
+  const { drawInstallation, forgetStatus } = screens;
+  mem.clear();
+  forgetStatus();
+  let kept = false, remembered = false;
+  const calls = [];
+  const native = { call: async (x, p) => {
+    calls.push(x);
+    if (x === "idevice.status") return st({ restore: kept, remembered });
+    if (x === "vpn.setRestore") { kept = p.on; return {}; }
+    if (x === "restore.add") throw new Error("unavailable: needs iOS 16");
+    throw new Error("no");
+  } };
+  const said = [];
+  const box = document.createElement("div");
+  const every = (e) => [e, ...e.children.flatMap(every)];
+  const sw = () => every(box).find((e) => e._cls.has("switch"));
+  const has = (t) => every(box).some((e) => e._cls.has("cell-label") && e.textContent === t);
+  const wait = async () => { for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 1)); };
+  await drawInstallation(box, "iphone", { store: { get: () => "iphone", set() {} }, native, alert: async (a) => { said.push(a.title); return { index: 0 }; } });
+  const first = sw();
+  first.listeners.click.forEach((f) => f({}));
+  assert.ok(has("Add Shortcut"), "at once");
+  assert.equal(sw(), first, "the row is kept, so the knob slides");
+  await wait();
+  assert.deepEqual(said, ["Couldn't Add Shortcut"]);
+  assert.equal(kept, false, "it can't run here: off again");
+  assert.equal(sw(), first);
+  assert.equal(first.getAttribute("aria-checked"), "false");
+  assert.ok(!has("Add Shortcut"));
+  core.keepRestore("1");
+  native.call = async (x, p) => {
+    calls.push(x);
+    if (x === "idevice.status") return st({ restore: kept, remembered });
+    if (x === "vpn.setRestore") kept = p.on;
+    if (x === "restore.store") remembered = true;
+    return { ok: true };
+  };
+  first.listeners.click.forEach((f) => f({}));
+  await wait();
+  assert.equal(mem.get(core.RESTORE_KEY), "2");
+  assert.ok(has("Remember VPN Again") && !has("Remember My VPN"));
+  const n = calls.filter((c) => c === "restore.store").length;
+  const again = every(box).find((e) => e._cls.has("cell-label") && e.textContent === "Remember VPN Again");
+  let c = again;
+  while (!c.listeners?.click) c = c.parentNode;
+  c.listeners.click.forEach((f) => f({}));
+  await wait();
+  assert.equal(calls.filter((x) => x === "restore.store").length, n + 1);
+  mem.clear();
   forgetStatus();
 });
 

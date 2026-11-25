@@ -504,9 +504,40 @@ export function quietCheckAllowed(choice, st, { again = false } = {}) {
 export const RESTORE_VPN = "Restore My VPN";
 // F412: shown when the shell can run the built-in VPN and knows the setting
 export const restoreShown = (st) => builtinVPN(st) && typeof st.vpn.restore === "boolean";
-export const restoreFooter = (on) => (on
-  ? "After installs your own VPN comes back once you open Settings > VPN."
-  : "Your own VPN stays off after installs.");
+// F420: what is left to do before the Shortcut can bring the VPN back. Shortcuts never says whether it was added, so the
+// page keeps it (`kept`): "0" a run didn't find it, "1" added since the last store run that passed, "2" that run passed;
+// null: never kept, so vpn.remembered alone says. "" once nothing is left, or the shell doesn't say `remembered`.
+export const RESTORE_KEY = "ifizbox.restoreShortcut";
+export function restoreKept(storage = globalThis.localStorage) {
+  try { const v = storage?.getItem(RESTORE_KEY); return ["0", "1", "2"].includes(v) ? v : null; } catch { return null; }
+}
+export function keepRestore(v, storage = globalThis.localStorage) {
+  try { storage?.setItem(RESTORE_KEY, v); } catch { /* storage off */ }
+}
+export function restoreLeft(st, kept = restoreKept()) {
+  if (typeof st?.vpn?.remembered !== "boolean") return "";
+  if (kept === "0" || (kept === null && !st.vpn.remembered)) return "add";
+  return !st.vpn.remembered || kept === "1" ? "remember" : "";
+}
+export const REMEMBER_VPN = "Remember My VPN";
+export const REMEMBER_AGAIN = "Remember VPN Again";
+export const REMEMBER_AGAIN_FOOTER = "Only if you changed VPN apps.";
+export const RESTORE_FIX = { add: "Add Shortcut", remember: REMEMBER_VPN }; // the group's fix row
+export function restoreFooter(st, left = restoreLeft(st)) {
+  if (!st?.vpn?.restore) return "Your own VPN stays off after installs.";
+  if (left === "add") return "Add its Shortcut to finish.";
+  if (left === "remember") return st.vpn.otherVPN ? "Let the Shortcut remember your VPN to finish." : "Turn your VPN on, then remember it here.";
+  return "After installs, Shortcuts opens for a moment and turns your VPN back on.";
+}
+// A store run that failed (native RestoreShortcut): the alert. `again`: its Try Again; `add`: its Add Shortcut Again.
+export function rememberFailed(code) {
+  if (code === "no_vpn") return { title: "Turn Your VPN On", message: "Turn on the VPN you use, then try again." };
+  const q = `“${RESTORE_VPN}”`;
+  return { title: "VPN Not Remembered", again: true, add: code === "not_run",
+    message: { not_run: `The Shortcut ${q} wasn't found or wasn't allowed to run.`, no_end: `The Shortcut ${q} didn't finish.`,
+      no_return: `The Shortcut ${q} didn't answer.`, not_opened: "Shortcuts didn't open.", busy: `The Shortcut ${q} was still running.`,
+      vpn_on: `${BUILTIN_VPN} was still on.` }[code] ?? `The Shortcut ${q} didn't run.` };
+}
 export const setRestoreVPN = (native, on) => native.call("vpn.setRestore", { on: Boolean(on) });
 
 // F415: iOS checks a new or regenerated provisioning profile online on an app's first launch; with no network then (or

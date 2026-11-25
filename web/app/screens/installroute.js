@@ -27,6 +27,7 @@ import { builtinVPN, setupFooter, iphoneSetUp, HOW_STEPS, vpnTestResult, NO_VPN,
 import { quietCheckDue, quietCheckAllowed, markQuietCheck } from "../core/installroute.js"; // F410b
 import { onCellular, cellularCheck, connectRefused } from "../core/installroute.js"; // B428a
 import { RESTORE_VPN, restoreShown, restoreFooter, setRestoreVPN } from "../core/installroute.js"; // F412
+import { restoreLeft, RESTORE_FIX, REMEMBER_AGAIN, REMEMBER_AGAIN_FOOTER } from "../core/installroute.js"; // F420
 import { ON_CELLULAR, cellularOptions, cellularFooter, onCellularChoice, setOnCellular, ADD_AGAIN, ADD_AGAIN_FOOTER } from "../core/cellular.js"; // F417
 import { createSwitch } from "../nav/switch.js";
 import { NAME } from "../brand.js";
@@ -61,6 +62,9 @@ export function within(p, ms) {
 // F417b: Cellular Installs, adding and checking it; the last cellular.status (null: not read), and while it's being added
 const shortcutSetup = () => import("../signing/cellularsetup.js");
 let lastShortcut = null, addingShortcut = false;
+// F420: the Restore My VPN Shortcut, adding it and its store run, and while that goes on (a row spins, a second tap waits)
+const restoreSetup = () => import("../signing/restoresetup.js");
+let settingRestore = false;
 const isLate = (e) => e?.code === "not_responding";
 // idevice.status with its deadline: { st } (null when it failed) and `late` when it didn't answer in time.
 async function readStatus(native) {
@@ -129,7 +133,7 @@ function spinRows(frag, sections) {
 // F301: `late: {device}` idevice.status didn't answer in time: the status says Not Responding.
 export function installationGroups(choice, st, { pick = () => {}, test = () => {},
   reading = false, picking = false, hint = null, server = () => [],
-  late = {}, testing = false, failure = null, fix = () => {}, fixing = false, pairChecking = false, checkNow, forget, setUp, cellular, setCellular, shortcut, adding, addAgain } = {}) {
+  late = {}, testing = false, failure = null, fix = () => {}, fixing = false, pairChecking = false, checkNow, forget, setUp, cellular, setCellular, shortcut, adding, addAgain, remember, remembering } = {}) {
   const groups = [{
     header: "Install Apps With",
     rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", icon: rowIcon(ROUTE_ICON[o.value]), checked: o.value === choice, onClick: () => pick(o.value),
@@ -141,7 +145,7 @@ export function installationGroups(choice, st, { pick = () => {}, test = () => {
   if (choice !== "iphone") return [...groups, ...(server() ?? [])];
   // F372: the built-in VPN is the way in: This iPhone's page is Set Up and How It Works, drawn from the first frame
   // (rows Checking… until idevice.status answers). A profile without Network Extensions says so there (core NO_VPN).
-  return [...groups, ...localGroups(st ?? hint, { reading: reading && !hint && !st, pairChecking, test, testing, failure, fix, fixing, checkNow, forget, setUp, cellular, setCellular, shortcut, adding, addAgain, late: Boolean(late.device) })];
+  return [...groups, ...localGroups(st ?? hint, { reading: reading && !hint && !st, pairChecking, test, testing, failure, fix, fixing, checkNow, forget, setUp, cellular, setCellular, shortcut, adding, addAgain, remember, remembering, late: Boolean(late.device) })];
 }
 
 // ---- F372: This iPhone with the built-in VPN (core BUILTIN_VPN; native/sideload/vpn)
@@ -151,7 +155,7 @@ export function installationGroups(choice, st, { pick = () => {}, test = () => {
 // `testing`/`fixing`/`pairChecking` while a test, a check or Fix runs. A failed check or install (B316's `failure`) is
 // the status, red, and its action is Fix.
 export function localGroups(st, { reading = false, pairChecking = false, test = () => {}, testing = false, failure = null, fix = () => {}, fixing = false, late = false,
-  checkNow = () => {}, forget = () => {}, setUp = () => goTo("pair"), cellular = "ask", setCellular = () => {}, shortcut = false, adding = false, addAgain = () => {} } = {}) {
+  checkNow = () => {}, forget = () => {}, setUp = () => goTo("pair"), cellular = "ask", setCellular = () => {}, shortcut = false, adding = false, addAgain = () => {}, remember = () => {}, remembering = false } = {}) {
   const howGroup = { rows: [{ label: "How It Works", icon: rowIcon("help"), href: route("how") }] };
   // A profile without Network Extensions: nothing to set up, and the page says so instead of the VPN's rows
   if (st && !reading && !late && !builtinVPN(st)) {
@@ -168,7 +172,14 @@ export function localGroups(st, { reading = false, pairChecking = false, test = 
       ...(p.done ? { checked: true } : p.next ? { onClick: p.key === "pair" ? setUp : test, chevron: true } : {}) })), footer: SETUP_FOOTER });
   }
   // F412: not in the row's content: a repaint keeps the row, so the knob slides (syncRestore sets it)
-  if (restoreShown(st)) groups.push({ key: "restore", rows: [{ label: RESTORE_VPN, cls: "restore-vpn", icon: rowIcon("syncNow") }], footer: restoreFooter(st.vpn.restore) });
+  // F420: what is left to do, with its row; nothing left: remembering again, a group of its own
+  if (restoreShown(st)) {
+    const left = restoreLeft(st), act = (label) => ({ label, cls: "sign-import", onClick: remember, ...(remembering ? { spin: true } : {}) });
+    const on = st.vpn.restore;
+    groups.push({ key: "restore", grow: true, footer: restoreFooter(st, left),
+      rows: [{ label: RESTORE_VPN, cls: "restore-vpn", icon: rowIcon("syncNow") }, ...(on && left ? [act(RESTORE_FIX[left])] : [])] });
+    if (on && !left && typeof st.vpn.remembered === "boolean") groups.push({ key: "remember", rows: [act(REMEMBER_AGAIN)], footer: REMEMBER_AGAIN_FOOTER });
+  }
   // F417: what an install does on cellular data. F417b: `shortcut`: Cellular Installs can run here; `adding`: it's being added
   const onCell = cellular === "shortcut" && !shortcut ? "ask" : cellular;
   if (st?.paired) groups.push({ key: "cellular", header: ON_CELLULAR, footer: cellularFooter(onCell), rows: cellularOptions(shortcut).map((o) => ({
@@ -366,6 +377,23 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
   const readShortcut = async () => {
     if (native?.call) lastShortcut = await (await shortcutSetup()).readShortcut(native) ?? { available: false, added: false };
   };
+  // F420: adds the Shortcut unless it's added, then its store run remembers the VPN that is on
+  const setUpRestore = async ({ turnedOn = false } = {}) => {
+    if (settingRestore || typeof (lastStatus ?? view)?.vpn?.remembered !== "boolean") return; // an older shell
+    settingRestore = true;
+    repaint();
+    let can = true;
+    try {
+      const fresh = async () => {
+        const { st } = await readStatus(native);
+        if (st) rememberStatus(st);
+        return lastStatus;
+      };
+      can = await (await restoreSetup()).setUpRestore(native, { alert, status: fresh, turnedOn });
+      await fresh();
+    } finally { settingRestore = false; redraws.get(el)?.(); }
+    if (!can && turnedOn) await restoreToggles.get(el)?.(false); // it can't run here
+  };
   // F412: shown at once; a call that fails reads the setting again (no answer: as it was)
   restoreToggles.set(el, async (on) => {
     const st = lastStatus ?? view;
@@ -381,7 +409,9 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
       if (read) rememberStatus(read);
       else if (lastStatus) rememberStatus({ ...lastStatus, vpn: { ...lastStatus.vpn, restore: tap.was } });
       redraw();
+      return;
     }
+    if (on && restoreTap === tap) await setUpRestore({ turnedOn: true });
   });
   const paint = () => {
     if (!mine()) return;
@@ -416,6 +446,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
       setCellular: (v) => pickCellular(v),
       shortcut: lastShortcut ? lastShortcut.available : onCellularChoice() === "shortcut",
       adding: addingShortcut, addAgain: () => addShortcut(),
+      remembering: settingRestore, remember: () => setUpRestore(),
     });
     const shown = subGroups(sections, sub);
     const restore = Boolean((view ?? lastStatus)?.vpn?.restore);
@@ -450,6 +481,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
 // element and only the rows whose content changed are swapped (a detail, a spinner, a checkmark), a footer's text is
 // set on the footer that's there, and only groups that come, go or change their rows are rebuilt. Moves slide
 // (nav/slide.js's watcher, measured right around the change by slideChange). Rows kept from an earlier draw call the latest draw's handlers (each tap goes through a holder).
+// `grow`: a keyed group whose rows come and go at its end keeps its element, so the rows before them (a switch) stay.
 // `build(sections)` makes the groups' DOM (grouped() and what the page adds to it).
 const sigOf = (r) => JSON.stringify(r, (k, v) => (typeof v === "function" ? "ƒ" : v));
 export function patchGroups(box, sections, build) {
@@ -461,7 +493,7 @@ export function patchGroups(box, sections, build) {
   }));
   const fresh = [...build(sections).children];
   const keyOf = (s) => s.key || s.header || s.rows?.[0]?.label || (s.spinner ? "spinner" : "");
-  const frameOf = (s) => sigOf({ h: s.header, w: s.warn, f: Boolean(s.footer), rows: s.key ? s.rows.length : (s.rows ?? []).map((r) => [r.label, r.cls, Boolean(r.href), Boolean(r.onClick)]) });
+  const frameOf = (s) => sigOf({ h: s.header, w: s.warn, f: Boolean(s.footer), rows: s.grow ? null : s.key ? s.rows.length : (s.rows ?? []).map((r) => [r.label, r.cls, Boolean(r.href), Boolean(r.onClick)]) });
   fresh.forEach((g, i) => {
     const s = sections[i];
     g.__key = keyOf(s);
@@ -473,7 +505,8 @@ export function patchGroups(box, sections, build) {
   slideChange(box, () => {
     const old = [...box.children];
     const used = new Set();
-    const next = fresh.map((g) => {
+    const next = fresh.map((g, gi) => {
+      const s = sections[gi];
       const o = old.find((x) => !used.has(x) && x.__key === g.__key && x.__frame === g.__frame);
       if (!o) return g;
       used.add(o);
@@ -488,7 +521,10 @@ export function patchGroups(box, sections, build) {
           changed = true;
           return n;
         });
-        if (changed) oul.replaceChildren(...keep);
+        if (s.grow) { // the kept ones aren't moved: that would end a knob's slide
+          keep.forEach((n, j) => { if (n !== lis[j]) { if (lis[j]) lis[j].replaceWith(n); else oul.append(n); } });
+          for (const k of lis.slice(keep.length)) k.remove();
+        } else if (changed) oul.replaceChildren(...keep);
       }
       if (o.__footer !== g.__footer) {
         const f = o.querySelector?.(".group-footer");
