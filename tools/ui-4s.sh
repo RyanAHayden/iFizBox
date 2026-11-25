@@ -5,6 +5,7 @@
 #   tools/ui-4s.sh ME swipe X1 Y1 X2 Y2 [secs]
 #   tools/ui-4s.sh ME open URL       uiopen, e.g. cydia://sources
 #   tools/ui-4s.sh ME home           home button
+#   tools/ui-4s.sh ME lock-button    side button (locks or wakes the screen)
 #   tools/ui-4s.sh ME shot NAME      screenshot -> ref/4s/screens/NAME.png (stays in the Camera Roll: no rm on the 4S)
 #   tools/ui-4s.sh unlock ME         quit every app, lock the screen and release it; always do this when done, even
 #                                    after a failure (the multitasking bar keeps its icons: iOS 6 has no way to clear it)
@@ -59,6 +60,7 @@ case $cmd in
   swipe) ssh "$host" "stouch swipe $*" 2>/dev/null ;;
   open) ssh "$host" "uiopen '$1'" 2>/dev/null ;;
   home) ssh "$host" 'activator send libactivator.system.homebutton' 2>/dev/null ;;
+  lock-button) ssh "$host" 'activator send libactivator.system.sleepbutton' 2>/dev/null ;;
   shot)
     dir=$(dirname "$0")/../ref/4s/screens; mkdir -p "$dir"
     f=$(ssh "$host" 'activator send libactivator.system.take-screenshot 2>/dev/null; sleep 2; ls -t /var/mobile/Media/DCIM/100APPLE/*.PNG | head -1')

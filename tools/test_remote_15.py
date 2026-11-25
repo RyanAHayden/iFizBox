@@ -120,7 +120,7 @@ class Rig(unittest.TestCase):
             for c in refused:
                 self.assertTrue(self.act(base, cmd=c, text="x").startswith("400"), (phone, c))
             self.assertEqual(self.calls(), [])
-            for cmd, line in ((dict(cmd="tap", x=3, y=4), "tap 3 4"), (dict(cmd="home"), "home"),
+            for cmd, line in ((dict(cmd="tap", x=3, y=4), "tap 3 4"), (dict(cmd="home"), "home"), (dict(cmd="lock-button"), "lock-button"),
                               (dict(cmd="swipe", x1=1, y1=2, x2=3, y2=4, secs=.5), "swipe 1 2 3 4 0.5")):
                 self.assertTrue(self.act(base, **cmd).startswith("ok (as USER)"), phone)
                 self.assertEqual(self.calls()[-1], "USER " + line)

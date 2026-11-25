@@ -47,6 +47,10 @@ label = "Home"
 cmd = "tools/ui-15.sh lock USER && tools/ui-15.sh USER home; r=$?; IFIZBOX_UI_TIDY=0 tools/ui-15.sh unlock USER; exit $r"
 
 [[run.tools.iphone15.buttons]]
+label = "Lock"
+cmd = "tools/ui-15.sh lock USER && tools/ui-15.sh USER lock-button; r=$?; IFIZBOX_UI_TIDY=0 tools/ui-15.sh unlock USER; exit $r"
+
+[[run.tools.iphone15.buttons]]
 label = "Wake"
 cmd = "tools/ui-15.sh lock USER && tools/ui-15.sh USER wake; r=$?; IFIZBOX_UI_TIDY=0 tools/ui-15.sh unlock USER; exit $r"
 
@@ -80,3 +84,7 @@ start = "tools/remote-15.py 4s"
 [[run.tools.iphone4s.buttons]]
 label = "Home"
 cmd = "tools/ui-4s.sh lock USER && tools/ui-4s.sh USER home; r=$?; IFIZBOX_UI_TIDY=0 tools/ui-4s.sh unlock USER; exit $r"
+
+[[run.tools.iphone4s.buttons]]
+label = "Lock"
+cmd = "tools/ui-4s.sh lock USER && tools/ui-4s.sh USER lock-button; r=$?; IFIZBOX_UI_TIDY=0 tools/ui-4s.sh unlock USER; exit $r"

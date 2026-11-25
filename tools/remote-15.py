@@ -19,9 +19,9 @@ from veency import ACCEPT, Veency, VeencyError, wake  # noqa: E402
 
 # size is what the script's tap and swipe take: screenshot pixels, on the 4S points
 PHONES = {
-    "15": {"name": "iPhone 15", "port": 8098, "size": (1179, 2556), "cmds": ("tap", "swipe", "home", "type", "wake")},
-    "7": {"name": "iPhone 7", "port": 8099, "size": (750, 1334), "cmds": ("tap", "swipe", "home")},
-    "4s": {"name": "iPhone 4S", "port": 8101, "size": (320, 480), "cmds": ("tap", "swipe", "home", "screen")},
+    "15": {"name": "iPhone 15", "port": 8098, "size": (1179, 2556), "cmds": ("tap", "swipe", "home", "lock-button", "type", "wake")},
+    "7": {"name": "iPhone 7", "port": 8099, "size": (750, 1334), "cmds": ("tap", "swipe", "home", "lock-button")},
+    "4s": {"name": "iPhone 4S", "port": 8101, "size": (320, 480), "cmds": ("tap", "swipe", "home", "lock-button", "screen")},
 }
 PHONE, UI, LOCK = "", "", ""
 
@@ -49,7 +49,7 @@ img{max-width:100%;max-height:calc(100vh - 90px);touch-action:none;user-select:n
 <div id=bar><span data-cmd=type><input id=t placeholder="text to type" autocomplete=off autocapitalize=off>
 <button onclick="go({cmd:'type',text:t.value+(nl.checked?'\\n':'')}).then(()=>t.value='')">Type</button>
 <label><input type=checkbox id=nl style="flex:0;min-width:0">⏎</label></span>
-<button onclick="go({cmd:'home'})">Home</button><button data-cmd=wake onclick="go({cmd:'wake'})">Wake</button>
+<button onclick="go({cmd:'home'})">Home</button><button data-cmd=lock-button onclick="go({cmd:'lock-button'})">Lock</button><button data-cmd=wake onclick="go({cmd:'wake'})">Wake</button>
 <button data-cmd=screen onclick="go({cmd:'screen'})">Show screen</button>
 <span id=who></span><button id=ua hidden onclick="go({cmd:'allow'})">Use it anyway</button>
 <div id=st></div><div id=no></div></div><img id=s draggable=false>
