@@ -26,6 +26,13 @@ tidy() {
     >/dev/null 2>&1 || echo "couldn't tidy the 4S (unreachable?)" >&2
 }
 case $1 in
+  state)  # for agents polling: 0 free, 75 busy (line 1 = holder), 69 missing (line 1 = why). No lock, no change.
+    if [ -d "$lock" ] && [ -z "$(find "$lock/owner" -mmin +$stale 2>/dev/null)" ]; then  # the same stale rule as lock
+      echo "$(holder)"; echo "4S UI is locked by $(holder)"; exit 75
+    fi
+    timeout 10 ssh -o BatchMode=yes -o ConnectTimeout=5 "$host" true >/dev/null 2>&1 ||
+      { echo "the 4S isn't reachable over ssh (host $host)"; exit 69; }
+    echo free; exit 0 ;;
   lock)
     if ! mkdir "$lock" 2>/dev/null; then
       if [ "$(holder)" != "$2" ] && [ -z "$(find "$lock/owner" -mmin +$stale 2>/dev/null)" ]; then
