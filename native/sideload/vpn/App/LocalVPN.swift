@@ -392,9 +392,10 @@ enum LocalVPN {
 
     // ---- The tunnel
 
-    private static let lock = NSLock() // held for a moment only (status() takes it): never while waiting on iOS
+    static let lock = NSLock() // held for a moment only (status() takes it): never while waiting on iOS
     private static let startLock = NSLock() // B418: one up() at a time; held while it waits on iOS. Taken before `lock`
-    private static var cached: NETunnelProviderManager? // guarded by lock
+    private(set) static var cached: NETunnelProviderManager? // guarded by lock
+    static var closing = false // guarded by lock: downToClose (VPNClose.swift)
     private static var holds = 0 // guarded by lock
     private static var stopGen = 0 // guarded by lock: a scheduled stop runs only if nothing came after it
     private static var installs = 0 // guarded by lock: installs going on (installBegan): a reconnect stays in its queue
@@ -516,7 +517,8 @@ enum LocalVPN {
             startLock.unlock()
         }
         defer { startLock.unlock() }
-        lock.lock(); let no = refusal; lock.unlock()
+        lock.lock(); let no = refusal, over = closing; lock.unlock()
+        if over { throw IDevice.Failure(code: "vpn_failed", text: "\(Brand.name) is closing for its update") }
         if let no = no, no.at > t0 { throw no.failure }
         try start(finishing: finishing, step)
         lock.lock(); refusal = nil; lock.unlock()

@@ -1,0 +1,9 @@
+1 front copied=23:51:04.644 off=23:51:15.443 exit=23:51:22.269 term= complete=23:51:24.255
+2 front copied=23:51:44.282 off=23:51:54.896 exit=23:52:01.828 term= complete=23:52:03.913
+3 front copied=23:52:23.735 off=23:52:34.656 exit=23:52:41.577 term= complete=23:52:43.644
+4 front copied=23:53:02.665 off=23:53:13.493 exit=23:53:20.417 term= complete=23:53:22.606
+5 home copied=23:53:41.999 off=23:53:52.885 exit=23:53:59.801 term= complete=23:54:01.730
+6 home copied=23:54:21.396 off=23:54:31.779 exit=23:54:38.709 term= complete=23:54:40.652
+7 home copied=23:54:59.979 off=23:55:10.914 exit=23:55:17.822 term= complete=23:55:19.813
+8 home copied=23:55:38.967 off=23:55:49.891 exit=23:55:56.768 term= complete=23:55:58.696
+9 reopen copied=23:56:17.815 off=23:56:28.753 exit=23:56:35.656 term= complete=23:56:37.911

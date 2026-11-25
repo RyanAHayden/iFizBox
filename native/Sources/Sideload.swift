@@ -1756,6 +1756,8 @@ enum CloseForUpdate {
     // How long after finished iFizBox exits on this route: the install call has just answered, and the page needs
     // a moment to ask signing.selfUpdate and draw "Closing iFizBox".
     static let hereExit: TimeInterval = 2
+    // B440: iOS 27 asks again 6 s after it found the VPN extension busy (measured on the 15 Pro).
+    static let vpnAsk: TimeInterval = 6.5
 
     // installd has the new IPA and waits for this copy to go: finished, and out (B178: no notification). Main queue.
     // B173: closes from any state but finished (a state some other path left behind must not keep iFizBox open).
@@ -1779,17 +1781,29 @@ enum CloseForUpdate {
         // updates stay counted). B178: no notification goes with the close.
         BackgroundCheck.selfHandedOff(ids: handing?.ids ?? [], version: handing?.version ?? "")
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["ifizbox.updating"])
-        IDevice.ilog("self-close: exiting in \(exitAfter) s")
-        DispatchQueue.main.asyncAfter(deadline: .now() + exitAfter) { IDevice.ilog("self-close: exit"); exit(0) }
+        // B440: our VPN goes off first: iOS doesn't replace the app while its VPN extension runs. It asks again every
+        // few seconds, so iFizBox leaves once it has asked with the VPN off: iOS then goes on the moment iFizBox exits,
+        // and the old copy can't be opened in between (one in front keeps iOS waiting for a swipe).
+        KeepAlive.shared.begin() // until the exit: the install's own hold ends with its connection
+        DispatchQueue.global(qos: .userInitiated).async {
+            let wait = LocalVPN.downToClose() ? max(exitAfter, vpnAsk) : exitAfter
+            IDevice.ilog("self-close: exiting in \(wait) s")
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + wait) {
+                _ = LocalVPN.downToClose() // a start already going on when it went off
+                IDevice.ilog("self-close: exit")
+                exit(0)
+            }
+        }
         // B173: the exit never waits on the main queue alone
-        exitBackstop("closeWith", after: exitAfter + 1)
+        exitBackstop("closeWith", after: LocalVPN.downWait + vpnAsk + 1)
     }
 
     // B173: exit(0) from a queue of its own `after` seconds from now, whatever the main queue is doing (any queue).
     // The polite exit (closeWith) comes first; this one only runs if it didn't.
-    static let backstop: TimeInterval = hereExit + 2
+    static let backstop: TimeInterval = LocalVPN.downWait + vpnAsk + 2
     static func exitBackstop(_ why: String, after: TimeInterval = backstop) {
         DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + after) {
+            _ = LocalVPN.downToClose() // B440: nothing to do when closeWith ran
             IDevice.ilog("self-close: exit (backstop: \(why))")
             exit(0)
         }
