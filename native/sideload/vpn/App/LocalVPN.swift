@@ -768,7 +768,7 @@ enum LocalVPNBridge {
         CellularShortcutBridge.register(b) // cellular.*
         RestoreShortcutBridge.register(b) // restore.*
         CellularRun.register(b) // cellular.run, and the put-back after a killed app
-        DispatchQueue.main.async { IDevice.AppFront.watch(); RestoreBack.watch() }
+        DispatchQueue.main.async { RestoreBack.watch(); IDevice.AppFront.watch() }
         LocalVPN.takeDownLeftOver() // B423: a killed app's
         b.on("vpn.setRestore") { c in
             guard let on = c.params["on"] as? Bool else { return Apt.reply(c, nil, "bad_params: on") }

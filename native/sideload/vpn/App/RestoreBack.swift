@@ -37,14 +37,19 @@ enum RestoreBack {
 
     private static func log(_ s: String) { LocalVPN.log("\(RestoreShortcut.shortcutName): \(s)") }
 
-    /// Follows the app being left; on the main thread, once.
+    /// Follows the app being left; on the main thread, once, before AppFront's: its return looks.
     static func watch() {
         NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: nil) { _ in
+            wentAt = Date()
             if away() { setLeft(true) }
         }
+        NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: nil) { _ in
+            if let t = wentAt, RestoreDue.leftOnTrip(Date().timeIntervalSince(t)) { setLeft(true) }
+        }
     }
-    /// The person left; a Cellular Installs run goes to Shortcuts by itself.
-    private static func away() -> Bool { CellularShortcut.report == nil }
+    private static var wentAt: Date? // on the main thread
+    /// The person left; a Cellular Installs run still going on went to Shortcuts by itself.
+    private static func away() -> Bool { !CellularShortcut.running }
 
     /// Under LocalVPN's startLock, before ours is enabled or started: what is up then is what it takes the place of.
     /// One still held from before begins anew: that VPN came up since.

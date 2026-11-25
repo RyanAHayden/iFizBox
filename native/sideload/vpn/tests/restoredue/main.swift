@@ -33,6 +33,7 @@ check(step { $0.left = true; $0.waiting = true } == .later, "an install began wh
 check(step { $0.left = true; $0.down = false } == .later, "ours is on again")
 check(step { $0.left = true; $0.otherVPN = true } == .drop, "back by itself, unasked")
 check(step { $0.left = true; $0.replaced = true } == .drop, "another VPN was picked, unasked")
+check(!RestoreDue.leftOnTrip(8) && RestoreDue.leftOnTrip(60) && RestoreDue.leftOnTrip(-5), "a Cellular Installs trip, and one gone on from")
 // never
 check(step { $0.left = true; $0.never = true } == .drop, "never: no question")
 check(step { $0.left = true; $0.never = true; $0.front = false } == .drop, "never: left")

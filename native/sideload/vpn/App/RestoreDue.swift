@@ -33,6 +33,11 @@ enum RestoreDue {
         return n.left ? .ask : .back
     }
 
+    /// A Cellular Installs trip to Shortcuts doesn't count as leaving, unless the app stayed away this long after it
+    /// (Home from Shortcuts is no second notice).
+    static let tripLimit: TimeInterval = 60
+    static func leftOnTrip(_ away: TimeInterval) -> Bool { !(0..<tripLimit).contains(away) }
+
     /// The person's answer while it is held.
     enum Answer: String { case on, notNow, never }
 

@@ -54,6 +54,7 @@ class Due(unittest.TestCase):
         """F427: owed at launch counts as left, as does the background (not a Cellular Installs trip); the answers."""
         self.assertIn("private static var left = true", self.src)
         self.assertOrder(self.part("static func watch()"), ["didEnterBackgroundNotification", "if away() { setLeft(true) }"])
+        self.assertIn("{ !CellularShortcut.running }", self.src)  # a finished run's report stays
         self.assertIn("RestoreBack.watch()", read("App", "LocalVPN.swift").split("enum LocalVPNBridge")[1])
         self.assertNotIn("run()", self.part("case .ask:", "case .back:"))
         answer = self.part("static func answer(")
