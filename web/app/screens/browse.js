@@ -15,6 +15,8 @@ import { grouped, placeholder, el, segments, note, buttonZone } from "../nav/ui.
 import { createVList, withLetterHeaders } from "../nav/vlist.js";
 import { createSectionIndex } from "../nav/sectionindex.js";
 import { onPageOpen, onPageShow } from "../nav/pagestate.js";
+import { searchBar, pinned } from "../nav/searchbar.js"; // F426c
+import { listScope, refineOptions, byName, listNote } from "./listfilter.js";
 import { showSheet } from "../nav/sheet.js";
 import { format, settingsRoute } from "../router.js";
 import { getBackend } from "../backend.js";
@@ -943,38 +945,80 @@ async function renderList(body, route, fetchRows, letters) {
 // F124: Browse's lists (New, Recently Updated, Popular, Featured, Free..., a category): the grey search bar, then the
 // package list, filtered as you type (name, id, description, author: core/changes.js filterRows). `letters`: A–Z
 // headers (lists by name); else `headers(rows)` may return the items with { header } rows of its own (New's days).
-export async function renderSearchableList(body, route, fetchRows, { letters = false, headers = null, empty = "No packages.", label = "Search this list" } = {}) {
-  const bar = listSearchBar(label);
+// F426c: pinned as Search's, with its scope bar and Filter button under the field (listfilter.js). `order` names the
+// list's own order in the panel's Sort; `oneKind` leaves the segments out.
+export async function renderSearchableList(body, route, fetchRows, { letters = false, headers = null, empty = "No packages.",
+  label = "Search this list", order = letters ? "Name" : "Default", oneKind = false } = {}) {
+  let rows = [];      // the list as it comes
+  let refined = null; // its rows by the filters and sort, or null before the first load
+  let turn = 0, loads = 0, list = null, index = null;
+  const bar = searchBar({ ariaLabel: label, delay: 120, className: "has-scope", onQuery: () => { if (refined) draw(true); },
+    onFocus: () => scope.close() });
+  const scope = listScope({ order, withSegments: !oneKind, rows: () => rows, changed: () => { if (refined) refine(true); } });
   const none = note();
   none.hidden = true;
   const ph = placeholder("list");
-  body.append(bar.el, none, ph);
-  let rows;
-  try {
-    await catalog.ensure();
-    rows = await fetchRows();
-  } catch (e) {
+  const results = pinned(body, bar, scope.el);
+  results.append(none, ph);
+  const fail = (e) => {
     ph.remove();
+    list?.setItems([]);
     none.textContent = e.message;
     none.hidden = false;
-    return;
-  }
-  ph.remove();
-  const itemsFor = (rs) => (letters ? withLetterHeaders(rs, (r) => indexLetter(r.name)) : headers ? headers(rs) : rs);
-  const shown = (q) => filterRows(rows, { query: q });
-  let list = null;
-  const draw = (q) => {
-    const rs = shown(q);
-    none.textContent = rs.length ? "" : q.trim() ? "No packages match your search." : empty;
+  };
+  const draw = (top = false) => {
+    const q = bar.input.value;
+    const rs = filterRows(refined, { query: q });
+    const az = byName(scope.filters, letters);
+    const items = az ? withLetterHeaders(rs, (r) => indexLetter(r.name)) : headers && !scope.filters.sort ? headers(rs) : rs;
+    none.textContent = listNote({ count: rs.length, total: rows.length, filters: scope.filters, query: q, empty });
     none.hidden = rs.length > 0;
     rememberNames(rs);
+    if (top) results.scrollTop = 0;
     if (!list) {
-      list = packageList(body, route, letters ? rs : itemsFor(rs), { letters }); // packageList adds the letters itself
-      body.append(list.el);
-    } else list.setItems(itemsFor(rs));
+      list = packageList(results, route, items, { letters: false });
+      results.append(list.el);
+    } else list.setItems(items);
+    // Cydia's index down the right edge only while the rows are under letters
+    const indexed = az && rows.length > 0;
+    if (indexed && !index) index = createSectionIndex(results, list);
+    else if (!indexed && index) { index.destroy(); index = null; }
   };
-  draw(bar.input.value);
-  bar.onQuery(draw);
+  const refine = async (top = false) => {
+    const mine = ++turn;
+    const opts = refineOptions(scope.filters);
+    try {
+      const rs = opts ? await catalog.refine(rows, opts) : rows;
+      if (mine !== turn) return; // a newer choice won
+      refined = rs;
+    } catch (e) {
+      if (mine === turn) fail(e);
+      return;
+    }
+    draw(top);
+  };
+  const load = async () => {
+    const mine = ++loads;
+    try {
+      await catalog.ensure();
+      const got = await fetchRows();
+      if (mine !== loads) return;
+      rows = got;
+    } catch (e) {
+      if (mine === loads) fail(e);
+      return;
+    }
+    ph.remove();
+    await refine();
+  };
+  // Show Incompatible (here, in Search or in Settings), the iOS version or the Architecture changed: the list again.
+  const off = settings.onChange((key) => {
+    if (!["worksOnMyPhone", "iosVersion", "arch", "device"].includes(key)) return;
+    if (!body.isConnected) { off(); return; }
+    if (key === "device") scope.draw();
+    load();
+  });
+  await load();
 }
 
 // F352: Add Tweaks, a page of its own under an app's Details ("addtweaks:<bundle id>"): the grey search bar, then the

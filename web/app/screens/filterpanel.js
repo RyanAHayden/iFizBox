@@ -13,17 +13,9 @@ import { getBackend } from "../backend.js";
 import { grouped, el } from "../nav/ui.js";
 import { EASE } from "../nav/motion.js";
 import { loadNew } from "./sources.js";
+import { emptyFilters, searchFilters } from "./searchscope.js"; // F426c
 
-// A page's filters, none set: section (a section name or "group:<kind>"), source (a key), installed
-// ("installed" | "not"), price ("free" | "paid"); null is any.
-export const emptyFilters = () => ({ section: null, source: null, installed: null, price: null });
-
-// What the catalog is asked: only the filters that are set (none: undefined, the plain search).
-export function searchFilters(f) {
-  const out = {};
-  for (const k of Object.keys(emptyFilters())) if (f[k] != null && f[k] !== "") out[k] = f[k];
-  return Object.keys(out).length ? out : undefined;
-}
+export { emptyFilters, searchFilters };
 
 // F53: the Filter panel's Source rows: only the sources the device type shows (Not Jailbroken: AltStore ones,
 // core/sources.js sourcesFor), in the Sources tab's order (Manage > Sources, F45) and by its display name.
@@ -43,7 +35,11 @@ let shown = null; // the one open panel: { close() }
 // Opens the panel, closing any other. `filters` (emptyFilters()) is the page's own and is changed in place; `anchor` is
 // the element it drops from under; `changed()` runs after each change; `closed()` once, as it is put away (close(), or
 // `alive()`, whether its page is still the open one, false after a navigation). -> { close }
-export function openFilterPanel({ filters: f, anchor, alive, changed, closed }) {
+// F426c, a list's own (listfilter.js): `sorts` ([{ label, value }]) is a Sort group at the top (filters.sort, which
+// Clear Filters leaves), `sectionRows()` -> { groups, sections } the Section rows instead of every section, and
+// `compatFooter` the words under Show Incompatible.
+export function openFilterPanel({ filters: f, anchor, alive, changed, closed, sorts = null, sectionRows = null,
+  compatFooter = "Packages that say they don't work on this iPhone. An exact name always shows, in red." }) {
   shown?.close();
   const box = el("div", "grouped filter-sheet filter-drop-inner");
   box.dataset.scroller = ""; // the iOS 6 scroll indicator follows it too (nav/scroller.js)
@@ -70,9 +66,10 @@ export function openFilterPanel({ filters: f, anchor, alive, changed, closed }) 
   function draw() {
     const top = box.scrollTop;
     box.replaceChildren();
+    if (sorts) box.append(choiceGroup("Sort", sorts, f.sort, (v) => set("sort", v)));
     // Compatibility first: the one users reach for when a package they know isn't there.
     const compat = grouped([{ rows: [{ label: "Show Incompatible" }],
-      footer: "Packages that say they don't work on this iPhone. An exact name always shows, in red." }]);
+      footer: compatFooter }]);
     const cell = compat.querySelector(".cell-inner");
     cell.classList.add("has-switch");
     cell.append(createSwitch({ label: "Show Incompatible", checked: !compatFilterOn(),
@@ -90,8 +87,9 @@ export function openFilterPanel({ filters: f, anchor, alive, changed, closed }) 
       f.price, (v) => set("price", v)));
     box.append(choiceGroup("Source", [{ label: "All Sources" }, ...sources],
       f.source, (v) => set("source", v)));
-    const groupRows = SECTION_GROUPS.map((g) => ({ label: `All ${g}`, value: `group:${g}` }));
-    box.append(choiceGroup("Section", [{ label: "All Sections" }, ...groupRows, ...sections.map((s) => ({ label: s, value: s }))],
+    const own = sectionRows?.();
+    const groupRows = (own?.groups ?? SECTION_GROUPS).map((g) => ({ label: `All ${g}`, value: `group:${g}` }));
+    box.append(choiceGroup("Section", [{ label: "All Sections" }, ...groupRows, ...(own?.sections ?? sections).map((s) => ({ label: s, value: s }))],
       f.section, (v) => set("section", v)));
     box.scrollTop = top;
   }
@@ -103,9 +101,9 @@ export function openFilterPanel({ filters: f, anchor, alive, changed, closed }) 
   async function load() {
     try {
       const type = settings.deviceType();
-      const [list, data] = await Promise.all([getBackend().sources(), catalog.sections(ALL)]);
+      const [list, data] = await Promise.all([getBackend().sources(), sectionRows ? null : catalog.sections(ALL)]);
       sources = sourceChoices(list, type, loadOrder());
-      sections = data.sections.map((s) => s.name);
+      if (data) sections = data.sections.map((s) => s.name);
       // A source picked under the other device type, now hidden: back to All Sources.
       if (f.source != null && !sources.some((o) => o.value === f.source)) { f.source = null; changed(); }
       if (box.isConnected) draw();

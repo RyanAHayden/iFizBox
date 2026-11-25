@@ -293,17 +293,17 @@ const BROWSE_ROUTES = [
   { match: "collection", nav: (route, b) => ({ title: collection(b.value).title, style: "plain" }),
     render: (body, route, ctx, b) => {
       const c = collection(b.value);
-      return browse.renderSearchableList(body, route, () => catalog.collection(c.id), { letters: true, label: `Search ${c.title}`,
+      return browse.renderSearchableList(body, route, () => catalog.collection(c.id), { letters: true, label: `Search ${c.title}`, oneKind: ONE_KIND.has(c.id),
         empty: `None of your sources' packages fit ${c.title} yet.` });
     } },
   { match: "list", nav: (route, b) => ({ title: browseList(b.value).title, style: "plain" }),
     render: (body, route, ctx, b) => {
       const v = LIST_VIEW[b.value];
-      return browse.renderSearchableList(body, route, v.rows, { letters: Boolean(v.letters), headers: v.headers ?? null,
+      return browse.renderSearchableList(body, route, v.rows, { letters: Boolean(v.letters), headers: v.headers ?? null, order: v.order, oneKind: v.oneKind,
         empty: v.empty, label: `Search ${browseList(b.value).title}` });
     } },
   { match: "category", nav: (route, b) => ({ title: b.value || "Browse", style: "plain" }),
-    render: (body, route, ctx, b) => browse.renderSearchableList(body, route, () => catalog.browse(b.value), { letters: true, label: `Search ${b.value}` }) },
+    render: (body, route, ctx, b) => browse.renderSearchableList(body, route, () => catalog.browse(b.value), { letters: true, label: `Search ${b.value}`, oneKind: true }) },
   { match: null, nav: (route) => browse.nav(route), render: (body, route, ctx) => browse.render(body, route, ctx) },
 ];
 
@@ -1039,17 +1039,20 @@ async function featuredRows() {
   return catalog.featured([...refs, ...appRefs]);
 }
 
+// F426c: the collections whose packages are all of one of Search's kinds, so their lists need no segments.
+const ONE_KIND = new Set(["themes", "make-it-yours", "play", "create", "connect", "tools"]);
+
 // Each list's rows and how it reads (browse.js renderSearchableList).
 const LIST_VIEW = {
-  new: { rows: () => catalog.fresh("new"), headers: dayHeaders,
+  new: { rows: () => catalog.fresh("new"), headers: dayHeaders, order: "Newest",
     empty: `Nothing new in the last ${FRESH_DAYS} days. Packages your sources add show up here after a refresh.` },
-  updated: { rows: () => catalog.fresh("updated"), headers: dayHeaders,
+  updated: { rows: () => catalog.fresh("updated"), headers: dayHeaders, order: "Recently Updated",
     empty: `No updates in the last ${FRESH_DAYS} days. New versions show up here after a refresh.` },
-  popular: { rows: () => catalog.popular() },
-  featured: { rows: featuredRows, empty: "None of your sources features packages." },
-  "free-apps": { rows: () => catalog.free("apps"), letters: true },
-  "free-tweaks": { rows: () => catalog.free("tweaks"), letters: true },
-  "free-themes": { rows: () => catalog.free("themes"), letters: true },
+  popular: { rows: () => catalog.popular(), order: "Most Sources" },
+  featured: { rows: featuredRows, order: "Featured", empty: "None of your sources features packages." },
+  "free-apps": { rows: () => catalog.free("apps"), letters: true, oneKind: true },
+  "free-tweaks": { rows: () => catalog.free("tweaks"), letters: true, oneKind: true },
+  "free-themes": { rows: () => catalog.free("themes"), letters: true, oneKind: true },
 };
 
 // Recommended Sources: one row per curated repo; a tap asks, checks the repo and adds it. Listed ones are ticked.
