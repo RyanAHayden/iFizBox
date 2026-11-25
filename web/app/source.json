@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "0.36.0",
+          "date": "2026-11-25T18:45:54Z",
+          "localizedDescription": "When iFizBox updates itself on this iPhone with Restore My VPN on, it now brings your VPN back before it closes, with no need to reopen iFizBox, as long as iFizBox stayed in front.\niFizBox.ipa is unsigned: sign it with your own certificate (Feather, AltStore, SideStore, or iFizBox's own\nSettings > Signing). iFizBox.deb (com.ryha.ifizbox_0.36.0-5791_iphoneos-arm64.deb) is the rootless jailbreak build.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.36.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.36.0/iFizBox.ipa",
+          "size": 31845652,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.35.0",
           "date": "2026-11-25T17:52:59Z",
           "localizedDescription": "Paid packages from Havoc and Chariz with capital letters in their ID, such as EchoUI or Lyre, show their price and Buy instead of Not Found.\nIn the sideload app (without a jailbreak), someone who bought a paid tweak its seller no longer sells can now sign in and add it to an app.\nIn Browse, choosing another Sort in Filter no longer changes the width of the buttons at the top, and the A\u2013Z index starts below them.\nIn lists sorted by name in Browse, the A\u2013Z index now goes all the way back to the top, and lands on the letter you touch.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.35.0",
@@ -250,14 +258,6 @@
           "localizedDescription": "Cydia-style Details page for packages and apps, and Source links that land on Sources\nPackages and apps open a Details page like Cydia's: icon rows, Preview, More Information, Filesystem Content\nWebsite add-source links open the Sources tab with the new source loading there\nHome Screen icon follows Theme > Mode; Tailscale names the machine after the phone model\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.19.1",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.19.1/iFizBox.ipa",
           "size": 38817394,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.19.0",
-          "date": "2026-11-21T18:27:52Z",
-          "localizedDescription": "A Glass app icon, wide package rows like Cydia's, and steadier This iPhone copies\nTheme > App Icon > Special offers Glass: Classic in Light, Gunmetal in Dark, drawn with the system's glass\nInstalled and section lists show wide package rows; Install IPAs is a plain row above A in Installed\nAuthor pages open again; price buttons match the iOS 7 and iOS 13 themes\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.19.0",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.19.0/iFizBox.ipa",
-          "size": 38807499,
           "minOSVersion": "15.0"
         }
       ]
