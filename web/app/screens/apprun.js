@@ -386,7 +386,18 @@ export async function runAppRun(jobs, deps) {
   };
   const answered = (r, onPhone) => { if (onPhone === false) unrecord(r); else recordIf(r, onPhone); };
   let sentSelf = false;
+  const isInstalled = deps.isInstalled ?? lanes.isInstalled;
+  // F424: the app this row installs over is on the iPhone: iOS's word when it has one (none on iOS 27, B229), else what
+  // iFizBox knows: the job's installed version, a re-sign, or Installed's record of the bundle ID it installs as
+  const replacing = async (r) => {
+    const id = r.bundleId ?? r.id;
+    let says = null;
+    try { says = (await isInstalled?.([id]))?.[id] ?? null; } catch { /* no answer */ }
+    if (typeof says === "boolean") return says;
+    return r.mode === "resign" || r.job?.installed != null || Boolean(await recordOf(id));
+  };
   const run = createAppRun({
+    replacing,
     rows,
     sign: (r, hooks) => lanes.sign(r, hooks, (text) => line("raw", text, r.id)),
     install: (r, hooks) => lanes.install(r, hooks, (text) => line("raw", text, r.id)),
@@ -417,7 +428,6 @@ export async function runAppRun(jobs, deps) {
     // B153: a new pass on this page starts with a clean log; B337: not the Signing Server Fallback's (keep)
     onStart: (pass, o) => { if (pass > 1 && !o?.keep) clearLog(page); },
   });
-  const isInstalled = deps.isInstalled ?? lanes.isInstalled;
   const handoff = followHandoff(run, rows, { isInstalled, answered,
     ...(deps.doc ? { doc: deps.doc } : {}) });
   let winding = false; // B175: closed by dismiss(): the follow winds down instead of stopping
