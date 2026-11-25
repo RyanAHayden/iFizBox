@@ -1,67 +1,44 @@
 <!doctype html>
 <!--
-  The showcase video as one page: every frame is render(t) of a virtual clock (no CSS animations, no timers), so
-  render.mjs can step it 1/60 s at a time and screenshot each frame. Transform and opacity only.
+  The showcase video as one page, cut from the recordings capture.mjs made. Every frame is render(t) of a virtual
+  clock (no CSS animations, no timers): render.mjs steps it 1/60 s at a time and screenshots each frame.
 
-    video.html?shots=<dir URL>&h=1350     shots: the captures (capture.mjs), h: 1350 (4:5) or 1920 (9:16); width 1080
-    window.DURATION                       the length in seconds
-    window.render(t)                      draws time t (seconds)
-    window.ready                          a promise: every image loaded
+    video.html?h=1350     1350 (4:5) or 1920 (9:16); the width is 1080
+    /rec/<name>.json, /frames/<name>/00001.jpg…   the recordings and their frames (render.mjs serves them)
+    window.DURATION       the length in seconds
+    window.render(t)      draws time t (a promise: the recordings' frames are decoded)
+    window.ready          a promise: the marks and images are loaded
 
-  The iOS 6 parts (nav bar blue, pinstripes, grouped text colours) are the palette of web/app/ios6.css. The phone is
-  a plain rounded frame drawn here (no device artwork). The name and domain come from web/app/brand.js.
+  The flow is never cut: the recordings run from mark to mark, some stretches faster (MAP). The phone is a plain
+  rounded frame drawn here (no device artwork). The name and domain come from web/app/brand.js.
 -->
 <html>
 <head>
 <meta charset="utf-8">
 <title>Showcase video</title>
 <style>
-  :root {
-    --bar-top: #b0bccd; --bar-bottom: #6d84a2; --bar-line: #2d3642;
-    --stripe-a: #c5ccd4; --stripe-b: #cbd2d8; --text: #1f2a3a; --sub: #4c566c; --blue: #2f68c9;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  }
-  html, body { margin: 0; background: #000; }
-  #stage { position: relative; width: 1080px; overflow: hidden; background: repeating-linear-gradient(90deg, var(--stripe-a) 0 8px, var(--stripe-b) 8px 12px); }
-  .abs { position: absolute; left: 0; top: 0; will-change: transform, opacity; transform-origin: 50% 50%; }
-  /* the caption band: an iOS 6 navigation bar, tall */
-  #band { position: absolute; left: 0; top: 0; width: 1080px; height: 230px; z-index: 20;
-    background: linear-gradient(var(--bar-top), var(--bar-bottom)); border-bottom: 2px solid var(--bar-line);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, .25); }
-  #band::before { content: ""; position: absolute; inset: 0 0 auto; height: 2px; background: rgba(255, 255, 255, .45); }
-  .cap { width: 1080px; height: 230px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; z-index: 21; }
-  .cap h1 { margin: 0; font-size: 72px; line-height: 1.05; font-weight: 700; color: #fff; text-shadow: 0 -3px 0 rgba(0, 0, 0, .45); letter-spacing: -.5px; }
-  .cap p { margin: 12px 0 0; font-size: 40px; font-weight: 500; color: #eef2f7; text-shadow: 0 -2px 0 rgba(0, 0, 0, .4); }
-  .pill { display: inline-block; margin-left: 14px; padding: 4px 16px 6px; border-radius: 22px; font-size: 26px; font-weight: 700; vertical-align: 10px;
-    color: #fff; text-shadow: 0 -1px 0 rgba(0, 0, 0, .4); background: linear-gradient(#7fa1d6, #3f6bb4); border: 2px solid #2d4f8c; letter-spacing: 0; }
-  .pill.jb { background: linear-gradient(#5d6470, #2f343c); border-color: #1d2026; }
-  /* the phone: a plain rounded slab */
-  .phone { position: absolute; border-radius: 76px; background: linear-gradient(145deg, #3a3d42, #16171a 55%, #2a2c30);
-    box-shadow: 0 0 0 3px #55595f inset, 0 30px 60px rgba(0, 0, 0, .35), 0 6px 14px rgba(0, 0, 0, .3); }
-  .screen { position: absolute; overflow: hidden; background: #000; border-radius: 58px; }
-  .screen img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; will-change: transform, opacity; }
-  .sb { position: absolute; left: 0; top: 0; width: 100%; color: #fff; font-weight: 600; z-index: 5; }
-  .sb .time { position: absolute; }
-  .sb .bat { position: absolute; border: 2px solid rgba(255, 255, 255, .9); border-radius: 6px; }
-  .sb .bat::after { content: ""; position: absolute; left: 2px; top: 2px; bottom: 2px; width: 70%; background: #fff; border-radius: 2px; }
-  .sb .bars { position: absolute; display: flex; align-items: flex-end; gap: 3px; }
-  .sb .bars i { display: block; width: 5px; background: #fff; border-radius: 1px; }
-  .ring { position: absolute; border: 6px solid #ffcc00; border-radius: 50%; box-shadow: 0 0 0 3px rgba(0, 0, 0, .25), 0 0 18px rgba(255, 204, 0, .7); z-index: 6; }
-  .label { font-size: 34px; font-weight: 700; color: var(--text); text-shadow: 0 2px 0 rgba(255, 255, 255, .7); text-align: center; }
-  .card { position: absolute; border-radius: 26px; background: #f7f7f7; border: 2px solid #a9b1bb; box-shadow: 0 2px 0 rgba(255, 255, 255, .8); padding: 26px 30px; box-sizing: border-box; }
-  .card h2 { margin: 0; font-size: 46px; color: var(--text); }
-  .card h2 small { display: block; font-size: 28px; color: var(--sub); font-weight: 500; margin-top: 4px; }
-  .card ul { margin: 18px 0 0; padding: 0; list-style: none; }
-  .card li { font-size: 31px; line-height: 1.25; color: var(--text); padding: 12px 0 12px 46px; position: relative; border-top: 1px solid #d9dde2; }
-  .card li::before { content: ""; position: absolute; left: 4px; top: 18px; width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(#6bd35f, #2f9e2b); box-shadow: 0 1px 0 rgba(0,0,0,.25); }
-  .card li::after { content: ""; position: absolute; left: 12px; top: 22px; width: 7px; height: 13px; border: solid #fff; border-width: 0 4px 4px 0; transform: rotate(45deg); }
-  .end { text-align: center; width: 1080px; }
-  .end .name { font-size: 120px; font-weight: 700; color: var(--text); text-shadow: 0 3px 0 rgba(255, 255, 255, .7); letter-spacing: -1px; }
-  .end .tag { font-size: 40px; color: var(--sub); text-shadow: 0 2px 0 rgba(255, 255, 255, .7); margin-top: 6px; padding: 0 60px; line-height: 1.25; }
-  .end .url { display: inline-block; margin-top: 46px; font-size: 64px; font-weight: 700; color: #fff; padding: 18px 54px 22px; border-radius: 26px;
-    background: linear-gradient(#7fa1d6, #3f6bb4); border: 3px solid #2d4f8c; text-shadow: 0 -2px 0 rgba(0, 0, 0, .4); box-shadow: 0 2px 0 rgba(255,255,255,.6); }
-  .end .lic { margin-top: 34px; font-size: 44px; font-weight: 700; color: var(--text); text-shadow: 0 2px 0 rgba(255, 255, 255, .7); }
-  .hookicon { width: 300px; height: 300px; border-radius: 66px; box-shadow: 0 16px 40px rgba(0, 0, 0, .35); }
+  html, body { margin: 0; }
+  body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: #24272c; }
+  #stage { position: relative; width: 1080px; overflow: hidden; background: #e4e1da; }
+  .abs { position: absolute; left: 0; top: 0; }
+  .phone { position: absolute; left: 0; top: 0; background: #1d1e20; transform-origin: 0 0; }
+  .screen { position: absolute; overflow: hidden; background: #000; }
+  .screen img { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .sb { position: absolute; left: 0; top: 0; width: 402px; height: 62px; transform-origin: 0 0; color: #fff; font-size: 17px; font-weight: 600; }
+  .sb.dark { color: #111; }
+  .sb b { position: absolute; left: 40px; top: 22px; font-weight: 600; }
+  .sb i { position: absolute; bottom: 21px; width: 3px; border-radius: 1px; background: currentColor; }
+  .sb u { position: absolute; right: 36px; top: 25px; width: 23px; height: 11px; border: 1.4px solid currentColor; border-radius: 4px; box-sizing: border-box; }
+  .sb u::after { content: ""; position: absolute; inset: 1.4px 6px 1.4px 1.4px; background: currentColor; border-radius: 1.5px; }
+  #band { position: absolute; left: 0; top: 0; width: 1080px; background: #e4e1da; }
+  .cap { position: absolute; left: 0; width: 1080px; text-align: center; font-size: 66px; line-height: 1.1; font-weight: 700; letter-spacing: -1px; }
+  .build { position: absolute; left: 0; width: 1080px; text-align: center; font-size: 42px; font-weight: 500; color: #6a6459; }
+  .label { position: absolute; left: 0; top: 0; text-align: center; font-size: 52px; font-weight: 700; }
+  #end { width: 1080px; text-align: center; }
+  #end img { width: 230px; height: 230px; border-radius: 51px; }
+  #end .name { font-size: 92px; font-weight: 700; letter-spacing: -2px; margin-top: 26px; }
+  #end .url { font-size: 68px; font-weight: 500; margin-top: 56px; }
+  #end .lic { font-size: 48px; color: #6a6459; margin-top: 18px; }
 </style>
 </head>
 <body>
@@ -69,244 +46,144 @@
 <script type="module">
 import { NAME, DOMAIN } from "../../web/app/brand.js";
 
-const q = new URLSearchParams(location.search);
-const SHOTS = (q.get("shots") || "shots").replace(/\/$/, "") + "/";
-const W = 1080, H = Number(q.get("h") || 1350), DY = (H - 1350) / 2; // DY: extra room above and below on a tall cut
+const W = 1080, H = Number(new URLSearchParams(location.search).get("h") || 1350), TALL = H > 1500;
 const stage = document.getElementById("stage");
 stage.style.height = H + "px";
+const mk = (cls, html = "", parent = stage) => { const e = document.createElement("div"); e.className = cls; e.innerHTML = html; parent.append(e); return e; };
+const clamp = (x) => Math.min(1, Math.max(0, x));
+const smooth = (x) => { x = clamp(x); return x * x * x * (x * (6 * x - 15) + 10); };
+const mix = (a, b, k) => a + (b - a) * k;
+const fade = (t, a, b, d = 0.22) => Math.min(smooth((t - a) / d), smooth((b - t) / d));
 
-// ---- a tiny keyframe engine: tracks of (element, property, t0, t1, from, to, ease); render(t) applies them all
-const ease = {
-  lin: (x) => x,
-  out: (x) => 1 - (1 - x) ** 3,
-  io: (x) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2),
-  back: (x) => { const c = 1.6; return 1 + (c + 1) * (x - 1) ** 3 + c * (x - 1) ** 2; },
-};
-const items = new Map(); // el -> { base: {x,y,s,o,r}, tracks: {prop: [...]}, ox, oy }
-function reg(el, base = {}) { items.set(el, { base: { x: 0, y: 0, s: 1, o: 1, r: 0, ...base }, tracks: {} }); return el; }
-function tw(el, prop, t0, t1, from, to, e = "io") { const it = items.get(el); (it.tracks[prop] ??= []).push({ t0, t1, from, to, e }); it.tracks[prop].sort((a, b) => a.t0 - b.t0); }
-function set(el, prop, t, v) { tw(el, prop, t, t, v, v, "lin"); }
-function valueAt(list, t, base) {
-  if (!list) return base;
-  let v = list[0].from;
-  for (const k of list) {
-    if (t < k.t0) break;
-    const p = k.t1 <= k.t0 ? 1 : Math.min(1, (t - k.t0) / (k.t1 - k.t0));
-    v = k.from + (k.to - k.from) * ease[k.e](p);
-  }
-  return v;
-}
-function renderAt(t) {
-  for (const [el, it] of items) {
-    const g = (p) => valueAt(it.tracks[p], t, it.base[p]);
-    const o = g("o");
-    el.style.opacity = o.toFixed(4);
-    el.style.visibility = o <= 0.001 ? "hidden" : "visible";
-    el.style.transform = `translate3d(${g("x").toFixed(2)}px, ${g("y").toFixed(2)}px, 0) rotate(${g("r").toFixed(3)}deg) scale(${g("s").toFixed(4)})`;
-  }
+const rec = {};
+for (const n of ["lite", "jailbreak"]) {
+  rec[n] = await (await fetch(`/rec/${n}.json`)).json();
+  rec[n].at = (mark) => { const m = rec[n].marks.find((x) => x.name === mark); if (!m) throw new Error(`no mark ${mark} in ${n}`); return m.t; };
 }
 
-const mk = (tag, cls, parent = stage, html = "") => { const e = document.createElement(tag); if (cls) e.className = cls; if (html) e.innerHTML = html; parent.append(e); return e; };
-const loads = [];
-function img(parent, name) {
-  const i = mk("img", "", parent);
-  loads.push(new Promise((res) => { i.onload = res; i.onerror = () => { console.error("missing " + name); res(); }; }));
-  i.src = name.includes("/") ? name : SHOTS + name + ".png";
-  return i;
+// ---- MAP: what each recording shows, as stretches of [its mark, the seconds the video takes to get to the next one]
+const HOLD = 2.7;  // both phones rest on Home before the fingers start
+const LITE = [["home", 2.1], ["sources", 1.0], ["add-source", 2.4], ["unknown-source", 1.4], ["source-added", 0.8],
+  ["search", 1.7], ["found", 1.6], ["app", 2.0], ["confirm-install", 0.9], ["installing", 1.9], ["installed", 1.0],
+  ["app-installed", 0.9], ["changes", 1.9], ["update-found", 1.2], ["confirm-update", 2.2], ["updated", 0.9],
+  ["up-to-date", 1.5], ["theme", 1.3], ["ios7", 1.3], ["ios13", 1.3], ["ios26", 1.3], ["home-ios26", 1.5], ["ios6", 1.0], ["end", 0]];
+// the jailbreak recording's Sources steps are the Lite one's again, so its part starts on Search
+const JAIL = [["search", 1.6], ["found", 2.0], ["queued", 1.4], ["tweak", 1.5], ["confirm", 0.9], ["installing", 2.0], ["end", 0]];
+function plan(name, stretches, start) {
+  let t = start;
+  const points = stretches.map(([mark, d]) => { const p = { mark, t, src: rec[name].at(mark) }; t += d; return p; });
+  return {
+    from: start, to: points.at(-1).t, when: (mark) => points.find((p) => p.mark === mark).t,
+    src(x) {
+      if (x <= points[0].t) return points[0].src;
+      for (let i = 1; i < points.length; i++) if (x < points[i].t) return mix(points[i - 1].src, points[i].src, (x - points[i - 1].t) / (points[i].t - points[i - 1].t));
+      return points.at(-1).src;
+    },
+  };
 }
+const lite = plan("lite", LITE, HOLD);
+const TAKE = HOLD + 1.6;        // the no-jailbreak phone takes over
+const SWAP = lite.to + 0.35;    // the jailbroken phone comes back in its place
+const jail = plan("jailbreak", JAIL, SWAP + 0.9);
+const END = jail.to + 0.5;      // the end card
+window.DURATION = Math.ceil((END + 3.1) * 60) / 60;
 
-// ---- the phone: screen width sw (CSS px); returns { el, screen, k } where k = px per capture point (402 wide)
-function phone(sw, { x, y, bar = true } = {}) {
-  const pad = Math.round(sw * 0.042), sh = Math.round(sw * 874 / 402);
-  const el = mk("div", "phone abs");
-  el.style.width = sw + 2 * pad + "px"; el.style.height = sh + 2 * pad + "px";
-  el.style.borderRadius = Math.round(sw * 0.16) + "px";
-  const screen = mk("div", "screen", el);
-  Object.assign(screen.style, { left: pad + "px", top: pad + "px", width: sw + "px", height: sh + "px", borderRadius: Math.round(sw * 0.125) + "px" });
-  const k = sw / 402;
-  if (bar) {
-    const sb = mk("div", "sb", screen);
-    sb.style.height = 62 * k + "px";
-    const time = mk("div", "time", sb, "12:30");
-    Object.assign(time.style, { left: 34 * k + "px", top: 22 * k + "px", fontSize: 17 * k + "px" });
-    const bars = mk("div", "bars", sb);
-    Object.assign(bars.style, { right: 76 * k + "px", top: 24 * k + "px", height: 12 * k + "px" });
-    for (const h of [4, 6, 9, 12]) { const b = mk("i", "", bars); b.style.height = h * k + "px"; b.style.width = 3.2 * k + "px"; }
-    const bat = mk("div", "bat", sb);
-    Object.assign(bat.style, { right: 32 * k + "px", top: 23 * k + "px", width: 25 * k + "px", height: 13 * k + "px", borderRadius: 4 * k + "px", borderWidth: Math.max(1.5, 1.2 * k) + "px" });
-  }
-  reg(el, { x, y });
-  return { el, screen, k, w: sw + 2 * pad, h: sh + 2 * pad, pad };
+// ---- the phones: a screen 402 points wide, scaled by place()
+const PAD = 15;
+function phone(name) {
+  const el = mk("phone");
+  Object.assign(el.style, { width: 402 + 2 * PAD + "px", height: 874 + 2 * PAD + "px", borderRadius: "66px" });
+  const screen = mk("screen", "<img>", el);
+  Object.assign(screen.style, { left: PAD + "px", top: PAD + "px", width: "402px", height: "874px", borderRadius: "52px" });
+  const sb = mk("sb", `<b>12:30</b>${[5, 7, 9, 12].map((h, n) => `<i style="right:${82 - n * 5}px;height:${h}px;bottom:25px"></i>`).join("")}<u></u>`, screen);
+  const img = screen.querySelector("img");
+  let shown = 0;
+  return {
+    el,
+    place(x, y, s) { el.style.transform = `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) scale(${s.toFixed(5)})`; },
+    async show(src) {
+      const r = rec[name], n = Math.min(r.frames, Math.max(1, Math.floor(src * r.fps + 1e-6) + 1));
+      const look = r.looks.filter((l) => l.t <= src + 1e-6).at(-1) ?? r.looks[0];
+      // iOS 6's status strip is black; the later looks' is the page's own light one, except under a run's black page
+      sb.classList.toggle("dark", look.style !== "ios6" && look.theme !== "dark");
+      if (n === shown) return;
+      shown = n;
+      img.src = `/frames/${name}/${String(n).padStart(5, "0")}.jpg`;
+      await img.decode();
+    },
+  };
 }
-function layer(ph, name) { const i = img(ph.screen, name); reg(i, { o: 0 }); set(i, "o", 0, 0); i._ph = ph; (ph.layers ??= []).push(i); return i; }
-// once `l` covers the screen at time t, every other layer of its phone goes out (so a layer drawn under it in the
-// DOM can come back later on top of what was there)
-function cover(l, t) { for (const o of l._ph.layers) if (o !== l) set(o, "o", t, 0); }
-// a ring around capture point (px, py) with radius r points
-function ring(ph, px, py, r) {
-  const e = mk("div", "ring", ph.screen);
-  const d = 2 * r * ph.k;
-  Object.assign(e.style, { width: d + "px", height: d + "px", left: px * ph.k - d / 2 + "px", top: py * ph.k - d / 2 + "px" });
-  reg(e, { o: 0 });
-  return e;
-}
-// a rounded box around the capture rectangle (x0, y0)-(x1, y1), in points
-function box(ph, x0, y0, x1, y1) {
-  const e = mk("div", "ring", ph.screen);
-  const k = ph.k, b = 6;
-  Object.assign(e.style, { left: (x0 * k - b) + "px", top: (y0 * k - b) + "px", width: (x1 - x0) * k + "px", height: (y1 - y0) * k + "px", borderRadius: 14 * k + "px" });
-  reg(e, { o: 0 });
-  return e;
-}
-function pulse(e, t0, t1, big = 1.6, beat = 1.12) {
-  tw(e, "o", t0, t0 + 0.25, 0, 1, "out"); tw(e, "s", t0, t0 + 0.35, big, 1, "out");
-  for (let t = t0 + 0.5; t + 0.5 < t1; t += 0.7) { tw(e, "s", t, t + 0.35, 1, beat, "io"); tw(e, "s", t + 0.35, t + 0.7, beat, 1, "io"); }
-  tw(e, "o", t1 - 0.2, t1, 1, 0, "lin");
-}
+const A = phone("lite"), B = phone("jailbreak");
 
-// screen transitions inside one phone
-const PUSH = 0.42;
-function show(l, t) { set(l, "o", t, 1); cover(l, t + 0.001); }
-function hide(l, t) { set(l, "o", t, 0); }
-function fadeIn(l, t, d = 0.3) { tw(l, "o", t, t + d, 0, 1, "out"); cover(l, t + d + 0.001); }
-function push(from, to, t, w) { tw(to, "o", t, t, 1, 1); tw(to, "x", t, t + PUSH, w, 0, "io"); tw(from, "x", t, t + PUSH, 0, -w * 0.5, "io"); tw(from, "x", t + PUSH + 0.01, t + PUSH + 0.01, 0, 0, "lin"); cover(to, t + PUSH + 0.001); }
-function sheet(to, t, h) { tw(to, "o", t, t, 1, 1); tw(to, "y", t, t + 0.45, h, 0, "out"); }
+// ---- the words
+const BAND = TALL ? 290 : 214, CAPY = TALL ? 112 : 46;
+const band = mk(""); band.id = "band"; band.style.height = BAND + "px";
+const words = [];
+const say = (a, b, text) => { const e = mk("cap", text); e.style.top = CAPY + "px"; words.push({ e, a, b }); };
+const build = (a, b, text) => { const e = mk("build", text); e.style.top = CAPY + 88 + "px"; words.push({ e, a, b }); };
+const L = lite.when, J = jail.when;
+const opening = mk("cap", `${NAME} works with<br>or without a jailbreak`);
+opening.style.top = (TALL ? 230 : 70) + "px";
+build(TAKE + 0.5, SWAP, "No jailbreak");
+say(TAKE + 0.5, L("search"), "Add a source");
+say(L("search"), L("app") + 0.2, "Find an app");
+say(L("app") + 0.2, L("changes") - 0.2, "Tap Install");
+say(L("changes") - 0.2, L("up-to-date") + 0.6, "New version? Tap Upgrade");
+say(L("up-to-date") + 0.6, L("ios7") - 1.1, "Change how it looks");
+say(L("ios7") - 1.1, L("ios13") - 1.1, "This is iOS 7");
+say(L("ios13") - 1.1, L("ios26") - 1.1, "iOS 13");
+say(L("ios26") - 1.1, L("ios6") - 0.6, "iOS 26");
+say(L("ios6") - 0.6, SWAP, "And back to iOS 6");
+build(SWAP + 0.4, END, "Jailbroken");
+say(SWAP + 0.4, J("found") + 0.5, "This one gets system tweaks");
+say(J("found") + 0.5, J("tweak") - 0.2, "Swipe one to queue it");
+say(J("tweak") - 0.2, END, "Add another, install both");
 
-// captions in the band
-const band = mk("div", "", stage); band.id = "band";
-function caption(t0, t1, title, sub = "", pill = "") {
-  const c = mk("div", "cap abs", stage, `<h1>${title}${pill}</h1>${sub ? `<p>${sub}</p>` : ""}`);
-  reg(c, { o: 0 });
-  tw(c, "o", t0, t0 + 0.3, 0, 1, "out"); tw(c, "y", t0, t0 + 0.4, 40, 0, "out");
-  tw(c, "o", t1 - 0.25, t1, 1, 0, "lin"); tw(c, "y", t1 - 0.25, t1, 0, -30, "io");
-  return c;
-}
-const LITE = `<span class="pill">Lite</span>`, JB = `<span class="pill jb">Jailbreak</span>`;
+const PAIR = TALL ? 1.1 : 1.02, pw = (402 + 2 * PAD), ph = (874 + 2 * PAD);
+const gap = (W - 2 * pw * PAIR) / 3, pairY = TALL ? 640 : 330;
+const labels = ["No jailbreak", "Jailbroken"].map((text, i) => { const e = mk("label", text); e.style.width = pw * PAIR + "px"; e.style.left = gap + i * (pw * PAIR + gap) + "px"; e.style.top = pairY - 84 + "px"; return e; });
 
-// ---- the timeline (seconds)
-const S = { hook: 0, sources: 3.4, search: 6.6, changes: 9.4, installed: 12.2, swipe: 14.8, signing: 19.2, resign: 22.6,
-  push: 25.4, themes: 28.0, split: 31.4, end: 36.4 };
-const END = 40.0;
-window.DURATION = END;
+const end = mk("abs", `<img src="../../web/app/icons/icon-glossy-228.png"><div class="name">${NAME}</div><div class="url">${DOMAIN}</div><div class="lic">Free, GPL-3.0</div>`);
+end.id = "end";
 
-// The hook: the icon and the line, then the phone rises under the band.
-const hook = mk("div", "abs", stage, `<div style="width:1080px;text-align:center">
-  <img class="hookicon" src="../../web/app/icons/icon-glossy-228.png"><div class="end"><div class="name">${NAME}</div>
-  <div class="tag">A package manager with the classic iOS look, for modern iPhones</div></div></div>`);
-loads.push(new Promise((r) => { const i = hook.querySelector("img"); i.onload = r; i.onerror = r; }));
-reg(hook, { y: 330 + DY, o: 0 });
-tw(hook, "o", 0, 0.2, 0.3, 1, "out"); tw(hook, "s", 0, 0.6, 0.85, 1, "back");
-tw(hook, "y", 2.3, 2.9, 330 + DY, 120 + DY, "io"); tw(hook, "o", 2.5, 2.9, 1, 0, "lin");
-reg(band); set(band, "o", 0, 0); tw(band, "o", 2.6, 3.0, 0, 1, "out"); tw(band, "y", 2.6, 3.0, -240, 0, "out");
-
-// The main phone, beats 1-8.
-const SW = H > 1500 ? 640 : 500;
-const main = phone(SW, { x: (W - (SW + 2 * Math.round(SW * 0.042))) / 2, y: 0 });
-const mainY = H > 1500 ? 290 + 30 : 262;
-tw(main.el, "y", 2.4, 3.2, H + 40, mainY, "out");
-const Lw = SW; // a layer's width, for pushes
-const L = Object.fromEntries(["jb-home", "jb-sources", "jb-havoc", "jb-havoc-tweaks", "jb-search", "jb-changes", "jb-installed", "jb-queued",
-  "jb-confirm", "lite-signing", "lite-with", "web-signing", "lite-cert", "lite-apps", "lite-updates"].map((n) => [n, layer(main, n)]));
-const SWIPE_FRAMES = 45; // sw-00 … sw-44 (31 moves + 14 after the lift)
-const sw = Array.from({ length: SWIPE_FRAMES }, (_, i) => layer(main, `sw-${String(i).padStart(2, "0")}`));
-
-show(L["jb-home"], 2.4);
-caption(S.sources, S.search, "Every source, one catalog", "APT repos and AltStore sources", JB);
-push(L["jb-home"], L["jb-sources"], S.sources + 0.15, Lw);
-push(L["jb-sources"], L["jb-havoc"], S.sources + 1.35, Lw);
-push(L["jb-havoc"], L["jb-havoc-tweaks"], S.sources + 2.35, Lw);
-caption(S.search, S.changes, "Search every source", "Tweaks, themes and apps in one list", JB);
-fadeIn(L["jb-search"], S.search + 0.1);
-caption(S.changes, S.installed, "Updates at a glance", "Changes, with a badge on the tab", JB);
-fadeIn(L["jb-changes"], S.changes + 0.1);
-pulse(ring(main, 216, 806, 28), S.changes + 0.6, S.installed - 0.1);
-pulse(box(main, 296, 70, 396, 100), S.changes + 1.2, S.installed - 0.1, 1.2, 1.05);
-caption(S.installed, S.swipe, "Everything installed", "Packages and apps, A to Z", JB);
-fadeIn(L["jb-installed"], S.installed + 0.1);
-// swipe to queue: zoom on the row, play the drag frame by frame, then the queued list and the Confirm sheet
-caption(S.swipe, S.signing, "Swipe to queue", "Then confirm the whole queue at once", JB);
-fadeIn(L["jb-search"], S.swipe + 0.05, 0.01); hide(L["jb-installed"], S.swipe + 0.06);
-const zoom = 1.35, rowY = 397 * main.k + main.pad; // the row's centre in the phone
-tw(main.el, "s", S.swipe + 0.1, S.swipe + 0.6, 1, zoom, "io");
-tw(main.el, "y", S.swipe + 0.1, S.swipe + 0.6, mainY, mainY + (main.h / 2 - rowY) * zoom * 0.55, "io");
-const f0 = S.swipe + 0.7, fd = 1 / 30;
-sw.forEach((l, i) => { set(l, "o", 0, 0); set(l, "o", f0 + i * fd, 1); if (i < sw.length - 1) set(l, "o", f0 + (i + 1) * fd + 0.001, 0); });
-const fEnd = f0 + SWIPE_FRAMES * fd;
-show(L["jb-queued"], fEnd); hide(sw[sw.length - 1], fEnd + 0.01);
-tw(main.el, "s", fEnd + 0.4, fEnd + 0.9, zoom, 1, "io");
-tw(main.el, "y", fEnd + 0.4, fEnd + 0.9, mainY + (main.h / 2 - rowY) * zoom * 0.55, mainY, "io");
-sheet(L["jb-confirm"], fEnd + 1.0, main.h);
-// signing on the phone (Lite)
-caption(S.signing, S.resign, "Sign apps on the phone", "This iPhone · your certificate · Free Apple ID", LITE);
-fadeIn(L["lite-signing"], S.signing + 0.1);
-hide(L["jb-confirm"], S.signing + 0.45); hide(L["jb-queued"], S.signing + 0.45);
-push(L["lite-signing"], L["lite-with"], S.signing + 1.0, Lw);
-pulse(box(main, 12, 222, 390, 312), S.signing + 1.5, S.signing + 2.3, 1.1, 1.03);
-push(L["lite-with"], L["web-signing"], S.signing + 2.3, Lw);
-pulse(box(main, 12, 640, 390, 684), S.signing + 2.8, S.resign - 0.05, 1.1, 1.03);
-caption(S.resign, S.push, "Re-sign before they expire", "Days left on every app · Re-sign All", LITE);
-fadeIn(L["lite-apps"], S.resign + 0.1);
-pulse(ring(main, 356, 295, 34), S.resign + 0.6, S.push - 0.1);
-pulse(box(main, 12, 457, 390, 498), S.resign + 1.3, S.push - 0.1, 1.1, 1.03);
-caption(S.push, S.themes, "Push alerts for app updates", "Within half an hour of a release", LITE);
-fadeIn(L["lite-updates"], S.push + 0.1);
-pulse(ring(main, 343, 396, 34), S.push + 0.6, S.themes - 0.1);
-tw(main.el, "y", S.themes - 0.1, S.themes + 0.5, mainY, H + 60, "io");
-
-// themes: three phones fan in
-caption(S.themes, S.split, "Make it yours", "Classic · Gunmetal · OLED", JB);
-const TW = H > 1500 ? 320 : 300;
-[["theme-classic", "Classic"], ["theme-gunmetal", "Gunmetal"], ["theme-oled", "OLED"]].forEach(([n, label], i) => {
-  const p = phone(TW, { x: 0, y: 0 });
-  const l = img(p.screen, n); reg(l);
-  const x = W / 2 - p.w / 2 + (i - 1) * (p.w + 22), y = 330 + DY;
-  items.get(p.el).base = { x, y, s: 1, o: 0, r: 0 };
-  const t = S.themes + 0.15 + i * 0.18;
-  tw(p.el, "o", t, t + 0.3, 0, 1, "out"); tw(p.el, "y", t, t + 0.6, y + 500, y, "out"); tw(p.el, "r", t, t + 0.6, (i - 1) * 8, 0, "out");
-  tw(p.el, "o", S.split - 0.3, S.split, 1, 0, "lin"); tw(p.el, "y", S.split - 0.3, S.split, y, y - 60, "io");
-  const lb = mk("div", "label abs", stage, label); lb.style.width = p.w + "px";
-  reg(lb, { x, y: y + p.h + 22, o: 0 });
-  tw(lb, "o", t + 0.4, t + 0.7, 0, 1, "out"); tw(lb, "o", S.split - 0.3, S.split, 1, 0, "lin");
-});
-
-// Lite vs Jailbreak
-caption(S.split, S.end, "Two builds, one app", "Pick the one your iPhone runs");
-const CW = 486, CX = [(W - 2 * CW - 28) / 2, (W - 2 * CW - 28) / 2 + CW + 28];
-const cols = [
-  { shot: "lite-home", title: "Lite", small: "IPA · no jailbreak", items: ["AltStore sources", "Sign + install IPAs on the phone", "Re-sign before expiry", "Push alerts for updates"] },
-  { shot: "jb-home", title: "Jailbreak", small: ".deb · jailbroken iPhones", items: ["APT repos", "Tweaks and themes", "Install queue, apt underneath", "Everything Lite does, where it applies"] },
+// ---- the one phone's place: whole on screen, and closer (4:5 only) while there are words to read on it
+const WHOLE = (H - BAND - 34) / ph, NEAR = TALL ? WHOLE : 1.62;
+const zooms = TALL ? [] : [ // [from, to, the point of the screen, in points from its top, kept in the middle]
+  [L("add-source") - 0.25, L("unknown-source") + 1.0, 330], [L("search") + 0.2, L("app") - 0.1, 330], [L("confirm-install") - 0.1, L("installing") + 0.3, 320],
+  [L("update-found") - 0.1, L("confirm-update") + 0.5, 330], [L("theme") + 0.2, L("ios26") + 0.4, 330],
+  [J("search") + 0.1, J("installing") + 0.2, 330],
 ];
-cols.forEach((c, i) => {
-  const t = S.split + 0.2 + i * 0.25;
-  const p = phone(210, { x: 0, y: 0 });
-  const l = img(p.screen, c.shot); reg(l);
-  const px = CX[i] + (CW - p.w) / 2, py = 262 + DY;
-  items.get(p.el).base = { x: px, y: py, s: 1, o: 0, r: 0 };
-  tw(p.el, "o", t, t + 0.3, 0, 1, "out"); tw(p.el, "y", t, t + 0.5, py + 80, py, "out");
-  tw(p.el, "o", S.end - 0.3, S.end, 1, 0, "lin");
-  const card = mk("div", "card abs", stage, `<h2>${c.title}<small>${c.small}</small></h2><ul>${c.items.map((x) => `<li>${x}</li>`).join("")}</ul>`);
-  card.style.width = CW + "px";
-  const cy = py + p.h + 18;
-  reg(card, { x: CX[i], y: cy, o: 0 });
-  tw(card, "o", t + 0.15, t + 0.45, 0, 1, "out"); tw(card, "y", t + 0.15, t + 0.6, cy + 60, cy, "out");
-  tw(card, "o", S.end - 0.3, S.end, 1, 0, "lin");
-  card.querySelectorAll("li").forEach((li, j) => { reg(li, { o: 0 }); const tj = t + 0.6 + j * 0.28; tw(li, "o", tj, tj + 0.25, 0, 1, "out"); tw(li, "x", tj, tj + 0.35, 40, 0, "out"); });
-  stage.append(p.el); // the phone over the card's top edge
-});
+function solo(t) {
+  let k = 0, mid = 437;
+  for (const [a, b, y] of zooms) { const z = Math.min(smooth((t - a) / 0.7), smooth((b + 0.7 - t) / 0.7)); if (z > k) { k = z; mid = y; } }
+  const s = mix(WHOLE, NEAR, k), room = H - BAND;
+  const whole = BAND + 8, near = Math.min(BAND + 8, BAND + room / 2 - (mid + PAD) * NEAR);
+  return { x: (W - pw * s) / 2, y: mix(whole, near, k), s };
+}
 
-// end card
-tw(band, "o", S.end - 0.2, S.end + 0.2, 1, 0, "lin"); tw(band, "y", S.end - 0.2, S.end + 0.2, 0, -240, "io");
-const end = mk("div", "abs end", stage, `<img class="hookicon" src="../../web/app/icons/icon-glossy-228.png"><div class="name">${NAME}</div>
-  <div class="tag">The classic iOS look, for modern iPhones</div><div class="url">${DOMAIN}</div><div class="lic">Free, GPL-3.0</div>`);
-loads.push(new Promise((r) => { const i = end.querySelector("img"); i.onload = r; i.onerror = r; }));
-reg(end, { y: 230 + DY, o: 0 });
-tw(end, "o", S.end + 0.1, S.end + 0.45, 0, 1, "out"); tw(end, "s", S.end + 0.1, S.end + 0.7, 0.85, 1, "back");
-const url = end.querySelector(".url"); reg(url, { o: 0 }); tw(url, "o", S.end + 0.5, S.end + 0.8, 0, 1, "out"); tw(url, "s", S.end + 0.5, S.end + 0.9, 0.7, 1, "back");
-const lic = end.querySelector(".lic"); reg(lic, { o: 0 }); tw(lic, "o", S.end + 0.9, S.end + 1.2, 0, 1, "out");
-
-window.render = (t) => renderAt(t);
-window.ready = Promise.all(loads).then(() => document.fonts.ready).then(() => { renderAt(0); return true; });
-renderAt(Number(q.get("t") || 0));
+window.render = async (t) => {
+  const take = smooth((t - TAKE) / 0.9), swap = smooth((t - SWAP) / 0.8), out = smooth((t - END) / 0.6);
+  const one = solo(t);
+  const a = { x: gap, y: pairY, s: PAIR }, b = { x: 2 * gap + pw * PAIR, y: pairY, s: PAIR };
+  A.place(mix(a.x, one.x, take) - swap * (W + 60), mix(a.y, one.y, take), mix(a.s, one.s, take));
+  if (t < SWAP) B.place(b.x + take * (W + 60), b.y, b.s);
+  else B.place(one.x + (1 - swap) * (W + 60), one.y + out * (H + 40), one.s);
+  A.el.style.visibility = t < SWAP + 0.85 ? "visible" : "hidden";
+  B.el.style.visibility = t < TAKE + 0.95 || t >= SWAP ? "visible" : "hidden";
+  band.style.opacity = t < TAKE ? 0 : Math.min(smooth((t - TAKE) / 0.5), 1);
+  opening.style.opacity = fade(t, -1, TAKE + 0.3); // there from the first frame, which is the video's poster too
+  labels.forEach((l, i) => { l.style.opacity = 1 - smooth((t - TAKE) / 0.3); });
+  for (const w of words) w.e.style.opacity = fade(t, w.a, w.b);
+  const e = smooth((t - END - 0.35) / 0.5);
+  end.style.opacity = e;
+  end.style.transform = `translateY(${(H / 2 - 330 + (1 - e) * 24).toFixed(2)}px)`;
+  const jobs = [];
+  if (t < SWAP + 0.9) jobs.push(A.show(lite.src(t)));
+  if (t < TAKE + 1) jobs.push(B.show(Math.max(0, t < HOLD ? 0 : mix(0, rec.jailbreak.at("sources"), clamp((t - HOLD) / 2.1)))));
+  else if (t >= SWAP - 0.1) jobs.push(B.show(jail.src(t)));
+  await Promise.all(jobs);
+};
+window.ready = Promise.all([...end.querySelectorAll("img")].map((i) => i.decode())).then(() => document.fonts.ready).then(() => window.render(0)).then(() => true);
 </script>
 </body>
 </html>

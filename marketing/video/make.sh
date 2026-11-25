@@ -1,5 +1,5 @@
 #!/bin/sh
-# The showcase video's recordings, in one command:
+# The showcase video, in one command:
 #
 #   marketing/video/make.sh [OUT_DIR]        (default: marketing/video/out, gitignored)
 #
@@ -8,6 +8,8 @@
 # 3. capture.mjs: one continuous session of each build, 60 fps under a virtual clock, with a fake native bridge:
 #    OUT_DIR/rec/lite.mp4 (shots-lite.json) and OUT_DIR/rec/jailbreak.mp4 (shots-jailbreak.json), each with a .json
 #    (marks, looks, touches) and a .txt (the words on screen at each mark)
+# 4. render.mjs cuts them (video.html) into OUT_DIR/showcase-4x5.mp4 (1080x1350) and OUT_DIR/showcase-9x16.mp4
+#    (1080x1920), 60 fps H.264
 #
 # Needs: node 22+, python3, chromium, ffmpeg. No network, no phone.
 set -eu
@@ -34,4 +36,7 @@ done
 cd "$out" # capture.mjs keeps its Chromium profile in the current directory
 APP_VERSION=$version timeout 2400 node "$here/capture.mjs" "http://127.0.0.1:$port/" rec "$here/shots-lite.json" --state state --mode sideload
 APP_VERSION=$version timeout 2400 node "$here/capture.mjs" "http://127.0.0.1:$port/" rec "$here/shots-jailbreak.json" --state state --mode jailbreak
-echo "done: $out/rec/lite.mp4 $out/rec/jailbreak.mp4"
+for cut in 4x5:1350 9x16:1920; do
+  timeout 2400 node "$here/render.mjs" . "showcase-${cut%:*}.mp4" --h "${cut#*:}"
+done
+echo "done: $out/showcase-4x5.mp4 $out/showcase-9x16.mp4"
