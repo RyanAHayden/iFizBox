@@ -9,7 +9,8 @@
     window.render(t)      draws time t (a promise: the recordings' frames are decoded)
     window.ready          a promise: the marks and images are loaded
 
-  The flow is never cut: the recordings run from mark to mark, some stretches faster (MAP). The phone is a plain
+  A recording is never cut once it runs: it goes from mark to mark, some stretches faster (MAP). The jailbreak one
+  opens beside the other, then comes back from its Search on. The phone is a plain
   rounded frame drawn here (no device artwork). The name and domain come from web/app/brand.js.
 -->
 <html>
@@ -86,7 +87,7 @@ const TAKE = HOLD + 1.6;        // the no-jailbreak phone takes over
 const SWAP = lite.to + 0.35;    // the jailbroken phone comes back in its place
 const jail = plan("jailbreak", JAIL, SWAP + 0.9);
 const END = jail.to + 0.5;      // the end card
-window.DURATION = Math.ceil((END + 3.1) * 60) / 60;
+window.DURATION = Math.ceil((END + 2.8) * 60) / 60;
 
 // ---- the phones: a screen 402 points wide, scaled by place()
 const PAD = 15;
@@ -127,17 +128,20 @@ opening.style.top = (TALL ? 230 : 70) + "px";
 build(TAKE + 0.5, SWAP, "No jailbreak");
 say(TAKE + 0.5, L("search"), "Add a source");
 say(L("search"), L("app") + 0.2, "Find an app");
-say(L("app") + 0.2, L("changes") - 0.2, "Tap Install");
-say(L("changes") - 0.2, L("up-to-date") + 0.6, "New version? Tap Upgrade");
-say(L("up-to-date") + 0.6, L("ios7") - 1.1, "Change how it looks");
+say(L("app") + 0.2, L("installed") - 0.1, "Tap Install");
+say(L("installed") - 0.1, L("changes") - 0.2, "And it's on the phone");
+say(L("changes") - 0.2, L("updated") - 0.1, "New version? Tap Upgrade");
+say(L("updated") - 0.1, L("up-to-date") + 0.5, "Now it's up to date");
+say(L("up-to-date") + 0.5, L("ios7") - 1.1, "Change how it looks");
 say(L("ios7") - 1.1, L("ios13") - 1.1, "This is iOS 7");
 say(L("ios13") - 1.1, L("ios26") - 1.1, "iOS 13");
 say(L("ios26") - 1.1, L("ios6") - 0.6, "iOS 26");
 say(L("ios6") - 0.6, SWAP, "And back to iOS 6");
 build(SWAP + 0.4, END, "Jailbroken");
-say(SWAP + 0.4, J("found") + 0.5, "This one gets system tweaks");
+say(SWAP + 0.4, J("found") + 0.5, "Jailbroken? Add system tweaks");
 say(J("found") + 0.5, J("tweak") - 0.2, "Swipe one to queue it");
-say(J("tweak") - 0.2, END, "Add another, install both");
+say(J("tweak") - 0.2, J("installing") + 1.2, "Add another, install both");
+say(J("installing") + 1.2, END, "Both installed");
 
 const PAIR = TALL ? 1.1 : 1.02, pw = (402 + 2 * PAD), ph = (874 + 2 * PAD);
 const gap = (W - 2 * pw * PAIR) / 3, pairY = TALL ? 640 : 330;
@@ -149,9 +153,9 @@ end.id = "end";
 // ---- the one phone's place: whole on screen, and closer (4:5 only) while there are words to read on it
 const WHOLE = (H - BAND - 34) / ph, NEAR = TALL ? WHOLE : 1.62;
 const zooms = TALL ? [] : [ // [from, to, the point of the screen, in points from its top, kept in the middle]
-  [L("add-source") - 0.25, L("unknown-source") + 1.0, 330], [L("search") + 0.2, L("app") - 0.1, 330], [L("confirm-install") - 0.1, L("installing") + 0.3, 320],
-  [L("update-found") - 0.1, L("confirm-update") + 0.5, 330], [L("theme") + 0.2, L("ios26") + 0.4, 330],
-  [J("search") + 0.1, J("installing") + 0.2, 330],
+  [L("add-source") - 0.25, L("unknown-source") + 1.0, 330], [L("search") + 0.2, L("app") - 0.1, 330], [L("confirm-install") - 0.1, L("installing") + 1.1, 330],
+  [L("changes") + 0.1, L("confirm-update") + 1.0, 330], [L("up-to-date") - 0.4, L("up-to-date") + 0.3, 330], [L("theme") + 0.2, L("ios26") + 0.4, 330],
+  [J("search") + 0.1, J("installing") + 0.7, 330],
 ];
 function solo(t) {
   let k = 0, mid = 437;
