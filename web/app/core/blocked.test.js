@@ -62,9 +62,9 @@ test("Changes leaves a blocked package out (it draws from the visible list)", ()
   const now = Date.UTC(2026, 10, 18, 12);
   const records = [{ id: "x", version: "0", first: now - 9e8 }, // the first load, so later records count
     ...["one", "two"].map((id) => ({ id, version: "1", first: now - 1000 }))];
-  assert.deepEqual(dayGroups(records, c.list()).flatMap((g) => g.rows.map((r) => r.id)).sort(), ["one", "two"]);
+  assert.deepEqual(dayGroups(records, c.list(), { now }).flatMap((g) => g.rows.map((r) => r.id)).sort(), ["one", "two"]);
   c.setBlocked(["two"]);
-  assert.deepEqual(dayGroups(records, c.list()).flatMap((g) => g.rows.map((r) => r.id)), ["one"]);
+  assert.deepEqual(dayGroups(records, c.list(), { now }).flatMap((g) => g.rows.map((r) => r.id)), ["one"]);
 });
 
 test("blocked authors are F104's hidden authors: one list", () => {
