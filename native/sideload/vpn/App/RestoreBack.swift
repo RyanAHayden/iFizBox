@@ -72,12 +72,14 @@ enum RestoreBack {
     /// After a stop, at launch and on coming back. Never blocks.
     static func look() {
         guard owed, LocalVPN.restore else { return }
+        if isClosing { return }
         lock.lock(); let already = looking; looking = true; lock.unlock()
         guard !already else { return }
         DispatchQueue.global(qos: .utility).async { turn() }
     }
 
     private static func turn() {
+        if isClosing { return done() }
         let n = now()
         let step = owed && LocalVPN.restore ? RestoreDue.step(n) : .drop
         switch step {
@@ -112,6 +114,34 @@ enum RestoreBack {
             }
             if ran { return done() }
             DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + again) { turn() }
+        }
+    }
+
+    // ---- iFizBox's own update (CloseForUpdate, the This iPhone route): the back run before it closes
+
+    /// The most closing() adds to the close: the exit doesn't wait longer for it.
+    static let closeLimit: TimeInterval = 15
+    /// Read before the close begins: a back run may be due.
+    static var mayClose: Bool { owed && LocalVPN.restore && remembered && !held }
+    private static var closingRun = false // guarded by lock: looks stop, the close has the owed run
+    static var isClosing: Bool { lock.lock(); defer { lock.unlock() }; return closingRun }
+
+    /// Blocking, never on the main thread, ours just taken down for good (LocalVPN.downToClose): the back run, when it
+    /// can run unasked, and Shortcuts' way back here: iOS lets an old copy opened after the exit keep it waiting. What
+    /// uses ours still (the update's own connection) is over with it. Owed still when Shortcuts wasn't opened.
+    static func closing() {
+        guard mayClose else { return }
+        lock.lock(); closingRun = true; lock.unlock()
+        let t0 = Date()
+        // not for ever: a look may be in a back run of its own
+        LocalVPN.withNoStart(before: t0.addingTimeInterval(closeLimit / 3)) {
+            var n = now()
+            n.waiting = false // the update itself
+            guard mayClose, RestoreDue.step(n) == .back else { return log("not run before the close; owed \(owed)") }
+            let r = run()
+            log("before the close: \(r.error ?? "done") in \(String(format: "%.1f", Date().timeIntervalSince(t0))) s")
+            while !r.due, !CellularShortcutBridge.active(), Date().timeIntervalSince(t0) < closeLimit { Thread.sleep(forTimeInterval: 0.1) }
+            log("before the close: \(CellularShortcutBridge.active() ? "back in front" : "not back in front")")
         }
     }
 

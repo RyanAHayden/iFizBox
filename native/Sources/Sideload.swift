@@ -640,7 +640,7 @@ enum Sideload {
             log?("iOS has the new \(app.name) (\(why)): closing \(Brand.name) so iOS can finish installing it")
             SignBridge.queue.async { opened(.success((app, record))); served?(true) }
             DispatchQueue.main.async { CloseForUpdate.hereReady() }
-            CloseForUpdate.exitBackstop("This iPhone self-update")
+            CloseForUpdate.exitBackstop("This iPhone self-update", after: CloseForUpdate.backstop + CloseForUpdate.restoreSpare)
         } : nil
         if isSelf { DispatchQueue.main.async { CloseForUpdate.hereBegan(app: app) } }
         DispatchQueue.main.async { KeepAlive.shared.begin(); IDevice.AppFront.watch() }
@@ -1765,7 +1765,7 @@ enum CloseForUpdate {
         guard state != .finished else { return }
         if state != .waiting { IDevice.ilog("self-close: closing from state \(state?.rawValue ?? "none")") }
         set(.finished)
-        closeWith(exitAfter: hereExit)
+        closeWith(exitAfter: hereExit, restore: true)
     }
 
     // installd answered (installed it, or refused it) while iFizBox was still here: nothing is closing. A watch
@@ -1776,7 +1776,13 @@ enum CloseForUpdate {
         sinks = sinks.filter { $0(nil) }
     }
 
-    private static func closeWith(exitAfter: TimeInterval = 0.6) {
+    static let backIn: TimeInterval = 0.5 // after the back run: iFizBox is in front again before it goes
+    // F438: what Restore My VPN's back run before the close may add to it; none with nothing owed.
+    static var restoreSpare: TimeInterval { RestoreBack.mayClose ? RestoreBack.closeLimit : 0 }
+
+    // `restore`: the back run goes before the exit, when it is owed and can run unasked.
+    private static func closeWith(exitAfter: TimeInterval = 0.6, restore: Bool = false) {
+        let spare = restore ? restoreSpare : 0
         // B124: the icon badge counted this very update and iOS keeps it through the install: drop it now (other
         // updates stay counted). B178: no notification goes with the close.
         BackgroundCheck.selfHandedOff(ids: handing?.ids ?? [], version: handing?.version ?? "")
@@ -1787,15 +1793,22 @@ enum CloseForUpdate {
         KeepAlive.shared.begin() // until the exit: the install's own hold ends with its connection
         DispatchQueue.global(qos: .userInitiated).async {
             let wait = LocalVPN.downToClose() ? max(exitAfter, vpnAsk) : exitAfter
+            let off = DispatchTime.now()
+            if spare > 0 {
+                let over = DispatchSemaphore(value: 0)
+                DispatchQueue.global(qos: .userInitiated).async { RestoreBack.closing(); over.signal() }
+                if over.wait(timeout: off + spare) == .timedOut { IDevice.ilog("self-close: the back run isn't over, going on") }
+            }
+            let at = max(off + wait, spare > 0 ? .now() + backIn : off) // off + wait: B440's close
             IDevice.ilog("self-close: exiting in \(wait) s")
-            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + wait) {
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: at) {
                 _ = LocalVPN.downToClose() // a start already going on when it went off
                 IDevice.ilog("self-close: exit")
                 exit(0)
             }
         }
         // B173: the exit never waits on the main queue alone
-        exitBackstop("closeWith", after: LocalVPN.downWait + vpnAsk + 1)
+        exitBackstop("closeWith", after: LocalVPN.downWait + vpnAsk + 1 + spare)
     }
 
     // B173: exit(0) from a queue of its own `after` seconds from now, whatever the main queue is doing (any queue).

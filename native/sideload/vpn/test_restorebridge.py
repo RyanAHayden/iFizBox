@@ -53,6 +53,17 @@ class RestoreBridge(unittest.TestCase):
         self.assertIn("RestoreShortcut.verdict(RestoreShortcut.report", drive)
         self.assertIn("otherVPN: LocalVPN.otherVPNUp()", drive)
 
+    def test_before_the_close(self):
+        """F438: the app's own update. Only owed, the setting on, remembered, not left; the rules see the rest."""
+        back = read("App", "RestoreBack.swift")
+        self.assertIn("owed && LocalVPN.restore && remembered && !held", part(back, "static var mayClose", "\n"))
+        close = part(back, "static func closing()", "\n    }\n")
+        self.assertOrder(close, ["guard mayClose else { return }", "closingRun = true", "LocalVPN.withNoStart(before:",
+                                 "n.waiting = false", "RestoreDue.step(n) == .back", "let r = run()", "CellularShortcutBridge.active()"])
+        self.assertIn("< closeLimit", close)
+        self.assertIn("if isClosing { return done() }", part(back, "private static func turn()", "let step"))
+        self.assertIn("if used, !RestoreBack.isClosing { return (false, false) }", read("App", "LocalVPN.swift"))
+
     def test_is_down(self):
         """Our tunnel counts as up when its state isn't known, while it comes or goes, and while something holds it."""
         down = part(read("App", "LocalVPN.swift"), "static func isDown()", "/// Our configuration as iOS has it")
