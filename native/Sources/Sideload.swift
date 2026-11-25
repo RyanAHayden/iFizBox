@@ -763,8 +763,9 @@ enum Sideload {
                                      opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
                                      served: ((Bool) -> Void)?) {
         let once = Once()
-        let fallback = HostFallback() // B89
-        KeepAlive.shared.begin()
+        let hold = InstallPrompt.Awake(bundleID: app.bundleID, name: app.name) // B435: KeepAlive
+        let fallback = HostFallback(hold: hold) // B89
+        hold.start()
         // B29: the bundle ID iOS is told to install (the manifest's, the signed Info.plist's) and what the
         // server sends, in the install log; the server's lines reach the page through signing.progress.
         InstallLog.reset(app.bundleID)
@@ -774,14 +775,15 @@ enum Sideload {
         let bid = app.bundleID
         let iosLink = URL(string: link)!
         // B85: any line from the IPA's route is iOS asking for it: Install was tapped (InstallPrompt.heard)
-        let serverLog = { (s: String) in InstallPrompt.heard(bid); InstallLog.say(bid, s) }
+        let serverLog = { (s: String) in InstallPrompt.heard(bid, hold: hold); InstallLog.say(bid, s) }
         let end = { (ok: Bool) in
             guard once.first() else { return }
             fallback.finish() // B89
+            hold.end() // B435
             InstallPrompt.end(bid, link: iosLink)
             job?.end()
             if !ok {
-                serverLog("iOS didn't fetch the whole IPA within 15 minutes; it is no longer served"); server.remove(ipaPath)
+                InstallLog.say(bid, "iOS didn't fetch the whole IPA within 15 minutes; it is no longer served"); server.remove(ipaPath)
                 SignBridge.queue.async { forgetUnlessInstalled(bid) { InstallLog.say(bid, $0) } } // B136
             }
             // B29: served: the route stays for the grace too. iOS's installer may ask again for parts, and
@@ -789,7 +791,7 @@ enum Sideload {
             SignBridge.queue.asyncAfter(deadline: .now() + servedGrace) {
                 if ok { server.remove(ipaPath) }
                 try? FileManager.default.removeItem(at: output)
-                KeepAlive.shared.end()
+                hold.over()
             }
             served?(ok)
         }
@@ -799,6 +801,8 @@ enum Sideload {
         let note = { (s: String) in InstallLog.say(bid, s) }
         route.note = note
         route.onFrozen = { f in
+            // B435: iOS suspended the app because its hold was given back: the listener is made again, nothing to upload
+            if hold.slept(from: f.from) { return note("\(Brand.name) slept after the Install prompt; \(app.name) is still served here") }
             SignBridge.queue.asyncAfter(deadline: .now() + frozenGrace) {
                 guard !server.asked(ipaPath, since: f.to) else {
                     return note("iOS asked for the IPA again after the freeze; it stays served here")
@@ -818,13 +822,14 @@ enum Sideload {
             server.cancel(ipaPath)
             SignBridge.queue.async {
                 try? FileManager.default.removeItem(at: output)
-                KeepAlive.shared.end()
+                hold.over()
                 forgetUnlessInstalled(bid, log: log) // B136
             }
             served?(false)
         }
         // B89: an IPA handed to the Signing Server after a freeze ends by that copy's status instead
-        SignBridge.queue.asyncAfter(deadline: .now() + 15 * 60) { if !fallback.hosting { end(false) } }
+        // B435: wall clock: the app may sleep meanwhile
+        SignBridge.queue.asyncAfter(wallDeadline: .now() + 15 * 60) { if !fallback.hosting { end(false) } }
         SignBridge.queue.async {
             saveRecords(SignedRecords.adding(record, to: records()))
             reschedule()
@@ -833,7 +838,7 @@ enum Sideload {
         DispatchQueue.main.async {
             log?("Handing iOS the install link; it asks \"Install \(app.name)?\"")
             // B85: once iFizBox is in front (an earlier app's prompt answered), and again when iOS drops it
-            InstallPrompt.open(iosLink, bundleID: bid, name: app.name) { _ in
+            InstallPrompt.open(iosLink, bundleID: bid, name: app.name, hold: hold) { _ in
                 if job?.cancelled == true { opened(.failure(SignJob.cancelledError)) } else { opened(.success((app, record))) }
             }
         }
@@ -915,6 +920,8 @@ enum Sideload {
     final class HostFallback {
         private let lock = NSLock()
         private var begun = false, ended = false, up = false
+        let hold: InstallPrompt.Awake // B435: stays held while the upload runs
+        init(hold: InstallPrompt.Awake) { self.hold = hold }
         var hosting: Bool { lock.lock(); defer { lock.unlock() }; return up }
         var over: Bool { lock.lock(); defer { lock.unlock() }; return ended }
         func begin() -> Bool {
@@ -941,7 +948,9 @@ enum Sideload {
             state.dropped()
             return note("Couldn't copy the IPA for the upload (\(error.localizedDescription)); it stays served here only")
         }
+        state.hold.uploading(true)
         uploadHosted(copy, server: remote, app: app) { res in
+            state.hold.uploading(false)
             try? FileManager.default.removeItem(at: copy)
             switch res {
             case .failure(let e):
@@ -1001,7 +1010,7 @@ enum Sideload {
                 if ok, marks?["finished"] as? Bool == true { return step(true, true) }
                 let now = ok && marks?["started"] as? Bool == true
                 if now && !started {
-                    InstallPrompt.heard(bid) // the prompt was answered with Install
+                    InstallPrompt.heard(bid, hold: state.hold) // the prompt was answered with Install
                     step(false, true)
                 }
                 if Date().timeIntervalSince(since) > hostedLimit { return step(false, false) }

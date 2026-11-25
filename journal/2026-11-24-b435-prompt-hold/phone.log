@@ -1,0 +1,47 @@
+Nov 24 21:11:59 install com.ryha.test.alpha: KeepAlive: held for Test Alpha
+Nov 24 21:11:59 install com.ryha.test.alpha: iOS took the install link for Test Alpha
+Nov 24 21:12:07 install com.ryha.test.alpha: No Install prompt for Test Alpha after 8 s; asking iOS again
+Nov 24 21:12:07 install com.ryha.test.alpha: iOS took the install link for Test Alpha (open 2)
+Nov 24 21:12:09 install com.ryha.test.alpha: iOS showed its Install prompt for Test Alpha
+Nov 24 21:12:10 install com.ryha.test.alpha: iFizBox went to the background; still serving
+Nov 24 21:13:11 install com.ryha.test.alpha: KeepAlive: let go for Test Alpha
+Nov 24 21:14:00 install com.ryha.test.alpha: iOS froze iFizBox for 13 s, 21:13:47 to 21:14:00; its listening socket may have stayed shut
+Nov 24 21:14:00 install com.ryha.test.alpha: iFizBox slept after the Install prompt; Test Alpha is still served here
+Nov 24 21:14:00 install com.ryha.test.alpha: iFizBox came back to the front
+Nov 24 21:14:00 install com.ryha.test.alpha: Couldn't listen again on 127.0.0.1:60825 (The operation couldn’t be completed. (Network.NWError error 48 - Address already in use)); trying again
+Nov 24 21:14:00 install com.ryha.test.alpha: The install server listens again on 127.0.0.1:60825 (its state was setup)
+Nov 24 21:14:09 install com.ryha.test.alpha: Asked iOS again to install Test Alpha
+Nov 24 21:14:09 install com.ryha.test.alpha: iFizBox isn't in front (an Install prompt is up, or it is in the background): the prompt for Test Alpha opens once it is
+Nov 24 21:14:22 install com.ryha.test.alpha: KeepAlive: held for Test Alpha
+Nov 24 21:14:22 install com.ryha.test.alpha: iOS: HEAD the whole file -> 200, bytes 0-2372798 of 2372799
+Nov 24 21:15:08 install com.utmapp.UTM-SE: KeepAlive: held for UTM SE
+Nov 24 21:15:08 install com.utmapp.UTM-SE: iOS took the install link for UTM SE
+Nov 24 21:15:08 install com.utmapp.UTM-SE: iOS showed its Install prompt for UTM SE
+Nov 24 21:15:11 install com.utmapp.UTM-SE: iOS: HEAD the whole file -> 200, bytes 0-244232031 of 244232032
+Nov 24 21:15:12 install com.utmapp.UTM-SE: iOS: GET the whole file -> 200, bytes 0-244232031 of 244232032
+Nov 24 21:15:12 install com.utmapp.UTM-SE: The Install prompt for UTM SE closed; iOS is fetching the IPA
+Nov 24 21:15:12 install com.utmapp.UTM-SE: Sent bytes 0-244232031; 244232032 of 244232032 bytes sent to iOS (all of it)
+Nov 24 21:15:12 install com.utmapp.UTM-SE: The whole IPA is sent to iOS
+Nov 24 21:15:13 install com.utmapp.UTM-SE: iFizBox went to the background; still serving
+Nov 24 21:15:13 install com.ryha.test.alpha: iFizBox went to the background; still serving
+Nov 24 21:16:24 install com.ryha.test.alpha: KeepAlive: let go for Test Alpha
+Nov 24 21:17:13 install com.utmapp.UTM-SE: KeepAlive: let go for UTM SE
+Nov 24 21:17:35 install com.ryha.test.alpha: KeepAlive: held for Test Alpha
+Nov 24 21:17:35 install com.ryha.test.alpha: iOS took the install link for Test Alpha
+Nov 24 21:17:35 install com.ryha.test.alpha: iOS showed its Install prompt for Test Alpha
+Nov 24 21:17:38 install com.ryha.test.alpha: The Install prompt for Test Alpha closed; waiting for iOS to ask for the IPA
+Nov 24 21:17:53 install com.ryha.test.alpha: iFizBox went to the background; still serving
+Nov 24 21:18:38 install com.ryha.test.alpha: KeepAlive: let go for Test Alpha
+Nov 24 21:20:22 install com.ryha.test.alpha: iOS froze iFizBox for 69 s, 21:19:14 to 21:20:22; its listening socket may have stayed shut
+Nov 24 21:20:22 install com.ryha.test.alpha: iFizBox slept after the Install prompt; Test Alpha is still served here
+Nov 24 21:20:22 install com.ryha.test.alpha: iFizBox came back to the front
+Nov 24 21:20:23 install com.ryha.test.alpha: Couldn't listen again on 127.0.0.1:60826 (The operation couldn’t be completed. (Network.NWError error 48 - Address already in use)); trying again
+Nov 24 21:20:23 install com.ryha.test.alpha: The install server listens again on 127.0.0.1:60826 (its state was setup)
+Nov 24 21:20:28 install com.ryha.test.alpha: Asked iOS again to install Test Alpha
+Nov 24 21:20:28 install com.ryha.test.alpha: KeepAlive: held for Test Alpha
+Nov 24 21:20:28 install com.ryha.test.alpha: iOS took the install link for Test Alpha (open 2)
+Nov 24 21:20:28 install com.ryha.test.alpha: iOS showed its Install prompt for Test Alpha
+Nov 24 21:20:34 install com.ryha.test.alpha: iOS: HEAD the whole file -> 200, bytes 0-2372792 of 2372793
+Nov 24 21:20:34 install com.ryha.test.alpha: iOS: GET the whole file -> 200, bytes 0-2372792 of 2372793
+Nov 24 21:20:34 install com.ryha.test.alpha: Sent bytes 0-2372792; 2372793 of 2372793 bytes sent to iOS (all of it)
+Nov 24 21:20:34 install com.ryha.test.alpha: The whole IPA is sent to iOS
