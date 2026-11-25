@@ -71,16 +71,19 @@ UI concepts (a screen proposed before it's built) go through the concept skill, 
   easily.
   Only one agent may drive its screen at a time. Taps, swipes, opening URLs and screenshots go through
   `tools/ui-4s.sh` under its lock: `lock <ID>` first, `unlock <ID>` when done (also after a failure). If it's
-  locked, do other work and try later. Reading or pulling files over ssh needs no lock and can run alongside.
+  locked (`tools/ui-4s.sh state` exits 75), run `/home/ryha/repos/agent-runner/run wait-for iphone4s`: the session
+  ends and goes on once the phone is free; never poll for it. Reading or pulling files over ssh needs no lock and can run alongside.
 - The iPhone 7 (iOS 15.8.8, palera1n rootless) is the test phone for the jailbreak app (.deb): `ssh 7` (user
   `mobile`; `sudo -n` works, passwordless since 2026-11-18; if it fails, ask the user). Read `docs/iphone7.md` before using it. Touch it only when
   your task says so; drive its screen only through `tools/ui-7.sh` under its own lock. If `ssh 7` fails or
   `/var/jb` is missing, it rebooted: stop and ask the user to re-jailbreak it. Phone only when Chromium/local can't
-  check (the rule under the iPhone 15 Pro, below).
+  check (the rule under the iPhone 15 Pro, below). If its lock is held or it is missing (`tools/ui-7.sh state`
+  exits 75 or 69), run `/home/ryha/repos/agent-runner/run wait-for iphone7` and don't poll.
 - The iPhone 15 Pro (iOS 27, no jailbreak, on this desktop's USB) is the test phone for the sideload build (Lite
   IPA). Agents may install, launch and tap on it without the user, only through `tools/ui-15.sh` under its own
   lock (go-ios + WebDriverAgent from Linux; read `docs/iphone15.md` first). If it isn't listed (`ios list`), it's
-  unplugged or untrusted: ask the user.
+  unplugged or untrusted: ask the user. If its lock is held (`tools/ui-15.sh state` exits 75), run
+  `/home/ryha/repos/agent-runner/run wait-for iphone15` and don't poll.
 - **Phone only when Chromium/local can't check** (both phones; user, 2026-11-21). Web and app changes in `web/app/`
   are checked in Chromium (the `tools/readme_shots.py` / `capture.mjs` route with the fake bridge) and with
   `node --test`. Take a phone's lock only for what needs the real device: the native shell, signing and installing,

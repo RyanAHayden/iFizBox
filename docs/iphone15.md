@@ -13,7 +13,9 @@ notifications. Write in the journal why Chromium couldn't do it.
 Hold the lock only while you drive the screen, and give it back even after a failure: in a script, put
 `trap 'tools/ui-15.sh unlock T99' EXIT` right after `lock`. When a runner session ends or is dropped, the runner
 frees every phone lock its task holds (`runner.toml` `on_exit` runs `tools/ui-release.sh`). A lock nobody gives back
-blocks every other phone task until it goes stale after 30 minutes.
+blocks every other phone task until it goes stale after 30 minutes. When `lock` fails because another task holds it,
+don't poll: `tools/ui-15.sh state` exits 0 free, 75 busy (line 1 names the holder), 69 missing, and
+`agent-runner run wait-for iphone15` ends your session until the phone is free.
 
 ## How it works
 
