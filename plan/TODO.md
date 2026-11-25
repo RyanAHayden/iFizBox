@@ -11,6 +11,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
+- [ ] **F441** Showcase video: a splash opening, no two phones (user 2026-11-25: 'make the video have a better splash page start and not show 2 phones at the start'). Replace the two-phone opening and its labels with a short splash (about 3 s, also a good poster frame): our app icon, the name and the existing line 'works with or without a jailbreak' on the same pinstripe ground, then one move into the no-jailbreak phone. Delete the code only the old opening used; the rest of the cut stays. Update the README. Check: stills of the opening in both sizes, text readable at 360 px wide; gate green. Don't post it. When rendered, block with CONFIRM 'Watch the video with the new splash opening', both MP4s playable from the ask, as F440b did. | files: marketing/video/video.html, marketing/video/README.md
 - [ ] **D32** Put the showcase video on the GitHub README (moving picture that links to the MP4 on the v1.0.0 release), keep web/app/source.json and the APT repo from listing releases before 1.0.0, 1.0.0 release notes. Check: the gate; README renders on GitHub | files: README.md, docs/img/showcase.webp, web/app/source.json, docs/release.md
 ### Research (any time, parallel)
 
