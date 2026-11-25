@@ -519,6 +519,11 @@ enum IDevice {
         var askUntil: Date?     // after a drop, how long to keep asking iOS for the app (one deadline per install)
         var onConnect: (() -> Void)? // after an airplane wait: what to say once the connection is open
         var lookedInstalled = false // B251: a second look found the new copy while installd's step was quiet
+        var plain = false       // B433: iOS refused the Developer package; the one retry goes without it
+        func copyAgainPlain() {
+            plain = true; copied = false; installSent = false; sent = 0
+            speed = HereRecheck.CopySpeed(); copyStart = nil; lastLanded = nil
+        }
         init(ipa: URL, size: Int, remote: String, bundleID: String?, version: String?) {
             self.ipa = ipa; self.size = size; self.remote = remote; self.bundleID = bundleID; self.version = version
         }
@@ -1094,17 +1099,22 @@ enum IDevice {
         }
         run.installSent = true
         lookWhileQuiet(run, watch: w)
-        let developer = HerePackage.developer(bundleID: run.bundleID, own: Bundle.main.bundleIdentifier)
+        let developer = !run.plain && HerePackage.developer(bundleID: run.bundleID, own: Bundle.main.bundleIdentifier)
         do {
             do {
                 try sendInstall(ip, run.remote, developer: developer, cb, box.toOpaque())
             } catch let f as Failure where developer && HerePackage.retryPlain(code: f.code, lib: f.lib, text: f.text) {
-                // B433: iOS refused the Developer package: once more as a plain install (the staged IPA is still there)
-                ilog("installd refused the Developer package: \(f.text); installing once more without it")
-                note("iOS refused the install: \(f.text). Trying once more another way")
+                // B433: iOS refused the Developer package: once more as a plain install. installd deletes the staged
+                // IPA when it refuses, so it is copied again (a drop from here on reconnects plainly too).
+                ilog("installd refused the Developer package: \(f.text); copying it again for a plain install")
+                note("iOS refused the install: \(f.text). Trying once more the plain way")
+                run.copyAgainPlain()
+                try upload(run, session: s, watch: w, note: note, progress: progress)
+                run.copied = true
                 let plain = try s.installationProxy()
                 defer { installation_proxy_client_free(plain) }
                 w.begin("iOS installing the app (installd)", Limit.install)
+                run.installSent = true
                 lookWhileQuiet(run, watch: w)
                 try sendInstall(plain, run.remote, developer: false, cb, box.toOpaque())
             }

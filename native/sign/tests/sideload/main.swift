@@ -474,6 +474,8 @@ test("This iPhone: installs as a Developer package, once more plainly when iOS r
     check(!HerePackage.retryPlain(code: "timeout", lib: nil, text: "x"), "a timeout never retries plainly")
     check(!HerePackage.retryPlain(code: "install_failed", lib: 27, text: "canceled by user"), "a cancel never")
     check(!HerePackage.retryPlain(code: "install_failed", lib: 15, text: "unknown error `MismatchedApplicationIdentifierEntitlement (x)`"), "another App ID never")
+    check(!HerePackage.retryPlain(code: "install_failed", lib: 15, text: "UnknownErrorType(\"DeviceOSVersionTooLow (x)\")"), "an iOS too old never")
+    check(!HerePackage.retryPlain(code: "upload_failed", lib: 15, text: refused), "a failed copy never")
 }
 
 test("This iPhone: a dropped connection is not a failed install (B246)") {

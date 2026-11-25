@@ -14,10 +14,14 @@ enum HerePackage {
     static func developer(bundleID: String?, own: String?) -> Bool { bundleID == nil || bundleID != own }
 
     /// Whether to install once more without the Developer type after this failure: iOS answered and refused (a drop
-    /// connects again instead, HereRecheck), and not for something a plain install can't change: another App ID
-    /// (AppIDMatch) or a cancel (idevice's CanceledByUser, 27).
+    /// connects again instead, HereRecheck), and not for something a plain install can't change (`never`, idevice's
+    /// CanceledByUser 27). installd deletes the staged IPA when it refuses, so the retry costs another copy.
     static func retryPlain(code: String, lib: Int32?, text: String) -> Bool {
-        guard let lib = lib, lib != 27 else { return false }
-        return !HereRecheck.isDropped(code: code, lib: lib) && !AppIDMatch.isMismatch(text)
+        guard code == "install_failed", let lib = lib, lib != 27 else { return false }
+        return !HereRecheck.isDropped(code: code, lib: lib) && !never.contains { text.contains($0) }
     }
+
+    /// installd's names for refusals about the IPA or the phone, the same whatever the package type.
+    private static let never = ["MismatchedApplicationIdentifierEntitlement", "DeviceOSVersionTooLow", "DeviceFamilyNotSupported",
+                                "IncorrectArchitecture", "PackageExtractionFailed", "MissingPackagePath"]
 }

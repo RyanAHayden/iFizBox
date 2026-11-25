@@ -149,6 +149,9 @@ class DeveloperPackage(unittest.TestCase):
         self.assertEqual(body.count("try sendInstall("), 2)
         self.assertEqual(body.count("developer: false"), 1)
         self.assertIn("HerePackage.retryPlain(code: f.code, lib: f.lib, text: f.text)", body)
+        self.assertIn("!run.plain &&", body)
+        # installd deletes the staged IPA when it refuses (MissingPackagePath): the retry copies it again
+        self.assertLess(body.index("run.copyAgainPlain()"), body.rindex("try upload(run"))
         # the connect's own step clears the quiet hook: the retry's step begins after it
         retry = body[body.index("HerePackage.retryPlain"):]
         self.assertLess(retry.index("s.installationProxy()"), retry.index("w.begin("))
