@@ -290,3 +290,10 @@ _Said_: sort, sorting options
 _On screen_: Sort: Name | Newest | Most Sources
 _In code_: filters.sort, listSorts
 _Avoid_: order by, ranking
+
+**Run Strip**:
+The black line under every tab's nav bar while a run's page is put away with Hide: how the run goes, or its summary; tapping it brings the page back
+_Said_: the strip with Show
+_On screen_: Show
+_In code_: screens/runstrip.js, qr-strip
+_Avoid_: banner, mini bar
