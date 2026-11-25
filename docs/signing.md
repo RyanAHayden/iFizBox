@@ -20,8 +20,9 @@ iOS's install prompt.
 - **zsign as WebAssembly**: `web/app/vendor/zsign/` (`zsign.js` + `zsign.wasm`, ~2.2 MB), built by
   `tools/build-zsign-wasm.sh` from zsign at a pinned commit and OpenSSL 3.5 (static,
   legacy provider built in for RC2 `.p12`s), both checked by SHA-256; `SOURCE` and the licences (zsign MIT, OpenSSL
-  Apache-2.0, zlib) sit beside it. `tools/zsign-wasm/ifizbox.cpp` adds two calls into zsign's own code: unzip, and
-  read a plist (binary or XML) as JSON. The build is reproducible: `tools/check.sh` rebuilds it where emcc is (emsdk
+  Apache-2.0, zlib) sit beside it. `tools/zsign-wasm/ifizbox.cpp` adds calls into zsign's own code: inflate and deflate, CRC,
+  SHA-256 and a reserve for the biggest executable (for the streamed IPA, `web/app/websign-stream.js`), and read a
+  plist (binary or XML) as JSON. zsign's source is patched by the `.patch` files in `tools/zsign-wasm/`. The build is reproducible: `tools/check.sh` rebuilds it where emcc is (emsdk
   on PATH or in `~/emsdk`) and fails when the committed copy differs from what the same emcc builds.
 - **Settings > Signing**: the `.p12`, its password and the `.mobileprovision` in this browser's
   IndexedDB (`signing-client.js`), the profile's details, **Install iFizBox App** and **Bring My Certificate**,
@@ -41,12 +42,16 @@ iOS's install prompt.
      part (a 200, or a `Content-Range` starting elsewhere) starts again from byte 0. Cancel isn't retried. When it
      gives up, the alert says "The app's download broke off before the end. Check the connection and tap Install
      again." (`CUT_TEXT`).
-  2. *Signing*: `signing-worker.js` (a module Web Worker) runs `websign-job.js`: unzip, then `websign-seal.js prepareSeal` drops and renames what iOS refuses in a seal (0xe8008017): old `_CodeSignature` folders, `CodeResources` and `_MASReceipt` at a bundle's root, files named `*.DS_Store`, a name spelled both NFC and NFD made one, and a non-ASCII executable's name (with its folders and `Info.plist`) decomposed; same rules as `native/sign/SealPath.swift`. It runs again after the tweaks' files go in. Then read `Info.plist`, the
+  2. *Signing*: `signing-worker.js` (a module Web Worker) runs `websign-job.js`, which opens the IPA with
+     `websign-stream.js` (no unzip to a folder: each file stays compressed in the IPA's own bytes and is inflated as
+     zsign reads it; the IPA's SHA-256 is hashed by the wasm in pieces). Then `websign-seal.js prepareSeal` drops and renames what iOS refuses in a seal (0xe8008017): old `_CodeSignature` folders, `CodeResources` and `_MASReceipt` at a bundle's root, files named `*.DS_Store`, a name spelled both NFC and NFD made one, and a non-ASCII executable's name (with its folders and `Info.plist`) decomposed; same rules as `native/sign/SealPath.swift`. It runs again after the tweaks' files go in. Then read `Info.plist`, the
      IDs (`core/websign.js signingIds`, see "Keep Bundle IDs" below), the profile's entitlements narrowed to the
      profile's App ID (`appEntitlements`, never `get-task-allow`), the app's injected tweaks (see "Tweak injection"
-     below: `websign-job.js putTweaks` writes their files into the folder and the weak load commands into the
-     executable), then zsign on the folder (`-b` only when the app is signed the old way). zsign's own last error is
-     what the alert shows.
+     below: `websign-job.js putTweaks` writes their files into the app and the weak load commands into the
+     executable), then zsign on the app's files in its in-memory file system (`core/websign.js zsignArgs`: `-b` only
+     when the app is signed the old way, and no output path). zsign's own last error is what the alert shows. The
+     signed IPA is then put together in pieces (`core/pieces.js`, `pack`): a file nothing changed is a view of the
+     IPA it came from, and a changed one is deflated as it's written.
      Before it signs, when the app's ID is known, a Signed Before Under Another ID alert (Cancel, Sign Anyway) comes
      up if this browser signed that app before under another team or App ID (`core/keepid.js siteSigned`,
      `resignNote`; team and App ID kept per bundle ID in localStorage `ifizbox.siteSigned` once the upload is done):
@@ -110,8 +115,10 @@ copy waits on the Worker for the same 10 minutes). With an App Store Connect API
 calls and their JWT go through the Worker's pass-through to Apple ("Own provisioning profiles" below); the `.p8` stays
 in the browser.
 
-Limits: the whole IPA, unpacked, and the signed copy sit in the browser's memory at once (WebAssembly up to 4 GB,
-less on an iPhone), so very large apps may fail with "zsign stopped … too big for this browser".
+Limits: the browser holds the IPA as it came (compressed), the biggest executable (zsign signs it in one piece, mapped
+into one reserved buffer) and the compressed files it changed; the app is never unpacked as a whole. Peak memory is
+therefore about the IPA's size plus that executable, so a huge executable (an iPhone 7 signed an app with an 80 MB one) can still
+fail with "zsign stopped … too big for this browser" (WebAssembly up to 4 GB, less on an iPhone).
 
 A browser that still has an old push service worker registered drops it at the next visit (`app.js`).
 

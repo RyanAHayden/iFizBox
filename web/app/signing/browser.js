@@ -19,6 +19,7 @@ import { IPA_MAX, overSiteLimit, overMemoryLimit, memoryLimit, IFIZBOX_ID, noteS
   noteOutOfMemory, profileInfo, signingIds } from "../core/websign.js";
 import { withKeep, siteSigned, rememberSiteSigned, resignNote, RESIGN_TITLE, RESIGN_BUTTONS, installWarningText,
   INSTALL_WARNING_TITLE, INSTALL_WARNING_BUTTONS } from "../core/keepid.js";
+import { piecedBytes } from "../core/pieces.js"; // F265
 import { progressHUD } from "../nav/progress.js";
 import { noteSiteSignature } from "../core/installed.js"; // F342
 import { showAlert } from "../nav/alert.js";
@@ -268,7 +269,7 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     const warning = installWarningText([...(late ? [late] : []), ...(signed.warnings ?? [])]);
     if (warning && !(await ask(INSTALL_WARNING_TITLE, warning, INSTALL_WARNING_BUTTONS))) return stop();
     h.set("Uploading");
-    const ipaBytes = signed.ipa instanceof Uint8Array ? signed.ipa : new Uint8Array(signed.ipa);
+    const ipaBytes = piecedBytes(signed.ipa); // F265: in pieces, joined a part at a time as they go up
     // the early link takes this app only if it came out with the reserved bundle ID (iOS already has its manifest)
     intoEarly = Boolean(early && signed.bundleId === early.bundleId && (await reserved));
     if (!intoEarly) drop(); // the Ready to Install alert's own link follows
