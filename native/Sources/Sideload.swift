@@ -1801,7 +1801,7 @@ enum CloseForUpdate {
                 if over.wait(timeout: off + spare) == .timedOut { IDevice.ilog("self-close: the back run isn't over, going on") }
             }
             let at = max(off + wait, spare > 0 ? .now() + backIn : off) // off + wait: B440's close
-            IDevice.ilog("self-close: exiting in \(wait) s")
+            IDevice.ilog("self-close: exiting \(wait) s after the VPN went off\(spare > 0 ? ", the back run over" : "")")
             DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: at) {
                 _ = LocalVPN.downToClose() // a start already going on when it went off
                 IDevice.ilog("self-close: exit")

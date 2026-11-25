@@ -36,7 +36,7 @@ Run on the iPhone 15 Pro, iOS 27, Tailscale up before, iFizBox in front. Not run
 
 ## Not verified
 
-- The last edit, after the phone runs: the route's backstop reads its extra time before the close starts (compiled and text tests only).
+- The last edit, after the phone runs: the route's backstop reads its extra time before the close starts (compiled and text tests only). Also after them: the wait for a start going on was cut from 5 s to 1 s (spec review: 5 + 3 + 10 s passed the 15 s limit, and the owed mark would be lost), and the exit's log line reworded.
 - An owed run with the app left, and no owed run (F438a).
 - 10 runs (F438a).
 - Shortcuts not opening, and an Allow prompt.

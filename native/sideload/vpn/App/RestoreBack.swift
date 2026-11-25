@@ -133,8 +133,9 @@ enum RestoreBack {
         guard mayClose else { return }
         lock.lock(); closingRun = true; lock.unlock()
         let t0 = Date()
-        // not for ever: a look may be in a back run of its own
-        LocalVPN.withNoStart(before: t0.addingTimeInterval(closeLimit / 3)) {
+        // a short wait, a look may be in a back run of its own: with the run's 3 s for the app and 10 s for Shortcuts to
+        // open it stays under closeLimit, so a run that didn't open is owed again before the exit
+        LocalVPN.withNoStart(before: t0.addingTimeInterval(1)) {
             var n = now()
             n.waiting = false // the update itself
             guard mayClose, RestoreDue.step(n) == .back else { return log("not run before the close; owed \(owed)") }
