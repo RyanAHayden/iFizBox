@@ -117,7 +117,10 @@ class Wiring(unittest.TestCase):
     def test_own_update_after_its_prompt(self):  # B445: cancelled or left unanswered
         side = read("Sideload.swift")
         cfu = body(side, "enum CloseForUpdate", "final class HereClose")
-        self.assertNotIn("KeepAlive.shared", cfu)  # the Awake takes and gives back, once each
+        # the Awake takes and gives back, once each; B440: only the close itself takes one more, until it exits
+        close = cfu[cfu.index("private static func closeWith"):cfu.index("static let backstop")]
+        self.assertEqual(close.count("KeepAlive.shared.begin()"), 1)
+        self.assertEqual(cfu.count("KeepAlive.shared"), 1)
         keep = body(cfu, "private static func keep(", "\n    }\n")
         self.assertLess(keep.index("new?.start()"), keep.index("old?.over()"))
         after = body(cfu, "static func afterPrompt(", "\n    }\n")
