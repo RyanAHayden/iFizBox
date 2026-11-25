@@ -12,6 +12,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 ### Web: browse and upgrade (in order)
 
 - [~] **T83** Tools page: the three phones get Start, Use, Stop for F431's remote, and custom buttons: in runner.toml give [run.tools.iphone15], iphone7 and iphone4s page (':PORT', its remote's port) and start, and buttons where the ui scripts have a fitting one-shot action (Home; Wake or Lock; Reboot with a confirm on the 15 only), each taking and freeing the lock as USER. Needs agent-runner's F428a to F428d in the installed release, else runner.toml is refused whole: check the installed release's docs/REFERENCE.md for [run.tools] page and buttons first; when they are not in it, change nothing and block again (plan block ID --until version:<the next one>). Check: run's own config check, Start and Use on one free phone. | files: runner.toml, tools/test_ui_state.py | after: F431 BLOCKED: (until version:0.68.0) waits for the agent-runner release with F428 (tool pages and buttons)
+- [ ] **V25** Release: bump the version where the project keeps it, per its versioning rules (agent-runner's: docs/SETUP.md#versions), move CHANGELOG.md's Unreleased entries under the new version heading, commit to main so the release workflow tags and publishes it. Check: the release workflow passed (gh run list) and gh release view shows the new tag | after: all
 ### Research (any time, parallel)
 
 ### Native jailbreak app (shape decided: docs/native.md)
