@@ -23,9 +23,9 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
+- [ ] **F439** (follow-up, normal) Cleaner release notes, rewritten before every release (split into F439a, F439b) | files: tools/publish.sh, tools/release.sh, tools/altsource.py, tools/test_release.py, tools/test_altsource.py, docs/release.md, release-notes/README.md, AGENTS.md
 ### Parked
 
 - [ ] **F107** (later, when the jailbreakme.dev exploit is ready) Upgrading & Jailbreaking Help stays unlocked on the website's locked Home (user 2026-11-18: 'we will not have the jailbreak tutorial thing locked when jailbreakme.dev exploit is ready, thats for later'): leave that row out of websign-gate's browsingLocked set in screens/home.js and point it at the jailbreak guide. | files: web/app/screens/home.js
 - [ ] **F293** (follow-up, later) Serve the known-malware IPA list (core/malicious.js MALWARE_IPAS) and the known-safe list from the Worker too, so a confirmed Report as Malicious blocks without an app release (F291 ships them in the app only); plus an admin way to read reports in D1 (malicious_reports) and confirm one | files: worker/src/**, web/app/core/malicious.js, web/app/core/safe-sources.js, web/app/screens/safety.js
 - [ ] **C31** (follow-up, later) Storage keys and module-private exports (audit 2026-11-20): one module naming the 55 ifizbox.* storage keys, used by their readers and writers; drop export from module-private exports (164 are used only inside their own module) where no test imports them, or note why in docs/audit.md. Check: node --test; a test that every ifizbox.* string literal comes from the key module. | files: web/app/core/storagekeys.js, docs/audit.md
-- [ ] **F439** (follow-up, later) Cleaner release notes, rewritten before every release (split into F439a, F439b) | files: tools/publish.sh, tools/release.sh, tools/altsource.py, tools/test_release.py, tools/test_altsource.py, docs/release.md, release-notes/README.md, AGENTS.md
