@@ -394,7 +394,7 @@ export async function runAppRun(jobs, deps) {
     let says = null;
     try { says = (await isInstalled?.([id]))?.[id] ?? null; } catch { /* no answer */ }
     if (typeof says === "boolean") return says;
-    return r.mode === "resign" || r.job?.installed != null || Boolean(await recordOf(id));
+    return r.mode === "resign" || (r.job?.installed != null && id === (r.job.id ?? r.id)) || Boolean(await recordOf(id));
   };
   const run = createAppRun({
     replacing,

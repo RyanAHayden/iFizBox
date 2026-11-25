@@ -142,6 +142,27 @@ test("several apps: another row's percent or end is news from installd, so a wai
   await done;
 });
 
+test("several apps: shown words go back when another row's percent comes; stopping a row that never got to installd is no news", async () => {
+  const { c, rows, run, done, at } = await start([app("a", "Delta"), app("b", "Echo"), app("c", "Fox")]);
+  at("a").progress("copying", 1);
+  await settle();
+  at("b").progress("copying", 1);
+  await settle();
+  await c.pass(10000);
+  run.stop("c");
+  await c.pass(5000);
+  assert.equal(rowStatus(rows[1]), "Close Echo to finish installing");
+  at("a").progress("installing", 0.3);
+  assert.equal(rowStatus(rows[1]), COPIED);
+  await c.pass(CLOSE_AFTER);
+  assert.equal(rowStatus(rows[1]), "Close Echo to finish installing");
+  rows[0].airplane = rows[1].airplane = "off";
+  assert.equal(runStatus(rows), "Close Echo to finish installing", "on cellular too");
+  at("a").end();
+  at("b").end();
+  await done;
+});
+
 test("iFizBox's own IPA never says to close it; a failed row and its retry start clean", async () => {
   const self = await start([app(SELF_ID, "Self")]);
   self.at(SELF_ID).progress("copying", 1);
@@ -176,7 +197,7 @@ async function pageWords(job, says, records = []) {
     const p = { last: "", closers: [], line() {}, status(t) { p.last = t; }, progress() {}, pane(n) { return n; }, view() {},
       segmented: () => ({ select() {} }), filter() {}, bar() {}, reopen() {}, finish() {}, onClose() {}, close: async () => {} };
     let call;
-    const lanes = { local: () => true, discard() {}, sign: async (r) => ({ token: "t", bundleId: r.id }),
+    const lanes = { local: () => true, discard() {}, sign: async (r) => ({ token: "t", bundleId: job.signs ?? r.id }),
       isInstalled: async (ids) => ({ [ids[0]]: says }),
       install: (r, { progress }) => new Promise((resolve) => { call = { progress, end: () => resolve({ installed: true }) }; }) };
     const done = runAppRun([job], { queue, lanes, store: async () => store, open: () => p, later: c.later, clear: c.clear, keepAwake() {},
@@ -200,5 +221,6 @@ test("the page asks iOS, then what iFizBox knows when iOS has no answer (iOS 27)
   assert.equal(await pageWords(app("a", "Delta", { installed: "" }), null), CLOSE, "installed, version not known");
   assert.equal(await pageWords(app("a", "Delta", { mode: "resign", installed: null }), null), CLOSE);
   assert.equal(await pageWords(fresh, null), waiting);
+  assert.equal(await pageWords(app("a", "Delta", { signs: "a.own" }), null), waiting, "installs under another bundle ID");
   assert.equal(await pageWords(fresh, null, [{ id: "a", name: "Delta", version: "1.0" }]), CLOSE);
 });

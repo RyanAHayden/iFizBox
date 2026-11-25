@@ -274,8 +274,9 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
   const finishRow = (r, state, patch = {}) => {
     const f = flights.get(r.id);
     if (f) { if (f.timer != null) clear(f.timer); endQuiet(f); flights.delete(r.id); }
+    const heard = r.here && r.phase === "installing"; // F424: its end is installd's word, not a stop before it got there
     set(r, { state, ...patch });
-    if (r.here && ended(r)) installdMoved(r); // F424
+    if (heard) installdMoved(r);
   };
 
   // One phase's progress: a new phase gets its log line once; a percent only moves the bar. B152: `step` is the
@@ -347,8 +348,10 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
   };
   const installdMoved = (r) => {
     for (const o of rows) {
-      const of = o !== r && !o.closeHint && copiedOver(o) ? flights.get(o.id) : null;
-      if (of?.quiet != null) listen(o, of);
+      const of = o !== r && copiedOver(o) ? flights.get(o.id) : null;
+      if (of?.quiet == null) continue;
+      if (o.closeHint) set(o, { closeHint: false });
+      listen(o, of);
     }
   };
   const installdHeard = (r, f) => {
@@ -755,14 +758,14 @@ export function airplaneStatus(rows) {
 }
 
 export function runStatus(rows) {
+  const quiet = rows.find(adviseClose);
+  if (quiet) return closeText(quiet); // F424: before Airplane Mode's words, which its row doesn't say
   const air = airplaneStatus(rows); // F368
   if (air) return air;
   if (rows.some((r) => r.state === "installing" && r.phase === "appWait")) return APP_WAIT; // B423
   if (rows.some((r) => r.state === "installing" && r.phase === "networkWait")) return NETWORK_WAIT;
   const pos = (r) => `${rows.indexOf(r) + 1} of ${rows.length}`;
   const withIos = rows.filter((r) => WITH_IOS.has(r.state) && r.phase !== "hold");
-  const quiet = withIos.find(adviseClose);
-  if (quiet) return closeText(quiet); // F424
   if (withIos.length > 1) { // F359: This iPhone rows installing together
     if (withIos.every(isCopying)) return `Copying ${withIos.length} apps to iPhone`;
     // R91: none has reached installd yet: connecting or copying, or the copy ended and iOS hasn't reported
