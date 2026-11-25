@@ -1,0 +1,4 @@
+2026-11-24 22:33:28.067563 iFizBox{iFizBox}[1034] <NOTICE>: iFizBox install: self-update: uploaded in the background; the prompt opens once iFizBox is in front
+2026-11-24 22:34:46.004057 iFizBox{iFizBox}[1034] <NOTICE>: iFizBox KeepAlive: the page's hold let go, an Install prompt waits
+2026-11-24 22:34:51.138825 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:1034] Suspending task.
+2026-11-24 22:35:54.065919 iFizBox{iFizBox}[1034] <NOTICE>: iFizBox install: self-update: resigned active
