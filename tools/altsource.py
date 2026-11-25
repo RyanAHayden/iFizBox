@@ -48,9 +48,8 @@ def is_own_ipa(entry):
     return str(entry.get("downloadURL")) == ipa_url(entry.get("version"))
 
 
-def note_text(version, notes=None):
-    """The version's description: the notes' first lines (Markdown bullets and headings off), then the link."""
-    link = f"Release notes: {REPO}/releases/tag/v{version}"
+def note_text(notes=None):
+    """The version's description: the notes' first lines (Markdown bullets and headings off), no link added."""
     lines = []
     for raw in (notes or "").splitlines():
         line = raw.strip()
@@ -59,7 +58,7 @@ def note_text(version, notes=None):
         lines.append(re.sub(r"^[-*+]\s+", "", line))
         if len(lines) >= 4:
             break
-    return "\n".join(lines + [link]) if lines else f"{NAME} {version}. {link}"
+    return "\n".join(lines) or "Smaller fixes and improvements."
 
 
 def build(version, size, date, notes=None, minimum=None, previous=()):
@@ -69,7 +68,7 @@ def build(version, size, date, notes=None, minimum=None, previous=()):
     newest = {
         "version": version,
         "date": date,
-        "localizedDescription": note_text(version, notes),
+        "localizedDescription": note_text(notes),
         "downloadURL": ipa_url(version),
         "size": size,
         "minOSVersion": MIN_OS,

@@ -93,6 +93,16 @@ class UpdateTest(unittest.TestCase):
         self.assertEqual(v["size"], 1002)
         self.assertEqual(altsource.check(data), [])
 
+    def test_notes_carry_no_link(self):
+        """F439a: a new version's description is its notes alone; older entries stay as published."""
+        self.assertEqual(altsource.note_text("# Head\n\n- One.\n- Two.\n"), "One.\nTwo.")
+        for empty in (None, "", "\n# Head\n"):
+            self.assertEqual(altsource.note_text(empty), "Smaller fixes and improvements.")
+        old = {"version": "1.0.0", "downloadURL": altsource.ipa_url("1.0.0"),
+               "localizedDescription": "Old.\nRelease notes: https://x"}
+        versions = altsource.build("1.0.1", 10, "2026-11-25T00:00:00Z", notes="- New.", previous=[old])["apps"][0]["versions"]
+        self.assertEqual([v["localizedDescription"] for v in versions], ["New.", old["localizedDescription"]])
+
     def test_update_drops_old_asset_names(self):
         """F180: versions[] keeps only releases whose IPA is <NAME>.ipa; the ones under the old name go."""
         old = {"version": "0.9.3", "downloadURL": altsource.REPO + "/releases/download/v0.9.3/" + "Cy" + "dian.ipa"}
