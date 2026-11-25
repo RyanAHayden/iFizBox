@@ -449,6 +449,7 @@ export const catalog = {
   free: (kind) => ask("free", [kind]),
   featured: (refs) => ask("featured", [refs]),
   collection: (id) => ask("collection", [id]), // F154: Browse's Collections (core/catalog.js COLLECTIONS)
+  refine: (rows, opts) => ask("refine", opts ? [rows, opts] : [rows]), // F426b: a list's filters and sort (core/catalog.js refine)
   roulette: (opts) => ask("roulette", opts ? [opts] : []), // F154: Tweak Roulette's pool (core/catalog.js roulettePool)
   fresh: async (kind, now = Date.now()) => {
     const rows = await ask("list", [ALL, ALL]);
