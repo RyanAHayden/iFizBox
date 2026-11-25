@@ -23,7 +23,8 @@
     10 s. On return the row and run line said the words (22.7 s page time; the page was suspended in the background,
     so its timer fired on return). The desktop ended the app at about 27 s: Installing 90% at 27.1, Installed at 27.3.
 - Clean up: test app, its records and IPAs removed, the branch's normal build reinstalled, lock released.
-- The phone took the `apps.isInstalled` no-answer path (job.installed null, so Installed's record from the fresh install).
+- The row's words were read through Web Inspector (the shots show the Log); the run line is in the shots. What
+  `apps.isInstalled` answered was not logged; iOS 27 gives none (B229), so it was presumably Installed's record.
 
 ## Not verified
 
