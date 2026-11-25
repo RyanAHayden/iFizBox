@@ -20,8 +20,8 @@
   logged step: open and Done; pick Not Installed and Free; the Clear Filters row; closed with Filter selected; Clear;
   leaving for Sources while open closes it; focusing the field closes it; Search's reselect closes it.
 - The three shots (open, filters set, closed) were byte-identical between the two copies.
-- The first run's focus and leave steps did not exercise closing: headless `focus()` fired no event, and the panel was
-  toggled shut before leaving. A second script covered both.
+- Leaving was covered by a second script and focus and reselect by a third: the earlier ones closed the panel another
+  way first, or aimed at another page's field.
 
 ## Not verified
 
