@@ -672,6 +672,8 @@ if (nativeBridge()) {
   if (detectMode() === "sideload") {
     import("./signing/cellularrun.js").then((m) => m.sayPutBackAtLaunch(nativeBridge())).catch(() => {});
   }
+  // F428: a VPN still to be turned back on after the app was left: asked first (signing/restoreask.js)
+  if (detectMode() === "sideload") import("./signing/restoreask.js").then((m) => m.askRestore(nativeBridge())).catch(() => {});
   // F410b: the pairing of This iPhone, checked in the background at launch and on coming back (screens/installroute.js
   // quietPairingCheck says when it runs). A moment after, so a link or a tap that starts an install goes first.
   if (detectMode() === "sideload") {
