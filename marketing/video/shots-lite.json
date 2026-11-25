@@ -1,54 +1,36 @@
-[
- {
-  "wait": 6000
- },
- {
-  "nav": "",
-  "ms": 14000
- },
- {
-  "shot": "lite-home"
- },
- {
-  "nav": "#/home/settings/installation",
-  "ms": 6000
- },
- {
-  "shot": "lite-signing"
- },
- {
-  "nav": "#/home/settings/installation/with",
-  "ms": 5000
- },
- {
-  "shot": "lite-with"
- },
- {
-  "nav": "#/home/settings/signing/certificate",
-  "ms": 5000
- },
- {
-  "shot": "lite-cert"
- },
- {
-  "nav": "#/home/settings/signing/apps",
-  "ms": 6000
- },
- {
-  "shot": "lite-apps"
- },
- {
-  "nav": "#/home/settings/updates",
-  "ms": 8000
- },
- {
-  "shot": "lite-updates"
- },
- {
-  "nav": "#/installed",
-  "ms": 6000
- },
- {
-  "shot": "lite-installed"
- }
-]
+{ "name": "lite", "storage": { "ifizbox.appearance": "light", "ifizbox.iconMatch": "false", "ifizbox.installRoute": "iphone" }, "steps": [
+ {"record": true}, {"mark": "home"}, {"pause": 900},
+
+ {"tap": "text=Sources", "nth": -1}, {"pause": 900}, {"mark": "sources"},
+ {"tap": "text=Add"}, {"pause": 650}, {"mark": "add-source"},
+ {"tap": ".alert input"}, {"pause": 200}, {"type": "harbor.example", "cps": 8.5}, {"pause": 450},
+ {"tap": "text=Add Source"}, {"until": "document.body.textContent.includes('Add & Trust')"}, {"pause": 1100}, {"mark": "unknown-source"},
+ {"tap": "text=Add & Trust"}, {"until": "[...document.querySelectorAll('.page.is-top *')].some((e) => e.textContent === 'Harbor Apps')"}, {"pause": 1500}, {"mark": "source-added"},
+
+ {"tap": "text=Search", "nth": -1}, {"pause": 700}, {"mark": "search"},
+ {"tap": "input", "nth": -1, "go": "search"}, {"pause": 250}, {"type": "tide", "cps": 6}, {"until": "[...document.querySelectorAll('.page.is-top *, .search-results *')].some((e) => e.textContent === 'Tidewell')"}, {"pause": 900}, {"mark": "found"}, {"key": "return"}, {"pause": 500},
+ {"tap": "text=Tidewell"}, {"pause": 1300}, {"mark": "app"},
+ {"swipe": [[210, 640], [210, 400]], "ms": 260}, {"pause": 1200}, {"swipe": [[210, 360], [210, 640]], "ms": 260}, {"pause": 700},
+ {"tap": "text=Install"}, {"pause": 1200}, {"mark": "confirm-install"},
+ {"tap": "text=Confirm", "nth": -1}, {"pause": 700}, {"mark": "installing"},
+ {"until": "document.body.textContent.includes('Open Tidewell')", "max": 20000}, {"pause": 1200}, {"mark": "installed"},
+ {"tap": "text=Return to iFizBox"}, {"pause": 1000}, {"mark": "app-installed"},
+
+ {"world": "update"},
+ {"tap": "text=Changes", "nth": -1}, {"pause": 900}, {"mark": "changes"},
+ {"swipe": [[205, 300], [212, 540]], "ms": 520, "rest": 120},
+ {"until": "document.body.textContent.includes('Upgrade (1)')", "max": 15000}, {"pause": 1200}, {"mark": "update-found"},
+ {"tap": "text=Upgrade (1)"}, {"pause": 1100}, {"mark": "confirm-update"},
+ {"tap": "text=Confirm", "nth": -1},
+ {"pause": 700}, {"until": "document.body.textContent.includes('Open Tidewell')", "max": 20000}, {"pause": 1000}, {"mark": "updated"},
+ {"tap": "text=Return to iFizBox"}, {"pause": 1100}, {"mark": "up-to-date"},
+
+ {"tap": "text=Home", "nth": -1}, {"pause": 700}, {"tap": "text=Theme"}, {"pause": 1000}, {"mark": "theme"},
+ {"tap": "text=iOS 7"}, {"pause": 1500}, {"mark": "ios7"},
+ {"tap": "text=iOS 13"}, {"pause": 1500}, {"mark": "ios13"},
+ {"tap": "text=iOS 26"}, {"pause": 1500}, {"mark": "ios26"},
+ {"tap": "text=Home", "nth": -1}, {"pause": 1500}, {"mark": "home-ios26"},
+ {"tap": "text=Theme"}, {"pause": 900},
+ {"tap": "text=iOS 6"}, {"pause": 1300}, {"mark": "ios6"},
+ {"tap": "text=Home", "nth": -1}, {"pause": 1500}, {"mark": "end"}
+]}

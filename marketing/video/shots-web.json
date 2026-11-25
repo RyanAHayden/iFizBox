@@ -1,8 +1,0 @@
-[
- {"wait": 6000},
- {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"},
- {"nav": "#/home/settings/signing", "ms": 8000},
- {"eval": "new Promise((r) => { const t0 = Date.now(); (function f() { if (!/Reloading Data/.test(document.body.innerText) && document.querySelector('.page.is-top')) r('settled after ' + (Date.now() - t0) + ' ms'); else if (Date.now() - t0 > 45000) r('still busy'); else setTimeout(f, 300); })(); })"},
- {"wait": 1500},
- {"shot": "web-signing"}
-]

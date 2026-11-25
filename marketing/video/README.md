@@ -1,28 +1,35 @@
-# Showcase video
+# Showcase recordings
 
-A 40-second video for X (Twitter) and other feeds: 1080x1350 (4:5) and a 1080x1920 (9:16) cut, 60 fps H.264, no
-audio. Real screens of both builds in a plain rounded phone frame, with short captions in an iOS 6 navigation-bar band.
+`make.sh` records the app for the showcase video. It makes recordings only: one continuous session of each build, at
+60 fps, 804x1748 (402x874 CSS px at 2x), of the Lite build (`lite.mp4`) and the jailbreak build (`jailbreak.mp4`). Each
+recording comes with a `.json` (the marks, the page's look through time and the touches) and a `.txt` (the words on
+screen at each mark). The cut is made from these.
 
-    marketing/video/make.sh [OUT_DIR]     # default marketing/video/out (gitignored)
+    marketing/video/make.sh [OUT_DIR]     # default marketing/video/out (gitignored); writes OUT_DIR/rec/
 
-Needs node 22+, python3, chromium, ffmpeg and xz, and the network: the captures read real repos (Procursus, Havoc,
-Chariz, ElleKit) and the live website. It writes `showcase-4x5.mp4`, `showcase-9x16.mp4`, `stills/` (the key beats,
-to check by eye) and `shots/` (the captures). A run takes about 15 minutes.
+Needs node 22+, python3, chromium and ffmpeg. No network and no phone: the world is made up (`.example` hosts, names
+and icons invented in `make_state.py`), and the app's native bridge is answered in Node by `shell.mjs`.
 
 | File | What it does |
 |---|---|
-| `make.sh` | the whole run: state, local server, captures, render |
-| `make_state.py` | a made-up rootless apt state: four sources, a dpkg status of real packages, a few a version behind so Changes has upgrades |
-| `capture.mjs` | web/app in headless Chromium at 402x874 (DPR 2) with a fake native bridge: the jailbreak build (`--native`), the Lite build (`--mode sideload`), or plain (the website) |
-| `shots-*.json` | what each capture run visits and shoots; `shots-jailbreak.json` also drives the swipe frame by frame (`touch`) |
-| `video.html` | the video as one page on a virtual clock: `render(t)` draws time t; transform and opacity only |
-| `render.mjs` | steps `render(t)` 1/60 s at a time, screenshots each frame and pipes them into ffmpeg; `--still` writes PNGs instead |
+| `make.sh` | the whole run: the made-up world, the app's own icons, a local server on 127.0.0.1, then both captures |
+| `make_state.py` | the made-up world: AltStore and APT sources, a dpkg status, the update a script can lay over it |
+| `capture.mjs` | web/app in headless Chromium with the fake bridge, on the virtual clock; the touches come from `tools/concept/touch.js` |
+| `shell.mjs` | the fake native shell: the bridge's answers from the made-up world, with the install and sign waits on the virtual clock |
+| `clock.js` | the page's time: Date, timers and animations stand still until `capture.mjs` ticks one frame |
+| `finger.js` | what the recording shows of the person holding the phone: a soft touch dot and a plain keyboard |
+| `shots-lite.json`, `shots-jailbreak.json` | each recording's script: the steps, in the order `capture.mjs`'s header lists them |
 
-The story, in seconds: hook (0) · Sources and a source's catalog (3.4) · Search (6.6) · Changes and the tab badge
-(9.4) · Installed (12.2) · swipe to queue and Confirm (14.8) · signing on the phone: Install Apps With, Free Apple ID
-(19.2) · re-sign before expiry (22.6) · push (25.4) · themes Classic, Gunmetal, OLED (28.0) · Lite vs Jailbreak
-(31.4) · end card with the domain and "Free, GPL-3.0" (36.4). Change the beats in `video.html` (`S`, the captions,
-the `cols` of the split); preview one moment without rendering with `node render.mjs <shots> --still 12.5 --stills <dir>`.
+The Lite recording runs `--mode sideload`, the jailbreak one `--mode jailbreak`. Each writes `rec/<name>.mp4`,
+`rec/<name>.json` and `rec/<name>.txt`.
 
-The name and domain come from `web/app/brand.js` (`video.html` and `capture.mjs` import it; `make.sh` sources
-`native/brand.env`). The frame is drawn in CSS: no device artwork, no other product's name or logo.
+For a quick check, `node capture.mjs <url> <outdir> <script> --state <dir> --shots` writes one PNG per mark and per
+`shot` step without recording video, and `--upto <mark>` stops after that mark.
+
+The step list (taps, typing, swipes, marks, world updates) is in `capture.mjs`'s header.
+
+`video.html` and `render.mjs` are the previous video's page and renderer. `make.sh` doesn't run them, and they can't find
+the shots of these recordings. The new cut replaces them.
+
+The status-bar strip (the top 62 px, the safe-area inset `capture.mjs` sets) is left empty in the recordings, for the
+cut to draw.
