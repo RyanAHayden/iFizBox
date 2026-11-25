@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { fakeDocument } from "../fakes.test-helper.js";
 
 globalThis.document = fakeDocument();
-const { drawInstallation, leave, pendingStep, setupGroups } = await import("./installroute.js");
+const { drawInstallation, leave, reread, pendingStep, setupGroups } = await import("./installroute.js");
 const { codeExpired, CODE_EXPIRED, NEW_CODE } = await import("../core/installroute.js");
 
 const all = (e) => [e, ...e.children.flatMap(all)];
@@ -63,5 +63,30 @@ test("expiring says so with no alert; Get New Code pairs again with a new code",
   assert.equal(pairs, 2);
   assert.equal(withClass(box, "pair-code")[0].textContent, "123 452");
   assert.doesNotMatch(box.textContent, /expired/);
+  leave();
+});
+
+test("expired in the background with the reply lost: coming back reads it; a late reply leaves the new code alone", async () => {
+  let pairs = 0, late;
+  const native = { call: (m, p, ev) => {
+    if (m === "idevice.status") return Promise.resolve(STATUS);
+    if (m === "idevice.pairState") return Promise.resolve({ active: false, expired: true });
+    if (m === "idevice.pair") return new Promise((_, no) => { ev({ pin: `12345${++pairs}` }); late ??= () => no(new Error("expired: x")); });
+    return Promise.resolve(null);
+  } };
+  const box = document.createElement("div");
+  const redraw = () => drawInstallation(box, "pair", { store: { get: () => "iphone", set: () => {} }, native, alert: async () => ({ index: 0 }), redraw });
+  document.visibilityState = "visible";
+  await redraw();
+  await flush();
+  await reread();
+  await flush();
+  assert.match(box.textContent, /The code expired/);
+  const row = withClass(box, "sign-import").find((n) => n.textContent.includes(NEW_CODE));
+  all(row).find((n) => n.listeners?.click?.length).listeners.click.forEach((f) => f({}));
+  await flush(); await flush();
+  late();
+  await flush(); await flush();
+  assert.equal(withClass(box, "pair-code")[0].textContent, "123 452");
   leave();
 });

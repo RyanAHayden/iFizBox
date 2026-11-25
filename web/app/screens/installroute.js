@@ -796,7 +796,7 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
 
 let pairing = null; // { pin, text, error } while idevice.pair waits for the phone (core pairEvent)
 let shown = null; // { native, redraw } of the page on screen, for the hooks below
-let visit = null; // this visit of the page: { started, asked, failed, expired, poll }; null once it's left
+let visit = null; // this visit of the page: { started, asked, failed, expired, run, poll }; null once it's left
 
 // The page's groups for `state` (core setupState) and the pairing `p` (pure, for tests). The code and the steps
 // with their screenshots are drawn after the groups marked `pin` and `guide` (drawPair).
@@ -895,10 +895,15 @@ async function reread() {
   const { native, redraw } = shown;
   if (!pairing) { if (visit) redraw(); return; }
   let st = null;
+  const v = visit, run = v?.run;
   try { st = await call(native, "idevice.pairState"); } catch { return; }
+  if (v !== visit || run !== v?.run) return; // another pairing started meanwhile
   const now = pairFromNative(st);
+  // B436: expired in the background; idevice.pair's reply may not have reached the page, and is dropped if it comes late
+  if (v && pairing && !now && st?.expired) { pairing = null; v.run++; v.failed = v.expired = true; redraw(); return; }
   if (now && pairing) { pairing = now; redraw(); } // not active: idevice.pair's reply settles it
 }
+export { reread }; // tests
 export function leave() { // also for tests: ends a visit without a hashchange
   const was = visit;
   visit = null;
@@ -1011,10 +1016,11 @@ async function drawPair(box, { store, native, alert, redraw }) {
     if (pairing) return;
     v.started = true;
     v.failed = v.expired = false;
+    const run = v.run = (v.run ?? 0) + 1;
     pairing = { pin: "", text: "", error: "" };
     redraw();
     // B320: this visit's events and answer only: an earlier visit's call answering late leaves this one's state alone
-    const mine = () => visit === v && pairing !== null;
+    const mine = () => visit === v && v.run === run && pairing !== null;
     try {
       // idevice.pair's first event is the code, before anything listens; it keeps listening until it pairs, the
       // page is left or the code expires (B436)
@@ -1028,7 +1034,7 @@ async function drawPair(box, { store, native, alert, redraw }) {
       if (test) return finishSetup(v, native, alert, store, redraw);
       if (visit === v) redraw();
     } catch (e) {
-      if (visit !== v) return;
+      if (visit !== v || v.run !== run) return;
       pairing = null;
       v.failed = true;
       v.expired = codeExpired(e);

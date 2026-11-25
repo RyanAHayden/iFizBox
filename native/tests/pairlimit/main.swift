@@ -137,7 +137,7 @@ do { // left open
     check("at 10:00 it answers expired", p.answer.value!.hasPrefix("expired: "))
     check("the hold is given back", KeepAlive.shared.holds.value == 0)
     check("the code notification is gone", Notes.shown.value == nil)
-    check("pairState is inactive", state()["active"] as? Bool == false)
+    check("pairState is inactive, expired", state()["active"] as? Bool == false && state()["expired"] as? Bool == true)
 }
 do { // joined: the original deadline
     let a = Pairing()
@@ -171,7 +171,7 @@ do { // paired, then a later pairing: the stale timer leaves both alone
     IDevice.paired.with { $0 = true }
     wait("paired") { a.answer.value != nil }
     idle()
-    check("paired answers status", a.answer.value == "ok")
+    check("paired answers status", a.answer.value == "ok" && state()["expired"] as? Bool == false)
     let b = Pairing()
     wait("start") { IDevice.running.value == 1 }
     Clock.advance(150)

@@ -9,9 +9,10 @@
 //                         pairLimit (10 min, B436): then it stops and replies "expired: ..."
 //                         B320: on a queue of its own (connects never wait behind it), and called while one still
 //                         runs it joins that one (the same code and deadline; the earlier call replies "canceled: ...")
-//   idevice.pairState     {active, pin, step, text, error}: the pairing now, for a page that was in the background
+//   idevice.pairState     {active, pin, step, text, error}: the pairing now, for a page that was in the background;
+//                         not active: {expired} (B436: the last one ended at pairLimit)
 //   idevice.pairCancel    ends a waiting idevice.pair (it replies "canceled: ..."); B320: its advertisement stays up
-//                         leaveGrace (90 s) more, so a page that comes back within it gets the same code
+//                         leaveGrace (90 s, never past pairLimit) more, so a page that comes back within it gets the same code
 //   idevice.verify        connects once: {ok: true, kind} or "not_paired:/connect_failed:/bad_pairing: ..."
 //   idevice.forget        deletes the pairing -> status
 // Installing through this route is IDevice.install(_:progress:), called by the install run.
@@ -140,8 +141,9 @@ enum IDeviceBridge {
                 lock.lock()
                 let to = session.call
                 let latest = pairing === session
-                if latest { pairing = nil; now = ["active": false] }
-                if session.expired && result == nil { failure = "expired: the pairing code expired" } // B436
+                let expired = session.expired && result == nil // B436
+                if latest { pairing = nil; now = ["active": false, "expired": expired] }
+                if expired { failure = "expired: the pairing code expired" }
                 lock.unlock()
                 KeepAlive.shared.end()
                 if latest { removeCode() } // else the notification is the later pairing's
