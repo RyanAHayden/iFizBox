@@ -124,3 +124,11 @@ test("AltStore store: altDefaults as a function is asked once, on the first open
   assert.deepEqual(await two.sources(), []);
   assert.equal(calls, 1);
 });
+
+test("F423: the default tweak sources leave out YTLite and SCInsta, and keep YTMusicUltimate", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const list = JSON.parse(await readFile(new URL("../tweak-sources.json", import.meta.url), "utf8"));
+  const names = list.map((s) => s.name);
+  assert.ok(!names.includes("YTLite") && !names.includes("SCInsta"));
+  assert.ok(names.includes("YTMusicUltimate"));
+});

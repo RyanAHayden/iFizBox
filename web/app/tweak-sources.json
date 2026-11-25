@@ -2,7 +2,5 @@
   { "name": "Chariz", "uri": "https://repo.chariz.com/", "dist": "./", "components": [] },
   { "name": "Havoc", "uri": "https://havoc.app/", "dist": "./", "components": [] },
   { "name": "Procursus", "uri": "https://apt.procurs.us/", "dist": "1800", "components": ["main"] },
-  { "name": "YTLite", "github": "dayanch96/YTLite", "inject": true },
-  { "name": "YTMusicUltimate", "github": "dayanch96/YTMusicUltimate", "inject": true },
-  { "name": "SCInsta", "github": "SoCuul/SCInsta", "inject": true }
+  { "name": "YTMusicUltimate", "github": "dayanch96/YTMusicUltimate", "inject": true }
 ]

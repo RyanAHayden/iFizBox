@@ -27,7 +27,7 @@ test("B272: the directory: Recommended's app sources first, then the checked ext
   const recs = appRecs();
   const recApps = RECOMMENDED_SOURCES.filter((r) => !r.jailbreak);
   assert.deepEqual(recs.slice(0, recApps.length).map((r) => r.name), recApps.map((r) => r.name));
-  assert.ok(APP_SOURCE_DIRECTORY.length >= 5);
+  assert.ok(APP_SOURCE_DIRECTORY.length >= 4);
   assert.ok(recs.every((r) => !r.jailbreak));
   assert.equal(new Set(recs.map((r) => r.url.toLowerCase().replace(/\/+$/, ""))).size, recs.length);
   for (const r of APP_SOURCE_DIRECTORY) {

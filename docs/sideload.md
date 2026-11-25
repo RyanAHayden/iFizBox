@@ -21,8 +21,8 @@ are left out on purpose (no verdict, and no app named), but a direct package lin
 still opens their page. Works on My Phone on a source's own page is that source's switch, as in Manage > Filters; on
 All Sources' page it is the All Sources one. Works on My Phone never judges a Tweak Source's tweaks in the sideload
 build, so a Tweak Source's page has no such switch there.
-A new install starts with app-tweak sources only: GitHub repos whose releases carry the tweak's `.deb` (YTLite,
-YTMusicUltimate, SCInsta; `web/app/tweak-sources.json` entries with `github` and `"inject": true`). The Sources tab
+A new install starts with app-tweak sources only: GitHub repos whose releases carry the tweak's `.deb` (YTMusicUltimate;
+YTLite and SCInsta are left out, but adding either by hand works; `web/app/tweak-sources.json` entries with `github` and `"inject": true`). The Sources tab
 leaves out a Tweak Source the Tweak Index has fully checked with no tweak for the user's apps (or for any app);
 searching and Manage still list it.
 The Tweak Index is read from the copy shipped with the app (`web/app/tweak-index.json`, written at each release, see
