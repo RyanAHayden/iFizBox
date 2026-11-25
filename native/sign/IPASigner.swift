@@ -111,8 +111,8 @@ final class IPASigner {
         var removed = [String]()
         func dropped(_ name: String) -> Bool {
             if name.hasPrefix("__MACOSX/") || name.hasSuffix("/.DS_Store") || name == ".DS_Store" { return true }
-            guard name.hasPrefix(appDir) else { return false }
-            let rel = name.dropFirst(appDir.count)
+            guard SealPath.inside(name, appDir) else { return false }
+            let rel = SealPath.relative(name, to: appDir)
             if rel.contains("com.apple.WatchPlaceholder/") || rel.hasSuffix("SignedByEsign") { return true }
             if rel.hasSuffix("_CodeSignature/CodeResources") || rel.hasSuffix("_CodeSignature/") { return true }
             if rel.hasSuffix("embedded.mobileprovision") { return true }
@@ -191,7 +191,7 @@ final class IPASigner {
         log("App \(appDir.dropFirst(8).dropLast()): \(oldID)" + (newID == oldID ? "" : " -> \(newID)") + ", \(zip.entries.count) files")
         if keep && entID != newID { log("Kept its bundle ID; App ID \(profile.team).\(entID) in the entitlements") }
         for r in removed { log("Left out \(r)" + (profile.isWildcard || keep ? "" : " (the profile covers one app ID)")) }
-        func gone(_ name: String) -> Bool { dropped(name) || cut.contains { name.hasPrefix($0) } }
+        func gone(_ name: String) -> Bool { dropped(name) || cut.contains { SealPath.inside(name, $0) } }
 
         // New bundle IDs: the app's, and the extensions' that start with the app's old one.
         func moved(_ id: String) -> String { id == oldID ? newID : id.hasPrefix(oldID + ".") ? newID + id.dropFirst(oldID.count) : id }
@@ -219,6 +219,12 @@ final class IPASigner {
         var machos = Set<String>()
         let kept = zip.entries.filter { !gone($0.name) }
         let order = kept.map(\.name)
+        var spelling = Spelling() // B432: one spelling a name, in the zip and the CodeResources alike
+        // iOS looks for a bundle's executable by its decomposed name and takes any other for an added file
+        for (dir, b) in bundles.sorted(by: { $0.key < $1.key }) {
+            if let exe = b.plist["CFBundleExecutable"] as? String { spelling.add(exe.utf8.allSatisfy { $0 < 0x80 } ? "" : dir + exe, decomposed: true) }
+        }
+        for name in order { spelling.add(name) }
         let totalBytes = max(1, kept.reduce(UInt64(0)) { $0 + $1.size })
         for e in kept where e.isSymlink && !e.isDirectory {
             files[e.name] = .symlink(String(decoding: try zip.data(e, limit: 4096), as: UTF8.self), e)
@@ -226,7 +232,7 @@ final class IPASigner {
         let read = try readAll(zip, kept.filter { !$0.isDirectory && !$0.isSymlink }, total: totalBytes, progress: progress)
         for (e, r) in read {
             files[e.name] = .entry(e, sha1: r.sha1, sha256: r.sha256)
-            if e.name.hasPrefix(appDir) && r.macho { machos.insert(e.name) }
+            if SealPath.inside(e.name, appDir) && r.macho { machos.insert(e.name) }
         }
         log("Read \(kept.count) files (\(ByteCountFormatter.string(fromByteCount: Int64(totalBytes), countStyle: .file))), \(machos.count) Mach-O, \(bundles.count) bundles to sign")
         for (path, d) in changed { files[path] = .data(d, mode: 0o100644) }
@@ -308,7 +314,7 @@ final class IPASigner {
 
             // Loose Mach-Os of this bundle (dylibs in Frameworks/, helpers): signed with no entitlements.
             // B65: each one moves the bar within the bundle's share, so a big main bundle doesn't sit at "Signing 50%".
-            let loose = machos.sorted().filter { p in p.hasPrefix(dir) && p != exe && !inner.contains(where: { p.hasPrefix($0) }) }
+            let loose = machos.sorted().filter { p in SealPath.inside(p, dir) && p != exe && !inner.contains(where: { SealPath.inside(p, $0) }) }
             // R41: side by side on `readers` threads (a game's 128 emulator cores, a framework's dylibs)
             let current = files
             let signedLoose = try parallel(loose.count, zip, done: { k in
@@ -335,7 +341,8 @@ final class IPASigner {
             if !loose.isEmpty { progress?("signing", (Double(n) + Double(loose.count) / Double(loose.count + 1)) / Double(dirs.count)) }
             if isApp { files[dir + "embedded.mobileprovision"] = .data(profile.data, mode: 0o100644) }
             let infoData = try contents(dir + "Info.plist", files, zip)
-            let resources = try codeResources(dir: dir, exe: exe, files: files, order: order + newPaths(files, order))
+            let resources = try codeResources(dir: dir, exe: exe, files: files, order: order + newPaths(files, order),
+                                              spelling: spelling)
             files[dir + "_CodeSignature/CodeResources"] = .data(resources, mode: 0o100644)
             if let exe = exe {
                 guard files[exe] != nil else { throw SignError("bad_ipa", "\(exe.dropFirst(appDir.count)) is missing.") }
@@ -380,16 +387,17 @@ final class IPASigner {
         for e in kept where e.isDirectory { folders[e.name] = e }
         for name in order + newPaths(files, order) where !written.contains(name) {
             written.insert(name)
+            let spelled = spelling.of(name)
             if name.hasSuffix("/") {
-                if let e = folders[name] { try out.copy(e, from: zip) }
+                if let e = folders[name] { try out.copy(e, as: spelled, from: zip) }
                 continue
             }
             switch files[name] {
-            case .entry(let e, _, _)?: try out.copy(e, from: zip)
-            case .symlink(_, let e)?: try out.copy(e, from: zip)
-            case .data(let d, let m)?: try out.add(name, d, mode: m, level: level)
+            case .entry(let e, _, _)?: try out.copy(e, as: spelled, from: zip)
+            case .symlink(_, let e)?: try out.copy(e, as: spelled, from: zip)
+            case .data(let d, let m)?: try out.add(spelled, d, mode: m, level: level)
             case .spilled(let u, let size, let crc, let packed, _, _, let m)?:
-                try out.add(name, file: u, size: size, crc: crc, packed: packed, mode: m)
+                try out.add(spelled, file: u, size: size, crc: crc, packed: packed, mode: m)
                 try? FileManager.default.removeItem(at: u)
             case nil: break
             }
@@ -530,17 +538,17 @@ final class IPASigner {
         }
     }
 
-    // _CodeSignature/CodeResources: every file in the bundle but its executable and this file, nested bundles'
+    // _CodeSignature/CodeResources: every file in the bundle but its executable and what iOS skips (SealPath), nested bundles'
     // files included (as zsign seals them), with SHA-1 (files) and SHA-1 + SHA-256 (files2) hashes, and the rules
     // Xcode writes.
-    private func codeResources(dir: String, exe: String?, files: [String: File], order: [String]) throws -> Data {
+    private func codeResources(dir: String, exe: String?, files: [String: File], order: [String], spelling: Spelling) throws -> Data {
         var f1 = [String: Any](), f2 = [String: Any]()
-        for path in Set(order) where path.hasPrefix(dir) && !path.hasSuffix("/") && path != exe {
-            let rel = String(path.dropFirst(dir.count))
-            if rel == "_CodeSignature/CodeResources" { continue }
+        for path in Set(order) where SealPath.inside(path, dir) && !path.hasSuffix("/") && path != exe {
+            let rel = SealPath.relative(spelling.of(path), to: spelling.of(dir))
+            if SealPath.unsealed(rel) { continue }
             let optional = rel.range(of: #"(^|/)[^/]+\.lproj/"#, options: .regularExpression) != nil
                 && !rel.hasPrefix("Base.lproj/")
-            let omit2 = rel == "Info.plist" || rel == "PkgInfo" || rel.hasSuffix(".DS_Store")
+            let omit2 = rel == "Info.plist" || rel == "PkgInfo" || rel == ".DS_Store" || rel.hasSuffix("/.DS_Store")
             let h1: Data, h2: Data
             switch files[path] {
             case .entry(_, let a, let b)?: h1 = a; h2 = b
