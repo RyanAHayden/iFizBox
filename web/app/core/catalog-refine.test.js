@@ -76,6 +76,21 @@ test("source: a copy that source's own list hides doesn't count", () => {
   assert.equal(refine(c, c.list(), { source: "B" }).length, 1);
 });
 
+test("source: Newest Copy Only (on by default) keeps a package whose newer copy is another source's", () => {
+  const c = loaded();
+  c.setFilters({});
+  assert.ok(!names(c.list("A")).includes("x.Both"), "A's own list leaves its older copy out");
+  assert.deepEqual(names(refine(c, c.list(), { source: "A" })), ["x.both", "x.paid", "x.theme", "x.zed"]);
+});
+
+test("source: section and price test the row shown", () => {
+  const c = createCatalog();
+  c.load("A", packages(deb("x.both", "Toys", { Tag: "cydia::commercial" })), "https://a.example/");
+  c.load("B", packages(deb("x.both", "Tweaks", { Version: "2" })), "https://b.example/");
+  assert.equal(refine(c, c.list(), { source: "A", section: "Tweaks", price: "free" }).length, 1);
+  assert.deepEqual(refine(c, c.list(), { source: "A", section: "Toys" }), []);
+});
+
 test("sort name", () => {
   const c = loaded();
   assert.deepEqual(refine(c, own(c), { sort: "name" }), c.list());

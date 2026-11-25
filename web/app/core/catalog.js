@@ -1022,8 +1022,9 @@ export function createCatalog() {
     return visibleOf(ALL).filter((r) => c.test(r)).map(slim);
   }
   // F426b: filters and a sort for any list already drawn (Browse's lists): `rows` as that list gave them, handed back
-  // as they are (New's `change` and `seen` too). A source filter keeps what that source's own list has, also where
-  // the row shown is another source's copy; the other filters test the row shown. Ties: newest by name, popular by
+  // as they are (New's `change` and `seen` too). A source filter keeps what that source lists, also where the row
+  // shown is another source's copy (so Newest Copy Only, on by default, doesn't count: it would take out every
+  // such package); what else its own list leaves out stays out. The other filters test the row shown. Ties: newest by name, popular by
   // newest then name (rankPopular).
   function refine(rows, { section = null, source = null, installed = null, price = null, sort = null } = {}) {
     if (!Array.isArray(rows) || (source && !sources.has(source))) return [];
@@ -1032,7 +1033,8 @@ export function createCatalog() {
     let inSource = null;
     if (source) {
       // ids compare as that source's merge does (mergeMap): apps' bundle IDs as spelled, packages ignoring case
-      const ids = visibleOf(source).map((r) => r.id);
+      const ids = [...entries(source).values()].map((e) => e.row)
+        .filter((r) => listed(r) && !filteredOut(r) && !systemTweak(r) && !misfit(r) && !isHidden(r)).map((r) => r.id);
       inSource = appsOnly && !tweakKeys.has(source) ? new Set(ids) : new IdSet(ids);
     }
     const out = rows.filter((r) => passes(r) && (!inSource || inSource.has(r.id)));
