@@ -56,7 +56,7 @@ Like Cydia's apt.saurik.com, iFizBox has a source of its own that is built in an
   releases with `gh` (`tools/selfrepo.py fetch`). For each one it takes the release's `Packages` asset, keeping
   only that release's own stanzas, or, for a release without one, its Debian-named .debs. Only package IDs
   the new release ships are kept, so builds from before the rename (another package ID) aren't listed. Drafts and
-  pre-releases are left out. The new release's `--minimum` field goes on its own stanza only. A dry run stays
+  pre-releases are left out; the releases before 1.0.0 are drafts, so no version list has them. The new release's `--minimum` field goes on its own stanza only. A dry run stays
   offline and lists the new release only, unless `IFIZBOX_RELEASE_HISTORY=DIR` points at a directory laid out as
   `DIR/<tag>/Packages` (which `tools/selfrepo.py fetch OWNER/NAME DIR` fills).
 - **AltStore source** (the sideload app and the site): `web/app/source.json`, served at

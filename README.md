@@ -18,6 +18,10 @@ re-signed. More on <a href="https://ifizbox.com/#/home/why">Why iFizBox</a>.</p>
 <img alt="iOS 15 and later" src="https://img.shields.io/badge/iOS-15%2B-lightgrey">
 <a href="https://discord.gg/3XASvpjbgp"><img alt="Discord" src="https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white"></a></div>
 
+<p align="center"><a href="https://github.com/RyanAHayden/iFizBox/releases/download/v1.0.0/showcase.mp4"><img
+src="docs/img/showcase.webp" alt="Showcase video: adding a source, installing and upgrading an app, themes, and tweaks on a jailbroken iPhone" width="400"></a><br>
+<sub><a href="https://github.com/RyanAHayden/iFizBox/releases/download/v1.0.0/showcase.mp4">Full-quality video (MP4)</a></sub></p>
+
 <p align="center">
   <img src="docs/img/jb-home.png" alt="Home in the jailbreak app" width="30%">
   <img src="docs/img/jb-package.png" alt="A package page in the jailbreak app" width="30%">

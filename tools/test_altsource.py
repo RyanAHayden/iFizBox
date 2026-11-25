@@ -111,6 +111,12 @@ class UpdateTest(unittest.TestCase):
         self.assertEqual([v["version"] for v in data["apps"][0]["versions"]], ["0.9.5", "0.9.4"])
         self.assertTrue(all(v["downloadURL"].endswith("/" + altsource.NAME + ".ipa") for v in data["apps"][0]["versions"]))
 
+    def test_update_drops_0x(self):
+        """The releases before 1.0.0 are drafts on GitHub: from 1.0.0 on they aren't listed."""
+        own = [{"version": v, "downloadURL": altsource.ipa_url(v)} for v in ("1.0.0", "0.36.0")]
+        data = altsource.build("1.0.1", 10, "2026-11-25T00:00:00Z", previous=own)
+        self.assertEqual([v["version"] for v in data["apps"][0]["versions"]], ["1.0.1", "1.0.0"])
+
     def test_check_refuses(self):
         data = altsource.build("1.0.0", 10, "2026-11-17T00:00:00Z")
         data["apps"][0]["versions"][0]["downloadURL"] = altsource.ipa_url("0.9.0")

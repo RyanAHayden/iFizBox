@@ -73,7 +73,8 @@ def build(version, size, date, notes=None, minimum=None, previous=()):
         "size": size,
         "minOSVersion": MIN_OS,
     }
-    older = [v for v in previous if isinstance(v, dict) and v.get("version") != version and is_own_ipa(v)][:KEEP - 1]
+    older = [v for v in previous if isinstance(v, dict) and v.get("version") != version and is_own_ipa(v)
+             and (version.startswith("0.") or not v["version"].startswith("0."))][:KEEP - 1]  # 0.x releases are hidden drafts
     app = app_entry([newest] + older)
     if minimum:
         app["minimumVersion"] = minimum
