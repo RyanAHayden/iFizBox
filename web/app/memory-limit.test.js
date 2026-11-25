@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { memStorage } from "./fakes.test-helper.js";
 import { signInBrowser, tooBigAlert, memoryText, memoryNote, MEMORY_TITLE, MEMORY_BUTTONS, TOO_BIG_BUTTONS } from "./signing-client.js";
-import { IPA_MAX, MEMORY_KEY, memoryLimit, noteOutOfMemory, noteSigned, overMemoryLimit, isOutOfMemory } from "./core/websign.js";
+import { IPA_MAX, MEMORY_KEY, OLD_MEMORY_KEY, memoryLimit, noteOutOfMemory, noteSigned, overMemoryLimit, isOutOfMemory } from "./core/websign.js";
 import { NAME } from "./brand.js";
 
 const MB = 1048576;
@@ -32,6 +32,15 @@ test("F261: the limit keeps the smallest out-of-memory size, and a sign at or pa
   assert.equal(noteOutOfMemory(null, 5 * MB), null);
   assert.equal(noteOutOfMemory(s, 0), null);
   assert.equal(IPA_MAX, 512 * MB); // the global cap doesn't move
+});
+
+test("F435: a limit learned under the old signer is forgotten", () => {
+  const s = memStorage();
+  s.setItem(OLD_MEMORY_KEY, JSON.stringify({ failed: 100 * MB }));
+  assert.equal(memoryLimit(s), null);
+  assert.equal(overMemoryLimit(200 * MB, s), false);
+  assert.equal(s.m.has(OLD_MEMORY_KEY), false);
+  assert.equal(noteOutOfMemory(s, 300 * MB), 300 * MB); // the streaming signer's own limit still works
 });
 
 test("F261: zsign's out-of-memory errors are told apart from others", () => {
