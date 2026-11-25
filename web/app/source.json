@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "0.35.0",
+          "date": "2026-11-25T17:52:59Z",
+          "localizedDescription": "Paid packages from Havoc and Chariz with capital letters in their ID, such as EchoUI or Lyre, show their price and Buy instead of Not Found.\nIn the sideload app (without a jailbreak), someone who bought a paid tweak its seller no longer sells can now sign in and add it to an app.\nIn Browse, choosing another Sort in Filter no longer changes the width of the buttons at the top, and the A\u2013Z index starts below them.\nIn lists sorted by name in Browse, the A\u2013Z index now goes all the way back to the top, and lands on the letter you touch.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.35.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.35.0/iFizBox.ipa",
+          "size": 31845093,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.34.0",
           "date": "2026-11-25T06:41:25Z",
           "localizedDescription": "Browse's New and Top 25 now have a Filter button.\nThe iOS 26 app icon is darker on a dark Home Screen.\nSearch keeps the keyboard up when you pick a category.\nBrowse's New and Top 25 have a Filter button, to filter and sort them as you can the other lists.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.34.0",
@@ -250,14 +258,6 @@
           "localizedDescription": "A Glass app icon, wide package rows like Cydia's, and steadier This iPhone copies\nTheme > App Icon > Special offers Glass: Classic in Light, Gunmetal in Dark, drawn with the system's glass\nInstalled and section lists show wide package rows; Install IPAs is a plain row above A in Installed\nAuthor pages open again; price buttons match the iOS 7 and iOS 13 themes\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.19.0",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.19.0/iFizBox.ipa",
           "size": 38807499,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.18.4",
-          "date": "2026-11-21T16:42:00Z",
-          "localizedDescription": "Re-sign without downloading again: each app keeps the IPA it was installed from, and Add Tweaks lists only tweaks for that app.\nRe-sign, Re-sign All and the queue sign from the IPA kept at install when it still matches, and each app goes to iOS as soon as it is signed.\nAdd Tweaks lists tweaks made for the app first (Works in: <app>), then ones for every app; paid Havoc and Chariz tweaks find their seller.\nHold Install on a package or app page to pick which version to install.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.18.4",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.18.4/iFizBox.ipa",
-          "size": 35781116,
           "minOSVersion": "15.0"
         }
       ]
