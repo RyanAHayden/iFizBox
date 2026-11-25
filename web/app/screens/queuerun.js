@@ -15,7 +15,8 @@
 //     "Stopping after X…", Cancel greyed; then Confirm again with what finished cleared from the queue and the
 //     footer "Stopped. N installed and cleared from the queue."), Close after a run with failures. Top right: Hide
 //     while it runs (the page slides away; a strip under every tab's nav bar reopens it, and the Installed badge
-//     counts what's left), Retry All once it ended with failures (failed, skipped and cancelled rows). A clean end has no bar
+//     counts what's left; a run that ends put away on Restart or Reload SpringBoard or Reboot Device asks in an alert,
+//     Later or that button, F429), Retry All once it ended with failures (failed, skipped and cancelled rows). A clean end has no bar
 //     buttons, as the 4S's "Complete": the finish button closes it.
 //   The bottom: the status and bar while it runs, then the finish button (core/progress.js chooseFinish over what
 //     was installed: Restart SpringBoard for a tweak, Reload Data for an app, Return to iFizBox).
@@ -262,7 +263,7 @@ export async function runQueue({ jobs, plan }, deps) {
         node = el("button", "qr-strip");
         node.type = "button";
         node.append(el("span", "qr-strip-text"), el("span", "qr-strip-show", "Show"));
-        node.addEventListener("click", () => { strip.hide(); page.show(); });
+        node.addEventListener("click", showPage);
         document.body.append(node);
         document.body.classList.add("qr-stripped");
         strip.update();
@@ -271,8 +272,25 @@ export async function runQueue({ jobs, plan }, deps) {
       hide() { node?.remove(); node = null; document.body.classList.remove("qr-stripped"); setBadge(null); },
     };
   })();
+  const showPage = () => { dropQuestion(); strip.hide(); page.show(); };
   page.onClose(() => strip.hide());
   if (deps.onClose) page.onClose(() => deps.onClose(latest));
+
+  // ---- F429: put away with Hide, the run ended on a button that waits for the tap ----
+  // The alert asks for it: Later leaves the strip, the action is the page's finish button's, the page shown first.
+  // The page coming back any other way, a retry or the page closing takes the alert down.
+  let question = null; // the open alert's AbortController
+  const askFinish = async (message, label, finish) => {
+    const mine = question = new AbortController();
+    const { index } = await alert({ title: "Complete", message, buttons: ["Later", label], cancel: 0, signal: mine.signal });
+    if (index !== 1 || mine.signal.aborted || page.closed) return;
+    showPage();
+    let keep = true;
+    try { keep = await finish(); } catch { /* the page stays, with its button */ }
+    if (!keep) page.close();
+  };
+  const dropQuestion = () => { question?.abort(); question = null; };
+  page.onClose(dropQuestion);
 
   // ---- F407: the apps' half ----
   const summary_ = () => summaryLine([...(apps?.rows ?? []).map((r) => ({ state: r.state, op: r.mode === "remove" ? "remove" : "install" })), ...rows]);
@@ -319,6 +337,7 @@ export async function runQueue({ jobs, plan }, deps) {
   async function drive(promises) {
     going = promises;
     busy = true;
+    dropQuestion();
     if (going.app) {
       helperBusy = true;
       going.app = going.app.then(() => deps.apps.idle?.()).then(() => { helperBusy = false; run.resume(); });
@@ -378,8 +397,15 @@ export async function runQueue({ jobs, plan }, deps) {
     }
     page.bar(clean ? {} : { left: closeB, right: retryAll });
     if (clean && ownOf("installed") && !TAP_LEVELS.includes(choice.level)) hold(false);
-    page.finish({ label: choice.label, status: text, action: () => finishAction(choice) });
-    if (page.hidden) strip.update();
+    // F429: the button and the alert share one go: a second tap waits for the first, only a failed one runs again
+    let pressed = null;
+    const finish = () => (pressed ??= Promise.resolve(finishAction(choice)).then((keep) => { if (keep) pressed = null; return keep; },
+      (e) => { pressed = null; throw e; }));
+    page.finish({ label: choice.label, status: text, action: finish });
+    if (page.hidden) {
+      strip.update();
+      if (TAP_LEVELS.includes(choice.level)) askFinish(text, choice.label, finish);
+    }
     apps?.settled();
     return result;
   }
