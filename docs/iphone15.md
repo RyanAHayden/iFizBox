@@ -38,15 +38,32 @@ tools/ui-15.sh unlock T99                # closes every app, locks the screen, f
 
 ## Remote control for a person
 
-`tools/remote-15.py` serves a page on this machine's Tailscale IP (port 8098) that mirrors the screen live (small JPEGs, only when it changes; needs Pillow)
-and forwards taps, drags, typing, Home and Wake. Use it when a login or other person-only step blocks an agent: the
-page's actions borrow whoever holds the UI lock, so the person types while the agent waits. With the lock free it
-takes it as `USER` and gives it back after 5 idle minutes. Anyone on the tailnet can drive the phone while it runs.
+`tools/remote-15.py [15|7|4s] [PORT]` serves a page on this machine's Tailscale IP that mirrors a phone's screen live (small JPEGs, needs Pillow)
+and forwards its taps and drags. The phone is `15` by default, on port 8098; `7` is on 8099 and `4s` on 8101 (8100 is WDA's).
+Use it when a login or other person-only step blocks an agent: the page's actions borrow whoever holds that phone's UI
+lock, so the person acts while the agent waits. With the lock free it takes it as `USER` and gives it back after 5 idle
+minutes. Each phone has its own lock. Anyone on the tailnet can drive the phone while it runs.
+
+What the page offers is what that phone's ui script does:
+
+- **15** (`ui-15.sh`, 1179x2556 px): tap, swipe, Home, type into the focused field, Wake. The screen comes from WDA.
+- **7** (`ui-7.sh`, 750x1334 px): tap, swipe, Home (Home also wakes it). No typing, no Wake. The screen is one ssh
+  running `phonectl shot` to stdout in a loop, only while someone watches: about 2.5 frames a second, nothing kept on
+  the phone, no lock.
+- **4S** (`ui-4s.sh`, 320x480 points): tap, swipe, Home. No typing, no Wake. The screen comes from Veency (the VNC
+  server on the phone) over ssh, through `tools/veency.py`. It starts with "Show screen", which takes the lock as `USER`
+  when it is free (otherwise it needs "Use it anyway"), wakes and unlocks the 4S, and presses Veency's Accept prompt
+  itself. It keeps nothing on the phone: the Camera Roll is untouched. A change shows in about half a second. The stream
+  ends when the lock changes hands, or when nobody has watched for 60 s.
+- Veency gotchas: a prompt left behind the lock screen blocks every later connection until it is answered, so the tool
+  wakes the phone first and answers any leftover prompt. Veency also leaves its arrow drawn on the phone after a
+  disconnect, so the tool parks it in the bottom right corner.
 
 The page shows who holds the phone. While a task holds it, taps, swipes, typing, Home and Wake are refused until the
 person presses "Use it anyway" for that holder; a new holder asks again. SIGTERM (the Tools page's Stop) frees the
-lock only when it is held as `USER`, then exits 0. Started while already serving, it says so and exits 0.
-`tools/test_remote_15.py` checks this with a fake `ui-15.sh` and lock folder (no phone).
+lock only when it is held as `USER`, then exits 0. Started while the same phone's page is already serving, it says so
+and exits 0; another phone's page doesn't count.
+`tools/test_remote_15.py` checks this with fake ui scripts and a lock folder (no phone).
 
 ## Rig files
 
