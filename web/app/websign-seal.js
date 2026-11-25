@@ -2,14 +2,14 @@
 // spells another way, and installd refuses that ("A signed resource has been added, modified, or deleted",
 // 0xe8008017). The app's own signer has the same rules in native/sign/SealPath.swift and IPASigner.swift.
 //
-//   prepareSeal(FS, payload, readPlist)  everything under `payload` (the unpacked Payload folder), in place:
+//   prepareSeal(FS, payload, { readPlist, removeTree })  everything under `payload` (the unpacked Payload folder), in place:
 //     - a bundle's old _CodeSignature folder goes, as do CodeResources and _MASReceipt at the root of one zsign signs;
 //     - files whose name ends in .DS_Store go (zsign leaves them out of the seal, iOS skips only that exact name);
 //     - the composed and decomposed spellings of a name (é) become one: the first one's, with the last one's data;
 //     - a bundle's executable with a non-ASCII name takes the decomposed spelling, its folders and Info.plist too.
-//   Running it again changes nothing. readPlist(path) -> the plist as a value (null or a throw: not readable).
+//   Running it again changes nothing. readPlist(path) -> the plist as a value (null or a throw: not readable); removeTree is websign-job.js's (passed
+//   in: importing it would be a cycle).
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { removeTree } from "./websign-job.js";
 import { parsePlist } from "./core/signing.js";
 
 const SIGNED = /\.(app|appex|framework|xctest)$/; // the folders zsign looks for bundles in
@@ -23,7 +23,7 @@ const exists = (FS, path) => { try { FS.stat(path); return true; } catch { retur
 const list = (FS, dir) => FS.readdir(dir).filter((n) => n !== "." && n !== "..");
 
 // `from` onto `to`, another spelling of its name: folders become one, a file takes `from`'s data (it came later).
-function mergeInto(FS, from, to) {
+function mergeInto(FS, from, to, removeTree) {
   if (isFolder(FS, from) && isFolder(FS, to)) {
     const have = new Map(list(FS, to).map((n) => [nfd(n), n]));
     for (const n of list(FS, from)) {
@@ -31,7 +31,7 @@ function mergeInto(FS, from, to) {
       if (at === undefined) {
         FS.rename(`${from}/${n}`, `${to}/${n}`);
         have.set(nfd(n), n);
-      } else mergeInto(FS, `${from}/${n}`, `${to}/${at}`);
+      } else mergeInto(FS, `${from}/${n}`, `${to}/${at}`, removeTree);
     }
     FS.rmdir(from);
   } else if (isFolder(FS, from) || isFolder(FS, to)) removeTree(FS, from);
@@ -41,14 +41,14 @@ function mergeInto(FS, from, to) {
   }
 }
 
-export function prepareSeal(FS, payload, readPlist) {
+export function prepareSeal(FS, payload, { readPlist, removeTree }) {
   const spelled = []; // bundles whose executable has a non-ASCII name: { parts (the folder's, under payload), exe }
   const walk = (dir, parts) => {
     const first = new Map();
     for (const n of list(FS, dir)) {
       const key = nfd(n), one = first.get(key);
       if (one === undefined) first.set(key, n);
-      else mergeInto(FS, `${dir}/${n}`, `${dir}/${one}`);
+      else mergeInto(FS, `${dir}/${n}`, `${dir}/${one}`, removeTree);
     }
     const bundle = parts.at(-1) ?? "";
     if (SIGNED.test(bundle) || bundle.endsWith(".bundle")) removeTree(FS, `${dir}/_CodeSignature`);
@@ -104,7 +104,9 @@ export function withExecutable(bytes, exe) {
 }
 
 function xmlExecutable(bytes, exe) {
-  const xml = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+  const xml = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes)
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (_, t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"));
   const esc = exe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const out = xml.replace(/(<key>CFBundleExecutable<\/key>\s*)(<string>[^<]*<\/string>)/g,
     (all, key, value) => (nfd(parsePlist(`<plist>${value}</plist>`)) === nfd(exe) ? `${key}<string>${esc}</string>` : all));

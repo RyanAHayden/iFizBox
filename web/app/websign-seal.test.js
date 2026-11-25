@@ -164,6 +164,8 @@ test("withExecutable: an XML plist with entities, a long name, and ones it can't
   const p = parsePlist(text(withExecutable(enc(nested), `${NFD}&`)));
   assert.equal(p.CFBundleExecutable, `${NFD}&`);
   assert.equal(p.X.CFBundleExecutable, "Other");
+  const odd = `<plist version="1.0"><dict><key>CFBundleExecutable</key><!-- x --><string><![CDATA[${NFC}]]></string></dict></plist>`;
+  assert.equal(parsePlist(text(withExecutable(enc(odd), NFD))).CFBundleExecutable, NFD);
   assert.equal(withExecutable(enc("not a plist"), NFD), null);
   assert.equal(withExecutable(enc("bplist00"), NFD), null);
 });

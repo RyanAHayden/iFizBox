@@ -89,7 +89,7 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   }
   FS.unlink("/w/in.ipa"); // the browser's memory is the limit: the zip goes once it's unpacked
   const readPlist = (path) => JSON.parse(zs.ccall("ifizbox_plist_json", "string", ["string"], [path]) || "null");
-  prepareSeal(FS, "/w/app/Payload", readPlist); // B434: before anything is looked up by name (it can rename the app's folder)
+  prepareSeal(FS, "/w/app/Payload", { readPlist, removeTree }); // B434: before anything is looked up by name (it can rename the app's folder)
   let apps = [];
   try { apps = FS.readdir("/w/app/Payload").filter((n) => n.endsWith(".app")); } catch { /* no Payload */ }
   if (apps.length !== 1) throw fail("bad_ipa", "That file is not an IPA: it has no Payload/<App>.app.");
@@ -142,7 +142,7 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   // F288: tweaks (core/tweaks.js prepareTweaks, done on the page): their files into the app, and the weak load commands
   // into the main executable, before zsign signs it all (it signs Frameworks/' dylibs and frameworks as any other).
   const injected = all?.files?.length ? putTweaks(FS, appDir, plist, all) : [];
-  if (all?.files?.length) prepareSeal(FS, "/w/app/Payload", readPlist); // B434: what the tweaks brought
+  if (all?.files?.length) prepareSeal(FS, "/w/app/Payload", { readPlist, removeTree }); // B434: what the tweaks brought
   if (plan?.shared && injected.includes(GROUPFIX.inject)) { // B425
     signLog.push(...fixExtensions(FS, appDir, (path) => JSON.parse(zs.ccall("ifizbox_plist_json", "string", ["string"], [path]) || "null")));
   }
