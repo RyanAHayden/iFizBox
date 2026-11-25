@@ -24,3 +24,17 @@ The person chose to re-queue the website's computer-install code page. Filed as 
 ## Update 2 (F436 landed)
 
 F436 is on main, so the code page exists. The real run still starts with the first 'setup' release (`tools/setup/release.sh`), which publishes outside git and needs the user's OK; the iPhone 15 run, the Mac and the Windows 11 x64 / ARM64 runs follow it and need the user at those machines. Blocked on the release OK. No code changed.
+
+## Update 3 (release OK given: Publish it)
+
+Probed the builds with `tools/setup/release.sh --probe`: Linux x86_64/arm64 and Windows x64 can build. Fetched llvm-mingw
+(`tools/setup/llvm-mingw.sh`), so the Windows ARM64 build has its compiler now. The macOS build still has no
+MacOSX.sdk: it comes from the MBA (`tools/setup/macos-sdk.sh`) and `ssh mba` times out (host mbas-macbook-air, port 22).
+I did not publish: a release without the universal macOS build would send Mac users an install script line saying
+"no build" and R38's Mac check would have nothing to run. Waiting for the MBA to be reachable.
+
+Release state: no `setup` release exists on GitHub yet.
+
+## Not verified (update 3)
+
+- Everything in the first Not verified list, plus: the Windows ARM64 and macOS builds were not made here (macOS: no SDK, MBA unreachable).
