@@ -1,0 +1,223 @@
+"before: otherVPN true restore true due {\"due\":false}"
+== on2 front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+Shortcut runs in the log: 1; last VPN states:
+11:19:09.500734 iFizBox VPN disconnected
+11:19:09.502942 Tailscale connected
+11:19:09.502986 iFizBox VPN disconnected
+11:18:46.240301 iFizBox{iFizBox}[2553] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+11:18:58.671129 iFizBox{iFizBox}[2553] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.11 s
+11:19:02.057378 iFizBox{iFizBox}[2553] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 3.4 s
+11:19:02.057466 iFizBox{iFizBox}[2553] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+11:19:02.057518 iFizBox{iFizBox}[2553] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+11:19:05.329246 iFizBox{iFizBox}[2553] <NOTICE>: iFizBox install: self-close: exit
+"before: otherVPN true restore true due {\"due\":false}"
+== on3 front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+Shortcut runs in the log: 1; last VPN states:
+11:20:12.213268 iFizBox VPN disconnected
+11:20:12.214867 Tailscale connected
+11:20:12.214899 iFizBox VPN disconnected
+11:19:48.575617 iFizBox{iFizBox}[2583] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+11:20:01.368185 iFizBox{iFizBox}[2583] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.11 s
+11:20:05.559403 iFizBox{iFizBox}[2583] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 4.2 s
+11:20:05.559415 iFizBox{iFizBox}[2583] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+11:20:05.559424 iFizBox{iFizBox}[2583] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+11:20:08.008305 iFizBox{iFizBox}[2583] <NOTICE>: iFizBox install: self-close: exit
+"before: otherVPN true restore true due {\"due\":false}"
+== on4 front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+Shortcut runs in the log: 1; last VPN states:
+11:21:14.901653 iFizBox VPN disconnected
+11:21:14.904767 Tailscale connected
+11:21:14.904804 iFizBox VPN disconnected
+11:20:50.973051 iFizBox{iFizBox}[2614] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+11:21:03.790580 iFizBox{iFizBox}[2614] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.11 s
+11:21:07.859184 iFizBox{iFizBox}[2614] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 4.1 s
+11:21:07.859203 iFizBox{iFizBox}[2614] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+11:21:07.859211 iFizBox{iFizBox}[2614] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+11:21:10.379926 iFizBox{iFizBox}[2614] <NOTICE>: iFizBox install: self-close: exit
+"before: otherVPN true restore true due {\"due\":false}"
+== on5 front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+Shortcut runs in the log: 1; last VPN states:
+11:22:17.127950 iFizBox VPN disconnected
+11:22:17.130789 Tailscale connected
+11:22:17.130823 iFizBox VPN disconnected
+11:21:53.437100 iFizBox{iFizBox}[2645] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+11:22:06.294007 iFizBox{iFizBox}[2645] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.11 s
+11:22:10.409395 iFizBox{iFizBox}[2645] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 4.1 s
+11:22:10.409439 iFizBox{iFizBox}[2645] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+11:22:10.409480 iFizBox{iFizBox}[2645] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+11:22:12.942226 iFizBox{iFizBox}[2645] <NOTICE>: iFizBox install: self-close: exit
+"before: otherVPN true restore true due {\"due\":false}"
+== on6 front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+Shortcut runs in the log: 1; last VPN states:
+11:23:19.227241 iFizBox VPN disconnected
+11:23:19.230761 Tailscale connected
+11:23:19.230806 iFizBox VPN disconnected
+11:22:55.805095 iFizBox{iFizBox}[2675] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+11:23:08.685962 iFizBox{iFizBox}[2675] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.17 s
+11:23:12.867059 iFizBox{iFizBox}[2675] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 4.2 s
+11:23:12.867084 iFizBox{iFizBox}[2675] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+11:23:12.867110 iFizBox{iFizBox}[2675] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+11:23:15.318507 iFizBox{iFizBox}[2675] <NOTICE>: iFizBox install: self-close: exit
+"before: otherVPN true restore true due {\"due\":false}"
+== on7 front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+Shortcut runs in the log: 1; last VPN states:
+11:24:22.058635 iFizBox VPN disconnected
+11:24:22.058975 Tailscale connected
+11:24:22.059079 iFizBox VPN disconnected
+11:23:58.234540 iFizBox{iFizBox}[2705] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+11:24:11.279519 iFizBox{iFizBox}[2705] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.32 s
+11:24:15.327788 iFizBox{iFizBox}[2705] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 4.0 s
+11:24:15.327839 iFizBox{iFizBox}[2705] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+11:24:15.327866 iFizBox{iFizBox}[2705] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+11:24:17.857280 iFizBox{iFizBox}[2705] <NOTICE>: iFizBox install: self-close: exit
+"before: otherVPN true restore true due {\"due\":false}"
+== on8 front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+Shortcut runs in the log: 1; last VPN states:
+11:25:23.452175 iFizBox VPN disconnected
+11:25:23.455067 Tailscale connected
+11:25:23.455076 iFizBox VPN disconnected
+11:25:00.237273 iFizBox{iFizBox}[2735] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+11:25:12.802051 iFizBox{iFizBox}[2735] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.16 s
+11:25:16.849206 iFizBox{iFizBox}[2735] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 4.0 s
+11:25:16.849238 iFizBox{iFizBox}[2735] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+11:25:16.849256 iFizBox{iFizBox}[2735] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+11:25:19.377494 iFizBox{iFizBox}[2735] <NOTICE>: iFizBox install: self-close: exit
+"before: otherVPN true restore true due {\"due\":false}"
+== on9 front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+Shortcut runs in the log: 1; last VPN states:
+11:26:26.929531 iFizBox VPN disconnected
+11:26:26.931353 Tailscale connected
+11:26:26.931414 iFizBox VPN disconnected
+11:26:03.195353 iFizBox{iFizBox}[2765] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+11:26:15.981194 iFizBox{iFizBox}[2765] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.11 s
+11:26:19.938906 iFizBox{iFizBox}[2765] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 4.0 s
+11:26:19.938935 iFizBox{iFizBox}[2765] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+11:26:19.939218 iFizBox{iFizBox}[2765] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+11:26:22.636774 iFizBox{iFizBox}[2765] <NOTICE>: iFizBox install: self-close: exit
+"before: otherVPN true restore true due {\"due\":false}"
+== on10 front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+Shortcut runs in the log: 1; last VPN states:
+11:27:28.187857 iFizBox VPN disconnected
+11:27:28.188486 Tailscale connected
+11:27:28.188527 iFizBox VPN disconnected
+11:27:05.410812 iFizBox{iFizBox}[2796] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+11:27:17.707182 iFizBox{iFizBox}[2796] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.16 s
+11:27:21.213433 iFizBox{iFizBox}[2796] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 3.5 s
+11:27:21.213465 iFizBox{iFizBox}[2796] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+11:27:21.213540 iFizBox{iFizBox}[2796] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+11:27:24.408544 iFizBox{iFizBox}[2796] <NOTICE>: iFizBox install: self-close: exit
+"before: otherVPN true restore true due {\"due\":false}"
+
+## DBG runs y1-y16: exit, then first launch of the new copy (0.99.0), then the rig build (0.34.0)
+2026-11-25 17:05:22 +0000 0.34.0 exit owed false mark 0
+2026-11-25 17:05:39 +0000 0.99.0 launch owed true mark 0
+2026-11-25 17:05:53 +0000 0.34.0 launch owed true mark 0
+2026-11-25 17:06:24 +0000 0.34.0 exit owed false mark 0
+2026-11-25 17:06:41 +0000 0.99.0 launch owed false mark 0
+2026-11-25 17:07:15 +0000 0.34.0 launch owed false mark 0
+2026-11-25 17:07:47 +0000 0.34.0 exit owed false mark 0
+2026-11-25 17:08:04 +0000 0.99.0 launch owed false mark 0
+2026-11-25 17:08:18 +0000 0.34.0 launch owed false mark 0
+2026-11-25 17:08:50 +0000 0.34.0 exit owed false mark 0
+2026-11-25 17:09:06 +0000 0.99.0 launch owed false mark 0
+2026-11-25 17:09:40 +0000 0.34.0 launch owed false mark 0
+2026-11-25 17:10:12 +0000 0.34.0 exit owed false mark 0
+2026-11-25 17:10:29 +0000 0.99.0 launch owed true mark 0
+2026-11-25 17:10:43 +0000 0.34.0 launch owed true mark 0
+2026-11-25 17:11:15 +0000 0.34.0 exit owed false mark 0
+2026-11-25 17:11:32 +0000 0.99.0 launch owed false mark 0
+2026-11-25 17:12:46 +0000 0.34.0 launch owed false mark 0
+2026-11-25 17:13:18 +0000 0.34.0 exit owed false mark 0
+2026-11-25 17:13:35 +0000 0.99.0 launch owed false mark 0
+2026-11-25 17:13:49 +0000 0.34.0 launch owed false mark 0
+2026-11-25 17:14:20 +0000 0.34.0 exit owed false mark 0
+2026-11-25 17:14:37 +0000 0.99.0 launch owed false mark 0
+2026-11-25 17:15:11 +0000 0.34.0 launch owed false mark 0
+2026-11-25 17:15:43 +0000 0.34.0 exit owed false mark 0
+2026-11-25 17:16:00 +0000 0.99.0 launch owed false mark 0
+2026-11-25 17:17:40 +0000 0.34.0 launch owed false mark 0
+2026-11-25 17:18:14 +0000 0.34.0 launch owed false mark 0
+2026-11-25 17:18:45 +0000 0.34.0 exit owed false mark 0
+2026-11-25 17:19:02 +0000 0.99.0 launch owed false mark 0
+2026-11-25 17:19:17 +0000 0.34.0 launch owed false mark 0
+2026-11-25 17:19:49 +0000 0.34.0 exit owed false mark 0
+2026-11-25 17:20:05 +0000 0.99.0 launch owed false mark 0
+2026-11-25 17:20:40 +0000 0.34.0 launch owed false mark 0
+2026-11-25 17:21:12 +0000 0.34.0 exit owed false mark 0
+2026-11-25 17:21:28 +0000 0.99.0 launch owed true mark 0
+2026-11-25 17:21:42 +0000 0.34.0 launch owed true mark 0
+2026-11-25 17:22:14 +0000 0.34.0 exit owed false mark 0
+2026-11-25 17:22:31 +0000 0.99.0 launch owed false mark 0
+2026-11-25 17:23:05 +0000 0.34.0 launch owed false mark 0
+2026-11-25 17:23:36 +0000 0.34.0 exit owed false mark 0
+2026-11-25 17:23:53 +0000 0.99.0 launch owed false mark 0
+2026-11-25 17:24:07 +0000 0.34.0 launch owed false mark 0
+2026-11-25 17:24:39 +0000 0.34.0 exit owed false mark 0
+2026-11-25 17:24:56 +0000 0.99.0 launch owed false mark 0
+2026-11-25 17:25:30 +0000 0.34.0 launch owed false mark 0
+## on1
+11:17:40.746489 iFizBox{iFizBox}[2520] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queu
+11:17:53.354660 iFizBox{iFizBox}[2520] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.16 s
+11:17:57.800530 iFizBox{iFizBox}[2520] <NOTICE>: iFizBox install: vpn: Restore My VPN Shortcut: back done
+11:17:57.801000 iFizBox{iFizBox}[2520] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 4.4 s
+11:17:57.801084 iFizBox{iFizBox}[2520] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+11:17:57.801255 iFizBox{iFizBox}[2520] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+11:17:59.887020 iFizBox{iFizBox}[2520] <NOTICE>: iFizBox install: self-close: exit
+## left1
+11:28:17.264077 iFizBox{iFizBox}[2826] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queu
+11:28:29.822782 iFizBox{iFizBox}[2826] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.10 s
+11:28:29.822804 iFizBox{iFizBox}[2826] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off
+11:28:36.721533 iFizBox{iFizBox}[2826] <NOTICE>: iFizBox install: self-close: exit
+## left2
+11:29:29.326374 iFizBox{iFizBox}[2851] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queu
+11:29:42.179891 iFizBox{iFizBox}[2851] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.11 s
+11:29:42.179908 iFizBox{iFizBox}[2851] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off
+11:29:49.034216 iFizBox{iFizBox}[2851] <NOTICE>: iFizBox install: self-close: exit
+## off1
+11:30:59.488596 iFizBox{iFizBox}[2881] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.11 s
+11:30:59.488611 iFizBox{iFizBox}[2881] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off
+11:31:06.386914 iFizBox{iFizBox}[2881] <NOTICE>: iFizBox install: self-close: exit
+## off2
+11:32:04.994685 iFizBox{iFizBox}[2911] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.16 s
+11:32:04.994725 iFizBox{iFizBox}[2911] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off
+11:32:11.910853 iFizBox{iFizBox}[2911] <NOTICE>: iFizBox install: self-close: exit
+## off3
+11:33:10.425123 iFizBox{iFizBox}[2941] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.11 s
+11:33:10.425157 iFizBox{iFizBox}[2941] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off
+11:33:17.349987 iFizBox{iFizBox}[2941] <NOTICE>: iFizBox install: self-close: exit
+## none1
+11:34:13.056777 iFizBox{iFizBox}[2971] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.10 s
+11:34:13.056824 iFizBox{iFizBox}[2971] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off
+11:34:19.947131 iFizBox{iFizBox}[2971] <NOTICE>: iFizBox install: self-close: exit
+## none2
+11:35:15.799016 iFizBox{iFizBox}[2995] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.11 s
+11:35:15.799028 iFizBox{iFizBox}[2995] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off
+11:35:22.366058 iFizBox{iFizBox}[2995] <NOTICE>: iFizBox install: self-close: exit
+## none3
+11:36:18.236084 iFizBox{iFizBox}[3027] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.11 s
+11:36:18.236115 iFizBox{iFizBox}[3027] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off
+11:36:24.834223 iFizBox{iFizBox}[3027] <NOTICE>: iFizBox install: self-close: exit
+## on11
+11:37:31.771443 iFizBox{iFizBox}[3068] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queu
+11:37:44.478811 iFizBox{iFizBox}[3068] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.11 s
+11:37:47.923219 iFizBox{iFizBox}[3068] <NOTICE>: iFizBox install: vpn: Restore My VPN Shortcut: back done
+11:37:47.923331 iFizBox{iFizBox}[3068] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 3.4 s
+11:37:47.923350 iFizBox{iFizBox}[3068] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+11:37:47.923370 iFizBox{iFizBox}[3068] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+11:37:51.174846 iFizBox{iFizBox}[3068] <NOTICE>: iFizBox install: self-close: exit
+## Readings printed by run.sh and again.sh for these runs (copied from the session's output)
+on1: version 0.99.0; Shortcut runs 1; Tailscale connected
+left1 (home), left2 (late): version 0.99.0; Shortcut runs 0; then the rig build: otherVPN false, restore true, due true; restore.answer on: ok, otherVPN true after
+off1, off2, off3: version 0.99.0; Shortcut runs 0; then the rig build: otherVPN false, restore false, due false
+none1, none2, none3: version 0.99.0; Shortcut runs 0; then the rig build: otherVPN false, restore true, due false
+on11: version 0.99.0; Shortcut runs 1; Settings: VPN, Connected; Tailscale off and iFizBox VPN selected, then the rig build: otherVPN false, restore true, due true
+d5 (before the y runs): the rig build's launch after d4's update: DBG launch owed true (d4: DBG exit owed false)

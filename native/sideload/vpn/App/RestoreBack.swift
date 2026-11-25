@@ -8,7 +8,10 @@ import Foundation
 import UIKit
 
 enum RestoreBack {
-    private static let owedKey = "ifizbox.vpn.backOwed"
+    // a file, not UserDefaults: after iFizBox's own update the new copy sometimes read UserDefaults' value from before
+    // the close (F438a, iOS 27), and asked again for a VPN already brought back
+    private static let owedFile = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("ifizbox.vpn.backOwed")
     private static let rememberedKey = "ifizbox.vpn.remembered"
     private static let neverKey = "ifizbox.vpn.backNever"
     static let again: TimeInterval = 2 // how often a look that must wait, also for an answer, looks again, the app in front
@@ -21,8 +24,11 @@ enum RestoreBack {
 
     /// Ours took another VPN's place, and it wasn't brought back yet. Kept, for an app killed before it was.
     private static var owed: Bool {
-        get { UserDefaults.standard.bool(forKey: owedKey) }
-        set { UserDefaults.standard.set(newValue, forKey: owedKey) }
+        get { (try? Data(contentsOf: owedFile)) == Data("1".utf8) }
+        set {
+            try? FileManager.default.createDirectory(at: owedFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+            do { try Data((newValue ? "1" : "0").utf8).write(to: owedFile, options: .atomic) } catch { log("owed not kept: \(error)") }
+        }
     }
     private static var held: Bool { lock.lock(); defer { lock.unlock() }; return left }
     private static func setLeft(_ on: Bool) { lock.lock(); left = on; lock.unlock() }
