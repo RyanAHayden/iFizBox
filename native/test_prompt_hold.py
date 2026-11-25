@@ -124,8 +124,7 @@ class Wiring(unittest.TestCase):
         self.assertLess(after.index("keep(InstallPrompt.Awake("), after.index("poll(h, run: mine"))
         self.assertIn("if mine == run { hold?.dismissed() }", after)
         poll = body(cfu, "private static func poll(", "\n    }\n")
-        # only a mark of this try keeps it
-        self.assertLess(poll.index('mark("asked"), state != .asked, !h.again'), poll.index("hold?.requested()"))
+        self.assertNotIn("requested()", poll)  # iOS's second question can be cancelled after `asked`
         self.assertIn("giveUp(late: h.age > h.life + lateBy)", poll)
         for start in ("private static func giveUp(", "static func hereBegan("):
             self.assertIn("keep(nil)", body(cfu, start, "\n    }\n"))

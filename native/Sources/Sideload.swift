@@ -1593,9 +1593,9 @@ enum CloseForUpdate {
         set { UserDefaults.standard.set(newValue.flatMap { try? JSONEncoder().encode($0) }, forKey: hostedKey) }
     }
     // B445: the run's KeepAlive hold, one whatever Try Again does. Given back PromptHold.quiet s after the prompt was
-    // dismissed, or after iFizBox went to the background, unless iOS asked for the IPA by then. The self-close isn't
-    // lost: iOS's prompt stays over the Home Screen, and an Install tapped there ends a suspended iFizBox by itself; in
-    // front, the polls go on and close it.
+    // dismissed, or after iFizBox went to the background, also when iOS asked for the IPA by then (its second
+    // question, for Low Data Mode, can be cancelled too). The self-close isn't lost: iOS's prompt stays over the Home
+    // Screen, and an Install tapped there ends a suspended iFizBox; in front, the polls go on and close it.
     private static var hold: InstallPrompt.Awake?
     private static func keep(_ new: InstallPrompt.Awake?) {
         let old = hold
@@ -1716,7 +1716,6 @@ enum CloseForUpdate {
                 }
                 if known, mark("asked"), state != .asked, !h.again {
                     IDevice.ilog("self-update: iOS asked for the IPA (Install was tapped)")
-                    hold?.requested() // B445: kept (or taken again) until the download begins or the link dies
                     set(.asked)
                 }
                 // an older Signing Server, without the status route: the old guess
