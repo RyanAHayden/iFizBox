@@ -269,3 +269,10 @@ _Said_: switch-back Shortcut
 _On screen_: Restore My VPN, Remember My VPN
 _In code_: RestoreShortcut, RestoreShortcutBridge, restoreshortcut.js, restoresetup.js, restore-vpn.plist
 _Avoid_: Install Switch, put-back Shortcut
+
+**Pairing Limit**:
+How long one pairing waits for its code to be typed: 10 minutes from its start, then it stops and the page offers a new code
+_Said_: pairing stops after 10 minutes
+_On screen_: The code expired after 10 minutes. / Get New Code
+_In code_: pairLimit, PairSession.expired, codeExpired, CODE_EXPIRED, NEW_CODE
+_Avoid_: pairing timeout

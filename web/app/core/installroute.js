@@ -275,6 +275,12 @@ export function pairFromNative(st) {
   return { pin: st.pin || "", text: st.text || "", error: st.error || "" };
 }
 
+// B436: idevice.pair's answer when nothing paired within the shell's 10 minutes (pairLimit): the page says so and
+// offers a new code.
+export const codeExpired = (e) => e?.code === "expired" || /^expired:/.test(e?.message || "");
+export const CODE_EXPIRED = "The code expired after 10 minutes.";
+export const NEW_CODE = "Get New Code";
+
 // The code as it shows: "123 456".
 export const pinText = (pin) => (/^\d{6}$/.test(pin || "") ? `${pin.slice(0, 3)} ${pin.slice(3)}` : pin || "");
 
