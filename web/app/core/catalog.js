@@ -587,7 +587,11 @@ export function createCatalog() {
       st.debUrl = root ? resolveFilename(root, st.filename) : null;
       // One source can list several versions of a package: the newest is the candidate, as in apt. The others
       // stay in `older` for the Version History page (F29, history()).
-      if (cur && compareVersions(cur.stanza.version, st.version) >= 0) { cur.older.push(st); continue; }
+      const than = cur ? compareVersions(cur.stanza.version, st.version) : -1;
+      // B429: the same version built for both architectures (Chariz: iphoneos-arm first): App Tweaks Only asks whether
+      // any of its builds can go into an app. The first stays the candidate, the one the Tweak Index checked.
+      if (tweaks && than === 0) cur.row._app ||= isAppTweak(st);
+      if (than >= 0) { cur.older.push(st); continue; }
       st.iconUrl = resolveIcon(root, st.icon);
       byId.set(st.package, { stanza: st, row: makeRow(st, key), older: cur ? [cur.stanza, ...cur.older] : [] });
     }

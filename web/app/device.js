@@ -6,7 +6,8 @@
 //
 //   currentDevice()          -> { ios: "16.5" | null, jailbreak: "rootless" | "rootful" | "roothide" | "none" (sideload build) }
 //   compatFilterOn()         -> whether rows that can't work are hidden (on by default)
-//   filterRow(onChange)      -> the "Works on My Phone" switch row for the Sections page and Search
+//   filterRow(onChange, key) -> the "Works on My Phone" switch row for the Sections page: All Sources' switch, or with
+//                               a source's key that source's own (B429, its Source Filters)
 //   compatBadge(code)        -> a row badge's text, or "" when the row was not judged
 //   applyNativeJailbreak(info, s) -> the app.info jailbreak type (F38) written to `arch`, in the jailbreak app only
 import { plain } from "./nav/ui.js";
@@ -15,6 +16,7 @@ import { catalog } from "./catalog.js";
 import { settings } from "./settings-store.js";
 import { createSwitch } from "./nav/switch.js";
 import { bridgeArch } from "./core/settings.js";
+import { ALL_SOURCES } from "./core/sourcefilters.js";
 import { iosFromUserAgent, jailbreakOfArch, badge, normalizeDevice } from "./core/compat.js";
 
 // The settings that change who the rows are judged for (F37 adds Device, which also sets "arch").
@@ -60,24 +62,25 @@ const APP_INFO_WAIT_MS = 2500;
 // The switch row: a one-row plain table with the device under the label, above the Sections list and Search's
 // results. `onChange()` runs after the setting changed and the catalog heard it, for the page to redraw its list.
 // The version and jailbreak type are changed in Settings (Works on My Phone, Device).
-export function filterRow(onChange = () => {}) {
+export function filterRow(onChange = () => {}, key = ALL_SOURCES) {
+  const isOn = () => settings.sourceFilters.isOn(key, "fit");
   const ul = document.createElement("ul");
   ul.className = "table plain compat-filter";
   ul.append(plain([{ rows: [{ label: "Works on My Phone", subtitle: deviceLabel() }] }]).firstChild);
   const cell = ul.querySelector(".cell-inner");
   cell.classList.add("has-switch");
   const makeSwitch = () => createSwitch({
-    label: "Works on My Phone", checked: compatFilterOn(),
-    onToggle: (on) => { if (compatFilterOn() !== on) settings.set("worksOnMyPhone", on); },
+    label: "Works on My Phone", checked: isOn(),
+    onToggle: (on) => { if (isOn() !== on) settings.sourceFilters.set(key, "fit", on); },
   });
   let sw = makeSwitch();
   cell.append(sw);
   // Any change (this switch, Settings, the Architecture) redraws the page; a row left behind unsubscribes.
-  const off = settings.onChange((key) => {
-    if (!DEVICE_KEYS.includes(key)) return;
+  const off = settings.onChange((changed) => {
+    if (!DEVICE_KEYS.includes(changed) && changed !== "sourceFilters") return;
     if (!ul.isConnected) { off(); return; }
     ul.querySelector(".cell-subtitle").textContent = deviceLabel();
-    if ((sw.getAttribute("aria-checked") === "true") !== compatFilterOn()) { const next = makeSwitch(); sw.replaceWith(next); sw = next; }
+    if ((sw.getAttribute("aria-checked") === "true") !== isOn()) { const next = makeSwitch(); sw.replaceWith(next); sw = next; }
     onChange();
   });
   return ul;
