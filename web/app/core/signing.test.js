@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { NAME } from "../brand.js";
 import {
   parseProfile, parseCert, parsePlist, checkP12Password, summary, profileCert, profileKind, normalizeServer,
-  bmpPassword, toBase64, APP_SERVER, LEGACY_SERVER,
+  bmpPassword, toBase64, APP_SERVER, LEGACY_SERVER, deviceError,
 } from "./signing.js";
 
 // Throwaway certificates with fixed dates, written by the old web/signer/make_fixtures.py (gone with the server, 9905b05).
@@ -147,4 +148,9 @@ test("B312: iOS already installing the same app for another app: the row's words
   assert.equal(stalled.message, "iOS didn't install uMod: nothing moved for a minute. Try again.");
   // no name: still a sentence, never the bundle ID's raw native text
   assert.equal(deviceError({ code: "install_busy", message: "x" }).message, busyStuckText("the app"));
+});
+
+test("B444: an error that begins with the app's name keeps the name's case", () => {
+  assert.equal(deviceError({ message: `${NAME} VPN didn't connect` }).message, `${NAME} VPN didn't connect`);
+  assert.equal(deviceError({ message: "network down" }).message, "Network down");
 });

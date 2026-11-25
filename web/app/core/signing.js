@@ -455,7 +455,7 @@ export const busyStuckText = (app) => `iOS is already installing ${app} for anot
 export function deviceError(err, name = "") {
   const code = err?.code ?? "";
   const raw = String(err?.message ?? err ?? "").trim();
-  const message = raw ? raw[0].toUpperCase() + raw.slice(1) : "Something went wrong.";
+  const message = raw ? (raw.startsWith(NAME) ? raw : raw[0].toUpperCase() + raw.slice(1)) : "Something went wrong."; // B444: the name keeps its own case
   if (code === "no_server") {
     return { title: "No Signing Server", open: "signing", message: `Installing needs a Signing Server: set one in ${signingPage()}.` };
   }
