@@ -38,3 +38,13 @@ Release state: no `setup` release exists on GitHub yet.
 ## Not verified (update 3)
 
 - Everything in the first Not verified list, plus: the Windows ARM64 and macOS builds were not made here (macOS: no SDK, MBA unreachable).
+
+## Update 4 (MBA up: released)
+
+The MBA answered ssh, so I copied a 90 MB MacOSX.sdk subset from its MacOSX15.5.sdk (usr/lib, usr/include, SDKSettings, the CoreFoundation/Security/SystemConfiguration/CoreServices/IOKit frameworks) to `~/.local/share/ifizbox/MacOSX.sdk`. `release.sh --probe` then said all five builds can be made. The first publish failed (HTTP 404) because gh's active account FIZL0 has no push access to RyanAHayden/iFizBox; re-ran with GH_TOKEN set to the RyanAHayden login's token (one command, account not switched) and it published the pre-release tag `setup` with all five binaries, SHA256SUMS, install.sh, install.ps1. https://ifizbox.com/sign/setup.sh and /sign/setup/bin/ifizbox-setup-macos answer 200. Verified on the MBA (arm64) over ssh: the universal macOS binary runs natively and under `arch -x86_64` (--help), and codesign shows Mach-O universal (x86_64 arm64), adhoc linker-signed signature accepted. Tip: the release needs RyanAHayden's token (`GH_TOKEN=$(gh auth token --user RyanAHayden)`).
+
+## Not verified (update 4)
+
+- iPhone 15 end to end: needs the app to sign for an Apple ID and show a code (a person's Apple ID). Install, pairing file written, app reads it (F254g): not run.
+- Real Windows 11 x64 and ARM64 runs (Apple Devices driver on 27015, Store link 9NP83LWLPZ9K, no window closing under `iex`): no Windows machine.
+- macOS run with a real iPhone plugged in: only `--help` ran.
