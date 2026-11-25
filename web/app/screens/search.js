@@ -15,9 +15,10 @@ import * as browse from "./browse.js";
 import { catalog } from "../catalog.js";
 import { compatFilterOn } from "../device.js";
 import { settings } from "../settings-store.js";
-import { SECTION_GROUPS, searchable } from "../core/catalog.js";
+import { searchable } from "../core/catalog.js";
 import { tweakSourcesOn } from "../core/sources.js"; // F305
-import { emptyFilters, searchFilters, openFilterPanel } from "./filterpanel.js";
+import { openFilterPanel } from "./filterpanel.js";
+import { SCOPES, scopesFor, scopeIndex, sheetActive, emptyFilters, searchFilters } from "./searchscope.js"; // F426c
 import { loadNew, onLanded, onSettled, isLoading } from "./sources.js";
 import { grouped, el, segments } from "../nav/ui.js";
 import { discoveryGroup } from "./extras.js";
@@ -29,20 +30,10 @@ import { detectMode } from "../core/settings.js";
 import { onPageShow } from "../nav/pagestate.js"; // B172
 
 export const title = "Search";
-
-// The segments: All plus the first three groups ("Utilities" and every other section are in the sheet; five
-// segments and a button don't fit a 320-point bar).
-export const SCOPES = ["All", ...SECTION_GROUPS.slice(0, 3)];
-
-// F41: the segments a device type shows. Not Jailbroken lists apps only (F37), so Tweaks and Themes would only
-// ever find nothing: just All and Apps then.
-const JAILBREAK_ONLY = ["Tweaks", "Themes"];
-export function scopesFor(type) {
-  return type === "none" ? SCOPES.filter((n) => !JAILBREAK_ONLY.includes(n)) : SCOPES;
-}
+export { SCOPES, scopesFor, scopeIndex, sheetActive };
 
 // The filters, kept for the session like the query: section (a section name or "group:<kind>"), source (a key),
-// installed ("installed" | "not"), price ("free" | "paid"); null is any (filterpanel.js).
+// installed ("installed" | "not"), price ("free" | "paid"); null is any (searchscope.js).
 const state = { query: "", seq: 0, filters: emptyFilters() };
 let drop = null; // Search's open Filter panel (filterpanel.js): { close() }
 let rootInput = null; // the root page's field, for reselect()
@@ -83,16 +74,6 @@ export const emptyNote = (count, loading) => (count ? "" : loading ? LOADING_NOT
 export function recentRows(list, pick) {
   return (list || []).map((q) => ({ label: q, cls: "recent-row", onClick: () => pick(q) }));
 }
-
-// The segment a section filter selects: its index in SCOPES, or -1 (a section picked in the sheet).
-export function scopeIndex(section) {
-  if (section == null) return 0;
-  const i = SCOPES.indexOf(String(section).replace(/^group:/, ""));
-  return String(section).startsWith("group:") && i > 0 ? i : -1;
-}
-
-// Whether the sheet holds anything the segments don't show (the Filter button looks pressed then).
-export const sheetActive = (f) => Boolean(f.source || f.installed || f.price || scopeIndex(f.section) === -1);
 
 // A tap on the Search tab while already on its root (nav/tabbar.js tapTab, F36): focus the field. Called straight
 // from the tap's click handler, never after an await or timer, or iOS won't bring up the keyboard.

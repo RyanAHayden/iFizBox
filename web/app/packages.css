@@ -392,6 +392,7 @@ html[data-sheet="card"] { --sheet-radius: 10px; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .scope-filter { flex: none; padding: 0 10px; }
+.scope-filter:only-child { margin-left: auto; } /* F426c: a list already of one kind has no segments */
 /* ==== look-only { ==== Search's scope bar */
 .search-bar.has-scope { background: var(--search-bar-scoped); }
 .search-scope { background: var(--search-scope); }
@@ -579,6 +580,7 @@ html[data-theme="dark"] .price-btn.version-mark.added { color: var(--subtitle); 
    index spans the table's visible part (Cydia has no strip, so its index is never covered). Only the index's letters
    close up; the list and its scroll position stay where they are. Over a sheet the strip leaves the tab bar, but
    then the sheet covers the index anyway. */
+.search-root:has(> .search-scope > .scope-filter.done) > .section-index { visibility: hidden; } /* F426c: its list is under the Filter panel */
 html.has-reload .section-index { bottom: calc(var(--tab-h) + 44px + 6px); }
 :is(.page-body, .search-results)[data-section-index] .pkg-row > .cell-inner { padding-right: 26px; } /* rows end before the index, as UITableView's */
 /* ==== look-only { ==== The section index */
@@ -718,7 +720,6 @@ html.has-manage-toolbar .search-results::after { content: ""; }
 .page-body[data-section-index] > .installed-search, .page-body[data-section-index] > .installed-scope { padding-right: 24px; }
 /* C10: pinned (nav/searchbar.js), the index is the results scroller's: the bars over it end short of it too. */
 .search-root:has(> .search-results[data-section-index]) > :is(.search-bar, .search-scope) { padding-right: 24px; }
-.page-body[data-section-index] > .list-search { padding-right: 24px; } /* F124: Browse's list search ends before the A–Z index */
 /* ==== look-only { ==== Installed's segmented title and Wish List button */
 .nav-title.nav-title-view { line-height: normal; }
 .nav-segments .scope-segments { box-shadow: 0 1px 0 rgba(255,255,255,.25); }

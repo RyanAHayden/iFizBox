@@ -283,3 +283,10 @@ _Said_: filter panel, Filter
 _On screen_: Filter
 _In code_: screens/filterpanel.js, openFilterPanel, .filter-drop
 _Avoid_: filter sheet, filter menu
+
+**Sort**:
+The order a list opened from Browse is shown in, picked in its Filter panel; the list's own order comes first
+_Said_: sort, sorting options
+_On screen_: Sort: Name | Newest | Most Sources
+_In code_: filters.sort, listSorts
+_Avoid_: order by, ranking
