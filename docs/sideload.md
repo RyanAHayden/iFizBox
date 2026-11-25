@@ -501,7 +501,6 @@ From reading code, not from a phone:
   their package metadata and code. Untested on any iOS 26/27 jailbreak.
 - Apple's online checks (OCSP, PPQ, enterprise trust) are from general knowledge, not observed traffic.
 - Upstream zsign's per-extension profiles: seen in its README only, not in the code.
-- The computer setup: no install or pairing-file write has run on a phone yet (the website's side that signs the app
-  and asks for a code isn't built); finding the iPhone, the trust check and Developer Mode's status were read from
+- The computer setup: no install or pairing-file write has run on a phone yet; finding the iPhone, the trust check and Developer Mode's status were read from
   an iPhone on iOS 27 with the Linux (x86_64, arm64 under qemu) and Windows x64 (under wine) builds. Not run on a
   Mac or on real Windows; the Microsoft Store link to the Apple Devices app is from memory.

@@ -2,7 +2,7 @@
 // signs an IPA with the user's certificate, all in the worker's memory, the app's files still compressed there (F265:
 // websign-stream.js). Nothing here touches the network.
 //
-//   await runSignJob(createZsign, { ipa, p12, password, profile, bring, appBundleId, keepBundleId, tweaks, groupFix, refuseSha256 }, { progress })
+//   await runSignJob(createZsign, { ipa, p12, password, profile, bring, appBundleId, keepBundleId, tweaks, groupFix, refuseSha256, free }, { progress })
 //     -> { ipa: [Uint8Array] (signed, in pieces: core/pieces.js), bundleId (signed as), originalId, name, version, sha256 (of the IPA as it came),
 //          injected?, warnings? (B227: data iOS keeps from the app after this signature, in words),
 //          signer (F342: core/websign.js webSignerStamp), expires? (F342: ISO, core/websign.js signatureEnd),
@@ -16,6 +16,8 @@
 // app as ifizbox-identity.plist (the app imports it on first launch, native BundledIdentity) and { transfer: link }
 // writes the website's ifizbox://import link as web/transfer.link (app.js imports it once); both before zsign seals
 // the bundle, as the old server signer did.
+// free (F436): a free Apple ID's profile: the entitlements are core/freeroute.js freeEntitlements' (get-task-allow as the
+// profile allows, no push) instead of the certificate route's.
 // groupFix (B211): the fix dylib's bytes (vendor/groupfix, signing-worker.js loads it); an app whose original
 // signature names app groups or keychain groups gets it injected (core/groupfix.js), iFizBox's own IPA never.
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -29,6 +31,7 @@ import { NAME } from "./brand.js";
 import { MALWARE_REFUSED } from "./core/malicious.js";
 import { prepareSeal } from "./websign-seal.js"; // B434
 import { ipaStream, editHead } from "./websign-stream.js"; // F265
+import { freeEntitlements } from "./core/freeroute.js"; // F436
 
 const fail = (code, message) => Object.assign(new Error(message), { code });
 
@@ -63,7 +66,7 @@ export function profileExtensions(FS, appDir, profile) {
   }
 }
 
-export async function runSignJob(createZsign, { ipa, p12, password = "", profile, bring = null, appBundleId = null, keepBundleId = true, tweaks = null, groupFix = null, refuseSha256 = [] }, { progress = () => {} } = {}) {
+export async function runSignJob(createZsign, { ipa, p12, password = "", profile, bring = null, appBundleId = null, keepBundleId = true, tweaks = null, groupFix = null, refuseSha256 = [], free = false }, { progress = () => {} } = {}) {
   const bytes = ipa instanceof Uint8Array ? ipa : new Uint8Array(ipa);
   if (!isZip(bytes)) throw fail("bad_ipa", "That file isn't an IPA (a zip archive).");
   const log = [];
@@ -111,7 +114,8 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   let previous = null, signedBefore = false;
   try { const c = FS.readFile(`${appDir}/${GROUPFIX.config}`); signedBefore = true; previous = readConfig(c); } catch { /* first sign */ }
   const original = fileEntitlements(FS, `${appDir}/${plist.CFBundleExecutable || ""}`);
-  const ents = appEntitlements(prof, entitlementsId, bundleId, originalDataProtection(original, prof, signedBefore)); // B413
+  const narrowed = appEntitlements(prof, entitlementsId, bundleId, originalDataProtection(original, prof, signedBefore)); // B413
+  const ents = free ? freeEntitlements(narrowed, prof) : narrowed; // F436
   FS.writeFile("/w/ents.plist", plistXml(ents));
   if (bring && own === IFIZBOX_ID) {
     if (bring.identity) FS.writeFile(`${appDir}/${IDENTITY_FILE}`, identityPlist({ p12, password, profile }));

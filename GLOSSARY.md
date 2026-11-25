@@ -297,3 +297,10 @@ _Said_: the strip with Show
 _On screen_: Show
 _In code_: screens/runstrip.js, qr-strip
 _Avoid_: banner, mini bar
+
+**Computer Install**:
+The free Apple ID route's one-time install of the app from a computer by USB: the website signs the app and shows a code, and the setup command on the computer installs what the code names
+_Said_: computer install, bootstrap download
+_On screen_: Computer Install; Download for a Computer Install
+_In code_: screens/computer-install.js, computerInstallBlock, worker/src/setup.js, tools/setup
+_Avoid_: bootstrap, USB install, desktop install
