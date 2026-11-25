@@ -198,7 +198,7 @@ Options:
 - `--draft`: create a draft. The app ignores drafts (and GitHub's `releases/latest` doesn't return them) until it
   is published on the site.
 - Without `--notes`, the notes are one bullet per `release-notes/*.md` ("Release notes" above), or, when there are
-  none, "Smaller fixes and improvements.", followed by the standard footer about the two files. The commit subjects
+  none, "Smaller fixes and improvements." The commit subjects
   are never used. Write the notes from those files for a real release.
 - `IFIZBOX_RELEASE_REPO=owner/name` publishes somewhere else, for a trial run on a fork.
 - `--minimum X.Y.Z`: the oldest iFizBox that may keep running without upgrading first (above).

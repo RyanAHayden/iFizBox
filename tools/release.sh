@@ -20,8 +20,8 @@
 #                    [--tag-source]
 #     --dry-run   build (or read --dist), check and print what would be published; publish nothing, no network
 #     --notes F   the release notes (Markdown; the first 4 lines show in the app's update alert). Default: one
-#                 bullet per release-notes/*.md (README.md left out), else "Smaller fixes and improvements."; then
-#                 the standard footer about the two files. IFIZBOX_RELEASE_NOTES_DIR reads another folder
+#                 bullet per release-notes/*.md (README.md left out), else "Smaller fixes and improvements."
+#                 IFIZBOX_RELEASE_NOTES_DIR reads another folder
 #     --dist DIR  publish DIR/iFizBox.deb and DIR/iFizBox.ipa as they are instead of running `make -C native package`
 #     --draft     create the release as a draft (the app ignores drafts until it is published on GitHub)
 #     --minimum V the oldest iFizBox that may keep running without upgrading first (F72): X-iFizBox-Minimum-Version in
@@ -353,24 +353,15 @@ if [ -n "$notes" ]; then
   [ -f "$notes" ] || die "no notes file $notes"
   cp "$notes" "$stage/notes.md"
 elif [ ${#notefiles[@]} -gt 0 ]; then
-  # D27: one release note per task (release-notes/<ID>.md, one sentence each), a bullet each, then the footer
-  {
-    for f in "${notefiles[@]}"; do
-      line=$(tr '\n' ' ' < "$f" | sed 's/  */ /g; s/^ //; s/ $//; s/^- //')
-      if [ -n "$line" ]; then echo "- $line"; fi
-    done
-    echo
-    echo "$BRAND_NAME.ipa is unsigned: sign it with your own certificate (Feather, AltStore, SideStore, or $BRAND_NAME's own"
-    echo "Settings > Signing). $BRAND_NAME.deb ($debname) is the rootless jailbreak build."
-  } > "$stage/notes.md"
-else
+  # D27: one release note per task (release-notes/<ID>.md, one sentence each), a bullet each
+  for f in "${notefiles[@]}"; do
+    line=$(tr '\n' ' ' < "$f" | sed 's/  */ /g; s/^ //; s/ $//; s/^- //')
+    if [ -n "$line" ]; then echo "- $line"; fi
+  done > "$stage/notes.md"
+fi
+if [ ! -s "$stage/notes.md" ]; then
   # no notes written: a plain line, never the commit subjects (internal, long)
-  {
-    echo "Smaller fixes and improvements."
-    echo
-    echo "$BRAND_NAME.ipa is unsigned: sign it with your own certificate (Feather, AltStore, SideStore, or $BRAND_NAME's own"
-    echo "Settings > Signing). $BRAND_NAME.deb ($debname) is the rootless jailbreak build."
-  } > "$stage/notes.md"
+  echo "Smaller fixes and improvements." > "$stage/notes.md"
 fi
 
 altargs=(--notes "$stage/notes.md" ${minimum:+--minimum "$minimum"})

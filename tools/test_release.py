@@ -64,8 +64,8 @@ class Release(unittest.TestCase):
                               env=env, capture_output=True, text=True, timeout=60)
 
     def test_notes_from_release_notes_files(self):
-        """D27: without --notes, the notes are one bullet per release-notes/*.md (README.md left out), then the
-        footer; not the commit subjects."""
+        """D27: without --notes, the notes are one bullet per release-notes/*.md (README.md left out);
+        F439a: nothing after them (no download text or links)."""
         self.fake_build("%s-7" % VERSION, VERSION)
         notesdir = os.path.join(self.tmp, "release-notes")
         os.makedirs(notesdir)
@@ -79,10 +79,12 @@ class Release(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         with open(os.path.join(out, "notes.md")) as f:
             lines = f.read().splitlines()
-        self.assertEqual(lines[:3], ["- Search no longer skips packages with long names.",
-                                     "- Apps install straight from a source's page.", ""])
-        self.assertNotIn("How to write these.", "\n".join(lines))
-        self.assertIn("rootless jailbreak build", lines[-1])
+        self.assertEqual(lines, ["- Search no longer skips packages with long names.",
+                                 "- Apps install straight from a source's page."])
+        with open(os.path.join(out, "source.json")) as f:
+            newest = json.load(f)["apps"][0]["versions"][0]
+        self.assertEqual(newest["localizedDescription"], "Search no longer skips packages with long names.\n"
+                                                         "Apps install straight from a source's page.")
         self.assertIn("  - Apps install straight from a source's page.", r.stdout)
 
     def test_notes_without_files_skip_commits(self):
@@ -95,9 +97,20 @@ class Release(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         with open(os.path.join(out, "notes.md")) as f:
             notes = f.read()
-        self.assertTrue(notes.startswith("Smaller fixes and improvements.\n\n"), notes)
-        self.assertNotIn("\n- ", notes)
-        self.assertIn("rootless jailbreak build", notes)
+        self.assertEqual(notes, "Smaller fixes and improvements.\n")
+
+    def test_blank_notes_files_give_plain_line(self):
+        """F439a: release-notes files with no text count as no notes."""
+        self.fake_build("%s-7" % VERSION, VERSION)
+        notesdir = os.path.join(self.tmp, "blank")
+        os.makedirs(notesdir)
+        with open(os.path.join(notesdir, "F1.md"), "w") as f:
+            f.write("\n")
+        out = os.path.join(self.tmp, "out")
+        r = self.dry_run("--out", out, notes_file=False, env_extra={"IFIZBOX_RELEASE_NOTES_DIR": notesdir})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(os.path.join(out, "notes.md")) as f:
+            self.assertEqual(f.read(), "Smaller fixes and improvements.\n")
 
     def assets(self, out):
         line = next(l for l in out.splitlines() if l.startswith("release: assets: "))
@@ -178,7 +191,7 @@ class Release(unittest.TestCase):
         app = src["apps"][0]
         self.assertEqual(app["minimumVersion"], VERSION)
         self.assertEqual(app["versions"][0]["version"], VERSION)
-        self.assertTrue(app["versions"][0]["localizedDescription"].startswith("A test release\n"))
+        self.assertEqual(app["versions"][0]["localizedDescription"], "A test release")
         # altsource.KEEP caps versions[]: once the source is full, the oldest entry drops off. F180: entries whose IPA
         # isn't <NAME>.ipa (the releases before it) drop off too.
         sys.path.insert(0, os.path.join(ROOT, "tools"))
