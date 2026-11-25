@@ -464,7 +464,7 @@ export const buyLabel = (price) => `Buy${price ? ` for ${isFreePrice(price) ? "F
 // unavailableNav). A free one was never sold, so it doesn't say so.
 function notSoldText(e, who, what) {
   const free = isFreePrice(e.price);
-  const gone = free ? `${what === "this" ? "Not" : `${what} is not`} available from ${who}.` : `${who} no longer sells ${what}.`;
+  const gone = free ? `${what === "this" ? "Not" : `${what} is not`} available from ${who}.` : `${who === "its seller" ? "Its seller" : who} no longer sells ${what}.`;
   return e.need === "signin" ? `${gone} If you ${free ? "already got" : "bought"} it, sign in to download it.` : gone;
 }
 

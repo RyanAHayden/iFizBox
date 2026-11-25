@@ -253,4 +253,7 @@ test("B454: a free tweak no longer available isn't called sold", async () => {
     alert: async (x) => { seen.push(x.message); } };
   for (const need of ["signin", "unavailable"]) await offerPaid({ package: "a", name: "A" }, new PaidNeeded(need, { price: "Free", available: false }), o);
   assert.deepEqual(seen, ["A is not available from Havoc. If you already got it, sign in to download it.", "A is not available from Havoc."]);
+  seen.length = 0;
+  await offerPaid({ package: "a", name: "A" }, new PaidNeeded("unavailable"), { ...o, paid: { seller: async () => null } });
+  assert.deepEqual(seen, ["Its seller no longer sells A."]);
 });
