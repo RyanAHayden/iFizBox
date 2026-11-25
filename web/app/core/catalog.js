@@ -31,6 +31,10 @@
 //   c.popular({ limit })                   -> [row] ranked by how many sources list it, then newest (rankPopular),
 //                                             each with `sources` (that count)
 //   c.collection(id)                       -> F154: [row] in Browse's collection `id` (COLLECTIONS)
+//   c.refine(rows, { section, source, installed, price, sort }) -> F426b: a list's [row] filtered with search()'s
+//                                             filters (no query) and sorted: "name", "newest" (the date popular()
+//                                             ranks by; undated last), "popular" (most sources first); no sort keeps
+//                                             the list's own order
 //   c.roulette({ per })                    -> F154: Tweak Roulette's pool, [{ label, icon, rows }] (roulettePool)
 //   c.aptProblems(aptOutput)              -> N4: explainApt over the same index as deps (the Confirm sheet)
 //   c.queueInfo([id])                      -> N4: { id: { name, restart, kind } } for the queue's packages (F151: kind)
@@ -841,6 +845,24 @@ export function createCatalog() {
     return pool;
   }
 
+  // Search's filters as one row test, shared by search() and refine() (F426b): `section`, `installed` and `price` as
+  // search() documents them. Null when they leave nothing (App Tweaks while that section is hidden).
+  // B341: in the sideload build, App Tweaks (or All Tweaks) over All Sources is the Tweak Sources' app tweaks.
+  const isAppTweaks = (section, key) => appsOnly && key === ALL && (section === APP_TWEAKS || section === "group:Tweaks");
+  function filterTest({ section = null, installed = null, price = null } = {}, key = ALL) {
+    const appTweaks = isAppTweaks(section, key);
+    if (appTweaks && hidden.has(APP_TWEAKS)) return null;
+    const inSection = appTweaks ? (r) => tweakKeys.has(r.key) : sectionTest(section);
+    return (r) => {
+      if (inSection && !inSection(r)) return false;
+      if (installed === "installed" && !statusById.has(r.id)) return false;
+      if (installed === "not" && statusById.has(r.id)) return false;
+      if (price === "paid" && !r.paid) return false;
+      if (price === "free" && r.paid) return false;
+      return true;
+    };
+  }
+
   // Every word must appear somewhere (name, id, description, author or maintainer). Ranked: exact name or id,
   // then name or id starting with the query, then the query starting a word in the name or id (F101), then the
   // query inside the name or id, then author or maintainer, then the rest. Within a tier (Sileo): the name
@@ -857,22 +879,18 @@ export function createCatalog() {
     const key = source && sources.has(source) ? source : ALL;
     if (source && key === ALL) return []; // a source that isn't loaded has nothing
     // B341: in the sideload build, App Tweaks (or All Tweaks) searches the Tweak Sources' app tweaks instead.
-    const appTweaks = appsOnly && key === ALL && (section === APP_TWEAKS || section === "group:Tweaks");
-    if (appTweaks && hidden.has(APP_TWEAKS)) return [];
-    const inSection = appTweaks ? null : sectionTest(section);
+    const appTweaks = isAppTweaks(section, key);
+    const passes = filterTest({ section, installed, price }, key);
+    if (!passes) return [];
     // B364: and an unfiltered one (no section) takes them in beside the apps, or a tweak whose source was added
     // dropped out of Search altogether (Other Sources leaves out what added sources list).
-    const withTweaks = appsOnly && key === ALL && !inSection && !appTweaks && !hidden.has(APP_TWEAKS);
+    const withTweaks = appsOnly && key === ALL && !sectionTest(section) && !hidden.has(APP_TWEAKS);
     const hits = [];
     const listed = sourceCounts();
     for (const r of appTweaks ? (tweakEntries(), tweakSorted) : withTweaks ? appsAndTweaks() : rowsOf(key)) {
       if (isHidden(r)) continue;
       if (!words.every((w) => r._hay.includes(w))) continue;
-      if (inSection && !inSection(r)) continue;
-      if (installed === "installed" && !statusById.has(r.id)) continue;
-      if (installed === "not" && statusById.has(r.id)) continue;
-      if (price === "paid" && !r.paid) continue;
-      if (price === "free" && r.paid) continue;
+      if (!passes(r)) continue;
       let rank = 5;
       if (r._n === q || r._id === q) rank = 0;
       else if (r._n.startsWith(q) || r._id.startsWith(q)) rank = 1;
@@ -962,12 +980,14 @@ export function createCatalog() {
     return visibleOf(ALL).filter((r) => browseCategory(r) === category).map(slim);
   }
 
+  // The date popular() and refine()'s newest rank by: the candidate's AltStore version date; APT has none.
+  const dateOf = (id) => entries(ALL).get(id)?.stanza.ipa?.versions?.[0]?.date ?? null;
+
   function popular({ limit = 50 } = {}) {
     const lists = [...sources].filter(([k]) => counts(k)).map(([, { byId }]) => byId);
-    const all = entries(ALL);
     const items = visibleOf(ALL).map((row) => ({
       row, sources: lists.reduce((n, byId) => n + (byId.has(row.id) ? 1 : 0), 0),
-      date: all.get(row.id)?.stanza.ipa?.versions?.[0]?.date ?? null,
+      date: dateOf(row.id),
     }));
     return rankPopular(items, limit).map(({ row, sources: n }) => ({ ...slim(row), sources: n }));
   }
@@ -1000,6 +1020,34 @@ export function createCatalog() {
     const c = collection(id);
     if (!c || (appsOnly && c.jailbreak)) return [];
     return visibleOf(ALL).filter((r) => c.test(r)).map(slim);
+  }
+  // F426b: filters and a sort for any list already drawn (Browse's lists): `rows` as that list gave them, handed back
+  // as they are (New's `change` and `seen` too). A source filter keeps what that source lists, also where the row
+  // shown is another source's copy (so Newest Copy Only, on by default, doesn't count: it would take out every
+  // such package); what else its own list leaves out stays out. The other filters test the row shown. Ties: newest by name, popular by
+  // newest then name (rankPopular).
+  function refine(rows, { section = null, source = null, installed = null, price = null, sort = null } = {}) {
+    if (!Array.isArray(rows) || (source && !sources.has(source))) return [];
+    const passes = filterTest({ section, installed, price }, source || ALL);
+    if (!passes) return [];
+    let inSource = null;
+    if (source) {
+      // ids compare as that source's merge does (mergeMap): apps' bundle IDs as spelled, packages ignoring case
+      const ids = [...entries(source).values()].map((e) => e.row)
+        .filter((r) => listed(r) && !filteredOut(r) && !systemTweak(r) && !misfit(r) && !isHidden(r)).map((r) => r.id);
+      inSource = appsOnly && !tweakKeys.has(source) ? new Set(ids) : new IdSet(ids);
+    }
+    const out = rows.filter((r) => passes(r) && (!inSource || inSource.has(r.id)));
+    if (sort === "name") return out.sort(compareNames);
+    if (sort === "newest") {
+      const at = new Map(out.map((r) => [r, dateOf(r.id) ?? -Infinity]));
+      return out.sort((a, b) => (at.get(a) === at.get(b) ? compareNames(a, b) : at.get(b) - at.get(a)));
+    }
+    if (sort === "popular") {
+      const listed = sourceCounts();
+      return rankPopular(out.map((row) => ({ row, sources: listed.get(row.id) ?? 0, date: dateOf(row.id) })), Infinity).map((i) => i.row);
+    }
+    return out;
   }
   function roulette({ per } = {}) {
     return roulettePool(visibleOf(ALL), { jailbroken: !appsOnly, per }).map((t) => ({ ...t, rows: t.rows.map(slim) }));
@@ -1148,7 +1196,7 @@ export function createCatalog() {
   }
 
   return { load, loadAlt, altSource, remove, setHidden, setHiddenAuthors, setBlocked, sections, list, search, author, package: pkg, history, has, versions, keys: () => [...sources.keys()],
-    categories, browse, popular, free, featured, collection: collectionRows, roulette,
+    categories, browse, popular, free, featured, collection: collectionRows, refine, roulette,
     setInstalled, installed, upgrades, setDevice, setIpaInfo, setFilters, setTweakVerdicts, setTweakKnown, shows,
     deps, aptProblems, queueInfo, runInfo };
 }
@@ -1167,7 +1215,7 @@ export function runCatalog(catalog, op, args = []) {
     installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice, setIpaInfo: catalog.setIpaInfo, setFilters: catalog.setFilters,
     setTweakVerdicts: catalog.setTweakVerdicts, setTweakKnown: catalog.setTweakKnown, shows: catalog.shows,
     categories: catalog.categories, browse: catalog.browse, popular: catalog.popular, free: catalog.free, featured: catalog.featured,
-    collection: catalog.collection, roulette: catalog.roulette,
+    collection: catalog.collection, refine: catalog.refine, roulette: catalog.roulette,
     deps: catalog.deps, aptProblems: catalog.aptProblems, queueInfo: catalog.queueInfo, runInfo: catalog.runInfo }[op];
   if (!f) throw new Error(`unknown catalog op ${op}`);
   return f(...args);
