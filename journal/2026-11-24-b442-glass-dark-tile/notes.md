@@ -26,27 +26,33 @@
   read the icon stacks. No other set's entries differ.
 - Lite IPA built from the branch.
 
-## Tried and failed
+## Phone check (iPhone 15 Pro, iOS 27, Lite IPA from this branch, 2026-11-25)
 
-- On 2026-11-24 the MBA was off: `ssh mba` timed out, Tailscale listed it offline, and the LAN address gave no route,
-  so the .car files could not be compiled that day. A macOS GitHub Actions job was not used, since it would be a new
-  published workflow the task did not ask for.
+Home Screen icons need the real device. The phone was already in Style iOS 26 with the Glass icon and in Dark. Home's
+header showed the new dark thumb.
 
-## Left
-
-- Home Screen shots on the iPhone 15 Pro: Default, Dark, Clear and Tinted beside system icons. Held by B440 at the
-  time, so waiting for it. Check whether the dark tile matches its neighbours, and whether Clear and Tinted are
-  unchanged. If they changed, pin their fill with a specialization.
-- Full gate.
+- Customize > Default, Dark (Auto), Clear (Light), Tinted (Light), shot with the sheet open:
+  `journal/2026-11-24-b442-glass-dark-tile/home-screen-15pro.png` (left to right). The dark tile measures `1f1f1f` at
+  the top to `0e0f0e` at the bottom, the same as Files beside it (`1f2020` to `101010`). The globe is legible.
+- Then installed a main build whose Assets.car is main's AssetsLite.car (matched by sha256) and took the same shots:
+  `journal/2026-11-24-b442-glass-dark-tile/before-after-15pro.png` (old left, new right; rows Default, Dark, Clear,
+  Tinted). Default and Tinted are pixel-identical. Clear differs by 4.3 levels on average in the icon, but untouched
+  neighbours differ too (2.6 to 8.4: OpenTennis, PartyBoard, Files...), and the wallpaper is 0. That is a difference in
+  how iOS drew the glass in the two shots, not a change in the icon.
+- Put back: Customize set to Default; the phone keeps the main build.
 
 ## Not verified
 
-- The phone shots listed above, including whether the dark tile matches its neighbours.
-- Clear and Tinted pixels. Only the SizeOnDisk match is known.
-- The full gate.
-- iOS 15-25's flat render of the Glass icon.
+- Clear and Tinted with the sheet's Dark choice: only Light was taken.
+- iOS 15-25's flat render of the dark look.
+- The dark picker grid: only Home's header was seen, which is the same file.
 
 ## Stale wording
 
 - The comments in `web/app/core/settings.js` still say Gunmetal for the Glass icon's dark look. That file is outside
   this task's changes and was left as it is.
+
+## Gate
+
+- The first `done` failed on `web/app/core/blocked.test.js`: a fixed date in it had gone out of the week it needs. Main
+  had already fixed that (`dayGroups` gets `now`); this branch takes main's copy of the file, nothing else from main.

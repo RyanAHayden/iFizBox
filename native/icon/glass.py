@@ -5,7 +5,8 @@ An .icon is a folder: icon.json (the background fill and the layer groups, front
 layer). Xcode 26's actool compiles it into Assets.car beside the asset catalog's PNG set of the same name
 (icon/assets.sh). An .icon replaces a same-named .appiconset's PNGs whole, and costs ~3 MB of renders per set, so
 only CAR_SETS go into the .car: the Glass icon (alternates.GLASS_SET, Classic in Light, Gunmetal's globe on iOS's own
-dark tile in Dark), an extra choice in Theme > App Icon with no PNG set (iOS 15-25 show actool's flat render of it). Every theme's set stays
+dark tile in Dark), an extra choice in Theme > App Icon with no PNG set (iOS 15-25 show actool's flat render of it).
+Every theme's set stays
 the PNGs (iOS 26 makes their Clear and Tinted looks itself). `write` still makes a document for every set, for the
 tests and for trying one.
 
@@ -186,13 +187,14 @@ def all_sets():
 # The sets whose .icon goes into Assets.car (icon/assets.sh). Only the Glass icon's (user 2026-11-21): actool drops a
 # same-named .appiconset's PNGs for the .icon (iOS 15-25 would get actool's flattened render, no LITE sash) and
 # stores ~3 MB of 1024 px renders per set, so every theme's set stays a PNG set and the glass one is an extra choice,
-# a set of its own with no PNG set (alternates.GLASS_SET): Classic in Light, Gunmetal's globe on iOS's dark tile in Dark. iOS 15-25 show
-# actool's flat render of it.
+# a set of its own with no PNG set (alternates.GLASS_SET): Classic in Light, Gunmetal's globe on iOS's dark tile in Dark.
+# iOS 15-25 show actool's flat render of it.
 CAR_SETS = (alternates.GLASS_SET,)
 
 
 def flat_svg(icon, fill=None):
-    """One icon's layers on its fill (or `fill`, its top and bottom colours) as a single flat picture (no system glass): the 180 px thumbnail the page shows
+    """One icon's layers on its fill (or `fill`, its top and bottom colours) as a single flat picture (no system glass):
+    the 180 px thumbnail the page shows
     for the Glass icon (icon/glass/AppIcon60x60@3x.png, `glass.py thumb`)."""
     c = colours(icon)
     inner = lambda s: s.split("\n", 1)[1].rsplit("\n</svg>", 1)[0]  # noqa: E731
@@ -209,8 +211,8 @@ THUMB = os.path.join(ICON, "glass", "AppIcon60x60@3x.png")
 def thumb():
     """icon/glass/AppIcon60x60@3x.png from flat_svg (needs rsvg-convert): the Glass icon's light look, the same in
     both builds (no LITE sash: the .icon is one picture for both). F371: and AppIconDark60x60@3x.png
-    (alternates.GLASS_DARK_THUMB), its dark look (Gunmetal's globe on iOS's dark tile), for Dark's grid and Home's header in dark
-    mode."""
+    (alternates.GLASS_DARK_THUMB), its dark look (Gunmetal's globe on iOS's dark tile), for Dark's grid
+    and Home's header in dark mode."""
     import subprocess
     import tempfile
     os.makedirs(os.path.dirname(THUMB), exist_ok=True)
