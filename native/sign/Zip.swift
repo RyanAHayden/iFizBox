@@ -82,7 +82,7 @@ final class ZipReader {
             guard p + 46 <= cd.count, le32(cd, p) == 0x02014b50 else { throw ZipError("bad central directory") }
             let nlen = Int(le16(cd, p + 28)), xlen = Int(le16(cd, p + 30)), clen = Int(le16(cd, p + 32))
             guard p + 46 + nlen + xlen + clen <= cd.count else { throw ZipError("bad central directory") }
-            let name = String(decoding: cd[(p + 46)..<(p + 46 + nlen)], as: UTF8.self)
+            let name = SealPath.short(String(decoding: cd[(p + 46)..<(p + 46 + nlen)], as: UTF8.self))
             var csize = UInt64(le32(cd, p + 20)), usize = UInt64(le32(cd, p + 24)), lho = UInt64(le32(cd, p + 42))
             var x = p + 46 + nlen
             let xend = x + xlen
@@ -304,9 +304,9 @@ final class ZipWriter {
         write(h)
     }
 
-    // An entry from another zip, its compressed bytes copied as they are.
-    func copy(_ e: ZipEntry, from r: ZipReader) throws {
-        let c = Central(name: Data(e.name.utf8), method: e.method, flags: e.flags & 0x0800, time: e.dosTime,
+    // An entry from another zip, its compressed bytes copied as they are, under its name or `name`.
+    func copy(_ e: ZipEntry, as name: String? = nil, from r: ZipReader) throws {
+        let c = Central(name: Data((name ?? e.name).utf8), method: e.method, flags: e.flags & 0x0800, time: e.dosTime,
                         date: e.dosDate, crc: e.crc, csize: e.compressedSize, usize: e.size, offset: offset,
                         attr: e.madeBy >> 8 == 3 ? e.externalAttr : e.unixMode << 16)
         local(c)

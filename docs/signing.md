@@ -478,7 +478,8 @@ cross-compiled into the app; this way neither. It writes what Apple's `codesign`
   refused;
 - each bundle inside out (frameworks and extensions before the app): `_CodeSignature/CodeResources` sealing every
   file with SHA-1 and SHA-256 (nested bundles' files included, as zsign seals them; symlinks as links; `.lproj`
-  optional), `embedded.mobileprovision` in apps and extensions, the entitlements narrowed per bundle, as the website does
+  optional; what iOS skips at a bundle's root stays unsealed, names take the one spelling iOS uses, and other files in
+  an old `_CodeSignature` are left out: `native/sign/SealPath.swift`), `embedded.mobileprovision` in apps and extensions, the entitlements narrowed per bundle, as the website does
   (`application-identifier` and the keychain group set to the bundle's ID, `get-task-allow` off);
 - the bundle ID rules (see "Keep Bundle IDs" below): kept, Info.plist and every code signature keep the app's and
   its extensions' own IDs, and the app and its extensions all carry the profile's App ID as `application-identifier`,

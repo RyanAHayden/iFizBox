@@ -198,6 +198,13 @@ test("profile rules") {
     check((try? Profile(Data("not a profile".utf8))) == nil, "garbage refused")
 }
 
+test("B432: odd names and signature leftovers (native/test_sign.py checks the seal)") {
+    let profile = try Profile(try fixture("profile.mobileprovision"))
+    let app = try IPASigner(profile: profile, identity: identity)
+        .sign(fixtures.appendingPathComponent("odd-names.ipa"), to: work.appendingPathComponent("odd-names.ipa"))
+    check(app.bundleID == "dev.ifizbox.odd" && app.skipped.isEmpty, "\(app)")
+}
+
 test("sign a fixture IPA, wildcard profile") {
     let profile = try Profile(try fixture("profile.mobileprovision"))
     let signer = IPASigner(profile: profile, identity: identity)

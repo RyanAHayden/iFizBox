@@ -13,6 +13,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import unicodedata
 import unittest
 import zipfile
 
@@ -150,6 +151,80 @@ def rich_ipa(main_binary=None, kit=None, loose=None, extra=None):
     return buf.getvalue()
 
 
+class RawName(zipfile.ZipInfo):
+    """A zip entry whose name is written as given (./, //, any bytes)."""
+    raw = b""
+
+    def _encodeFilenameFlags(self):
+        return self.raw, self.flag_bits | 0x800
+
+
+def odd_names_ipa():
+    """B432: names iOS's scan of a signed bundle treats its own way, each refused by installd (0xe8008017) before."""
+    buf = io.BytesIO()
+    kit = "Frameworks/Kit.framework/"
+    files = [("Info.plist", info("dev.ifizbox.odd", "Proc\u00e9")), ("Proc\u00e9", macho()),
+             (kit + "Info.plist", info("dev.ifizbox.kit", "Kit", CFBundlePackageType="FMWK")), (kit + "Kit", macho(6))]
+    for d in ("", kit):  # what an earlier signer left at a bundle's root
+        files += [(d + n, b"left over") for n in (
+            "_CodeSignature/CodeDirectory", "_CodeSignature/sub/x", "CodeResources", "_MASReceipt/receipt",
+            "foo.DS_Store", "SC_Info/a.sinf", "CodeResources2")]
+    files += [("./dot.txt", b"x"), ("/slash.txt", b"x"), ("sub//deep/./z.txt", b"x"),       # paths not in their short form
+              ("\u0301first.txt", b"x"), ("\u200dzwj.txt", b"x"), ("sub/\ufe0fvs.txt", b"x"),  # joins the "/" before it
+              ("caf\u00e9.txt", b"one"), ("cafe\u0301.txt", b"two"),                        # one file on the phone
+              ("d\u00e9/a.txt", b"x"), ("de\u0301/b.txt", b"x"),                            # one folder
+              ("twice.txt", b"one"), ("twice.txt", b"two")]
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for i, (name, data) in enumerate(files):
+            zi = RawName("entry%d" % i, date_time=(2026, 11, 24, 0, 0, 0))
+            zi.raw = ("Payload/Odd.app/" + name).encode()
+            zi.create_system = 3
+            zi.external_attr = 0o100755 << 16
+            zi.compress_type = zipfile.ZIP_DEFLATED
+            z.writestr(zi, data)
+    return buf.getvalue()
+
+
+def phone_files(ipa):
+    """{path: data} as installd leaves an IPA on disk: APFS takes NFC and NFD as one name and keeps the first spelling."""
+    out, spelled = {}, {}
+    with zipfile.ZipFile(ipa) as z:
+        for zi in z.infolist():
+            path = key = ""
+            for part in zi.filename.split("/"):
+                if part in ("", "."):
+                    continue
+                key += "/" + unicodedata.normalize("NFD", part)
+                path = spelled.setdefault(key, (path + "/" + part).lstrip("/"))
+            if not zi.filename.endswith("/"):
+                out[path] = z.read(zi)
+    return out
+
+
+def seal_problems(files, bundle):
+    """iOS's check of one bundle against its CodeResources, as installd on the iPhone 15 Pro did it (B432's journal):
+    what's on disk and not sealed, sealed and not on disk, or different."""
+    here = {p[len(bundle):]: d for p, d in files.items() if p.startswith(bundle)}
+    exe = unicodedata.normalize("NFD", plistlib.loads(here["Info.plist"])["CFBundleExecutable"])
+    seal = plistlib.loads(here["_CodeSignature/CodeResources"])["files2"]
+    disk = {p: d for p, d in here.items() if p not in (exe, "Info.plist", "PkgInfo") and p.split("/")[-1] != ".DS_Store"
+            and p.split("/")[0] not in ("_CodeSignature", "CodeResources", "_MASReceipt")}
+    seal1 = plistlib.loads(here["_CodeSignature/CodeResources"])["files"]
+    out = sorted("added " + p for p in disk.keys() - seal.keys())
+    out += sorted("deleted " + p for p in seal.keys() - disk.keys() if not seal[p].get("optional"))
+    for p in sorted(disk.keys() & seal.keys()):
+        e, old = seal[p], seal1.get(p)
+        if "symlink" in e:
+            ok = e["symlink"].encode() == disk[p] and old is None
+        else:
+            sha1 = hashlib.sha1(disk[p]).digest()
+            ok = (e["hash2"], e["hash"]) == (hashlib.sha256(disk[p]).digest(), sha1)
+            ok = ok and (old["hash"] if isinstance(old, dict) else old) == sha1
+        if not ok:
+            out.append("modified " + p)
+    return out
+
+
 def small_zip(files):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as z:
@@ -257,6 +332,7 @@ class OnDeviceSigner(unittest.TestCase):
         w("thin32.ipa", rich_ipa(extra={"modules/old_libretro_ios.dylib": armv7(),
                                         "modules/fat32_libretro_ios.dylib": fat32(),
                                         "modules/new_libretro_ios.dylib": macho(6)}))
+        w("odd-names.ipa", odd_names_ipa())
         w("unsigned.macho", macho())
         w("fat.macho", fat())
         w("notanipa.ipa", small_zip({"hello.txt": "hi"}))
@@ -320,6 +396,26 @@ class OnDeviceSigner(unittest.TestCase):
             self.assertEqual(entry["hash"], hashlib.sha1(files[A + rel]).digest(), rel)
         self.assertEqual(files[A + "embedded.mobileprovision"], self.profile)
 
+    def test_swift_signed_ipas_sealed(self):
+        """B432: no file changed after it was hashed, in every IPA the Swift tests signed (name, icon, tweaks, group
+        fix, arm64e, big binaries): each bundle against its CodeResources, both ways."""
+        checked = 0
+        for name in sorted(os.listdir(self.work)):
+            if not name.endswith(".ipa"):
+                continue
+            with zipfile.ZipFile(os.path.join(self.work, name)) as z:
+                if len([n for n in z.namelist() if n.endswith(".app/_CodeSignature/CodeResources")]) != 1:
+                    continue
+            files = phone_files(os.path.join(self.work, name))
+            if b"old seal" in files.values():  # a test's input, not yet signed
+                continue
+            for seal in [p for p in files if p.endswith("/_CodeSignature/CodeResources")]:
+                bundle = seal[:-len("_CodeSignature/CodeResources")]
+                with self.subTest(ipa=name, bundle=bundle):
+                    self.assertEqual(seal_problems(files, bundle), [])
+                checked += 1
+        self.assertGreater(checked, 10)
+
     def test_tweaked_ipa(self):
         """F288: the IPA test_swift signed with tweaks (work/tweaked.ipa; test_swift runs first, by name): the main
         executable lists the injected dylibs as weak loads with the Frameworks rpath, read here as otool -l would,
@@ -338,6 +434,26 @@ class OnDeviceSigner(unittest.TestCase):
         cr = plistlib.loads(files[A + "_CodeSignature/CodeResources"])
         for rel in ("Frameworks/Fixture.dylib", "Fixture.bundle/Info.plist", "Frameworks/TweakKit.framework/Info.plist"):
             self.assertEqual(cr["files2"][rel]["hash2"], hashlib.sha256(files[A + rel]).digest(), rel)
+
+    def test_odd_names_sealed(self):
+        """B432: iOS finds nothing added, modified or deleted in a bundle with odd names or signature leftovers."""
+        path = os.path.join(self.work, "odd-names.ipa")
+        self.assertIsNone(self.build_error, self.build_error)
+        if not os.path.exists(path):  # test_swift signs it, and runs after this one, by name
+            env = disktmp.swift_env(dict(os.environ), self.tmp)
+            subprocess.run([self.binary, self.fx, self.work], check=True, capture_output=True, timeout=600, env=env)
+        files = phone_files(path)
+        app = "Payload/Odd.app/"
+        for bundle in (app, app + "Frameworks/Kit.framework/"):
+            self.assertEqual(seal_problems(files, bundle), [], bundle)
+        self.assertEqual(files[app + "caf\u00e9.txt"], b"two")
+        for rel in ("dot.txt", "slash.txt", "sub/deep/z.txt", "\u0301first.txt", "d\u00e9/a.txt", "d\u00e9/b.txt"):
+            self.assertIn(app + rel, files)
+        with zipfile.ZipFile(path) as z:  # written once, in the short form
+            names = z.namelist()
+        self.assertEqual(len(names), len(set(names)))
+        self.assertEqual([n for n in names if "/_CodeSignature/" in n and not n.endswith("/CodeResources")], [])
+        self.assertFalse([n for n in names if "//" in n or "/./" in n])
 
 
 def load_commands(binary):
