@@ -24,6 +24,8 @@
 //                              isn't served any more (the row then signs again from the start)
 //       discard(row)        frees a signed copy that will never be installed (its row stopped, or the run cancelled)
 //       reprompt(row)       -> true | false: B85, iOS's prompt for the app with iOS ("asking") again
+//       replacing(row)      -> true | false, or a promise: F424, the app the row installs over is on the iPhone (asked
+//                           after CLOSE_AFTER of silence once its IPA is copied; only then "Close <App> to finish installing")
 //       local(row)          -> true when the row's install goes the This iPhone route (B137: its row and the bottom
 //                              status say Installing, never Tap Install, until iOS's prompt really shows: promptUp)
 //     .start() -> a promise for the end (every row installed, failed or cancelled)
@@ -109,6 +111,14 @@ export const APP_STALL = 180_000;
 // B152: the signer's own phases under "signing" (native/sign/IPASigner.swift: "reading" hashes the IPA 0..1, then
 // "signing" signs its bundles 0..1): each fills its part of the row's Signing, so the bar doesn't empty in between
 export const SIGN_STEPS = { reading: [0, 0.5], signing: [0.5, 1] };
+
+// F424: a This iPhone install that copied its IPA and then hears nothing from installd for this long says to close the
+// app it replaces (R102: installd waits for an open one, or one playing audio, to exit when iOS refuses to end it).
+// iFizBox can't tell whether the app is running, so the words are advice. Longer than installd's usual 2 to 10 s.
+export const CLOSE_AFTER = 15_000;
+export const closeText = (row) => `Close ${label(row)} to finish installing`;
+const copiedOver = (row) => row?.state === "installing" && row.phase === "copying" && (Number(row.fraction) || 0) >= 1;
+const adviseClose = (row) => Boolean(row?.closeHint && copiedOver(row) && !isSelf(row));
 
 const PHASE_WORD = { downloading: "Downloading", signing: "Signing", asking: "Asking iOS", installing: "Installing",
   connecting: "Connecting to iPhone", copying: "Copying to iPhone" };
@@ -239,7 +249,7 @@ export function installLaneStart(rows = [], { parallel = 1, local = () => false 
 }
 
 export function createAppRun({ rows, sign, install, discard = () => {}, reprompt = null, ahead = 2, parallel = 1, stallMs = APP_STALL,
-  later = setTimeout, clear = clearTimeout, onChange = () => {}, onLog = () => {}, local = () => false, onStart = () => {}, keepAwake = () => {} }) {
+  later = setTimeout, clear = clearTimeout, onChange = () => {}, onLog = () => {}, local = () => false, replacing = () => false, onStart = () => {}, keepAwake = () => {} }) {
   const awake = (on) => { try { Promise.resolve(keepAwake(on)).catch(() => {}); } catch { /* the screen may lock */ } }; // F287
   const flights = new Map(); // id -> { ctl: AbortController, timer, why }
   let running = false;
@@ -263,8 +273,10 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
 
   const finishRow = (r, state, patch = {}) => {
     const f = flights.get(r.id);
-    if (f) { if (f.timer != null) clear(f.timer); flights.delete(r.id); }
+    if (f) { if (f.timer != null) clear(f.timer); endQuiet(f); flights.delete(r.id); }
+    const heard = r.here && r.phase === "installing"; // F424: its end is installd's word, not a stop before it got there
     set(r, { state, ...patch });
+    if (heard) installdMoved(r);
   };
 
   // One phase's progress: a new phase gets its log line once; a percent only moves the bar. B152: `step` is the
@@ -310,6 +322,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     if (phase === "signing" && SIGN_STEPS[step]) frac = SIGN_STEPS[step][0] + (SIGN_STEPS[step][1] - SIGN_STEPS[step][0]) * frac;
     const dl = phase === "downloading" && info ? { bytes: Number(info.bytes) || 0, total: Number(info.total) || 0, rate: Number(info.rate) || 0 } : {};
     set(r, { phase, state, here, fraction: frac, ...dl, ...word });
+    installdHeard(r, f); // F424
     if (SIGNING.has(phase)) arm(r, f);
     // F359: the shell signs one app at a time, so a downloaded app waits for the signer with no progress of its own:
     // while another row's signing moves, the downloaded rows' stall clocks start again (a stuck signer still fails)
@@ -318,6 +331,34 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       if (of && !of.ctl.signal.aborted) arm(o, of);
     }
     if (settled) pump();
+  };
+
+  // F424: the copy ended: installd's silence starts (a repeat of the copy's 100% is no news from installd). installd
+  // takes one install at a time, so another row's percent or end is news too: the rows still waiting start again.
+  const endQuiet = (f) => { if (f.quiet != null) clear(f.quiet); f.quiet = null; f.quietRun = (f.quietRun ?? 0) + 1; };
+  const listen = (r, f) => {
+    endQuiet(f);
+    const n = f.quietRun;
+    const still = () => f.quietRun === n && flights.get(r.id) === f && !f.ctl.signal.aborted && copiedOver(r);
+    f.quiet = later(async () => {
+      let there = false;
+      try { there = still() && await replacing(r); } catch { /* not known: the usual words */ }
+      if (there === true && still()) set(r, { closeHint: true });
+    }, CLOSE_AFTER);
+  };
+  const installdMoved = (r) => {
+    for (const o of rows) {
+      const of = o !== r && copiedOver(o) ? flights.get(o.id) : null;
+      if (of?.quiet == null) continue;
+      if (o.closeHint) set(o, { closeHint: false });
+      listen(o, of);
+    }
+  };
+  const installdHeard = (r, f) => {
+    if (copiedOver(r) && !isSelf(r)) { if (f.quiet == null) listen(r, f); return; }
+    endQuiet(f);
+    r.closeHint = false;
+    if (r.here && r.phase === "installing") installdMoved(r);
   };
 
   // B65: a download or signing phase that goes quiet fails its row (and aborts its job); iOS's prompt waits for the user.
@@ -403,7 +444,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     const f = fly(r);
     const again = Boolean(r.again);
     const reinstall = Boolean(r.reinstall); // B337: installAgain's row
-    set(r, { state: "asking", phase: null, fraction: 0, word: null, wordPercent: null, again: false, reinstall: false, here: false, airplane: null, local: localRoute(r) });
+    set(r, { state: "asking", phase: null, fraction: 0, word: null, wordPercent: null, again: false, reinstall: false, here: false, airplane: null, closeHint: false, local: localRoute(r) });
     let res;
     try {
       res = await install(r, { signal: f.ctl.signal, progress: progressOf(r, f), allSigned: () => allSigned(f.ctl.signal), ...(again ? { again: true } : {}) });
@@ -673,6 +714,7 @@ export function rowStatus(row, opts = {}) {
       if (row.phase === "airplaneOff") return "Connected to iOS";
       if (row.phase === "connecting") return "Connecting to iPhone"; // R91
       if (isCopying(row)) return p > 0 && p < 100 ? `Copying to iPhone ${p}%` : "Copying to iPhone";
+      if (adviseClose(row)) return closeText(row); // F424
       if (row.phase === "copying") return "Copied to iPhone, waiting for iOS"; // R91: the copy ended, installd hasn't reported
       if (selfClosing(row)) return SELF_CLOSING;
       return p > 0 && p < 100 ? `Installing ${p}%` : "Installing";
@@ -716,6 +758,8 @@ export function airplaneStatus(rows) {
 }
 
 export function runStatus(rows) {
+  const quiet = rows.find(adviseClose);
+  if (quiet) return closeText(quiet); // F424: before Airplane Mode's words, which its row doesn't say
   const air = airplaneStatus(rows); // F368
   if (air) return air;
   if (rows.some((r) => r.state === "installing" && r.phase === "appWait")) return APP_WAIT; // B423

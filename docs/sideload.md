@@ -266,7 +266,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   to stay up, it works offline, and iFizBox updates itself (installd closes and replaces it). The install is sent with
   installation_proxy's `PackageType` = `Developer` (`native/sign/HerePackage.swift`): a plain install asks iOS to end the
   app being replaced only politely (NonInteractive), an app in front or playing audio refuses, and installd waits for it
-  to close. Developer asks with Absolute, so iOS ends the app and its data stays. iFizBox's own update stays plain, since
+  to close; while it waits, the row reads "Copied to iPhone, waiting for iOS", and after 15 s of silence "Close <App> to finish installing" (not for iFizBox's own update). Developer asks with Absolute, so iOS ends the app and its data stays. iFizBox's own update stays plain, since
   it closes itself once installd has accepted it. If iOS refuses with a reason the option might cause, the staged IPA is
   copied again and sent once more plainly (installd deletes the staged copy on a refusal). No retry for a dropped
   connection (iFizBox reconnects instead), a cancel, or a refusal about the IPA or the phone (other App ID, iOS too old,
