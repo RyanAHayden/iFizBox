@@ -52,7 +52,8 @@ export function listNote({ count, total, filters, query, empty }) {
 }
 
 // -> { el, filters, close(), draw() }. `order` names the list's own order, `withSegments` false leaves the segments out
-// (a list already of one kind), `rows()` is the unfiltered list, `changed()` runs after each choice.
+// (a list already of one kind), `rows()` is the unfiltered list (null: the panel lists every section, Top 25's),
+// `changed()` runs after each choice.
 export function listScope({ order, withSegments = true, rows, changed }) {
   const filters = { ...emptyFilters(), sort: null };
   let drop = null;
@@ -72,7 +73,7 @@ export function listScope({ order, withSegments = true, rows, changed }) {
     if (drop || location.hash !== at) return;
     drop = openFilterPanel({ filters, anchor: scope, alive: () => location.hash === at,
       changed: () => { draw(); changed(); }, closed: () => { drop = null; draw(); },
-      sorts: listSorts(order), sectionRows: () => listSections(rows(), filters.section),
+      sorts: listSorts(order), sectionRows: rows && (() => listSections(rows(), filters.section)),
       compatFooter: "Packages that say they don't work on this iPhone." });
     draw();
   });
