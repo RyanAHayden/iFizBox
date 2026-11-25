@@ -187,7 +187,7 @@ test("F434: Free but unavailable isn't called sold; a package for sale keeps its
 
 // Havoc's live answers (2026-11-25): an unknown package and a request with no UDID also carry available: false.
 test("F434: a vendor error throws its message, though its body says available: false", async () => {
-  for (const [status, error] of [[404, "Not Found"], [400, "Bad Request"]]) {
+  for (const [status, error] of [[404, "Not Found"], [400, "Bad Request"], [200, "Not Found"]]) {
     const client = createPaymentClient({ base: "https://havoc.app/api/sileo/",
       request: async () => ({ status, json: { available: false, error, recovery_url: "https://havoc.app" } }) });
     await assert.rejects(client.packageInfo("com.nope.nope"), new RegExp(error));
