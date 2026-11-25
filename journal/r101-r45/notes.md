@@ -15,7 +15,8 @@ to Chariz since 2026-11-23. Earlier run: journal/2026-11-21-r45-iphone15-chariz.
 ## Findings
 
 1. **Buy row.** Glint's Add to an App group shows `Price $3.99`, then `Buy for $3.99 ›`. The footer reads "Sold by
-   Chariz. Once bought, it goes into an app you sign here." There is no Sign In row, which reads as the signed-in state.
+   Chariz. Once bought, it goes into an app you sign here." There is no Sign In row; the signed-in state is shown by the Keychain credential and
+   `purchased` answers in finding 3, not by the missing row.
    I did not tap Buy, so no purchase was made and the post-Buy state is unseen.
 2. **betterAlarm can't go into an app.** Its Add to an App group reads "Can't Go into an App": "It's for iOS itself
    (SpringBoard or a system app), not an app you can sign." This is expected for a system tweak, which is not injected.
@@ -44,7 +45,10 @@ to Chariz since 2026-11-23. Earlier run: journal/2026-11-21-r45-iphone15-chariz.
 
 - The end-to-end paid inject. betterAlarm and Glint cannot be injected, and no paid tweak was bought, per the brief.
 - Tapping Buy and the state after it.
-- The kept .deb in Application Support/PaidTweaks, written on this run. It was not read back from the container. The
-  earlier run (journal/2026-11-21-r45-iphone15-chariz) did see it.
+- That this run wrote the kept .deb. `Library/Application Support/PaidTweaks/com.noisyflake.betteralarm_1.4.1.deb` is
+  in the app container afterwards (listed with afcclient), but its time and size were not read, and the earlier run
+  (journal/2026-11-21-r45-iphone15-chariz) had already left one there.
+- That a user can start the download from a page: I called the shipped `createPaidTweaks().deb` through Web Inspector;
+  betterAlarm's page has no Add to App path (Can't Go into an App).
 - The Sign In flow itself. The owner was already signed in.
 - The Chariz credential is read from the Keychain and is present, but its owner and account were not inspected.
