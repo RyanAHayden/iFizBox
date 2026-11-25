@@ -33,7 +33,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 - [ ] **B429** (follow-up, low) On the sideload IPA the Chariz source page lists 0 packages with default Source Filters (App Tweaks Only hides every jailbreak tweak), so paid tweaks like Glint and betterAlarm are reachable only by ifizbox://package?id=; also the Works on My Phone switch on a source's page changes the All Sources filter, not that source. Decide whether either is intended, fix or document it. | files: web/app/screens/sources.js
 - [ ] **C75** (follow-up, low) Add reviews.db to .gitignore (node worker/node.mjs recreates it untracked) | files: .gitignore
 - [ ] **C74** (follow-up, low) Add reviews.db to .gitignore (running worker/node.mjs from a checkout creates it). | files: .gitignore
-- [ ] **D31** (follow-up, low) Ask the person whether to delete or trim the Tailscale-route memories listed in journal/r101-reviews-memories/README.md | files: journal/r101-reviews-memories/README.md
 
 ### Parked
 
