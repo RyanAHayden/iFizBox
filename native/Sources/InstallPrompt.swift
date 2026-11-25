@@ -248,6 +248,9 @@ enum InstallPrompt {
         }
         private var isOver = false
 
+        // B437: the prompt waits for the app in front, and the hold was given back
+        private var waits: Bool { lock.lock(); defer { lock.unlock() }; return rule.unopened && !rule.held }
+
         func slept(from: Date) -> Bool { lock.lock(); defer { lock.unlock() }; return rule.slept(from: from) }
 
         // One event through the rule, what it answers done in the same order (KeepAlive counts on the main queue), and a
@@ -263,10 +266,13 @@ enum InstallPrompt {
             let due = rule.releaseAt
             let arm = due != nil && due != timed
             timed = due
+            let unopened = rule.unopened
             lock.unlock()
             switch step {
             case .take: InstallLog.say(bid, "KeepAlive: held for \(name)")
-            case .release: InstallLog.say(bid, "KeepAlive: let go for \(name)")
+            case .release:
+                InstallLog.say(bid, "KeepAlive: let go for \(name)")
+                if unopened { DispatchQueue.main.async { Sideload.yieldPageHold { self.waits } } } // B437
             case .none: break
             }
             if arm, let due = due {

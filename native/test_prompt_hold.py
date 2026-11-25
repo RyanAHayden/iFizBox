@@ -83,6 +83,23 @@ class Wiring(unittest.TestCase):
         self.assertEqual(awake.count("KeepAlive.shared.end()"), 1)
         self.assertIn("asyncAfter(wallDeadline:", awake)
 
+    def test_callers_hold_ends_with_serving(self):  # B437: the answer waits for the app in front
+        side = read("Sideload.swift")
+        serve = body(side, "private static func serveChecked(", "\n    }\n\n")
+        self.assertLess(serve.index("hold.start()"), serve.index("serving?()"))
+        install = body(side, "static func install(", "\n    }\n\n")
+        self.assertEqual(install.count("signAndOpen("), 3)
+        self.assertEqual(install.count("serving: released"), 3)
+        for start in ("static func signAndOpen(", "static func serveAndOpen("):
+            self.assertIn("serving: serving)", body(side, start, "\n    }\n\n"))
+
+    def test_page_hold_goes_too(self):  # B437
+        prompt = read("InstallPrompt.swift")
+        self.assertIn("if unopened { DispatchQueue.main.async { Sideload.yieldPageHold { self.waits } } }", prompt)
+        page = body(read("Sideload.swift"), "static func yieldPageHold(", "\n    }\n")
+        self.assertIn("guard waiting() else { return }", page)
+        self.assertIn("KeepAlive.shared.holds == 1 && UIApplication.shared.applicationState == .background", page)
+
 
 if __name__ == "__main__":
     unittest.main()

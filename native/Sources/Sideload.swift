@@ -207,7 +207,8 @@ enum Sideload {
         do { options = try SignOptions(json: c.params) } catch { return Apt.reply(c, nil, SignBridge.text(error)) }
         let job = SignJob.begin() // F196: what signing.cancel stops
         // B252: KeepAlive from the call to its answer, so leaving the app right after Confirm doesn't stop the run
-        // while the IPA is signed (download, serving and This iPhone's copy add holds of their own)
+        // while the IPA is signed (download, serving and This iPhone's copy add holds of their own). B437: given back once
+        // the IPA is served, as its Awake holds from there: the answer waits for the app in front
         let released = holdUntilAnswer()
         let throttle = Throttle()
         let emit = { (phase: String, p: Double) in
@@ -258,7 +259,7 @@ enum Sideload {
                         let src = try OwnIcons.selfSource(own, current: current) { job.cancelled }
                         var o = options
                         o.ownIconFiles = src.files
-                        signAndOpen(src.ipa, url: SelfIPA.url, id: id, profile: profile, options: o, servers: servers, emit: emit, log: log, job: job, opened: finish, step: step)
+                        signAndOpen(src.ipa, url: SelfIPA.url, id: id, profile: profile, options: o, servers: servers, emit: emit, log: log, job: job, opened: finish, serving: released, step: step)
                     } catch { finish(.failure(error)) }
                 }
             }
@@ -272,7 +273,7 @@ enum Sideload {
                 }
                 log("Using the IPA downloaded for the look-first sheet (\(p.url))")
                 guard hashed(p.file) else { return }
-                signAndOpen(p.file, url: p.url, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish, step: step,
+                signAndOpen(p.file, url: p.url, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish, serving: released, step: step,
                             sha256: ipaSha) // F343
             }
             return
@@ -285,7 +286,7 @@ enum Sideload {
             case .failure(let e): finish(.failure(e))
             case .success(let file):
                 guard hashed(file) else { return }
-                signAndOpen(file, url: url.absoluteString, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish, step: step,
+                signAndOpen(file, url: url.absoluteString, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish, serving: released, step: step,
                             sha256: ipaSha) // F343
             }
         }
@@ -327,6 +328,21 @@ enum Sideload {
             }
             c.reply(["held": pageHold != nil], nil)
         }
+    }
+
+    // B437: an install's prompt waits for the app in front and its own hold was given back (InstallPrompt.Awake): the
+    // page's hold, whose signing.install or signing.open can't answer until then, goes too once it is the only one left
+    // (PageYield: an app being signed holds on its own). `waiting`: the prompt still does. The page's next
+    // {on: true} takes it again. Main queue.
+    static func yieldPageHold(_ yield: PageYield = PageYield(), waiting: @escaping () -> Bool) {
+        guard waiting() else { return }
+        var y = yield
+        let alone = pageHold != nil && KeepAlive.shared.holds == 1 && UIApplication.shared.applicationState == .background
+        if y.step(alone: alone, at: Date()) {
+            DeviceLog.say("\(Brand.name) KeepAlive: the page's hold let go, an Install prompt waits for the app in front")
+            pageHold?.release(); pageHold = nil
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + PageYield.poll) { yieldPageHold(y, waiting: waiting) }
     }
 
     // ---- F196: the progress page's Cancel (web/app/signing-client.js stopNative)
@@ -531,7 +547,8 @@ enum Sideload {
     static func signAndOpen(_ input: URL, url: String, id: SecIdentity, profile: Profile, options: SignOptions, servers: Servers,
                             emit: @escaping (String, Double) -> Void, log: ((String) -> Void)? = nil, job: SignJob? = nil,
                             opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
-                            served: ((Bool) -> Void)? = nil, step: ((String, Double) -> Void)? = nil, sha256: String? = nil) {
+                            served: ((Bool) -> Void)? = nil, serving: (() -> Void)? = nil, step: ((String, Double) -> Void)? = nil,
+                            sha256: String? = nil) {
         let tok = SignBridge.token()
         let output = SignBridge.work.appendingPathComponent("\(tok).ipa")
         defer { try? FileManager.default.removeItem(at: input) }
@@ -586,7 +603,8 @@ enum Sideload {
             return
         }
         emit("handoff", 0) // B424: iOS gets the install link next; its own progress is signing.progress's
-        serveAndOpen(output, server: servers.manifest, app: app, record: record, log: log, job: job, opened: answered, served: served)
+        serveAndOpen(output, server: servers.manifest, app: app, record: record, log: log, job: job, opened: answered, served: served,
+                     serving: serving)
     }
 
     // The "This iPhone" route (Servers.local): `output` (deleted after) goes to installd through the built-in VPN, AFC upload then
@@ -686,7 +704,7 @@ enum Sideload {
     // IPA or the link expired; Cancel then stops serving it at once and releases KeepAlive.
     static func serveAndOpen(_ output: URL, server remote: String, app: SignedApp, record: SignedRecord, log: ((String) -> Void)? = nil,
                              job: SignJob? = nil, opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
-                             served: ((Bool) -> Void)? = nil) {
+                             served: ((Bool) -> Void)? = nil, serving: (() -> Void)? = nil) {
         let ipaPath = "/\(SignBridge.token())/app.ipa"
         let server = InstallServer.plain
         server.start { res in
@@ -728,7 +746,7 @@ enum Sideload {
                     }
                     log?(ManifestCheck.okLine(host: ManifestCheck.host(of: q.url!)))
                     serveChecked(output, server: server, remote: remote, ipaPath: ipaPath, link: link, app: app, record: record, log: log,
-                                 job: job, opened: opened, served: served)
+                                 job: job, opened: opened, served: served, serving: serving)
                 }
             }
         }
@@ -761,11 +779,12 @@ enum Sideload {
     private static func serveChecked(_ output: URL, server: InstallServer, remote: String, ipaPath: String, link: String, app: SignedApp,
                                      record: SignedRecord, log: ((String) -> Void)?, job: SignJob?,
                                      opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
-                                     served: ((Bool) -> Void)?) {
+                                     served: ((Bool) -> Void)?, serving: (() -> Void)?) {
         let once = Once()
         let hold = InstallPrompt.Awake(bundleID: app.bundleID, name: app.name) // B435: KeepAlive
         let fallback = HostFallback(hold: hold) // B89
         hold.start()
+        serving?() // B437: the caller's own hold, not needed beside this one
         // B29: the bundle ID iOS is told to install (the manifest's, the signed Info.plist's) and what the
         // server sends, in the install log; the server's lines reach the page through signing.progress.
         InstallLog.reset(app.bundleID)
@@ -1405,7 +1424,7 @@ final class Once {
 final class KeepAlive {
     static let shared = KeepAlive()
     private var player: AVAudioPlayer?
-    private var holds = 0
+    private(set) var holds = 0 // main queue
 
     func begin() {
         DispatchQueue.main.async {

@@ -16,6 +16,7 @@ struct PromptHold {
 
     private(set) var held = false
     private(set) var requested = false // iOS asked for the IPA
+    private var linked = false // the install link was handed to iOS
     private var ended = false // no longer served: never taken again
     private var gone = false // over(): given back for good
     private var uploading = false
@@ -30,6 +31,7 @@ struct PromptHold {
 
     // The install link is handed to iOS, for the first time or again (the app is in front).
     mutating func opened(at t: Date) -> Step {
+        linked = true
         dismissedAt = nil
         backgroundAt = nil
         return take(t)
@@ -63,6 +65,9 @@ struct PromptHold {
         return release(t)
     }
 
+    // B437: served, and its prompt still waits for the app in front.
+    var unopened: Bool { !linked && !requested && !ended && !gone }
+
     // When the hold is given back by the rule, nil while nothing says so.
     var releaseAt: Date? {
         guard held, !requested, !uploading else { return nil }
@@ -93,5 +98,23 @@ struct PromptHold {
         held = false
         releasedAt = t
         return .release
+    }
+}
+
+// B437: when the page's hold (signing.hold) is given back while an install's prompt waits for the app in front: alone
+// (the only hold left, the app in the background) at every look for `quiet` s, which outlasts the page's gaps between
+// one app's signing and the next.
+struct PageYield {
+    static let quiet: TimeInterval = 10
+    static let poll: TimeInterval = 5
+    private var since: Date?
+
+    // One look; true: give it back.
+    mutating func step(alone: Bool, at t: Date) -> Bool {
+        guard alone else { since = nil; return false }
+        if since == nil { since = t }
+        guard let s = since, t.timeIntervalSince(s) >= Self.quiet else { return false }
+        since = nil
+        return true
     }
 }

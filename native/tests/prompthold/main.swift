@@ -91,5 +91,25 @@ check("frozen while held isn't", !r.rule.slept(from: at(20)))
 r.tick(600)
 check("nor when the release ran after waking", !r.rule.slept(from: at(20)))
 
+r = Run(background: true)
+check("B437: its prompt waits for the app in front", r.rule.unopened)
+r.tick(60)
+check("B437: still, once the hold was given back", r.rule.unopened && !r.rule.held)
+r.opened(300)
+check("B437: not once the link was handed over", !r.rule.unopened && r.rule.held)
+r = Run(background: true); r.tick(60); r.over(70)
+check("B437: nor after Cancel", !r.rule.unopened)
+r = Run(background: true); r.tick(60); r.rule.end()
+check("B437: nor after the expiry", !r.rule.unopened)
+
+var y = PageYield()
+check("the page's hold stays for now", !y.step(alone: true, at: at(0)) && !y.step(alone: true, at: at(5)))
+check("the page's hold goes after 10 s alone", y.step(alone: true, at: at(10)))
+check("given back once", !y.step(alone: true, at: at(15)))
+y = PageYield()
+_ = y.step(alone: true, at: at(0))
+check("another hold starts the wait again",
+      !y.step(alone: false, at: at(5)) && !y.step(alone: true, at: at(10)) && y.step(alone: true, at: at(20)))
+
 if failed > 0 { print("\(failed) failed"); exit(1) }
 print("all passed")
