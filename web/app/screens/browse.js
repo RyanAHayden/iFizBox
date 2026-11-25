@@ -1621,13 +1621,30 @@ export function addToAppFollowsCheck(body, info, { button = (b) => handleOf(b)?.
 // B11: a paid package a vendor sells (extras.js paidNav) shows its price on the button until it's bought, as Cydia
 // did; Install once the vendor lets this account download it; Modify once it's installed, as for any package.
 const paidLabels = new WeakMap(); // page body -> label
-const buttonLabel = (body, installed) => installed ? "Modify" : paidLabels.get(body) ?? "Install";
+// B447: a queued apt package says Modify too (its sheet has Clear), paid or not.
+export const buttonLabel = (body, installed, queued = pageQueued([...packagePages.values()].find((p) => p.body === body))) =>
+  installed || queued ? "Modify" : paidLabels.get(body) ?? "Install";
+// Whether the page is an apt package on the install queue (a backend with no queue never has one).
+export function pageQueued(page, queue = installQueue) {
+  const st = page?.pkg?.stanza;
+  if (!st || st.kind === "ipa" || isSideloadTweak(st)) return false;
+  return Boolean(queue.get(st.package || page.id));
+}
 function paidButton(body, state) {
   if (state) paidLabels.set(body, state.label);
   else paidLabels.delete(body);
   const page = [...packagePages.values()].find((p) => p.body === body);
   if (page) setRightLabel(body, buttonLabel(body, page.history?.versions.some((v) => v.installed)));
 }
+// B447: the button follows the queue at once, as the Package Queue row does.
+installQueue.subscribe(() => {
+  if (!globalThis.document) return;
+  for (const [k, p] of [...packagePages]) {
+    if (!p.body.isConnected) { packagePages.delete(k); continue; }
+    if (p.pkg.stanza.kind === "ipa" || isSideloadTweak(p.pkg.stanza)) continue;
+    setRightLabel(p.body, buttonLabel(p.body, p.history?.versions.some((v) => v.installed)));
+  }
+});
 
 // N11: a run (install, upgrade, remove) re-reads dpkg (catalog.reloadInstalled), which fires catalog.onChange. A
 // package page left open under the console kept saying Install after its package went in (and Modify after it was
@@ -1691,7 +1708,7 @@ async function sheet(title, actions) {
 export function installNoModify(page, { mode = detectMode() } = {}) {
   const st = page?.pkg?.stanza;
   if (!st || st.kind === "ipa" || isSideloadTweak(st, mode)) return false;
-  return !installedOf(page.history);
+  return !installedOf(page.history) && !pageQueued(page); // B447: queued: Modify, its sheet has Clear
 }
 
 // The tap. -> "queued" (Confirm opens) or "options" (packageActions ran), or null for a page gone.
@@ -1825,7 +1842,8 @@ async function packageActions(route, button) {
   }
   const older = installed ? history.versions.filter((v) => v.keys.length && compareVersions(v.version, installed) < 0) : [];
   // Cydia's first action on a queued package: Clear (N4).
-  if (queue && installQueue.get(st.package || id)) actions.push({ label: "Clear", run: () => installQueue.clear(st.package || id) });
+  const queuedNow = Boolean(queue && installQueue.get(st.package || id));
+  if (queuedNow) actions.push({ label: "Clear", red: true, run: () => installQueue.clear(st.package || id) });
   if (queue) {
     if (installed) {
       // Cydia's order: Upgrade or Reinstall (only what a source can download), then Remove, then Downgrade.
@@ -1839,7 +1857,7 @@ async function packageActions(route, button) {
       if (ignoreVer) actions.push(ignoreVer);
       if ((st.package || id) !== PACKAGE) actions.push({ label: "Remove", run: () => queue({ op: "remove", id }) }); // B71: never itself
       if (older.length) actions.push({ label: "Downgrade", run: () => sheet("", older.map((v) => ({ label: v.version, run: () => queue({ op: "install", id, version: v.version }) }))) });
-    } else {
+    } else if (!queuedNow) { // B447: queued: Clear gives Install back
       actions.push({ label: "Install", run: () => queue({ op: "install", id, version: st.version }) });
     }
   } else if (installed && older.length) {
@@ -1900,7 +1918,7 @@ function withVersionRowItems(entries, item) {
 // the vendor only hands out the current deb. Add to / Remove from Wish List as for any package.
 export function paidActions(paid, { id, version, installed, queue, queued = false, wish = wishlist() }) {
   const actions = [];
-  if (queued) actions.push({ label: "Clear", run: () => installQueue.clear(id) });
+  if (queued) actions.push({ label: "Clear", red: true, run: () => installQueue.clear(id) });
   if (installed) {
     if (paid.install && version && compareVersions(version, installed) > 0) actions.push({ label: "Upgrade", run: paid.install });
     else if (paid.install && version === installed) actions.push({ label: "Reinstall", run: paid.install });
