@@ -1025,6 +1025,7 @@ test("B211: group fix") {
     // B259: the stamp names the dylib the app got; another dylib build makes only such apps stale
     check(app.groupFix == SignerStamp.hash(dylib) && app.stamp == SignerStamp.now && !app.stamp.isStale(), "stamp \(app.stamp)")
     check(own.groupFix == nil && own.stamp.groupFix == nil, "no fix, no hash")
+    check(app.stamp.groupFixRevision == SignerStamp.groupFixRevision && own.stamp.groupFixRevision == nil, "B458: the revision of the dylib the app got")
     let other = SignerStamp(version: SignerStamp.version, groupFix: SignerStamp.hash(Data([1])))
     check(app.stamp.isStale(against: other) && !own.stamp.isStale(against: other), "a new dylib: only apps with the fix")
 }
@@ -1103,6 +1104,56 @@ test("B259: signer stamp") {
         try JSONSerialization.data(withJSONObject: dict).write(to: sidePath)
         check(lib.signed(a, certificate: identity.certificate) == nil, "a copy with no stamp: sign it again")
     } else { check(false, "signed side file not found at \(sidePath.path)") }
+    try lib.delete(a)
+}
+
+// B458: the group fix's hand-set revision in the stamp, and each version's reach beside the current one
+test("B458: group fix revision, reach") {
+    let dylib = GroupFix.dylib
+    defer { GroupFix.dylib = dylib }
+    GroupFix.dylib = { Data("fix".utf8) }
+    let cur = SignerStamp.now, hash = SignerStamp.hash(Data("fix".utf8))
+    let j = cur.json
+    check(j["version"] as? Int == SignerStamp.version && j["groupFix"] as? String == hash
+        && j["groupFixRevision"] as? Int == SignerStamp.groupFixRevision && j["reach"] == nil, "a record's: \(j)")
+    check(SignerStamp.signed(groupFix: nil).json["groupFixRevision"] is NSNull, "no fix, no revision")
+    let c = SignerStamp.currentJSON
+    check(c["version"] as? Int == SignerStamp.version && c["groupFix"] as? String == hash
+        && c["groupFixRevision"] as? Int == SignerStamp.groupFixRevision && JSONSerialization.isValidJSONObject(c), "current: \(c)")
+    let reach = c["reach"] as? [String: [Int]] ?? [:]
+    let all = reach["all"] ?? [], fix = reach["groupFix"] ?? []
+    check(reach.count == 2 && all == all.sorted() && fix == fix.sorted()
+        && (all + fix).sorted() == Array(1...SignerStamp.version), "every version once: \(reach)")
+    check([1, 2, 3].allSatisfy(all.contains), "1 to 3 reach every app: \(reach)")
+
+    // a record keeps it; an older one (version and hash only) decodes without
+    let r = SignedRecord(bundleID: "a", originalBundleID: "a", name: "A", version: "1", url: "u",
+                         signed: Date(timeIntervalSince1970: 0), expires: nil, options: SignOptions().stored, signer: cur)
+    check(SignedRecords.decode(try SignedRecords.encode([r])).first?.signer == cur, "kept in the record")
+    let old = SignedRecords.decode(Data(#"[{"bundleID":"a","originalBundleID":"a","name":"A","version":"1","url":"u","signed":"2026-11-24T00:00:00Z","options":{"removeExtensions":[],"fixArm64e":true},"signer":{"version":3,"groupFix":"496d0525dc08812d"}}]"#.utf8))
+    check(old.count == 1 && old[0].signer == SignerStamp(version: 3, groupFix: "496d0525dc08812d", groupFixRevision: nil), "old record: \(old)")
+
+    // My IPAs: a signed copy with another dylib is signed again, though the revision is the same
+    let lib = IPALibrary(root: work.appendingPathComponent("lib458/Documents"), store: work.appendingPathComponent("lib458/Store"))
+    let a = try lib.add(fixtures.appendingPathComponent("rich.ipa"), name: "Rich.ipa", move: false)
+    let cert = identity.certificate
+    try lib.sign(a, signer: IPASigner(profile: try Profile(try fixture("profile.mobileprovision")), identity: identity),
+                 certificate: cert, expires: nil, work: work)
+    let sidePath = lib.store.appendingPathComponent(a + ".signed.json")
+    func stamp(_ s: [String: Any]) throws {
+        var dict = try JSONSerialization.jsonObject(with: Data(contentsOf: sidePath)) as? [String: Any] ?? [:]
+        dict["signer"] = s
+        try JSONSerialization.data(withJSONObject: dict).write(to: sidePath)
+    }
+    try stamp(["version": cur.version, "groupFix": hash, "groupFixRevision": SignerStamp.groupFixRevision])
+    check(lib.signed(a, certificate: cert) != nil, "the same dylib: kept")
+    try stamp(["version": cur.version, "groupFix": hash])
+    check(lib.signed(a, certificate: cert) != nil, "the same dylib, stamped before revisions: kept")
+    try stamp(["version": cur.version, "groupFix": "0000000000000000", "groupFixRevision": SignerStamp.groupFixRevision])
+    check(lib.signed(a, certificate: cert) == nil, "another dylib, the same revision: sign it again")
+    let again = try lib.sign(a, signer: IPASigner(profile: try Profile(try fixture("profile.mobileprovision")), identity: identity),
+                             certificate: cert, expires: nil, work: work)
+    check(lib.signed(a, certificate: cert)?.signer == again.signer && again.signer == .signed(groupFix: nil), "signed again (this app needs no fix): \(String(describing: again.signer))")
     try lib.delete(a)
 }
 

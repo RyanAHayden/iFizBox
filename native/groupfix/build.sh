@@ -4,6 +4,10 @@
 # browser) and the app's own (it bundles web/app/) both inject that file. Run it after changing groupfix.m and commit
 # the result (and its .source-sha256); web/app/core/groupfix.test.js checks the committed dylib matches the current source.
 #
+# Raise SignerStamp.groupFixRevision (native/sign/SignerStamp.swift) when the new dylib does something that apps already
+# signed with the fix should get: it is what asks for their re-sign. Leave it for a change they can do without (logging,
+# a tidy-up, another toolchain); they get the new dylib with their next re-sign. A revision is never reused or lowered.
+#
 #   build.sh            build it
 #   build.sh <out>      build it to <out> instead (a look at it; no .source-sha256)
 #
