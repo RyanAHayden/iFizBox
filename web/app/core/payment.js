@@ -55,9 +55,15 @@ export function parseEndpoint(text) {
 
 const JSON_HEADERS = { "Content-Type": "application/json", Accept: "application/json" };
 
-function pkgPath(id) {
+// B453: these vendors' payment APIs know a package only by its ID in lowercase (com.thetimeloop.EchoUI as listed is
+// Not Found; both checked live 2026-11-25). Any other vendor is asked for the ID as listed. Only the request path
+// changes: the apt package ID stays as listed everywhere else, and the downloaded .deb must match that one.
+const LOWERCASE_ID_HOSTS = new Set(["havoc.app", "chariz.com"]);
+
+function pkgPath(base, id) {
   if (!PKG.test(String(id ?? ""))) throw new Error(`not a package name: ${id}`);
-  return `package/${encodeURIComponent(id)}/`;
+  const name = LOWERCASE_ID_HOSTS.has(new URL(base).hostname) ? String(id).toLowerCase() : id;
+  return `package/${encodeURIComponent(name)}/`;
 }
 
 // The request one call sends. `opts`: { token, secret, udid, device, packageId, version, repo, architecture }.
@@ -76,13 +82,13 @@ export function buildRequest(base, action, opts = {}) {
     case "info": method = "GET"; path = "info"; break;
     case "user_info": need(token, "token"); path = "user_info"; body = who(); break;
     case "sign_out": need(token, "token"); path = "sign_out"; body = { token }; break;
-    case "package_info": path = pkgPath(packageId) + "info"; body = who(); break;
+    case "package_info": path = pkgPath(b, packageId) + "info"; body = who(); break;
     case "purchase":
       need(token, "token"); need(secret, "payment secret");
-      path = pkgPath(packageId) + "purchase"; body = { ...clean({ token, udid, device }), payment_secret: String(secret) }; break;
+      path = pkgPath(b, packageId) + "purchase"; body = { ...clean({ token, udid, device }), payment_secret: String(secret) }; break;
     case "authorize_download":
       if (!tokenless) need(token, "token");
-      path = pkgPath(packageId) + "authorize_download"; body = clean({ token, udid, device, version, repo, architecture }); break;
+      path = pkgPath(b, packageId) + "authorize_download"; body = clean({ token, udid, device, version, repo, architecture }); break;
     default: throw new Error(`unknown payment action: ${action}`);
   }
   return { method, url: b + path, headers: method === "GET" ? { Accept: "application/json" } : { ...JSON_HEADERS },
