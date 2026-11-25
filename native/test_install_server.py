@@ -54,7 +54,7 @@ class InstallServerSource(unittest.TestCase):
         self.assertIn("if !ok {", end)
         grace = end[end.index("asyncAfter(deadline: .now() + servedGrace)"):]
         self.assertIn("if ok { server.remove(ipaPath) }", grace)
-        self.assertIn("KeepAlive.shared.end()", grace)
+        self.assertIn("hold.over()", grace)
         m = re.search(r"static let servedGrace: TimeInterval = (\d+)", self.sideload)
         self.assertTrue(m and int(m.group(1)) >= 60, "servedGrace")
         self.assertIn("log: serverLog", serve)

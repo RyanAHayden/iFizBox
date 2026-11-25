@@ -2,7 +2,7 @@
 // iFizBox isn't in front (another app's prompt still up, or just answered, or iFizBox in the background), and the
 // install server can't tell a dismissed prompt from one still waiting. So, per bundle ID, on the main queue:
 //
-//   open(link, bundleID, name, done)   opens the link once iFizBox is in front and settled (`settle` after it came
+//   open(link, bundleID, name, hold, done)   opens the link once iFizBox is in front and settled (`settle` after it came
 //                                     back), tries again when iOS refuses it (`tries`), and once more when iOS showed no
 //                                     prompt within `noPrompt` s; done(true) once iOS took it
 //   reprompt(bundleID) -> Bool         the user's tap (the run's "Tap Install on the iOS prompt" row, or a "didn't
@@ -15,6 +15,8 @@
 //   dismissed(bundleID) -> Bool        the prompt was shown and closed, then nothing for `dismissQuiet` s with iFizBox in
 //                                     front: Cancel, or iOS couldn't reach the IPA (signing.progress answers dismissed)
 //   summary(bundleID) -> String        what was seen, for the watch's last log line
+//   Awake                              B435: the IPA's KeepAlive hold, given back once the prompt was dismissed or left
+//                                     unanswered (sign/PromptHold.swift), taken again by an open or iOS's request
 //
 // The prompt is seen through iFizBox's own state: iOS's alert makes it inactive (shown), closing it makes it active
 // again (answered). Every step goes to the install log (InstallLog), which signing.progress streams to the page.
@@ -28,6 +30,7 @@ enum InstallPrompt {
         var link: URL          // what an open hands iOS (B91: the Signing Server's after rehost)
         var links: Set<URL>    // every link this IPA is served at (end() matches any)
         let name: String
+        let hold: Awake        // B435
         var opening: Date?     // an open went out (the prompt can show before its completion runs)
         var opens = 0          // opens iOS took
         var shownAt: Date?     // iFizBox went inactive after an open: iOS's prompt is up
@@ -38,7 +41,7 @@ enum InstallPrompt {
         var reopened = false   // the one automatic open again when no prompt showed
         var gone = false       // dismissed() said so: it stays so
         var waitingSaid = false
-        init(link: URL, name: String) { self.link = link; self.links = [link]; self.name = name }
+        init(link: URL, name: String, hold: Awake) { self.link = link; self.links = [link]; self.name = name; self.hold = hold }
     }
 
     private static var entries = [String: Entry]()
@@ -67,6 +70,7 @@ enum InstallPrompt {
             lastActive = Date()
             for (bid, e) in entries where !e.ended && e.shownAt != nil && e.answeredAt == nil {
                 e.answeredAt = Date()
+                e.hold.dismissed()
                 say(bid, e.requested ? "The Install prompt for \(e.name) closed; iOS is fetching the IPA"
                     : "The Install prompt for \(e.name) closed; waiting for iOS to ask for the IPA")
             }
@@ -77,9 +81,10 @@ enum InstallPrompt {
         UIApplication.shared.applicationState == .active && Date().timeIntervalSince(lastActive) >= settle
     }
 
-    static func open(_ link: URL, bundleID bid: String, name: String, done: @escaping (Bool) -> Void) {
+    static func open(_ link: URL, bundleID bid: String, name: String, hold: Awake, done: @escaping (Bool) -> Void) {
         observe()
-        let e = Entry(link: link, name: name)
+        entries[bid]?.hold.dismissed() // B435: an earlier install of the same app has no prompt any more
+        let e = Entry(link: link, name: name, hold: hold)
         entries[bid] = e
         attempt(bid, e, n: 1, user: false, done: done)
     }
@@ -106,6 +111,7 @@ enum InstallPrompt {
         }
         e.waitingSaid = false
         e.opening = Date()
+        e.hold.opened()
         e.shownAt = nil
         e.answeredAt = nil
         UIApplication.shared.open(e.link, options: [:]) { ok in
@@ -159,7 +165,11 @@ enum InstallPrompt {
     }
 
     static func heard(_ bid: String) {
-        DispatchQueue.main.async { entries[bid]?.requested = true }
+        DispatchQueue.main.async {
+            guard let e = entries[bid] else { return }
+            e.requested = true
+            e.hold.requested()
+        }
     }
 
     static func end(_ bid: String, link: URL) {
@@ -185,5 +195,83 @@ enum InstallPrompt {
         let yes = { (b: Bool) in b ? "yes" : "no" }
         return "link opened \(e.opens)x, prompt seen \(yes(e.shownAt != nil)), answered \(yes(e.answeredAt != nil)), "
             + "IPA asked for \(yes(e.requested))"
+    }
+
+    // ---- B435: one IPA's KeepAlive hold. PromptHold decides; `dismissed` and `opened` on the main queue, the rest on any.
+    final class Awake {
+        private let bid: String, name: String
+        private var rule = PromptHold()
+        private let lock = NSLock()
+        private var observers = [NSObjectProtocol]()
+        private var timed: Date? // the release a timer waits for
+
+        init(bundleID: String, name: String) { bid = bundleID; self.name = name }
+
+        // The hold is taken now. Kept alive by its observers until over().
+        func start() {
+            apply { $0.start(at: $1, background: false) }
+            DispatchQueue.main.async {
+                self.lock.lock(); let over = self.isOver; self.lock.unlock()
+                if over { return }
+                let nc = NotificationCenter.default
+                self.observers = [
+                    nc.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { _ in
+                        self.apply { $0.background(at: $1); return .none }
+                    },
+                    nc.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { _ in
+                        self.apply { r, t in
+                            let s = r.tick(at: t) // due while iOS had the app suspended
+                            r.foreground()
+                            return s
+                        }
+                    },
+                ]
+                if UIApplication.shared.applicationState == .background { self.apply { $0.background(at: $1); return .none } }
+            }
+        }
+
+        func opened() { apply { $0.opened(at: $1) } }
+        func dismissed() { apply { $0.dismissed(at: $1); return .none } }
+        func requested() { apply { $0.request(at: $1) } }
+        func uploading(_ on: Bool) { apply { $0.upload(on, at: $1) } }
+        func end() { apply { r, _ in r.end(); return .none } }
+
+        func over() {
+            lock.lock(); isOver = true; lock.unlock()
+            apply { $0.over(at: $1) }
+            DispatchQueue.main.async {
+                self.observers.forEach(NotificationCenter.default.removeObserver)
+                self.observers = []
+            }
+        }
+        private var isOver = false
+
+        func slept(from: Date) -> Bool { lock.lock(); defer { lock.unlock() }; return rule.slept(from: from) }
+
+        // One event through the rule, what it answers done in the same order (KeepAlive counts on the main queue), and a
+        // timer for the release it now plans.
+        private func apply(_ f: (inout PromptHold, Date) -> PromptHold.Step) {
+            lock.lock()
+            let step = f(&rule, Date())
+            switch step {
+            case .take: KeepAlive.shared.begin()
+            case .release: KeepAlive.shared.end()
+            case .none: break
+            }
+            let due = rule.releaseAt
+            let arm = due != nil && due != timed
+            timed = due
+            lock.unlock()
+            switch step {
+            case .take: InstallLog.say(bid, "KeepAlive: held for \(name)")
+            case .release: InstallLog.say(bid, "KeepAlive: let go for \(name)")
+            case .none: break
+            }
+            if arm, let due = due {
+                DispatchQueue.main.asyncAfter(wallDeadline: .now() + max(0, due.timeIntervalSinceNow) + 0.1) { [weak self] in
+                    self?.apply { $0.tick(at: $1) }
+                }
+            }
+        }
     }
 }

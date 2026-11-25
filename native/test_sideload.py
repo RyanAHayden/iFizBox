@@ -348,8 +348,8 @@ class HandoffSourceTest(unittest.TestCase):
         side = self.files["Sideload.swift"]
         prompt = self.files["InstallPrompt.swift"]
         self.assertNotIn("UIApplication.shared.open(URL(string: link)!)", side)
-        self.assertIn("InstallPrompt.open(iosLink, bundleID: bid, name: app.name)", side)
-        self.assertIn("InstallPrompt.heard(bid); InstallLog.say(bid, s)", side)
+        self.assertIn("InstallPrompt.open(iosLink, bundleID: bid, name: app.name, hold: hold)", side)
+        self.assertIn("hold.requested(); InstallPrompt.heard(bid); InstallLog.say(bid, s)", side)
         self.assertEqual(side.count("InstallPrompt.end(bid, link: iosLink)"), 2)  # served/expired, and cancelled
         self.assertIn('b.on("signing.reprompt")', side)
         self.assertIn("InstallPrompt.reprompt(bid)", side)
