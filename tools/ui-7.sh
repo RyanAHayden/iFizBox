@@ -38,6 +38,13 @@ tidy() {
   s "$pc home; sleep 1; $pc lock" || true
 }
 case $1 in
+  state)  # for agents polling: 0 free, 75 busy (line 1 = holder), 69 missing (line 1 = why). No lock, no change.
+    if [ -d "$lock" ] && [ -n "$(find "$lock/owner" -mmin -$stale 2>/dev/null)" -o ! -e "$lock/owner" -a -d "$lock" ]; then
+      echo "$(holder)"; echo "iPhone 7 UI is locked by $(holder)"; exit 75
+    fi
+    timeout 10 ssh -o BatchMode=yes -o ConnectTimeout=5 "$host" true >/dev/null 2>&1 ||
+      { echo "the iPhone 7 isn't reachable over ssh (host $host)"; exit 69; }
+    echo free; exit 0 ;;
   lock)
     if ! mkdir "$lock" 2>/dev/null; then
       if [ "$(holder)" != "$2" ] && [ -z "$(find "$lock/owner" -mmin +$stale 2>/dev/null)" ]; then
