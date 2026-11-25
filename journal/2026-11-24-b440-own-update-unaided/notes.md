@@ -63,3 +63,5 @@ Not run in Chromium: the test needs real installd and the VPN.
 ## Spec review
 
 Fixed: the second take-down at the exit. The other findings were evidence not committed yet when it ran.
+
+`blocked.test.js` began to fail at midnight (a fixed date left the Changes window); same one-word fix as main has.
