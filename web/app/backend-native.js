@@ -656,6 +656,20 @@ function nativeSourceCalls(backend, call, opts) {
   const arch = () => (typeof opts.arch === "function" ? opts.arch() : opts.arch) || DEFAULT_ARCH;
   const count = opts.count;
   const aptSources = async () => parseAptSources((await call("apt.sources")) ?? []);
+  // B446: keys added since the last apt-get update that covers them started, so apt has no lists for them yet
+  // (core/sources.js addedFilter loads them at once). In memory: after a restart they are Refresh's.
+  const added = new Set();
+  backend.addedSources = () => [...added];
+  // One apt-get update at a time: one left running by a cancelled Refresh ends before the next starts (apt's lock).
+  let updating = Promise.resolve();
+  function aptUpdate(one, feed) {
+    const run = updating.then(() => {
+      if (one) added.delete(one.key); else added.clear();
+      return one ? backend.updateSource(one, feed) : backend.update(feed);
+    });
+    updating = run.catch(() => {});
+    return run;
+  }
 
   // F33: ifizbox-helper addsource|removesource. Resolves true when it ran and succeeded, false when the helper
   // couldn't be run at all (no helper: the sideload build); a refusal or failed write is an error with its message.
@@ -713,8 +727,10 @@ function nativeSourceCalls(backend, call, opts) {
       const cur = await db.get(s.key);
       const inApt = (await aptSources()).some((a) => a.key === s.key);
       const written = !inApt && (await writeSource("addsource", s));
-      const { added, ...rest } = { ...cur, ...s };
-      return db.put(inApt || written ? rest : { ...rest, added: true });
+      const { added: _, ...rest } = { ...cur, ...s };
+      const saved = await db.put(inApt || written ? rest : { ...rest, added: true });
+      if (inApt || written) added.add(s.key);
+      return saved;
     },
     async removeSource(key) {
       const apt = (await aptSources()).find((s) => s.key === key);
@@ -723,6 +739,7 @@ function nativeSourceCalls(backend, call, opts) {
       } else if (apt) {
         throw new Error(`This source is listed in ${apt.file}, which ${NAME} doesn't change. Remove it there (Filza or a terminal), then Refresh.`);
       }
+      added.delete(key);
       return (await store()).remove(key);
     },
     // F144: drops a record from the device store only (core/altstore.js withAltSources dropApt, the sideload build).
@@ -744,7 +761,7 @@ function nativeSourceCalls(backend, call, opts) {
       const live = onRow ? liveUpdate(wanted, onRow) : null;
       const feed = live ? (ev) => live.feed(ev) : undefined;
       const one = retry && wanted.length === 1 ? wanted[0] : null;
-      const { failures = [] } = (one ? await backend.updateSource(one, feed) : await backend.update(feed)) ?? {};
+      const { failures = [] } = (await aptUpdate(one, feed)) ?? {};
       live?.end();
       if (signal?.aborted) return Object.assign([], { failed: [] });
       const db = await store();

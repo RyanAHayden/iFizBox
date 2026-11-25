@@ -694,10 +694,19 @@ export function tweakSourcesFor(list, type, mode) {
 // F43: the sources a first visit loads by itself: AltStore sources (the F28 defaults are seeded as bare URLs) that
 // have never loaded, among those the device type shows (sourceFilter). APT sources are left to Refresh: their rows
 // already have a name and CydiaIcon.png, and refreshing one means Packages through the proxy, or apt-get update in
-// the app, where it would fight Refresh on Launch for apt's lock.
+// the app. Only an APT source just added in the jailbreak app loads by itself (addedFilter).
 export function firstLoadFilter(type) {
   const shown = sourceFilter(type) ?? (() => true);
   return (s) => isAltKey(s?.key) && neverLoaded(s) && shown(s);
+}
+
+// B446: the APT sources just added that no apt-get update has been started for since, among those the device type
+// shows: apt can't install from them until it has their lists. `backend.addedSources` is the jailbreak app's alone
+// (backend-native.js); on the site and in the sideload build this keeps nothing.
+export function addedFilter(backend, type) {
+  const added = new Set(backend?.addedSources?.() ?? []);
+  const shown = sourceFilter(type) ?? (() => true);
+  return (s) => added.has(s?.key) && !isAltKey(s?.key) && shown(s);
 }
 
 // B141: the AltStore sources worth one more try when Search finds nothing: never loaded, last fetch failed, or no
@@ -713,16 +722,20 @@ export function retryFilter(type) {
 // B141: `retry` (a Set of keys the caller keeps per visit, Search's) also takes the sources retryFilter keeps that
 // aren't in it yet: one whose first fetch failed (first launch, the network still coming up) loads again once per
 // Search visit instead of never.
+// B446: APT sources just added (addedFilter) load in the same run, whatever `tried` says (one removed and added again).
 export async function loadNeverLoaded(backend, list, type, { tried = new Set(), retry = null, begin = () => () => {}, onEach, onRow } = {}) {
   const want = firstLoadFilter(type);
   const again = retry ? retryFilter(type) : null;
+  const added = addedFilter(backend, type);
+  const apt = (Array.isArray(list) ? list : []).filter(added).length;
   const keys = new Set((Array.isArray(list) ? list : [])
-    .filter((s) => (want(s) && !tried.has(s.key)) || (again?.(s) && !retry.has(s.key))).map((s) => s.key));
+    .filter((s) => added(s) || (want(s) && !tried.has(s.key)) || (again?.(s) && !retry.has(s.key))).map((s) => s.key));
   if (!keys.size) return null;
   for (const k of keys) { tried.add(k); retry?.add(k); }
   const end = begin(keys);
   try {
-    return await backend.refreshSources(onEach, { filter: (s) => keys.has(s?.key), ...(onRow ? { onRow } : {}) });
+    return await backend.refreshSources(onEach, { filter: (s) => keys.has(s?.key), ...(onRow ? { onRow } : {}),
+      ...(apt === 1 ? { retry: true } : {}) }); // retry: apt-get update for that source alone (F233a)
   } finally {
     if (typeof end === "function") end(); // B75: a begin() that returns nothing is fine
   }

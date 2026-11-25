@@ -1093,6 +1093,7 @@ function renderSources(body, ctx) {
       busy = false;
     }
     if (error) await showAlert({ title: error.title || "Verification Error", message: error.message, buttons: ["OK"] });
+    else if (settings.mode === "jailbreak") (await import("./manage.js")).sourcesChanged(ctx); // B446: apt's lists
     await draw();
   }
   draw();

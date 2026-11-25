@@ -72,3 +72,50 @@ test("the HUD goes away when the refresh throws", async () => {
   await assert.rejects(loadNeverLoaded(b, list, "none", { begin: () => () => hidden++ }), /boom/);
   assert.equal(hidden, 1);
 });
+
+// B446: in the jailbreak app (backend.addedSources) an APT source just added loads at once.
+function addedBackend(list, added) {
+  const calls = [];
+  return {
+    calls,
+    addedSources: () => added,
+    async refreshSources(onEach, { filter, retry } = {}) {
+      calls.push({ keys: list.filter(filter).map((s) => s.key), retry: retry ?? false });
+      return [];
+    },
+  };
+}
+const aptRec = (n) => ({ key: `deb:https://${n}.test/:./`, uri: `https://${n}.test/`, updated: 1, count: 3 });
+
+test("B446: one added APT source loads alone (retry: update-source), several in one run; the others stay Refresh's", async () => {
+  const [a, b, old] = ["a", "b", "old"].map(aptRec);
+  const one = addedBackend([a, old, apt], [a.key]);
+  await loadNeverLoaded(one, [a, old, apt], "iphoneos-arm64");
+  assert.deepEqual(one.calls, [{ keys: [a.key], retry: true }]);
+  const two = addedBackend([a, b, old], [a.key, b.key]);
+  await loadNeverLoaded(two, [a, b, old], "iphoneos-arm64");
+  assert.deepEqual(two.calls, [{ keys: [a.key, b.key], retry: false }]);
+});
+
+test("B446: an AltStore source beside it is loaded in the same run", async () => {
+  const a = aptRec("a");
+  const b = addedBackend([a, seeded], [a.key]);
+  await loadNeverLoaded(b, [a, seeded], "iphoneos-arm64");
+  assert.deepEqual(b.calls, [{ keys: [a.key, seeded.key], retry: true }]);
+});
+
+test("B446: added again after `tried`: loads again; a device that hides APT sources doesn't load it", async () => {
+  const a = aptRec("a");
+  const b = addedBackend([a], [a.key]);
+  await loadNeverLoaded(b, [a], "iphoneos-arm64", { tried: new Set([a.key]) });
+  assert.equal(b.calls.length, 1);
+  assert.equal(await loadNeverLoaded(b, [a], "none"), null);
+  assert.equal(b.calls.length, 1);
+});
+
+test("B446: the site and the sideload build (no addedSources): nothing for an APT source just added", async () => {
+  const a = aptRec("a");
+  const b = fakeBackend([a]);
+  for (const type of ["none", "iphoneos-arm64"]) assert.equal(await loadNeverLoaded(b, [a], type), null);
+  assert.deepEqual(b.calls, []);
+});
