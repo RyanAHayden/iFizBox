@@ -37,7 +37,7 @@ case $1 in
     if [ -d "$lock" ] && [ -z "$(find "$lock/owner" -mmin +$stale 2>/dev/null)" ]; then  # the same stale rule as lock
       echo "$(holder)"; echo "iPhone 15 UI is locked by $(holder)"; exit 75
     fi
-    t=$(mktemp -d) && (cd "$t" && timeout 10 ios list 2>/dev/null | grep -q "$udid"); r=$?; rm -rf "$t"; [ $r = 0 ] ||
+    t=$(mktemp -d); r=0; (cd "$t" && timeout 10 ios list 2>/dev/null | grep -q "$udid") || r=1; rm -rf "$t"; [ $r = 0 ] ||
       { echo "the iPhone 15 ($udid) isn't on USB, or isn't trusted"; exit 69; }
     echo free; exit 0 ;;
   lock)
