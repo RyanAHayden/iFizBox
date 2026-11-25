@@ -229,7 +229,8 @@ export const isZip = (b) => b?.length >= 4 && b[0] === 0x50 && b[1] === 0x4b;
 //   WEB_SIGNER_VERSION        the newest of those
 //   WEB_GROUPFIX_REVISION     B458: the hosted dylib's revision, the same as SignerStamp.groupFixRevision (same dylib)
 //   groupFixHash(bytes)       the group fix dylib's hash: the first 16 hex digits of its SHA-256 (null without crypto.subtle)
-//   webSignerStamp(groupFix)  { version, groupFix, groupFixRevision }: the hash and revision when the app got the dylib, else null
+//   webSignerStamp(groupFix, got)  { version, groupFix, groupFixRevision }: the hash and revision when the app got the dylib
+//                             (`got`, for one whose hash can't be had), else null
 //   webSignerNow()            the current stamp records are held against: { version, groupFixRevision, reach: { all, groupFix } }
 //   signatureEnd(profile)     ISO date the signature ends: the profile's expiry, or its certificates' latest end when
 //                             that is earlier (the signing certificate is one of them); null when unknown
@@ -246,8 +247,8 @@ export async function groupFixHash(bytes) {
     return Array.from(d, (b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
   } catch { return null; }
 }
-export const webSignerStamp = (groupFix = null) => ({ version: WEB_SIGNER_VERSION, groupFix: groupFix || null,
-  groupFixRevision: groupFix ? WEB_GROUPFIX_REVISION : null });
+export const webSignerStamp = (groupFix = null, got = Boolean(groupFix)) => ({ version: WEB_SIGNER_VERSION, groupFix: groupFix || null,
+  groupFixRevision: got ? WEB_GROUPFIX_REVISION : null });
 export function webSignerNow() {
   const versions = (r) => Object.keys(WEB_REACHES).filter((v) => WEB_REACHES[v] === r).map(Number);
   return { version: WEB_SIGNER_VERSION, groupFixRevision: WEB_GROUPFIX_REVISION, reach: { all: versions("all"), groupFix: versions("groupFix") } };

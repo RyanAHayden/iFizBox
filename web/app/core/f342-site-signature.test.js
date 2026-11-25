@@ -35,6 +35,7 @@ test("groupFixHash: the first 16 hex digits of the dylib's SHA-256; the stamp ca
   assert.equal(await groupFixHash(null), null);
   assert.deepEqual(webSignerStamp(want), { version: WEB_SIGNER_VERSION, groupFix: want, groupFixRevision: WEB_GROUPFIX_REVISION });
   assert.deepEqual(webSignerStamp(), { version: WEB_SIGNER_VERSION, groupFix: null, groupFixRevision: null });
+  assert.equal(webSignerStamp(null, true).groupFixRevision, WEB_GROUPFIX_REVISION, "got the dylib, no hash to be had");
 });
 
 test("the sign job returns its stamp and the signature's end", async () => {

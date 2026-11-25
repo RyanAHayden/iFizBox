@@ -156,6 +156,10 @@ test("B458: an app is older only by a marked change that reaches it", async () =
   assert.equal(older({ version: 3, groupFix: HASH }, rebuilt), false);
   assert.equal(older({ version: 3, groupFix: HASH, groupFixRevision: 1 }, rebuilt), false);
   assert.equal(older({ version: 3, groupFix: "cccc", groupFixRevision: 1 }), false, "its revision decides, not its hash");
+  // a shell from before the revision
+  const shell = { version: 3, groupFix: "cccc" };
+  assert.equal(older({ version: 3, groupFix: "bbbb" }, shell), true);
+  assert.equal(older({ version: 3, groupFix: HASH }, shell), false);
   // a raised revision lists the apps with the fix only
   const raised = { ...rebuilt, groupFixRevision: 2 };
   assert.equal(older({ version: 3, groupFix: HASH }, raised), true);

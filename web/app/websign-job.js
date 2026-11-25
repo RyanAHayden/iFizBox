@@ -161,7 +161,8 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   // B227: what iOS will keep from the app after this signature (the group folder an earlier sign used, gone from this profile)
   const warnings = plan?.lost ? [`This profile has no ${plan.lost}, where ${info.name} kept its shared data until now: iOS keeps that folder from it.`] : [];
   // F342: the signer stamp (the group fix dylib's hash when the app got it) and the signature's end, for the install record
-  const signer = webSignerStamp(injected.includes(GROUPFIX.inject) ? await groupFixHash(groupFix) : null);
+  const gotFix = injected.includes(GROUPFIX.inject);
+  const signer = webSignerStamp(gotFix ? await groupFixHash(groupFix) : null, gotFix);
   const expires = signatureEnd(profile);
   return { ipa: out, bundleId, originalId: info.bundleId, name: info.name, version: info.version, ...(sha256 ? { sha256 } : {}),
     signer, signLog, ...(expires ? { expires } : {}),

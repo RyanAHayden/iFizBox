@@ -11,8 +11,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
-- [ ] **B458** Needs Re-sign lists an app as 'Signed by an older iFizBox' only when a signing change is marked as needing a re-sign and affects that app, instead of after any signer version bump or group fix dylib byte change (user 2026-11-25, approved). Apps on version 3 with dylib 496d0525dc08812d are not listed after this update; apps listed today for a real reason stay listed (split into B458a, B458b) | files: native/sign/SignerStamp.swift, native/sign/Library.swift, native/sign/tests/main.swift, native/groupfix/build.sh, web/app/core/signing.js, web/app/core/signing.test.js, web/app/core/websign.js, web/app/core/installed.js, web/app/core/f342-site-signature.test.js
-- [ ] **B458b** Needs Re-sign uses the marked changes: olderSigner lists an app only when a raised group fix revision or a version reaching it is newer than its stamp, not on a dylib hash change; the website signer stamp and records (websign.js, installed.js) the same. Old records (version and hash only): version 3 with hash 496d0525dc08812d (0.31.0 on) counts as current; another hash, an older version or no stamp stays listed; can't tell = list it. Expiry rows unchanged. Release note. Context and acceptance: B458. Check: node tests for each case, including a re-signed app leaving the list. | files: web/app/core/signing.js, web/app/core/signing.test.js, web/app/core/websign.js, web/app/core/installed.js, web/app/core/f342-site-signature.test.js | after: B458a
 ### Research (any time, parallel)
 
 ### Native jailbreak app (shape decided: docs/native.md)

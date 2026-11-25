@@ -922,9 +922,11 @@ export function olderSigner(record, current) {
     const skips = !hasFix && Array.isArray(fixOnly) && fixOnly.includes(w);
     if (!skips) return true;
   }
-  if (!hasFix || !Number.isFinite(current.groupFixRevision)) return false; // no current dylib: a re-sign can't bring one
+  // a shell from before the revision has a dylib of revision 1 at best; with no dylib a re-sign can't bring one
+  const want = Number.isFinite(current.groupFixRevision) ? current.groupFixRevision : current.groupFix ? 1 : 0;
+  if (!hasFix) return false;
   const revision = Number.isFinite(s.groupFixRevision) ? s.groupFixRevision : s.groupFix === GROUPFIX_REVISION_1 ? 1 : 0;
-  return revision < current.groupFixRevision;
+  return revision < want;
 }
 
 // ---- F236: is this iPhone in the profile? -----------------------------------------------------------------------
