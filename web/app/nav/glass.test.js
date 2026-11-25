@@ -159,7 +159,17 @@ test("titles and buttons follow the page; a badge and the chosen tab update the 
   sources.querySelector(".badge").classList.add("spinning");
   sources.querySelector(".badge")._text = "";
   syncGlass(doc, native, win);
-  assert.equal(calls.at(-1).tabbar.items[1].badge, "", "the refreshing spinner: a dot");
+  assert.equal(calls.at(-1).tabbar.items[1].badge, "spinner", "the refreshing spinner, not a dot");
+  sources.querySelector(".badge").classList.remove("spinning");
+  sources.querySelector(".badge")._text = "2";
+  syncGlass(doc, native, win);
+  assert.equal(calls.at(-1).tabbar.items[1].badge, "2", "then the failure count");
+  sources.querySelector(".badge").classList.add("spinning");
+  syncGlass(doc, native, win);
+  sources.querySelector(".badge").classList.remove("spinning");
+  sources.querySelector(".badge").hidden = true;
+  syncGlass(doc, native, win);
+  assert.equal(calls.at(-1).tabbar.items[1].badge, null, "or nothing");
 });
 
 test("a card sheet scaling the page back (the tab bar too) hides the UITabBar until it is still", () => {
@@ -289,6 +299,7 @@ test("the shell: ui.glass registered, a real UITabBar and UIKit glass buttons ov
   assert.match(swift, /UISearchTab\(viewControllerProvider:/, "Search as the search tab");
   assert.match(swift, /UITab\(title:/);
   assert.match(swift, /\.badgeValue = badge/);
+  assert.match(swift, /"spinner"[^\n]*\n[^\n]*\n\s+let badge = spins \? TabBadgeSpinner\.mark :/, "B441: the spinner badge");
   assert.match(swift, /tabBarMinimizeBehavior = \.onScrollDown/, "shrinks on scroll");
   assert.match(swift, /setContentScrollView\(best, for: \.bottom\)/, "following the page's own scroller");
   assert.match(swift, /vc\.view\.insertSubview\(web, at: 0\)/, "the web view inside the chosen tab's view");
