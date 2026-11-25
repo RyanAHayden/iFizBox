@@ -47,7 +47,7 @@ class Due(unittest.TestCase):
         self.assertOrder(drop, ["LocalVPN.withNoStart", "RestoreDue.step(now()) == .drop", "owed = false"])
         look = self.part("static func look()")
         self.assertIn("looking = true", look)
-        self.assertIn("UserDefaults", self.part("private static var owed", "/// A store run"))  # a killed app's, at its next launch
+        self.assertIn("contentsOf: owedFile", self.part("private static var owed", "/// A store run"))  # a killed app's, at its next launch
         self.assertIn("LocalVPN.takeDownLeftOver()", read("App", "LocalVPN.swift").split("enum LocalVPNBridge")[1])
 
     def test_asks_once_left(self):

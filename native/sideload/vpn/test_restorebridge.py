@@ -64,6 +64,12 @@ class RestoreBridge(unittest.TestCase):
         self.assertIn("if isClosing { return done() }", part(back, "private static func turn()", "let step"))
         self.assertIn("if used, !RestoreBack.isClosing { return (false, false) }", read("App", "LocalVPN.swift"))
 
+    def test_owed_is_a_file(self):
+        """F438a: UserDefaults' last write before iFizBox's own update was sometimes lost."""
+        owed = part(read("App", "RestoreBack.swift"), "private static var owed: Bool", "private static var held")
+        self.assertIn("write(to: owedFile, options: .atomic)", owed)
+        self.assertNotIn("UserDefaults", owed)
+
     def test_is_down(self):
         """Our tunnel counts as up when its state isn't known, while it comes or goes, and while something holds it."""
         down = part(read("App", "LocalVPN.swift"), "static func isDown()", "/// Our configuration as iOS has it")
