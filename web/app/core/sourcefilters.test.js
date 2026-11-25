@@ -136,3 +136,20 @@ test("Lite: App Tweaks Only drops rootful-only tweaks from a Tweak Source; the s
   c.setFilters({}, { lite: false });
   assert.equal(c.sections(BIGBOSS).total, 0, "Hide Unknown still leaves BigBoss's tweaks out");
 });
+
+test("Lite: App Tweaks Only keeps a tweak whose newest version also has an iphoneos-arm64 build, either order (B429)", () => {
+  const build = (arch, version = "1.0.11") => ({ Package: "com.ps.yougroupsettings", Name: "YouGroupSettings", Version: version, Architecture: arch,
+    Section: "Tweaks", Depends: "mobilesubstrate, firmware (>= 11.0)", Filename: `debs/you_${version}_${arch}.deb` });
+  const shown = (...list) => {
+    const c = createCatalog();
+    c.setDevice({ ios: "27.0", jailbreak: "none" });
+    c.setTweakKnown({ worked: ["com.ps.yougroupsettings"] });
+    c.setFilters({}, { lite: true });
+    c.load(OTHER, pkgs(...list), "https://repo.example/", "iphoneos-arm64", { tweaks: true });
+    return ids(c.list(OTHER, ALL)).length;
+  };
+  assert.equal(shown(build("iphoneos-arm"), build("iphoneos-arm64")), 1, "rootful first, as Chariz lists them");
+  assert.equal(shown(build("iphoneos-arm64"), build("iphoneos-arm")), 1);
+  assert.equal(shown(build("iphoneos-arm64", "1.0.10"), build("iphoneos-arm")), 0, "only an older version was rootless");
+  assert.equal(shown(build("iphoneos-arm")), 0);
+});
