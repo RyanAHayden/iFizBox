@@ -146,3 +146,39 @@ test("a page gone does nothing", async () => {
   assert.equal(await installHold(gone, "btn", d.opts), null);
   assert.deepEqual([d.jobs, d.opened], [[], []]);
 });
+
+// B447: a queued apt package says Modify; its tap opens the sheet, whose Clear (red) takes it out of the queue
+import { buttonLabel, pageQueued } from "./browse.js";
+import { installQueue } from "../queue.js";
+
+test("B447: a queued package's button says Modify, on queue, clear and reopen; a tap opens the sheet", async () => {
+  const p = page(NOT_INSTALLED);
+  const body = p.body;
+  assert.equal(buttonLabel(body, false, pageQueued(p)), "Install");
+  installQueue.add({ op: "install", id: "com.ex.tweak", version: "3.0" }, { quiet: true });
+  try {
+    assert.equal(pageQueued(p), true);
+    assert.equal(buttonLabel(body, false, pageQueued(p)), "Modify");
+    assert.equal(installNoModify(p, { mode: "jailbreak" }), false);
+    const d = deps(p);
+    assert.equal(await installTap(ROUTE, "btn", d.opts), "options");
+    assert.deepEqual([d.jobs, d.opened.length], [[], 1]);
+    assert.equal(pageQueued(page(NOT_INSTALLED, { kind: "ipa", ipa: {} })), false);
+    installQueue.clear("com.ex.tweak");
+    assert.equal(buttonLabel(body, false, pageQueued(p)), "Install");
+    assert.equal(installNoModify(p, { mode: "jailbreak" }), true);
+  } finally { installQueue.clearAll(); }
+});
+
+test("B447: a queued paid package's sheet starts with a red Clear that takes it out of the queue", async () => {
+  const { paidActions } = await import("./browse.js");
+  installQueue.add({ op: "install", id: "com.ex.paid", version: "1.0" }, { quiet: true });
+  try {
+    const { actions } = paidActions({ actions: [{ label: "$1.99", run() {} }] }, { id: "com.ex.paid", version: "1.0", installed: null, queue: null, queued: true });
+    assert.equal(actions[0].label, "Clear");
+    assert.equal(actions[0].red, true);
+    assert.equal(actions[1].label, "$1.99");
+    actions[0].run();
+    assert.equal(installQueue.get("com.ex.paid"), null);
+  } finally { installQueue.clearAll(); }
+});
