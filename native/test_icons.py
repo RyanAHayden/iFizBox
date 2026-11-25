@@ -385,9 +385,11 @@ class Glass(unittest.TestCase):
         for name, (light, dark) in glass.all_sets().items():
             with self.subTest(set=name):
                 doc = self.doc(name)
-                fills = {s.get("appearance", "any"): s["value"]["linear-gradient"] for s in doc["fill-specializations"]}
-                self.assertEqual(fills["any"], [glass.srgb(c) for c in glass.colours(light)["fill"]])
-                self.assertEqual(fills["dark"], [glass.srgb(c) for c in glass.colours(dark)["fill"]])
+                fills = {s.get("appearance", "any"): s["value"] for s in doc["fill-specializations"]}
+                gradient = lambda i: {"linear-gradient": [glass.srgb(c) for c in glass.colours(i)["fill"]]}  # noqa: E731
+                self.assertEqual(fills["any"], gradient(light))
+                # B442: the Glass icon's dark look is the globe alone, on iOS's own dark tile
+                self.assertEqual(fills["dark"], "system-dark" if name == alternates.GLASS_SET else gradient(dark))
                 grid = doc["groups"][0]["layers"][0]["image-name-specializations"]
                 self.assertEqual(grid, [{"value": light + "-grid.svg"}, {"appearance": "dark", "value": dark + "-grid.svg"}])
         self.assertEqual(glass.all_sets()["AppIcon"], alternates.PRIMARY)
@@ -419,7 +421,7 @@ class Glass(unittest.TestCase):
 
     def test_glass_icon_is_its_own_set(self):
         """User 2026-11-21: every theme keeps its PNG set (an .icon would replace it, LITE sash and all); the glass
-        one is an extra set, Classic in Light and Gunmetal in Dark, with no PNG set, that only the .icon fills."""
+        one is an extra set, Classic in Light and Gunmetal's globe in Dark, with no PNG set, that only the .icon fills."""
         self.assertEqual(glass.CAR_SETS, (alternates.GLASS_SET,))
         self.assertNotIn(alternates.GLASS_SET, alternates.sets())
         self.assertEqual(glass.all_sets()[alternates.GLASS_SET], alternates.PRIMARY)
@@ -428,7 +430,7 @@ class Glass(unittest.TestCase):
         with open(os.path.join(os.path.dirname(HERE), "web", "app", "core", "settings.js")) as f:
             self.assertIn('{ value: "%s", label: "iOS 26", tone: null }' % alternates.GLASS, f.read())  # F371: renamed
         self.assertEqual(carfile.png_size(read(os.path.join("glass", "AppIcon60x60@3x.png"))), (180, 180))
-        # F371: its dark (Gunmetal) picture, for Dark's grid and Home's header in dark mode
+        # F371: its dark picture, for Dark's grid and Home's header in dark mode
         self.assertEqual(carfile.png_size(read(os.path.join("glass", "AppIconDark60x60@3x.png"))), (180, 180))
         self.assertNotEqual(read(os.path.join("glass", "AppIconDark60x60@3x.png")), read(os.path.join("glass", "AppIcon60x60@3x.png")))
 

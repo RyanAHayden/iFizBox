@@ -54,7 +54,7 @@ TINTED_ICON = "tinted"  # F360: the alternate sets' tinted appearance in the cat
 ERAS = (("ios7", "ios7dark"), ("ios13", "ios13dark"))
 ERA_ICONS = [i for pair in ERAS for i in pair]
 LIGHT_ONLY = "light"  # Icon-<era light icon>light: that icon alone (core/settings.js lightOnlyName)
-GLASS_DARK = "glass-dark"  # F371: the Glass icon's dark (Gunmetal) thumbnail, appicon/glass-dark.png (glass.py thumb)
+GLASS_DARK = "glass-dark"  # F371: the Glass icon's dark thumbnail, appicon/glass-dark.png (glass.py thumb)
 GLASS_DARK_THUMB = os.path.join(ICON, "glass", "AppIconDark60x60@3x.png")
 
 
@@ -234,7 +234,7 @@ def thumbs(dest, lite):
         shutil.copyfile(src(i, 60, 3, lite), os.path.join(dest, i + ".png"))
     # F324: the Glass icon's flat picture (icon/glass.py thumb), no sash in either build
     shutil.copyfile(os.path.join(ICON, "glass", "AppIcon60x60@3x.png"), os.path.join(dest, GLASS + ".png"))
-    # F371: and its dark (Gunmetal) one, for Dark's grid and Home's header in dark mode
+    # F371: and its dark one (the globe on iOS's dark tile), for Dark's grid and Home's header in dark mode
     shutil.copyfile(GLASS_DARK_THUMB, os.path.join(dest, GLASS_DARK + ".png"))
 
 
