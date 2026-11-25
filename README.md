@@ -40,7 +40,6 @@ src="docs/img/showcase.webp" alt="Showcase video: adding a source, installing an
 - [Install](#install)
 - [How it works](#how-it-works)
 - [Build and test](#build-and-test)
-- [Host your own server](#host-your-own-server)
 - [Project layout](#project-layout)
 - [Contributing](#contributing)
 - [Credits](#credits)
@@ -176,22 +175,8 @@ graph TD
 - **The apps** are a Swift shell around a WKWebView that runs `web/app/`, built on Linux into both the rootless
   `.deb` (with a root helper for apt) and the sideload IPA (without it). They're designed to hold 120 Hz: animations
   use only transform and opacity, long lists are virtualised, and parsing runs in a Web Worker.
-- **ifizbox.com is a single Cloudflare Worker** (`worker/`), with no server of our own:
-
-  | Path | What it does |
-  |---|---|
-  | `/` | the website: `web/app/` as static assets, revalidated on every load |
-  | `/api/fetch` | the website's fetch proxy (APT repos and AltStore sources don't let a page read them), kept off private addresses: Cloudflare's fetch can't reach private or loopback ones, and literal private hosts and `localhost` are refused up front (a self-hosted `node.mjs` also resolves and checks every host and redirect itself), with time limits and a 64 MB cap on plain fetches (IPAs up to `MAX_UPLOAD_MB`). A GitHub repo's details and releases (a repo added as a source) go through GitHub's API with the server's token, kept 10 minutes |
-  | `/api/applookup`, `/api/appreviews`, `/api/ipainfo` | App Store details and reviews for an app, and an IPA's `Info.plist` (supported iOS versions) |
-  | `/sign/status` | tells the sideload app's Settings > Installation & Signing the server answers |
-  | `/sign/manifest`, `/sign/host/*` | the install manifest iOS needs when the app signs on the phone, and iFizBox's own update held for 10 minutes while iOS replaces the app |
-  | `/sign/upload`, `/sign/up/*` | an app the website signed in the browser, held for 10 minutes for iOS's install prompt |
-  | `/repo/` | iFizBox's flat APT repo, served from the latest GitHub release's assets |
-  | `/repo/source.json` | iFizBox's AltStore source |
-  | `/apple/*` | the website's App Store Connect calls with your own API key (Apple sends no CORS headers), and the free Apple ID sign-in relay where a deploy turns it on; allow-listed hosts and paths, nothing logged |
-  | `/api/account/*` | iFizBox Account (below) |
-  | `/reviews/*` | package reviews (Cloudflare D1) |
-
+- **ifizbox.com is a single Cloudflare Worker**, with no server of our own:
+  [what it does and how to host your own](worker/README.md).
 - **Signing happens on your own device.** The sideload app signs on the iPhone (the jailbreak app needs no
   signing: its helper installs IPAs directly). The website signs in the browser with
   [zsign](https://github.com/zhlynn/zsign) compiled to WebAssembly (`web/app/vendor/zsign`, built reproducibly by
@@ -235,38 +220,6 @@ It also needs `ld64.lld` (rustup's, or one on `PATH`) and `ldid` or `rcodesign` 
 notes: [docs/native.md](docs/native.md). Releases: [docs/release.md](docs/release.md).
 
 </details>
-
-## Host your own server
-
-Anyone can run their own copy of the Worker for free and point iFizBox at it. Full guide:
-[worker/README.md](worker/README.md).
-
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/RyanAHayden/iFizBox/tree/main/worker)
-
-```bash
-git clone https://github.com/RyanAHayden/iFizBox && cd iFizBox/worker
-npx wrangler login
-npx wrangler deploy     # creates the KV storage on the first deploy and prints your https://….workers.dev address
-```
-
-Or on your own machine or in Docker:
-
-```bash
-node worker/node.mjs    # PORT, HOST, HOST_IDS, TTL as in worker/wrangler.toml
-docker build -f worker/Dockerfile -t ifizbox . && docker run -d -p 8787:8787 -v ifizbox-data:/data ifizbox
-```
-
-<img src="docs/img/crop-signing-server.png" alt="Settings > Installation & Signing > Signing Server: Server, Check Server, Run Your Own" width="36%" align="right">
-
-Then in the sideload app: **Settings > Installation & Signing > Signing Server**, paste your address and tap **Check Server**. iOS accepts
-install manifests only over HTTPS with a trusted certificate, so a self-hosted Node server has to sit behind
-Tailscale, a Cloudflare Tunnel or a reverse proxy with a real domain.
-
-ifizbox.com itself is deployed on release tags, not on pushes to `main`: `tools/publish.sh` runs
-`tools/deploy.sh vX.Y.Z` after tagging a release, which checks the tag out and runs
-`tools/buildinfo.sh && cd worker && npx wrangler deploy -c wrangler.ifizbox.toml`.
-
-<br clear="right">
 
 ## Project layout
 
