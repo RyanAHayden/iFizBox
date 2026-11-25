@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { searchBar, pinned, scrollerOf } from "./searchbar.js";
+import { searchBar, clearTap, pinned, scrollerOf } from "./searchbar.js";
 
 import { fakeDocument as sharedDocument } from "./fakedom.test-helper.js";
 
@@ -97,6 +97,38 @@ test("C10: pinned puts the bar and scope over a scroller of their own", () => {
   const other = document.createElement("div");
   other.className = "page-body";
   assert.equal(scrollerOf(other), other);
+});
+
+test("B430: a tap on the x, on the label or the input under it, empties the field; on the text it does nothing", () => {
+  globalThis.document = fakeDocument();
+  const seen = [];
+  const bar = searchBar({ onQuery: (q) => seen.push(q) });
+  const [field] = bar.children, input = bar.input;
+  field.getBoundingClientRect = () => ({ left: 5, right: 305 });
+  const tap = (target, clientX) => {
+    let prevented = false;
+    clearTap({ target, clientX, preventDefault: () => { prevented = true; } });
+    return prevented;
+  };
+  for (const target of [field, input]) {
+    seen.length = 0;
+    input.value = "big";
+    input.blur();
+    assert.equal(tap(target, 272), false, "left of the x: the caret's");
+    assert.equal(input.value, "big");
+    assert.deepEqual(seen, []);
+    assert.equal(tap(target, 290), true);
+    assert.equal(input.value, "");
+    assert.deepEqual(seen, [""], "the results reset");
+    assert.equal(input.focused, true, "the keyboard stays up");
+    assert.equal(tap(target, 290), false, "empty: no x to tap");
+  }
+  assert.equal(tap(bar.cancel, 320), false, "outside the field");
+});
+
+test("B430: app.js clears on a captured click", () => {
+  const src = readFileSync(new URL("../app.js", import.meta.url), "utf8");
+  assert.match(src, /document\.addEventListener\("click", clearTap, true\);/);
 });
 
 // Every list screen builds its bar through searchBar and pins it; none draws a field of its own.

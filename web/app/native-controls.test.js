@@ -156,6 +156,9 @@ test("F345a: the search field's room for the drawn magnifier goes under iOS 26 (
   assert.match(pk, /html\[data-style="ios26"\] \.search-field \{ padding: 0; \}/);
   assert.match(pk, /html\[data-style="ios26"\] \.search-field input \{ padding: revert; padding-right: 30px; \}/);
   assert.match(pk, /html\[data-style="ios26"\] \.search-field::after \{ margin: 0 6px 0 -25px; \}/, "the clear inside the capsule");
+  // B430: the x lies on the input, and WebKit gives the input the tap unless the label's own area is raised over it
+  assert.match(pk, /html\[data-style="ios26"\] \.search-field \{ position: relative; \}/);
+  assert.match(pk, /html\[data-style="ios26"\] \.search-field:has\(input:not\(:placeholder-shown\)\)::before \{\s*content: ""; position: absolute; z-index: 1; top: 0; right: 0; bottom: 0; width: 32px;/);
 });
 
 test("F345a: the run page's bar is a <progress> under iOS 26 (nav/progress.js)", () => {
