@@ -4,7 +4,7 @@ import { memStorage } from "../fakes.test-helper.js";
 import http from "node:http";
 import {
   isCommercial, paymentEndpointUrl, parseEndpoint, buildRequest, authenticateUrl, parseCallback, parseReply,
-  parsePurchase, createPaymentClient, createCredentialStore, PaymentError,
+  parsePurchase, createPaymentClient, createCredentialStore, PaymentError, paidTweakDeb,
 } from "./payment.js";
 
 test("cydia::commercial in Tag", () => {
@@ -47,6 +47,33 @@ test("requests are built as the spec writes them", () => {
   assert.throws(() => buildRequest(base, "package_info", { packageId: "../../admin" }), /package name/);
   assert.throws(() => buildRequest("http://plain.example/", "info"), /https/);
   assert.equal(authenticateUrl(base, { udid: "4e12", model: "iPhone7,2" }), base + "authenticate?udid=4e12&model=iPhone7%2C2");
+});
+
+test("B453: Havoc and Chariz are asked for the ID in lowercase on all three calls, other vendors as listed", () => {
+  const path = (base, action, packageId) =>
+    buildRequest(base, action, { packageId, token: "t", secret: "s" }).url.slice(base.length);
+  for (const [action, last] of [["package_info", "info"], ["purchase", "purchase"], ["authorize_download", "authorize_download"]]) {
+    for (const base of ["https://havoc.app/api/sileo/", "https://chariz.com/api/sileo/"]) {
+      assert.equal(path(base, action, "com.thetimeloop.EchoUI"), `package/com.thetimeloop.echoui/${last}`);
+      assert.equal(path(base, action, "com.paid.tweak"), `package/com.paid.tweak/${last}`);
+    }
+    assert.equal(path("https://vendor.example/api/", action, "com.Mixed.Case"), `package/com.Mixed.Case/${last}`);
+  }
+});
+
+test("B453: a mixed-case package's paid .deb is asked for in lowercase and downloaded as the package listed", async () => {
+  const urls = [];
+  const client = createPaymentClient({
+    base: "https://havoc.app/api/sileo/",
+    request: async ({ url }) => {
+      urls.push(url);
+      return { status: 200, json: url.endsWith("/info") ? { price: "$0.99", purchased: true, available: true } : { url: "https://havoc.app/dl" } };
+    },
+    credentials: { load: async () => ({ token: "t", secret: "s" }) },
+  });
+  const st = { package: "com.thetimeloop.EchoUI", version: "1.0" };
+  assert.equal(await paidTweakDeb(st, { client, download: (url, got) => got.package }), "com.thetimeloop.EchoUI");
+  assert.deepEqual(urls, ["info", "authorize_download"].map((c) => `https://havoc.app/api/sileo/package/com.thetimeloop.echoui/${c}`));
 });
 
 test("callbacks: sileo:// as vendors send it, ifizbox:// the same way", () => {
