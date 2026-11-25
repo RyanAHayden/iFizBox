@@ -93,9 +93,10 @@ class Wiring(unittest.TestCase):
         for start in ("static func signAndOpen(", "static func serveAndOpen("):
             self.assertIn("serving: serving)", body(side, start, "\n    }\n\n"))
 
-    def test_page_hold_goes_too(self):  # B437
+    def test_page_hold_goes_too(self):  # B437, B438
         prompt = read("InstallPrompt.swift")
-        self.assertIn("if unopened { DispatchQueue.main.async { Sideload.yieldPageHold { self.waits } } }", prompt)
+        self.assertIn("DispatchQueue.main.async { Sideload.yieldPageHold { self.waits } }", prompt)
+        self.assertIn("asleep && InstallPrompt.undecided(bid, hold: self)", prompt)
         page = body(read("Sideload.swift"), "static func yieldPageHold(", "\n    }\n")
         self.assertIn("guard waiting() else { return }", page)
         self.assertIn("KeepAlive.shared.holds == 1 && UIApplication.shared.applicationState == .background", page)

@@ -192,6 +192,12 @@ enum InstallPrompt {
         return true
     }
 
+    // B438: this install's prompt isn't known to be dismissed (which ends its signing.progress watch), nor another's by now.
+    private static func undecided(_ bid: String, hold: Awake) -> Bool {
+        guard let e = entries[bid], e.hold === hold else { return false }
+        return !e.gone
+    }
+
     static func summary(_ bid: String) -> String {
         guard let e = entries[bid] else { return "no install link was opened here" }
         let yes = { (b: Bool) in b ? "yes" : "no" }
@@ -248,8 +254,11 @@ enum InstallPrompt {
         }
         private var isOver = false
 
-        // B437: the prompt waits for the app in front, and the hold was given back
-        private var waits: Bool { lock.lock(); defer { lock.unlock() }; return rule.unopened && !rule.held }
+        // B437, B438: the prompt waits for the app in front, or for its answer, and the hold was given back. Main queue.
+        private var waits: Bool {
+            lock.lock(); let asleep = rule.asleep; lock.unlock()
+            return asleep && InstallPrompt.undecided(bid, hold: self)
+        }
 
         func slept(from: Date) -> Bool { lock.lock(); defer { lock.unlock() }; return rule.slept(from: from) }
 
@@ -266,13 +275,12 @@ enum InstallPrompt {
             let due = rule.releaseAt
             let arm = due != nil && due != timed
             timed = due
-            let unopened = rule.unopened
             lock.unlock()
             switch step {
             case .take: InstallLog.say(bid, "KeepAlive: held for \(name)")
             case .release:
                 InstallLog.say(bid, "KeepAlive: let go for \(name)")
-                if unopened { DispatchQueue.main.async { Sideload.yieldPageHold { self.waits } } } // B437
+                DispatchQueue.main.async { Sideload.yieldPageHold { self.waits } } // B437, B438
             case .none: break
             }
             if arm, let due = due {
