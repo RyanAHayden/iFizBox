@@ -5,7 +5,7 @@
     marketing/video/make.sh [OUT_DIR]     # default marketing/video/out (gitignored)
 
 It writes `OUT_DIR/rec/` (the recordings), then `OUT_DIR/showcase-4x5.mp4` (1080x1350) and `OUT_DIR/showcase-9x16.mp4`
-(1080x1920): 60 fps H.264, about 50 s, no sound.
+(1080x1920): 60 fps H.264, about 71 s, no sound.
 
 Needs node 22+, python3, chromium and ffmpeg. No network and no phone: the world is made up (`.example` hosts, names
 and icons invented in `make_state.py`), and the app's native bridge is answered in Node by `shell.mjs`.
@@ -32,11 +32,13 @@ marks, world updates) is in `capture.mjs`'s header.
 - `render.mjs` unpacks the recordings' frames into `OUT_DIR/frames/` (about 0.5 GB; it can be deleted, and is unpacked
   again when a recording is newer). It serves the repo and `OUT_DIR` on 127.0.0.1, and stops at the first unpack error.
 - `video.html` draws the phones (a plain rounded frame, no device artwork, and the status bar: 12:30 and the signal and
-  battery marks), the captions, the zooms and the end card. The name and domain come from `web/app/brand.js`.
-- `MAP` in `video.html` is the timing: for the `LITE` and `JAIL` tables, each stretch between two marks and the seconds
-  the video takes to reach the next one. Some stretches are played faster than the recording. A recording is never cut
-  within a build.
-- `say()` sets a caption and `build()` the grey line under it that names the build (No jailbreak, Jailbroken).
+  battery marks), the two phone labels (in the opening only), the captions, the zooms and the end card. The background
+  is the pinstripe ground of `web/app/ios6.css`, drawn at a 3x phone's size, with its text colours and emboss read from
+  the same file. The name and domain come from `web/app/brand.js`.
+- `MAP` in `video.html` is the timing: `LITE` and `JAIL`, each `{ from, to, cuts }`. Each recording plays at its own
+  speed (1x) from mark to mark. Each cut `[from, to]` is in seconds of the recording and drops part of a wait on the
+  install screen; nothing is sped up. If the recordings are made again with different timing, check the cuts.
+- `say()` sets a caption.
 - The zooms close in on the one phone for the key steps. They are for 4:5 only; 9:16 shows the whole phone.
 
 | File | What it does |
@@ -49,7 +51,7 @@ marks, world updates) is in `capture.mjs`'s header.
 | `finger.js` | what the recording shows of the person holding the phone: a soft touch dot and a plain keyboard |
 | `shots-lite.json`, `shots-jailbreak.json` | each recording's script: the steps, in the order `capture.mjs`'s header lists them |
 | `render.mjs` | the cut's renderer: unpacks the frames, serves the page, steps its clock and pipes the frames to ffmpeg (H.264, 60 fps, no audio) |
-| `video.html` | the cut as one page: the phones, the status bar, the captions (`say()`, `build()`), the timing (`MAP`), the zooms and the end card |
+| `video.html` | the cut as one page: the phones, the status bar, the captions (`say()`), the timing (`MAP`), the zooms and the end card |
 
 Re-render one cut from the recordings already in `OUT_DIR`:
 
