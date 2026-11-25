@@ -507,8 +507,7 @@ export function paidNav(info, signedIn, { vendorName = "the vendor", signIn = nu
   const price = info?.price ?? null;
   const priced = price && !isFreePrice(price);
   if (!info) return { label: "Install", purchased: false, install: null, actions: [], note: note ?? null };
-  if (!info.available) return { label: priced ? price : "Install", purchased: false, install: null, actions: [],
-    note: `Not available to buy from ${vendorName}.` };
+  if (!info.available) return unavailableNav(info, signedIn, { vendorName, signIn, install, signInLabel });
   // F319: signed out, a FREE package the vendor calls purchased (Chariz's betterAlarm) installs without Sign In
   // (`freeInstall`: a tokenless authorize_download that falls back to Sign In); Sign In stays on offer below it.
   if (!signedIn && freeInstall && freeSignedOut(info)) return { label: "Install", purchased: true, install: freeInstall,
@@ -520,6 +519,27 @@ export function paidNav(info, signedIn, { vendorName = "the vendor", signIn = nu
     actions: buy ? [{ label: buyLabel(price), run: buy }] : [], note: `Sold by ${vendorName}.` };
   return { label: "Install", purchased: true, install,
     actions: install ? [{ label: "Download & Install", run: install }] : [], note: null };
+}
+
+// F434: the vendor answered available: false (never an error: those come as `info` null). Whoever bought it may still
+// get it, so signed out it offers Sign In and signed in and purchased Download & Install (the vendor's refusal shows
+// in the Purchase alert). A free package was never sold, so its note doesn't say so.
+function unavailableNav(info, signedIn, { vendorName, signIn, install, signInLabel }) {
+  const free = isFreePrice(info.price);
+  const gone = free ? `Not available from ${vendorName}.` : `${vendorName} no longer sells this.`;
+  const label = info.price && !free ? info.price : "Install";
+  if (!signedIn) return { label, purchased: false, install: null,
+    actions: signIn ? [{ label: signInLabel || `Sign In to ${vendorName}`, run: signIn }] : [],
+    note: `${gone} If you ${free ? "already got" : "bought"} it, sign in to download it.` };
+  if (!info.purchased) return { label, purchased: false, install: null, actions: [], note: gone };
+  return { label: "Install", purchased: true, install,
+    actions: install ? [{ label: "Download & Install", run: install }] : [], note: gone };
+}
+
+// The Purchase group's footer: why a package isn't for sale, else the vendor's sign-in message, else who sells it.
+export function purchaseFooter(info, signedIn, { note = null, banner = null, vendorName = "the vendor" } = {}) {
+  if (!info.available) return note;
+  return banner && !signedIn ? banner.message : `Sold by ${vendorName}.`;
 }
 
 // F319: the vendor gives this package away and says so without a token: {price FREE, purchased true, available}.
@@ -623,10 +643,9 @@ async function drawApp(st, source, base, draw, ctx, box, publish = () => {}) {
   // B11: the nav bar button offers the same step as the row below (paidNav), so both stay in step.
   const nav = paidNav(info, signedIn, { vendorName: name, signIn, buy, install, freeInstall,
     signInLabel: vendor?.banner?.button || null });
-  if (!info.available) rows.push({ label: "Not available to buy" });
   for (const a of nav.actions) rows.push({ label: a.label, onClick: a.run });
   if (signedIn) rows.push({ label: `Sign Out of ${name}`, onClick: busy("Signing Out", () => client.signOut()) });
-  const footer = vendor?.banner && !signedIn ? vendor.banner.message : `Sold by ${name}.`;
+  const footer = purchaseFooter(info, signedIn, { note: nav.note, banner: vendor?.banner, vendorName: name });
   // B183: the price came without this iPhone's UDID (the shell has none yet): say so, as Sign In and Buy need it.
   const udidNote = info.deviceError ? ` ${info.deviceError.replace(/^device:\s*/, "").replace(/^./, (c) => c.toUpperCase()).replace(/([^.])$/, "$1.")}` : "";
   // F314: the UDID note is a second hint: its own group (AGENTS.md, Hints), never joined to the seller's footer

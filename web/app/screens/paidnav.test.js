@@ -44,10 +44,67 @@ test("purchased: true without a token (Chariz's free packages) still needs Sign 
   assert.deepEqual(labels(n), ["Sign In to Havoc"]);
 });
 
-test("not available, or the vendor couldn't be asked: nothing to queue, and the note says why", () => {
-  const n = paidNav({ price: "$1", purchased: false, available: false }, true, cbs);
+// F434: Havoc's answer for Lunar Legacy, which it no longer sells.
+const gone = { price: "Unavailable", purchased: false, available: false };
+
+test("F434: no longer sold, signed out: Sign In, and the note says a buyer can still download it", () => {
+  for (const vendorName of ["Havoc", "Chariz"]) {
+    const n = paidNav(gone, false, { ...cbs, vendorName });
+    assert.equal(n.label, "Unavailable");
+    assert.equal(n.install, null);
+    assert.deepEqual(labels(n), [`Sign In to ${vendorName}`]);
+    assert.equal(n.actions[0].run, signIn);
+    assert.equal(n.note, `${vendorName} no longer sells this. If you bought it, sign in to download it.`);
+  }
+  const sheet = paidActions(paidNav(gone, false, { ...cbs, signInLabel: "Log In" }),
+    { id: "org.haxi0.lunar", version: "1.0", installed: null, queue: noQueue, wish: wishOf() });
+  assert.deepEqual(labels(sheet), ["Log In", "Add to Wish List"]);
+  assert.match(sheet.title, /^Havoc no longer sells this\./);
+});
+
+test("F434: no longer sold, signed in and purchased: Download & Install", () => {
+  const n = paidNav({ ...gone, purchased: true }, true, cbs);
+  assert.equal(n.label, "Install");
+  assert.equal(n.purchased, true);
+  assert.equal(n.install, install);
+  assert.deepEqual(labels(n), ["Download & Install"]);
+  assert.equal(n.actions[0].run, install);
+  const up = paidActions(n, { id: "p", version: "1.2", installed: "1.1", queue: () => {}, wish: wishOf() });
+  assert.deepEqual(labels(up), ["Upgrade", "Remove"]);
+});
+
+test("F434: no longer sold, signed in and not purchased: nothing to do but the note", () => {
+  const n = paidNav(gone, true, cbs);
+  assert.equal(n.install, null);
   assert.deepEqual(n.actions, []);
-  assert.match(n.note, /Not available/);
+  assert.equal(n.note, "Havoc no longer sells this.");
+});
+
+test("F434: Free but unavailable (icontweak) never says it was sold", () => {
+  const free = { ...gone, price: "Free" };
+  const out = paidNav(free, false, cbs);
+  assert.equal(out.label, "Install");
+  assert.equal(out.install, null);
+  assert.deepEqual(labels(out), ["Sign In to Havoc"]);
+  assert.deepEqual(labels(paidNav(free, true, cbs)), []);
+  assert.deepEqual(labels(paidNav({ ...free, purchased: true }, true, cbs)), ["Download & Install"]);
+  for (const n of [out, paidNav(free, true, cbs), paidNav({ ...free, purchased: true }, true, cbs)]) {
+    assert.match(n.note, /^Not available from Havoc\./);
+    assert.doesNotMatch(n.note, /sell|sold|bought/i);
+  }
+});
+
+test("F434: a vendor error is its own message, never no longer sold", () => {
+  for (const note of ["Not Found", "Bad Request"]) {
+    for (const signedIn of [false, true]) {
+      const n = paidNav(null, signedIn, { ...cbs, note });
+      assert.equal(n.note, note);
+      assert.deepEqual(n.actions, []);
+    }
+  }
+});
+
+test("the vendor couldn't be asked: nothing to queue, and the note says why", () => {
   const e = paidNav(null, false, { note: "offline" });
   assert.deepEqual(e.actions, []);
   assert.equal(e.label, "Install");

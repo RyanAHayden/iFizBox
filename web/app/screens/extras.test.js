@@ -158,3 +158,38 @@ test("F319: any refusal offers Sign In: Sign In runs it, Cancel does nothing; no
     assert.match(alerts[0].message, /Chariz/);
   }
 });
+
+// F434: what the Purchase group says about a package its vendor answers available: false for.
+import { purchaseFooter } from "./extras.js";
+import { createPaymentClient } from "../core/payment.js";
+
+const banner = { message: "Sign in with your Havoc account", button: "Sign In" };
+const groupFooter = (info, signedIn, vendorName = "Havoc") => purchaseFooter(info, signedIn,
+  { note: paidNav(info, signedIn, { ...navCbs, vendorName }).note, banner, vendorName });
+
+test("F434: no longer sold: the footer says so, over the vendor's sign-in message", () => {
+  const gone = { price: "Unavailable", purchased: false, available: false };
+  assert.equal(groupFooter(gone, false), "Havoc no longer sells this. If you bought it, sign in to download it.");
+  assert.equal(groupFooter(gone, true, "Chariz"), "Chariz no longer sells this.");
+  assert.equal(groupFooter({ ...gone, purchased: true }, true), "Havoc no longer sells this.");
+  assert.equal(priceDetail(gone, false), "Unavailable");
+  assert.equal(priceDetail({ ...gone, purchased: true }, true), "Purchased");
+});
+
+test("F434: Free but unavailable isn't called sold; a package for sale keeps its footer", () => {
+  const free = { price: "Free", purchased: false, available: false };
+  assert.doesNotMatch(groupFooter(free, false), /sell|sold|bought/i);
+  assert.equal(groupFooter(free, true), "Not available from Havoc.");
+  const sale = { price: "$1.99", purchased: false, available: true };
+  assert.equal(groupFooter(sale, false), banner.message);
+  assert.equal(groupFooter(sale, true), "Sold by Havoc.");
+});
+
+// Havoc's live answers (2026-11-25): an unknown package and a request with no UDID also carry available: false.
+test("F434: a vendor error throws its message, though its body says available: false", async () => {
+  for (const [status, error] of [[404, "Not Found"], [400, "Bad Request"], [200, "Not Found"]]) {
+    const client = createPaymentClient({ base: "https://havoc.app/api/sileo/",
+      request: async () => ({ status, json: { available: false, error, recovery_url: "https://havoc.app" } }) });
+    await assert.rejects(client.packageInfo("com.nope.nope"), new RegExp(error));
+  }
+});
