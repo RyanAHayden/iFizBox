@@ -1582,6 +1582,7 @@ enum CloseForUpdate {
     // B394: the last upload and its install link, which the same IPA handed over again reuses. Main queue.
     struct Hosted: Codable {
         let link: URL, status: URL?, record: SignedRecord, server: String, at: Date, life: TimeInterval
+        var by: String? = Bundle.main.bundlePath // B445: the copy of iFizBox that uploaded it; each install has a path of its own
         var again = false // reused: its `asked` mark may be the try before's, so it says nothing
         var age: TimeInterval { Date().timeIntervalSince(at) }
     }
@@ -1605,6 +1606,9 @@ enum CloseForUpdate {
     static let reuseSpare: TimeInterval = 30 // of the link's life, for the tap and iOS's requests
     static func reusable(_ r: SignedRecord, server: String) -> Hosted? {
         guard var h = hosted, h.age < h.life - reuseSpare, h.server == server else { return nil }
+        // B445: this copy is the installed update (iOS ended the last one while suspended, so `hosted` was never dropped):
+        // its `started` mark would close iFizBox at once
+        guard h.by == Bundle.main.bundlePath else { return nil }
         let o = h.record
         h.again = true
         let same = o.sha256 != nil && r.sha256 != nil ? o.sha256 == r.sha256 : o.url == r.url

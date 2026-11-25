@@ -50,6 +50,7 @@ class HostedSelfUpdate(unittest.TestCase):
         for k in ("sha256", "bundleID", "version", "appID", "expires", "options", "server"):
             self.assertIn(k, reuse)
         self.assertIn("h.age < h.life - reuseSpare", reuse)
+        self.assertIn("guard h.by == Bundle.main.bundlePath", reuse)  # B445: not once the update is in
         self.assertIn("hosted = nil", body(cfu(), "private static func giveUp("))
 
 

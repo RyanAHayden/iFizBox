@@ -1,0 +1,41 @@
+2026-11-24 23:03:24.668222 iFizBox{iFizBox}[1161] <NOTICE>: iFizBox install com.ryha.ifizbox: KeepAlive: held for iFizBox
+2026-11-24 23:03:29.875851 iFizBox{iFizBox}[1161] <NOTICE>: iFizBox install: self-update: waiting (resigned false, state 0)
+2026-11-24 23:03:39.064940 iFizBox{iFizBox}[1161] <NOTICE>: iFizBox install: the app went to the background
+2026-11-24 23:04:40.739884 iFizBox{iFizBox}[1161] <NOTICE>: iFizBox install com.ryha.ifizbox: KeepAlive: let go for iFizBox
+2026-11-24 23:04:45.879112 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:1161] Suspending task.
+2026-11-24 23:05:23.786680 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:1161] Terminating with context: <RBSTerminateContext| explanation:installcoordinationd app:[com.ryha.ifizbox/F
+2026-11-24 23:06:00.561079 iFizBox{iFizBox}[1176] <NOTICE>: iFizBox install com.ryha.ifizbox: KeepAlive: held for iFizBox
+2026-11-24 23:06:00.615216 iFizBox{iFizBox}[1176] <NOTICE>: iFizBox install: self-close: iOS began the download (finished true)
+2026-11-24 23:06:00.617362 iFizBox{iFizBox}[1176] <NOTICE>: iFizBox install: self-close: exiting in 0.6 s
+2026-11-24 23:06:01.230606 iFizBox{iFizBox}[1176] <NOTICE>: iFizBox install: self-close: exit
+2026-11-24 23:08:33.613286 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install com.ryha.ifizbox: KeepAlive: held for iFizBox
+2026-11-24 23:08:38.749093 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install: self-update: waiting (resigned false, state 0)
+2026-11-24 23:08:46.735171 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install: the app went to the background
+2026-11-24 23:09:47.481625 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install com.ryha.ifizbox: KeepAlive: let go for iFizBox
+2026-11-24 23:09:57.880829 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox KeepAlive: the page's hold let go, an Install prompt waits
+2026-11-24 23:10:03.009974 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:1189] Suspending task.
+2026-11-24 23:10:46.832654 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install: the app is in front again
+2026-11-24 23:10:50.354958 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install com.ryha.ifizbox: KeepAlive: held for iFizBox
+2026-11-24 23:10:50.469556 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install: self-update: resigned active
+2026-11-24 23:10:55.835535 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install com.ryha.ifizbox: KeepAlive: held for iFizBox
+2026-11-24 23:10:55.835572 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install com.ryha.ifizbox: KeepAlive: let go for iFizBox
+2026-11-24 23:11:01.058013 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install: self-update: waiting (resigned false, state 1)
+2026-11-24 23:11:08.360047 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install: the app went to the background
+2026-11-24 23:11:28.254376 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install: self-update: uploaded in the background; the prompt opens once iFizBox is in front
+2026-11-24 23:12:09.961838 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install com.ryha.ifizbox: KeepAlive: let go for iFizBox
+2026-11-24 23:12:41.210090 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox KeepAlive: the page's hold let go, an Install prompt waits
+2026-11-24 23:12:46.339495 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:1189] Suspending task.
+2026-11-24 23:13:44.578667 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install: the app is in front again
+2026-11-24 23:13:51.142162 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install com.ryha.ifizbox: KeepAlive: held for iFizBox
+2026-11-24 23:13:51.272088 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install: self-update: resigned active
+2026-11-24 23:13:55.529315 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install com.ryha.ifizbox: KeepAlive: held for iFizBox
+2026-11-24 23:13:55.529327 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install com.ryha.ifizbox: KeepAlive: let go for iFizBox
+2026-11-24 23:14:00.735143 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install: self-update: waiting (resigned false, state 1)
+2026-11-24 23:14:30.678337 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install com.ryha.ifizbox: KeepAlive: held for iFizBox
+2026-11-24 23:14:30.678358 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install com.ryha.ifizbox: KeepAlive: let go for iFizBox
+2026-11-24 23:14:35.922053 iFizBox{iFizBox}[1189] <NOTICE>: iFizBox install: self-update: waiting (resigned false, state 1)
+2026-11-24 23:17:03.230423 iFizBox{iFizBox}[1216] <NOTICE>: iFizBox install com.ryha.ifizbox: KeepAlive: held for iFizBox
+2026-11-24 23:17:08.401000 iFizBox{iFizBox}[1216] <NOTICE>: iFizBox install: self-update: waiting (resigned false, state 0)
+2026-11-24 23:17:12.657325 iFizBox{iFizBox}[1216] <NOTICE>: iFizBox install: self-close: iOS began the download (finished true)
+2026-11-24 23:17:12.657786 iFizBox{iFizBox}[1216] <NOTICE>: iFizBox install: self-close: exiting in 0.6 s
+2026-11-24 23:17:13.283019 iFizBox{iFizBox}[1216] <NOTICE>: iFizBox install: self-close: exit
