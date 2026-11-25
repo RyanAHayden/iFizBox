@@ -128,7 +128,8 @@ For people with no certificate. The certificate route stays the recommended one:
 time, makes 10 App IDs a week, and its profiles last 7 days. iOS refuses apps with a free profile from a website
 (`MIInstallerErrorDomain` 111, "free provisioning profile … not allowed to be installed from this source"), so the
 website does the Apple side only: sign-in, the development certificate and the profiles. Installing is the app's job,
-through `installation_proxy` (pairing file + a loopback VPN), which the app doesn't have yet.
+through `installation_proxy` (pairing file + a loopback VPN), which the app doesn't have yet. Until it does, the first
+install takes a computer once (**Download for a Computer Install**, under Ready).
 
 Where: How Signing Works (the walkthrough Install opens when there's no certificate), under the two steps, as
 **Use a Free Apple ID**. It shows only when the Worker's Apple relay is on (`GET /apple/status` answers
@@ -151,8 +152,18 @@ The flow (`web/app/screens/free-apple-id.js`):
    issued certificates (this site's first, SideStore's and other tools' last) to revoke one, with the warning that
    every app signed with it stops until signed again. Cancel stops setup and revokes nothing.
 3. **Ready**: the team, certificate and profile dates, **Save for the App** (a `.zip` with the `.p12`, its password
-   and the profile, which the app's Select All Files imports), the Developer Mode + Trust note, Refresh Profile,
-   and Forget Free Apple ID (removes the key and certificate from this browser; Apple's copy isn't revoked).
+   and the profile, which the app's Select All Files imports), **Download for a Computer Install**
+   (`screens/computer-install.js`), the Developer Mode + Trust note, Refresh Profile, and Forget Free Apple ID
+   (removes the key and certificate from this browser; Apple's copy isn't revoked).
+
+**Download for a Computer Install** signs the newest release's IPA in the browser with the free identity
+(`runSignJob` with `free`: `freeEntitlements`; the bundle ID becomes `<id>.<TEAMID>`, extensions left out; the
+identity goes in as `ifizbox-identity.plist`, with the website's settings link), uploads it (`/sign/upload`), and
+`POST /sign/setup` makes a code for its SHA-256 (the default bundle ID and pairing path). The code shows until it
+expires, with the two one-liners of sideload.md. **Make a New Code** re-uploads the same signed IPA. **Save the IPA**
+is the fallback for other tools. With the profile missing or expired, the group's row is Refresh Profile or Sign In
+Again, and its footer says so. The signed IPA and the code live only in the page's memory: a new profile or Forget
+Free Apple ID drops them.
 
 The setup makes the App ID and profile for the app itself (`BUNDLE_ID`, `brand.js`). The certificate (a `.p12`:
 the certificate in a plain bag, the key under PBES2 with PBKDF2-HMAC-SHA256 and AES-256-CBC, an HMAC-SHA256 MAC:
@@ -167,15 +178,19 @@ developer.apple.com/account), session ended, the 10-a-week App ID limit, no UDID
 
 Rules for apps on this route (`freeroute.js`): `freeEntitlements` keeps `get-task-allow` as the development profile
 allows (with it false iOS says "integrity could not be verified"), drops `aps-environment` (Personal Teams have no
-Push) and takes the profile's keychain group; `freeExpiry` says "soon" 3 days before the 7-day profile ends
+Push) and narrows a `TEAM.*` keychain group to the app's own (`TEAM.<bundle ID>`, which native `OwnKeychain` looks
+for); `freeExpiry` says "soon" 3 days before the 7-day profile ends
 (`FREE_EXPIRY_WARNING`), not the certificate route's setting.
 
 What leaves the browser: every Apple and anisette request goes through the Worker's relay (allow-listed hosts and
 paths, no logging); that includes the Xcode app token and the developer-portal replies, but not the password or
-the private key. Tests: `core/freeroute.test.js` (CSR checked with WebCrypto, the `.p12` opened by
+the private key. Only Download for a Computer Install sends the key out: inside the signed IPA, kept on the Worker for its
+10 minutes. Tests: `core/freeroute.test.js` (CSR checked with WebCrypto, the `.p12` opened by
 `checkP12Password` and decrypted back, a real zsign WebAssembly signing run with it, the checklist against a fake
 portal, the limit and Cancel), `screens/free-apple-id.test.js` (the alerts' effects, storage, the hand-off zip read
-back by the import's unzip, the relay check), `worker/test.mjs` (`/apple/status`).
+back by the import's unzip, the relay check), `worker/test.mjs` (`/apple/status`). The computer install:
+`screens/computer-install.test.js` (the sign job, the code from the Worker with KV in memory, the block's states) and
+`websign-free.test.js` (the free option's entitlements in zsign's own signature).
 
 ## Own provisioning profiles (App Store Connect API key)
 
