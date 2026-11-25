@@ -9,9 +9,9 @@
     window.render(t)      draws time t (a promise: the recordings' frames are decoded)
     window.ready          a promise: the marks and images are loaded
 
-  A recording plays at its own speed, with only its waits cut short (MAP). The jailbreak one
-  opens beside the other, then comes back from its Search on. The phone is a plain
-  rounded frame drawn here (no device artwork). The name and domain come from web/app/brand.js.
+  A recording plays at its own speed, with only its waits cut short (MAP). It opens on a
+  splash, whose icon opens into the no-jailbreak phone; the jailbreak recording follows from its Search on. The phone is
+  a plain rounded frame drawn here (no device artwork). The name and domain come from web/app/brand.js.
 -->
 <html>
 <head>
@@ -26,7 +26,7 @@
   .abs { position: absolute; left: 0; top: 0; }
   .phone { position: absolute; left: 0; top: 0; background: #1d1e20; transform-origin: 0 0; }
   .screen { position: absolute; overflow: hidden; background: #000; }
-  .screen img { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .screen img { position: absolute; left: 0; top: 0; width: 402px; height: 874px; }
   .sb { position: absolute; left: 0; top: 0; width: 402px; height: 62px; transform-origin: 0 0; color: #fff; font-size: 17px; font-weight: 600; }
   .sb.dark { color: #111; }
   .sb b { position: absolute; left: 40px; top: 22px; font-weight: 600; }
@@ -35,7 +35,10 @@
   .sb u::after { content: ""; position: absolute; inset: 1.4px 6px 1.4px 1.4px; background: currentColor; border-radius: 1.5px; }
   #band { position: absolute; left: 0; top: 0; width: 1080px; }
   .cap { position: absolute; left: 0; width: 1080px; text-align: center; font-size: 66px; line-height: 1.1; font-weight: 700; letter-spacing: -1px; text-shadow: var(--emboss); }
-  .label { position: absolute; left: 0; top: 0; text-align: center; font-size: 52px; font-weight: 700; text-shadow: var(--emboss); }
+  #icon { position: absolute; left: 0; top: 0; object-fit: cover; }
+  #splash { position: absolute; left: 0; width: 1080px; text-align: center; text-shadow: var(--emboss); }
+  #splash .name { font-size: 132px; line-height: 1.1; font-weight: 700; letter-spacing: -3px; }
+  #splash .line { font-size: 66px; line-height: 1.2; font-weight: 500; margin-top: 28px; }
   #end { width: 1080px; text-align: center; text-shadow: var(--emboss); }
   #end img { width: 230px; height: 230px; border-radius: 51px; }
   #end .name { font-size: 92px; font-weight: 700; letter-spacing: -2px; margin-top: 26px; }
@@ -73,7 +76,7 @@ for (const n of ["lite", "jailbreak"]) {
 
 // ---- MAP: what each recording shows, at its own speed. A cut [from, to] (seconds of the recording) drops part of a wait
 // on the install screen, where the log's lines and the bar jump anyway
-const HOLD = 2.7;  // both phones rest on Home before the fingers start
+const OPEN = 2.4;  // the splash's icon starts to open into the no-jailbreak phone (0.9 s)
 const LITE = { from: "home", to: "end", cuts: [[21.7, 23], [33, 35.5]] };
 // the jailbreak recording's Sources steps are the Lite one's again, so its part starts on Search
 const JAIL = { from: "search", to: "end", cuts: [[23.3, 24.4]] };
@@ -90,9 +93,8 @@ function plan(name, { from, to, cuts }, at) {
     },
   };
 }
-const lite = plan("lite", LITE, HOLD);
-const TAKE = HOLD + 1.6;        // the no-jailbreak phone takes over
-const SWAP = lite.to + 0.35;    // the jailbroken phone comes back in its place
+const lite = plan("lite", LITE, OPEN + 0.6);
+const SWAP = lite.to + 0.35;    // the jailbroken phone comes in, in its place
 const jail = plan("jailbreak", JAIL, SWAP + 0.9);
 const END = jail.to + 0.5;      // the end card
 window.DURATION = Math.ceil((END + 2.8) * 60) / 60;
@@ -101,14 +103,19 @@ window.DURATION = Math.ceil((END + 2.8) * 60) / 60;
 const PAD = 15;
 function phone(name) {
   const el = mk("phone");
-  Object.assign(el.style, { width: 402 + 2 * PAD + "px", height: 874 + 2 * PAD + "px", borderRadius: "66px" });
+  el.style.width = 402 + 2 * PAD + "px";
   const screen = mk("screen", "<img>", el);
-  Object.assign(screen.style, { left: PAD + "px", top: PAD + "px", width: "402px", height: "874px", borderRadius: "52px" });
+  Object.assign(screen.style, { left: PAD + "px", top: PAD + "px", width: "402px" });
+  const size = (h, r) => { // its outside height and corners
+    Object.assign(el.style, { height: h + "px", borderRadius: r + "px" });
+    Object.assign(screen.style, { height: h - 2 * PAD + "px", borderRadius: r - 14 + "px" });
+  };
+  size(874 + 2 * PAD, 66);
   const sb = mk("sb", `<b>12:30</b>${[5, 7, 9, 12].map((h, n) => `<i style="right:${82 - n * 5}px;height:${h}px;bottom:25px"></i>`).join("")}<u></u>`, screen);
   const img = screen.querySelector("img");
   let shown = 0;
   return {
-    el,
+    el, size,
     place(x, y, s) { el.style.transform = `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) scale(${s.toFixed(5)})`; },
     async show(src) {
       const r = rec[name], n = Math.min(r.frames, Math.max(1, Math.floor(src * r.fps + 1e-6) + 1));
@@ -130,9 +137,7 @@ const band = mk("", `<div class="ground"></div>`); band.id = "band"; band.style.
 const words = [];
 const say = (a, b, text) => { const e = mk("cap", text); e.style.top = CAPY + "px"; words.push({ e, a, b }); };
 const L = lite.when, J = jail.when;
-const opening = mk("cap", `${NAME} works with<br>or without a jailbreak`);
-opening.style.top = (TALL ? 230 : 70) + "px";
-say(TAKE + 0.5, L("source-added") + 0.2, "Add a source");
+say(OPEN + 0.8, L("source-added") + 0.2, "Add a source");
 say(L("source-added") + 0.2, L("app") + 1.8, "Find an app");
 say(L("app") + 1.8, L("installed") - 1.1, "Tap Install");
 say(L("installed") - 1.1, L("app-installed") + 0.2, "And it's on the phone");
@@ -148,9 +153,11 @@ say(J("found") + 0.6, J("queued") - 0.2, "Swipe one to queue it");
 say(J("queued") - 0.2, J("end") - 1.7, "Add another, install both");
 say(J("end") - 1.7, END, "Both installed");
 
-const PAIR = TALL ? 1.1 : 1.02, pw = (402 + 2 * PAD), ph = (874 + 2 * PAD);
-const gap = (W - 2 * pw * PAIR) / 3, pairY = TALL ? 640 : 330;
-const labels = ["No jailbreak", "Jailbroken"].map((text, i) => { const e = mk("label", text); e.style.width = pw * PAIR + "px"; e.style.left = gap + i * (pw * PAIR + gap) + "px"; e.style.top = pairY - 84 + "px"; return e; });
+// ---- the splash: there from the first frame, which is the video's poster too
+const ICON = 420, ICONY = (H - 800) / 2, pw = 402 + 2 * PAD, ph = 874 + 2 * PAD;
+const icon = new Image(); icon.id = "icon"; icon.src = "../../web/app/icons/icon-glossy.svg"; stage.append(icon);
+const splash = mk("", `<div class="name">${NAME}</div><div class="line">works with or<br>without a jailbreak</div>`);
+splash.id = "splash"; splash.style.top = ICONY + ICON + 48 + "px";
 
 const end = mk("abs", `<img src="../../web/app/icons/icon-glossy-228.png"><div class="name">${NAME}</div><div class="url">${DOMAIN}</div><div class="lic">Free, GPL-3.0</div>`);
 end.id = "end";
@@ -171,28 +178,28 @@ function solo(t) {
 }
 
 window.render = async (t) => {
-  const take = smooth((t - TAKE) / 0.9), swap = smooth((t - SWAP) / 0.8), out = smooth((t - END) / 0.6);
+  const open = smooth((t - OPEN) / 0.9), swap = smooth((t - SWAP) / 0.8), out = smooth((t - END) / 0.6);
   const one = solo(t);
-  const a = { x: gap, y: pairY, s: PAIR }, b = { x: 2 * gap + pw * PAIR, y: pairY, s: PAIR };
-  A.place(mix(a.x, one.x, take) - swap * (W + 60), mix(a.y, one.y, take), mix(a.s, one.s, take));
-  if (t < SWAP) B.place(b.x + take * (W + 60), b.y, b.s);
-  else B.place(one.x + (1 - swap) * (W + 60), one.y + out * (H + 40), one.s);
-  A.el.style.visibility = t < SWAP + 0.85 ? "visible" : "hidden";
-  B.el.style.visibility = t < TAKE + 0.95 || t >= SWAP ? "visible" : "hidden";
-  band.style.opacity = t < TAKE ? 0 : Math.min(smooth((t - TAKE) / 0.5), 1);
-  opening.style.opacity = fade(t, -1, TAKE + 0.3); // there from the first frame, which is the video's poster too
-  labels.forEach((l, i) => { l.style.opacity = 1 - smooth((t - TAKE) / 0.3); });
+  // the phone grows out of the icon's square while the icon over it fades
+  const x = mix((W - ICON) / 2, one.x, open), y = mix(ICONY, one.y, open), s = mix(ICON / pw, one.s, open), h = mix(pw, ph, open);
+  const r = mix(pw * 180 / 1024, 66, open);
+  A.place(x - swap * (W + 60), y, s);
+  A.size(h, r);
+  Object.assign(icon.style, { transform: `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px)`, width: pw * s + "px", height: h * s + "px", borderRadius: r * s + "px", opacity: 1 - smooth(open / 0.6), visibility: open < 1 ? "visible" : "hidden" });
+  splash.style.opacity = 1 - smooth((t - OPEN) / 0.3);
+  B.place(one.x + (1 - swap) * (W + 60), one.y + out * (H + 40), one.s);
+  A.el.style.visibility = open > 0 && t < SWAP + 0.85 ? "visible" : "hidden";
+  B.el.style.visibility = t >= SWAP ? "visible" : "hidden";
   for (const w of words) w.e.style.opacity = fade(t, w.a, w.b);
   const e = smooth((t - END - 0.35) / 0.5);
   end.style.opacity = e;
   end.style.transform = `translateY(${(H / 2 - 330 + (1 - e) * 24).toFixed(2)}px)`;
   const jobs = [];
   if (t < SWAP + 0.9) jobs.push(A.show(lite.src(t)));
-  if (t < TAKE + 1) jobs.push(B.show(Math.max(0, t < HOLD ? 0 : Math.min(rec.jailbreak.at("sources"), t - HOLD))));
-  else if (t >= SWAP - 0.1) jobs.push(B.show(jail.src(t)));
+  if (t >= SWAP - 0.1) jobs.push(B.show(jail.src(t)));
   await Promise.all(jobs);
 };
-window.ready = Promise.all([...end.querySelectorAll("img")].map((i) => i.decode())).then(() => document.fonts.ready).then(() => window.render(0)).then(() => true);
+window.ready = Promise.all([icon, ...end.querySelectorAll("img")].map((i) => i.decode())).then(() => document.fonts.ready).then(() => window.render(0)).then(() => true);
 </script>
 </body>
 </html>
