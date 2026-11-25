@@ -189,3 +189,23 @@ test("B13: isFreePrice reads FREE in any case, and nothing else", async () => {
   for (const p of ["FREE", "free", "Free", " free "]) assert.equal(isFreePrice(p), true, p);
   for (const p of ["$1.99", "", null, undefined, 0, "Freeware"]) assert.equal(isFreePrice(p), false, String(p));
 });
+
+test("B454: paidTweakDeb, available false: signed out Sign In; bought authorizes, or throws the vendor's refusal; else unavailable", async () => {
+  const { paidTweakDeb, PaidNeeded } = await import("./payment.js");
+  const st = { package: "org.gone.tweak", version: "1.0", architecture: "iphoneos-arm64" };
+  const asked = [];
+  const run = ({ signedIn, purchased, price = "Unavailable", refusal = null }) => paidTweakDeb(st, {
+    client: { signedIn: async () => signedIn, packageInfo: async () => ({ price, purchased, available: false }),
+      authorizeDownload: async (id) => { asked.push(id); if (refusal) throw refusal; return "https://v.test/dl"; } },
+    download: async () => new Uint8Array([9]) });
+  const needs = (need) => (e) => e instanceof PaidNeeded && e.need === need && e.available === false;
+  await assert.rejects(run({ signedIn: false, purchased: false }), needs("signin"));
+  await assert.rejects(run({ signedIn: false, purchased: true, price: "FREE" }), needs("signin"), "no tokenless ask (F434)");
+  await assert.rejects(run({ signedIn: true, purchased: false }), needs("unavailable"));
+  assert.deepEqual(asked, []);
+  assert.deepEqual([...await run({ signedIn: true, purchased: true })], [9]);
+  const refusal = new PaymentError({ error: "Withdrawn", recoveryUrl: null, invalidate: false });
+  await assert.rejects(run({ signedIn: true, purchased: true, refusal }), (e) => e === refusal);
+  const stale = new PaymentError({ error: "Signed out", recoveryUrl: null, invalidate: true });
+  await assert.rejects(run({ signedIn: true, purchased: true, refusal: stale }), needs("signin"));
+});

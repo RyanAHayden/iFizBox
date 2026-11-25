@@ -95,7 +95,7 @@ test("a FREE commercial tweak (Chariz answers purchased) downloads once signed i
     authorizeDownload: async () => { throw new Error("Please sign in"); } }, download: async () => null }),
   (e) => e instanceof PaidNeeded && e.need === "signin");
   await assert.rejects(paidTweakDeb({ package: "x", version: "1" }, { client: { ...client, packageInfo: async () => ({ price: "$1", purchased: false, available: false }) },
-    download: async () => null }), (e) => e instanceof PaidNeeded && e.need === "unavailable");
+    download: async () => null }), (e) => e instanceof PaidNeeded && e.need === "unavailable" && e.available === false);
 });
 
 test("Add to App on a paid tweak: Sign In, then Buy for its price, then the .deb is injected like a free one", async (t) => {
@@ -189,4 +189,68 @@ test("F318: signed out, a FREE tweak the seller calls purchased downloads withou
   const { buildRequest } = await import("../core/payment.js");
   assert.throws(() => buildRequest(BASE, "authorize_download", { packageId: "a" }), /no token/);
   assert.equal(JSON.parse(buildRequest(BASE, "authorize_download", { packageId: "a", tokenless: true }).body).token, undefined);
+});
+
+// B454: the vendor answers available: false (F434's rules, for a tweak that goes into an app).
+const noLongerSold = (vendor) => {
+  const handle = vendor.handle;
+  vendor.handle = (req) => {
+    const r = handle(req);
+    return r && req.url.endsWith("/info") && req.method === "POST" ? { ...r, body: JSON.stringify({ ...JSON.parse(r.body), available: false }) } : r;
+  };
+};
+const adding = (paid) => {
+  const mem = memoryIpaStore(), seen = { sheets: [], alerts: [] };
+  return { seen, opts: { paid, store: async () => mem, storage: storage(), hud: () => () => {},
+    sheet: async (o) => { seen.sheets.push(o); return 0; }, alert: async (o) => { seen.alerts.push(o); return 0; },
+    pick: async (o) => o.made[0], apps: async () => [{ bundleId: ID, name: "Fixture" }] } };
+};
+
+test("B454: no longer sold: signed out offers Sign In and says why; a buyer's sign-in adds it", async (t) => {
+  const { vendor, paid } = setup(t);
+  noLongerSold(vendor);
+  const signIn = paid.signIn;
+  // the account that signs in bought it while it was sold
+  paid.signIn = async (s) => (await signIn(s)) && paid.buy(s);
+  const { seen, opts } = adding(paid);
+  const app = await addToApp(st(), opts);
+  assert.equal(app?.bundleId, ID);
+  assert.deepEqual(seen.sheets.map((s) => [s.title, s.buttons]),
+    [["Fake Vendor no longer sells Fixture. If you bought it, sign in to download it.", ["Sign In to Fake Vendor"]]]);
+  assert.deepEqual(seen.alerts.map((a) => a.title), ["Tweak Added"]);
+});
+
+test("B454: no longer sold, signed in and not bought: says so, no Buy and no download asked for", async (t) => {
+  const { vendor, paid } = setup(t);
+  noLongerSold(vendor);
+  const s = st();
+  await paid.signIn(s);
+  const { seen, opts } = adding(paid);
+  assert.equal(await addToApp(s, opts), null);
+  assert.deepEqual(seen.sheets, []);
+  assert.deepEqual(seen.alerts.map((a) => a.message), ["Fake Vendor no longer sells Fixture."]);
+  assert.ok(!vendor.log.some((r) => r.path.endsWith("authorize_download")));
+});
+
+test("B454: no longer sold, bought, and the vendor refuses the download: its own message", async (t) => {
+  const { vendor, paid } = setup(t);
+  noLongerSold(vendor);
+  const s = st();
+  await paid.signIn(s);
+  await paid.buy(s);
+  const handle = vendor.handle;
+  vendor.handle = (req) => req.url.endsWith("/authorize_download")
+    ? { status: 403, headers: { "content-type": "application/json" }, body: JSON.stringify({ error: "This package was withdrawn" }) } : handle(req);
+  const { seen, opts } = adding(paid);
+  assert.equal(await addToApp(s, opts), null);
+  assert.deepEqual(seen.alerts.map((a) => [a.title, a.message]), [["Can't Add This Tweak", "This package was withdrawn"]]);
+  assert.deepEqual(seen.sheets, []);
+});
+
+test("B454: a free tweak no longer available isn't called sold", async () => {
+  const seen = [];
+  const o = { paid: { seller: async () => ({ name: "Havoc" }) }, sheet: async (x) => { seen.push(x.title); return -1; },
+    alert: async (x) => { seen.push(x.message); } };
+  for (const need of ["signin", "unavailable"]) await offerPaid({ package: "a", name: "A" }, new PaidNeeded(need, { price: "Free", available: false }), o);
+  assert.deepEqual(seen, ["A is not available from Havoc. If you already got it, sign in to download it.", "A is not available from Havoc."]);
 });

@@ -460,17 +460,26 @@ export const paidTweaks = () => (appPaid ??= createPaidTweaks());
 
 export const buyLabel = (price) => `Buy${price ? ` for ${isFreePrice(price) ? "Free" : price}` : ""}`;
 
+// B454: what a PaidNeeded says about a tweak its seller no longer sells, worded as the package page does (F434's
+// unavailableNav). A free one was never sold, so it doesn't say so.
+function notSoldText(e, who, what) {
+  const free = isFreePrice(e.price);
+  const gone = free ? `${what === "this" ? "Not" : `${what} is not`} available from ${who}.` : `${who} no longer sells ${what}.`;
+  return e.need === "signin" ? `${gone} If you ${free ? "already got" : "bought"} it, sign in to download it.` : gone;
+}
+
 export async function offerPaid(st, e, { paid = null, sheet = showActionSheet, alert = showAlert } = {}) {
   const p = paid ?? paidTweaks();
   const name = st.name || st.package;
   const who = (await p.seller(st).catch(() => null))?.name || "its seller";
   if (e.need === "unavailable") {
-    await alert({ title: name, message: `${who} doesn't sell ${name} right now.`, buttons: ["OK"] });
+    await alert({ title: name, message: notSoldText(e, who, name), buttons: ["OK"] });
     return false;
   }
   const signIn = e.need === "signin";
   const price = e.price && !isFreePrice(e.price) ? ` for ${e.price}` : "";
-  const title = signIn ? `${name} is sold by ${who}${price}. Sign in to buy it, or to download it if you have.`
+  const title = signIn && e.available === false ? notSoldText(e, who, name)
+    : signIn ? `${name} is sold by ${who}${price}. Sign in to buy it, or to download it if you have.`
     : `${name} is sold by ${who}. Buy it to add it to your apps.`;
   const i = await sheet({ title, buttons: [signIn ? `Sign In to ${who}` : buyLabel(e.price)] });
   if (i !== 0) return false;
@@ -671,10 +680,11 @@ export function worksInGroup(st, { paid = null, onAdd = () => addToApp(st, { pai
     };
     if (e.need === "unavailable") {
       ul.replaceChildren(row("Price", price));
-      foot.textContent = `${who} doesn't sell it right now.`;
+      foot.textContent = notSoldText(e, who, "this");
     } else if (e.need === "signin") {
       ul.replaceChildren(row("Price", price), row(`Sign In to ${who}`, null, () => act(() => p.signIn(st))));
-      foot.textContent = `Sold by ${who}. Sign in to buy it, or to add it if you already have.`;
+      foot.textContent = e.available === false ? notSoldText(e, who, "this")
+        : `Sold by ${who}. Sign in to buy it, or to add it if you already have.`;
     } else {
       ul.replaceChildren(row("Price", price), row(buyLabel(e.price), null, () => act(() => p.buy(st))));
       foot.textContent = `Sold by ${who}. Once bought, it goes into an app you sign here.`;
