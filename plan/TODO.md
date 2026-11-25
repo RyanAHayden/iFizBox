@@ -11,7 +11,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
-- [ ] **D33** Swap the README's showcase video for F441's approved cut (user 2026-11-25: 'use the new video once its in'): regenerate docs/img/showcase.webp from the new 4:5 MP4 (ffmpeg fps=10,scale=400:-2, libwebp_anim -q:v 28 -compression_level 6 -loop 0, under 1 MB) and replace the showcase.mp4 asset on GitHub release v1.0.0 (GH_TOKEN of RyanAHayden, gh release upload v1.0.0 showcase.mp4 --clobber), which the README links to; fix the img alt text if needed. Check: the gate; the MP4 URL answers with the new file's size | files: docs/img/showcase.webp, README.md | after: F441 | model: sonnet
 ### Research (any time, parallel)
 
 ### Native jailbreak app (shape decided: docs/native.md)
