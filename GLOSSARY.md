@@ -266,6 +266,6 @@ _Avoid_: Install Switch, Cellular Shortcuts
 **Restore My VPN Shortcut**:
 The Shortcut that remembers the VPN that is on (store run) and turns it on again after the built-in VPN was used (back run)
 _Said_: switch-back Shortcut
-_On screen_: Restore My VPN
-_In code_: RestoreShortcut, RestoreShortcutBridge, restoreshortcut.js, restore-vpn.plist
+_On screen_: Restore My VPN, Remember My VPN
+_In code_: RestoreShortcut, RestoreShortcutBridge, restoreshortcut.js, restoresetup.js, restore-vpn.plist
 _Avoid_: Install Switch, put-back Shortcut

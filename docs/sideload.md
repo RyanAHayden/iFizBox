@@ -402,7 +402,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   run, or one that ended under 10 s ago before its Shortcut did. Run failures: `not_opened`, `not_run`, `no_vpn` (Shortcuts
   found none), `not_stored`, `not_back`, `no_end`, `no_return` (`RestoreShortcut.Verdict`). All three are refused with
   `unavailable: …` in the jailbreak app, under another bundle ID and before iOS 16, and with `missing: …` while the signed file
-  is not in the build. No page calls them yet; the app's own back run does (Restore My VPN above). Code: `RestoreShortcutBridge.swift`, `web/app/core/restoreshortcut.js`, `RestoreBack.swift`, `RestoreDue.swift`.
+  is not in the build. This iPhone's page calls add and store (`web/app/signing/restoresetup.js`); back is still only the app's own run (Restore My VPN above). Code: `RestoreShortcutBridge.swift`, `web/app/core/restoreshortcut.js`, `RestoreBack.swift`, `RestoreDue.swift`.
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`.
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and
