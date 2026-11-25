@@ -17,6 +17,7 @@ import { createSectionIndex } from "../nav/sectionindex.js";
 import { onPageOpen, onPageShow } from "../nav/pagestate.js";
 import { searchBar, pinned } from "../nav/searchbar.js"; // F426c
 import { listScope, refineOptions, byName, listNote } from "./listfilter.js";
+import { newRows, topRows, slideBar } from "./browsescope.js"; // F426d
 import { showSheet } from "../nav/sheet.js";
 import { format, settingsRoute } from "../router.js";
 import { getBackend } from "../backend.js";
@@ -2424,12 +2425,27 @@ export function browseHomeNav() {
   return { title: "Browse" };
 }
 
-// The bar at the top of the page: Featured | New | Top 25 (Search's scope bar and segments).
+// The bar at the top of the page: Featured | New | Top 25 (Search's scope bar and segments). F426d: on New and Top 25
+// Search's Filter button ends it (listfilter.js); each keeps its own filters and sort while the page lasts.
 function filterBar(page) {
-  const bar = el("div", "search-scope browse-scope");
-  bar.append(segments(BROWSE_FILTERS.map((f) => f.id), Object.fromEntries(BROWSE_FILTERS.map((f) => [f.id, f.label])),
+  const bar = page.scope?.el ?? el("div", "search-scope browse-scope");
+  bar.querySelector(".scope-segments")?.remove();
+  bar.prepend(segments(BROWSE_FILTERS.map((f) => f.id), Object.fromEntries(BROWSE_FILTERS.map((f) => [f.id, f.label])),
     page.filter, (id) => setBrowseFilter(id, page)));
+  bar.dataset.noslide = ""; // browsescope.js slideBar moves what is in it
   return bar;
+}
+
+function scopeOf(page) {
+  const { filter: id, body } = page;
+  if (id === "featured") return null;
+  if (page.scopes[id]) return page.scopes[id];
+  const scope = page.scopes[id] = listScope({ order: page.view.order, withSegments: false, rows: page.view.all ? () => page.view.all() : null,
+    changed: () => { if (page.scope === scope) drawFilterList(page, ++page.turn, true, true); } }); // a closed panel may still say so
+  scope.el.classList.add("browse-scope");
+  // The panel drops from under the bar, so the bar is brought into place first (packages.css keeps it there).
+  scope.el.querySelector(".scope-filter").addEventListener("click", () => { body.scrollTop = 0; });
+  return scope;
 }
 
 // Shows filter `id` (unknown ids: Featured) on `page` (the last Browse page drawn): it redraws in place, its bar
@@ -2445,63 +2461,103 @@ export function setBrowseFilter(id, page = browseHome.page) {
   return f.id;
 }
 
-// What each filter draws: the rows' source and how they read. Top 25 is ranked (rank on every row).
-export function filterView(id, { fresh, popular }) {
+// What each filter draws: the rows' source and how they read (browsescope.js newRows, topRows). Top 25 is ranked (rank
+// on every row) in its own order.
+export function filterView(id, { fresh, popular, refine }) {
   const f = browseFilter(id);
-  if (f.id === "new") return { id: "new", rows: () => fresh("new"), ranked: false, empty: "Nothing new lately. Packages your sources add show up here after a refresh." };
-  if (f.id === "top") return { id: "top", rows: async () => (await popular({ limit: TOP_LIMIT })).slice(0, TOP_LIMIT), ranked: true,
+  if (f.id === "new") return { id: "new", ...newRows({ fresh, refine }), ranked: false, order: "Newest",
+    empty: "Nothing new lately. Packages your sources add show up here after a refresh." };
+  if (f.id === "top") return { id: "top", ...topRows({ popular, refine }, TOP_LIMIT), ranked: true, order: "Most Sources",
     empty: "Add a source to see what's popular.", footer: "Ranked by how many of your sources list each package." };
   return { id: "featured" };
 }
 
 // `opts`: { jailbroken, featured: () => rows (the sources' featured packages), headers: rows -> items (New's days) }.
 export function renderBrowseHome(body, route, opts = {}) {
-  const page = { body, route, turn: 0, list: null, filter: browseHome.filter, ...opts };
+  const page = { body, route, turn: 0, list: null, index: null, bar: null, scope: null, scopes: {}, view: null, filter: browseHome.filter, ...opts };
   browseHome.page = page;
+  body._browsePage = page;
+  // F426d: Show Incompatible (the panel's switch), the iOS version or the Architecture changed: New or Top 25 again.
+  const off = settings.onChange((key) => {
+    if (!["worksOnMyPhone", "iosVersion", "arch", "device"].includes(key)) return;
+    if (!body.isConnected || body._browsePage !== page) { off(); return; }
+    if (page.filter === "featured") return;
+    page.view = viewOf(page);
+    drawFilterList(page, ++page.turn, true);
+  });
   return drawBrowseHome(page);
+}
+
+const viewOf = (page) => filterView(page.filter, { fresh: catalog.fresh, popular: catalog.popular, refine: catalog.refine });
+
+function dropBrowseList(page) {
+  page.list?.destroy();
+  page.index?.destroy();
+  page.list = page.index = null;
 }
 
 function drawBrowseHome(page) {
   const turn = ++page.turn;
-  page.list?.destroy();
-  page.list = null;
+  page.scope?.close();
+  dropBrowseList(page);
   const { body } = page;
   const featured = page.filter === "featured";
   body.classList.toggle("grouped", featured);
   body.classList.toggle("plain", !featured);
+  const slide = slideBar(page.bar);
+  page.view = viewOf(page);
+  page.scope = scopeOf(page);
   page.bar = filterBar(page);
   body.replaceChildren(page.bar);
   body.scrollTop = 0;
+  slide(page.bar);
   return featured ? drawFeatured(page, turn) : drawFilterList(page, turn);
 }
 
-async function drawFilterList(page, turn) {
-  const { body, route } = page;
-  const v = filterView(page.filter, { fresh: catalog.fresh, popular: catalog.popular });
-  body.append(placeholder("list", 8));
+// `again`: the list is on screen and a filter, the sort or a setting changed, so only its rows do; `top`: from the top.
+async function drawFilterList(page, turn, again = false, top = false) {
+  const { body, route, view: v, scope } = page;
+  const clear = () => { dropBrowseList(page); for (const n of [...body.children]) if (n !== page.bar) n.remove(); };
+  if (!again) body.append(placeholder("list", 8));
   let rows;
   try {
     await catalog.ensure();
-    rows = await v.rows();
+    rows = await v.rows(scope.filters);
   } catch (e) {
-    if (turn === page.turn) body.replaceChildren(page.bar, note(e.message));
+    if (turn === page.turn) { clear(); body.append(note(e.message)); }
     return;
   }
   if (turn !== page.turn || !body.isConnected) return;
-  body.replaceChildren(page.bar);
-  if (!rows.length) { body.append(note(v.empty)); return; }
-  const items = v.ranked ? rows.map((r, i) => ({ ...r, rank: i + 1 })) : page.headers ? page.headers(rows) : rows;
-  page.list = packageList(body, route, items, { letters: false, decorate: v.ranked ? rankRow : null });
+  if (!rows.length) {
+    clear();
+    body.append(note(listNote({ count: 0, total: v.total(), filters: scope.filters, query: "", empty: v.empty })));
+    return;
+  }
+  const az = byName(scope.filters, false), own = !scope.filters.sort;
+  const items = az ? withLetterHeaders(rows, (r) => indexLetter(r.name))
+    : v.ranked && own ? rows.map((r, i) => ({ ...r, rank: i + 1 })) : page.headers && !v.ranked && own ? page.headers(rows) : rows;
+  if (!page.list) {
+    clear();
+    page.list = packageList(body, route, items, { letters: false, decorate: v.ranked ? rankRow : null });
+    body.append(page.list.el);
+    if (v.footer) page.list.footer = body.appendChild(el("p", "browse-list-footer", v.footer));
+  } else {
+    rememberNames(rows);
+    page.list.setItems(items);
+    if (top) body.scrollTop = 0;
+  }
   page.list.el.classList.add(v.ranked ? "browse-ranked" : "browse-new");
-  body.append(page.list.el);
-  if (v.footer) body.append(el("p", "browse-list-footer", v.footer));
+  if (page.list.footer) page.list.footer.hidden = !own; // it explains the ranks
+  if (az && !page.index) page.index = createSectionIndex(body, page.list);
+  else if (!az && page.index) { page.index.destroy(); page.index = null; }
 }
 
-// Top 25: the rank at the row's left (packages.css .pkg-rank).
+// Top 25: the rank at the row's left (packages.css .pkg-rank), none under another sort.
 function rankRow(row, item) {
   let r = row._.rank;
   if (!r) { r = row._.rank = el("span", "pkg-rank"); row._.a.prepend(r); }
   r.textContent = item.rank ? String(item.rank) : "";
+  r.hidden = !item.rank;
 }
 
 const pkgHref = (route, id) => format({ tab: route.tab, path: [...route.path, token("package", id)] });

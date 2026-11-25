@@ -733,7 +733,12 @@ html.has-manage-toolbar .search-results::after { content: ""; }
 
 /* ---- F154: Browse (screens/browse.js renderBrowseHome), from docs/concepts/browse/ in the app's own look. ---- */
 /* Featured | New | Top 25: Search's scope bar at the top of the page (screens/browse.js filterBar). */
-.browse-scope { margin-bottom: -1px; }
+.browse-scope { position: relative; margin-bottom: -1px; }
+.scope-ghost { position: absolute; pointer-events: none; } /* F426d: the Filter button on its way out (browsescope.js) */
+/* F426d: under the open Filter panel the page stays where the panel dropped from, and its A-Z index is hidden. */
+.page-body:has(> .browse-scope > .scope-filter.done) { overflow-y: hidden; }
+.page-body:has(> .browse-scope > .scope-filter.done) ~ .section-index { visibility: hidden; }
+.page-body[data-section-index] > .browse-scope { padding-right: 24px; }
 /* Tweak of the Day: an iOS 6 App Store banner (user 2026-11-18, concept B without the ribbon): the package's tint
    (browse.js heroTint) with a soft light behind the icon and the bars' gloss on the top half, the icon reflected
    under it, the words to its right, the store's price button at the bottom. The whole card is the link. */
