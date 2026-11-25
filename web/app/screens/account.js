@@ -127,7 +127,8 @@ export async function collectHere({ syncCert = true, backend = getBackend(), sto
 const b64toUrl = (b64) => String(b64).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
 export async function applyHere(c, { backend = getBackend(), store = settings, native = nativeBridge(), mode = detectMode(),
-  appStore = apps, wishes = createWishlist(), logins = repoLogins() } = {}) {
+  appStore = apps, wishes = createWishlist(), logins = repoLogins(),
+  added = async () => (await import("./manage.js")).sourcesChanged() } = {}) {
   // F309: a repo sign-in from another device (kept only where this device didn't sign in itself), or a sign-out
   for (const { base, token } of c.adoptLogins ?? []) await Promise.resolve().then(() => logins?.adopt(base, token)).catch(() => {});
   for (const base of c.dropLogins ?? []) await Promise.resolve().then(() => logins?.drop(base)).catch(() => {});
@@ -139,6 +140,7 @@ export async function applyHere(c, { backend = getBackend(), store = settings, n
     }
   }
   for (const line of c.addSources) await backend.addSource(line).catch(() => {}); // offline, or gone: next sync tries again
+  if (c.addSources.length && mode === "jailbreak") await added(); // B446: apt gets their lists at once
   for (const [k, v] of Object.entries(c.settings)) { try { if (store.isShown(k)) store.set(k, v); } catch { /* not in this build */ } }
   for (const p of c.addHolds) await Promise.resolve(store.holds.set(p, true)).catch(() => {});
   for (const p of c.removeHolds) await Promise.resolve(store.holds.set(p, false)).catch(() => {});

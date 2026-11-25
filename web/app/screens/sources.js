@@ -272,7 +272,8 @@ function firstLoad(ctx, { fresh = false, backend = getBackend(), retry = null } 
 // Sources the device has never loaded (one just added by Add, Add All, Import, or Search's Recommended Add) start
 // loading now: firstLoad's one run under the reload bar, with the words, rows, badge and Cancel of Refresh, whichever
 // tab is open. Search calls it on opening and as a query is typed; Manage's adds through onSourcesChanged. Each
-// source is tried once per session (state.tried, shared by every caller). `backend` is for the tests.
+// source is tried once per session (state.tried, shared by every caller). B446: in the jailbreak app an APT source
+// just added loads here too, so apt has its lists and its packages can be installed with no Refresh. `backend` is for the tests.
 // B141: `retry` (a Set Search keeps per visit, core/sources.js loadNeverLoaded) also loads failed or empty sources
 // once more.
 export function loadNew(ctx = state.ctx, { backend, retry } = {}) {

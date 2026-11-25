@@ -6,6 +6,9 @@ import assert from "node:assert/strict";
 
 import { loadNew, onLanded } from "./sources.js";
 import { followNewSources } from "./search.js";
+import { refreshInBackground } from "./sources.js";
+import { sourcesChanged } from "./manage.js";
+import { getBackend } from "../backend.js";
 
 // The rows a run paints (none here) are looked up after the modules load, which build nothing without a DOM.
 globalThis.document ??= { querySelectorAll: () => [], querySelector: () => null };
@@ -94,4 +97,61 @@ test("B75: a page left behind stops listening; listeners can unsubscribe", () =>
   assert.equal(fire, null, "and unsubscribed");
   const off = onLanded(() => {});
   assert.equal(off(), true);
+});
+
+// B446: the jailbreak app's backend says which APT sources were just added (addedSources); every add path ends in
+// manage.js sourcesChanged.
+function aptWorld() {
+  const list = [];
+  let added = [];
+  const asked = [];
+  const gates = [];
+  const fake = {
+    addedSources: () => added,
+    sources: async () => list.map((s) => ({ ...s })),
+    async refreshSources(onEach, { filter, retry } = {}) {
+      const rows = list.filter(filter ?? (() => true));
+      const gate = gates.shift();
+      added = [];
+      asked.push({ keys: rows.map((s) => s.key), retry: retry ?? false });
+      await gate;
+      for (const r of rows) onEach?.({ ...r, updated: Date.now() });
+      return rows;
+    },
+  };
+  const add = (n) => { const s = { key: `deb:https://${n}.test/:./`, uri: `https://${n}.test/`, updated: 1 }; list.push(s); added.push(s.key); return s.key; };
+  const ctx = { setBadge() {}, async loadData() {}, reloadBar: () => ({ set() {}, hide() {} }) };
+  return { fake, add, asked, gates, ctx };
+}
+
+test("B446: an APT source just added loads at once, and one added during a Refresh after it", async (t) => {
+  const b = getBackend();
+  const before = { ...b };
+  t.after(() => { delete b.addedSources; Object.assign(b, before); });
+  const { settings } = await import("../settings-store.js");
+  t.mock.method(settings, "deviceType", () => "iphoneos-arm64");
+  const w = aptWorld();
+  Object.assign(b, w.fake);
+  const until = async (n) => { for (let i = 0; i < 1000 && w.asked.length < n; i++) await new Promise((r) => setTimeout(r, 5)); };
+
+  const one = w.add("one");
+  sourcesChanged(w.ctx);
+  await until(1);
+  assert.deepEqual(w.asked, [{ keys: [one], retry: true }]);
+  await loadNew(w.ctx); // the run ends
+  assert.equal(w.asked.length, 1, "asked once");
+
+  let release;
+  w.gates.push(new Promise((r) => { release = r; }));
+  const refresh = refreshInBackground(w.ctx);
+  await until(2);
+  const two = w.add("two");
+  sourcesChanged(w.ctx);
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(w.asked.length, 2, "it waits for the running Refresh");
+  release();
+  await refresh;
+  await until(3);
+  assert.deepEqual(w.asked[2], { keys: [two], retry: true });
+  await loadNew(w.ctx);
 });
