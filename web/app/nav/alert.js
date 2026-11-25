@@ -28,6 +28,9 @@ import { nativeBridge, hasNativeCall } from "../native.js";
 export const alertOK = (title, message, alert = showAlert) => alert({ title, message, buttons: ["OK"] });
 
 let alertIds = 0; // F417
+let nativeUp = 0;
+// F428: one of the shell's alerts is up (popups.js sees only the page's own).
+export const nativeAlertUp = () => nativeUp > 0;
 export function showAlert(opts = {}) {
   if (opts.signal?.aborted) return Promise.resolve({ index: -1, value: undefined });
   const native = nativeBridge();
@@ -45,7 +48,8 @@ export function showAlert(opts = {}) {
   }
   const submit = input?.pasteSubmits;
   if (Number.isInteger(submit) && submit >= 0 && submit < buttons.length) params.input.pasteSubmits = submit;
-  return native.call("ui.alert", params).finally(() => { if (closing) signal.removeEventListener("abort", closing); }).then((r) => {
+  nativeUp++;
+  return native.call("ui.alert", params).finally(() => { nativeUp--; if (closing) signal.removeEventListener("abort", closing); }).then((r) => {
     if (signal && (signal.aborted || r?.closed)) return { index: -1, value: undefined };
     const index = Number.isInteger(r?.index) && r.index >= 0 && r.index < buttons.length ? r.index : (params.cancel >= 0 ? params.cancel : 0);
     let value = input ? String(r?.value ?? "") : undefined;

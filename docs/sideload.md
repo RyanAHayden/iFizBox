@@ -386,14 +386,16 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   status), so a later return neither asks nor runs, while a run right after an install still goes on. Turning Restore My VPN off
   clears `never`. A held run is dropped unasked when another VPN is up or took Settings > VPN's checkmark. An install starting
   while it waits withdraws the question until the queue ends; if another VPN was up again at that start, it counts anew. `on`
-  during an install, or offline, answers `later` and runs unasked once it can, the app in front until then. No page asks yet, so
-  a held run just waits. A look that has to wait looks again every 2 s, also while it asks, so the question is withdrawn if
+  during an install, or offline, answers `later` and runs unasked once it can, the app in front until then. The page asks
+  with "Turn Your VPN Back On?", 1.5 s after the app is in front with no alert, sheet, menu or keyboard up (the iOS 26 style's own menus and action sheets are not waited for); a question the shell withdraws (`due` false) closes
+  unanswered. A failed run shows "VPN Not Turned On" (`later`, `on_already` and `not_due` are no failure); `not_opened` while still due
+  asks again. A look that has to wait looks again every 2 s, also while it asks, so the question is withdrawn if
   another VPN comes up. Owed is cleared before Shortcuts opens. Nothing runs when no other VPN was up, none was remembered,
   another VPN came up or took Settings > VPN's checkmark meanwhile, iOS is below 16, or the bundle ID is not the app's own.
   Success is judged by another VPN being up, not by Set VPN's error. A run that failed is not repeated; only `not_opened`,
   `busy` and `vpn_on` are tried again. `not_stored` clears `remembered`. With the switch off nothing is brought back. The log
   lines "vpn: Restore My VPN: ..." say what was decided and why. Code: `RestoreBack.swift` (the looks, the question and the back
-  run), `RestoreDue.swift` (when a run is due).
+  run), `RestoreDue.swift` (when a run is due), `web/app/signing/restoreask.js` (the page's question).
   Bridge: `idevice.status`'s `vpn` is `{available, bundled, entitled, tested, on, cellular, wifi, otherVPN, restore, remembered, restoreNever, name}`,
   `vpn.setRestore` `{on}` turns Restore My VPN on or off and answers the same status, and `vpn.test` runs the Set Up test.
   Cellular Installs bridge: `cellular.status` is `{available, bundled, added}`: whether the signed Shortcut is in this build
@@ -433,7 +435,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   on every change, `true` while a held back run waits for an answer. `restore.answer` `{answer}`: `on` runs it, `notNow` drops
   it, `never` drops it and keeps it (above). It answers `{ok, error, text}`; `error` only for `on`: `not_due`, `later`,
   `not_opened` while the app is not in front, or the back run's code. Code: `RestoreShortcutBridge.swift`,
-  `web/app/core/restoreshortcut.js`, `RestoreBack.swift`, `RestoreDue.swift`.
+  `web/app/core/restoreshortcut.js`, `web/app/signing/restoreask.js`, `RestoreBack.swift`, `RestoreDue.swift`.
 - **Keep-alive and progress** as Feather does: a silent audio loop while the install sheet is up, and
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:`. Until iOS asks for the IPA, the silent audio is given back 60 s after the prompt is dismissed, or after the app goes to the background with the prompt unanswered (`native/sign/PromptHold.swift`); opening the install link (Try Again) or iOS's first request takes it again. A suspension after that isn't treated as a freeze, so nothing is uploaded; the IPA stays served for 15 minutes. When signing ends in the background, so the prompt waits for the app in front, the install call's hold ends as serving begins, the serving hold is given back 60 s later, and the page's hold (`signing.hold`) about 10-15 s after that once no other hold is left (apps still being signed keep it); the page's hold is given back the same way while an opened prompt is unanswered in the background, or was closed and the watch hasn't ended yet. The install link opens once iFizBox is in front, within the 15 minutes the IPA is served. iFizBox's own update through the Signing Server, uploaded while the app is in the background, works the same way: the install call's hold is given back 60 s after the upload ended, and the page's hold about 10-20 s later once no other hold is left, so iFizBox may stop running; the link opens once iFizBox is in front, while it lives (10 minutes). Once iFizBox's own update's Install prompt has been opened, its hold is given back 60 s after the prompt is dismissed, or after iFizBox goes to the background, even if iOS has asked for the IPA by then (its second question can be cancelled too). iOS's prompt stays over the Home Screen: an Install tapped there ends a suspended iFizBox and installs the update, and in front the polls go on and iFizBox closes itself. Retrying the same IPA reuses the uploaded link only within the same installed copy, not after the update landed. If the link died while iFizBox was suspended, no notification is posted; the page says so when it is opened.
 - **iFizBox's own update** can't come from 127.0.0.1 (the install closes iFizBox); it is signed on the phone and
