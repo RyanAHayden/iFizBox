@@ -509,7 +509,8 @@ enum LocalVPN {
             startLock.unlock()
         }
         defer { startLock.unlock() }
-        lock.lock(); let no = refusal; lock.unlock()
+        lock.lock(); let no = refusal, over = closing; lock.unlock()
+        if over { throw IDevice.Failure(code: "vpn_failed", text: "\(Brand.name) is closing for its update") }
         if let no = no, no.at > t0 { throw no.failure }
         try start(step)
         lock.lock(); refusal = nil; lock.unlock()
@@ -628,6 +629,22 @@ enum LocalVPN {
         lock.lock(); let over = holds == 0 && installs == 0 && (gen == nil || gen == stopGen); lock.unlock()
         if over { RestoreBack.look() } // else what came after it looks, at its own end
     }
+
+    /// B440: iFizBox closes for its own update, whatever holds the tunnel: down now, and no start after it. While our
+    /// extension runs iOS doesn't replace the app ("plugins are busy"), and it would run on for up to a minute after
+    /// the exit (PacketTunnelProvider.quietLimit). Blocking, downWait at most. True when it was up.
+    static func downToClose() -> Bool {
+        lock.lock(); closing = true; let m = cached; lock.unlock()
+        guard let m = m, ![.disconnected, .invalid].contains(m.connection.status) else { return false }
+        m.connection.stopVPNTunnel()
+        let t0 = Date()
+        while ![.disconnected, .invalid].contains(m.connection.status), Date().timeIntervalSince(t0) < downWait {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        log("off (closing for the update) in \(String(format: "%.2f", Date().timeIntervalSince(t0))) s")
+        return true
+    }
+    private static var closing = false // guarded by lock
 
     /// One background task, ended once; `expiring` runs first when iOS ends it early, off the main thread (downIfIdle
     /// blocks), for expireLimit at most: iOS ends an app that keeps an expired task.
