@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 
 import { loadNew, onLanded } from "./sources.js";
 import { followNewSources } from "./search.js";
-import { refreshInBackground } from "./sources.js";
+import { refreshInBackground, isLoading } from "./sources.js";
 import { sourcesChanged } from "./manage.js";
 import { getBackend } from "../backend.js";
 
@@ -154,6 +154,7 @@ test("B446: an APT source just added loads at once, and one added during a Refre
   await until(3);
   assert.deepEqual(w.asked[2], { keys: [two], retry: true });
   await loadNew(w.ctx);
+  while (isLoading()) await new Promise((r) => setTimeout(r, 5));
 
   // Cancelling the Refresh doesn't drop it either.
   let cancel;
