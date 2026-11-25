@@ -169,3 +169,16 @@ test("B447: a queued package's button says Modify, on queue, clear and reopen; a
     assert.equal(installNoModify(p, { mode: "jailbreak" }), true);
   } finally { installQueue.clearAll(); }
 });
+
+test("B447: a queued paid package's sheet starts with a red Clear that takes it out of the queue", async () => {
+  const { paidActions } = await import("./browse.js");
+  installQueue.add({ op: "install", id: "com.ex.paid", version: "1.0" }, { quiet: true });
+  try {
+    const { actions } = paidActions({ actions: [{ label: "$1.99", run() {} }] }, { id: "com.ex.paid", version: "1.0", installed: null, queue: null, queued: true });
+    assert.equal(actions[0].label, "Clear");
+    assert.equal(actions[0].red, true);
+    assert.equal(actions[1].label, "$1.99");
+    actions[0].run();
+    assert.equal(installQueue.get("com.ex.paid"), null);
+  } finally { installQueue.clearAll(); }
+});
