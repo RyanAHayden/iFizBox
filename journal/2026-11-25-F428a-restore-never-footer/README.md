@@ -9,3 +9,7 @@ Test: `web/app/core/installroute.test.js` (F428a case). `installroute.test.js` a
 Shots: `shot.mjs` in Chromium with a fake bridge. `1-never.png` shows the footer; `2-off-and-on.png` shows the usual footer after the switch goes off and on.
 
 Not verified: on a real phone with the real shell. Native clearing on off is F427's code and was not run here.
+
+## Review
+A tap whose call and follow-up read both fail puts the cached `restoreNever` back too (not tested on its own).
+A Don't Ask Again chosen within `TIMEOUTS.status` of a tap shows from the next read after it.
