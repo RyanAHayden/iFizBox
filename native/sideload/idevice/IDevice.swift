@@ -519,6 +519,11 @@ enum IDevice {
         var askUntil: Date?     // after a drop, how long to keep asking iOS for the app (one deadline per install)
         var onConnect: (() -> Void)? // after an airplane wait: what to say once the connection is open
         var lookedInstalled = false // B251: a second look found the new copy while installd's step was quiet
+        var plain = false       // B433: iOS refused the Developer package; the one retry goes without it
+        func copyAgainPlain() {
+            plain = true; copied = false; installSent = false; sent = 0
+            speed = HereRecheck.CopySpeed(); copyStart = nil; lastLanded = nil
+        }
         init(ipa: URL, size: Int, remote: String, bundleID: String?, version: String?) {
             self.ipa = ipa; self.size = size; self.remote = remote; self.bundleID = bundleID; self.version = version
         }
@@ -1094,9 +1099,28 @@ enum IDevice {
         }
         run.installSent = true
         lookWhileQuiet(run, watch: w)
-        let err = installation_proxy_install_with_callback(ip, run.remote, nil, cb, box.toOpaque())
+        let developer = !run.plain && HerePackage.developer(bundleID: run.bundleID, own: Bundle.main.bundleIdentifier)
         do {
-            try check(err, "install_failed")
+            do {
+                try sendInstall(ip, run.remote, developer: developer, cb, box.toOpaque())
+            } catch let f as Failure where developer && HerePackage.retryPlain(code: f.code, lib: f.lib, text: f.text) {
+                // B433: iOS refused the Developer package: once more as a plain install. installd deletes the staged
+                // IPA when it refuses, so it is copied again (a drop from here on reconnects plainly too).
+                ilog("installd refused the Developer package: \(f.text); copying it again for a plain install")
+                note("iOS refused the install: \(f.text). Trying once more the plain way")
+                run.copyAgainPlain()
+                do { try upload(run, session: s, watch: w, note: note, progress: progress) } catch let u as Failure where !u.dropped {
+                    ilog("couldn't copy it again: \(u.text)")
+                    throw f // iOS's refusal, not the copy's error
+                }
+                run.copied = true
+                let plain = try s.installationProxy()
+                defer { installation_proxy_client_free(plain) }
+                w.begin("iOS installing the app (installd)", Limit.install)
+                run.installSent = true
+                lookWhileQuiet(run, watch: w)
+                try sendInstall(plain, run.remote, developer: false, cb, box.toOpaque())
+            }
         } catch let f as Failure where f.dropped && run.bundleID != nil && run.version != nil {
             throw f // install() connects again and asks iOS; the staged IPA stays for a second try
         } catch {
@@ -1106,6 +1130,18 @@ enum IDevice {
         ilog("installd: Complete \(String(format: "%.1f", Date().timeIntervalSince(requestAt))) s after the request")
         removeStaged(run.remote, session: s, watch: w)
         progress(.install(1))
+    }
+
+    /// Asks installd to install the staged IPA and waits for its answer. B433: `developer` sends PackageType=Developer,
+    /// which makes iOS end the app being replaced even when it is in front or playing audio (HerePackage).
+    private static func sendInstall(_ ip: OpaquePointer?, _ remote: String, developer: Bool,
+                                    _ cb: @convention(c) (UInt64, UnsafeMutableRawPointer?) -> Void,
+                                    _ ctx: UnsafeMutableRawPointer) throws {
+        let opts: plist_t? = developer ? plist_new_dict() : nil
+        defer { if let o = opts { plist_free(o) } } // the call copies it
+        if let o = opts { plist_dict_set_item(o, "PackageType", plist_new_string(HerePackage.type)) }
+        ilog("installd: install asked, package type \(developer ? HerePackage.type : "plain")")
+        try check(installation_proxy_install_with_callback(ip, remote, opts, cb, ctx), "install_failed")
     }
 
     /// After a drop once the install was sent: asks iOS for the app every HereRecheck.askEvery seconds, for up to

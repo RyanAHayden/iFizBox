@@ -135,6 +135,29 @@ class InstallNeverHangs(unittest.TestCase):
         self.assertIn(".notConnectedToInternet", sign)
 
 
+class DeveloperPackage(unittest.TestCase):
+    # B433: an app in front or playing audio refuses a plain install's polite termination; PackageType=Developer ends
+    # it. iFizBox's own update stays plain, and a refusal is tried once more without the option.
+    def test_install_sends_the_option_and_retries_plain_once(self):
+        src = read("IDevice.swift")
+        send = src[src.index("private static func sendInstall("):src.index("private static func askInstalled(")]
+        self.assertIn('plist_dict_set_item(o, "PackageType", plist_new_string(HerePackage.type))', send)
+        self.assertIn("installation_proxy_install_with_callback(ip, remote, opts, cb, ctx)", send)
+        self.assertEqual(src.count("installation_proxy_install_with_callback("), 1)  # no second way round the option
+        body = src[src.index("private static func installTry("):src.index("private static func sendInstall(")]
+        self.assertIn("HerePackage.developer(bundleID: run.bundleID, own: Bundle.main.bundleIdentifier)", body)
+        self.assertEqual(body.count("try sendInstall("), 2)
+        self.assertEqual(body.count("developer: false"), 1)
+        self.assertIn("HerePackage.retryPlain(code: f.code, lib: f.lib, text: f.text)", body)
+        self.assertIn("!run.plain &&", body)
+        # installd deletes the staged IPA when it refuses (MissingPackagePath): the retry copies it again
+        self.assertLess(body.index("run.copyAgainPlain()"), body.rindex("try upload(run"))
+        # the connect's own step clears the quiet hook: the retry's step begins after it
+        retry = body[body.index("HerePackage.retryPlain"):]
+        self.assertLess(retry.index("s.installationProxy()"), retry.index("w.begin("))
+        self.assertLess(retry.index("w.begin("), retry.index("lookWhileQuiet("))
+
+
 class RemotePairingPort(unittest.TestCase):
     # B220: remotepairingd's port isn't fixed at 49152; a connect finds it (last good, 49152, then mDNS) over the
     # route in use, and a refused or turned-down pairing comes back as a code the page answers with Pair Again.

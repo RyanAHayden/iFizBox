@@ -263,7 +263,15 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
 - **This iPhone** (Settings > Installation & Signing > Install Apps With; `native/sideload/idevice/`, its README): idevice
   built from source on Linux and linked statically. The signed IPA goes to this phone's installd over the built-in VPN
   (AFC upload to PublicStaging, then installation_proxy), so nothing reaches the Signing Server, no install sheet has
-  to stay up, it works offline, and iFizBox updates itself (installd closes and replaces it). Choosing This iPhone
+  to stay up, it works offline, and iFizBox updates itself (installd closes and replaces it). The install is sent with
+  installation_proxy's `PackageType` = `Developer` (`native/sign/HerePackage.swift`): a plain install asks iOS to end the
+  app being replaced only politely (NonInteractive), an app in front or playing audio refuses, and installd waits for it
+  to close. Developer asks with Absolute, so iOS ends the app and its data stays. iFizBox's own update stays plain, since
+  it closes itself once installd has accepted it. If iOS refuses with a reason the option might cause, the staged IPA is
+  copied again and sent once more plainly (installd deletes the staged copy on a refusal). No retry for a dropped
+  connection (iFizBox reconnects instead), a cancel, or a refusal about the IPA or the phone (other App ID, iOS too old,
+  device family, architecture, extraction). Not known: whether iOS refuses a Developer package with Developer Mode off,
+  or an enterprise-signed IPA. Choosing This iPhone
   opens its page (`installation/iphone`): Set Up (1. Pair This iPhone, 2. Allow iFizBox VPN, 3. Test Connection,
   the done ones checked) until it's set up, then How It Works. The status says Checking… until `idevice.status` answers;
   a failed or late answer says Not Responding. Pair This

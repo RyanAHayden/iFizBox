@@ -465,6 +465,19 @@ test("This iPhone self-update: close once installd accepted the install (B159, B
     check(d.copiedAt == t0 && d.closeAt == t0.addingTimeInterval(SelfCloseClock.accepted), "a 0% status without copied() counts too")
 }
 
+test("This iPhone: installs as a Developer package, once more plainly when iOS refuses (B433)") {
+    check(HerePackage.developer(bundleID: "com.x.app", own: "com.ryha.ifizbox"), "another app: Developer")
+    check(!HerePackage.developer(bundleID: "com.ryha.ifizbox", own: "com.ryha.ifizbox"), "its own update stays plain")
+    let refused = "unknown error `PackageTypeRefused (x)` returned from device"
+    for c: Int32 in [15, 24, 107, 203] { check(HerePackage.retryPlain(code: "install_failed", lib: c, text: refused), "refused (\(c)): retry") }
+    for c: Int32 in [1, 17, 19, 101, 103, 109] { check(!HerePackage.retryPlain(code: "install_failed", lib: c, text: refused), "a drop (\(c)) reconnects") }
+    check(!HerePackage.retryPlain(code: "timeout", lib: nil, text: "x"), "a timeout never retries plainly")
+    check(!HerePackage.retryPlain(code: "install_failed", lib: 27, text: "canceled by user"), "a cancel never")
+    check(!HerePackage.retryPlain(code: "install_failed", lib: 15, text: "unknown error `MismatchedApplicationIdentifierEntitlement (x)`"), "another App ID never")
+    check(!HerePackage.retryPlain(code: "install_failed", lib: 15, text: "UnknownErrorType(\"DeviceOSVersionTooLow (x)\")"), "an iOS too old never")
+    check(!HerePackage.retryPlain(code: "upload_failed", lib: 15, text: refused), "a failed copy never")
+}
+
 test("This iPhone: a dropped connection is not a failed install (B246)") {
     // the user's error: idevice's Socket(Kind(UnexpectedEof)) is code 1
     check(HereRecheck.isDropped(code: "install_failed", lib: 1), "UnexpectedEof (Socket, 1) is a drop")
