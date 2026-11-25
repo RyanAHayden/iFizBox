@@ -276,3 +276,10 @@ _Said_: pairing stops after 10 minutes
 _On screen_: The code expired after 10 minutes. / Get New Code
 _In code_: pairLimit, PairSession.expired, codeExpired, CODE_EXPIRED, NEW_CODE
 _Avoid_: pairing timeout
+
+**Filter panel**:
+The list of choices that drops down from under a page's scope bar and limits which packages the page lists
+_Said_: filter panel, Filter
+_On screen_: Filter
+_In code_: screens/filterpanel.js, openFilterPanel, .filter-drop
+_Avoid_: filter sheet, filter menu

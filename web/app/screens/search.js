@@ -12,16 +12,13 @@
 // Recent (F100, from Zebra): with the field empty, a grouped Recent table of the last five queries (saved on
 // Search or when a result is opened; core/settings.js recentSearches) with Clear in its header; a tap runs one again.
 import * as browse from "./browse.js";
-import { catalog, ALL } from "../catalog.js";
+import { catalog } from "../catalog.js";
 import { compatFilterOn } from "../device.js";
 import { settings } from "../settings-store.js";
-import { createSwitch } from "../nav/switch.js";
 import { SECTION_GROUPS, searchable } from "../core/catalog.js";
-import { displayName, sourcesFor } from "../core/sources.js";
 import { tweakSourcesOn } from "../core/sources.js"; // F305
+import { emptyFilters, searchFilters, openFilterPanel } from "./filterpanel.js";
 import { loadNew, onLanded, onSettled, isLoading } from "./sources.js";
-import { orderSources, loadOrder } from "../core/sourcelist.js";
-import { getBackend } from "../backend.js";
 import { grouped, el, segments } from "../nav/ui.js";
 import { discoveryGroup } from "./extras.js";
 import { recommendedApps, addRecommended, onSourcesChanged } from "./manage.js";
@@ -30,7 +27,6 @@ import { showAlert } from "../nav/alert.js";
 import { searchBar, pinned } from "../nav/searchbar.js";
 import { detectMode } from "../core/settings.js";
 import { onPageShow } from "../nav/pagestate.js"; // B172
-import { EASE } from "../nav/motion.js";
 
 export const title = "Search";
 
@@ -46,23 +42,10 @@ export function scopesFor(type) {
 }
 
 // The filters, kept for the session like the query: section (a section name or "group:<kind>"), source (a key),
-// installed ("installed" | "not"), price ("free" | "paid"); null is any.
-const EMPTY = { section: null, source: null, installed: null, price: null };
-const state = { query: "", seq: 0, filters: { ...EMPTY } };
+// installed ("installed" | "not"), price ("free" | "paid"); null is any (filterpanel.js).
+const state = { query: "", seq: 0, filters: emptyFilters() };
+let drop = null; // Search's open Filter panel (filterpanel.js): { close() }
 let rootInput = null; // the root page's field, for reselect()
-
-// What the catalog is asked: only the filters that are set (none: undefined, the plain search).
-export function searchFilters(f) {
-  const out = {};
-  for (const k of Object.keys(EMPTY)) if (f[k] != null && f[k] !== "") out[k] = f[k];
-  return Object.keys(out).length ? out : undefined;
-}
-
-// F53: the Filter panel's Source rows: only the sources the device type shows (Not Jailbroken: AltStore ones,
-// core/sources.js sourcesFor), in the Sources tab's order (Manage > Sources, F45) and by its display name.
-export function sourceChoices(list, type, order = null) {
-  return sourcesFor(orderSources(list, order), type).shown.map((s) => ({ label: displayName(s), value: s.key }));
-}
 
 // B75: sources added but never loaded (Manage > Recommended > Add All, then Search) load at once, under the Sources
 // tab's reload bar (screens/sources.js loadNew: one shared run, Refresh's words, progress and Cancel), and the query
@@ -153,7 +136,11 @@ export function render(body, route, ctx) {
   filterButton.type = "button";
   filterButton.addEventListener("click", () => {
     if (drop) drop.close();
-    else openFilters(scope, () => { drawScope(); run(); }, drawScope);
+    else {
+      drop = openFilterPanel({ filters: state.filters, anchor: scope, alive: () => /^#\/search\/?$/.test(location.hash),
+        changed: () => { drawScope(); run(); }, closed: () => { drop = null; drawScope(); } });
+      drawScope();
+    }
   });
   scope.append(seg, filterButton);
   function drawScope() {
@@ -323,91 +310,4 @@ async function offer(row, app, ctx) {
     buttons: ["Cancel", "Add Source"], cancel: 0 });
   if (index !== 1 || !(await addRecommended(row, ctx))) return;
   ctx.go({ tab: "sources", path: [row.key] });
-}
-
-// ---- the Filter sheet ----------------------------------------------------------------------------------------
-
-// One choice group: a row per option, the chosen one checked; a tap picks it and redraws.
-function choiceGroup(header, options, current, pick, footer) {
-  return grouped([{ header, footer, rows: options.map((o) => ({
-    label: o.label, checked: (o.value ?? null) === (current ?? null), onClick: () => pick(o.value ?? null),
-  })) }]);
-}
-
-// The Filter panel drops down from under the scope bar and covers only the results (the search field and the
-// segments stay), like a menu; Filter again, or a tap on the Search tab, puts it away (reselect()). Leaving Search
-// closes it too. Transform only.
-let drop = null; // the open panel: { close() }
-async function openFilters(scope, changed, redraw) {
-  const box = el("div", "grouped filter-sheet filter-drop-inner");
-  box.dataset.scroller = ""; // the iOS 6 scroll indicator follows it too (nav/scroller.js)
-  const wrap = el("div", "filter-drop");
-  wrap.style.top = Math.round(scope.getBoundingClientRect().bottom) + "px";
-  wrap.append(box);
-  document.body.append(wrap);
-  const ease = EASE;
-  box.animate([{ transform: "translateY(-100%)" }, { transform: "none" }], { duration: 280, easing: ease });
-  const onRoute = () => { if (!/^#\/search\/?$/.test(location.hash)) close(); };
-  addEventListener("hashchange", onRoute);
-  function close() {
-    if (drop !== ctl) return;
-    drop = null;
-    removeEventListener("hashchange", onRoute);
-    redraw?.();
-    const a = box.animate([{ transform: "none" }, { transform: "translateY(-100%)" }], { duration: 220, easing: ease, fill: "forwards" });
-    a.finished.then(() => wrap.remove(), () => wrap.remove());
-  }
-  const ctl = { close };
-  drop = ctl;
-  redraw?.();
-  let sources = [], sections = [];
-  const f = state.filters;
-  const set = (key, value) => { f[key] = value; draw(); changed(); };
-
-  function draw() {
-    const top = box.scrollTop;
-    box.replaceChildren();
-    // Compatibility first: the one users reach for when a package they know isn't there.
-    const compat = grouped([{ rows: [{ label: "Show Incompatible" }],
-      footer: "Packages that say they don't work on this iPhone. An exact name always shows, in red." }]);
-    const cell = compat.querySelector(".cell-inner");
-    cell.classList.add("has-switch");
-    cell.append(createSwitch({ label: "Show Incompatible", checked: !compatFilterOn(),
-      onToggle: (on) => { if (compatFilterOn() === on) settings.set("worksOnMyPhone", !on); } }));
-    box.append(compat);
-    if (searchFilters(f)) {
-      box.append(grouped([{ rows: [{ label: "Clear Filters", onClick: () => { Object.assign(f, EMPTY); draw(); changed(); } }] }]));
-      box.querySelector(".group:last-child .cell-inner").classList.add("filter-clear");
-    }
-    box.append(choiceGroup("Installed", [{ label: "All Packages" }, { label: "Installed", value: "installed" },
-      { label: "Not Installed", value: "not" }], f.installed, (v) => set("installed", v),
-    catalog.statusSource() === "upload" ? "Installed packages come from the dpkg status file uploaded on the Installed page." : null));
-    box.append(choiceGroup("Price", [{ label: "Free and Paid" }, { label: "Free", value: "free" }, { label: "Paid", value: "paid" }],
-      f.price, (v) => set("price", v)));
-    box.append(choiceGroup("Source", [{ label: "All Sources" }, ...sources],
-      f.source, (v) => set("source", v)));
-    const groupRows = SECTION_GROUPS.map((g) => ({ label: `All ${g}`, value: `group:${g}` }));
-    box.append(choiceGroup("Section", [{ label: "All Sections" }, ...groupRows, ...sections.map((s) => ({ label: s, value: s }))],
-      f.section, (v) => set("section", v)));
-    box.scrollTop = top;
-  }
-  draw();
-  try {
-    const type = settings.deviceType();
-    const [list, data] = await Promise.all([getBackend().sources(), catalog.sections(ALL)]);
-    sources = sourceChoices(list, type, loadOrder());
-    sections = data.sections.map((s) => s.name);
-    // A source picked under the other device type, now hidden: back to All Sources.
-    if (f.source != null && !sources.some((o) => o.value === f.source)) { f.source = null; changed(); }
-    if (box.isConnected) draw();
-    // F53: AltStore sources seeded by URL (F28) have no name until loaded, as on the Sources tab's first visit
-    // (F43): load them (B75: Search's shared run under the reload bar, screens/sources.js loadNew) and redraw with
-    // their names.
-    if (await loadNew()) {
-      sources = sourceChoices(await getBackend().sources(), type, loadOrder());
-      if (box.isConnected) draw();
-    }
-  } catch {
-    // no sources or sections yet (or a first load failed): the sheet keeps what it has
-  }
 }
