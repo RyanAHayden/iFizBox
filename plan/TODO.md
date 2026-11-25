@@ -11,6 +11,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
+- [ ] **F439a** (follow-up, high) No download text or links in release notes: drop the IPA/.deb footer from tools/release.sh's default notes and the "Release notes: <url>" line altsource.py's note_text adds to new versions (old entries stay). With no link, empty notes give "Smaller fixes and improvements." Check: tests for both gone. | files: tools/release.sh, tools/altsource.py, tools/test_release.py, tools/test_altsource.py
 ### Research (any time, parallel)
 
 ### Native jailbreak app (shape decided: docs/native.md)
