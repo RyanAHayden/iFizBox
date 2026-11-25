@@ -1,0 +1,332 @@
+#### on1 12:47:42
+Settings: ts -> VPN Status, Connected | selected: Tailscale | ok
+"setting true remembered true"
+"before: otherVPN true restore true remembered true entitled true"
+on1-installed: owed file 0
+== on1 front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+on1-opened: owed file 0
+Shortcut runs in the log: 1; last VPN states:
+12:48:30.763136 iFizBox VPN disconnected
+12:48:30.767001 Tailscale connected
+12:48:30.767037 iFizBox VPN disconnected
+12:48:08.015579 iFizBox{iFizBox}[4122] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+12:48:20.705833 iFizBox{iFizBox}[4122] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.10 s
+12:48:25.193358 iFizBox{iFizBox}[4122] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 4.5 s
+12:48:25.193631 iFizBox{iFizBox}[4122] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+12:48:25.193721 iFizBox{iFizBox}[4122] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+12:48:27.329812 iFizBox{iFizBox}[4122] <NOTICE>: iFizBox install: self-close: exit
+rig build in: 0.34.0
+Settings: ours -> VPN Status, Not Connected | selected: iFizBox VPN | ok
+on1-rig: owed file 0
+"strong: otherVPN false on false restore true remembered true due {\"due\":false}"
+"strong, again: due {\"due\":false}"
+on1-strong: owed file 0
+#### on2 12:49:54
+Settings found: VPN Status, Not Connected | selected: ['iFizBox VPN']
+Settings: ts -> VPN Status, Connected | selected: Tailscale | ok
+"setting true remembered true"
+"before: otherVPN true restore true remembered true entitled true"
+on2-installed: owed file 0
+== on2 front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+on2-opened: owed file 0
+Shortcut runs in the log: 1; last VPN states:
+12:50:47.822455 iFizBox VPN disconnected
+12:50:47.826737 Tailscale connected
+12:50:47.826901 iFizBox VPN disconnected
+12:50:24.831501 iFizBox{iFizBox}[4188] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+12:50:37.725631 iFizBox{iFizBox}[4188] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.11 s
+12:50:42.214123 iFizBox{iFizBox}[4188] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 4.5 s
+12:50:42.214138 iFizBox{iFizBox}[4188] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+12:50:42.214151 iFizBox{iFizBox}[4188] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+12:50:44.342222 iFizBox{iFizBox}[4188] <NOTICE>: iFizBox install: self-close: exit
+rig build in: 0.34.0
+Settings found: VPN Status, Connected | selected: ['Tailscale']
+Settings: ours -> VPN Status, Not Connected | selected: iFizBox VPN | ok
+on2-rig: owed file 0
+"strong: otherVPN false on false restore true remembered true due {\"due\":false}"
+"strong, again: due {\"due\":false}"
+on2-strong: owed file 0
+#### on3 12:52:04
+Settings found: VPN Status, Not Connected | selected: ['iFizBox VPN']
+Settings: ts -> VPN Status, Connected | selected: Tailscale | ok
+"setting true remembered true"
+"before: otherVPN true restore true remembered true entitled true"
+on3-installed: owed file 0
+== on3 front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+on3-opened: owed file 0
+Shortcut runs in the log: 1; last VPN states:
+12:52:57.538760 iFizBox VPN disconnected
+12:52:57.543686 Tailscale connected
+12:52:57.543702 iFizBox VPN disconnected
+12:52:34.483284 iFizBox{iFizBox}[4240] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+12:52:47.246518 iFizBox{iFizBox}[4240] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.06 s
+12:52:51.120486 iFizBox{iFizBox}[4240] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 3.9 s
+12:52:51.120566 iFizBox{iFizBox}[4240] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+12:52:51.120668 iFizBox{iFizBox}[4240] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+12:52:53.873169 iFizBox{iFizBox}[4240] <NOTICE>: iFizBox install: self-close: exit
+rig build in: 0.34.0
+Settings found: VPN Status, Connected | selected: ['Tailscale']
+Settings: ours -> VPN Status, Not Connected | selected: iFizBox VPN | ok
+on3-rig: owed file 0
+"strong: otherVPN false on false restore true remembered true due {\"due\":false}"
+"strong, again: due {\"due\":false}"
+on3-strong: owed file 0
+#### on4 12:54:14
+Settings found: VPN Status, Not Connected | selected: ['iFizBox VPN']
+Settings: ts -> VPN Status, Connected | selected: Tailscale | ok
+"setting true remembered true"
+"before: otherVPN true restore true remembered true entitled true"
+on4-installed: owed file 0
+== on4 front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+on4-opened: owed file 0
+Shortcut runs in the log: 1; last VPN states:
+12:55:08.278294 iFizBox VPN disconnected
+12:55:08.281476 Tailscale connected
+12:55:08.281502 iFizBox VPN disconnected
+12:54:45.135974 iFizBox{iFizBox}[4292] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+12:54:58.007336 iFizBox{iFizBox}[4292] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.10 s
+12:55:01.732553 iFizBox{iFizBox}[4292] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 3.7 s
+12:55:01.732593 iFizBox{iFizBox}[4292] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+12:55:01.732626 iFizBox{iFizBox}[4292] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+12:55:04.681137 iFizBox{iFizBox}[4292] <NOTICE>: iFizBox install: self-close: exit
+rig build in: 0.34.0
+Settings found: VPN Status, Connected | selected: ['Tailscale']
+Settings: ours -> VPN Status, Not Connected | selected: iFizBox VPN | ok
+on4-rig: owed file 0
+"strong: otherVPN false on false restore true remembered true due {\"due\":false}"
+"strong, again: due {\"due\":false}"
+on4-strong: owed file 0
+#### on5 12:56:26
+Settings found: VPN Status, Not Connected | selected: ['iFizBox VPN']
+Settings: ts -> VPN Status, Connected | selected: Tailscale | ok
+"setting true remembered true"
+"before: otherVPN true restore true remembered true entitled true"
+on5-installed: owed file 0
+== on5 front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+on5-opened: owed file 0
+Shortcut runs in the log: 1; last VPN states:
+12:57:18.588029 iFizBox VPN disconnected
+12:57:18.597132 Tailscale connected
+12:57:18.597194 iFizBox VPN disconnected
+12:56:55.583943 iFizBox{iFizBox}[4342] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+12:57:08.416096 iFizBox{iFizBox}[4342] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.11 s
+12:57:12.248664 iFizBox{iFizBox}[4342] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 3.8 s
+12:57:12.248743 iFizBox{iFizBox}[4342] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+12:57:12.248991 iFizBox{iFizBox}[4342] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+12:57:15.090805 iFizBox{iFizBox}[4342] <NOTICE>: iFizBox install: self-close: exit
+rig build in: 0.34.0
+Settings found: VPN Status, Connected | selected: ['Tailscale']
+Settings: ours -> VPN Status, Not Connected | selected: iFizBox VPN | ok
+on5-rig: owed file 0
+"strong: otherVPN false on false restore true remembered true due {\"due\":false}"
+"strong, again: due {\"due\":false}"
+on5-strong: owed file 0
+#### on6 12:58:37
+Settings found: VPN Status, Not Connected | selected: ['iFizBox VPN']
+Settings: ts -> VPN Status, Connected | selected: Tailscale | ok
+"setting true remembered true"
+"before: otherVPN true restore true remembered true entitled true"
+on6-installed: owed file 0
+== on6 front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+on6-opened: owed file 0
+Shortcut runs in the log: 1; last VPN states:
+12:59:30.345148 iFizBox VPN disconnected
+12:59:30.350319 Tailscale connected
+12:59:30.350654 iFizBox VPN disconnected
+12:59:07.682479 iFizBox{iFizBox}[4398] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+12:59:20.431645 iFizBox{iFizBox}[4398] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.11 s
+12:59:24.084666 iFizBox{iFizBox}[4398] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 3.7 s
+12:59:24.084696 iFizBox{iFizBox}[4398] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+12:59:24.084839 iFizBox{iFizBox}[4398] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+12:59:26.982267 iFizBox{iFizBox}[4398] <NOTICE>: iFizBox install: self-close: exit
+rig build in: 0.34.0
+Settings found: VPN Status, Connected | selected: ['Tailscale']
+Settings: ours -> VPN Status, Not Connected | selected: iFizBox VPN | ok
+on6-rig: owed file 0
+"strong: otherVPN false on false restore true remembered true due {\"due\":false}"
+"strong, again: due {\"due\":false}"
+on6-strong: owed file 0
+#### on7 13:00:47
+Settings found: VPN Status, Not Connected | selected: ['iFizBox VPN']
+Settings: ts -> VPN Status, Connected | selected: Tailscale | ok
+"setting true remembered true"
+"before: otherVPN true restore true remembered true entitled true"
+on7-installed: owed file 0
+== on7 front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+on7-opened: owed file 0
+Shortcut runs in the log: 1; last VPN states:
+13:01:40.507315 iFizBox VPN disconnected
+13:01:40.514432 Tailscale connected
+13:01:40.514496 iFizBox VPN disconnected
+13:01:17.607235 iFizBox{iFizBox}[4450] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+13:01:30.358499 iFizBox{iFizBox}[4450] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.11 s
+13:01:34.213830 iFizBox{iFizBox}[4450] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 3.9 s
+13:01:34.213860 iFizBox{iFizBox}[4450] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+13:01:34.213880 iFizBox{iFizBox}[4450] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+13:01:37.031417 iFizBox{iFizBox}[4450] <NOTICE>: iFizBox install: self-close: exit
+rig build in: 0.34.0
+Settings found: VPN Status, Connected | selected: ['Tailscale']
+Settings: ours -> VPN Status, Not Connected | selected: iFizBox VPN | ok
+on7-rig: owed file 0
+"strong: otherVPN false on false restore true remembered true due {\"due\":false}"
+"strong, again: due {\"due\":false}"
+on7-strong: owed file 0
+#### on8 13:02:57
+Settings found: VPN Status, Not Connected | selected: ['iFizBox VPN']
+Settings: ts -> VPN Status, Connected | selected: Tailscale | ok
+"setting true remembered true"
+"before: otherVPN true restore true remembered true entitled true"
+on8-installed: owed file 0
+== on8 front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+on8-opened: owed file 0
+Shortcut runs in the log: 1; last VPN states:
+13:03:50.015806 iFizBox VPN disconnected
+13:03:50.020351 Tailscale connected
+13:03:50.020359 iFizBox VPN disconnected
+13:03:27.045185 iFizBox{iFizBox}[4503] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+13:03:39.837813 iFizBox{iFizBox}[4503] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.10 s
+13:03:43.842153 iFizBox{iFizBox}[4503] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 4.0 s
+13:03:43.842226 iFizBox{iFizBox}[4503] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+13:03:43.842292 iFizBox{iFizBox}[4503] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+13:03:46.495424 iFizBox{iFizBox}[4503] <NOTICE>: iFizBox install: self-close: exit
+rig build in: 0.34.0
+Settings found: VPN Status, Connected | selected: ['Tailscale']
+Settings: ours -> VPN Status, Not Connected | selected: iFizBox VPN | ok
+on8-rig: owed file 0
+"strong: otherVPN false on false restore true remembered true due {\"due\":false}"
+"strong, again: due {\"due\":false}"
+on8-strong: owed file 0
+#### on9 13:05:08
+Settings found: VPN Status, Not Connected | selected: ['iFizBox VPN']
+Settings: ts -> VPN Status, Connected | selected: Tailscale | ok
+"setting true remembered true"
+"before: otherVPN true restore true remembered true entitled true"
+on9-installed: owed file 0
+== on9 front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+on9-opened: owed file 0
+Shortcut runs in the log: 1; last VPN states:
+13:06:01.853286 iFizBox VPN disconnected
+13:06:01.858035 Tailscale connected
+13:06:01.858083 iFizBox VPN disconnected
+13:05:39.148260 iFizBox{iFizBox}[4555] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+13:05:51.870643 iFizBox{iFizBox}[4555] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.05 s
+13:05:55.779965 iFizBox{iFizBox}[4555] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 3.9 s
+13:05:55.780053 iFizBox{iFizBox}[4555] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+13:05:55.780088 iFizBox{iFizBox}[4555] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+13:05:58.490609 iFizBox{iFizBox}[4555] <NOTICE>: iFizBox install: self-close: exit
+rig build in: 0.34.0
+Settings found: VPN Status, Connected | selected: ['Tailscale']
+Settings: ours -> VPN Status, Not Connected | selected: iFizBox VPN | ok
+on9-rig: owed file 0
+"strong: otherVPN false on false restore true remembered true due {\"due\":false}"
+"strong, again: due {\"due\":false}"
+on9-strong: owed file 0
+#### on10 13:07:20
+Settings found: VPN Status, Not Connected | selected: ['iFizBox VPN']
+Settings: ts -> VPN Status, Connected | selected: Tailscale | ok
+"setting true remembered true"
+"before: otherVPN true restore true remembered true entitled true"
+on10-installed: owed file 0
+== on10 front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+on10-opened: owed file 0
+Shortcut runs in the log: 1; last VPN states:
+13:08:13.472247 iFizBox VPN disconnected
+13:08:13.478278 Tailscale connected
+13:08:13.478324 iFizBox VPN disconnected
+13:07:50.645406 iFizBox{iFizBox}[4607] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+13:08:03.337023 iFizBox{iFizBox}[4607] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.05 s
+13:08:07.220010 iFizBox{iFizBox}[4607] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: done in 3.9 s
+13:08:07.220106 iFizBox{iFizBox}[4607] <NOTICE>: iFizBox install: vpn: Restore My VPN: before the close: back in front
+13:08:07.220436 iFizBox{iFizBox}[4607] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off, the back run over
+13:08:10.001437 iFizBox{iFizBox}[4607] <NOTICE>: iFizBox install: self-close: exit
+rig build in: 0.34.0
+no VPN page
+on10-rig: owed file 0
+"strong: otherVPN true on false restore true remembered true due {\"due\":false}"
+"strong, again: due {\"due\":false}"
+on10-strong: owed file 0
+#### off 13:11:25
+Settings found: VPN Status, Connected | selected: ['Tailscale']
+Settings: ts -> VPN Status, Connected | selected: Tailscale | ok
+"setting false remembered true"
+"before: otherVPN true restore false remembered true entitled true"
+off-installed: owed file 0
+== off front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+off-opened: owed file 0
+Shortcut runs in the log: 0; last VPN states:
+13:12:21.743475 iFizBox VPN disconnected
+13:12:21.743901 Tailscale disconnected
+13:12:21.743948 iFizBox VPN disconnected
+13:12:11.140045 iFizBox{iFizBox}[4677] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.11 s
+13:12:11.140054 iFizBox{iFizBox}[4677] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off
+13:12:18.066807 iFizBox{iFizBox}[4677] <NOTICE>: iFizBox install: self-close: exit
+rig build in: 0.34.0
+off-rig: owed file 0
+"return: otherVPN false restore false due {\"due\":false}"
+off-return: owed file 0
+#### none 13:13:11
+Settings found: VPN Status, Not Connected | selected: ['iFizBox VPN']
+Settings: ours -> VPN Status, Not Connected | selected: iFizBox VPN | ok
+"setting true remembered true"
+"before: otherVPN false restore true remembered true entitled true"
+none-installed: owed file 0
+== none front version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+none-opened: owed file 0
+Shortcut runs in the log: 0; last VPN states:
+13:14:02.135278 iFizBox VPN disconnected
+13:14:02.135405 Tailscale disconnected
+13:14:02.135505 iFizBox VPN disconnected
+13:13:51.837811 iFizBox{iFizBox}[4726] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.11 s
+13:13:51.838371 iFizBox{iFizBox}[4726] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off
+13:13:58.742602 iFizBox{iFizBox}[4726] <NOTICE>: iFizBox install: self-close: exit
+rig build in: 0.34.0
+none-rig: owed file 0
+"return: otherVPN false restore true due {\"due\":false}"
+none-return: owed file 0
+#### left 13:14:52
+Settings found: VPN Status, Not Connected | selected: ['iFizBox VPN']
+Settings: ts -> VPN Status, Connected | selected: Tailscale | ok
+"setting true remembered true"
+"before: otherVPN true restore true remembered true entitled true"
+left-installed: owed file 1
+== left home version 0.99.0 (no swipe, no reopen before this reading)
+"new copy due {\"due\":false}"
+left-opened: owed file 1
+Shortcut runs in the log: 0; last VPN states:
+13:15:51.288675 iFizBox VPN disconnected
+13:15:51.289012 Tailscale disconnected
+13:15:51.289130 iFizBox VPN disconnected
+13:15:27.930411 iFizBox{iFizBox}[4775] <NOTICE>: iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+13:15:41.112150 iFizBox{iFizBox}[4775] <NOTICE>: iFizBox install: vpn: off (closing for the update) in 0.06 s
+13:15:41.112887 iFizBox{iFizBox}[4775] <NOTICE>: iFizBox install: self-close: exiting 6.5 s after the VPN went off
+13:15:47.997761 iFizBox{iFizBox}[4775] <NOTICE>: iFizBox install: self-close: exit
+rig build in: 0.34.0
+left-rig: owed file 1
+"return: otherVPN false restore true due {\"due\":true}"
+left-return: owed file 1
+"answer {\"error\":null,\"text\":null,\"ok\":true}"
+"after the answer: otherVPN true"
+left-answered: owed file 0
+## Preferences on disk after each update, before the new copy was opened: pageCount, number of pageKeys, foundKeys (before the run: the 'strong' reading of the run before)
+on1: installed 20 1 None; opened 20 1 None; strong 20 1 None
+on2: installed 20 1 []; opened 20 1 None; strong 20 1 None
+on3: installed 20 1 []; opened 20 1 None; strong 21 2 None
+on4: installed 20 1 []; opened 20 1 None; strong 21 2 None
+on5: installed 20 1 []; opened 20 1 None; strong 21 2 None
+on6: installed 20 1 []; opened 20 1 None; strong 21 2 None
+on7: installed 20 1 []; opened 20 1 None; strong 21 2 None
+on8: installed 20 1 []; opened 20 1 None; strong 21 2 None
+on9: installed 20 1 []; opened 20 1 None; strong 21 2 None
+on10: installed 20 1 []; opened 20 1 None; strong 21 2 None
