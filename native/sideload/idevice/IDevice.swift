@@ -1109,7 +1109,10 @@ enum IDevice {
                 ilog("installd refused the Developer package: \(f.text); copying it again for a plain install")
                 note("iOS refused the install: \(f.text). Trying once more the plain way")
                 run.copyAgainPlain()
-                try upload(run, session: s, watch: w, note: note, progress: progress)
+                do { try upload(run, session: s, watch: w, note: note, progress: progress) } catch let u as Failure where !u.dropped {
+                    ilog("couldn't copy it again: \(u.text)")
+                    throw f // iOS's refusal, not the copy's error
+                }
                 run.copied = true
                 let plain = try s.installationProxy()
                 defer { installation_proxy_client_free(plain) }
