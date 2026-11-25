@@ -26,3 +26,11 @@ Not verified:
 
 - 120 Hz on a real phone.
 - A BigBoss-sized catalog through the worker when Top 25 is filtered.
+
+Second attempt (2026-11-25): the first one's merge failed only on main's own date bug in `blocked.test.js` (fixed on
+main since), so its commits were put back on main as they were. The spec review found one slip, fixed: Featured and
+back within the slide took the leaving Filter button for the real one, which then did not slide in. Top 25's panel
+lists every section on purpose, as it filters every package.
+
+Also not verified: the Chromium shots are the first attempt's, not taken again on this main or after that selector
+fix (only `node --test` and the gate were).

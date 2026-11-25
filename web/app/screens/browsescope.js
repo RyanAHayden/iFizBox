@@ -48,7 +48,7 @@ const still = () => Boolean(globalThis.matchMedia?.("(prefers-reduced-motion: re
 export function slideBar(bar) {
   if (!bar?.isConnected || !bar.animate || still()) return () => {};
   const segs = (b) => [...b.querySelectorAll(".scope-segment")].map((el) => ({ el, r: el.getBoundingClientRect() }));
-  const was = segs(bar), button = bar.querySelector(".scope-filter");
+  const was = segs(bar), button = bar.querySelector(".scope-filter:not(.scope-ghost)");
   const gone = button && { el: button, r: button.getBoundingClientRect(), top: bar.getBoundingClientRect() };
   return (next) => {
     const timing = { duration: DURATION, easing: EASE };
