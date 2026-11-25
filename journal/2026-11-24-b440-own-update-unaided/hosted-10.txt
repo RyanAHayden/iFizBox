@@ -1,0 +1,10 @@
+1 front began=00:18:49.659 exit=00:18:50.266 gone=00:18:50.332 complete=00:18:55.219 refused=1 busy=0
+2 front began=00:19:21.533 exit=00:19:22.152 gone=00:19:22.229 complete=00:19:27.109 refused=1 busy=0
+3 front began=00:19:53.566 exit=00:19:54.171 gone=00:19:54.254 complete=00:19:58.405 refused=1 busy=0
+4 front began=00:20:24.789 exit=00:20:25.403 gone=00:20:25.473 complete=00:20:29.864 refused=1 busy=0
+5 home began=00:20:56.938 exit=00:20:57.550 gone=00:20:57.615 complete=00:21:02.396 refused=1 busy=0
+6 home began=00:21:30.701 exit=00:21:31.324 gone=00:21:31.392 complete=00:21:35.802 refused=1 busy=0
+7 home began=00:22:02.816 exit=00:22:03.435 gone=00:22:03.488 complete=00:22:07.943 refused=1 busy=0
+8 reopen began=00:22:32.842 exit=00:22:33.481 gone=00:22:33.555 complete=00:22:38.171 refused=1 busy=0
+9 reopen began=00:23:03.987 exit=00:23:04.606 gone=00:23:04.702 complete=00:23:09.156 refused=1 busy=0
+10 reopen began=00:23:35.181 exit=00:23:35.818 gone=00:23:35.892 complete=00:23:40.768 refused=1 busy=0

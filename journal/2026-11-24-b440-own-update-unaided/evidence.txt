@@ -1,0 +1,23 @@
+## before, reopened 10 s after the exit
+23:44:07.905660 iFizBox{iFizBox}[1290] <NOTICE>: iFizBox install: This iPhone: com.ryha.ifizbox 0.32.0, 32.4 MB
+23:44:07.940461 iFizBox{iFizBox}[1290] <NOTICE>: iFizBox install: vpn: on; up tunnels: utun0 link, utun0 IPv6 fe80::8e02:bdd8:aee5:e400, ipsec0 link, ipsec1 link, utun1 link, 
+23:44:08.205666 iFizBox{iFizBox}[1290] <NOTICE>: iFizBox install: vpn: on in 0.16 s
+23:44:09.806381 iFizBox{iFizBox}[1290] <NOTICE>: iFizBox install: self-close: IPA copied; closing in 10 s unless installd answers sooner
+23:44:09.811860 iFizBox{iFizBox}[1290] <NOTICE>: iFizBox install: installd: install asked, package type plain
+23:44:12.622334 installcoordinationd{RunningBoardServices}[271] <INFO>: Received terminate request response: <Error Domain=RBSRequestErrorDomain Code=5 "Error acquiring hold o
+23:44:18.620853 installcoordinationd{installcoordinationd}[271] <NOTICE>: -[IXSCoordinatedAppInstall _onQueue_handleAssertionAcquisitionFailureForPlaceholder:withError:]_block
+23:44:18.645181 installcoordinationd{RunningBoardServices}[271] <INFO>: Received terminate request response: <Error Domain=RBSRequestErrorDomain Code=5 "Error acquiring hold o
+23:44:20.525986 iFizBox{iFizBox}[1290] <NOTICE>: iFizBox install: This iPhone: installd sent no status 10 s after the copy; closing iFizBox so installd can finish
+23:44:20.532678 iFizBox{iFizBox}[1290] <NOTICE>: iFizBox install: self-close: exiting in 2.0 s
+23:44:22.580954 iFizBox{iFizBox}[1290] <NOTICE>: iFizBox install: self-close: exit
+23:44:22.710449 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:1290] termination reported by launchd (0, 0, 0)
+23:44:24.648114 installcoordinationd{installcoordinationd}[271] <NOTICE>: -[IXSCoordinatedAppInstall _onQueue_handleAssertionAcquisitionFailureForPlaceholder:withError:]_block
+23:44:24.670571 installcoordinationd{RunningBoardServices}[271] <INFO>: Received terminate request response: <Error Domain=RBSRequestErrorDomain Code=5 "Error acquiring hold o
+23:44:30.677709 iFizBox{iFizBox}[1303] <NOTICE>: iFizBox install: vpn: off (left on with nothing going on); the configuration stays
+23:44:30.678176 installcoordinationd{installcoordinationd}[271] <NOTICE>: -[IXSCoordinatedAppInstall _onQueue_handleAssertionAcquisitionFailureForPlaceholder:withError:]_block
+23:44:30.732934 installcoordinationd{RunningBoardServices}[271] <INFO>: Received terminate request response: <Error Domain=RBSRequestErrorDomain Code=5 "Error acquiring hold o
+23:44:30.897668 runningboardd{RunningBoard}[36] <NOTICE>: [xpcservice<com.ryha.ifizbox.vpn([osservice<com.apple.neagent-ios>:509:509])>{vt hash: 0}[uuid:D44EA6B5-98AA-4EEE-9B0
+23:44:30.914021 SpringBoard{NetworkExtension}[37] <NOTICE>: VPN iFizBox VPN (79E4AE2C-B593-494A-887D-727387AAE7CE) is disconnected
+23:44:33.504516 runningboardd{RunningBoard}[36] <NOTICE>: [extension<com.ryha.ifizbox.widget[config:6E69CA09-34E3-3493-B8FC-B5021E1ACB71]((null):115)>[uuid:6C5ACDF2-3695-4AED-
+23:44:36.681772 installcoordinationd{installcoordinationd}[271] <NOTICE>: -[IXSCoordinatedAppInstall _onQueue_handleAssertionAcquisitionFailureForPlaceholder:withError:]_block
+23:44:36.712303 runningboardd{RunningBoard}[36] <INFO>: skipping [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:1303] for reason : Target process has a higher te

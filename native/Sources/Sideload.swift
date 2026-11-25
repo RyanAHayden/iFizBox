@@ -1770,7 +1770,11 @@ enum CloseForUpdate {
         DispatchQueue.global(qos: .userInitiated).async {
             let wait = LocalVPN.downToClose() ? max(exitAfter, vpnAsk) : exitAfter
             IDevice.ilog("self-close: exiting in \(wait) s")
-            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + wait) { IDevice.ilog("self-close: exit"); exit(0) }
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + wait) {
+                _ = LocalVPN.downToClose() // a start already going on when it went off
+                IDevice.ilog("self-close: exit")
+                exit(0)
+            }
         }
         // B173: the exit never waits on the main queue alone
         exitBackstop("closeWith", after: LocalVPN.downWait + vpnAsk + 1)
