@@ -107,7 +107,7 @@ class App(unittest.TestCase):
         self.assertIn("stopNow(gen: gen)", src)  # ours is off after the last connection
         self.assertIn('s["vpn"] = LocalVPN.status()', read("idevice", "IDeviceBridge.swift", base=os.path.dirname(HERE)))
         up = src[src.index("static func up("):src.index("/// Before a connect to iOS")]
-        self.assertLess(up.index("if !Path.online() {"), up.index("var m = try manager()"))  # no network: say so, not after startLimit
+        self.assertLess(up.index("if !Path.online() {"), up.index("m = try manager()"))  # no network: say so, not after startLimit
 
     def test_no_network_waits_a_few_seconds(self):
         """B428b: a start with no network waits for one, cancellable and without startLock; status() waits for nothing."""
@@ -134,7 +134,7 @@ class App(unittest.TestCase):
         """B418: several installs at once: one start, the others find it connected; no save unless needed."""
         src = read("App", "LocalVPN.swift")
         up = src[src.index("static func up("):src.index("private static func start(")]
-        self.assertLess(up.index("startLock.lock(before:"), up.index("try start(step)"))
+        self.assertLess(up.index("startLock.lock(before:"), up.index("try start(finishing: finishing, step)"))
         self.assertIn("defer { startLock.unlock() }", up)
         start = src[src.index("private static func start("):src.index("/// Before a connect to iOS")]
         self.assertLess(start.index("if on { return }"), start.index("try manager()"))
@@ -200,7 +200,7 @@ class App(unittest.TestCase):
         stop = src[src.index("private static func stopLater()"):src.index("private static func stopNow(")]
         self.assertLess(stop.index("BackgroundHold("), stop.index("asyncAfter"))
         # every stop: idle, checked again under startLock
-        self.assertEqual(src.count("stopVPNTunnel()"), 1)  # downIfIdle's
+        self.assertEqual(src.count("stopVPNTunnel()"), 1)  # takeDown's: downIfIdle, and a stalled start's
         down = src[src.index("private static func downIfIdle("):src.index("static let beatEvery")]
         self.assertLess(down.index("startLock.lock()"), down.index("guard idle(), !["))
         self.assertIn("LocalVPN.takeDownLeftOver()", src[src.index("static func register("):])

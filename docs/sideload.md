@@ -345,6 +345,9 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   without a network". That wait is outside `startLock`, so `status()` and other starts aren't held up. An install waits
   in `waitOffCellular` before it reads the path: Cancel ends it, and cellular that comes back goes on to the Airplane Mode
   wait. Checks wait in `up`.
+  A start that stalls (off for 3 s, off again as it started, or not connected in 10 s) is logged with its status and done
+  once more: the configuration is read again, a tunnel stuck on its way up is stopped first, and the second start has the
+  whole 10 s. Not once the app was left, cancelled, or without a network. Code: `VPNStart.swift`, `LocalVPN.start`.
   In the background the VPN starts only to finish an install already connected (`finishing`). An install not yet
   connected pauses instead (`LocalVPN.waitForApp`): its row reads "Waiting for iFizBox" (event `appWait`), its KeepAlive
   is let go so iOS may suspend the app, and it goes on when the app is opened. Opened with no network (Airplane Mode went on
