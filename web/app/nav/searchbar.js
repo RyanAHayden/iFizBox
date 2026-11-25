@@ -55,6 +55,19 @@ export function searchBar({ placeholder = "Search", ariaLabel = placeholder, val
   return bar;
 }
 
+// The search fields' clear button (packages.css .search-field::after), for app.js's captured click: a tap at the field's
+// right end, while it has text, empties it and searches again (the field's own input listener), keeping the keyboard
+// up. Under iOS 26 the input runs beneath the x, so the click may land on the label or on the input.
+export function clearTap(e) {
+  const field = e.target?.closest?.(".search-field");
+  const input = field?.querySelector("input");
+  if (!input?.value || e.clientX < field.getBoundingClientRect().right - 32) return;
+  e.preventDefault();
+  input.value = "";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.focus();
+}
+
 // Search's layout (packages.css .search-root): the bar and any scope row stay put under the nav bar, as Cydia's
 // search bar does on the 4S; only the scroller returned (.search-results) scrolls, and bounces, under them. `head`
 // are the pinned nodes in order (anything a page shows above its bar too). The scroller is the page's list's

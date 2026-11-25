@@ -17,7 +17,7 @@ import { animate, setProgress, clear, DURATION, EASE, EASE_OUT } from "./nav/tra
 import { attachEdgeSwipe, attachPageSwipe, lockScroll, pageSwipeBlocked } from "./nav/swipe.js";
 import { keepRow, ghostFor } from "./nav/selection.js";
 import { createTabbar, tapTab, scrollToTop, isSliding } from "./nav/tabbar.js";
-import { scrollerOf } from "./nav/searchbar.js";
+import { scrollerOf, clearTap } from "./nav/searchbar.js";
 import { showHUD } from "./nav/hud.js";
 import { showAlert } from "./nav/alert.js";
 import { initScroller } from "./nav/scroller.js";
@@ -478,18 +478,7 @@ document.addEventListener("pointermove", (e) => {
 // A held row lets go the moment its list scrolls (UIKit cancels the cell's highlight when the pan starts); iOS's
 // pointercancel alone can come late or not at all after a long hold.
 document.addEventListener("scroll", () => { if (pressed) { pressed.classList.remove("is-pressed"); pressed = null; lastPress = null; } }, { capture: true, passive: true });
-// The search fields' clear button (packages.css .search-field::after): a tap at the field's right end, while it has
-// text, empties it and searches again (the field's own input listener), keeping the keyboard up.
-document.addEventListener("click", (e) => {
-  const f = e.target;
-  if (!(f instanceof Element) || !f.classList.contains("search-field")) return;
-  const input = f.querySelector("input");
-  if (!input?.value || e.clientX < f.getBoundingClientRect().right - 32) return;
-  e.preventDefault();
-  input.value = "";
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-  input.focus();
-}, true);
+document.addEventListener("click", clearTap, true); // the search fields' clear button
 // iOS only applies :active to elements when a touch listener exists somewhere on the page.
 document.addEventListener("touchstart", () => {}, { passive: true });
 
