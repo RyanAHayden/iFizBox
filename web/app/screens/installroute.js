@@ -86,7 +86,7 @@ let restoreTap = null; // { on, at, was, sending }: the last tap; was = the sett
 export function rememberStatus(st) {
   if (!st || typeof st !== "object") return;
   if (restoreTap && !restoreTap.sending && Date.now() - restoreTap.at > TIMEOUTS.status) restoreTap = null;
-  lastStatus = restoreTap && restoreShown(st) ? { ...st, vpn: { ...st.vpn, restore: restoreTap.on } } : st;
+  lastStatus = restoreTap && restoreShown(st) ? { ...st, vpn: { ...st.vpn, restore: restoreTap.on, restoreNever: false } } : st; // F428a: off clears Don't Ask Again
 }
 export function forgetStatus() { lastStatus = null; restoreTap = null; } // tests, and Forget Pairing
 export const cachedStatus = () => lastStatus;

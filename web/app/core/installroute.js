@@ -529,10 +529,12 @@ export const REMEMBER_VPN = "Remember My VPN";
 export const REMEMBER_AGAIN = "Remember VPN Again";
 export const REMEMBER_AGAIN_FOOTER = "Only if you changed VPN apps.";
 export const RESTORE_FIX = { add: "Add Shortcut", remember: REMEMBER_VPN }; // the group's fix row
+export const RESTORE_NEVER_FOOTER = "You chose Don't Ask Again. To be asked again, turn this switch off and on."; // F428a: off clears it
 export function restoreFooter(st, left = restoreLeft(st)) {
   if (!st?.vpn?.restore) return "Your own VPN stays off after installs.";
   if (left === "add") return "Add its Shortcut to finish.";
   if (left === "remember") return st.vpn.otherVPN ? "Let the Shortcut remember your VPN to finish." : "Turn your VPN on, then remember it here.";
+  if (st.vpn.restoreNever === true) return RESTORE_NEVER_FOOTER;
   return "After installs, Shortcuts opens for a moment and turns your VPN back on.";
 }
 // A store run that failed (native RestoreShortcut): the alert. `again`: its Try Again; `add`: its Add Shortcut Again.

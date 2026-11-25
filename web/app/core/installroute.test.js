@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { decideRoute, routeParams, storedRoute, pairState, pairEvent, pairFooter, pairFromNative, pinText, verifyFailure, ROUTE_OPTIONS, ALERTS, STORAGE_KEY, IPHONE_INTRO, setupState, PAIR_GUIDE,
-  NO_VPN, AIRPLANE_ON, STATUS_ACTIONS, HOW_STEPS, routeRefused, installStatus, BUILTIN_VPN, earlyEOF, setRestoreVPN } from "./installroute.js";
+  NO_VPN, AIRPLANE_ON, STATUS_ACTIONS, HOW_STEPS, routeRefused, installStatus, BUILTIN_VPN, earlyEOF, setRestoreVPN, restoreFooter, RESTORE_NEVER_FOOTER } from "./installroute.js";
 import { existsSync, readFileSync } from "node:fs";
 import { ringStyle } from "./installroute.js";
 import { SETTINGS } from "./settings.js";
@@ -188,4 +188,18 @@ test("setRestoreVPN: vpn.setRestore with a plain boolean", async () => {
   assert.deepEqual(await setRestoreVPN(native, true), { restore: true });
   await setRestoreVPN(native, undefined);
   assert.deepEqual(sent, [["vpn.setRestore", { on: true }], ["vpn.setRestore", { on: false }]]);
+});
+
+test("F428a: Restore My VPN's footer says Don't Ask Again was chosen", () => {
+  const st = (o) => ({ paired: "rp", vpn: vpn({ restore: true, remembered: true, ...o }) });
+  const usual = restoreFooter(st({}), "");
+  assert.match(usual, /^After installs/);
+  assert.equal(restoreFooter(st({ restoreNever: false }), ""), usual);
+  const never = restoreFooter(st({ restoreNever: true }), "");
+  assert.equal(never, RESTORE_NEVER_FOOTER);
+  assert.match(never, /Don't Ask Again.*off and on\./);
+  // what is left to do, and the switch off, keep their own footers
+  for (const left of ["add", "remember"]) assert.equal(restoreFooter(st({ restoreNever: true }), left), restoreFooter(st({}), left));
+  assert.notEqual(restoreFooter(st({}), "add"), usual);
+  assert.equal(restoreFooter(st({ restore: false, restoreNever: true }), ""), restoreFooter(st({ restore: false }), ""));
 });
