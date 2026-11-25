@@ -24,9 +24,19 @@ the nav bar says how the run is going, or that an iOS prompt waits for a tap. Sh
 - Chromium: `script.json` run by `journal/2026-11-23-F401-add-tweaks-queue/capture.mjs --mode sideload`, fake lanes
   passed to `runAppRun`, iOS 6 style only. Shots `1-running.png` to `5-shown.png`.
 
+## Second attempt
+
+The first attempt (`wip/F430`) was not merged. `web/app/core/blocked.test.js` "Changes leaves a blocked package out"
+failed on main too: it fixed its records at 2026-11-18 but let `dayGroups` use today's clock, and the 7-day window
+dropped them at midnight on 2026-11-25. The work was brought back unchanged on current main, and the test now passes
+`{ now }` to `dayGroups`. All 1351 screens tests pass.
+
+The spec review added: iFizBox's own row on This iPhone brings the page back already when its copy ends (installd has
+the IPA), and also when Open Now had put the page aside. Node tests only; the Chromium shots are the first attempt's.
+
 **Not verified**
 
 - Real installs on the iPhone 15 Pro (a web change; Chromium is enough).
 - iOS 13 and iOS 26 style shots of the strip (its CSS is unchanged).
 - An Open Now during the locked "Waiting for iOS" end hides that page with nothing to bring it back. This existed
-  before and is unchanged; filed as a follow-up.
+  before and is unchanged; filed as B452.

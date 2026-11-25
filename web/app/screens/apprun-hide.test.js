@@ -150,6 +150,23 @@ test("F430 iFizBox's own IPA on This iPhone: back as soon as installd has it", (
   assert.deepEqual([t.page.finished.label, t.page.hidden], [CLOSING_LABEL, false]);
 }));
 
+test("F430 iFizBox's own IPA on This iPhone: back once its copy ended, put away by Hide or Open Now", async () => {
+  for (const away of ["hide", "aside"]) {
+    await running([self()], { phase: "copying", here: true, selfUpdate: () => new Promise(() => {}) }, async (t) => {
+      if (away === "hide") t.hide(); else runPage().putAside();
+      const { progress } = await t.lanes.at(SELF_ID);
+      progress("copying", 0.5);
+      await settle();
+      assert.equal(t.page.hidden, true);
+      progress("copying", 1);
+      await settle();
+      assert.deepEqual([t.page.hidden, t.strip()], [false, null]);
+      assert.equal(t.page.bars.at(-1).right, undefined);
+      await t.lanes.end(SELF_ID);
+    });
+  }
+});
+
 test("F430 Cancel and Close take the strip away", async () => {
   await running([app("a", "Alpha")], {}, async (t) => {
     t.hide();

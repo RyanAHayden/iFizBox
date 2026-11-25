@@ -471,11 +471,12 @@ export async function runAppRun(jobs, deps) {
   let hiding = false; // Hide is on the bar
   const showPage = () => { put = false; strip.hide(); page.show?.(); };
   // iFizBox's own IPA is with iOS, which closes iFizBox to install it: its page stays up
-  const selfAway = () => rows.some((r) => isSelf(r) && (r.state === "installed" || selfClosing(r)));
+  const selfAway = () => rows.some((r) => isSelf(r) && (r.state === "installed" || selfClosing(r)
+    || (r.state === "installing" && r.phase === "copying" && (Number(r.fraction) || 0) >= 1))); // copied: installd has the IPA
   const keepSelfUp = () => {
     if (!selfAway()) return;
     if (hiding) { hiding = false; page.bar({ left: cancel }); }
-    if (put) showPage();
+    if (put || page.hidden) showPage(); // Open Now's too
   };
   hide.addEventListener("click", () => {
     if (!hiding || page.hidden) return;
