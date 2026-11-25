@@ -348,15 +348,18 @@ export function createCredentialStore({ storage = globalThis.localStorage, secur
 //       the .deb the vendor hands this account: `cached(st)` first (the shell's copy, kept per package and version),
 //       else package_info, then authorize_download and `download(url, st)` (the shell fetches the one-time URL and
 //       keeps the file). Throws PaidNeeded when the account has to act first: not signed in, not bought, not for sale.
-//   PaidNeeded { need: "signin" | "purchase" | "unavailable", price, packageId }
+//   PaidNeeded { need: "signin" | "purchase" | "unavailable", price, packageId, available }
 //
 // Not bought or signed out is not an error for the screen: it offers Sign In or Buy (screens/tweaks.js offerPaid).
 // A token the vendor no longer takes (invalidate: the store forgets it) asks for Sign In again.
 // F318: signed out, a FREE package the vendor already calls purchased (Chariz's betterAlarm) is first asked for
 // without a token (Chariz's authorize_download hands it out, checked live 2026-11-20); any refusal there asks for
 // Sign In as before.
+// B454: a package its seller no longer sells (available: false) goes by the package page's rules (F434): signed out
+// Sign In (with `available` false, so the screen says why), bought the download (the vendor's refusal is thrown),
+// signed in and not bought "unavailable".
 export class PaidNeeded extends Error {
-  constructor(need, { price = null, packageId = "" } = {}) {
+  constructor(need, { price = null, packageId = "", available = need !== "unavailable" } = {}) {
     super(need === "signin" ? "Sign in to its seller to download this tweak."
       : need === "purchase" ? `Buy this tweak${price ? ` (${isFreePrice(price) ? "free" : price})` : ""} to download it.`
         : "Its seller doesn't sell this tweak right now.");
@@ -364,6 +367,7 @@ export class PaidNeeded extends Error {
     this.need = need;
     this.price = price;
     this.packageId = packageId;
+    this.available = available;
   }
 }
 
@@ -373,17 +377,17 @@ export async function paidTweakDeb(st, { client, repo = "", architecture = "", c
   const hit = cached ? await Promise.resolve().then(() => cached(st)).catch(() => null) : null;
   if (hit?.length) return hit;
   const [signedIn, info] = await Promise.all([client.signedIn(), client.packageInfo(id)]);
-  if (!info.available) throw new PaidNeeded("unavailable", { price: info.price, packageId: id });
-  const freeOpen = !signedIn && info.purchased && isFreePrice(info.price);
-  if (!signedIn && !freeOpen) throw new PaidNeeded("signin", { price: info.price, packageId: id });
-  if (!info.purchased) throw new PaidNeeded("purchase", { price: info.price, packageId: id });
+  const needed = (need) => new PaidNeeded(need, { price: info.price, packageId: id, available: info.available });
+  const freeOpen = !signedIn && info.available && info.purchased && isFreePrice(info.price);
+  if (!signedIn && !freeOpen) throw needed("signin");
+  if (!info.purchased) throw needed(info.available ? "purchase" : "unavailable");
   const ask = { version, repo, architecture: st?.architecture || architecture };
   if (freeOpen) {
     let url;
     try {
       url = await client.authorizeDownload(id, { ...ask, tokenless: true });
     } catch {
-      throw new PaidNeeded("signin", { price: info.price, packageId: id });
+      throw needed("signin");
     }
     return download(url, st);
   }
@@ -391,7 +395,7 @@ export async function paidTweakDeb(st, { client, repo = "", architecture = "", c
   try {
     url = await client.authorizeDownload(id, ask);
   } catch (e) {
-    if (e instanceof PaymentError && e.invalidate) throw new PaidNeeded("signin", { price: info.price, packageId: id });
+    if (e instanceof PaymentError && e.invalidate) throw needed("signin");
     throw e;
   }
   return download(url, st);
