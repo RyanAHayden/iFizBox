@@ -120,3 +120,22 @@ test("the page stays put and its index hides under the open panel", () => {
   assert.match(css, /\.page-body:has\(> \.browse-scope > \.scope-filter\.done\) \{ overflow-y: hidden; \}/);
   assert.match(css, /\.browse-scope > \.scope-filter\.done\) ~ \.section-index \{ visibility: hidden; \}/);
 });
+
+test("B455: a Sort never resizes Browse's bars: no rule of theirs depends on the index, which starts below them", () => {
+  const css = readFileSync(new URL("../packages.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const sels = [...css.matchAll(/([^{}]+)\{/g)].map((m) => m[1].trim()).filter((s) => s.includes("data-section-index"));
+  assert.ok(sels.length);
+  for (const s of sels) assert.doesNotMatch(s, /\.browse-scope|\.search-bar|\.search-scope|\.scope-filter|\.search-field/, s);
+  assert.ok(sels.some((s) => s.includes(".search-results[data-section-index]") && s.includes(".installed-scope")), "Installed keeps its own");
+  const height = (sel) => {
+    const at = css.indexOf(`\n${sel} {`);
+    return Number(/[{;]\s*height: (\d+)px/.exec(css.slice(at, css.indexOf("}", at)))[1]);
+  };
+  assert.match(css, /\n\.list-scope > \.scope-filter \{ width: \d+px;/, "Filter and Done, one width");
+  const scope = height(".search-scope"), search = height(".search-bar");
+  const top = (sel) => css.slice(css.indexOf(`\n${sel} {`)).split("}")[0].split("{")[1].trim();
+  assert.equal(top(".page-body:has(> .browse-scope) ~ .section-index"),
+    `top: calc(var(--nav-h) + var(--strip-room, 0px) + ${scope}px + 6px);`);
+  assert.equal(top(".search-root:has(> .list-scope) > .section-index"),
+    `top: calc(var(--nav-h) + var(--strip-room, 0px) + ${search + scope}px + 6px);`);
+});
