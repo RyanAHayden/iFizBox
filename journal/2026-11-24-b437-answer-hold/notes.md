@@ -12,10 +12,27 @@
 - `SignAhead.swift` needed no change.
 - Tests: `native/test_prompt_hold.py` and `native/tests/prompthold`.
 
+## Device run
+
+- iPhone 15 Pro, iOS 27, this build. Route: Signing Server.
+- `signing.hold {on}`, then `signing.install` of UTM SE over Web Inspector; Home 4 s after the call. Log: `phone.log`
+  beside this file.
+- 21:50:03 serving began in background; the link waited.
+- 21:51:03 serving hold let go.
+- 21:51:13 page's hold let go.
+- Frozen by iOS from 21:51:49.
+- Opened 21:52:24: no upload, listener back, hold retaken; link opened and prompt shown 21:52:26.
+- Cancelled on the prompt; nothing installed.
+- Chromium could not do this run: it has no native audio and no suspension.
+- First try: Home straight after the call. `signing.install` answered "Could not connect to the server" (read 8 min
+  later; when and why unknown; a later download worked in 22 s). It never reached serving.
+- idevicesyslog showed almost none of the app's lines; `pymobiledevice3 syslog live` did.
+
 ## Not verified
 
-- On a phone: nothing was run on the iPhone 15; build and unit/text tests only (timing, suspension, link opening on
-  return are from reading the code).
+- On a phone, still open: the sign-ahead queue (`signing.prepare` + `signing.open`) with another app still signing
+  while the prompt waits (unit/text tests only); Install after such a return (prompt cancelled); return after the
+  15 min expiry; the first try's connection error.
 - A page gap between signing calls longer than 10 s with the app in background would let the page hold go early; the
   run would go on when the app is in front.
 

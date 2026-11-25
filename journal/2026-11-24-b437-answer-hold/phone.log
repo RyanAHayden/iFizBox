@@ -1,0 +1,14 @@
+2026-11-24 21:50:03.369734 install com.utmapp.UTM-SE: KeepAlive: held for UTM SE
+2026-11-24 21:50:03.372204 install com.utmapp.UTM-SE: iFizBox isn't in front (an Install prompt is up, or it is in the background): the prompt for UTM SE opens once it is
+2026-11-24 21:51:03.670794 install com.utmapp.UTM-SE: KeepAlive: let go for UTM SE
+2026-11-24 21:52:24.684741 install com.utmapp.UTM-SE: iOS froze iFizBox for 35 s, 21:51:49 to 21:52:24; its listening socket may have stayed shut
+2026-11-24 21:52:24.687175 install com.utmapp.UTM-SE: iFizBox slept after the Install prompt; UTM SE is still served here
+2026-11-24 21:52:24.687836 install com.utmapp.UTM-SE: iFizBox came back to the front
+2026-11-24 21:52:24.692598 install com.utmapp.UTM-SE: Couldn't listen again on 127.0.0.1:60827 (The operation couldn’t be completed. (Network.NWError error 48 - Address already in use)); trying again
+2026-11-24 21:52:25.192591 install com.utmapp.UTM-SE: The install server listens again on 127.0.0.1:60827 (its state was setup)
+2026-11-24 21:52:25.939574 install com.utmapp.UTM-SE: KeepAlive: held for UTM SE
+2026-11-24 21:52:26.060253 install com.utmapp.UTM-SE: iOS took the install link for UTM SE
+2026-11-24 21:52:26.153372 install com.utmapp.UTM-SE: iOS showed its Install prompt for UTM SE
+2026-11-24 21:52:47.808306 install com.utmapp.UTM-SE: The Install prompt for UTM SE closed; waiting for iOS to ask for the IPA
+2026-11-24 21:52:50.869302 install com.utmapp.UTM-SE: KeepAlive: let go for UTM SE
+2026-11-24 21:51:13.972103 iFizBox KeepAlive: the page's hold let go, an Install prompt waits for the app in front
