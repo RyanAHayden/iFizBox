@@ -8,7 +8,8 @@ free (and give it back after 5 idle min).
 The 15's and 7's screens need no lock. The 4S's comes from Veency (tools/veency.py), which prompts on the phone, so it
 starts with "Show screen", under the lock like an action; it keeps no shot on the phone (only Veency's arrow tip, bottom right).
 While a task holds the phone, actions are refused until the person presses "Use it anyway" for that holder (a new holder asks again).
-SIGTERM (the Tools page's Stop) frees the lock only when it is held as USER, then exits 0. Started while already serving, it says so and exits 0.
+SIGTERM (the Tools page's Stop) locks the phone's screen and frees the lock when it is free or held as USER (in a detached
+process, as the tidy can outlast the page's 4 s kill); a task's lock is never touched. Then it exits 0. Started while already serving, it says so and exits 0.
 Bound to the Tailscale IP only: anyone on the tailnet can drive the phone while it runs. Ctrl-C to stop."""
 import base64, io, json, os, signal, subprocess, sys, threading, time, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -343,11 +344,23 @@ class H(BaseHTTPRequestHandler):
         self.send(200, out.encode(), "text/plain; charset=utf-8")
 
 
-def stop(*_):  # SIGTERM/SIGINT: free the lock only if it is ours (USER), never a task's
+TIDY_SECS = 200  # the 15's tidy takes up to 180 s; the Tools page kills the process group 4 s after SIGTERM
+
+# Free: take the lock as USER (a task that got there first wins: nothing happens); then unlock, which closes the apps,
+# locks the screen (a dark phone stays dark) and frees the lock. An unreachable phone still frees the lock.
+LOCK_AND_FREE = '[ "$2" = free ] && { "$1" lock USER || exit 0; }; "$1" unlock USER'
+
+
+def stop(*_):  # SIGTERM/SIGINT: lock the screen and free the lock when free or ours (USER), never touch a task's
     if live[0]:
         getattr(live[0], "p", live[0]).kill()
-    if holder() == ME:
-        subprocess.run([UI, "unlock", ME])
+    who = holder()
+    if who in (None, ME):
+        try:  # its own session: it outlives the group kill, and is cut off by timeout
+            subprocess.Popen(["timeout", str(TIDY_SECS), "sh", "-c", LOCK_AND_FREE, "sh", UI, "free" if not who else "held"],
+                             start_new_session=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError:
+            pass
     os._exit(0)
 
 

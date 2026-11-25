@@ -261,8 +261,13 @@ class Rig(unittest.TestCase):
         port = s.getsockname()[1]
         s.close()
         for phone, who, freed in (((), "USER", True), ((), "T7", False), (("7",), "USER", True), (("7",), "T7", False),
-                                  (("4s",), "USER", True), (("4s",), "T7", False)):
-            self.hold(who)
+                                  (("4s",), "USER", True), (("4s",), "T7", False), ((), None, True), (("7",), None, True)):
+            open(self.log, "w").close()
+            if who:
+                self.hold(who)
+            elif os.path.exists(self.lock):
+                import shutil
+                shutil.rmtree(self.lock)
             p = subprocess.Popen([sys.executable, SRC, *phone, str(port)], env=self.env, stdout=subprocess.PIPE, text=True)
             try:
                 self.assertIn(str(port), p.stdout.readline())
@@ -278,7 +283,44 @@ class Rig(unittest.TestCase):
                 if p.poll() is None:
                     p.kill()
                 p.stdout.close()
+            if who != "T7":  # the detached tidy: free or USER-held gets lock (if free) then unlock, a task's gets nothing
+                for _ in range(100):
+                    if os.path.exists(self.lock) != (not freed):
+                        break
+                    time.sleep(.1)
+                time.sleep(.3)
             self.assertEqual(not os.path.exists(self.lock), freed, (phone, who))
+            want = {"USER": ["unlock USER"], None: ["lock USER", "unlock USER"], "T7": []}[who]
+            self.assertEqual(self.calls(), want, (phone, who))
+
+    def test_stop_outlives_the_group_kill_and_survives_an_unreachable_phone(self):
+        """The Tools page kills the process group 4 s after SIGTERM: the tidy runs in its own session, and a failing
+        tidy script still ends Stop with the lock freed by the script, not by us."""
+        slow = os.path.join(self.tmp.name, "slow.sh")
+        with open(slow, "w") as f:
+            f.write('#!/bin/sh\necho "$*" >> "$FAKE_LOG"\ncase $1 in lock) mkdir -p "$IFIZBOX_UI_LOCK"; echo "$2" > "$IFIZBOX_UI_LOCK/owner";;\n'
+                    'unlock) sleep 1; echo "unreachable" >&2; rm -rf "$IFIZBOX_UI_LOCK"; exit 1;; esac\n')
+        os.chmod(slow, 0o755)
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+        p = subprocess.Popen([sys.executable, SRC, "15", str(port)], env=dict(self.env, IFIZBOX_UI_SCRIPT=slow),
+                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        self.addCleanup(p.stdout.close)
+        self.addCleanup(p.kill)
+        self.assertIn(str(port), p.stdout.readline())
+        p.send_signal(signal.SIGTERM)
+        self.assertEqual(p.wait(timeout=20), 0)
+        for _ in range(100):
+            if "unlock USER" in self.calls():
+                break
+            time.sleep(.1)
+        self.assertEqual(self.calls(), ["lock USER", "unlock USER"])
+        for _ in range(100):
+            if not os.path.exists(self.lock):
+                break
+            time.sleep(.1)
+        self.assertFalse(os.path.exists(self.lock))
 
 
 if __name__ == "__main__":
