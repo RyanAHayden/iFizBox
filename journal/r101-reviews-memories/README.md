@@ -25,4 +25,6 @@ Partly stale (a section or sentence mentions the route; the rest holds):
 Still valid (Tailscale is only the desktop's dev transport, not the removed route):
 - `test-ipa-via-tailscale-page`, `iphone15-local-source-via-tailscale-serve`: serve a test IPA or source from the desktop; ATS needs https. Keep unless the desktop stops using Tailscale.
 
+Decision (D31, 2026-11-24): the person chose "delete 3, trim 3". Deleted the three "Likely stale" memories and their index lines. Trimmed `iphone15-lockdown-over-wifi`, `iphone15-ui-gotchas-r53` and `test-on-15-not-user` (and their index lines), plus the dead links to the deleted memories in `iphone15-local-source-via-tailscale-serve`. `vpn-needs-network-to-start` kept as is: its Tailscale lines describe the test phone's other VPN, which still holds. The two desktop-transport memories are kept.
+
 Not verified: whether the route's removal also dropped the Lite app's pairing over Tailscale beyond what R101a lists; I did not re-test any memory on a phone.
