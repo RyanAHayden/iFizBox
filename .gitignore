@@ -13,3 +13,4 @@ web/app/build.json
 !web/app/core/fixtures/signing/*.ipa
 /tools/phonectl/build/
 .claude/worktrees/
+reviews.db
