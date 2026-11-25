@@ -261,7 +261,7 @@ class Rig(unittest.TestCase):
         port = s.getsockname()[1]
         s.close()
         for phone, who, freed in (((), "USER", True), ((), "T7", False), (("7",), "USER", True), (("7",), "T7", False),
-                                  (("4s",), "USER", True), (("4s",), "T7", False), ((), None, True), (("7",), None, True)):
+                                  (("4s",), "USER", True), (("4s",), "T7", False), ((), None, True), (("7",), None, True), (("4s",), None, True)):
             open(self.log, "w").close()
             if who:
                 self.hold(who)
@@ -290,7 +290,7 @@ class Rig(unittest.TestCase):
                     time.sleep(.1)
                 time.sleep(.3)
             self.assertEqual(not os.path.exists(self.lock), freed, (phone, who))
-            want = {"USER": ["unlock USER"], None: ["lock USER", "unlock USER"], "T7": []}[who]
+            want = {"USER": ["unlock USER"] * 2, None: ["lock USER"] + ["unlock USER"] * 2, "T7": []}[who]
             self.assertEqual(self.calls(), want, (phone, who))
 
     def test_stop_outlives_the_group_kill_and_survives_an_unreachable_phone(self):
@@ -312,10 +312,10 @@ class Rig(unittest.TestCase):
         p.send_signal(signal.SIGTERM)
         self.assertEqual(p.wait(timeout=20), 0)
         for _ in range(100):
-            if "unlock USER" in self.calls():
+            if self.calls().count("unlock USER") == 2:
                 break
             time.sleep(.1)
-        self.assertEqual(self.calls(), ["lock USER", "unlock USER"])
+        self.assertEqual(self.calls(), ["lock USER", "unlock USER", "unlock USER"])
         for _ in range(100):
             if not os.path.exists(self.lock):
                 break

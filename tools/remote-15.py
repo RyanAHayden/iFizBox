@@ -344,11 +344,11 @@ class H(BaseHTTPRequestHandler):
         self.send(200, out.encode(), "text/plain; charset=utf-8")
 
 
-TIDY_SECS = 200  # the 15's tidy takes up to 180 s; the Tools page kills the process group 4 s after SIGTERM
+TIDY_SECS = 330  # the 15's tidy takes up to 180 s; the Tools page kills the process group 4 s after SIGTERM
 
 # Free: take the lock as USER (a task that got there first wins: nothing happens); then unlock, which closes the apps,
 # locks the screen (a dark phone stays dark) and frees the lock. An unreachable phone still frees the lock.
-LOCK_AND_FREE = '[ "$2" = free ] && { "$1" lock USER || exit 0; }; "$1" unlock USER'
+LOCK_AND_FREE = '[ "$2" = free ] && { "$1" lock USER || exit 0; }; timeout 200 "$1" unlock USER; IFIZBOX_UI_TIDY=0 "$1" unlock USER'  # the last one frees a lock the tidy left (it only frees USER's)
 
 
 def stop(*_):  # SIGTERM/SIGINT: lock the screen and free the lock when free or ours (USER), never touch a task's
