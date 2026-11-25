@@ -90,7 +90,7 @@ function events() {
   return { listeners, addEventListener: (t, f) => { listeners[t] = f; } };
 }
 
-test("reopened (no link): a finished run's page closes; a running one stays", async () => {
+test("B431 reopened (no link): a finished run's page stays up, as does a running one", async () => {
   const native = { async call() { return null; } };
   const doc = fakeDoc();
   let page = fakeRun();
@@ -98,7 +98,7 @@ test("reopened (no link): a finished run's page closes; a running one stays", as
   doc.set("hidden");
   doc.set("visible");
   await settle();
-  assert.deepEqual(page.log, ["dismiss"]);
+  assert.deepEqual(page.log, []);
   page = fakeRun({ busy: true });
   doc.set("hidden");
   doc.set("visible");

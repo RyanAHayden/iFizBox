@@ -17,8 +17,8 @@
 //                                      tab, Add Source filled in over it; an IPA to Install IPAs, then Install (signAndInstall).
 //                                      Off, or a link iFizBox has no use for: handed back (handBack below)
 //
-//   B175: the app run's log (screens/apprun.js) still up with its run over closes when iFizBox comes back to the
-//   front and before any link opens; a run still going asks first (clearRunPage)
+//   B175/B431: the app run's log (screens/apprun.js) still up with its run over closes before a link or file opens
+//   (clearRunPage); a run still going asks first. Coming back to the front leaves it up.
 //
 //   startIncoming({ native })          once, in the app
 //   await handleIncoming(url, deps)    -> "import" | "install" | "myipas" | "add" | "shared" | "package" | "account" | "tab" | "other-source" |
@@ -31,19 +31,14 @@ import { parseAddLink } from "./core/handoff.js";
 import { parseOtherLink, otherLinksOn } from "./core/otherlinks.js";
 import { packageIdOf } from "./websign-gate.js";
 import { NAME } from "./brand.js";
-import { userTouch } from "./nav/hometop.js";
 import { markHandoff } from "./handoffclock.js";
 import { nativeBridge } from "./native.js";
 
 export function startIncoming({ native = nativeBridge(), events = globalThis, doc = globalThis.document,
   runPage = defaultRunPage, alert = showAlert } = {}) {
   if (!native?.call) return;
-  // B175: back in front (reopened, or a link or file brought it up) with the app run's log still up and its run over:
-  // that page closes (B406: not once the user touched anything, it is theirs to close). A link's take does the same before it opens anything (clearRunPage).
-  doc?.addEventListener?.("visibilitychange", () => {
-    if (doc.visibilityState === "hidden") return;
-    Promise.resolve(runPage()).then((p) => { if (p && !p.busy && !p.aside && !userTouch.touched()) return p.dismiss(); }).catch(() => {});
-  });
+  // B431: coming back to the front never closes the app run's log, over or not: it stays until the user closes it
+  // (Close, Return). Only a link or file closes a finished log first (clearRunPage), since what it opens would hide behind it.
   let busy = false;
   let again = false; // B174: an "ifizbox:url" while a take ran: take once more after it
   const take = async () => {

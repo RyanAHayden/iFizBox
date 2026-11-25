@@ -31,7 +31,7 @@
 // What iOS took leaves the queue (and is recorded for Installed) as it goes; failed and cancelled apps stay queued.
 // An app handed to iOS while iFizBox was in the background ends "Sent to iOS", and turns Installed once iOS says it has
 // it when iFizBox is back in front (followHandoff, B76).
-// B175: a finished run's page closes when iFizBox is back in front or a link comes (incoming.js, through runPage()).
+// B175/B431: a finished run's page closes when a link or file comes (incoming.js, through runPage()); coming back to the front leaves it up.
 // F407: with packages queued too (the jailbreak app), this run is a guest on the queue run's page (screens/queuerun.js;
 // deps.host): its rows and log lines go there, and the host starts it, cancels it, retries it and ends it.
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -220,7 +220,7 @@ export function followHandoff(run, rows, { isInstalled, doc = globalThis.documen
     check();
   };
   doc?.addEventListener?.("visibilitychange", onVisibility);
-  // B175: the page closed by itself (iFizBox back in front with the run over): no more visibility changes, but the
+  // B175: the page closed for a link (run over): no more visibility changes, but the
   // question for the rows iOS hasn't confirmed is asked now and its retries run out (an app installed while iFizBox
   // was away is still recorded).
   const wind = () => {
