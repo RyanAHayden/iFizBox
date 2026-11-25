@@ -39,9 +39,13 @@ export const overSiteLimit = (size, max = IPA_MAX) => Number.isFinite(Number(siz
 //   noteSigned(storage, bytes)           an IPA that signed: forget a limit at or under its size
 //   overMemoryLimit(size, storage)       a listed size at or past that limit (false when unknown or none)
 //   isOutOfMemory(message)               zsign's error was memory (websign-job.js zsignCrash)
-export const MEMORY_KEY = "ifizbox.signMemory";
+// F435: a limit learned under the old signer (which held the whole IPA) lives under OLD_MEMORY_KEY; the streaming
+// signer signs far bigger apps, so that one is forgotten and the limit now lives under MEMORY_KEY.
+export const OLD_MEMORY_KEY = "ifizbox.signMemory";
+export const MEMORY_KEY = "ifizbox.signMemory.streaming";
 const positive = (n) => (Number.isFinite(Number(n)) && Number(n) > 0 ? Math.round(Number(n)) : null);
 export function memoryLimit(storage) {
+  try { storage?.removeItem?.(OLD_MEMORY_KEY); } catch { /* private mode */ }
   try { return positive(JSON.parse(storage?.getItem?.(MEMORY_KEY) ?? "null")?.failed); } catch { return null; }
 }
 export function noteOutOfMemory(storage, bytes) {
