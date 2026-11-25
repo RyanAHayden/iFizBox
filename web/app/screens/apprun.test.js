@@ -118,7 +118,7 @@ test("Cancel abandons the rest and reopens Confirm with what finished cleared", 
   const cancel = s.page.bars.at(-1).left;
   assert.equal(cancel.textContent, "Cancel");
   assert.ok(!cancel.className.includes("red"));
-  assert.equal(s.page.bars.at(-1).right ?? null, null);
+  assert.equal(s.page.bars.at(-1).right.textContent, "Hide"); // F430
   cancel.click();
   const r = await done;
   assert.equal(r.stopped, true);

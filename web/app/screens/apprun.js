@@ -27,6 +27,9 @@
 //     (B123, followSelf): locked on "Waiting for iOS" while the shell waits for iOS to download it, "Closing iFizBox"
 //     once the shell closes, Try Again (the row Failed) when iOS never took it, and an honest "close it from the app
 //     switcher" with Return wherever iFizBox didn't close by itself.
+//   Hide (F430, the sideload app only): at the top right while it runs: the page slides away, the run goes on, and the
+//     strip (screens/runstrip.js) under every tab's nav bar says how it goes, and when iOS's prompt waits for a tap;
+//     Show brings the page back, finished or not. iFizBox's own IPA going to iOS brings it back and takes Hide away.
 //
 // What iOS took leaves the queue (and is recorded for Installed) as it goes; failed and cancelled apps stay queued.
 // An app handed to iOS while iFizBox was in the background ends "Sent to iOS", and turns Installed once iOS says it has
@@ -38,11 +41,13 @@
 import { el, barButton } from "../nav/ui.js";
 import { openProgress, openOn, rowBar, RETURN_LABEL, CLOSING_LABEL, WAITING_LABEL, UPDATING_TITLE, NOT_YET_TITLE, TRY_AGAIN_LABEL, CLOSE_GRACE, CLOSE_BY_HAND,
   RESTART_BY_HAND } from "../nav/progress.js";
+import { runStrip } from "./runstrip.js"; // F430
 import { fitFileNames } from "../core/midtrunc.js";
 import { ipaStep } from "../core/ipainstall.js"; // B400
 import { appRows, createAppRun, rowStatus, helperRow, summaryLine, runStatus, runPercent, ended, isSelf, DIDNT_DOWNLOAD, barOf } from "../core/apprun.js";
 import { recordWhen } from "../core/apprun.js"; // B136
 import { HERE_PARALLEL } from "../core/apprun.js"; // F359
+import { selfClosing, promptUp } from "../core/apprun.js"; // F430
 import { firstLaunchHint } from "../core/apprun.js"; // F415
 import { sayFirstLaunch } from "../core/installroute.js"; // F415
 import { listedOf } from "../core/appqueue.js"; // F400
@@ -421,6 +426,7 @@ export async function runAppRun(jobs, deps) {
       recordIf(r); // B136: only once iOS has it (a confirm comes back here with unsure off)
       // B264: after the record above is asked for (`recorded`: its promise, when one was written), so the count sees it
       if (endedNow) try { onAppEnd(r, recorded.get(r.id) ?? null); } catch { /* the badge counts again on the next open */ }
+      keepSelfUp();
       tick();
       deps.host?.changed();
     },
@@ -441,6 +447,7 @@ export async function runAppRun(jobs, deps) {
       if (run.stopping) page.status("Stopping…");
       else if (run.running) page.status(runStatus(rows));
       page.progress(runPercent(rows));
+      strip.update();
     });
   };
 
@@ -455,6 +462,28 @@ export async function runAppRun(jobs, deps) {
   });
   closeB.addEventListener("click", () => page.close());
   retryAll.addEventListener("click", () => { const p = run.retryAll(); if (p) drive(p); });
+
+  // ---- F430: Hide, and its strip ----
+  // Not the jailbreak app's run (helper rows): its end may wait for a tap (AppSync Unified's respring).
+  const hide = barButton("Hide");
+  const strip = runStrip({ text: () => (run.stopping ? "Stopping…" : run.running ? stripText(rows) : summaryLine(rows)), onShow: () => showPage() });
+  let put = false; // put away with Hide (Open Now's putAside, which comes back at the end, is not)
+  let hiding = false; // Hide is on the bar
+  const showPage = () => { put = false; strip.hide(); page.show?.(); };
+  // iFizBox's own IPA is with iOS, which closes iFizBox to install it: its page stays up
+  const selfAway = () => rows.some((r) => isSelf(r) && (r.state === "installed" || selfClosing(r)));
+  const keepSelfUp = () => {
+    if (!selfAway()) return;
+    if (hiding) { hiding = false; page.bar({ left: cancel }); }
+    if (put) showPage();
+  };
+  hide.addEventListener("click", () => {
+    if (!hiding || page.hidden) return;
+    put = true;
+    page.hide();
+    strip.show();
+  });
+  page.onClose?.(() => strip.hide());
   const idle = () => !run.running && !deps.host?.busy; // F407: the packages' half of the run counts too
   const go = (p) => (deps.host ? deps.host.drive(p) : drive(p));
   const retry = (id) => { const p = run.retry(id); if (p) go(p); };
@@ -470,9 +499,11 @@ export async function runAppRun(jobs, deps) {
     page.reopen({ title: "Running", status: runStatus(rows) });
     cancel.disabled = false;
     summary.hidden = true;
-    page.bar({ left: cancel });
+    hiding = !rows.some(helperRow) && !selfAway();
+    page.bar({ left: cancel, ...(hiding ? { right: hide } : {}) });
     for (const r of rows) draw(r);
     await promise;
+    hiding = false;
     return end(cancelled);
   }
 
@@ -542,7 +573,8 @@ export async function runAppRun(jobs, deps) {
     else if (opener) page.finish({ label: RETURN_LABEL, status: text, action: () => false, also: opener });
     else if (server) page.finish({ label: RETURN_LABEL, status: text, action: () => false, also: server });
     else page.finish({ label: RETURN_LABEL, status: text, action: () => false });
-    if (page.hidden) page.show?.(); // B175: put aside for a link (Open Now): back with its result
+    if (page.hidden && !put) page.show?.(); // B175: put aside for a link (Open Now): back with its result
+    strip.update(); // F430: put away with Hide: the summary, until Show
     settled();
     return result;
   }
@@ -686,6 +718,12 @@ export async function runAppRun(jobs, deps) {
   const p = run.start();
   return drive(p).then(() => first, () => first);
 }
+
+// F430: the strip while a hidden run works: the bottom status, or that iOS's Install prompt waits for a tap.
+const stripText = (rows) => {
+  const ask = rows.find((r) => r.state === "asking" && r.phase !== "busy" && promptUp(r));
+  return ask ? `Tap Install on the iOS prompt: ${ask.name || ask.id}` : runStatus(rows);
+};
 
 // B153: the page's log emptied for a new pass (Retry All, a failed row's tap, Try Again, the own-bundle-ID retry after
 // the run ended): the lines still waiting for a frame go out first, then every line goes, so none of the last pass's

@@ -30,6 +30,7 @@
 import { el, barButton } from "../nav/ui.js";
 import { openProgress, openOn, rowBar } from "../nav/progress.js";
 import { showAlert } from "../nav/alert.js";
+import { runStrip } from "./runstrip.js";
 import { classify, chooseFinish, selfLevels } from "../core/progress.js";
 import { runRows, neededBy, createInstallRun, rowStatus, summaryLine, runStatus, runPercent, ended } from "../core/installrun.js";
 import { MODES, runTitle, CONFFILE_TITLE, CONFFILE_BUTTONS, conffileMessage, conffileAnswer, conffileLine } from "../core/queue.js";
@@ -255,25 +256,10 @@ export async function runQueue({ jobs, plan }, deps) {
   };
 
   // ---- Hide's strip, under every tab's nav bar ----
-  const strip = (() => {
-    let node = null;
-    return {
-      show() {
-        if (node) return;
-        node = el("button", "qr-strip");
-        node.type = "button";
-        node.append(el("span", "qr-strip-text"), el("span", "qr-strip-show", "Show"));
-        node.addEventListener("click", showPage);
-        document.body.append(node);
-        document.body.classList.add("qr-stripped");
-        strip.update();
-      },
-      update() { if (node) node.firstChild.textContent = running() ? status() : summary_(); },
-      hide() { node?.remove(); node = null; document.body.classList.remove("qr-stripped"); setBadge(null); },
-    };
-  })();
-  const showPage = () => { dropQuestion(); strip.hide(); page.show(); };
-  page.onClose(() => strip.hide());
+  const strip = runStrip({ text: () => (running() ? status() : summary_()), onShow: () => showPage() });
+  const dropStrip = () => { strip.hide(); setBadge(null); };
+  const showPage = () => { dropQuestion(); dropStrip(); page.show(); };
+  page.onClose(dropStrip);
   if (deps.onClose) page.onClose(() => deps.onClose(latest));
 
   // ---- F429: put away with Hide, the run ended on a button that waits for the tap ----
@@ -390,7 +376,7 @@ export async function runQueue({ jobs, plan }, deps) {
     onEnd(result);
     if (wasCancel) {
       // Cancel: back to Confirm with what finished cleared, and a footer that says so
-      strip.hide();
+      dropStrip();
       await page.close();
       deps.reopenConfirm?.(`Stopped. ${done} installed and cleared from the queue.`);
       return result;

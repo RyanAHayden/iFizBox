@@ -283,3 +283,10 @@ _Said_: filter panel, Filter
 _On screen_: Filter
 _In code_: screens/filterpanel.js, openFilterPanel, .filter-drop
 _Avoid_: filter sheet, filter menu
+
+**Run Strip**:
+The black line under every tab's nav bar while a run's page is put away with Hide: how the run goes, or its summary; tapping it brings the page back
+_Said_: the strip with Show
+_On screen_: Show
+_In code_: screens/runstrip.js, qr-strip
+_Avoid_: banner, mini bar
