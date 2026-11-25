@@ -844,8 +844,8 @@ export async function syncReminder(get, call) {
 //           page's row. ok: outside the window (green), soon: inside it (amber), expired (red).
 //   needsResign(installed, { now, window, skip })
 //        -> Changes' Needs Re-sign rows from signing.installed: every app inside the window or expired, soonest first,
-//           leaving out the ids in `skip` (apps with an upgrade, which re-signs them anyway); B259: also every app an
-//           older signer signed (olderSigner, below; the row says so and carries olderSigner: true)
+//           leaving out the ids in `skip` (apps with an upgrade, which re-signs them anyway); B259: also every app a
+//           marked signer change should reach (olderSigner, below; the row says so and carries olderSigner: true)
 //   signedIndex(installed)               a Map from bundle ID (installed and original) to its signing.installed record
 
 export const RESIGN_WINDOW = 2;
@@ -898,21 +898,33 @@ export function needsResign(installed, { now = new Date(), window = RESIGN_WINDO
 
 // B259: an app signed before the signer's output last changed (B227's own keychain group, B233's group fix) keeps that
 // signature until it nears its end, so Needs Re-sign also lists it. Each signing.installed record carries the stamp it
-// was signed with (`signer`: { version, groupFix }, native/sign/SignerStamp.swift) and signing.installed the current
-// one: a record is older when it has no stamp (signed before stamps), an earlier version, or a group fix dylib other
-// than the current one. No current stamp (an older shell, the website): never. iFizBox's own record never counts: its
-// re-sign is an update of the app itself, offered on its own.
-//   olderSigner(record, current)   true when that record's signer is older than `current`
+// was signed with (`signer`: { version, groupFix, groupFixRevision }, native/sign/SignerStamp.swift; the website's:
+// core/websign.js webSignerStamp) and signing.installed the current one, with each version's reach. B458: a record is
+// older only by a change marked as needing a re-sign: a later version that reaches it, or a raised group fix revision
+// when it carries the fix; another dylib hash alone isn't one. No stamp (signed before stamps), a version with no known
+// reach, or a fix whose revision can't be told: older. No current stamp (an older shell): never. iFizBox's own record
+// never counts: its re-sign is an update of the app itself, offered on its own.
+//   olderSigner(record, current)   true when a marked change newer than that record's signer affects it
 //   OLDER_SIGNER_TEXT              the row's line under its name
 export const OLDER_SIGNER_TEXT = `Signed by an older ${NAME}: re-sign it so its data stays its own`;
+// Records from before the revision was kept have the dylib's hash alone: this one (0.31.0 on) is revision 1, any other is older.
+const GROUPFIX_REVISION_1 = "496d0525dc08812d";
 export function olderSigner(record, current) {
   const cur = Number(current?.version);
   if (!Number.isFinite(cur) || !record) return false;
   if (record.bundleId === BUNDLE_ID || record.originalBundleId === BUNDLE_ID) return false;
   const s = record.signer;
   const v = Number(s?.version);
-  if (!Number.isFinite(v) || v < cur) return true;
-  return Boolean(s.groupFix && current.groupFix && s.groupFix !== current.groupFix);
+  if (!Number.isFinite(v)) return true;
+  const hasFix = Boolean(s.groupFix) || Number.isFinite(s.groupFixRevision);
+  const fixOnly = current.reach?.groupFix;
+  for (let w = Math.max(0, Math.floor(v)) + 1; w <= cur; w++) {
+    const skips = !hasFix && Array.isArray(fixOnly) && fixOnly.includes(w);
+    if (!skips) return true;
+  }
+  if (!hasFix || !Number.isFinite(current.groupFixRevision)) return false; // no current dylib: a re-sign can't bring one
+  const revision = Number.isFinite(s.groupFixRevision) ? s.groupFixRevision : s.groupFix === GROUPFIX_REVISION_1 ? 1 : 0;
+  return revision < current.groupFixRevision;
 }
 
 // ---- F236: is this iPhone in the profile? -----------------------------------------------------------------------

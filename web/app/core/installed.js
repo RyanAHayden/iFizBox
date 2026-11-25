@@ -134,7 +134,7 @@ export async function recordInstall(store, app, now = Date.now()) {
 //   takeSiteSignature(id, now)           that note, once (recordInstall), or null
 //   siteSignedApps(records, current)     signing.installed's shape from the records that carry a signature:
 //                                        { apps: [{ bundleId, name, version, expires, signer }], signer: current }
-//   siteSignerNow({ fetcher })           this website's current stamp: WEB_SIGNER_VERSION and the hosted dylib's hash
+//   siteSignerNow()                      this website's current stamp (core/websign.js webSignerNow)
 // Records written before F342 carry neither and stay out: nothing says the website signed them.
 export const SITE_SIGNATURE_WAIT = 30 * 60 * 1000; // Ready to Install can wait a while for its tap
 const siteSignatures = new Map();
@@ -144,7 +144,11 @@ export function signatureOf(app) {
   const t = Date.parse(app?.expires ?? "");
   if (Number.isFinite(t)) out.expires = new Date(t).toISOString();
   const v = Number(app?.signer?.version);
-  if (Number.isFinite(v)) out.signer = { version: v, groupFix: text(app.signer.groupFix) || null };
+  if (Number.isFinite(v)) {
+    out.signer = { version: v, groupFix: text(app.signer.groupFix) || null };
+    const rev = app.signer.groupFixRevision; // B458: none on records from before it
+    if (Number.isFinite(rev)) out.signer.groupFixRevision = rev;
+  }
   return out;
 }
 
@@ -185,20 +189,8 @@ export function siteSignedApps(records, current = null) {
   return { apps, signer: current };
 }
 
-let signerNow = null;
-export function siteSignerNow({ fetcher = globalThis.fetch } = {}) {
-  signerNow ??= (async () => {
-    // loaded here, not at startup (module-graph.test.js): groupfix.js brings core/tweaks.js
-    const [{ GROUPFIX }, { webSignerStamp, groupFixHash }] = await Promise.all([import("./groupfix.js"), import("./websign.js")]);
-    let hash = null;
-    try {
-      const r = await fetcher(new URL(`../${GROUPFIX.file}`, import.meta.url));
-      if (r.ok) hash = await groupFixHash(new Uint8Array(await r.arrayBuffer()));
-    } catch { /* no dylib: the version alone decides */ }
-    if (!hash) signerNow = null; // asked again next time, not kept for the session
-    return webSignerStamp(hash);
-  })();
-  return signerNow;
+export async function siteSignerNow() {
+  return (await import("./websign.js")).webSignerNow(); // loaded here, not at startup (module-graph.test.js)
 }
 
 export async function removeInstall(store, id) {

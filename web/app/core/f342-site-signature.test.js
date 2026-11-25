@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { WEB_SIGNER_VERSION, webSignerStamp, groupFixHash, signatureEnd } from "./websign.js";
+import { WEB_SIGNER_VERSION, WEB_GROUPFIX_REVISION, webSignerStamp, webSignerNow, groupFixHash, signatureEnd } from "./websign.js";
 import { parseProfile, needsResign, OLDER_SIGNER_TEXT } from "./signing.js";
 import { appRecord, recordInstall, memoryAppStore, noteSiteSignature, takeSiteSignature, siteSignedApps, signatureOf,
   siteSignerNow, SITE_SIGNATURE_WAIT } from "./installed.js";
@@ -33,8 +33,8 @@ test("groupFixHash: the first 16 hex digits of the dylib's SHA-256; the stamp ca
   const want = createHash("sha256").update(DYLIB).digest("hex").slice(0, 16);
   assert.equal(await groupFixHash(DYLIB), want);
   assert.equal(await groupFixHash(null), null);
-  assert.deepEqual(webSignerStamp(want), { version: WEB_SIGNER_VERSION, groupFix: want });
-  assert.deepEqual(webSignerStamp(), { version: WEB_SIGNER_VERSION, groupFix: null });
+  assert.deepEqual(webSignerStamp(want), { version: WEB_SIGNER_VERSION, groupFix: want, groupFixRevision: WEB_GROUPFIX_REVISION });
+  assert.deepEqual(webSignerStamp(), { version: WEB_SIGNER_VERSION, groupFix: null, groupFixRevision: null });
 });
 
 test("the sign job returns its stamp and the signature's end", async () => {
@@ -50,7 +50,7 @@ test("the sign job returns its stamp and the signature's end", async () => {
     callMain: (args) => { return 0; },
   });
   const r = await runSignJob(create, { ipa: new Uint8Array([0x50, 0x4b, 3, 4]), p12: P12, profile: PROFILE, groupFix: DYLIB });
-  assert.deepEqual(r.signer, { version: WEB_SIGNER_VERSION, groupFix: null }, "no fix injected: no hash");
+  assert.deepEqual(r.signer, { version: WEB_SIGNER_VERSION, groupFix: null, groupFixRevision: null }, "no fix injected: no hash");
   assert.equal(r.expires, signatureEnd(PROFILE));
 });
 
@@ -62,6 +62,7 @@ test("an app that got the group fix carries the dylib's hash", { skip: !existsSy
   const r = await runSignJob(real, { ...base, ipa: joinPieces(first.ipa), appBundleId: "com.example.box" });
   assert.deepEqual(r.injected, [GROUPFIX.inject]);
   assert.equal(r.signer.groupFix, await groupFixHash(DYLIB));
+  assert.equal(r.signer.groupFixRevision, WEB_GROUPFIX_REVISION);
 });
 
 test("appRecord keeps a valid expiry and stamp, and leaves the shape alone without them", () => {
@@ -70,6 +71,7 @@ test("appRecord keeps a valid expiry and stamp, and leaves the shape alone witho
   const r = appRecord({ id: "a", expires: "2026-12-01T00:00:00Z", signer: { version: 1, groupFix: "abc" } }, 5);
   assert.equal(r.expires, "2026-12-01T00:00:00.000Z");
   assert.deepEqual(r.signer, { version: 1, groupFix: "abc" });
+  assert.deepEqual(appRecord({ id: "a", signer: { version: 3, groupFix: "abc", groupFixRevision: 1 } }, 5).signer, { version: 3, groupFix: "abc", groupFixRevision: 1 });
   assert.deepEqual(signatureOf({ expires: "never", signer: { version: "x" } }), {});
   assert.deepEqual(appRecord(r, 9).signer, r.signer, "a record written again keeps them");
 });
@@ -112,7 +114,7 @@ test("siteSignedApps: only records with the website's signature, in signing.inst
 });
 
 test("Needs Re-sign on the website: expiring apps and ones an older website signer signed", async () => {
-  const current = { version: WEB_SIGNER_VERSION, groupFix: "ffff" };
+  const current = webSignerNow();
   const rows = needsResign(siteSignedApps(records, current), { now, window: 2 });
   assert.deepEqual(rows.map((r) => r.id).sort(), ["oldfix", "oldver", "soon"]);
   assert.equal(rows.find((r) => r.id === "oldver").short, OLDER_SIGNER_TEXT);
@@ -130,10 +132,24 @@ test("Installed on the website: days left from the record, no '?' for the others
   assert.deepEqual(extra, []);
 });
 
-test("siteSignerNow: the hosted dylib's hash, once; the version alone when it can't be had", async () => {
-  let calls = 0;
-  const stamp = await siteSignerNow({ fetcher: async () => { calls++; return { ok: true, arrayBuffer: async () => DYLIB.buffer.slice(DYLIB.byteOffset, DYLIB.byteOffset + DYLIB.byteLength) }; } });
-  assert.deepEqual(stamp, { version: WEB_SIGNER_VERSION, groupFix: await groupFixHash(DYLIB) });
-  await siteSignerNow({ fetcher: async () => { calls++; throw new Error("x"); } });
-  assert.equal(calls, 1, "cached");
+test("siteSignerNow: the version, the dylib's revision and each version's reach", async () => {
+  const stamp = await siteSignerNow();
+  assert.deepEqual(stamp, webSignerNow());
+  assert.deepEqual([...stamp.reach.all, ...stamp.reach.groupFix].sort((a, b) => a - b), Array.from({ length: WEB_SIGNER_VERSION }, (_, i) => i + 1));
+  const swift = readFileSync(new URL("../../../native/sign/SignerStamp.swift", import.meta.url), "utf8");
+  assert.equal(WEB_GROUPFIX_REVISION, Number(/static let groupFixRevision = (\d+)/.exec(swift)[1]), "the app's signer injects the same dylib");
+});
+
+test("B458: a website record lists only for a marked change, and leaves the list once re-signed", async () => {
+  const current = webSignerNow();
+  const far = new Date(now.getTime() + 30 * DAY).toISOString();
+  const ids = async (store) => needsResign(siteSignedApps(await store.all(), current), { now, window: 2 }).map((r) => r.id);
+  const store = memoryAppStore();
+  await recordInstall(store, { id: "kept", version: "1", expires: far, signer: { version: 3, groupFix: "496d0525dc08812d" } }, 1);
+  await recordInstall(store, { id: "other", version: "1", expires: far, signer: { version: 3, groupFix: "0000" } }, 1);
+  await recordInstall(store, { id: "rebuilt", version: "1", expires: far, signer: webSignerStamp("cccc") }, 1);
+  assert.deepEqual(await ids(store), ["other"]);
+  noteSiteSignature("other", { expires: far, signer: webSignerStamp("dddd") }, 2);
+  await recordInstall(store, { id: "other", version: "1" }, 3);
+  assert.deepEqual(await ids(store), []);
 });

@@ -309,12 +309,12 @@ _Avoid_: bootstrap, USB install, desktop install
 The number raised by hand when a new group fix holds a change that apps already signed with it should get by a re-sign
 _Said_: dylib revision
 _On screen_: none
-_In code_: SignerStamp.groupFixRevision
+_In code_: SignerStamp.groupFixRevision, WEB_GROUPFIX_REVISION
 _Avoid_: dylib version
 
 **Reach**:
 Which installed apps a marked signer change is for: every app, or only those with the group fix
 _Said_: which apps it affects
 _On screen_: none
-_In code_: SignerStamp.reaches, reach
+_In code_: SignerStamp.reaches, WEB_REACHES, reach
 _Avoid_: scope

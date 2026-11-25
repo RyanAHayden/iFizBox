@@ -101,20 +101,21 @@ test("bytes go to the bridge as base64", () => {
   assert.equal(toBase64(new Uint8Array([255, 0, 1])), "/wAB");
 });
 
-// B259: Needs Re-sign also lists apps an older signer signed (signing.installed's records against its own stamp).
+// B259: Needs Re-sign also lists apps an older signer signed (signing.installed's records against its own stamp); B458:
+// only by a change marked as needing a re-sign that reaches the app.
 test("needsResign: an app with an older signer stamp (or none, as 0.18.0's records) is listed, saying why", async () => {
   const { needsResign, olderSigner, OLDER_SIGNER_TEXT } = await import("./signing.js");
   const now = new Date("2026-11-21T12:00:00Z");
   const later = new Date(now.getTime() + 5 * 86400000).toISOString();
   const soon = new Date(now.getTime() + 0.5 * 86400000).toISOString();
-  const signer = { version: 1, groupFix: "aaaa" };
+  const signer = { version: 1, groupFix: "aaaa", groupFixRevision: 2, reach: { all: [1], groupFix: [] } };
   const installed = { signer, apps: [
     // 0.18.0's record shape: no signer at all
     { bundleId: "old", originalBundleId: "old", name: "Old", version: "1.0", url: "https://x/old.ipa", signed: "2026-11-15T00:00:00Z", expires: later },
     { bundleId: "v0", name: "Version Zero", version: "1.0", expires: later, signer: { version: 0, groupFix: null } },
-    { bundleId: "fix", name: "Old Fix", version: "1.0", expires: later, signer: { version: 1, groupFix: "bbbb" } },
+    { bundleId: "fix", name: "Old Fix", version: "1.0", expires: later, signer: { version: 1, groupFix: "bbbb", groupFixRevision: 1 } },
     { bundleId: "now", name: "Current", version: "1.0", expires: later, signer: { version: 1, groupFix: null } },
-    { bundleId: "nowfix", name: "Current Fix", version: "1.0", expires: later, signer: { version: 1, groupFix: "aaaa" } },
+    { bundleId: "nowfix", name: "Current Fix", version: "1.0", expires: later, signer: { version: 1, groupFix: "aaaa", groupFixRevision: 2 } },
     { bundleId: "soon", name: "Soon", version: "1.0", expires: soon },
     { bundleId: "com.ryha.ifizbox", name: "Self", version: "0.18.0", expires: later },
   ] };
@@ -134,6 +135,45 @@ test("needsResign: an app with an older signer stamp (or none, as 0.18.0's recor
   // a current dylib unknown (none bundled) can't make a record stale
   assert.equal(olderSigner({ bundleId: "y", signer: { version: 1, groupFix: "bbbb" } }, { version: 1, groupFix: null }), false);
   assert.equal(olderSigner({ bundleId: "y", signer: { version: 1, groupFix: "bbbb" } }, null), false);
+});
+
+test("B458: an app is older only by a marked change that reaches it", async () => {
+  const { olderSigner, needsResign } = await import("./signing.js");
+  const HASH = "496d0525dc08812d";
+  const now = { version: 3, groupFix: HASH, groupFixRevision: 1, reach: { all: [1, 2, 3], groupFix: [] } };
+  const older = (signer, current = now) => olderSigner({ bundleId: "y", signer }, current);
+  // records from before the revision: version and hash only
+  assert.equal(older({ version: 3, groupFix: HASH }), false, "0.31.0 on");
+  assert.equal(older({ version: 3, groupFix: HASH, groupFixRevision: null }), false, "the shell's JSON of one");
+  assert.equal(older({ version: 3, groupFix: null }), false, "current, no fix");
+  assert.equal(older({ version: 3, groupFix: "bbbb" }), true, "another dylib");
+  assert.equal(older({ version: 2, groupFix: HASH }), true, "an older version");
+  assert.equal(older({ version: 2, groupFix: null }), true);
+  assert.equal(older(undefined), true, "no stamp");
+  assert.equal(older(null), true);
+  // a new dylib alone lists nothing
+  const rebuilt = { ...now, groupFix: "cccc" };
+  assert.equal(older({ version: 3, groupFix: HASH }, rebuilt), false);
+  assert.equal(older({ version: 3, groupFix: HASH, groupFixRevision: 1 }, rebuilt), false);
+  assert.equal(older({ version: 3, groupFix: "cccc", groupFixRevision: 1 }), false, "its revision decides, not its hash");
+  // a raised revision lists the apps with the fix only
+  const raised = { ...rebuilt, groupFixRevision: 2 };
+  assert.equal(older({ version: 3, groupFix: HASH }, raised), true);
+  assert.equal(older({ version: 3, groupFix: HASH, groupFixRevision: 1 }, raised), true);
+  assert.equal(older({ version: 3, groupFix: null, groupFixRevision: null }, raised), false);
+  // a version reaching only the group fix apps, one reaching all, one with no known reach
+  const fixOnly = { ...now, version: 4, reach: { all: [1, 2, 3], groupFix: [4] } };
+  assert.equal(older({ version: 3, groupFix: HASH, groupFixRevision: 1 }, fixOnly), true);
+  assert.equal(older({ version: 3, groupFix: null }, fixOnly), false);
+  assert.equal(older({ version: 2, groupFix: null }, fixOnly), true, "version 3 reaches it");
+  assert.equal(older({ version: 3, groupFix: null }, { ...now, version: 4, reach: { all: [1, 2, 3, 4], groupFix: [] } }), true);
+  assert.equal(older({ version: 3, groupFix: null }, { ...now, version: 4 }), true, "can't tell");
+  assert.equal(older({ version: 3, groupFix: null }, { version: 4, groupFix: null }), true, "no reach at all");
+  // re-signed: it leaves the list
+  const far = "2030-01-01T00:00:00Z";
+  const list = (signer) => needsResign({ signer: raised, apps: [{ bundleId: "y", name: "Y", expires: far, signer }] }, { now: new Date("2026-11-25T00:00:00Z") }).length;
+  assert.equal(list({ version: 3, groupFix: HASH, groupFixRevision: 1 }), 1);
+  assert.equal(list({ version: raised.version, groupFix: raised.groupFix, groupFixRevision: raised.groupFixRevision }), 0);
 });
 
 test("B312: iOS already installing the same app for another app: the row's words and the failure's", async () => {
