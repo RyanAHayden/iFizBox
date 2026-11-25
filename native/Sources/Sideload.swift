@@ -481,6 +481,7 @@ enum Sideload {
     // still lives opens that link: iOS may still take it, and a second copy on the server would only be a duplicate.
     static func hostAndOpen(_ output: URL, server: String, app: SignedApp, record: SignedRecord, job: SignJob? = nil,
                             log: ((String) -> Void)? = nil, opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void, served: ((Bool) -> Void)?,
+                            serving: (() -> Void)? = nil, // B439: gives the caller's hold back while the link waits for the app in front
                             phase: ((String) -> Void)? = nil) { // B424: "uploading", then "handoff" (the link going to iOS)
         let hand = { (h: CloseForUpdate.Hosted, saved: Bool) in
             phase?("handoff")
@@ -492,7 +493,7 @@ enum Sideload {
                 }
             }
             // B178: iFizBox closes itself once iOS has begun the download, with no notification (the progress page says so)
-            CloseForUpdate.inFront {
+            CloseForUpdate.inFront(idle: serving) {
                 guard h.age < h.life - CloseForUpdate.reuseSpare else { // came back too late
                     opened(.failure(Failed(text: "server: the install link expired while \(Brand.name) was in the background. Try again.")))
                     served?(false)
@@ -600,7 +601,7 @@ enum Sideload {
         }
         if let host = servers.host { // B64: this call's own choice, made when it started
             hostAndOpen(output, server: host, app: app, record: record, job: job, log: log, opened: answered, served: served,
-                        phase: { emit($0, 0) })
+                        serving: serving, phase: { emit($0, 0) })
             return
         }
         emit("handoff", 0) // B424: iOS gets the install link next; its own progress is signing.progress's
@@ -1602,15 +1603,23 @@ enum CloseForUpdate {
     }
 
     // B394: iOS drops an itms-services link opened while iFizBox isn't in front (left during the upload): `go` runs now,
-    // or once it is back. Main queue.
+    // or once it is back. B439: after PromptHold.quiet s of that wait `idle` gives the caller's KeepAlive hold back, and
+    // the page's goes too (Sideload.yieldPageHold): iOS may suspend the app, the link is on the server. Main queue.
     private static var frontToken: NSObjectProtocol?
-    static func inFront(_ go: @escaping () -> Void) {
+    private static var frontRun = 0 // each wait bumps it: a wait another one replaced is over
+    static func inFront(idle: (() -> Void)? = nil, _ go: @escaping () -> Void) {
         frontToken.map(NotificationCenter.default.removeObserver); frontToken = nil
         if UIApplication.shared.applicationState != .background { return go() }
         IDevice.ilog("self-update: uploaded in the background; the prompt opens once \(Brand.name) is in front")
         frontToken = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
             frontToken.map(NotificationCenter.default.removeObserver); frontToken = nil
             go()
+        }
+        frontRun += 1
+        let mine = frontRun
+        DispatchQueue.main.asyncAfter(wallDeadline: .now() + PromptHold.quiet) {
+            idle?() // once however often it is called; already done when the call has answered
+            Sideload.yieldPageHold { frontToken != nil && frontRun == mine }
         }
     }
 

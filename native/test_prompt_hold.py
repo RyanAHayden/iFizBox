@@ -101,6 +101,18 @@ class Wiring(unittest.TestCase):
         self.assertIn("guard waiting() else { return }", page)
         self.assertIn("KeepAlive.shared.holds == 1 && UIApplication.shared.applicationState == .background", page)
 
+    def test_own_update_waiting_for_the_front(self):  # B439: uploaded in the background, the link not opened yet
+        side = read("Sideload.swift")
+        self.assertIn("CloseForUpdate.inFront(idle: serving)", body(side, "static func hostAndOpen(", "\n    }\n\n"))
+        sign = body(side, "static func signAndOpen(", "\n    }\n\n")
+        self.assertIn("serving: serving", sign[sign.index("hostAndOpen("):sign.index('emit("handoff"')])
+        front = body(side, "static func inFront(", "\n    }\n\n")
+        now = front.index("if UIApplication.shared.applicationState != .background { return go() }")
+        rest = front.index("asyncAfter(wallDeadline: .now() + PromptHold.quiet)")
+        self.assertLess(now, rest)  # opened at once: no timer
+        self.assertLess(rest, front.index("idle?()"))
+        self.assertIn("Sideload.yieldPageHold { frontToken != nil && frontRun == mine }", front[rest:])
+
 
 if __name__ == "__main__":
     unittest.main()
