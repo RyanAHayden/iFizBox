@@ -7,6 +7,8 @@ import { readFileSync, existsSync } from "node:fs";
 import { runSignJob, putTweaks, fixExtensions } from "./websign-job.js";
 import { prepareTweaks, dylibsOf, loadCommands, LC, RPATH } from "./core/tweaks.js";
 import { readZip } from "./core/unpack.js";
+import { joinPieces } from "./core/pieces.js";
+import { fileCalls } from "./stream.test-helper.js";
 import { GROUPFIX } from "./core/groupfix.js";
 
 const fx = (n) => new Uint8Array(readFileSync(new URL(`./core/fixtures/signing/${n}`, import.meta.url)));
@@ -17,7 +19,7 @@ const CSMAGIC_EMBEDDED_SIGNATURE = Buffer.from([0xfa, 0xde, 0x0c, 0xc0]);
 
 test("putTweaks: files under the app, folders made; a path outside it is refused", () => {
   const files = new Map(), dirs = new Set();
-  const FS = { mkdir: (p) => { if (dirs.has(p)) throw new Error("EEXIST"); dirs.add(p); }, writeFile: (p, d) => files.set(p, d),
+  const FS = { ...fileCalls(files), mkdir: (p) => { if (dirs.has(p)) throw new Error("EEXIST"); dirs.add(p); }, writeFile: (p, d) => files.set(p, d),
     readFile: (p) => { if (!files.has(p)) throw new Error("ENOENT"); return files.get(p); } };
   files.set("/a/X.app/X", tw("app.macho"));
   const prep = prepareTweaks([{ name: "FixtureUI.framework.zip", data: tw("FixtureUI.framework.zip") }]);
@@ -52,7 +54,7 @@ test("zsign WebAssembly signs an IPA with a tweak: the executable loads it weakl
   assert.ok(cmds.some(([c, n]) => c === LC.RPATH && n === RPATH));
   assert.ok(Buffer.from(exe).includes(Buffer.from("<string>TESTTEAM42.com.ryha.ifizbox</string>")), "signed after the injection");
   assert.ok(Buffer.from(dylib).includes(CSMAGIC_EMBEDDED_SIGNATURE), "zsign signed the tweak");
-  const zip = readZip(r.ipa);
+  const zip = readZip(joinPieces(r.ipa));
   const cr = zip.find((e) => e.path === "Payload/Tiny.app/_CodeSignature/CodeResources");
   assert.ok(Buffer.from(cr.data).includes(Buffer.from("Frameworks/Plain.dylib")), "sealed by the app");
   assert.ok(zip.some((e) => e.path === "Payload/Tiny.app/Frameworks/Plain.dylib"));
@@ -79,7 +81,7 @@ test("B211: an app whose original signature names keychain groups gets the group
   const first = await runSignJob(createZsign, { ...base, ipa: fx("tiny-ifizbox.ipa"), appBundleId: "com.example.box" });
   assert.equal(first.injected, undefined);
   // signed once, it carries keychain-access-groups: signed again as another app, it gets the fix
-  const r = await runSignJob(createZsign, { ...base, ipa: first.ipa, appBundleId: "com.example.box" });
+  const r = await runSignJob(createZsign, { ...base, ipa: joinPieces(first.ipa), appBundleId: "com.example.box" });
   assert.deepEqual(r.injected, [GROUPFIX.inject]);
   assert.ok(loadCommands(seen.exe).some((c) => c.cmd === LC.LOAD_WEAK_DYLIB && c.name === GROUPFIX.inject));
   assert.ok(Buffer.from(seen.dylib).includes(CSMAGIC_EMBEDDED_SIGNATURE), "zsign signed the fix");
@@ -87,12 +89,12 @@ test("B211: an app whose original signature names keychain groups gets the group
   // B327: the sign log names the fix it got, and says when an app that needs one went without (no dylib loaded)
   assert.equal(first.signLog[1], "Group fix: none (the original signature names no app groups or keychain groups)");
   assert.match(r.signLog[1], /^Group fix: no app groups -> the app's own folder; keychain groups stripped/);
-  const bare = await runSignJob(createZsign, { ...base, groupFix: null, ipa: first.ipa, appBundleId: "com.example.box" });
+  const bare = await runSignJob(createZsign, { ...base, groupFix: null, ipa: joinPieces(first.ipa), appBundleId: "com.example.box" });
   assert.equal(bare.signLog[1], "Group fix: none (no fix dylib was loaded, the app's groups go unmapped)");
-  const cr = readZip(r.ipa).find((e) => e.path === "Payload/Tiny.app/_CodeSignature/CodeResources");
+  const cr = readZip(joinPieces(r.ipa)).find((e) => e.path === "Payload/Tiny.app/_CodeSignature/CodeResources");
   assert.ok(Buffer.from(cr.data).includes(Buffer.from(GROUPFIX.config)), "its config sealed by the app");
   // iFizBox's own IPA keeps its own groups: no fix
-  const own = await runSignJob(createZsign, { ...base, ipa: first.ipa, appBundleId: "com.ryha.ifizbox" });
+  const own = await runSignJob(createZsign, { ...base, ipa: joinPieces(first.ipa), appBundleId: "com.ryha.ifizbox" });
   assert.equal(own.injected, undefined);
   assert.equal(seen.dylib, null);
 });
@@ -102,14 +104,13 @@ test("B425: the app's notification extensions load the group fix from the app's 
   const ext = (point) => ({ CFBundleExecutable: "E", NSExtension: { NSExtensionPointIdentifier: point } });
   const plists = { "/a/PlugIns/N.appex/Info.plist": ext("com.apple.usernotifications.service"),
     "/a/PlugIns/S.appex/Info.plist": ext("com.apple.share-services"), "/a/PlugIns/B.appex/Info.plist": ext("com.apple.usernotifications.service") };
-  const files = { "/a/PlugIns/N.appex/E": app, "/a/PlugIns/S.appex/E": app, "/a/PlugIns/B.appex/E": new Uint8Array([1, 2, 3]) };
-  const FS = { readdir: (p) => { if (p !== "/a/PlugIns") throw new Error("ENOENT"); return [".", "..", "N.appex", "S.appex", "B.appex"]; },
-    readFile: (p) => files[p], writeFile: (p, d) => { files[p] = d; } };
+  const files = new Map([["/a/PlugIns/N.appex/E", app], ["/a/PlugIns/S.appex/E", app], ["/a/PlugIns/B.appex/E", new Uint8Array([1, 2, 3])]]);
+  const FS = { ...fileCalls(files), readdir: (p) => { if (p !== "/a/PlugIns") throw new Error("ENOENT"); return [".", "..", "N.appex", "S.appex", "B.appex"]; } };
   const run = () => fixExtensions(FS, "/a", (p) => plists[p]);
   assert.deepEqual(run(), ["Group fix in PlugIns/N.appex", "No group fix in PlugIns/B.appex: its executable couldn't take it"]);
   run(); // signed again: once only
-  const cmds = loadCommands(files["/a/PlugIns/N.appex/E"]);
+  const cmds = loadCommands(files.get("/a/PlugIns/N.appex/E"));
   assert.equal(cmds.filter((c) => c.cmd === LC.LOAD_WEAK_DYLIB && c.name === GROUPFIX.inject).length, 1);
   assert.ok(cmds.some((c) => c.name === GROUPFIX.extensionRpath));
-  assert.equal(files["/a/PlugIns/S.appex/E"], app);
+  assert.equal(files.get("/a/PlugIns/S.appex/E"), app);
 });

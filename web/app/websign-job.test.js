@@ -7,6 +7,8 @@ import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import { runSignJob, zsignCrash } from "./websign-job.js";
 import { parsePlist } from "./core/signing.js";
+import { joinPieces } from "./core/pieces.js";
+import { fakeStream, afterOpen } from "./stream.test-helper.js";
 
 const fx = (n) => new Uint8Array(readFileSync(new URL(`./core/fixtures/signing/${n}`, import.meta.url)));
 const P12 = fx("test.p12"), PROFILE = fx("test.mobileprovision");
@@ -26,21 +28,18 @@ function fakeZsign({ plist = { CFBundleIdentifier: "io.github.x.delta", CFBundle
       unlink: (p) => files.delete(p),
       readdir: (p) => { if (p !== "/w/app/Payload" || unzip) throw new Error("ENOENT"); return [".", "..", appName]; },
     },
-    ccall: (name, _r, _t, args) => {
-      if (name === "ifizbox_unzip") {
-        seen.unzipped = files.get(args[0]);
-        if (!unzip) { dirs.add(`/w/app/Payload/${appName}`); dirs.add(`/w/app/Payload/${appName}/web`); }
-        return unzip;
-      }
+    ipaStream: fakeStream({ unzip, open: (b) => {
+      seen.opened = b;
+      if (!unzip) { dirs.add(`/w/app/Payload/${appName}`); dirs.add(`/w/app/Payload/${appName}/web`); }
+    } }),
+    ccall: (name) => {
       if (name === "ifizbox_plist_json") return plist ? JSON.stringify(plist) : "";
       throw new Error("unknown " + name);
     },
     callMain: (args) => {
       seen.args = args;
-      seen.inputGone = !files.has("/w/in.ipa");
       if (throws !== undefined) throw throws;
       if (fail) { for (const l of fail) print(l); return 255; }
-      files.set(args[args.indexOf("-o") + 1], new Uint8Array([0x50, 0x4b, 9, 9]));
       return 0;
     },
   });
@@ -54,10 +53,10 @@ test("signs: unzips, reads the app, passes zsign the certificate, profile, narro
   const steps = [];
   const r = await runSignJob(create, job(), { progress: (p) => steps.push(p) });
   assert.deepEqual(steps, ["Signing"]);
-  assert.deepEqual([...seen.unzipped], [...ZIP]);
-  assert.equal(seen.inputGone, true, "the zip is freed once it's unpacked");
+  assert.deepEqual([...seen.opened], [...ZIP]);
+  assert.equal([...seen.files.values()].some((d) => d.length === ZIP.length), false, "the IPA isn't copied into zsign's files");
   assert.deepEqual(seen.args, ["-f", "-k", "/w/key.p12", "-p", "hunter2", "-m", "/w/app.mobileprovision", "-t", "/w/tmp",
-    "-z", "1", "-o", "/w/out.ipa", "-e", "/w/ents.plist", "/w/app/Payload/Delta.app"]);
+    "-e", "/w/ents.plist", "/w/app/Payload/Delta.app"]);
   const ents = parsePlist(text(seen.files.get("/w/ents.plist")));
   assert.equal(ents["application-identifier"], "TESTTEAM42.io.github.x.delta");
   assert.equal(ents["get-task-allow"], false);
@@ -65,7 +64,7 @@ test("signs: unzips, reads the app, passes zsign the certificate, profile, narro
   assert.equal(r.bundleId, "io.github.x.delta");
   assert.equal(r.name, "Delta");
   assert.equal(r.version, "1.2");
-  assert.deepEqual([...r.ipa], [0x50, 0x4b, 9, 9]);
+  assert.deepEqual([...joinPieces(r.ipa)], [0x50, 0x4b, 9, 9]);
   assert.equal(seen.files.has("/w/app/Payload/Delta.app/ifizbox-identity.plist"), false);
   // B327: the keychain groups and the group fix it signed with, in the app's sign log's words
   assert.deepEqual(r.signLog, ["Keychain: TESTTEAM42.io.github.x.delta (application-identifier TESTTEAM42.io.github.x.delta)",
@@ -140,14 +139,14 @@ test("zsign WebAssembly signs a tiny IPA, sealing iFizBox's bring files", { skip
   assert.equal(r.bundleId, "com.ryha.ifizbox");
   assert.equal(r.name, "Tiny iFizBox"); // from a binary Info.plist
   assert.equal(r.version, "9.9");
-  assert.equal(r.ipa[0], 0x50);
+  assert.equal(r.ipa[0][0], 0x50);
   for (const n of ["Payload/Tiny.app/_CodeSignature/CodeResources", "Payload/Tiny.app/embedded.mobileprovision",
-    "Payload/Tiny.app/ifizbox-identity.plist", "Payload/Tiny.app/web/transfer.link"]) assert.ok(has(r.ipa, n), n);
+    "Payload/Tiny.app/ifizbox-identity.plist", "Payload/Tiny.app/web/transfer.link"]) assert.ok(has(joinPieces(r.ipa), n), n);
 });
 
 test("zsign WebAssembly signs the executable itself: the profile's entitlements and a CMS signature", { skip: !existsSync(WASM) && "no vendor/zsign" }, async () => {
   // zsign signs each Mach-O in a MAP_SHARED mapping; emscripten writes it back at munmap through the mapping's fd,
-  // which zsign had closed (tools/zsign-wasm/fs-mmap.patch): the app kept its old signature and iOS refused it.
+  // which zsign had closed (before tools/zsign-wasm/stream-files.patch): the app kept its old signature and iOS refused it.
   const { default: real } = await import(WASM);
   let exe = null;
   const createZsign = async (o) => {
@@ -193,11 +192,9 @@ async function signWithExtensions(over = {}) {
   const { default: real } = await import(WASM);
   const tree = {};
   const createZsign = async (o) => {
-    const zs = await real(o), { FS } = zs, { ccall, callMain } = zs;
+    const zs = await real(o), { FS } = zs, { callMain } = zs;
     const app = "/w/app/Payload/Tiny.app";
-    zs.ccall = (name, ...rest) => {
-      const r = ccall(name, ...rest);
-      if (name === "ifizbox_unzip") {
+    afterOpen(zs, () => {
         for (const [dir, id] of [["PlugIns/Share.appex", "share"], ["Extensions/Kit.appex", "kit"], ["Watch/W.app", "watch"]]) {
           FS.mkdir(`${app}/${dir.split("/")[0]}`);
           FS.mkdir(`${app}/${dir}`);
@@ -206,9 +203,7 @@ async function signWithExtensions(over = {}) {
             + `<key>CFBundleIdentifier</key><string>com.ryha.ifizbox.${id}</string><key>CFBundleExecutable</key><string>Tiny</string></dict></plist>`);
         }
         FS.writeFile(`${app}/PlugIns/Share.appex/embedded.mobileprovision`, "an old profile");
-      }
-      return r;
-    };
+    });
     zs.callMain = (args) => {
       const walk = (p) => {
         for (const n of FS.readdir(p)) {
@@ -235,7 +230,7 @@ test("zsign WebAssembly, ID kept: app extensions stay, signed, with the app's pr
     assert.ok(has(tree["_CodeSignature/CodeResources"], `${dir}/embedded.mobileprovision`), "the app seals it too");
     assert.ok(has(tree[`${dir}/Tiny`], `com.ryha.ifizbox.${id}\0`), "its own ID is its code identifier");
     assert.ok(has(tree[`${dir}/Tiny`], "<string>TESTTEAM42.com.ryha.ifizbox</string>"), "the app's entitlements");
-    assert.ok(has(r.ipa, `Payload/Tiny.app/${dir}/embedded.mobileprovision`), "in the signed IPA");
+    assert.ok(has(joinPieces(r.ipa), `Payload/Tiny.app/${dir}/embedded.mobileprovision`), "in the signed IPA");
   }
   assert.ok(!inExt(tree).some((p) => p.startsWith("Watch/")));
 });

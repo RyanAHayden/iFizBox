@@ -1,0 +1,241 @@
+--- a/src/common/fs.cpp
++++ b/src/common/fs.cpp
+@@ -6,6 +6,67 @@
+ 
+ map<void*, void*> ZFile::s_mapFiles;
+ 
++#ifdef __EMSCRIPTEN__
++// Emscripten's mmap copies the file in and, for MAP_SHARED, back out at munmap. Here that copy is plain malloc, read and
++// write (iFizBox F265): one buffer, reserved at the size of the app's biggest executable, serves one mapping after the
++// other, and a changed executable is written from it into a file that deflates as it is written
++// (web/app/websign-stream.js). `save` false drops the mapping's changes. Nothing here may fail quietly: an executable that
++// can't be mapped would be left unsigned.
++struct MappedFile { string path; size_t size; bool ro; };
++static map<void*, MappedFile> s_mapped;
++static void* s_reserve = NULL;
++static size_t s_reserveSize = 0;
++static bool s_reserveUsed = false;
++
++bool ZFile::ReserveMap(size_t size)
++{
++	if (s_reserveUsed) {
++		return false;
++	}
++	free(s_reserve);
++	s_reserve = malloc(size);
++	s_reserveSize = NULL != s_reserve ? size : 0;
++	return NULL != s_reserve;
++}
++
++static void ReleaseMap(void* base)
++{
++	if (base == s_reserve) {
++		s_reserveUsed = false;
++	} else {
++		free(base);
++	}
++}
++
++static void* ReadMap(const char* path, int fd, size_t offset, size_t size, bool ro)
++{
++	if (0 == size) {
++		return NULL;
++	}
++	void* base = NULL;
++	if (!s_reserveUsed && size <= s_reserveSize) {
++		base = s_reserve;
++		s_reserveUsed = true;
++	} else {
++		base = malloc(size);
++		if (NULL == base) {
++			abort(); // out of memory
++		}
++	}
++	size_t got = 0;
++	while (got < size) {
++		ssize_t n = pread(fd, (uint8_t*)base + got, size - got, (off_t)(offset + got));
++		if (n <= 0) {
++			ReleaseMap(base);
++			return NULL;
++		}
++		got += (size_t)n;
++	}
++	s_mapped[base] = { path, size, ro };
++	return base;
++}
++#endif
++
+ bool ZFile::IsRegularFile(const char* path)
+ {
+ 	struct stat st = { 0 };
+@@ -54,10 +115,14 @@
+ 			*psize = size;
+ 		}
+ 
++#ifdef __EMSCRIPTEN__
++		base = ReadMap(path, fd, offset, size, ro);
++#else
+ 		base = mmap(NULL, size, ro ? PROT_READ : PROT_READ | PROT_WRITE, MAP_SHARED, fd, offset);
+ 		if (MAP_FAILED == base) {
+ 			base = NULL;
+ 		}
++#endif
+ 		close(fd);
+ 	}
+ 
+@@ -66,7 +131,7 @@
+ 	return base;
+ }
+ 
+-bool ZFile::UnmapFile(void* base, size_t size)
++bool ZFile::UnmapFile(void* base, size_t size, bool save)
+ {
+ #ifdef _WIN32
+ 	auto it = s_mapFiles.find(base);
+@@ -78,8 +143,22 @@
+ 	}
+ 	return false;
+ #else
++#ifdef __EMSCRIPTEN__
++	auto it = s_mapped.find(base);
++	if (it == s_mapped.end()) {
++		return false;
++	}
++	bool ok = true;
++	if (save && !it->second.ro) {
++		ok = WriteFile(it->second.path.c_str(), (const char*)base, it->second.size);
++	}
++	s_mapped.erase(it);
++	ReleaseMap(base);
++	return ok;
++#else
+ 	return (0 == munmap(base, size));
+ #endif
++#endif
+ }
+ 
+ bool ZFile::WriteFile(const char* szFile, const char* szData, size_t sLen)
+--- a/src/common/fs.h
++++ b/src/common/fs.h
+@@ -35,7 +35,10 @@
+ 	static string	GetFullPath(const char* szPath);
+ 	static string	GetRealPathV(const char* szPath, ...);
+ 	static void*	MapFile(const char* path, size_t offset, size_t size, size_t* psize, bool ro);
+-	static bool		UnmapFile(void* base, size_t size);
++	static bool		UnmapFile(void* base, size_t size, bool save = true);
++#ifdef __EMSCRIPTEN__
++	static bool		ReserveMap(size_t size);
++#endif
+ 	static bool		IsPathSuffix(const string& strPath, const char* suffix);
+ 	static const char* GetTempFolder();
+ 	static bool		EnumFolder(const char* szFolder, bool bRecursive, enum_folder_callback filter, enum_folder_callback callback);
+--- a/src/common/sha.cpp
++++ b/src/common/sha.cpp
+@@ -57,6 +57,35 @@
+ {
+ 	strSHA1.clear();
+ 	strSHA256.clear();
++#ifdef __EMSCRIPTEN__
++	// In pieces, never the whole file in memory (iFizBox F265).
++	FILE* fp = fopen(szFile, "rb");
++	if (NULL == fp) {
++		return false;
++	}
++	setvbuf(fp, NULL, _IONBF, 0);
++	static uint8_t buf[64 * 1024];
++	SHA_CTX c1;
++	SHA256_CTX c256;
++	::SHA1_Init(&c1);
++	::SHA256_Init(&c256);
++	size_t n;
++	while ((n = fread(buf, 1, sizeof(buf), fp)) > 0) {
++		::SHA1_Update(&c1, buf, n);
++		::SHA256_Update(&c256, buf, n);
++	}
++	bool bad = 0 != ferror(fp);
++	fclose(fp);
++	if (bad) {
++		return false;
++	}
++	uint8_t h1[20], h256[32];
++	::SHA1_Final(h1, &c1);
++	::SHA256_Final(h256, &c256);
++	strSHA1.append((const char*)h1, sizeof(h1));
++	strSHA256.append((const char*)h256, sizeof(h256));
++	return true;
++#else
+ 	size_t sSize = 0;
+ 	uint8_t* pBase = (uint8_t*)ZFile::MapFile(szFile, 0, 0, &sSize, true);
+ 	if (NULL == pBase) { // an empty file can't be mapped, but an unreadable one must not hash as empty
+@@ -69,6 +98,7 @@
+ 		ZFile::UnmapFile(pBase, sSize);
+ 	}
+ 	return (!strSHA1.empty() && !strSHA256.empty());
++#endif
+ }
+ 
+ bool ZSHA::SHABase64(const string& strData, string& strSHA1Base64, string& strSHA256Base64)
+--- a/src/macho.cpp
++++ b/src/macho.cpp
+@@ -14,6 +14,9 @@
+ 
+ ZMachO::~ZMachO()
+ {
++#ifdef __EMSCRIPTEN__
++	CloseFile(false); // a file that isn't a Mach-O after all gives its buffer back (iFizBox F265)
++#endif
+ 	FreeArchOes();
+ }
+ 
+@@ -91,16 +94,20 @@
+ 	return (!m_arrArchOes.empty());
+ }
+ 
+-bool ZMachO::CloseFile()
++bool ZMachO::CloseFile(bool save)
+ {
+ 	if (NULL == m_pBase || m_sSize <= 0) {
+ 		return false;
+ 	}
+ 
+-	if (!ZFile::UnmapFile((void*)m_pBase, m_sSize)) {
++	if (!ZFile::UnmapFile((void*)m_pBase, m_sSize, save)) {
+ 		ZLog::ErrorV(">>> CodeSign write(munmap) failed! Error: %p, %lu, %s\n", m_pBase, m_sSize, strerror(errno));
+ 		return false;
+ 	}
++#ifdef __EMSCRIPTEN__
++	m_pBase = NULL;
++	m_sSize = 0;
++#endif
+ 	return true;
+ }
+ 
+@@ -179,7 +186,7 @@
+ 	ZLog::Warn(">>> Success!\n");
+ 
+ 	if (1 == m_arrArchOes.size()) {
+-		CloseFile();
++		CloseFile(false); // the file goes next: its changes are in the new one (iFizBox F265: saved, it was deflated for nothing)
+ 		ZFile::RemoveFile(m_strFile.c_str());
+ 		string strNewArchOFile = m_strFile + ".archo.0";
+ 		if (0 == rename(strNewArchOFile.c_str(), m_strFile.c_str())) {
+@@ -194,7 +201,7 @@
+ 			fat_arch arch = *((fat_arch*)(m_pBase + sizeof(fat_header) + sizeof(fat_arch) * i));
+ 			arrArches.push_back(arch);
+ 		}
+-		CloseFile();
++		CloseFile(false);
+ 
+ 		if (arrArches.size() != m_arrArchOes.size()) {
+ 			return false;
+--- a/src/macho.h
++++ b/src/macho.h
+@@ -24,7 +24,7 @@
+ 
+ private:
+ 	bool OpenFile(const char* szPath);
+-	bool CloseFile();
++	bool CloseFile(bool save = true);
+ 
+ 	bool NewArchO(uint8_t* pBase, uint32_t uLength);
+ 	void FreeArchOes();

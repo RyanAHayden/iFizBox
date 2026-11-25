@@ -28,7 +28,7 @@ test("zsign WebAssembly: a .bundle and a .framework without their executables ar
     const r = await runSignJob(createZsign, { ipa: fx("../fixtures/missing-exe.ipa"), p12: fx("./core/fixtures/signing/test.p12"),
       profile: fx("./core/fixtures/signing/test.mobileprovision"), password: "hunter2" });
     assert.equal(r.bundleId, "com.ryha.ifizbox");
-    assert.equal(r.ipa[0], 0x50);
+    assert.equal(r.ipa[0][0], 0x50);
     assert.ok(log.some((l) => /Skipped Frameworks\/Kit\.framework: its executable Kit is missing/.test(l)), log.join("\n"));
     for (const f of ["YTUHD.bundle/Info.plist", "YTUHD.bundle/en.lproj/Localizable.strings", "Frameworks/Kit.framework/Info.plist",
       "Frameworks/Kit.framework/kit.txt", "DontEatMyContent.bundle/Info.plist"]) assert.ok(resources?.includes(`<key>${f}</key>`), `${f} sealed by the app`);

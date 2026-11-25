@@ -1,6 +1,7 @@
 // F237: Keep Bundle IDs. The ID and entitlement choice per profile kind and option (both signers' rules: core/websign.js
 // signingIds, core/keepid.js keepPlan), the warnings, the guide link, the bridge params, the website's job (no -b,
 // the profile's App ID in the entitlements), Custom Install's params and the queue's library job.
+import { fakeStream } from "../stream.test-helper.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { keepPlan, profileFacts, profileNotes, originalNote, sheetNotes, notifyNote, originalState, withKeep, storedKeep, keepOn,
@@ -173,8 +174,9 @@ function fakeZsign(bundleId) {
       mkdir: () => {}, writeFile: (p, d) => files.set(p, d), readFile: (p) => files.get(p), unlink: (p) => files.delete(p),
       readdir: () => [".", "..", "App.app"],
     },
-    ccall: (name) => (name === "ifizbox_unzip" ? 0 : JSON.stringify({ CFBundleIdentifier: bundleId, CFBundleName: "App" })),
-    callMain: (args) => { seen.args = args; files.set(args[args.indexOf("-o") + 1], new Uint8Array([0x50, 0x4b, 1])); return 0; },
+    ipaStream: fakeStream(),
+    ccall: () => JSON.stringify({ CFBundleIdentifier: bundleId, CFBundleName: "App" }),
+    callMain: (args) => { seen.args = args; return 0; },
   });
   return { create, seen };
 }

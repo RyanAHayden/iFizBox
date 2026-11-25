@@ -1,12 +1,13 @@
 // F292: the IPA's SHA-256 taken when it is signed (the website's signing job; the shell's signing.install /
 // signing.prepare answers), kept for Report as Malicious (core/malicious.js rememberIpaHash) under the app page's ID and
 // version and the IPA's own, and refused before signing when MALWARE_IPAS lists it (refuseSha256, code "malware").
+import { fakeStream } from "./stream.test-helper.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { memStorage as memory } from "./fakes.test-helper.js";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { runSignJob, ipaSha256 } from "./websign-job.js";
+import { runSignJob } from "./websign-job.js";
 import { rememberSigned, malwareHashes, ipaHash, MALWARE_REFUSED, MALWARE_IPAS } from "./core/malicious.js";
 import { keepIpaHash, prepareOnDevice, installOnDevice, KNOWN_MALWARE } from "./signing-client.js";
 
@@ -29,16 +30,13 @@ function fakeZsign() {
       readdir: (p) => { if (p !== "/w/app/Payload") throw new Error("ENOENT"); return ["Delta.app"]; },
       stat: () => { throw new Error("ENOENT"); },
     },
-    ccall: (name) => (name === "ifizbox_unzip" ? 0 : JSON.stringify({ CFBundleIdentifier: "io.x.delta", CFBundleName: "Delta", CFBundleShortVersionString: "1.2" })),
-    callMain: (args) => { seen.signed = true; files.set(args[args.indexOf("-o") + 1], new Uint8Array([0x50, 0x4b, 9, 9])); return 0; },
+    ipaStream: fakeStream(),
+    ccall: () => JSON.stringify({ CFBundleIdentifier: "io.x.delta", CFBundleName: "Delta", CFBundleShortVersionString: "1.2" }),
+    callMain: (args) => { seen.signed = true; return 0; },
   });
   return { create, seen };
 }
 const job = (over = {}) => ({ ipa: ZIP.buffer.slice(0), p12: P12, profile: PROFILE, password: "", ...over });
-
-test("ipaSha256: the bytes' SHA-256 in lowercase hex", async () => {
-  assert.equal(await ipaSha256(ZIP), SHA);
-});
 
 test("the website's signing job answers the IPA's hash, taken before signing", async () => {
   const { create } = fakeZsign();

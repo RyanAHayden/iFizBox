@@ -1,8 +1,9 @@
 // F93: one signing job on the website, inside the Web Worker (signing-worker.js): zsign (vendor/zsign, WebAssembly)
-// signs an IPA with the user's certificate, all in the worker's memory. Nothing here touches the network.
+// signs an IPA with the user's certificate, all in the worker's memory, the app's files still compressed there (F265:
+// websign-stream.js). Nothing here touches the network.
 //
 //   await runSignJob(createZsign, { ipa, p12, password, profile, bring, appBundleId, keepBundleId, tweaks, groupFix, refuseSha256 }, { progress })
-//     -> { ipa: Uint8Array (signed), bundleId (signed as), originalId, name, version, sha256 (of the IPA as it came),
+//     -> { ipa: [Uint8Array] (signed, in pieces: core/pieces.js), bundleId (signed as), originalId, name, version, sha256 (of the IPA as it came),
 //          injected?, warnings? (B227: data iOS keeps from the app after this signature, in words),
 //          signer (F342: core/websign.js webSignerStamp), expires? (F342: ISO, core/websign.js signatureEnd),
 //          signLog (B327: the keychain groups and group fix config it signed with, in the app's sign log's words) }
@@ -10,7 +11,7 @@
 //   malware (F292: the IPA's SHA-256 is in refuseSha256, core/malicious.js malwareHashes).
 //
 // `createZsign` is the module factory (vendor/zsign/zsign.js; a fake in the tests): it takes { print, printErr }
-// and resolves a module with FS, ccall and callMain. A fresh module per job: zsign's main() keeps globals.
+// and resolves a module with FS, ccall and callMain, what websign-stream.js calls, or an ipaStream of its own. A fresh module per job: zsign's main() keeps globals.
 // bring (iFizBox's own IPA only, com.ryha.ifizbox): { identity: true } puts the .p12, password and profile inside the
 // app as ifizbox-identity.plist (the app imports it on first launch, native BundledIdentity) and { transfer: link }
 // writes the website's ifizbox://import link as web/transfer.link (app.js imports it once); both before zsign seals
@@ -27,6 +28,7 @@ import { keychainLogLine } from "./core/websign.js"; // B327
 import { NAME } from "./brand.js";
 import { MALWARE_REFUSED } from "./core/malicious.js";
 import { prepareSeal } from "./websign-seal.js"; // B434
+import { ipaStream, editHead } from "./websign-stream.js"; // F265
 
 const fail = (code, message) => Object.assign(new Error(message), { code });
 
@@ -61,33 +63,23 @@ export function profileExtensions(FS, appDir, profile) {
   }
 }
 
-// F292: the IPA's SHA-256 (lowercase hex) as it came, before anything changes it; null where the browser has no
-// crypto.subtle (an http page), which only leaves the report and the hash check without it.
-export async function ipaSha256(bytes) {
-  try {
-    const d = new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256", bytes));
-    return Array.from(d, (b) => b.toString(16).padStart(2, "0")).join("");
-  } catch { return null; }
-}
-
 export async function runSignJob(createZsign, { ipa, p12, password = "", profile, bring = null, appBundleId = null, keepBundleId = true, tweaks = null, groupFix = null, refuseSha256 = [] }, { progress = () => {} } = {}) {
   const bytes = ipa instanceof Uint8Array ? ipa : new Uint8Array(ipa);
   if (!isZip(bytes)) throw fail("bad_ipa", "That file isn't an IPA (a zip archive).");
-  // F292: hashed before signing; one on the known-malware list (core/malicious.js MALWARE_IPAS) goes no further
-  const sha256 = await ipaSha256(bytes);
-  if (sha256 && (refuseSha256 ?? []).some((h) => String(h).toLowerCase() === sha256)) throw fail("malware", MALWARE_REFUSED);
-  let prof;
-  try { prof = profileInfo(profile); } catch (e) { throw fail("bad_profile", e.message); }
   const log = [];
   const zs = await createZsign({ print: (s) => log.push(s), printErr: (s) => log.push(s) });
   const { FS } = zs;
+  const stream = ipaStream(zs, "/w/app");
+  // F292: the IPA's SHA-256 as it came, before anything changes it; one on the known-malware list (core/malicious.js
+  // MALWARE_IPAS) goes no further. F265: in pieces, as crypto.subtle takes a copy of the whole IPA.
+  const sha256 = stream.sha256(bytes);
+  if ((refuseSha256 ?? []).some((h) => String(h).toLowerCase() === sha256)) throw fail("malware", MALWARE_REFUSED);
+  let prof;
+  try { prof = profileInfo(profile); } catch (e) { throw fail("bad_profile", e.message); }
   progress("Signing");
   FS.mkdir("/w");
-  FS.writeFile("/w/in.ipa", bytes);
-  if (zs.ccall("ifizbox_unzip", "number", ["string", "string"], ["/w/in.ipa", "/w/app"]) !== 0) {
-    throw fail("bad_ipa", "That IPA couldn't be unpacked.");
-  }
-  FS.unlink("/w/in.ipa"); // the browser's memory is the limit: the zip goes once it's unpacked
+  const UNREADABLE = "That IPA couldn't be unpacked.";
+  try { stream.open(bytes); } catch { throw fail("bad_ipa", UNREADABLE); }
   const readPlist = (path) => JSON.parse(zs.ccall("ifizbox_plist_json", "string", ["string"], [path]) || "null");
   prepareSeal(FS, "/w/app/Payload", { readPlist, removeTree }); // B434: before anything is looked up by name (it can rename the app's folder)
   let apps = [];
@@ -148,15 +140,20 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   }
   FS.mkdir("/w/tmp");
   const args = zsignArgs({ p12: "/w/key.p12", password, profile: "/w/app.mobileprovision", entitlements: "/w/ents.plist",
-    bundleId: bundleId !== info.bundleId ? bundleId : null, input: appDir, output: "/w/out.ipa", temp: "/w/tmp" });
+    bundleId: bundleId !== info.bundleId ? bundleId : null, input: appDir, temp: "/w/tmp" });
+  const stopped = (e) => fail("sign_failed", `zsign stopped: ${zsignCrash(e)}. The app may be too big for this browser.`);
   let code;
-  try { code = zs.callMain(args); } catch (e) {
-    if (typeof e?.status !== "number") throw fail("sign_failed", `zsign stopped: ${zsignCrash(e)}. The app may be too big for this browser.`);
+  try {
+    stream.reserve();
+    code = zs.callMain(args);
+  } catch (e) {
+    if (typeof e?.status !== "number") throw stopped(e);
     code = e.status; // exit(): emscripten's ExitStatus
   }
-  let out = null;
-  try { out = code === 0 ? FS.readFile("/w/out.ipa") : null; } catch { /* no output */ }
-  if (!out?.length) throw fail("sign_failed", zsignError(log));
+  if (stream.damaged) throw fail("bad_ipa", UNREADABLE); // a file's data didn't inflate while zsign read it
+  if (code !== 0) throw fail("sign_failed", zsignError(log));
+  let out;
+  try { out = stream.pack(); } catch (e) { throw stopped(e); }
   // B227: what iOS will keep from the app after this signature (the group folder an earlier sign used, gone from this profile)
   const warnings = plan?.lost ? [`This profile has no ${plan.lost}, where ${info.name} kept its shared data until now: iOS keeps that folder from it.`] : [];
   // F342: the signer stamp (the group fix dylib's hash when the app got it) and the signature's end, for the install record
@@ -198,9 +195,8 @@ export function putTweaks(FS, appDir, plist, { files, inject = [] }) {
   }
   if (!inject.length) return [];
   const exe = `${appDir}/${plist.CFBundleExecutable || ""}`;
-  let bin;
-  try { bin = FS.readFile(exe); } catch { throw fail("bad_ipa", "That IPA's app has no executable to inject the tweaks into."); }
-  try { FS.writeFile(exe, injectInto(bin, inject)); } catch (e) { throw fail(e?.code ?? "bad_tweak", e?.message ?? String(e)); }
+  try { FS.stat(exe); } catch { throw fail("bad_ipa", "That IPA's app has no executable to inject the tweaks into."); }
+  try { editHead(FS, exe, (bin) => injectInto(bin, inject)); } catch (e) { throw fail(e?.code ?? "bad_tweak", e?.message ?? String(e)); }
   return [...inject];
 }
 
@@ -217,7 +213,7 @@ export function fixExtensions(FS, appDir, readPlist) {
       if (!isNotificationExtension(plist) || !plist.CFBundleExecutable) continue;
       const exe = `${appDir}/${dir}/${n}/${plist.CFBundleExecutable}`;
       try {
-        FS.writeFile(exe, injectInto(FS.readFile(exe), [GROUPFIX.inject], { rpath: GROUPFIX.extensionRpath }));
+        editHead(FS, exe, (bin) => injectInto(bin, [GROUPFIX.inject], { rpath: GROUPFIX.extensionRpath }));
         lines.push(`Group fix in ${dir}/${n}`);
       } catch { lines.push(`No group fix in ${dir}/${n}: its executable couldn't take it`); }
     }
