@@ -873,8 +873,11 @@ A web page can't read the UDID, but iOS gives it to a "Profile Service" profile 
   for the IPA ends its row "Failed: iOS didn't download it" (the user's Cancel and a frozen server look the same;
   "Cancelled" is only iFizBox's own Stop and Cancel); the IPA stays served, and the row's Try Again asks iOS again
   (`signing.reprompt`, no new signing; it signs again when the IPA is no longer served). A download or signing phase with no
-  progress for 3 minutes fails its row. Top right: the red Cancel while it runs (everything not finished is abandoned,
-  then Confirm again with the finished apps cleared), Retry All after failures, Done when clean. Re-sign rows end
+  progress for 3 minutes fails its row. Top left: the plain Cancel while it runs (everything not finished is abandoned,
+  then Confirm again with the finished apps cleared); top right while it runs: Hide, which slides the page away and
+  leaves the Run Strip under every tab's nav bar with the run's status or "Tap Install on the iOS prompt: <app>", then
+  the summary once it ends; Show reopens the page. iFizBox's own IPA reaching iOS brings the page back and removes
+  Hide. After failures Retry All is top right and Close top left; when clean the bar has no buttons. Re-sign rows end
   "Re-signed, expires <date>". The Log has one line per phase per app; percents only move the bars. A Custom Install
   job signs from its url with its edits here (the look's token isn't used). The website keeps the one-at-a-time run.
 - **Settings > Installation & Signing** (sideload, under the walkthrough; `screens/signed-apps.js`): Certificate Status with Check

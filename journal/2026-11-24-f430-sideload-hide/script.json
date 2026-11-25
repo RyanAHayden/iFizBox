@@ -1,0 +1,7 @@
+[{"wait":2000},{"eval":"localStorage.setItem('ifizbox.firstVisit','later')"},{"eval":"document.querySelectorAll('.banner,.sheet').forEach(e=>e.remove())"},
+{"eval":"(async()=>{const m=await import('./screens/apprun.js');const q=await import('./core/appqueue.js');const queue=q.createAppQueue();[['a','Alpha'],['b','Beta']].forEach(([id,name])=>queue.add({id,name,mode:'install',url:'https://x/'+id+'.ipa',version:'1.0'}));window.__end={};const lanes={sign:async r=>({token:r.id,bundleId:r.id}),install:(r,{progress})=>new Promise(f=>{progress('asking',0);window.__prog=p=>progress('installing',p);window.__end[r.id]=()=>f({installed:true})}),discard(){}};m.runAppRun(queue.list(),{queue,lanes,record:async()=>{}});return 'started'})()"},
+{"wait":1200},{"shot":"1-running"},
+{"eval":"[...document.querySelectorAll('.progress-page .bar-button')].find(b=>b.textContent==='Hide').click()"},{"wait":1000},{"shot":"2-prompt"},
+{"eval":"__prog(0.4)"},{"wait":300},{"shot":"3-installing"},
+{"eval":"__end.a()"},{"wait":500},{"eval":"__end.b()"},{"wait":800},{"shot":"4-ended"},
+{"eval":"document.querySelector('.qr-strip').click()"},{"wait":1000},{"shot":"5-shown"},{"eval":"String(!!document.querySelector('.qr-strip'))"}]
