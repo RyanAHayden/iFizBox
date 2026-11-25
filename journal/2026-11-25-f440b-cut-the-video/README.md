@@ -31,8 +31,8 @@ jailbroken-or-not subtitle. This is the second cut.
 - Not split into parts, although the brief said so: the rest was three edits to one page, one render and one CONFIRM,
   and split parts would only start after the CONFIRM.
 - The recordings were not captured again: unchanged, from F440a.
-- Review page: the run page's /concept/F440b, both videos inside, packed to 5.7 and 5.6 MB. claude.ai refused a copy (too
-  big for its one-shot).
+- Review page: the run page's /concept/F440b, both videos inside, packed to 5.7 and 5.6 MB. It is on claude.ai too, privately:
+  https://claude.ai/artifact/MekJsYk1ejwn2QbWRAE6RR
 
 ## Failed
 - The first stills of the recut failed because one `build()` call was left in `video.html`.
