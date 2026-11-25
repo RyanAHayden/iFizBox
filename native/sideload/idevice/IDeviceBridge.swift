@@ -5,12 +5,14 @@
 //   idevice.pair          makes the 6-digit code first and emits [{pin}] at once (also posted as a notification, for
 //                         the Settings app), then [{step, text}] as it goes (listening, advertised, connected) and
 //                         [{step: "failed", error}] when a try fails (it keeps listening: Pair can be tapped again);
-//                         replies status when paired (iOS 27+). No timeout: it waits until paired or canceled.
+//                         replies status when paired (iOS 27+). It waits until paired or canceled, at most
+//                         pairLimit (10 min, B436): then it stops and replies "expired: ..."
 //                         B320: on a queue of its own (connects never wait behind it), and called while one still
-//                         runs it joins that one (the same code; the earlier call replies "canceled: ...")
-//   idevice.pairState     {active, pin, step, text, error}: the pairing now, for a page that was in the background
+//                         runs it joins that one (the same code and deadline; the earlier call replies "canceled: ...")
+//   idevice.pairState     {active, pin, step, text, error}: the pairing now, for a page that was in the background;
+//                         not active: {expired} (B436: the last one ended at pairLimit)
 //   idevice.pairCancel    ends a waiting idevice.pair (it replies "canceled: ..."); B320: its advertisement stays up
-//                         leaveGrace (90 s) more, so a page that comes back within it gets the same code
+//                         leaveGrace (90 s, never past pairLimit) more, so a page that comes back within it gets the same code
 //   idevice.verify        connects once: {ok: true, kind} or "not_paired:/connect_failed:/bad_pairing: ..."
 //   idevice.forget        deletes the pairing -> status
 // Installing through this route is IDevice.install(_:progress:), called by the install run.
@@ -26,12 +28,16 @@ enum IDeviceBridge {
         let code: String // the 6-digit code every try of this pairing uses
         var call: Bridge.Call? // nil once the page left (idevice.pairCancel), until a page joins again
         var leaving = 0 // bumped by every leave and join: a scheduled stop runs only if nothing came after it
+        var expired = false // B436: pairLimit ended it: its answer is "expired: ..."
         init(cancel: IDevice.PairCancel, code: String, call: Bridge.Call) { self.cancel = cancel; self.code = code; self.call = call }
     }
     /// B320: how long a left pairing keeps advertising before it stops. iOS's Developer Mode page (Preferences) keeps a
     /// row for every advertisement that came and went while it was open or in the background ("Pair with <app>" three
     /// times on the iPhone 15 Pro, only the last one alive): coming back to Pairing within this rejoins the same one.
     static let leaveGrace: TimeInterval = 90
+    /// B436: how long one pairing runs, counted from its start (a join doesn't restart it): its hold on KeepAlive kept
+    /// the app running in the background for as long as the page stayed open.
+    static let pairLimit: TimeInterval = 600
     private static var pairing: PairSession? // guarded by lock
     private static let lock = NSLock()
     private static let pairQueue = DispatchQueue(label: "ifizbox.idevice.pair", qos: .userInitiated) // one pairing at a time
@@ -60,6 +66,20 @@ enum IDeviceBridge {
             if let to = to { DispatchQueue.main.async { to.emit([e]) } }
         }
         return status()
+    }
+
+    /// B436: stops `s` pairLimit from now, unless it ended or was canceled before; never a later pairing. Wall time, so
+    /// the time the phone slept counts. The stop itself is idevice.pair's end on pairQueue, as for a cancel.
+    private static func limit(_ s: PairSession) {
+        DispatchQueue.global(qos: .utility).asyncAfter(wallDeadline: .now() + pairLimit) {
+            lock.lock()
+            let stop = pairing === s && !s.cancel.isCanceled
+            if stop { s.expired = true }
+            lock.unlock()
+            guard stop else { return }
+            IDevice.log("not paired in \(Int(pairLimit)) s; pairing stops")
+            s.cancel.signal()
+        }
     }
 
     static func register(_ b: Bridge) {
@@ -106,12 +126,13 @@ enum IDeviceBridge {
             lock.unlock()
             // The code first, before anything listens: the page shows it, and a notification carries it into the
             // Settings app, where it is typed. iFizBox is in the background meanwhile: KeepAlive's silent audio
-            // keeps the listener and Bonjour going for as long as the page is in pairing mode.
+            // keeps the listener and Bonjour going while the page is in pairing mode, at most pairLimit.
             c.emit([["pin": code]])
             KeepAlive.shared.begin()
             postCode(code)
+            limit(session)
             // B320: on its own queue, not IDevice.queue: behind a check or a test there, the code
-            // showed while nothing listened yet; and every connect waited behind a pairing with no time limit
+            // showed while nothing listened yet; and every connect waited behind a pairing for minutes
             pairQueue.async {
                 var result: Any? = nil, failure: String? = nil
                 do {
@@ -119,10 +140,13 @@ enum IDeviceBridge {
                 } catch let e as IDevice.Failure { failure = e.errorDescription } catch { failure = "internal: \(error.localizedDescription)" }
                 lock.lock()
                 let to = session.call
-                if pairing === session { pairing = nil; now = ["active": false] }
+                let latest = pairing === session
+                let expired = session.expired && result == nil // B436
+                if latest { pairing = nil; now = ["active": false, "expired": expired] }
+                if expired { failure = "expired: the pairing code expired" }
                 lock.unlock()
                 KeepAlive.shared.end()
-                removeCode()
+                if latest { removeCode() } // else the notification is the later pairing's
                 if let to = to { Apt.reply(to, result, failure) }
             }
         }
@@ -182,6 +206,9 @@ enum IDeviceBridge {
         let center = UNUserNotificationCenter.current()
         center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
             guard granted else { return IDevice.log("no notification permission; the code is on the page only") }
+            // B436: the permission alert can stay up past the pairing's end: no code that no longer works
+            lock.lock(); let live = pairing.map { $0.code == code && !$0.cancel.isCanceled } ?? false; lock.unlock()
+            guard live else { return }
             let n = UNMutableNotificationContent()
             n.title = "\(Brand.name) Pairing Code"
             n.body = "\(code.prefix(3)) \(code.suffix(3)) — type it in Settings"

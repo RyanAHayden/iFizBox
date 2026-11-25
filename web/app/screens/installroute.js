@@ -10,14 +10,14 @@
 //   installation/pair  Pairing, one page that runs by itself (core setupState): one sentence on what it gives,
 //                      drawn at once with a spinner while it checks, then pairing starts on its own: the 6-digit code
 //                      big at the top and where to type it, a line and a screenshot a step; it keeps pairing while
-//                      the page is open. Paired: a check, Check Connection (Fix after a failure) and Forget.
+//                      the page is open, at most 10 minutes (B436: then Get New Code). Paired: a check, Check Connection (Fix after a failure) and Forget.
 //                      Older iOS: Import Pairing File. A profile without Network Extensions: NO_VPN says so.
 // The idevice.* bridge calls are native/sideload/idevice/IDeviceBridge.swift's, vpn.* native/sideload/vpn's.
 import { grouped, el } from "../nav/ui.js";
 import { format, settingsRoute, mounted, parse } from "../router.js";
 import { showAlert } from "../nav/alert.js";
 import { toBase64 } from "../core/signing.js";
-import { ROUTE_KEY, ROUTE_OPTIONS, IPHONE_INTRO, setupState, droppedPairing, plainSocket, PAIR_GUIDE, pairEvent, pairFooter, pairFromNative, pinText, PAIR_STEPS, verifyFailure } from "../core/installroute.js";
+import { ROUTE_KEY, ROUTE_OPTIONS, IPHONE_INTRO, setupState, droppedPairing, plainSocket, PAIR_GUIDE, pairEvent, pairFooter, pairFromNative, codeExpired, CODE_EXPIRED, NEW_CODE, pinText, PAIR_STEPS, verifyFailure } from "../core/installroute.js";
 import { ringStyle } from "../core/installroute.js";
 import { leaveQuestion, LEAVE } from "../core/installroute.js";
 import { installStatus, CHECKING, CHECKING_SERVER, STATUS_ACTIONS } from "../core/installroute.js";
@@ -796,7 +796,7 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
 
 let pairing = null; // { pin, text, error } while idevice.pair waits for the phone (core pairEvent)
 let shown = null; // { native, redraw } of the page on screen, for the hooks below
-let visit = null; // this visit of the page: { started, asked, failed, poll }; null once it's left
+let visit = null; // this visit of the page: { started, asked, failed, expired, run, poll }; null once it's left
 
 // The page's groups for `state` (core setupState) and the pairing `p` (pure, for tests). The code and the steps
 // with their screenshots are drawn after the groups marked `pin` and `guide` (drawPair).
@@ -804,7 +804,7 @@ let visit = null; // this visit of the page: { started, asked, failed, poll }; n
 // says the profile has no Network Extensions (core NO_VPN).
 export const IMPORT_PAIRING = "Import Pairing File";
 export const TESTING_AFTER_PAIRING = "Testing the Connection…";
-export function setupGroups(state, st, p, { retry = () => {}, check = () => {}, forget = () => {}, failed = false, failing = false,
+export function setupGroups(state, st, p, { retry = () => {}, check = () => {}, forget = () => {}, failed = false, expired = false, failing = false,
   importFile = () => {} } = {}) {
   const intro = { header: "Install on This iPhone", footer: IPHONE_INTRO };
   if (state === "paired") {
@@ -825,6 +825,9 @@ export function setupGroups(state, st, p, { retry = () => {}, check = () => {}, 
   if (state === "testing") return [intro, { spinner: TESTING_AFTER_PAIRING }]; // B357: pairing's last step (finishSetup)
   if (state === "noVPN") return [intro, { rows: [{ label: "Network Extensions", detail: "Missing" }], footer: NO_VPN.message, warn: true }];
   const conn = { rows: [{ label: BUILTIN_VPN, detail: "On" }] }; // B277: the VPN that's on
+  // B436: where the code was, the code's end and a new one (the code pairs nothing any more)
+  if (expired && !p) return [intro, conn, { header: "Pairing Code", rows: [{ label: NEW_CODE, cls: "sign-import", onClick: retry }], footer: CODE_EXPIRED },
+    { header: "Where to Type It", guide: true }];
   const line = failed && !p ? `Pairing stopped.` : p ? pairFooter(p) : "Starting…";
   // B133: while idevice.pair runs, the code's place spins until the code comes, and the step line spins with it
   // (waiting for the iPhone to connect, pairing) unless a try failed (then it waits on a tap on the iPhone).
@@ -892,10 +895,15 @@ async function reread() {
   const { native, redraw } = shown;
   if (!pairing) { if (visit) redraw(); return; }
   let st = null;
+  const v = visit, run = v?.run;
   try { st = await call(native, "idevice.pairState"); } catch { return; }
+  if (v !== visit || run !== v?.run) return; // another pairing started meanwhile
   const now = pairFromNative(st);
+  // B436: expired in the background; idevice.pair's reply may not have reached the page, and is dropped if it comes late
+  if (v && pairing && !now && st?.expired) { pairing = null; v.run++; v.failed = v.expired = true; redraw(); return; }
   if (now && pairing) { pairing = now; redraw(); } // not active: idevice.pair's reply settles it
 }
+export { reread }; // tests
 export function leave() { // also for tests: ends a visit without a hashchange
   const was = visit;
   visit = null;
@@ -1007,14 +1015,15 @@ async function drawPair(box, { store, native, alert, redraw }) {
   const start = async () => {
     if (pairing) return;
     v.started = true;
-    v.failed = false;
+    v.failed = v.expired = false;
+    const run = v.run = (v.run ?? 0) + 1;
     pairing = { pin: "", text: "", error: "" };
     redraw();
     // B320: this visit's events and answer only: an earlier visit's call answering late leaves this one's state alone
-    const mine = () => visit === v && pairing !== null;
+    const mine = () => visit === v && v.run === run && pairing !== null;
     try {
-      // idevice.pair's first event is the code, before anything listens; it keeps listening until it pairs or the
-      // page is left (no timeout)
+      // idevice.pair's first event is the code, before anything listens; it keeps listening until it pairs, the
+      // page is left or the code expires (B436)
       await call(native, "idevice.pair", {}, (ev) => { if (mine()) { pairing = pairEvent(pairing, ev); redraw(); } });
       if (visit === v) pairing = null;
       AUTO_CHECK.last = 0; // B316: paired again: the paired page checks at once and goes green on its own
@@ -1025,11 +1034,12 @@ async function drawPair(box, { store, native, alert, redraw }) {
       if (test) return finishSetup(v, native, alert, store, redraw);
       if (visit === v) redraw();
     } catch (e) {
-      if (visit !== v) return;
+      if (visit !== v || v.run !== run) return;
       pairing = null;
       v.failed = true;
+      v.expired = codeExpired(e);
       redraw();
-      if (e?.code !== "canceled" && e?.code !== "cancelled" && !/^cancel+ed/.test(e?.message || "")) {
+      if (!v.expired && e?.code !== "canceled" && e?.code !== "cancelled" && !/^cancel+ed/.test(e?.message || "")) {
         alert({ title: "Couldn't Pair", message: plainSocket(e?.message) || "No answer.", buttons: ["OK"] });
       }
     }
@@ -1044,6 +1054,7 @@ async function drawPair(box, { store, native, alert, redraw }) {
   const sections = setupGroups(state, st ?? (pairing ? cachedStatus() : null), pairing, {
     importFile: () => input?.click(),
     failed: v.failed,
+    expired: v.expired,
     failing: Boolean(routeFailure()), // F409: the row says Fix
     retry: start,
     check: () => check(native, alert, recheck, store, checkButton, { fix: Boolean(routeFailure()) }),
