@@ -1,0 +1,61 @@
+[
+{
+"wait": 2000
+},
+{
+"eval": "localStorage.setItem('ifizbox.firstVisit','later');'ok'"
+},
+{
+"nav": "#/sources",
+"ms": 5000
+},
+{
+"nav": "#/sources",
+"ms": 8000
+},
+{
+"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200);'ok'"
+},
+{
+"tap": ".page.is-top .source-row[data-url*='8749']",
+"ms": 5000
+},
+{
+"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,500)"
+},
+{
+"shot": "source-page"
+},
+{
+"tap": ".page.is-top .compat-filter .switch",
+"ms": 2500
+},
+{
+"eval": "JSON.stringify([localStorage.getItem('ifizbox.sourceFilters'),localStorage.getItem('ifizbox.worksOnMyPhone'),document.querySelector('.page.is-top .compat-filter .switch').getAttribute('aria-checked')])"
+},
+{
+"tap": ".page.is-top .compat-filter .switch",
+"ms": 2500
+},
+{
+"eval": "JSON.stringify([localStorage.getItem('ifizbox.sourceFilters'),localStorage.getItem('ifizbox.worksOnMyPhone'),document.querySelector('.page.is-top .compat-filter .switch').getAttribute('aria-checked')])"
+},
+{
+"tap": ".page.is-top .compat-filter .switch",
+"ms": 2000
+},
+{
+"nav": "#/sources/*",
+"ms": 4000
+},
+{
+"eval": "JSON.stringify(['All Sources switch',document.querySelector('.page.is-top .compat-filter .switch').getAttribute('aria-checked')])"
+},
+{
+"nav": "#/sources/manage/filters",
+"ms": 3000
+},
+{
+"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,400)"
+}
+]

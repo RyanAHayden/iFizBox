@@ -15,7 +15,12 @@ featured banners): the Source Filters first; then a verdict, from the shipped Tw
 decides. With no verdict (a free or paid tweak, or a source the index lacks), a tweak is listed only when its name or
 description mentions an app iFizBox knows or one of your apps. A tweak already in an app is always listed, and one this
 phone found to work stays listed while a newer version has no verdict. The phone does not download tweak `.deb`s in the
-background to check them; opening a tweak or Add to App checks that one `.deb`.
+background to check them; opening a tweak or Add to App checks that one `.deb`. App Tweaks Only keeps a tweak if any
+build of its newest version is iphoneos-arm64 or states firmware 15+. Paid tweaks for iOS itself (Glint, betterAlarm)
+are left out on purpose (no verdict, and no app named), but a direct package link (`ifizbox://package?id=`)
+still opens their page. Works on My Phone on a source's own page is that source's switch, as in Manage > Filters; on
+All Sources' page it is the All Sources one. Works on My Phone never judges a Tweak Source's tweaks in the sideload
+build, so a Tweak Source's page has no such switch there.
 A new install starts with app-tweak sources only: GitHub repos whose releases carry the tweak's `.deb` (YTLite,
 YTMusicUltimate, SCInsta; `web/app/tweak-sources.json` entries with `github` and `"inject": true`). The Sources tab
 leaves out a Tweak Source the Tweak Index has fully checked with no tweak for the user's apps (or for any app);

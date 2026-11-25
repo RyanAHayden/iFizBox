@@ -277,12 +277,15 @@ async function drawSections(page) {
     for (const s of data.sections) ul.append(sectionRow(s.name, s.count, deeper(route, token("section", s.name))));
   }
   body.replaceChildren(ul);
-  if (!editing) body.prepend(filterRow(() => drawSections(page)));
+  // B429: not on a Tweak Source's page in the sideload build: its tweaks are never judged (core/catalog.js judge).
+  const tweakSource = key !== ALL && detectMode() === "sideload";
+  if (!editing && !tweakSource) body.prepend(filterRow(() => drawSections(page), key === ALL ? undefined : key));
   const statusNote = status?.error ? note(status.error) : null; // B177: the error group below takes its place
   if (statusNote) body.append(statusNote);
   else if (editing ? !data.sections.length : !data.total) {
     body.append(note(data.sections.length ? "Every section is hidden. Tap Edit to show them."
-      : "No packages for this device. Works on My Phone hides the rest."));
+      : tweakSource ? "No tweaks to show. Tweaks that can't go into an app and those Filters hide are left out."
+        : "No packages for this device. Works on My Phone hides the rest."));
   }
   // F76: Share in the nav bar (the iOS 6 share sheet: Copy Link, Add on Another Device, the APT managers) took the
   // place of F8's Open In group under the sections.
