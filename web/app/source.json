@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "0.31.0",
+          "date": "2026-11-25T00:19:29Z",
+          "localizedDescription": "Restore My VPN turns your own VPN back on after installs.\nInstall several IPAs at once from Confirm, up to three together.\nCellular installs can use a Shortcut or your Signing Server.\nNotification fixes for tweaked apps such as RyukGram.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.31.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.31.0/iFizBox.ipa",
+          "size": 31972353,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.30.0",
           "date": "2026-11-24T17:30:21Z",
           "localizedDescription": "Installing an app through iOS now shows its real progress.\nThe jailbreak app says Preparing until an install starts.\nInstalling an app now says Uploading, Handing to iOS, or Waiting for iOS until iOS actually starts installing, and the jailbreak app says Preparing until its install starts.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.30.0",
@@ -250,14 +258,6 @@
           "localizedDescription": "Re-signed apps keep their data: each app gets its own keychain, so apps like RyukGram stay signed in.\nApps signed under one App ID no longer share a keychain, where one app signing out signed the others out.\nEach app keeps its own app-group folder under any profile, and an older sign's data is copied in once.\nWebsite signing warns before Install when a profile group the app used is gone, or the app was signed under another ID.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.18.1",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.18.1/iFizBox.ipa",
           "size": 35403898,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.18.0",
-          "date": "2026-11-21T01:15:18Z",
-          "localizedDescription": "iOS 7 style, your own app icon, and an app icon that follows the theme.\nTheme > Style: pick iOS 6 (default) or iOS 7.\nTheme > App Icon: the icon follows your theme, or add your own picture (Photos or Files) and move and scale it.\nSigned apps keep their app-group folders and keychain.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.18.0",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.18.0/iFizBox.ipa",
-          "size": 35344422,
           "minOSVersion": "15.0"
         }
       ]
