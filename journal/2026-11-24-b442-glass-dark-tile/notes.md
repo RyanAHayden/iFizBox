@@ -11,31 +11,39 @@
   gradient, sampled from the Mail and Claude tiles in the user's Home Screen shot. On it the rim, sphere and lines
   are clear. The light thumb came out byte-identical, so git shows it unchanged.
 - `native/test_icons.py`: the dark-appearance test expects `"system-dark"` for Icon-glass and the gradient for the
-  other sets. Result: 37 run, 1 failure, `test_cars_compiled_from_the_current_pngs`, as expected until the .car
-  files are recompiled.
+  other sets.
 - `native/icon/alternates.py`: comments only.
+- Spec review: no definite code error.
+
+## Compiled on 2026-11-25
+
+- `native/icon/assets.sh mba` on the MBA compiled Assets.car and AssetsLite.car with no actool complaint. That
+  settles the earlier question of whether actool accepts the document.
+- `test_icons.py`: 37 run, all OK.
+- `assetutil --info`, old vs new Assets.car: 1168 renditions each. Only Icon-glass differs. Its dark render is
+  smaller, and its two dark fill colours are now system grey 0.192 and 0.078. Its Any and Tintable renders have new
+  names and digests but the same SizeOnDisk, which suggests but does not prove identical pixels; assetutil cannot
+  read the icon stacks. No other set's entries differ.
+- Lite IPA built from the branch.
 
 ## Tried and failed
 
-- The MBA is the only Mac with Xcode, and it is asleep or off. `ssh mba` gave "connect to host mbas-macbook-air port
-  22: Connection timed out" over several tries, and a 4-minute retry loop too. Tailscale has listed it offline for
-  about an hour. The LAN address answered "No route to host", no ping reply, and no MAC in the neighbour table, so
-  there was no wake-on-LAN target.
-- The iPhone 15 Pro was free, but there was nothing to install without the compiled .car.
-- Not used: a macOS GitHub Actions job on the public repo. It would be a new published workflow the task did not ask for.
+- On 2026-11-24 the MBA was off: `ssh mba` timed out, Tailscale listed it offline, and the LAN address gave no route,
+  so the .car files could not be compiled that day. A macOS GitHub Actions job was not used, since it would be a new
+  published workflow the task did not ask for.
 
 ## Left
 
-- `native/icon/assets.sh mba` on the MBA, then commit Assets.car, AssetsLite.car and assets.sources.
-- Check with assetutil, and on the phone, that Clear and Tinted did not change. If they derive from the dark fill,
-  pin their fill with a specialization.
-- Home Screen shots on the iPhone 15 Pro: Default, Dark, Clear and Tinted beside system icons.
+- Home Screen shots on the iPhone 15 Pro: Default, Dark, Clear and Tinted beside system icons. Held by B440 at the
+  time, so waiting for it. Check whether the dark tile matches its neighbours, and whether Clear and Tinted are
+  unchanged. If they changed, pin their fill with a specialization.
+- Full gate.
 
 ## Not verified
 
-- That actool accepts the document.
-- The .car files, and so the gate: it cannot pass until they are recompiled.
-- All the iPhone 15 Pro shots listed above.
+- The phone shots listed above, including whether the dark tile matches its neighbours.
+- Clear and Tinted pixels. Only the SizeOnDisk match is known.
+- The full gate.
 - iOS 15-25's flat render of the Glass icon.
 
 ## Stale wording
