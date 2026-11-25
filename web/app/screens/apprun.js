@@ -294,7 +294,10 @@ export async function runAppRun(jobs, deps) {
     if (!v) return;
     v.li.dataset.state = r.state;
     v.status.textContent = rowStatus(r);
-    const waiting = r.state === "signed" && !helperRow(r); // F391: signed, waiting its turn: the full striped bar
+    // F391: signed, waiting its turn: the full striped bar. F422: so is "Copied to iPhone, waiting for iOS" (copy ended,
+    // installd's first percent not in yet); the fill comes back at that percent
+    const copied = r.state === "installing" && r.phase === "copying" && (Number(r.fraction) || 0) >= 1;
+    const waiting = (r.state === "signed" && !helperRow(r)) || copied;
     const busy = waiting || ["downloading", "signing", "asking", "installing"].includes(r.state);
     v.bar.hidden = !busy;
     // B152: the app's whole way (barOf: download, signing, iOS's install by weight), never backwards; it sweeps only
