@@ -1153,7 +1153,7 @@ test("B458: group fix revision, reach") {
     check(lib.signed(a, certificate: cert) == nil, "another dylib, the same revision: sign it again")
     let again = try lib.sign(a, signer: IPASigner(profile: try Profile(try fixture("profile.mobileprovision")), identity: identity),
                              certificate: cert, expires: nil, work: work)
-    check(lib.signed(a, certificate: cert)?.signer == again.signer && again.signer?.version == cur.version, "signed again: kept")
+    check(lib.signed(a, certificate: cert)?.signer == again.signer && again.signer == .signed(groupFix: nil), "signed again (this app needs no fix): \(String(describing: again.signer))")
     try lib.delete(a)
 }
 
