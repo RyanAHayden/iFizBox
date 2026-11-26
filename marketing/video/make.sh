@@ -53,4 +53,8 @@ APP_VERSION=$version timeout 2400 node "$here/capture.mjs" "http://127.0.0.1:$po
 for cut in 4x5:1350 9x16:1920; do
   timeout 2400 node "$here/render.mjs" . "promo-lite-${cut%:*}.mp4" --h "${cut#*:}" --page promo-lite
 done
-echo "done: $out/showcase-4x5.mp4 $out/showcase-9x16.mp4 $out/promo-4x5.mp4 $out/promo-9x16.mp4 $out/promo-lite-4x5.mp4 $out/promo-lite-9x16.mp4"
+# the r/jailbreak clip (jb-reddit.html): one slow jailbreak take with the app's own page slides, a title card, 4:5 only:
+# OUT_DIR/jb-reddit-4x5.mp4
+APP_VERSION=$version timeout 2400 node "$here/capture.mjs" "http://127.0.0.1:$port/" rec "$here/shots-jb-reddit.json" --state state --mode jailbreak
+timeout 2400 node "$here/render.mjs" . jb-reddit-4x5.mp4 --h 1350 --page jb-reddit
+echo "done: $out/showcase-4x5.mp4 $out/showcase-9x16.mp4 $out/promo-4x5.mp4 $out/promo-9x16.mp4 $out/promo-lite-4x5.mp4 $out/promo-lite-9x16.mp4 $out/jb-reddit-4x5.mp4"

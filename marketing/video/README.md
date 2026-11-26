@@ -58,6 +58,8 @@ marks, world updates) is in `capture.mjs`'s header.
 | `shots-promo.json` | the promo recording's script: the jailbreak steps from the Changes badge through Upgrade, Confirm, the install, Complete and Theme |
 | `promo-lite.html` | the sideload promo clip as one page: captions, speed segments and the status bar (no end card), cut from `rec/promo-lite.mp4` alone (`render.mjs --page promo-lite`) |
 | `shots-promo-lite.json` | the sideload promo recording's script: Add Tweaks, the queue and Confirm, the signed install, the Installed days and Re-sign All |
+| `jb-reddit.html` | the r/jailbreak clip as one page: the title card, the phone's slide in and out, the captions, and the end card, cut from `rec/jb-reddit.mp4` alone (`render.mjs --page jb-reddit`) |
+| `shots-jb-reddit.json` | the r/jailbreak recording's script: jailbreak mode, adds the Lamplight source, searches "dock", and installs Dockshade through Confirm to the Complete page, with pauses so each screen reads |
 
 Re-render one cut from the recordings already in `OUT_DIR`:
 
@@ -115,3 +117,22 @@ Cut it alone from the recording already in `OUT_DIR/rec/`:
 
 `make.sh` makes both after the showcase and the jailbreak promo cuts, as `OUT_DIR/promo-lite-4x5.mp4` and
 `OUT_DIR/promo-lite-9x16.mp4`.
+
+## The r/jailbreak clip
+
+`jb-reddit.html` is a third timeline page, about 40 s, for the jailbreak build. It is cut from one unbroken recording,
+`rec/jb-reddit.mp4` (about 33 s, at 1x, with no cuts and no speed-up). Its script is `shots-jb-reddit.json`, run in
+jailbreak mode by `capture.mjs`. The script adds the Lamplight source, searches "dock", and installs Dockshade through
+Confirm to the Complete page, with slow pauses so each screen reads.
+
+The pages change with the app's own push slide, because they are captured from the app. Nothing is cut or crossfaded
+between them. The cut runs in this order:
+
+- a title card (the icon, the name, and "The package manager for your jailbreak") for 2.8 s;
+- the phone slides up, and one caption per step is switched at the tap, with no fades;
+- the phone slides down, and the end card slides up.
+
+It is made in 4:5 only: 1080x1350, 60 fps H.264, no sound. `make.sh` makes it after the Lite promo cut, as
+`OUT_DIR/jb-reddit-4x5.mp4`. Cut it alone from the recording already in `OUT_DIR/rec/`:
+
+    node marketing/video/render.mjs marketing/video/out jb-reddit-4x5.mp4 --h 1350 --page jb-reddit

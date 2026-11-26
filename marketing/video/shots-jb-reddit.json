@@ -1,0 +1,16 @@
+{ "name": "jb-reddit", "storage": { "ifizbox.appearance": "light" }, "steps": [
+ {"until": "!document.body.innerText.match(/Searcher Cache|Reloading|Updating/)", "max": 20000}, {"pause": 1000},
+ {"record": true}, {"mark": "home"}, {"pause": 1600},
+ {"tap": "text=Sources", "nth": -1}, {"pause": 1500}, {"mark": "sources"},
+ {"tap": "text=Add"}, {"pause": 1800}, {"mark": "add-source"},
+ {"tap": ".alert input"}, {"pause": 500}, {"type": "lamplight.example", "cps": 7}, {"pause": 900},
+ {"tap": "text=Add Source"}, {"until": "document.body.textContent.includes('Add & Trust')"}, {"pause": 1500}, {"mark": "unknown-source"},
+ {"tap": "text=Add & Trust"}, {"until": "[...document.querySelectorAll('.page.is-top *')].some((e) => e.textContent === 'Lamplight')"}, {"pause": 1500}, {"mark": "source-added"},
+ {"tap": "text=Search", "nth": -1}, {"pause": 1500}, {"mark": "search"},
+ {"tap": "input", "nth": -1, "go": "search"}, {"pause": 600}, {"type": "dock", "cps": 5}, {"until": "document.body.textContent.includes('Softdock')"}, {"pause": 1500}, {"mark": "found"},
+ {"key": "return"}, {"pause": 900},
+ {"tap": "text=Dockshade"}, {"pause": 2200}, {"mark": "tweak"},
+ {"tap": "text=Install"}, {"pause": 2400}, {"mark": "confirm"},
+ {"tap": "text=Confirm", "nth": -1}, {"pause": 1500}, {"mark": "installing"},
+ {"until": "document.body.textContent.includes('Restart SpringBoard')", "max": 30000}, {"pause": 2400}, {"mark": "end"}
+]}
