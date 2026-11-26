@@ -11,6 +11,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
+- [ ] **B488** Lists opened from Browse's top categories (Featured, New, Popular…): a swipe on the scope bar / category segments at the top must not start the edge swipe back (user report). Confirm in Chromium which gesture pops the page, stop it there; normal edge swipe back from the page edge stays. | files: web/app/screens/listfilter.js, web/app/screens/browse.js
 - [ ] **B487** Browse lists' Filter button (scope bar, .scope-filter) must look pressed while held, like the segments and bar buttons (iOS 6 pressed art). Check a 3x Chromium shot mid-press, all themes. | files: web/app/packages.css | model: sonnet
 - [ ] **F449** Filter panel Source rows show each source's icon (as on the Sources tab), All Sources keeps a generic icon. Check: Chromium shot of the panel. | files: web/app/screens/filterpanel.js, web/app/packages.css | model: sonnet
 - [ ] **B486** Browse list Filter panel: picking a Source doesn't filter the list properly (user report). Find why in the Filter panel → catalog.refine path for lists opened from Browse (Featured, New, Popular, Free…); check: pick one source, only its packages remain (node --test case in browse-listfilter.test.js). | files: web/app/screens/listfilter.js, web/app/screens/filterpanel.js, web/app/catalog.js, web/app/screens/browse-listfilter.test.js
