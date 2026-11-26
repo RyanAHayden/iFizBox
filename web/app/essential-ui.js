@@ -124,7 +124,8 @@ export const bannerDue = (v, { shown = bannerSeen.version, queued = selfQueued()
 // B464: the jailbreak banner's Upgrade queues apt's iFizBox row and Changes' Upgrade (N) counts apt's rows, but GitHub's
 // release can be out before apt's lists have it (the repo published later, or no refresh since). -> whether the catalog
 // has iFizBox's apt upgrade at `v` or newer, outside Ignored Upgrades as Changes reads them.
-const aptUpgrades = () => catalog.upgrades([...settings.holds.list(), ...settings.blocked.list()]);
+// The list as screens/changes.js ignoredList builds it (not imported: changes.js imports this module).
+const aptUpgrades = () => catalog.upgrades([...new Set([...settings.holds.list(), ...settings.blocked.list()])].sort());
 export async function aptHasSelf(v, { upgrades = aptUpgrades } = {}) {
   const u = await Promise.resolve().then(upgrades).catch(() => null);
   const row = (u?.available ?? []).find((r) => r?.id === SELF_ID);
