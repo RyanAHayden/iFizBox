@@ -149,7 +149,7 @@ export const FREE_SESSION_KEY = "ifizbox.freeid.session";
 const SESSION_MS = 30 * 60 * 1000;
 export function keepFreeSession({ token, adsid, team, email = "", expiry = null }, store, now = Date.now()) {
   if (!token || !adsid || !team?.teamId) return;
-  const exp = Number(expiry);
+  const exp = Number(expiry) > 0 && Number(expiry) < 1e12 ? Number(expiry) * 1000 : Number(expiry); // seconds or ms
   const until = exp > now ? Math.min(exp, now + SESSION_MS) : now + SESSION_MS;
   writeJson(store, FREE_SESSION_KEY, { token, adsid, team: { teamId: team.teamId, name: team.name ?? null }, email, until });
 }

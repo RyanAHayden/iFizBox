@@ -334,10 +334,19 @@ test("B473: after a reload the kept sign-in comes back; with the UDID here Regis
     const again = freeRouteBlock({ alert: async (o) => { asked.push(o); return { index: 0 }; } }); // back on Signing
     await wait();
     assert.ok(relayed.length > 0, "setup asked Apple again");
-    assert.ok(relayed.every((r) => !/apple\/status/.test(r.url)));
-    assert.ok(again.querySelector("li.free-step.is-running"), "Register This iPhone is running");
+    assert.ok(again.querySelectorAll("li.free-step")[0].classList.contains("is-running"), "Register This iPhone is running");
     assert.doesNotMatch(again.textContent, /Sign In With a Free Apple ID/, "no new sign-in");
     assert.deepEqual(asked, []);
+    // a real reload after the UDID was found: a fresh module (no sign-in in memory) picks the kept one up
+    relayed.length = 0;
+    const fresh = await import("./free-apple-id.js?reload");
+    const reloaded = fresh.freeRouteBlock({ alert: async (o) => { asked.push(o); return { index: 0 }; } });
+    await wait();
+    assert.match(reloaded.textContent, /Setting Up Me/);
+    assert.ok(reloaded.querySelectorAll("li.free-step")[0].classList.contains("is-running"), "Register This iPhone goes on");
+    assert.ok(relayed.length > 0, "asked Apple with the kept sign-in");
+    assert.deepEqual(asked, []);
+    fresh.dropFreeSession(ls);
   } finally {
     Object.assign(globalThis, saved);
     Object.defineProperty(globalThis, "navigator", nav);
