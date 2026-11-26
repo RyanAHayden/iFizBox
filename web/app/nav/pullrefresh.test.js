@@ -389,11 +389,11 @@ async function page(t, tag) {
   Object.assign(scroller, {
     scrollTop: 0, offsetTop: 0, clientHeight: 600, parentNode: {}, children: [fakeEl(), fakeEl()],
     addEventListener: (type, fn) => { on[type] = fn; },
-    after(x) { x.parentNode = scroller.parentNode; x.previousSibling = scroller; },
+    append(x) { x.parentNode = scroller; scroller.children.push(x); },
   });
   const saved = { document: globalThis.document, gcs: globalThis.getComputedStyle };
   globalThis.document = { createElement: () => clip, documentElement: fakeEl() };
-  globalThis.getComputedStyle = () => ({ paddingTop: "0px" });
+  globalThis.getComputedStyle = () => ({ paddingTop: `${scroller.pad ?? 0}px` });
   t.after(() => { globalThis.document = saved.document; globalThis.getComputedStyle = saved.gcs; });
   t.mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
   const mod = await import(`./pullrefresh.js?${tag}`); // a module of its own: the native/script guess starts fresh
@@ -401,7 +401,7 @@ async function page(t, tag) {
   mod.pullToRefresh(scroller, { onRefresh: () => { refreshes++; return Promise.resolve(); } });
   const fire = (type, y) => on[type]({ type, touches: y == null ? [] : [{ clientY: y }] });
   const scroll = (top) => { scroller.scrollTop = top; on.scroll(); };
-  const rows = () => scroller.children.map((c) => c.style.transform || "");
+  const rows = () => scroller.children.filter((c) => c !== clip).map((c) => c.style.transform || "");
   const look = () => ({ spinner: area.classList.contains("refreshing"), armed: area.classList.contains("armed"),
     title: title.textContent, shown: clip.classList.contains("on") });
   const flush = async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r)); };
@@ -413,7 +413,9 @@ test("native rubber band: an armed release lets the list spring back, the hidden
   p.fire("touchstart", 100);
   for (const top of [-20, -45, -70, -90]) p.scroll(top);
   assert.deepEqual(p.look(), { spinner: false, armed: true, title: TEXT.armed, shown: true });
-  assert.match(p.area.style.transform, /translateY\(-390px\)/); // the area's foot on the content's top edge
+  assert.equal(p.clip.parentNode, p.scroller); // B472: inside the list, it scrolls with the rows by itself
+  assert.equal(p.area.style.transform ?? "", "");
+  assert.equal(p.clip.style.transform ?? "", "");
   p.fire("touchend");
   p.scroll(-60);
   // springing back, still on screen: no spinner yet (it is seen only by pulling again)
@@ -446,6 +448,8 @@ test("script pull (no rubber band): rows follow the finger, spring back to none 
   const seen = [];
   for (let y = 120; y <= 400; y += 8) { p.fire("touchmove", y); seen.push(parseFloat(p.rows()[0].slice(11)) || 0); }
   for (let i = 1; i < seen.length; i++) assert.ok(seen[i] > seen[i - 1], "follows every move, never stalls or snaps");
+  assert.equal(p.clip.parentNode, p.scroller);
+  assert.equal(p.clip.style.transform, p.rows()[0], "B472: the anchor, and so the area, moves with the rows");
   assert.equal(p.look().armed, true);
   p.fire("touchend");
   assert.deepEqual(p.look(), { spinner: false, armed: true, title: TEXT.armed, shown: true }); // springing away
@@ -471,36 +475,49 @@ test("script pull (no rubber band): rows follow the finger, spring back to none 
   assert.deepEqual(p.look(), { spinner: false, armed: false, title: TEXT.pull, shown: false });
 });
 
-// ---- B463: the area shows only in the gap a pull opens, never over the page, the nav bar or the pinned headers ----
+// ---- B463/B472: the area shows only in the gap a pull opens, never over the page, the nav bar or the pinned headers ----
 
-test("hidden, the area is parked wholly above the clip, wherever iOS's last bounce event left it", async (t) => {
+test("native: nothing follows scrollTop: the area keeps its place in the list through the pull and the bounce", async (t) => {
   const p = await page(t, "parked");
   p.fire("touchstart", 100);
   for (const top of [-30, -90]) p.scroll(top);
   p.fire("touchend");
   p.scroll(-50); // the bounce's last event under 0 ...
-  assert.match(p.area.style.transform, /translateY\(-430px\)/);
   p.scroll(0); // ... and the next one already back at the top
   assert.equal(p.look().shown, false);
-  assert.match(p.area.style.transform, /translateY\(-480px\)/, "its foot on the clip's top, nothing of it inside");
   t.mock.timers.tick(0);
   await p.flush();
-  assert.equal(p.look().spinner, true); // the refresh runs: the spinner is on, the area still out of sight
-  assert.match(p.area.style.transform, /translateY\(-480px\)/);
+  assert.equal(p.look().spinner, true); // the refresh runs: the spinner is on, the area out of sight
+  for (const el of [p.area, p.clip]) assert.equal(el.style.transform ?? "", "", "no transform written on the native path");
+  assert.deepEqual(p.rows(), ["", ""]);
 });
 
-test("a fling past the top measures the clip again: it starts where the list starts now", async (t) => {
+test("the anchor sits at the top of the list's content, under the scroller's padding, and comes back after a redraw", async (t) => {
   const p = await page(t, "fling");
+  p.scroller.pad = 44; // Home: the list starts under the nav bar's padding
   p.fire("touchstart", 100);
   p.fire("touchend");
-  assert.equal(p.clip.style.top, "0px");
-  p.scroller.offsetTop = 52; // a strip or header above the list came since that touch
-  p.scroller.clientHeight = 548;
+  assert.equal(p.clip.parentNode, p.scroller);
+  assert.equal(p.clip.style.top, "44px");
+  p.scroller.children = [{ style: {} }]; // the list was redrawn since that touch: the anchor went with the old rows
+  p.clip.parentNode = null;
   p.scroll(400);
   p.scroll(-20); // a fling's overshoot, no finger down
-  assert.equal(p.clip.style.top, "52px");
-  assert.equal(p.clip.style.height, "548px");
+  assert.equal(p.clip.parentNode, p.scroller);
+  assert.ok(p.scroller.children.includes(p.clip));
   assert.equal(p.look().shown, true);
+});
+
+test("the area is a layer of its own inside a zero-height anchor: no clip box measured from the list", () => {
+  const css = readFileSync(new URL("../style.css", import.meta.url), "utf8");
+  const rule = (sel) => css.slice(css.indexOf(`${sel} {`), css.indexOf("}", css.indexOf(`${sel} {`)));
+  assert.match(rule(".pull-clip"), /height: 0/);
+  assert.doesNotMatch(rule(".pull-clip"), /overflow: hidden/);
+  assert.match(rule(".pull-refresh"), /bottom: 0/);
+  assert.match(rule(".pull-refresh"), /will-change: transform/); // WebKit paints it above the scroll origin then
+  assert.doesNotMatch(rule(".pull-refresh"), /transform: translate/);
+  const js = readFileSync(new URL("./pullrefresh.js", import.meta.url), "utf8");
+  assert.doesNotMatch(js, /area\.style\.transform|area\.animate|clip\.style\.height|offsetTop/);
 });
 
 test("the spinner shows and turns only inside a shown clip: visibility: visible on a child beats a hidden parent", () => {

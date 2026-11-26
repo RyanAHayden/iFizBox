@@ -513,15 +513,17 @@ html.has-reload :is(.page-body, .sheet-scroll, .search-results, .progress-scroll
 .undo-bar.shown { transform: none; pointer-events: auto; }
 .undo-bar-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .undo-bar-button { flex: none; }
-/* Pull to refresh (nav/pullrefresh.js): a 480pt area over the list's top, its 60pt foot holding the arrow and text */
+/* Pull to refresh (nav/pullrefresh.js): a 480pt area just above the list's top, its 60pt foot holding the arrow and
+   text. B472: part of the page: the anchor (.pull-clip, no height) sits inside the scroller at the top of the list's
+   content (pullrefresh.js sets its top to the scroller's padding) and scrolls with it, so only a pull's gap shows it. */
 .pull-clip {
-  position: absolute; left: 0; right: 0; z-index: 1; overflow: hidden; visibility: hidden; pointer-events: none;
+  position: absolute; left: 0; right: 0; top: 0; height: 0; z-index: 1; visibility: hidden; pointer-events: none;
   -webkit-user-select: none; user-select: none;
 }
 .pull-clip.on { visibility: visible; }
 .pull-refresh {
-  position: absolute; left: 0; right: 0; top: 0; height: 480px; transform: translateY(-480px);
-  will-change: transform; /* B209: its own layer, so following the finger each frame repaints nothing */
+  position: absolute; left: 0; right: 0; bottom: 0; height: 480px;
+  will-change: transform; /* a layer of its own: WebKit paints none of a scroller's own layer above its scroll origin */
 }
 .pull-inner { position: absolute; left: 0; right: 0; bottom: 0; height: 60px; }
 .pull-arrow {

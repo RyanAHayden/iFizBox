@@ -16,18 +16,21 @@
 // `scroller` is the element the list scrolls in: the .page-body, or the .search-results of a page with the pinned
 // search bar (nav/searchbar.js pinned). Calling it again for the same scroller only takes the new options.
 //
-// The area is not inside the scroller: WebKit paints nothing of a scroller's content above its top, so an area placed
-// there stayed blank in the rubber band (iPhone 7). It sits beside the scroller, over it, in a box clipped to where
-// the list starts (.pull-clip), and moves by transform so its foot is always on the content's top edge: it covers
-// exactly the gap the pull opens.
+// The area is part of the page, as on iOS 6 (B472): it sits inside the scroller, in a zero-height anchor (.pull-clip)
+// at the top of the list's content, its 480pt rising above that, out of view. It scrolls with the content itself, so
+// only the gap a pull opens reveals it, and it moves exactly with the rows: no script follows scrollTop. WebKit paints
+// nothing of a scroller's content above its scroll origin on the scroller's own layer (F270 saw a blank gap on the
+// iPhone 7), so the area is a layer of its own (will-change in style.css), which the rubber band shows.
 // Two ways a pull happens:
 //  - native: iOS rubber-bands the scroller itself (scrollTop goes below 0); a passive scroll listener reads it.
 //  - script: a browser without the rubber band (Chromium, Android) keeps scrollTop at 0. Then a finger pulling down at
-//    the top moves the scroller's children by transform (rubber() damping) and they spring back on release.
-// On the native path nothing but the area is ever moved by script (moving the list too fought iOS's own scroll and
-// bounce: B188's hold jittered), and on the script path the scroller pans nothing while the children are moved.
-// Either way only transform changes per frame (the area is its own layer: will-change in ios6.css), no layout is
-// read per frame (the scroller's size is read once per touch), and every listener is passive: 120 Hz holds.
+//    the top moves the scroller's children (the anchor among them) by transform (rubber() damping) and they spring
+//    back on release.
+// On the native path nothing is ever moved by script (moving the list fought iOS's own scroll and bounce: B188's hold
+// jittered), and on the script path the scroller pans nothing while the children are moved. Only transform changes
+// per frame, no layout is read per frame (the scroller's padding is read once per touch), and every listener is
+// passive: 120 Hz holds. The anchor is hidden (visibility) while nothing is pulled: on a page whose list starts below
+// a padding under the nav bar, the area's foot would show through a translucent bar.
 //
 // The Last Updated time is settings.lastRefresh (core/settings.js): set when a source refresh ends (the
 // ifizbox:refreshing count from screens/sources.js falls back to 0: Sources' Refresh, Home's Reload, the launch
@@ -254,14 +257,14 @@ export function pullToRefresh(scroller, opts = {}) {
     title.textContent = titleFor(spin ? "refreshing" : tracker.state);
   }
 
-  // Puts the clip box back beside the scroller (a redraw that empties the page takes it away) over the list's box,
-  // from where its content starts. Layout is read here, once per touch at the top, never per frame.
+  // Puts the anchor back inside the scroller (a redraw that empties the list takes it away), at the top of the list's
+  // content: below the scroller's top padding (Home's, under the nav bar), so the area covers that padding when pulled.
+  // Layout is read here, once per touch at the top, never per frame.
   const ensure = () => {
-    if (clip.parentNode !== scroller.parentNode || clip.previousSibling !== scroller) scroller.after(clip);
+    if (clip.parentNode !== scroller) scroller.append(clip);
     const pad = parseFloat(getComputedStyle(scroller).paddingTop) || 0;
     dim = scroller.clientHeight || AREA_H; // the rubber band's box, kept for the gesture: no layout read per move
-    clip.style.top = `${scroller.offsetTop + pad}px`;
-    clip.style.height = `${Math.max(0, scroller.clientHeight - pad)}px`;
+    clip.style.top = `${pad}px`;
     // The area wears the page's own background: white on a plain list, the pinstripe on a grouped page (ios6.css).
     clip.classList.toggle("grouped", scroller.classList.contains("grouped"));
     time.textContent = lastUpdatedText(o.settings?.lastRefresh?.get?.() ?? null);
@@ -273,31 +276,25 @@ export function pullToRefresh(scroller, opts = {}) {
     if (on === shown) return; // a scroll event per frame: no class write when nothing changes
     shown = on;
     clip.classList.toggle("on", on);
-    // B463: hidden means parked wholly above the clip's top. iOS's bounce sends a scroll event only now and then, so
-    // the last one under 0 could leave the area's foot tens of points down the list once the list was back at 0.
-    if (!on) follow(0);
     if (!on && frozen) { frozen = false; paint(); }
     if (!on && tracker.state === "closing") tracker.hidden();
   };
   const k = () => globalThis.devicePixelRatio || 1; // whole device pixels: a fractional offset smeared the rows' edges
   const px = (v) => Math.round(v * k()) / k();
-  // The area's foot on the content's top edge, `pull` below where the list starts.
-  const follow = (pull) => { area.style.transform = `translateY(${px(Math.max(0, pull)) - AREA_H}px)`; };
 
-  // The script way: the scroller's children follow the finger by transform, and the area with them.
+  // The script way: the scroller's children follow the finger by transform, the anchor (and so the area) with them.
   let g = null; // the gesture: { y, base, mode: "?" | "native" | "script", pull }
   const moved = () => [...scroller.children];
   const place = (pull) => {
     const t = pull > 0 ? `translateY(${px(pull)}px)` : "";
     for (const c of moved()) c.style.transform = t;
-    follow(pull);
   };
   const springBack = (from) => {
     place(0);
     if (!(from > 0)) { show(false); return; }
     const opts = { duration: SPRING_MS, easing: "cubic-bezier(.25,.6,.3,1)" };
-    for (const c of moved()) c.animate?.([{ transform: `translateY(${px(from)}px)` }, { transform: "none" }], opts);
-    const last = area.animate?.([{ transform: `translateY(${px(from) - AREA_H}px)` }, { transform: `translateY(${-AREA_H}px)` }], opts);
+    let last = null;
+    for (const c of moved()) last = c.animate?.([{ transform: `translateY(${px(from)}px)` }, { transform: "none" }], opts);
     if (last?.finished) last.finished.then(() => { if (!g) show(false); }, () => {});
     else show(false);
   };
@@ -315,7 +312,7 @@ export function pullToRefresh(scroller, opts = {}) {
     tracker.start();
     frozen = false;
     paint(); // a pull that starts while a refresh runs shows the spinner, never the arrow
-    if (top < 0) { follow(-top); show(true); } // caught while springing back
+    if (top < 0) show(true); // caught while springing back
   }, { passive: true });
 
   // A pull while a refresh runs is never stopped: it shows the spinner, and the tracker keeps it from arming.
@@ -347,7 +344,8 @@ export function pullToRefresh(scroller, opts = {}) {
     tracker.move(g.pull);
   }, { passive: true });
 
-  // The native way: scrollTop under 0 is the rubber band. Only the area moves (follow), with iOS's own scroll.
+  // The native way: scrollTop under 0 is the rubber band. Nothing is moved by script: the area scrolls with the
+  // content, inside the scroller.
   scroller.addEventListener("scroll", () => {
     const top = scroller.scrollTop;
     if (top < 0) {
@@ -356,10 +354,7 @@ export function pullToRefresh(scroller, opts = {}) {
       if (g) {
         if (!g.ready) { ensure(); g.ready = true; } // scrolled up to the top and on past it in one gesture
         g.mode = "native"; g.pull = -top; tracker.move(-top);
-      } else if (!shown) ensure(); // a fling's overshoot: B463, measured again, as the list's top may have moved
-      // since the last touch at the top (a strip, a header or the reload bar came or went), and a clip box left where
-      // the list used to start showed the area over the nav bar or the pinned headers
-      follow(-top);
+      } else if (!shown) ensure(); // a fling's overshoot: the anchor back in a list redrawn since the last touch
       show(true); // also during the bounce after an armed release: the area slides up, its look frozen
     } else {
       if (!g || g.mode === "native") show(false);
