@@ -72,17 +72,31 @@ const OPEN = 2.2, START = OPEN + 0.6;
 // Apple's answers, the source walk) go fast; what is read (the certificate rows, the sign-in fields, the Confirm lists, the days left)
 // plays at its own speed or near it. A mark not named plays at DEFAULT.
 const DEFAULT = 1.5, FASTER = 1.25; // FASTER: all of it, so the whole fits the length
-const SPEED = { home: 3, signing: 1.5, certpage: 1.3, picker: 1, importing: 1.3, imported: 2, remove: 3, free: 3.5, typed: 2, code: 2.5, setup: 3,
+const SPEED = { home: 3, signing: 1.5, certpage: 1.3, picker: 1, importing: 1.3, imported: 2, remove: 3,
   "free-done": 1, sources: 4, "source-added": 5, app: 1.3, "confirm-install": 1, installing: 3, installed: 1.5, details: 1.5, addtweaks: 1.3,
   added: 2.5, "confirm-tweak": 1, "tweak-running": 3, "tweak-done": 1.5, "tweak-installed": 1.5, changes: 2.5, "update-found": 1.2, "confirm-update": 3,
   updated: 1.5, "up-to-date": 3, signedapps: 1.2, resignconfirm: 1, resigning: 3, resigned: 2 };
+// ---- the Free Apple ID sign-in is real: filmed on an iPhone (take-free-apple-id.sh, takes/free-apple-id.webm, the Apple ID
+// covered) and played in place of the recording's stubbed one, from mark `free` to `free-done`. TAKE_SPEED: as SPEED, per part
+// of the take (takes/free-apple-id.json).
+const take = await (await fetch("takes/free-apple-id.json")).json();
+const TAKE_SPEED = { open: 1.3, typed: 1.3, signin: 2.5, code: 1.3, setup: 2, revoke: 1.6, ready: 1 };
 const names = rec.marks.map((m) => m.name);
 const segs = [];
 let out = START;
 for (let i = 0; i < names.length - 1; i++) {
+  if (names.indexOf("free") < i && i < names.indexOf("free-done")) continue; // only the take shows that span
+  if (names[i] === "free") {
+    for (const p of take.parts) {
+      const a = p.at, b = p.at + p.to - p.from, k = (TAKE_SPEED[p.name] ?? 1) * FASTER, len = (b - a) / k;
+      segs.push({ take: true, from: NaN, a, b, k, t0: out, t1: out + len }); out += len;
+    }
+    continue;
+  }
   const from = at(names[i]), to = at(names[i + 1]), k = (SPEED[names[i]] ?? DEFAULT) * FASTER, len = (to - from) / k;
   segs.push({ from, to, k, t0: out, t1: out + len }); out += len;
 }
+const recSegs = segs.filter((x) => !x.take);
 const RECEND = out;
 // the output time of a mark
 const when = (mark, dx = 0) => { const s = segs.find((x) => x.from >= at(mark) - 1e-6) ?? segs.at(-1); return s.t0 + dx; };
@@ -97,6 +111,22 @@ Object.assign(el.style, { width: pw + "px" });
 Object.assign(screen.style, { left: PAD + "px", top: PAD + "px", width: "402px" });
 const sb = mk("sb", `<b>12:30</b>${[5, 7, 9, 12].map((h, n) => `<i style="right:${82 - n * 5}px;height:${h}px;bottom:25px"></i>`).join("")}<u></u>`, screen);
 const img = screen.querySelector("img");
+// the take: a muted <video> (from a blob, so it seeks) drawn into a canvas over the recording's frame
+const film = document.createElement("canvas"); film.width = 804; film.height = 1748;
+Object.assign(film.style, { position: "absolute", left: 0, top: 0, width: "402px", height: "874px", visibility: "hidden" });
+img.after(film);
+const video = document.createElement("video"); video.muted = true; video.preload = "auto";
+video.src = URL.createObjectURL(new Blob([await (await fetch("takes/free-apple-id.webm")).arrayBuffer()], { type: "video/webm" }));
+await new Promise((ok, bad) => { video.onloadeddata = ok; video.onerror = () => bad(new Error("can't play takes/free-apple-id.webm")); });
+let filmAt = -1;
+const showTake = async (s) => {
+  const f = Math.min(Math.floor(s * 60 + 1e-6), Math.floor(video.duration * 60) - 1) / 60;
+  if (f === filmAt) return;
+  filmAt = f;
+  video.currentTime = f + 0.5 / 60;
+  await new Promise((ok) => { video.onseeked = ok; });
+  film.getContext("2d").drawImage(video, 0, 0, 804, 1748);
+};
 let shown = 0;
 const BAND = TALL ? 260 : 160, CAPY = TALL ? 122 : 46;
 const WHOLE = (H - BAND - 34) / ph;
@@ -122,7 +152,12 @@ end.id = "end";
 
 window.render = async (t) => {
   const open = smooth((t - OPEN) / 0.9), out = smooth((t - END) / 0.6);
-  const s = Math.min(segs.at(-1).to, t <= START ? 0 : (() => { const g = segs.find((x) => t < x.t1) ?? segs.at(-1); return g.from + Math.min(t - g.t0, g.t1 - g.t0) * g.k; })());
+  const g = t <= START ? null : segs.find((x) => t < x.t1) ?? segs.at(-1);
+  const along = g ? Math.min(t - g.t0, g.t1 - g.t0) * g.k : 0;
+  // the take's last frame stays up while the recording taps Sources, so its stubbed certificate never shows
+  const hold = !g?.take && g?.from === at("free-done") && along < 0.25;
+  const inTake = Boolean(g?.take) || hold;
+  const s = Math.min(recSegs.at(-1).to, !g ? 0 : inTake ? at("free") : g.from + along);
   const n = Math.min(rec.frames, Math.max(1, Math.floor(s * rec.fps + 1e-6) + 1));
   const look = rec.looks.filter((l) => l.t <= s + 1e-6).at(-1) ?? rec.looks[0];
   sb.classList.toggle("dark", look.style !== "ios6" && look.theme !== "dark");
@@ -138,6 +173,8 @@ window.render = async (t) => {
   const e = smooth((t - END - 0.35) / 0.5);
   end.style.opacity = e;
   end.style.transform = `translateY(${(H / 2 - 330 + (1 - e) * 24).toFixed(2)}px)`;
+  film.style.visibility = inTake ? "visible" : "hidden";
+  if (inTake) await showTake(hold ? take.length : g.a + along);
   if (t >= OPEN - 0.1 && n !== shown) {
     shown = n;
     img.src = `/frames/promo-sideload/${String(n).padStart(5, "0")}.jpg`;
