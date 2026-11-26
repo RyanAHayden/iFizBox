@@ -21,6 +21,7 @@
 // <NAME> Updates is off (F285 withoutSelf). Sent again only when it changes.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { catalog } from "./catalog.js";
+import { altKey } from "./core/altstore.js";
 import { getBackend } from "./backend.js";
 import { apps } from "./core/installed.js";
 import { detectMode, selfUpdateAlertsOn } from "./core/settings.js";
@@ -35,12 +36,17 @@ let lastSent = null;
 
 // The source's row for each remembered app, as screens/installed.js candidates() finds it. B47: `failed` counts the
 // lookups that threw (the catalog not there), so a watch list isn't built from a half answer.
-async function candidates(records, lookup = (id) => catalog.package(id)) {
+// B476: only on the source the app was installed from (ownKey): another source listing the same bundle ID (a modded
+// X on fastsign beside AppTesters') is a different app, never its upgrade. No source of its own (My IPAs, a URL): none.
+export const ownKey = (r) => (r?.key && r.key !== "*" ? r.key : typeof r?.source === "string" && r.source ? altKey(r.source) : null);
+
+async function candidates(records, lookup = (id, key) => catalog.package(id, key)) {
   const out = new Map();
   let failed = 0;
-  await Promise.all(records.filter((r) => r?.id && !r.self).map(async (r) => {
-    const p = await Promise.resolve().then(() => lookup(r.id)).catch(() => { failed++; return null; });
-    if (p?.key && p.stanza?.version) out.set(r.id, { ...(p.row ?? {}), id: r.id, version: p.stanza.version, key: p.key });
+  await Promise.all(records.filter((r) => r?.id && !r.self && ownKey(r)).map(async (r) => {
+    const key = ownKey(r);
+    const p = await Promise.resolve().then(() => lookup(r.id, key)).catch(() => { failed++; return null; });
+    if (p?.key === key && p.stanza?.version) out.set(r.id, { ...(p.row ?? {}), id: r.id, version: p.stanza.version, key: p.key });
   }));
   return { cands: out, failed };
 }

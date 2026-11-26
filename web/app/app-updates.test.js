@@ -76,7 +76,7 @@ const jbRecords = [
   { id: "com.utmapp.UTM", name: "UTM", version: "4.5.2", source: SRC, date: 2 },
   { id: "com.example.gone", name: "Gone", version: "2.0", source: SRC, date: 1 }, // deleted from the Home Screen
 ];
-const offers = (versions) => async (id) => (versions[id] ? { key: "altstore:a", stanza: { version: versions[id] }, row: { name: id } } : null);
+const offers = (versions) => async (id) => (versions[id] ? { key: `alt:${SRC}`, stanza: { version: versions[id] }, row: { name: id } } : null);
 
 test("jailbreak: a remembered app's upgrade is worked out from the version on the phone", async (t) => {
   const backend = jailbreakBackend(t);
@@ -192,4 +192,26 @@ test("self-update alerts off: the shell isn't told to follow iFizBox", async () 
   } finally {
     if (had) Object.defineProperty(globalThis, "localStorage", had); else delete globalThis.localStorage;
   }
+});
+
+// ---- B476: upgrades only from the source the app was installed from ----
+
+test("B476: another source listing the same bundle ID offers no upgrade; the app's own source does", async () => {
+  const OTHER = "https://fastsign.example/repo.json";
+  const store = async () => memoryAppStore([
+    { id: "com.atebits.Tweetie2", name: "X", version: "10.0", source: SRC, date: 1 },
+    { id: "com.google.ios.youtube", name: "YouMod", version: "19.0", key: `alt:${SRC}`, source: SRC, date: 1 },
+    { id: "com.local.ipa", name: "Mine", version: "1.0", source: null, date: 1 }]); // My IPAs: no source of its own
+  const asked = [];
+  // The other source has every app newer; the app's own source has only YouMod newer.
+  const lookup = async (id, key) => {
+    asked.push([id, key]);
+    if (key === `alt:${SRC}` && id === "com.google.ios.youtube") return { key, stanza: { version: "19.1" }, row: { name: "YouMod" } };
+    if (key === `alt:${SRC}`) return { key, stanza: { version: id === "com.atebits.Tweetie2" ? "10.0" : "1.0" }, row: {} };
+    return { key: `alt:${OTHER}`, stanza: { version: "99" }, row: {} }; // what an any-source lookup would answer
+  };
+  const up = await withAppUpgrades({ available: [], ignored: [] }, [], { mode: "site", store, lookup });
+  assert.deepEqual(up.available.map((r) => [r.id, r.version]), [["com.google.ios.youtube", "19.1"]]);
+  assert.ok(asked.every(([, key]) => key === `alt:${SRC}`), "only the install's own source is asked");
+  assert.ok(!asked.some(([id]) => id === "com.local.ipa"), "an app with no source of its own is not looked up");
 });

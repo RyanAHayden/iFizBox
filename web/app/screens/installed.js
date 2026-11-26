@@ -79,7 +79,7 @@ import { recordInstall, unrecordedSigned, sourceRecordFor } from "../core/instal
 import { creditedRecords, recreditedRecords, urlCredit, recordWithCredit } from "../core/installed.js"; // B247
 import { siteSignedApps } from "../core/installed.js"; // F342
 import { mediaUrl } from "./depiction.js";
-import { rememberedApps } from "../app-updates.js";
+import { rememberedApps, ownKey } from "../app-updates.js";
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
 import { settings } from "../settings-store.js";
 import { wishRows, wishCount, WISH_EMPTY } from "../core/wishlist.js";
@@ -626,14 +626,14 @@ function chooseStatus() {
 
 // ---- F30: the apps recorded on this device -------------------------------------------------------------------
 
-// The newest version of each app on any source, from the catalog (null where no source has it any more). B247: on the
-// source it was installed from first (the record's key), so RyukGram isn't offered AppTesters' Instagram as its upgrade.
+// The newest version of each app on the source it was installed from (null where that source no longer has it, or it
+// has none). B476: never another source's: RyukGram isn't offered AppTesters' Instagram as its upgrade.
 async function candidates(rows) {
   const out = new Map();
   await Promise.all(rows.map(async (r) => {
-    const own = r.key && r.key !== ALL ? await catalog.package(r.id, r.key).catch(() => null) : null;
-    const p = own?.key && own.stanza?.version ? own : await catalog.package(r.id, ALL).catch(() => null);
-    if (p?.key && p.stanza?.version) out.set(r.id, { version: p.stanza.version, key: p.key, pkg: p }); // F222: pkg for Manage's jobs
+    const key = ownKey(r);
+    const p = key ? await catalog.package(r.id, key).catch(() => null) : null;
+    if (p?.key === key && p.stanza?.version) out.set(r.id, { version: p.stanza.version, key: p.key, pkg: p }); // F222: pkg for Manage's jobs
   }));
   return out;
 }
