@@ -1017,6 +1017,7 @@ export function notLandedText(_app, check) {
 //   expiryWarningDays(get)  Expiry Warning's days (the "expiryWarning" setting), EXPIRY_WARNING (7) when unset
 
 export const EXPIRY_WARNING = 7;
+const EXPIRY_GRACE = 60 * 60 * 1000;
 
 export function expiryWarningDays(get) {
   let v;
@@ -1033,7 +1034,10 @@ export function expiryWarning(identity, { now = new Date(), warn = EXPIRY_WARNIN
   const what = prof && (!cert || prof < cert) ? "Profile" : "Certificate";
   const expires = what === "Profile" ? prof : cert;
   const left = expires.getTime() - now.getTime();
-  const days = Math.floor(left / DAY);
+  // B474: whole days left, an hour's grace: a 7-day profile made minutes ago has 7 days, not 6. Never under 2 days
+  // (Today and Tomorrow stay exact)
+  const whole = Math.floor(left / DAY);
+  const days = whole >= 2 ? Math.floor((left + EXPIRY_GRACE) / DAY) : whole;
   if (left <= 0) {
     return { stage: "gone", what, days, expires, title: `${what} Expired`, subtitle: "Apps won't open · Renew in Signing" };
   }

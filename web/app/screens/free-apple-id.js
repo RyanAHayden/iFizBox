@@ -27,6 +27,9 @@
 //   nativeTransport(native)              gsa.js's transport over net.request
 //   directWsUrl(server)                  wss://<anisette server>/v3/provisioning_session
 //   APP_FOOTERS                          the app's wording of the footers that name the website or the browser
+//   await adoptBundledFreeId({ native, store })
+//                                        after a computer install: the record it carried (web/free-id.json) under
+//                                        FREE_KEY, so the group and its Refresh Profile show (app.js, every launch)
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped, el } from "../nav/ui.js";
 import { NAME, BUNDLE_ID } from "../brand.js";
@@ -96,12 +99,36 @@ export function loadFreeIdentity(store) {
       expires: j.expires ? new Date(j.expires) : null };
   } catch { return null; }
 }
-export function saveFreeIdentity(id, store) {
-  writeJson(store, FREE_KEY, { teamId: id.teamId, teamName: id.teamName ?? null, serial: id.serial, password: id.password,
-    p12: b64encode(id.p12), expires: id.expires ? new Date(id.expires).toISOString() : null,
-    profile: id.profile ? b64encode(id.profile) : null, appId: id.appId ?? null });
-}
+// The record kept under FREE_KEY (JSON-ready: base64 for the bytes); the computer install carries it too (FREE_ID_FILE).
+export const freeRecord = (id) => ({ teamId: id.teamId, teamName: id.teamName ?? null, serial: id.serial, password: id.password,
+  p12: b64encode(id.p12), expires: id.expires ? new Date(id.expires).toISOString() : null,
+  profile: id.profile ? b64encode(id.profile) : null, appId: id.appId ?? null });
+export function saveFreeIdentity(id, store) { writeJson(store, FREE_KEY, freeRecord(id)); }
 export const forgetFreeIdentity = (store) => writeJson(store, FREE_KEY, null);
+
+// B474: an app installed by a computer install has the Free Apple ID's identity in its Keychain (BundledIdentity) but
+// nothing under FREE_KEY, so Signing hid the Free Apple ID group (settings.js freeInUse) and with it Sign In Again /
+// Refresh Profile. The signed app also carries the website's record (web/free-id.json, websign-job.js bring.freeId):
+// take it while the Keychain's certificate is that record's (same serial), once per file. True: taken.
+export const FREE_ID_URL = "free-id.json";
+const BUNDLED_KEY = "ifizbox.freeid.bundled";
+export async function adoptBundledFreeId({ native, store, fetcher = globalThis.fetch } = {}) {
+  if (!native?.call) return false;
+  try {
+    const r = await fetcher(FREE_ID_URL, { cache: "no-store" });
+    if (!r?.ok) return false;
+    const text = await r.text();
+    const rec = JSON.parse(text);
+    if (!rec?.p12 || !rec?.teamId || !rec?.serial) return false;
+    const mark = `${rec.serial}:${rec.profile?.length ?? 0}:${rec.profile?.slice(-32) ?? ""}`;
+    if (readJson(store, BUNDLED_KEY) === mark) return false;
+    const st = await native.call("signing.status", {});
+    if (!sameSerial(st?.identity?.serial, rec.serial)) return false;
+    writeJson(store, FREE_KEY, rec);
+    writeJson(store, BUNDLED_KEY, mark);
+    return true;
+  } catch { return false; } // no file (not a computer install), or the signer didn't answer: next launch asks again
+}
 
 const te = new TextEncoder();
 export function handoffFiles(id) {
@@ -671,7 +698,8 @@ function readyView(ctx, saved) {
     }
   } else {
     out.push(button("Save for the App", () => download(handoffZip(saved), `${NAME} Free Apple ID.zip`), "free-primary", FREE_ZIP_FOOTER));
-    out.push(computerInstallBlock({ id: saved, expired: !prof || exp.state === "expired", ask: ctx.ask, save: download, // F436
+    out.push(computerInstallBlock({ id: saved, record: freeRecord(saved), // B474: the app takes it (adoptBundledFreeId)
+      expired: !prof || exp.state === "expired", ask: ctx.ask, save: download, // F436
       fix: { label: renewLabel, onClick: renew } }));
   }
   // F254i: the Developer Mode + Trust steps, a page of their own; gone once an app on this route installed fine
