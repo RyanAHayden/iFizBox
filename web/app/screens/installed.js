@@ -528,10 +528,12 @@ export function ipasAppsRow(route, counts = null, apps = 0) {
     badge: n > 0 ? String(n) : undefined, icon: rowIcon("ipa"), cls: "ipas-apps-row" };
 }
 
-// "7 apps · 3 IPAs · 2 not installed": the apps iFizBox remembers (none: left out), then the IPA library's counts.
+// "7 apps · 3 IPAs · 2 not installed": the apps iFizBox remembers (none: left out), then the IPA library's counts
+// (not read yet: the apps alone, or what the row is for when there are none).
 export function ipasAppsSubtitle(counts, apps = 0) {
-  const ipas = counts ? ipaCountText(counts) : "Your own IPAs";
-  return apps > 0 ? `${apps === 1 ? "1 app" : `${apps} apps`} · ${ipas}` : ipas;
+  const own = apps > 0 ? (apps === 1 ? "1 app" : `${apps} apps`) : "";
+  if (!counts) return own || "Your own IPAs and the apps you install";
+  return own ? `${own} · ${ipaCountText(counts)}` : ipaCountText(counts);
 }
 
 // B291: the jailbreak app's row above the package list (F443: IPAs and Apps) as a plain row of the list, edge to edge
