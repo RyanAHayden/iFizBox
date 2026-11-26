@@ -407,14 +407,18 @@ html[data-theme="dark"] .pair-button.delete-button:is(:active, .is-pressed) {
   border-radius: 2.5px;
   color: var(--tab-text); font-size: 10px; font-weight: bold; line-height: 12px;
 }
-.tab.active { color: var(--tab-text-active); background: var(--tab-active); box-shadow: var(--tab-active-edge); }
+/* A held tab (app.js .is-pressed) wears the selected look, as UIKit's tab bar does under the finger. */
+.tab.active, .tab.is-pressed { color: var(--tab-text-active); background: var(--tab-active); box-shadow: var(--tab-active-edge); }
 .tab-icon { filter: var(--tab-icon-emboss); }
 .tab-icon::before { /* the tab's glyph (--glyph, below) masks the fill */
   background: var(--tab-icon);
   -webkit-mask: var(--glyph) center / contain no-repeat; mask: var(--glyph) center / contain no-repeat;
 }
-.tab.active .tab-icon { filter: var(--tab-icon-emboss-active); }
-.tab.active .tab-icon::before { background: var(--tab-icon-active); }
+.tab.active .tab-icon, .tab.is-pressed .tab-icon { filter: var(--tab-icon-emboss-active); }
+.tab.active .tab-icon::before, .tab.is-pressed .tab-icon::before { background: var(--tab-icon-active); }
+/* The tab already chosen has no further look to take, so held it dims its icon and label (a tap there goes back
+   to the root or the top): every tab goes visibly down under the finger. */
+.tab.active.is-pressed .tab-icon, .tab.active.is-pressed .tab-label { opacity: .5; }
 .tab[data-tab="home"]      { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M14 3 1.5 14H5v11h7v-7h4v7h7V14h3.5z'/%3E%3C/svg%3E"); }
 .tab[data-tab="sources"]   { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect x='3' y='3' width='22' height='6' rx='2'/%3E%3Crect x='3' y='11' width='22' height='6' rx='2'/%3E%3Crect x='3' y='19' width='22' height='6' rx='2'/%3E%3C/svg%3E"); }
 .tab[data-tab="changes"]   { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath fill-rule='evenodd' d='M14 2a12 12 0 1 0 0 24 12 12 0 1 0 0-24zm0 3a9 9 0 1 1 0 18 9 9 0 1 1 0-18z'/%3E%3Cpath d='M12.6 7h2.8v6.3l4.4 3.1-1.6 2.3-5.6-4z'/%3E%3C/svg%3E"); }
