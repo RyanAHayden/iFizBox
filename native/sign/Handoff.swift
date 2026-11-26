@@ -64,14 +64,16 @@ enum BundledIdentity {
     // identity came from one.
     static let importedCertKey = "ifizbox.bundledCert"
 
-    // Import the file's identity in place of the held one? Only when the file's certificate is another one that its
-    // profile lists and can sign with now, and the held identity is one a file brought (heldFromFile) or a Free Apple
+    // Import the file's identity in place of the held one? Only when the file's certificate is another, newer one that
+    // its profile lists and can sign with now, and the held identity is one a file brought (heldFromFile) or a Free Apple
     // ID's (a 7-day team profile): one imported by hand from a paid team stays. In doubt (no profile held, the file's
     // can't be read), what is held stays.
     static func replacesIdentity(fileProfile: Profile?, fileCertificate: Data?, heldCertificate: Data, heldProfile: Profile?,
                                  heldFromFile: Bool, now: Date = Date()) -> Bool {
         guard let fc = fileCertificate, fc != heldCertificate, let fp = fileProfile,
-              fp.problem(with: fc, now: now) == nil, fp.devices != 0 else { return false }
+              fp.problem(with: fc, now: now) == nil, fp.devices != 0,
+              let made = (try? Certificate(der: fc))?.notBefore, let was = (try? Certificate(der: heldCertificate))?.notBefore,
+              made > was else { return false } // only a newer certificate: an old file never brings back a revoked one
         return heldFromFile || heldProfile?.isFree == true
     }
 

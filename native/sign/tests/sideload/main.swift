@@ -405,6 +405,9 @@ test("bundled identity: another certificate replaces one a file brought, or a Fr
     check(!takes(heldProfile: nil), "held: by hand, no profile to tell: kept")
     check(!takes(held: cert, heldProfile: freeHeld, fromFile: true), "the same certificate: kept (B420 looks at the profile)")
     check(!takes(fileCert: nil, heldProfile: freeHeld), "the file's .p12 doesn't open: kept")
+    check(try !takes(profile(certs: [other]), fileCert: other, held: cert, heldProfile: try profile(made: -3, certs: [cert]), fromFile: true),
+          "the file's certificate is older than the held one: kept")
+    check(!takes(held: Data([1]), heldProfile: freeHeld, fromFile: true), "the held certificate can't be read: kept")
     check(!BundledIdentity.replacesIdentity(fileProfile: nil, fileCertificate: cert, heldCertificate: other, heldProfile: freeHeld,
                                             heldFromFile: true, now: now), "the file's profile can't be read: kept")
     check(try !takes(profile(certs: [other]), heldProfile: freeHeld), "the file's profile doesn't list its certificate: kept")

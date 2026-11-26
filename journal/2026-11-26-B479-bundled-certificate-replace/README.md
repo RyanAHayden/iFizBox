@@ -14,7 +14,8 @@ certificate in the Keychain. B479 makes the app switch to the certificate the co
 ## Code change
 - New pure rule `BundledIdentity.replacesIdentity` in `native/sign/Handoff.swift`. The file's identity replaces the held
   one when all of these hold:
-  - the file's certificate differs from the held one;
+  - the file's certificate differs from the held one and is newer (a later notBefore; added after the spec review, so
+    an old file never brings back a revoked certificate; either date unreadable keeps what is held);
   - the file's profile lists that certificate, can sign now (not expired) and lists devices;
   - the held identity either came from a file, or has a Free Apple ID profile (`Profile.isFree`, the 7-day team
     profile).
@@ -34,7 +35,7 @@ The phone from B478 was installed by a build from before this fix, so it has no 
 branch (held profile `isFree`) covers it, so no migration step is needed.
 
 ## Tests
-- 12 checks in `native/sign/tests/sideload/main.swift`, "another certificate replaces one a file brought, or a Free
+- 14 checks in `native/sign/tests/sideload/main.swift`, "another certificate replaces one a file brought, or a Free
   Apple ID's". They use the fixtures' `cert.der` and `ca.der` as the two certificates.
 - `native/test_sideload.py`: the source check for `refreshBundledProfile` is updated. It used to forbid `importIdentity`
   there.
