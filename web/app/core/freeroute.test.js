@@ -187,7 +187,7 @@ test("B478: a computer install's carried certificate is reused while Apple lists
   const cert = fakeCert(spki, [0x6c, 0x76, 0x16, 0xe2]);
   const portal = fakePortal({ devices: [{ deviceNumber: UDID }], appIds: [{ identifier: `com.x.${TEAM}`, appIdId: "OLD" }], certs: [
     { serialNumber: "1DB66FCB", status: "Issued", machineName: "iloader" },
-    { serialNumber: certSerial(cert), status: "Issued", machineName: MACHINE_NAME, certContent: cert }] });
+    { serialNumber: "6C7616E2", status: "Issued", machineName: MACHINE_NAME }] }); // Apple's own string, no certContent
   const saved = { teamId: TEAM, serial: certSerial(cert), p12: Uint8Array.of(1), password: "s" };
   const r = await runSetup({ portal, teamId: TEAM, phone: { udid: UDID }, saved, bundleId: "com.x", make: fakeMake(portal),
     askRevoke: async () => assert.fail("no Certificate Limit alert while the carried certificate is issued") });
