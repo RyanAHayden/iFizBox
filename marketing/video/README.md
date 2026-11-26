@@ -63,7 +63,9 @@ marks, world updates) is in `capture.mjs`'s header.
 | `shots-jb-reddit.json` | the r/jailbreak recording's script: jailbreak mode, adds the Lamplight source, searches "dock", and installs Dockshade through Confirm to the Complete page, with pauses so each screen reads |
 | `promo-sideload.html` | the sideload-only clip as one page: a splash, the phone, the captions, the speed segments and the end card, cut from `rec/promo-sideload.mp4` alone (`render.mjs --page promo-sideload`) |
 | `shots-promo-sideload.json` | the sideload-only recording's script: the certificate import, the Free Apple ID sign-in, sources and an install, a tweak, the update and Re-sign All |
-| `stubs/` | the sideload-only recording's stand-ins, served at `/__video/<file>`: `gsa.js` and `freeroute.js` (Apple's answers, stubbed), `pick.js` (the iOS Files picker sheet), `profile.js` (a provisioning profile made at the page's "now") |
+| `take-free-apple-id.sh` | cuts a phone's screen recording of the Free Apple ID sign-in into `takes/`: `take-free-apple-id.sh RAW.mp4`; the Apple ID is covered, the status bar blanked, Apple's sign-in alert left out |
+| `takes/` | the real footage the clips play: `free-apple-id.webm` (the sign-in, filmed on an iPhone) and its `free-apple-id.json` (parts and seconds) |
+| `stubs/` | the sideload-only recording's stand-ins, served at `/__video/<file>`: `gsa.js` and `freeroute.js` (Apple's answers, stubbed, off screen), `pick.js` (the iOS Files picker sheet), `profile.js` (a provisioning profile made at the page's "now") |
 
 Re-render one cut from the recordings already in `OUT_DIR`:
 
@@ -160,9 +162,13 @@ Its script is `shots-promo-sideload.json`, run in sideload mode by `make.sh`. It
   as a sheet, with the app's own icons, steps and `select-files-light.jpg`. The .p12 fixture, a profile made at the
   page's "now" and a password file are put into the file input.
 - Remove Certificate.
-- Use a Free Apple ID. Apple's answers are stubbed: the script's `override` makes `capture.mjs` serve `stubs/gsa.js` and
-  `stubs/freeroute.js` in place of `core/gsa.js` and `core/freeroute.js`; each re-exports the real module from `?real`.
-  The Apple ID is made up (`taylor@example.com`). The sign-in page, the alerts and the Keychain import are the real app.
+- Use a Free Apple ID. The sign-in the clip shows is a real one, filmed on an iPhone: `takes/free-apple-id.webm`, made by
+  `take-free-apple-id.sh RAW.mp4` from the phone's screen recording (Apple ID covered, status bar blanked, Apple's
+  sign-in alert left out). `promo-sideload.html` plays it from mark `free` to `free-done`.
+  The recording still runs the stubbed sign-in, off screen, because the later steps need the certificate it imports:
+  the script's `override` makes `capture.mjs` serve `stubs/gsa.js` and `stubs/freeroute.js` in place of
+  `core/gsa.js` and `core/freeroute.js`; each re-exports the real module from `?real`. The Apple ID there is made up
+  (`taylor@example.com`).
 - Sources and Install Tidewell, then Add Tweaks (Night Charts).
 - The update (a world update) with Upgrade.
 - Signed Apps > Re-sign All.
@@ -173,7 +179,7 @@ field's "/" key and a number pad for code fields. `shell.mjs` answers `signing.i
 `device.info`, and its phone status starts with no certificate when fresh. A Free Apple ID's certificate lasts 7 days;
 an imported one lasts a year.
 
-The login uses no real Apple ID.
+The recording's login uses no real Apple ID. The take is the only real sign-in, with its Apple ID covered.
 
 Cut it alone from the recording already in `OUT_DIR/rec/`:
 
