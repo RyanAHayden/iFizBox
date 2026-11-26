@@ -489,7 +489,9 @@ rest:
 This iPhone connects through LocalDevVPN instead (a free app on the App Store, not ours), which the person turns on
 by hand before each install, so the free profile needs no Network Extensions. Measured on an iPhone 15 Pro
 (iOS 27.0.1): LocalDevVPN's Device IP is 10.7.0.1/32, the address the app already uses, its Tunnel IP 10.7.1.1/32,
-and iOS asks once to add its VPN configuration. The pairing file still comes from the one-time computer setup.
+and iOS asks once to add its VPN configuration. Through it, Test Connection, an install and a re-sign each connect
+over RemotePairing in under a second, with nothing of iFizBox's VPN on. The pairing file still comes from the
+one-time computer setup.
 
 **Jailbreak build**: the root helper's `install-ipa` installs an IPA through `LSApplicationWorkspace
 installApplication:withOptions:error:`, as AppSync's `appinst` does (`native/helper/README.md`). It needs AppSync

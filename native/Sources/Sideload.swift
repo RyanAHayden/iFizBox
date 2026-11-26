@@ -665,7 +665,7 @@ enum Sideload {
         // sent) then "installing" (installd's percent), so the run's row shows them and no "iOS prompt" step
         let isSelf = app.bundleID == Bundle.main.bundleIdentifier
         IDevice.ilog("This iPhone: \(app.bundleID) \(app.version), \(Sideload.size(output))")
-        let way = "\(LocalVPN.name) (\(IDevice.address))"
+        let way = "\(LocalVPN.routeName) (\(IDevice.address))" // F447: Connect Through's choice
         log?("Using this iPhone's own install route through \(way); nothing goes to a Signing Server")
         emit?("here", 0)
         if isSelf {
