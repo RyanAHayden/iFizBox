@@ -54,3 +54,65 @@ export function guarded(fn, guard = tapGuard()) {
     return fn.call(this, e, ...rest);
   };
 }
+
+// B466: a drag is never a tap, for every click on the page, as UIKit. A touch that moved past MOVE, scrolled the
+// list under it, was cancelled, or went down while that list was still gliding (a momentum scroll: the touch only
+// stops it) never clicks what it started on, even when it ends on the same row. cancelDragTaps eats such a click
+// before any handler (window, capture phase); app.js also drops the pressed look the moment a touch turns into a
+// drag (onDrag) and never presses during a glide (dragging()). Lives here, not in a module of its own, to keep the
+// startup closure under its cap (module-graph.test.js).
+//
+//   const st = cancelDragTaps(document, { onDrag: () => unpress() })
+//   st.dragging()          // the touch now down is a drag (or a glide-stopping touch)
+//   st.endsDrag(clickEvent)
+//
+// Only touch and pen: a mouse click after a drag or a wheel scroll is the browser's to keep. Controls that follow the
+// finger themselves and want the click that ends their own drag (a switch's knob, a banner pulled up) are left
+// alone: OWN_DRAG. A click with no touch behind it (keyboard, el.click(): detail 0) always runs.
+export const GLIDE_MS = 100; // a scroll event this recent under the finger means the list is still moving
+export const OWN_DRAG = ".switch, [role='switch'], .banner, input, textarea, select";
+
+const holds = (outer, node) => outer === node || outer?.nodeType === 9 || (typeof outer?.contains === "function" && outer.contains(node));
+
+export function cancelDragTaps(doc, { win = doc?.defaultView ?? globalThis.window, now = () => (globalThis.performance ?? Date).now(), onDrag = () => {} } = {}) {
+  let t = null;        // the touch: { id, x, y, target, drag, down, upAt }
+  let glide = null;    // the last scroll: { target, at }
+  const opts = { capture: true, passive: true };
+  const mark = () => { if (t && !t.drag) { t.drag = true; onDrag(); } };
+  const moveTo = (x, y) => { if (t?.down && Number.isFinite(x) && Number.isFinite(y) && Math.hypot(x - t.x, y - t.y) > MOVE) mark(); };
+  const on = {
+    pointerdown(e) {
+      if (e.isPrimary === false) return;
+      if (e.pointerType === "mouse") { t = null; return; }
+      t = { id: e.pointerId, x: e.clientX, y: e.clientY, target: e.target, drag: false, down: true, upAt: 0 };
+      if (glide && now() - glide.at < GLIDE_MS && holds(glide.target, e.target)) mark();
+    },
+    pointermove(e) { if (t && e.pointerId === t.id) moveTo(e.clientX, e.clientY); },
+    // iOS stops pointermove once it pans; the touch's own moves still come.
+    touchmove(e) { const p = e.touches?.[0]; if (p) moveTo(p.clientX, p.clientY); },
+    pointerup(e) { if (t?.down && e.pointerId === t.id) { moveTo(e.clientX, e.clientY); t.down = false; t.upAt = now(); } },
+    pointercancel(e) { if (t?.down && e.pointerId === t.id) { mark(); t.down = false; t.upAt = now(); } },
+    // Only a pane holding the touch's target: a carousel elsewhere moving on its own is not this touch's scroll.
+    scroll(e) {
+      glide = { target: e.target, at: now() };
+      if (t?.down && holds(e.target, t.target)) mark();
+    },
+  };
+  for (const [type, f] of Object.entries(on)) doc.addEventListener(type, f, opts);
+  const endsDrag = (e) => {
+    if (!e || e.detail === 0 || !t?.drag) return false;
+    if (!t.down && now() - t.upAt > STALE) return false;
+    return !e.target?.closest?.(OWN_DRAG);
+  };
+  const click = (e) => { if (endsDrag(e)) { e.preventDefault(); e.stopImmediatePropagation(); } };
+  const host = win?.addEventListener ? win : doc;
+  host.addEventListener("click", click, true);
+  return {
+    dragging: () => !!(t?.down && t.drag),
+    endsDrag,
+    destroy() {
+      for (const [type, f] of Object.entries(on)) doc.removeEventListener(type, f, opts);
+      host.removeEventListener("click", click, true);
+    },
+  };
+}
