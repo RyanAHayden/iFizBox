@@ -53,6 +53,8 @@ test("the rules: LocalDevVPN is a way in; the built-in VPN's own branches are of
   assert.equal(iphoneSetUp(FREE()), false);
   assert.deepEqual(decideRoute("iphone", FREE({ tested: true })), { route: "idevice" });
   assert.deepEqual(decideRoute("iphone", { paired: "rp", vpn: { available: false } }), { route: "server", alert: "noVPN" });
+  assert.deepEqual(decideRoute("iphone", FREE({ tested: true, cellular: true }), "server"), { route: "idevice" }, "On Cellular's hidden choice doesn't count");
+  assert.deepEqual(decideRoute("iphone", ST({ tested: true, cellular: true }), "server"), { route: "server", cellular: true });
   assert.equal(setupState({ paired: null, pairOnPhone: true, vpn: vpn({ available: false, via: "app" }) }), "pairing");
   const ready = installStatus("iphone", FREE({ tested: true }));
   assert.equal(ready.state, "ready");

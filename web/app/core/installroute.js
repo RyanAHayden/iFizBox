@@ -169,7 +169,8 @@ export function decideRoute(choice, status, cellular = "ask") {
   if (!status) return { route: "server", alert: "noStatus" };
   if (!status.paired) return { route: "server", alert: "notPaired" };
   if (!canConnect(status)) return { route: "server", alert: "noVPN" };
-  if (cellular === "server" && onCellular(status)) return { route: "server", cellular: true };
+  // F447: On Cellular is the built-in VPN's (hidden through LocalDevVPN), so its choice counts only there
+  if (cellular === "server" && ownVPN(status) && onCellular(status)) return { route: "server", cellular: true };
   return { route: "idevice" };
 }
 
