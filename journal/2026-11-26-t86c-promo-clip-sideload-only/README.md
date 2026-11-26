@@ -1,7 +1,7 @@
 # T86c: sideload-only promo clip
 
 ## Result
-- `promo-sideload-4x5.mp4`: 1080x1350, 6.2 MB. `promo-sideload-9x16.mp4`: 1080x1920, 8.4 MB.
+- `promo-sideload-4x5.mp4`: 1080x1350, 4.0 MB. `promo-sideload-9x16.mp4`: 1080x1920, 5.3 MB.
 - Both: H.264 High, yuv420p, 60 fps, 2488 frames, 41.5 s, no audio.
 - Stills checked: `stills/promo-sideload-4x5-t5.png`, `stills/promo-sideload-4x5-t12.png`, `stills/promo-sideload-4x5-t25.png`.
 - The X/r/sideloaded post text is T86a's and is untouched here.
