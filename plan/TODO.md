@@ -30,7 +30,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
-- [ ] **F445** (follow-up, low) Film the Free Apple ID login of the sideload-only promo clip (T86c) on the iPhone 15 with the real ID in ~/.config/ifizbox-appleid (2FA code from the person), via tools/ui-15.sh's lock; replace the stubbed login in marketing/video/promo-sideload.html, hiding the real Apple ID on screen. Check: the 4:5 and 9:16 cuts show the real flow. | files: marketing/video/promo-sideload.html, marketing/video/shots-promo-sideload.json | after: T86c
+- [~] **F445** (follow-up, low) Film the Free Apple ID login of the sideload-only promo clip (T86c) on the iPhone 15 with the real ID in ~/.config/ifizbox-appleid (2FA code from the person), via tools/ui-15.sh's lock; replace the stubbed login in marketing/video/promo-sideload.html, hiding the real Apple ID on screen. Check: the 4:5 and 9:16 cuts show the real flow. | files: marketing/video/promo-sideload.html, marketing/video/shots-promo-sideload.json | after: T86c BLOCKED: (after T87a) Waits for T87a: it signs in with the same free Apple ID, and an in-app sign-in now could revoke its certificate
 ### Parked
 
 - [ ] **F107** (later, when the jailbreakme.dev exploit is ready) Upgrading & Jailbreaking Help stays unlocked on the website's locked Home (user 2026-11-18: 'we will not have the jailbreak tutorial thing locked when jailbreakme.dev exploit is ready, thats for later'): leave that row out of websign-gate's browsingLocked set in screens/home.js and point it at the jailbreak guide. | files: web/app/screens/home.js
