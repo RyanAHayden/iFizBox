@@ -11,6 +11,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
+- [ ] **B462** Changes: Refresh still shows the old blocking 'Reloading Data' popup. Use the same non-blocking toast the Home page shows while it refreshes, and drop the blocking popup here. | files: web/app/screens/changes.js, web/app/screens/changes.test.js | after: B459
 - [ ] **F443** Installed (jailbreak app): the Install IPAs and Apps rows above the package list are much taller than the other rows. Merge them into one normal-height row (one link to IPAs and installed apps, its subtitle the counts), sized like the package rows. Screenshot: .runner/uploads/20261126-104415-IMG_0019.png | files: web/app/screens/installed.js, web/app/screens/installed.test.js | after: B460
 - [ ] **B461** Find More: row buttons (ADD/ADDED) draw on top of the pinned section header (Popular on Canister) when scrolling; the header must cover the rows' buttons. Screenshot: .runner/uploads/20261126-104415-IMG_0021.png | files: web/app/screens/findmore.js, web/app/screens/findmore.test.js | model: sonnet
 - [ ] **B460** Installed, sorted by name: the pinned letter header (A, B...) slides up under the search field and scope bar instead of pinning below them. Search's page already does this right; give Installed the same pinned top. Screenshots: .runner/uploads/20261126-104415-IMG_0019.png, .runner/uploads/20261126-104415-IMG_0020.png | files: web/app/screens/installed.js, web/app/screens/installed.test.js | model: sonnet
