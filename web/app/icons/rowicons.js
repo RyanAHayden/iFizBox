@@ -436,7 +436,9 @@ export const cssSvgUrl = (svg) => `url("data:image/svg+xml,${svg.replace(/</g, "
 export function tabGlyphTokens(style = "ios6", kind = "tabs") {
   const sel = kind === "tabsSelected" ? ".active" : "";
   if (sel && !ICON_SETS[style]?.tabsSelected) throw new Error(`${style} draws no selected tabs`);
-  return Object.keys(TAB_GLYPHS).map((tab) => `.tab[data-tab="${tab}"]${sel} { --glyph: ${cssSvgUrl(icon(kind, tab, style))}; }`).join("\n");
+  // iOS 7: a held tab wears the chosen glyph too (B467)
+  const held = (tab) => (sel && style === "ios7" ? `, html[data-style="ios7"] .tab[data-tab="${tab}"].is-pressed` : "");
+  return Object.keys(TAB_GLYPHS).map((tab) => `.tab[data-tab="${tab}"]${sel}${held(tab)} { --glyph: ${cssSvgUrl(icon(kind, tab, style))}; }`).join("\n");
 }
 
 // A Home tile's paint (home.css .home-glyph): its colour, then the glyph over its gradient.
