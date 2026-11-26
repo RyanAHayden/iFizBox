@@ -16,4 +16,5 @@
 ## Not verified
 - Not checked on the iPhone 7. The fix comes from reading the CSS and JS and from the unit tests. A phone test needs a fresh .deb built with this change.
 - Not checked in Chromium. Chromium has no native rubber band, so causes 2 and 3 do not happen there.
+- Not checked on the phone whether pinned headers inside the scroller move down with the content during iOS's rubber band. If WebKit held them at the top instead, the clip would start above them; Changes' pinned header (`.vlist-sticky`, z-index 2) still paints over the area (z-index 1) then.
 - Not confirmed whether iOS WebKit also failed to clip the composited area layer under a hidden clip. The fix removes every visible part outside the gap either way.
