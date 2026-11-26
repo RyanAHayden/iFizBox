@@ -173,6 +173,19 @@ test("setup: everything already there -> reuses the saved certificate and App ID
   assert.match(r.steps.certificate, /Reused/);
 });
 
+test("setup: in the app the reuse summary names no browser", async () => {
+  const saved = { teamId: TEAM, serial: "AA01", p12: Uint8Array.of(1), password: "s" };
+  const run = (app) => {
+    const portal = fakePortal({ devices: [{ deviceNumber: UDID }], certs: [{ serialNumber: "AA01", status: "Issued" }],
+      appIds: [{ identifier: `com.x.${TEAM}`, appIdId: "OLD" }] });
+    return runSetup({ portal, teamId: TEAM, phone: { udid: UDID }, saved, bundleId: "com.x", make: fakeMake(portal), app });
+  };
+  const inApp = await run(true);
+  assert.equal(inApp.steps.certificate, "Reused the saved certificate");
+  assert.doesNotMatch(inApp.steps.certificate, /browser|website/i);
+  assert.equal((await run(false)).steps.certificate, "Reused this browser's certificate");
+});
+
 test("setup: a revoked saved certificate is replaced", async () => {
   const portal = fakePortal({ certs: [{ serialNumber: "AA01", status: "Revoked" }] });
   const r = await runSetup({ portal, teamId: TEAM, phone: { udid: UDID }, saved: { teamId: TEAM, serial: "AA01", p12: Uint8Array.of(1), password: "s" },
