@@ -98,6 +98,13 @@ struct Profile {
     // no other kind), or one Xcode made on the Mac (LocalProvision).
     var isTeamProfile: Bool { name.hasPrefix("iOS Team Provisioning Profile") || localProvision }
 
+    // B475: a free Apple ID's profile: a team profile that lasts 7 days (a paid team's lasts a year). iOS refuses its
+    // apps from a website (itms-services, MIInstallerErrorDomain 111), so the Signing Server can't install them.
+    var isFree: Bool {
+        guard isTeamProfile, let c = created, let x = expires else { return false }
+        return x.timeIntervalSince(c) <= 8 * 86400
+    }
+
     // B413: a profile with every capability gives NSFileProtectionComplete, and an app that didn't ask for it can't read
     // its own preferences and files when it's launched in the background on a locked phone.
     static let dataProtectionKey = "com.apple.developer.default-data-protection"

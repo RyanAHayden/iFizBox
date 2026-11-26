@@ -228,8 +228,9 @@ enum SignAhead {
     }
 
     static func open(_ c: Bridge.Call) {
-        guard Sideload.ready(c) != nil else { return }
+        guard let (_, profile) = Sideload.ready(c) else { return }
         guard let servers = Sideload.servers(c) else { return Apt.reply(c, nil, Sideload.noServer) }
+        if Sideload.refusesFree(c, profile, servers) { return } // B475: the signed copy stays kept for This iPhone
         let tag = (c.params["tag"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? SignBridge.token()
         let tok = c.params["token"] as? String ?? ""
         let log = { (s: String) in c.emitOnMain([["log": s]]) }
