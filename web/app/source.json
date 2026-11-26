@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "1.0.3",
+          "date": "2026-11-26T19:06:10Z",
+          "localizedDescription": "Sign apps with a free Apple ID: sign in under Installation & Signing > Certificate, refresh weekly.",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v1.0.3/iFizBox.ipa",
+          "size": 31856517,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.0.2",
           "date": "2026-11-26T18:07:12Z",
           "localizedDescription": "Buttons, including the tab bar, now show they are pressed whenever you tap them.\nSmaller fixes: dragging or scrolling over a button no longer counts as a tap.",
