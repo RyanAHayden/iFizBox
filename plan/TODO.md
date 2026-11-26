@@ -12,7 +12,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 ### Web: browse and upgrade (in order)
 
 - [ ] **B463** Pull to refresh area ('Refreshing...' with spinner) shows drawn over the page and sometimes pokes into the nav bar and pinned headers (iPhone 7, Changes and other pages). It must sit hidden behind the top bars and only show in the gap a pull opens past the list's top. Find why the .pull-clip box lets it show outside that gap. | files: web/app/nav/pullrefresh.js, web/app/ios6.css
-- [ ] **B462** Changes: Refresh still shows the old blocking 'Reloading Data' popup. Use the same non-blocking toast the Home page shows while it refreshes, and drop the blocking popup here. | files: web/app/screens/changes.js, web/app/screens/changes.test.js | after: B459
 - [ ] **B460** Installed, sorted by name: the pinned letter header (A, B...) slides up under the search field and scope bar instead of pinning below them. Search's page already does this right; give Installed the same pinned top. Screenshots: .runner/uploads/20261126-104415-IMG_0019.png, .runner/uploads/20261126-104415-IMG_0020.png | files: web/app/screens/installed.js, web/app/screens/installed.test.js | model: sonnet
 - [ ] **V28** Release 1.0.1 (patch) once everything queued ahead has landed. Release notes: exactly 'UI fixes and improvements' (replace the waiting release-notes/*.md with that one line). tools/publish.sh 1.0.1 --notes FILE. | after: all
 ### Research (any time, parallel)
