@@ -51,6 +51,7 @@ import { sourceCalls, loadInjectSources } from "./core/sources.js"; // F302
 import { countInjectable } from "./core/tweakfields.js"; // F302; C32: the small module, not core/tweaks.js
 import { parseAptSources, listNamesFor } from "./core/aptsources.js";
 import { healthFields } from "./core/health.js";
+import { pool, withTimeout, REFRESH_CONCURRENCY } from "./core/health.js"; // B459
 import { DEFAULT_ARCH, compareVersions } from "./core/apt.js";
 import { withAltSources } from "./core/altstore.js";
 import { detectMode } from "./core/settings.js";
@@ -646,6 +647,11 @@ function coreFoundationOf(call) {
   };
 }
 
+// B459: how long refreshSources gives one source once apt-get update has run (sourceOptions.timeout in the tests).
+// Longer than the site's 20 s: a big list apt fetched is read and counted on the phone, which an iPhone 7 takes a
+// while for; a source apt couldn't fetch is read over the network and, past this, is marked Not Responding.
+export const NATIVE_REFRESH_TIMEOUT = 60_000;
+
 // The source-list calls (sources, addSource, removeSource, refreshSources) over apt's files plus the device store.
 function nativeSourceCalls(backend, call, opts) {
   let opened = null;
@@ -768,8 +774,18 @@ function nativeSourceCalls(backend, call, opts) {
       const all = await list();
       const failed = failedSources(all, failures);
       const sources = all.filter(filter ?? (() => true));
-      const rows = await Promise.all(sources.map(async (s) => {
-        const fields = await refreshSource(backend, s, { arch: arch(), count });
+      // B459: as on the site (core/sources.js sourceCalls), a few sources at a time, each given a time limit. With
+      // every source at once and none, one that apt couldn't fetch (read again over the network: Release, then each
+      // Packages form, 30 s idle and 120 s in all per request in the shell) held the whole refresh for many minutes,
+      // the reload bar stuck on Downloading Packages and Changes left on the old lists (no Upgrade (N)).
+      const rows = await pool(sources, opts.concurrency ?? REFRESH_CONCURRENCY, async (s) => {
+        if (signal?.aborted) return null; // the reload bar's Cancel: no more sources are started
+        let fields;
+        try {
+          fields = await withTimeout(refreshSource(backend, s, { arch: arch(), count }), opts.timeout ?? NATIVE_REFRESH_TIMEOUT);
+        } catch (e) {
+          fields = { updated: Date.now(), error: e?.message || String(e) };
+        }
         const apt = failureFor(s, failures);
         fields.aptError = apt ? apt.message : null;
         if (apt) fields.error = apt.message;
@@ -780,8 +796,8 @@ function nativeSourceCalls(backend, call, opts) {
         const shown = file ? { ...next, file } : next;
         onEach(shown);
         return shown;
-      }));
-      return Object.assign(rows, { failed });
+      });
+      return Object.assign(rows.filter(Boolean), { failed });
     },
   };
 }
