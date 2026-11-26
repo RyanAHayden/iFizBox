@@ -2074,7 +2074,7 @@ async function renderVersions(body, route, key, id) {
   body.replaceChildren();
   if (history.kind === "ipa") {
     const source = sources.find((s) => s.key === history.key);
-    const mine = await appVersionInstalled(pkg.stanza.ipa ?? { bundleIdentifier: history.id });
+    const mine = await appVersionInstalled(pkg.stanza.ipa ?? { bundleIdentifier: history.id }, { key: history.key }); // B483: this source's only
     if (!body.isConnected) return;
     const on = mine ? history.versions.find((v) => v.version === mine) : null; // the newest entry of that version
     const cells = history.versions.map((v) => {
