@@ -406,4 +406,8 @@ test("B474: Home's tile counts a 7-day profile made minutes ago as 7 days left",
   const profile = { expires: new Date(made.getTime() + 7 * 24 * 3600 * 1000).toISOString() };
   const w = expiryWarning({ expires: "2027-11-26T00:00:00Z", profile }, { now });
   assert.deepEqual([w.what, w.days, w.subtitle], ["Profile", 7, "Expires in 7 days · Renew in Signing"]);
+  // no grace near the end: 23.5 hours is still Today's, 1.97 days still Tomorrow's
+  const at = (h) => ({ expires: "2027-11-26T00:00:00Z", profile: { expires: new Date(now.getTime() + h * 3600 * 1000).toISOString() } });
+  assert.equal(expiryWarning(at(23.5), { now }).title, "Profile Expires Today");
+  assert.equal(expiryWarning(at(47.3), { now }).title, "Profile Expires Tomorrow");
 });

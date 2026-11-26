@@ -25,6 +25,15 @@ No Refresh Profile and no Sign In Again; Home's expiry tile went to Settings > S
 core/signing.js `expiryWarning` counted `Math.floor(left / DAY)`, so a 7-day profile a few minutes old gave 6. Now
 `floor((left + 1 hour) / DAY)` (`EXPIRY_GRACE`). The existing tests (6.5 days -> 6, 1.5 -> Tomorrow, 0.25 -> Today) are
 unchanged. A profile made more than an hour before the app first shows it still reads 6 days, which is true whole days.
+The spec review pointed out that the grace also rounded 23.5 hours up to Tomorrow, so it now applies only from 2 whole
+days up: Today and Tomorrow stay exact. Using the profile's CreationDate instead would need signing.status to report it
+(native SignBridge.swift); not worth a native change here.
+
+## From the spec review, left as is
+- The record is taken in the background at launch and nothing redraws afterwards. Home's tile doesn't depend on it, and
+  Settings draws fresh when opened, so only a Settings page already open in the first second would miss the group.
+- In a new app session there is no Apple session, so the button is Sign In Again, not Refresh Profile. After the
+  sign-in, setup makes the new profile and imports it, which is the refresh.
 
 ## Tests
 - screens/free-apple-id.test.js (adopt): same serial -> taken and the group in the layout; once per file, even after
