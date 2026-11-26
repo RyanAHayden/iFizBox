@@ -484,6 +484,13 @@ rest:
   `tools/setup/llvm-mingw.sh` fetches the llvm-mingw that the Windows on ARM build needs. release.sh finds both in
   their default folders.
 
+**Free Apple ID without a computer (a plan, not built)**: a free profile has no packet tunnel, so the built-in VPN
+can't start on it. The plan is for This iPhone to use LocalDevVPN (a free app on the App Store, not ours), which
+the person turns on by hand before an install, so the free profile needs no Network Extensions. Measured on an
+iPhone 15 Pro (iOS 27.0.1): LocalDevVPN's Device IP is 10.7.0.1/32, the address the app already uses, its Tunnel IP
+10.7.1.1/32, and iOS asked once to add its VPN configuration (Allow once). Not yet checked: whether the app's own
+connection through that tunnel, and an install over it, work. Until they are, the computer setup is the way in.
+
 **Jailbreak build**: the root helper's `install-ipa` installs an IPA through `LSApplicationWorkspace
 installApplication:withOptions:error:`, as AppSync's `appinst` does (`native/helper/README.md`). It needs AppSync
 Unified; when the binary has no `application-identifier`, the helper fakesigns the app with `ldid` first. No
