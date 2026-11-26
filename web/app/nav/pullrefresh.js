@@ -273,6 +273,9 @@ export function pullToRefresh(scroller, opts = {}) {
     if (on === shown) return; // a scroll event per frame: no class write when nothing changes
     shown = on;
     clip.classList.toggle("on", on);
+    // B463: hidden means parked wholly above the clip's top. iOS's bounce sends a scroll event only now and then, so
+    // the last one under 0 could leave the area's foot tens of points down the list once the list was back at 0.
+    if (!on) follow(0);
     if (!on && frozen) { frozen = false; paint(); }
     if (!on && tracker.state === "closing") tracker.hidden();
   };
@@ -353,7 +356,9 @@ export function pullToRefresh(scroller, opts = {}) {
       if (g) {
         if (!g.ready) { ensure(); g.ready = true; } // scrolled up to the top and on past it in one gesture
         g.mode = "native"; g.pull = -top; tracker.move(-top);
-      } else if (clip.parentNode !== scroller.parentNode) ensure(); // a fling's overshoot
+      } else if (!shown) ensure(); // a fling's overshoot: B463, measured again, as the list's top may have moved
+      // since the last touch at the top (a strip, a header or the reload bar came or went), and a clip box left where
+      // the list used to start showed the area over the nav bar or the pinned headers
       follow(-top);
       show(true); // also during the bounce after an armed release: the area slides up, its look frozen
     } else {
