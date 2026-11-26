@@ -158,3 +158,29 @@ test("F255: the jailbreak app's Upgrade (N) queues app upgrades in the app queue
   assert.deepEqual(apps.list().map((j) => `${j.id} ${j.url}`), ["own https://y/own.ipa"]);
   assert.deepEqual(r.apps.map((j) => j.id), ["own"]);
 });
+
+test("Changes (B462): Refresh runs under the reload bar, no Reloading Data HUD; one at a time; waits for a running refresh", async () => {
+  const { refreshInBar } = await import("./changes.js");
+  const steps = [];
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const ctx = { showHUD: () => { steps.push("hud"); return () => {}; } };
+  const first = refreshInBar(ctx, {
+    background: async (c) => { assert.equal(c, ctx); steps.push("bar"); await gate; },
+    settled: async () => { steps.push("settled"); },
+    reload: async () => { steps.push("reload"); },
+  });
+  assert.equal(await refreshInBar(ctx, { background: async () => { steps.push("second"); } }), false); // busy
+  release();
+  assert.equal(await first, true);
+  assert.deepEqual(steps, ["bar", "settled", "reload"]); // never the HUD
+  // the bar's Cancel stops the whole Refresh: no reload, not counted as a refresh
+  const after = [];
+  assert.equal(await refreshInBar(ctx, { background: async () => "cancelled", settled: async () => after.push("settled"), reload: async () => after.push("reload") }), false);
+  assert.deepEqual(after, []);
+  // a failure frees the job for the next tap
+  const alerts = [];
+  assert.equal(await refreshInBar(ctx, { background: async () => {}, settled: async () => {}, reload: async () => { throw new Error("x"); }, alert: async (a) => { alerts.push(a); } }), false);
+  assert.equal(alerts[0]?.title, "Error");
+  assert.equal(await refreshInBar(ctx, { background: async () => {}, settled: async () => {}, reload: async () => {} }), true);
+});

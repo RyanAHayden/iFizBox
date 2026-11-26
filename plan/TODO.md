@@ -11,7 +11,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
-- [ ] **B462** Changes: Refresh still shows the old blocking 'Reloading Data' popup. Use the same non-blocking toast the Home page shows while it refreshes, and drop the blocking popup here. | files: web/app/screens/changes.js, web/app/screens/changes.test.js | after: B459
 - [ ] **V28** Release 1.0.1 (patch) once everything queued ahead has landed. Release notes: exactly 'UI fixes and improvements' (replace the waiting release-notes/*.md with that one line). tools/publish.sh 1.0.1 --notes FILE. | after: all
 ### Research (any time, parallel)
 
