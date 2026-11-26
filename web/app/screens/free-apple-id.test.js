@@ -196,3 +196,61 @@ test("B369: scrollTarget puts the Sign In group at the top, under the nav bar", 
   assert.equal(scrollTarget({ groupTop: 900, scrollerTop: 0, scrollTop: 0, navBottom: 64, max: 400 }), 400);
   assert.equal(scrollTarget({ groupTop: 20, scrollerTop: 0, scrollTop: 0, navBottom: 64 }), 0);
 });
+
+// F444: the sideload app's route: Apple through the shell's net.request, the WebSocket straight to the anisette server,
+// Ready into the Keychain, Forget only the Keychain identity that is this Free Apple ID's.
+test("F444: nativeTransport passes the request to net.request and reads the answer back", async () => {
+  const { nativeTransport } = await import("./free-apple-id.js");
+  const { b64encode, utf8 } = await import("../core/gsa.js");
+  const calls = [];
+  const native = { call: async (name, p) => { calls.push([name, p]); return { status: 409, headers: { "Content-Type": "text/x-xml-plist" }, body: b64encode(utf8("<plist/>")) }; } };
+  const r = await nativeTransport(native)({ url: "https://gsa.apple.com/auth/verify/phone", method: "PUT",
+    headers: { "User-Agent": "akd/1.0", Accept: "application/json" }, body: utf8('{"mode":"sms"}') });
+  assert.deepEqual(calls, [["net.request", { url: "https://gsa.apple.com/auth/verify/phone", method: "PUT",
+    headers: { "User-Agent": "akd/1.0", Accept: "application/json" }, body: '{"mode":"sms"}' }]]);
+  assert.equal(r.status, 409);
+  assert.equal(r.headers["content-type"], "text/x-xml-plist");
+  assert.equal(new TextDecoder().decode(r.body), "<plist/>");
+  // a GET has no body
+  await nativeTransport(native)({ url: "https://gsa.apple.com/grandslam/GsService2/lookup" });
+  assert.equal("body" in calls[1][1], false);
+  assert.equal(calls[1][1].method, "GET");
+  // a bridge error throws, as the relay's refusal does
+  await assert.rejects(nativeTransport({ call: async () => { throw new Error("network: offline"); } })({ url: "https://gsa.apple.com/x" }), /offline/);
+});
+
+test("F444: the provisioning WebSocket goes straight to the anisette server in the app", async () => {
+  const { directWsUrl } = await import("./free-apple-id.js");
+  assert.equal(directWsUrl("https://ani.sidestore.io"), "wss://ani.sidestore.io/v3/provisioning_session");
+  assert.equal(directWsUrl("https://ani.sidestore.app/"), "wss://ani.sidestore.app/v3/provisioning_session");
+});
+
+test("F444: Ready's signing.import gets the .p12, profile and password as Select All Files does", async () => {
+  const { importParams } = await import("./free-apple-id.js");
+  const { b64decode } = await import("../core/gsa.js");
+  const p = importParams({ p12: new Uint8Array([1, 2, 3]), profile: new Uint8Array([4, 5]), password: "pw" });
+  assert.deepEqual([...b64decode(p.p12)], [1, 2, 3]);
+  assert.deepEqual([...b64decode(p.profile)], [4, 5]);
+  assert.equal(p.password, "pw");
+});
+
+test("F444: Forget removes the Keychain identity only when its serial is the Free Apple ID's", async () => {
+  const { sameSerial } = await import("./free-apple-id.js");
+  assert.ok(sameSerial("0A1B2C", "a1b2c"));
+  assert.ok(sameSerial("0a:1b:2c", "0A1B2C"));
+  assert.ok(!sameSerial("0A1B2C", "0A1B2D"));
+  assert.ok(!sameSerial("", ""));
+  assert.ok(!sameSerial(null, undefined));
+});
+
+test("F444: the app's footers name neither the website nor the browser", async () => {
+  const { APP_FOOTERS, signInButtons, FREE_PASSWORD_FOOTER } = await import("./free-apple-id.js");
+  for (const [k, v] of Object.entries(APP_FOOTERS)) assert.doesNotMatch(v, /website|browser|server/i, k);
+  assert.equal(signInButtons({ app: true }).footer, APP_FOOTERS.password);
+  assert.equal(signInButtons().footer, FREE_PASSWORD_FOOTER);
+});
+
+test("F444: settings.js reads the Free Apple ID under free-apple-id.js's key", async () => {
+  const { FREE_ID_KEY } = await import("./settings.js");
+  assert.equal(FREE_ID_KEY, FREE_KEY);
+});

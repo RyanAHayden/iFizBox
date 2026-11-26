@@ -16,7 +16,17 @@
 //                                        Select All Files imports (as one .zip: handoffZip)
 //   checklist(states)                    pure: the setup rows [{ id, title, state, summary }] in order
 //   signInFailure(e, now)                pure: { alert, keepEmail, clearPassword, stayOnCode, waitUntil, link }
-//   freeRouteBlock({ alert, store })     the Signing page's Free Apple ID group, expanding into the flow in place
+//   freeRouteBlock({ alert, store, native })
+//                                        the Signing page's Free Apple ID group, expanding into the flow in place
+//
+// In the sideload app (`native`: the bridge; Settings > Installation & Signing > Certificate) the same flow runs with
+// no relay: Apple and the anisette server are asked straight from the phone through the shell's net.request
+// (nativeTransport: no CORS, and the Worker's relay refuses other origins), the provisioning WebSocket goes straight
+// to the anisette server (directWsUrl), the UDID is the shell's (device.info), and Ready puts the certificate and
+// profile into the Keychain (signing.import) as the app's signing identity: no Save for the App, no computer install.
+//   nativeTransport(native)              gsa.js's transport over net.request
+//   directWsUrl(server)                  wss://<anisette server>/v3/provisioning_session
+//   APP_FOOTERS                          the app's wording of the footers that name the website or the browser
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped, el } from "../nav/ui.js";
 import { NAME, BUNDLE_ID } from "../brand.js";
@@ -52,6 +62,30 @@ export function relayAvailable({ fetcher = globalThis.fetch, origin = globalThis
   return relayAnswer;
 }
 export const resetRelayAnswer = () => { relayAnswer = null; };
+
+// The app's transport: the shell makes the request (Paid.swift net.request: https, GET/POST/PUT, text bodies, which
+// every GSA, developer-portal and anisette request is). Apple's status comes back as is; a bridge error throws.
+const td = new TextDecoder();
+export function nativeTransport(native) {
+  return async ({ url, method = "GET", headers = {}, body }) => {
+    const r = await native.call("net.request", { url, method, headers,
+      ...(body != null ? { body: typeof body === "string" ? body : td.decode(body) } : {}) });
+    const h = Object.fromEntries(Object.entries(r?.headers ?? {}).map(([k, v]) => [k.toLowerCase(), String(v)]));
+    return { status: Number(r?.status ?? 0), headers: { "content-type": h["content-type"] ?? "" }, body: r?.body ? b64decode(r.body) : new Uint8Array(0) };
+  };
+}
+// Anisette provisioning straight to the server (a WebSocket has no CORS; the website relays it only to stay on its origin).
+export const directWsUrl = (server) => `${String(server).replace(/\/+$/, "").replace(/^http/, "ws")}/v3/provisioning_session`;
+
+// The phone for Register This iPhone, in the app: the shell's UDID (paired, or MobileGestalt), else why not.
+async function nativePhone(native) {
+  try {
+    const r = await native.call("device.info", {});
+    return r?.udid ? { udid: r.udid, product: r.model ?? null } : null;
+  } catch (e) {
+    throw Object.assign(new Error(String(e?.message ?? e).replace(/^device:\s*/, "")), { kind: "no-udid", step: "device", native: true });
+  }
+}
 
 export function loadFreeIdentity(store) {
   const j = readJson(store, FREE_KEY);
@@ -98,7 +132,8 @@ export function signInFailure(e, now = new Date()) {
 const AGREEMENT_URL = "https://developer.apple.com/account";
 
 // ---- the flow's state (kept across redraws of the Signing page) ----
-const flow = { open: false, view: "signin", email: "", busy: false, steps: {}, session: null, portal: null, team: null, phone: null, sms: null };
+const flow = { open: false, view: "signin", email: "", busy: false, steps: {}, session: null, portal: null, team: null, phone: null, sms: null,
+  kept: null }; // the app: true once Ready's signing.import worked, false when it failed (Use for Signing tries again)
 
 function anisetteStore(store) {
   return { load: () => readJson(store, ANISETTE_KEY), save: (s) => writeJson(store, ANISETTE_KEY, s) };
@@ -137,10 +172,10 @@ function button(label, onClick, cls = "", footer = null) {
 //   signInButtons({ busy, wait, onSignIn, onCancel }) / codeButtons({ onVerify, onCancel })
 //                                        pure: { rows: [{ label, cls, onClick }] (left to right), footer }
 //   splitButtons({ rows, footer })       the group
-export function signInButtons({ busy = false, wait = null, onSignIn = () => {}, onCancel = () => {} } = {}) {
+export function signInButtons({ busy = false, wait = null, app = false, onSignIn = () => {}, onCancel = () => {} } = {}) {
   return { rows: [{ label: "Cancel", cls: "free-button", onClick: onCancel },
     { label: busy ? "Signing In…" : "Sign In", cls: "free-primary", onClick: onSignIn }],
-  footer: wait ? freeWaitFooter(wait) : FREE_PASSWORD_FOOTER };
+  footer: wait ? freeWaitFooter(wait) : app ? APP_FOOTERS.password : FREE_PASSWORD_FOOTER };
 }
 export function codeButtons({ onVerify = () => {}, onCancel = () => {} } = {}) {
   return { rows: [{ label: "Cancel", cls: "free-button", onClick: onCancel }, { label: "Verify", cls: "free-primary", onClick: onVerify }],
@@ -255,6 +290,14 @@ export const freeWaitFooter = (wait) =>
 export const FREE_ZIP_FOOTER = `Holds the certificate, its password and the 7-day profile, for the ${NAME} app's `
   + `${MERGED_PAGE} > Select All Files.`; // C15: the app it names is the sideload build
 export const FREE_RENEW_FOOTER = "Sign in again for a new profile each week. The certificate is kept for its year.";
+// The sideload app's own words where the website's name the website or the browser.
+export const APP_FOOTERS = {
+  entry: "Signs up to 3 apps for 7 days at a time, no certificate needed.",
+  password: "Your password is checked on this iPhone and never sent anywhere.",
+  renew: "Refresh the profile each week. The certificate is kept for its year.",
+  forget: "This removes the Free Apple ID's key and certificate from this iPhone, the one apps are signed with too. Apple keeps "
+    + "the certificate (it isn't revoked); a new one can be made next time.",
+};
 export const FREE_DEVICE_LABEL = "This iPhone";
 
 // F317: the ready page's rows, split by setup step: each step's summary from this session's setup under the row it
@@ -271,12 +314,13 @@ export function readySections(rows, steps = {}) {
   return out.filter((g) => g.rows.length);
 }
 
-export function freeRouteBlock({ alert, store, onChange = () => {} } = {}) {
+export function freeRouteBlock({ alert, store, onChange = () => {}, native = null } = {}) {
   const box = el("div", "free-route");
   box.hidden = true;
   const ask = async (opts) => (alert ?? (await import("../nav/alert.js")).showAlert)(opts);
-  const draw = () => render(box, { ask, store, redraw: draw, onChange });
-  relayAvailable().then((on) => { if (on) { box.hidden = false; draw(); } });
+  const draw = () => render(box, { ask, store, redraw: draw, onChange, native });
+  // the app needs no relay: it asks Apple itself (nativeTransport)
+  if (native?.call) { box.hidden = false; draw(); } else relayAvailable().then((on) => { if (on) { box.hidden = false; draw(); } });
   return box;
 }
 
@@ -295,7 +339,7 @@ function render(box, ctx) {
         ctx.redraw();
         if (flow.view === "signin") bringToTop(box); // B369: after the redraw, the Sign In group at the top
       }, chevron: true }],
-      footer: FREE_ENTRY_FOOTER }]));
+      footer: ctx.native ? APP_FOOTERS.entry : FREE_ENTRY_FOOTER }]));
   } else if (flow.view === "signin") parts.push(...signInView(ctx));
   else if (flow.view === "code") parts.push(...codeView(ctx));
   else if (flow.view === "setup") parts.push(...setupView(ctx));
@@ -318,7 +362,7 @@ function signInView(ctx) {
   const wait = waitingUntil(ctx.store);
   const fields = table("Sign In With a Free Apple ID", email.li, pw.li);
   fields.append(el("p", "group-footer", FREE_FIELDS_FOOTER));
-  const out = [fields, splitButtons(signInButtons({ busy: flow.busy, wait, onSignIn: go,
+  const out = [fields, splitButtons(signInButtons({ busy: flow.busy, wait, app: Boolean(ctx.native), onSignIn: go,
     onCancel: () => { flow.open = false; ctx.redraw(); } }))];
   // B369: no scroll of the focus's own: the page puts the group at the top (bringToTop)
   queueMicrotask(() => (flow.email ? pw.input : email.input).focus?.({ preventScroll: true }));
@@ -338,8 +382,8 @@ async function signIn(ctx, emailInput, pwInput) {
   flow.busy = true;
   ctx.redraw();
   try {
-    const transport = relayTransport();
-    const anisette = anisetteV3({ transport, storage: anisetteStore(ctx.store), wsUrl: relayWsUrl });
+    const transport = ctx.native ? nativeTransport(ctx.native) : relayTransport();
+    const anisette = anisetteV3({ transport, storage: anisetteStore(ctx.store), wsUrl: ctx.native ? directWsUrl : relayWsUrl });
     flow.session = new AppleIdSession({ transport, anisette });
     flow.transport = transport;
     flow.anisette = anisette;
@@ -428,24 +472,59 @@ async function askRevoke(ctx, certs) {
 async function setup(ctx) {
   flow.view = "setup";
   flow.steps = {};
-  flow.phone = storedUdid();
+  flow.phone = ctx.native ? null : storedUdid();
   ctx.redraw();
   const saved = loadFreeIdentity(ctx.store);
   try {
+    if (ctx.native) flow.phone = await nativePhone(ctx.native);
     const r = await runSetup({ portal: flow.portal, teamId: flow.team.teamId, phone: flow.phone, saved, bundleId: BUNDLE_ID, appName: NAME,
       onStep: (s) => { flow.steps[s.id] = s; ctx.redraw(); }, askRevoke: (certs) => askRevoke(ctx, certs) });
     saveFreeIdentity({ ...r.identity, teamName: flow.team.name ?? null, profile: r.profile.data, appId: r.appId }, ctx.store);
     resetComputerInstall(); // F436: signed with the profile before this one
     flow.view = "ready";
+    if (ctx.native) await keepInApp(ctx, loadFreeIdentity(ctx.store));
     ctx.redraw();
     ctx.onChange();
   } catch (e) {
-    const a = setupError(e);
+    const a = e?.native ? { title: "iPhone Not Known", message: e.message } : setupError(e);
     const agreement = e?.kind === "agreement";
     await ctx.ask({ title: a.title, message: a.message, buttons: agreement ? ["OK", "Open developer.apple.com"] : ["OK"], cancel: 0,
       onTap: (i) => { if (i === 1 && agreement) globalThis.open?.(AGREEMENT_URL, "_blank", "noopener"); } });
     if (e?.kind === "session") { flow.view = "signin"; flow.session = null; ctx.redraw(); }
   }
+}
+
+// The app's Ready: the certificate and profile go into the Keychain as the signing identity (signing.import, as Select
+// All Files does), so Install and re-sign use them; every Refresh Profile puts the new profile in the same way.
+export function importParams(id) {
+  return { p12: b64encode(id.p12), profile: b64encode(id.profile), password: id.password ?? "" };
+}
+async function keepInApp(ctx, id) {
+  flow.kept = null;
+  if (!id?.profile) return false;
+  try {
+    await ctx.native.call("signing.import", importParams(id));
+    flow.kept = true;
+    return true;
+  } catch (e) {
+    flow.kept = false;
+    await ctx.ask({ title: "Not Kept", message: `The certificate couldn't go into this iPhone's Keychain: ${e?.message ?? e}`, buttons: ["OK"], cancel: 0 });
+    return false;
+  }
+}
+
+// Forget in the app: the Keychain's identity goes too, only when it is this Free Apple ID's certificate (one the user
+// imported since stays).
+export const sameSerial = (a, b) => {
+  const n = (s) => String(s ?? "").replace(/[^0-9a-f]/gi, "").replace(/^0+/, "").toUpperCase();
+  return Boolean(n(a)) && n(a) === n(b);
+};
+async function forgetInApp(native, saved) {
+  try {
+    const st = await native.call("signing.status", {});
+    if (sameSerial(st?.identity?.serial, saved?.serial)) await native.call("signing.remove", {});
+  } catch { /* nothing kept, or the signer didn't answer: the Certificate group still has Remove */ }
+  flow.kept = null;
 }
 
 function setupView(ctx) {
@@ -496,23 +575,32 @@ function readyView(ctx, saved) {
   ];
   const setupDone = checklist(flow.steps).every((s) => s.state === "done");
   const out = [grouped(readySections(rows, setupDone ? flow.steps : {}))];
-  out.push(button("Save for the App", () => download(handoffZip(saved), `${NAME} Free Apple ID.zip`), "free-primary", FREE_ZIP_FOOTER));
   const renew = () => (flow.portal ? setup(ctx) : signOut(ctx));
   const renewLabel = flow.portal ? "Refresh Profile" : "Sign In Again";
-  out.push(computerInstallBlock({ id: saved, expired: !prof || exp.state === "expired", ask: ctx.ask, save: download, // F436
-    fix: { label: renewLabel, onClick: renew } }));
+  if (ctx.native) {
+    // the app keeps it as its signing identity (keepInApp); a failed import gets its button back
+    if (flow.kept === false) {
+      out.push(button("Use for Signing", async () => { if (await keepInApp(ctx, saved)) { ctx.redraw(); ctx.onChange(); } }, "free-primary",
+        "Puts the certificate and profile into this iPhone's Keychain, for signing apps here."));
+    }
+  } else {
+    out.push(button("Save for the App", () => download(handoffZip(saved), `${NAME} Free Apple ID.zip`), "free-primary", FREE_ZIP_FOOTER));
+    out.push(computerInstallBlock({ id: saved, expired: !prof || exp.state === "expired", ask: ctx.ask, save: download, // F436
+      fix: { label: renewLabel, onClick: renew } }));
+  }
   // F254i: the Developer Mode + Trust steps, a page of their own; gone once an app on this route installed fine
   if (!freeInstalled(ctx.store)) {
     out.push(grouped([{ header: "Before the First Install",
       rows: [{ label: "Developer Mode and Trust", onClick: () => { flow.view = "devmode"; ctx.redraw(); }, chevron: true }],
       footer: "iOS 16 and later: a few steps in Settings on the iPhone, once." }]));
   }
-  out.push(button(renewLabel, renew, "", FREE_RENEW_FOOTER));
+  out.push(button(renewLabel, renew, "", ctx.native ? APP_FOOTERS.renew : FREE_RENEW_FOOTER));
   out.push(button("Forget Free Apple ID", async () => {
     const { index } = await ctx.ask({ title: "Forget Free Apple ID?",
-      message: "This removes the certificate and key from this browser. Apple keeps the certificate (it isn't revoked); a new one "
+      message: ctx.native ? APP_FOOTERS.forget : "This removes the certificate and key from this browser. Apple keeps the certificate (it isn't revoked); a new one "
         + "can be made next time.", buttons: ["Cancel", "Forget"], cancel: 0, colors: { 1: "red" } });
     if (index !== 1) return;
+    if (ctx.native) await forgetInApp(ctx.native, saved);
     forgetFreeIdentity(ctx.store);
     resetComputerInstall(); // F436: the signed IPA holds the identity
     signOut(ctx);
