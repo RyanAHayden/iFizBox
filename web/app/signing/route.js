@@ -67,7 +67,6 @@ import { lastDevice, openRoute } from "./device.js";
 import { onCellularChoice } from "../core/cellular.js"; // F417
 import { cellularAsk, cellularStopped } from "./cellular.js";
 import { followHereSelf, followSelfUpdate } from "./selfupdate.js";
-
 // Signs `url` (an IPA) on the phone and opens the install link: true once iOS was asked to install; false after an
 // error, which an alert explains (no_server and no_identity then open Settings > Signing).
 // F68: `params` replaces { url } with the look-first sheet's { token, name?, bundleId?, icon?, removeExtensions? }
@@ -116,6 +115,12 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   const manifestServer = server && server !== "own" ? defaultServer() : getServer(); // F417: "own": the user's
   // This iPhone: installd puts the app (iFizBox too) in place itself, so no Signing Server and no hosting.
   const self = isSelfIpa(url) || host; // iFizBox itself, whichever route
+  // B475: on a free Apple ID's profile iFizBox's own update takes the profile's <bundle ID>.<TEAMID> (the shell
+  // refuses the Signing Server route itself then: free_profile, worded by deviceError)
+  if (self) {
+    const fp = await import("./freeprofile.js");
+    if (await fp.onFreeProfile(native)) params = fp.selfParams(params ?? { url });
+  }
   const hosted = host; // F417: for the Signing Server instead
   if (route.route) host = false;
   const h = hud("Downloading");

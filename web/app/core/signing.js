@@ -452,10 +452,20 @@ export const busyStuckText = (app) => `iOS is already installing ${app} for anot
 
 // What a failed signing call leads to, by its error code (native/Sources/SignBridge.swift): an alert's
 // { title, message } and where it sends the user next ("signing": Settings > Signing's walkthrough; null: nowhere).
+// B475: the identity in signing.status uses a free Apple ID's profile (the shell's profile.free: a 7-day team
+// profile). iOS refuses its apps from a website (itms-services, MIInstallerErrorDomain 111) and shows nothing, so an
+// install through the Signing Server never lands; This iPhone needs Network Extensions, which a free profile lacks.
+export const freeProfile = (status) => status?.identity?.profile?.free === true;
+export const FREE_PROFILE_TITLE = "Free Apple ID Can't Install";
+export const freeProfileText = (name = "") =>
+  `iOS doesn't install ${name || "an app"} from the Signing Server when it's signed with a free Apple ID, and This iPhone needs Network Extensions, which a free Apple ID's profile doesn't have. `
+  + `Use a certificate in ${signingPage()}, or install ${NAME} again from a computer (Computer Install on ${DOMAIN}).`;
+
 export function deviceError(err, name = "") {
   const code = err?.code ?? "";
   const raw = String(err?.message ?? err ?? "").trim();
   const message = raw ? (raw.startsWith(NAME) ? raw : raw[0].toUpperCase() + raw.slice(1)) : "Something went wrong."; // B444: the name keeps its own case
+  if (code === "free_profile") return { title: FREE_PROFILE_TITLE, open: "signing", message: freeProfileText(name) };
   if (code === "no_server") {
     return { title: "No Signing Server", open: "signing", message: `Installing needs a Signing Server: set one in ${signingPage()}.` };
   }

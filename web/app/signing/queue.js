@@ -82,6 +82,12 @@ export async function prepareOnDevice(job, { tag, signal = null, progress = () =
   if (params?.url && customInstallSave(job)) params = { ...params, keepInLibrary: true };
   // B469: Lite's own update keeps the picked own icon (the shell puts its own-icon set into the IPA)
   if (job?.id === SELF_ID && params) params = await ownIcon(params);
+  // B475: a free Apple ID's profile is for <bundle ID>.<TEAMID>, the ID the Computer Install gave iFizBox: its own
+  // update takes that ID, as Keep Bundle IDs would sign it as the plain ID, which is another app (the older copy)
+  if (job?.id === SELF_ID && params) {
+    const fp = await import("./freeprofile.js");
+    if (await fp.onFreeProfile(native)) params = fp.selfParams(params);
+  }
   try {
     // B104: an http link with no https twin asks first (askInsecure); Cancel ends the row as its stop does
     const r = await askInsecure((extra) => abortable(native, "signing.prepare", { ...params, ...refusing(), ...extra }, (ev) => {

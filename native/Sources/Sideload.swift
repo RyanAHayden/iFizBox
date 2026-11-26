@@ -202,9 +202,19 @@ enum Sideload {
         return Servers(manifest: m, host: allowHost && (c.params["host"] as? Bool ?? false) ? m : nil)
     }
 
+    // B475: iOS refuses an app signed with a free Apple ID's profile from a website (itms-services,
+    // MIInstallerErrorDomain 111) without a word, so the Signing Server route says so before anything downloads or
+    // uploads, rather than ending "Completed" with nothing installed (core/signing.js deviceError words it).
+    static func refusesFree(_ c: Bridge.Call, _ profile: Profile, _ servers: Servers) -> Bool {
+        guard profile.isFree, !servers.local else { return false }
+        Apt.reply(c, nil, "free_profile: iOS doesn't install an app signed with a free Apple ID from the Signing Server")
+        return true
+    }
+
     static func install(_ c: Bridge.Call) {
         guard let (id, profile) = ready(c) else { return }
         guard let servers = servers(c) else { return Apt.reply(c, nil, noServer) }
+        if refusesFree(c, profile, servers) { return }
         let options: SignOptions
         do { options = try SignOptions(json: c.params) } catch { return Apt.reply(c, nil, SignBridge.text(error)) }
         let job = SignJob.begin() // F196: what signing.cancel stops
