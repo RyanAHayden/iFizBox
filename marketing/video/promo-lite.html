@@ -1,0 +1,108 @@
+<!doctype html>
+<!--
+  The sideloaders' clip: one recording of the Lite build (rec/promo-lite.json, shots-promo-lite.json) cut to about 15 s. The app is on
+  screen from the first frame (no splash, no end card): the recording's time runs through SPEED's segments, faster where
+  nothing needs reading. Same page, ground, status bar and phone as video.html; render.mjs --page promo-lite.
+
+    promo-lite.html?h=1350    1350 (4:5) or 1920 (9:16); the width is 1080
+    window.DURATION       the length in seconds
+    window.render(t)      draws time t (a promise: the recording's frame is decoded)
+    window.ready          a promise: the marks and fonts are loaded
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Sideloaders' clip</title>
+<style>
+  html, body { margin: 0; }
+  body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: var(--text); }
+  #stage { position: relative; width: 1080px; overflow: hidden; }
+  .ground { position: absolute; inset: 0; background: var(--grouped-ground); zoom: 3; }
+  .phone { position: absolute; left: 0; top: 0; background: #1d1e20; transform-origin: 0 0; }
+  .screen { position: absolute; overflow: hidden; background: #000; }
+  .screen img { position: absolute; left: 0; top: 0; width: 402px; height: 874px; }
+  .sb { position: absolute; left: 0; top: 0; width: 402px; height: 62px; color: #fff; font-size: 17px; font-weight: 600; }
+  .sb.dark { color: #111; }
+  .sb b { position: absolute; left: 40px; top: 22px; font-weight: 600; }
+  .sb i { position: absolute; width: 3px; border-radius: 1px; background: currentColor; }
+  .sb u { position: absolute; right: 36px; top: 25px; width: 23px; height: 11px; border: 1.4px solid currentColor; border-radius: 4px; box-sizing: border-box; }
+  .sb u::after { content: ""; position: absolute; inset: 1.4px 6px 1.4px 1.4px; background: currentColor; border-radius: 1.5px; }
+  #band { position: absolute; left: 0; top: 0; width: 1080px; overflow: hidden; }
+  .cap { position: absolute; left: 0; width: 1080px; text-align: center; font-size: 66px; line-height: 1.1; font-weight: 700; letter-spacing: -1px; text-shadow: var(--emboss); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script type="module">
+const W = 1080, H = Number(new URLSearchParams(location.search).get("h") || 1350), TALL = H > 1500;
+const stage = document.getElementById("stage");
+stage.style.height = H + "px";
+const ios6 = await (await fetch("../../web/app/ios6.css")).text();
+for (const n of ["--pin-dark", "--pin-light", "--grouped-ground", "--text", "--head", "--emboss"]) {
+  const m = ios6.match(new RegExp(`${n}:\\s*([^;]+);`));
+  if (!m) throw new Error(`no ${n} in ios6.css`);
+  document.documentElement.style.setProperty(n, m[1]);
+}
+const mk = (cls, html = "", parent = stage) => { const e = document.createElement("div"); e.className = cls; e.innerHTML = html; parent.append(e); return e; };
+mk("ground");
+const clamp = (x) => Math.min(1, Math.max(0, x));
+const smooth = (x) => { x = clamp(x); return x * x * x * (x * (6 * x - 15) + 10); };
+const fade = (t, a, b, d = 0.22) => Math.min(smooth((t - a) / d), smooth((b - t) / d));
+const frame = (x) => Math.round(x * 60) / 60;
+
+const rec = await (await fetch("/rec/promo-lite.json")).json();
+const at = (mark) => { const m = rec.marks.find((x) => x.name === mark); if (!m) throw new Error(`no mark ${mark} in promo-lite`); return frame(m.t); };
+
+// ---- SPEED: [from mark, to mark, speed]: the recording's seconds between the marks play this many times faster. The
+// first segment starts the recording, so frame 1 is the app. Waits (the signing runs) and walking through Settings go fast;
+// what is read (the tweak, the days left, the Signed Apps list) plays near its own speed.
+const SPEED = [
+  ["details", "addtweaks", 1.5], ["addtweaks", "added", 1.3], ["added", "confirm", 1.6], ["confirm", "running", 1.2],
+  ["running", "done", 2.2], ["done", "installed", 1.5], ["installed", "settings", 1.4], ["settings", "signedapps", 2.2],
+  ["signedapps", "resignconfirm", 1.2], ["resignconfirm", "resigning", 1.3], ["resigning", "resigned", 2.2], ["resigned", "end", 1.2],
+];
+const segs = [];
+let out = 0;
+for (const [a, b, k] of SPEED) { const from = at(a), to = at(b), len = (to - from) / k; segs.push({ from, to, k, t0: out, t1: out + len }); out += len; }
+const src = (t) => { const s = segs.find((x) => t < x.t1) ?? segs.at(-1); return Math.min(s.to, s.from + (t - s.t0) * s.k); };
+const when = (mark) => { const m = at(mark); const s = segs.find((x) => m < x.to - 1e-6) ?? segs.at(-1); return s.t0 + (m - s.from) / s.k; };
+window.DURATION = Math.ceil(out * 60) / 60;
+
+// ---- the phone: a screen 402 points wide, scaled to fit under the words
+const PAD = 15, pw = 402 + 2 * PAD, ph = 874 + 2 * PAD;
+const el = mk("phone");
+Object.assign(el.style, { width: pw + "px", height: ph + "px", borderRadius: "66px" });
+const screen = mk("screen", "<img>", el);
+Object.assign(screen.style, { left: PAD + "px", top: PAD + "px", width: "402px", height: ph - 2 * PAD + "px", borderRadius: "52px" });
+const sb = mk("sb", `<b>12:30</b>${[5, 7, 9, 12].map((h, n) => `<i style="right:${82 - n * 5}px;height:${h}px;bottom:25px"></i>`).join("")}<u></u>`, screen);
+const img = screen.querySelector("img");
+let shown = 0;
+const BAND = TALL ? 260 : 160, CAPY = TALL ? 122 : 46;
+const WHOLE = (H - BAND - 34) / ph;
+el.style.transform = `translate(${((W - pw * WHOLE) / 2).toFixed(2)}px, ${BAND + 8}px) scale(${WHOLE.toFixed(5)})`;
+
+// ---- the words
+const band = mk("", `<div class="ground"></div>`); band.id = "band"; band.style.height = BAND + "px";
+const words = [];
+const say = (a, b, text) => { const e = mk("cap", text); e.style.top = CAPY + "px"; words.push({ e, a, b }); };
+const D = window.DURATION;
+say(0, when("confirm") - 0.1, "Pick a tweak from a repo");
+say(when("confirm") - 0.1, when("done") + 0.2, "Signed on your iPhone");
+say(when("done") + 0.2, when("installed") + 1.2, "Days left on every app");
+say(when("installed") + 1.2, when("resigned") - 0.2, "Re-sign All, before they expire");
+say(when("resigned") - 0.2, D + 1, "No computer. No jailbreak.");
+
+window.render = async (t) => {
+  const s = src(t), n = Math.min(rec.frames, Math.max(1, Math.floor(s * rec.fps + 1e-6) + 1));
+  const look = rec.looks.filter((l) => l.t <= s + 1e-6).at(-1) ?? rec.looks[0];
+  sb.classList.toggle("dark", look.style !== "ios6" && look.theme !== "dark");
+  for (const w of words) w.e.style.opacity = w.a <= 0 && t < w.b ? Math.min(1, smooth((w.b - t) / 0.22)) : fade(t, w.a, w.b);
+  if (n === shown) return;
+  shown = n;
+  img.src = `/frames/promo-lite/${String(n).padStart(5, "0")}.jpg`;
+  await img.decode();
+};
+window.ready = document.fonts.ready.then(() => window.render(0)).then(() => true);
+</script>
+</body>
+</html>
