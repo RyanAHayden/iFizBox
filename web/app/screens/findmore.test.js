@@ -215,6 +215,12 @@ test("a repo's page: the head icon sits clipped in the letter's slot and shows o
   assert.match(rule(".find-head .cell-icon img:not(.loaded)"), /opacity: 0/, "a failed icon leaves the letter");
 });
 
+test("B461: the pinned section header draws over the rows' ADD buttons", () => {
+  const css = readFileSync(new URL("../sources.css", import.meta.url), "utf8");
+  assert.match(css, /\.find-row \.find-add, \.rec-more-row \.rec-add \{ z-index: 0; \}/);
+  assert.match(css, /\.section-header:has\(~ \.find-row\) \{ z-index: 2; \}/);
+});
+
 test("View Repo's link keeps the row, so the repo's page names it at once", async () => {
   const href = repoHref(chariz());
   assert.equal(href, "#/sources/manage/find/chariz");
