@@ -381,6 +381,42 @@ test("bundled identity: a newer profile for the held certificate") {
           "the log line: \(BundledIdentity.replacedLine(new, held: held))")
 }
 
+// B479: a second computer install brings a new Free Apple ID certificate; the held one was revoked by it.
+test("bundled identity: another certificate replaces one a file brought, or a Free Apple ID's") {
+    let now = Date(), day: TimeInterval = 86400, other = try fixture("ca.der")
+    func profile(_ name: String = "iOS Team Provisioning Profile: *", made: TimeInterval = -1, days: TimeInterval = 7,
+                 certs: [Data], devices: [String]? = ["00008110-000000000000000A"]) throws -> Profile {
+        var d: [String: Any] = ["Name": name, "TeamIdentifier": ["TEAM123456"], "CreationDate": now.addingTimeInterval(made * day),
+                                "ExpirationDate": now.addingTimeInterval((made + days) * day),
+                                "Entitlements": ["application-identifier": "TEAM123456.*"], "DeveloperCertificates": certs]
+        if let u = devices { d["ProvisionedDevices"] = u }
+        return try Profile(PropertyListSerialization.data(fromPropertyList: d, format: .xml, options: 0))
+    }
+    let file = try profile(certs: [cert]), freeHeld = try profile(made: -3, certs: [other])
+    let paidHeld = try profile("Paid", made: -3, days: 365, certs: [other])
+    func takes(_ fp: Profile? = nil, fileCert: Data? = cert, held: Data = other, heldProfile: Profile?, fromFile: Bool = false) -> Bool {
+        BundledIdentity.replacesIdentity(fileProfile: fp ?? file, fileCertificate: fileCert, heldCertificate: held,
+                                         heldProfile: heldProfile, heldFromFile: fromFile, now: now)
+    }
+    check(takes(heldProfile: freeHeld), "held: a Free Apple ID's; the file's is another: replaced")
+    check(takes(heldProfile: paidHeld, fromFile: true), "held: a paid one a file brought: replaced")
+    check(takes(heldProfile: nil, fromFile: true), "held: a file's, its profile unreadable: replaced")
+    check(!takes(heldProfile: paidHeld), "held: a paid one imported by hand: kept")
+    check(!takes(heldProfile: nil), "held: by hand, no profile to tell: kept")
+    check(!takes(held: cert, heldProfile: freeHeld, fromFile: true), "the same certificate: kept (B420 looks at the profile)")
+    check(!takes(fileCert: nil, heldProfile: freeHeld), "the file's .p12 doesn't open: kept")
+    check(try !takes(profile(certs: [other]), fileCert: other, held: cert, heldProfile: try profile(made: -3, certs: [cert]), fromFile: true),
+          "the file's certificate is older than the held one: kept")
+    check(!takes(held: Data([1]), heldProfile: freeHeld, fromFile: true), "the held certificate can't be read: kept")
+    check(!BundledIdentity.replacesIdentity(fileProfile: nil, fileCertificate: cert, heldCertificate: other, heldProfile: freeHeld,
+                                            heldFromFile: true, now: now), "the file's profile can't be read: kept")
+    check(try !takes(profile(certs: [other]), heldProfile: freeHeld), "the file's profile doesn't list its certificate: kept")
+    check(try !takes(profile(made: -8, certs: [cert]), heldProfile: freeHeld), "the file's profile expired: kept")
+    check(try !takes(profile(certs: [cert], devices: nil), heldProfile: freeHeld), "the file's profile lists no device: kept")
+    check(BundledIdentity.importedCertKey != BundledIdentity.seenKey && BundledIdentity.importedCertKey != BundledIdentity.profileSeenKey,
+          "a key of its own")
+}
+
 test("incoming ifizbox:// links") {
     check(IncomingLink.accepts(URL(string: "ifizbox://import?d=H4sI")!), "import")
     check(IncomingLink.accepts(URL(string: "ifizbox://install?url=https%3A%2F%2Fe.example%2Fa.ipa")!), "install (F89)")

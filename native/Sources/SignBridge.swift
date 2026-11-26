@@ -128,6 +128,7 @@ enum SignBridge {
                 _ = try SignStore.importIdentity(p12: c.p12, password: c.password, profile: c.profile)
                 try confirmImport(p12: c.p12, password: c.password)
                 UserDefaults.standard.set(digest, forKey: BundledIdentity.profileSeenKey) // B420: its profile is the one held
+                rememberImportedCertificate()
             } catch {
                 NSLog("\(Brand.name): the certificate inside the app didn't import: %@", text(error))
             }
@@ -137,22 +138,47 @@ enum SignBridge {
     // B420: an identity is held, so only the file's profile can be taken (BundledIdentity.replacesProfile). The file
     // counts as looked at for shouldImport too: a certificate removed afterwards doesn't come back from it. While the
     // held profile can't be read, or the new one can't be written, nothing is marked and the next launch looks again.
+    // B479: the file's identity with another certificate replaces a held one that a file brought or a Free Apple ID's
+    // (BundledIdentity.replacesIdentity): a second computer install made a new certificate and revoked the held one.
     private static func refreshBundledProfile(_ data: Data, digest: String, hasIdentity: Bool) {
         let defaults = UserDefaults.standard
         guard BundledIdentity.shouldCompareProfile(digest: digest, seen: defaults.string(forKey: BundledIdentity.profileSeenKey),
                                                    hasIdentity: hasIdentity),
-              let id = SignStore.identity(), let der = SignStore.certificateDER(id), let held = SignStore.profile() else { return }
-        if let c = BundledIdentity.parse(data), let new = try? Profile(c.profile),
-           BundledIdentity.replacesProfile(new, held: held, certificate: der,
-                                           fileCertificate: SignStore.certificateDER(p12: c.p12, password: c.password),
+              let id = SignStore.identity(), let der = SignStore.certificateDER(id) else { return }
+        let held = SignStore.profile()
+        let c = BundledIdentity.parse(data)
+        let fileCertificate = c.flatMap { SignStore.certificateDER(p12: $0.p12, password: $0.password) }
+        if let c = c, BundledIdentity.replacesIdentity(
+            fileProfile: try? Profile(c.profile), fileCertificate: fileCertificate, heldCertificate: der, heldProfile: held,
+            heldFromFile: defaults.string(forKey: BundledIdentity.importedCertKey) == sha256(der).base64EncodedString()) {
+            do {
+                _ = try SignStore.importIdentity(p12: c.p12, password: c.password, profile: c.profile)
+                try confirmImport(p12: c.p12, password: c.password)
+                rememberImportedCertificate()
+                NSLog("\(Brand.name): the certificate inside the app (serial %@) replaced the held one (serial %@)",
+                      fileCertificate.flatMap(ASC.serialHex) ?? "?", ASC.serialHex(der) ?? "?")
+            } catch {
+                NSLog("\(Brand.name): the certificate inside the app didn't replace the held one: %@", text(error))
+                return
+            }
+        } else if let held = held, let c = c, let new = try? Profile(c.profile),
+           BundledIdentity.replacesProfile(new, held: held, certificate: der, fileCertificate: fileCertificate,
                                            phone: PhoneID.current()) {
             do { try SignStore.replaceProfile(new, line: BundledIdentity.replacedLine(new, held: held)) } catch {
                 NSLog("\(Brand.name): the profile inside the app wasn't kept: %@", text(error))
                 return
             }
+        } else if held == nil {
+            return // the held profile can't be read: the next launch looks again
         }
         defaults.set(digest, forKey: BundledIdentity.seenKey)
         defaults.set(digest, forKey: BundledIdentity.profileSeenKey)
+    }
+
+    // B479: the certificate now held came from a file (BundledIdentity.importedCertKey).
+    private static func rememberImportedCertificate() {
+        guard let id = SignStore.identity(), let der = SignStore.certificateDER(id) else { return }
+        UserDefaults.standard.set(sha256(der).base64EncodedString(), forKey: BundledIdentity.importedCertKey)
     }
 
     // ---- F73: the certificate for the Signing Server
