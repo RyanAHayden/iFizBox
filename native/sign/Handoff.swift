@@ -6,6 +6,8 @@
 //                      into the Keychain on the first launch that finds it, unless the Keychain already holds one;
 //                      the bundle is read-only, so its digest is remembered and the same file is never looked at again.
 //                      B420: with one held, a newer profile for the same certificate replaces the held profile, once.
+//                      B479: a file with another certificate replaces a held identity that a file brought, or a Free
+//                      Apple ID's, once (a second computer install's new certificate revoked the old one).
 //   IncomingLink       which ifizbox:// links the shell hands to the page: ifizbox://import?d=… (sources and settings),
 //                      ifizbox://install?url=… (F89: the website's Open in iFizBox on an app page), ifizbox://myipas (F77),
 //                      ifizbox://add?url=… (N8's Add Source intent), ifizbox://shared?route=… (N9), ifizbox://package?id=… (F96:
@@ -54,6 +56,23 @@ enum BundledIdentity {
               let made = new.created, let was = held.created, made > was, new.expires != nil,
               new.problem(with: certificate, now: now) == nil, new.devices != 0 else { return false }
         return DeviceCheck.check(profile: new.data, phone: phone).state != .out
+    }
+
+    // ---- B479: a computer install's file with another certificate (a new Free Apple ID setup revokes the old one)
+
+    // UserDefaults: the SHA-256 (base64) of the certificate last imported from a file, so a later file knows the held
+    // identity came from one.
+    static let importedCertKey = "ifizbox.bundledCert"
+
+    // Import the file's identity in place of the held one? Only when the file's certificate is another one that its
+    // profile lists and can sign with now, and the held identity is one a file brought (heldFromFile) or a Free Apple
+    // ID's (a 7-day team profile): one imported by hand from a paid team stays. In doubt (no profile held, the file's
+    // can't be read), what is held stays.
+    static func replacesIdentity(fileProfile: Profile?, fileCertificate: Data?, heldCertificate: Data, heldProfile: Profile?,
+                                 heldFromFile: Bool, now: Date = Date()) -> Bool {
+        guard let fc = fileCertificate, fc != heldCertificate, let fp = fileProfile,
+              fp.problem(with: fc, now: now) == nil, fp.devices != 0 else { return false }
+        return heldFromFile || heldProfile?.isFree == true
     }
 
     // The log's line: which profile replaced which.

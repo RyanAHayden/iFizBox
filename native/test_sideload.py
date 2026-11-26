@@ -283,13 +283,16 @@ class HandoffSourceTest(unittest.TestCase):
         for part in ('"ifizbox-identity"', "BundledIdentity.shouldImport", "SignStore.identity() != nil",
                      "UserDefaults.standard.set(digest", "SignStore.importIdentity", "confirmImport", "refreshBundledProfile"):
             self.assertIn(part, body)
-        # B420: with an identity held, the profile only, never the certificate
+        self.assertIn("rememberImportedCertificate()", body)
+        # B420: with an identity held, the profile; B479: the certificate only when replacesIdentity says so
         start = bridge.index("static func refreshBundledProfile(")
         body = bridge[start:bridge.index("\n    }\n", start)]
         for part in ("BundledIdentity.shouldCompareProfile", "BundledIdentity.replacesProfile", "SignStore.replaceProfile",
-                     "forKey: BundledIdentity.seenKey", "forKey: BundledIdentity.profileSeenKey"):
+                     "forKey: BundledIdentity.seenKey", "forKey: BundledIdentity.profileSeenKey",
+                     "BundledIdentity.replacesIdentity(", "BundledIdentity.importedCertKey", "rememberImportedCertificate()"):
             self.assertIn(part, body)
-        self.assertNotIn("importIdentity", body)
+        self.assertEqual(body.count("importIdentity("), 1)
+        self.assertLess(body.index("BundledIdentity.replacesIdentity("), body.index("SignStore.importIdentity("))
 
     def test_no_local_trust_left(self):
         for name, text in self.files.items():
