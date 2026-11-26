@@ -2,7 +2,7 @@
 """The made-up world of the showcase recordings (capture.mjs's fake bridge reads it). Nothing in it is real: the
 sources, apps, tweaks, icons and names are all invented here, on .example hosts, so no one's brand shows as ours.
 
-    python3 marketing/video/make_state.py OUT_DIR
+    python3 marketing/video/make_state.py OUT_DIR [--promo]
 
 Writes
     OUT_DIR/www/<host>/<path>          what each source answers (AltStore sources, APT repos, icons as SVG)
@@ -128,7 +128,13 @@ def release(name):
             f"Components: main\nDescription: {name}\n")
 
 
-def main(out):
+# --promo: the promo clip's world. Lamplight is already a source, and four of its tweaks are installed one release
+# behind, so Changes opens with a badge and four upgrades
+BEHIND = {"example.lamplight.softdock": "1.1", "example.lamplight.dockshade": "0.9", "example.lamplight.quietbar": "1.9",
+          "example.lamplight.longnight": "1.0"}
+
+
+def main(out, promo=False):
     out = Path(out)
 
     def put(path, text):
@@ -152,9 +158,13 @@ def main(out):
         put(f"www/{host}/%s.svg" % REPO_ICON, ICONS[art])
     put("etc/apt/sources.list.d/fernhill.sources", f"Types: deb\nURIs: https://{BASE}/\nSuites: ./\n")
     skip = ("Filename", "Size", "SHA256")
-    put("var/lib/dpkg/status", "\n\n".join(control({k: v for k, v in r.items() if k not in skip}, Status="install ok installed") for r in base) + "\n")
-    print(f"{len(TWEAK_LIST)} tweaks, {len(base)} installed packages, 1 AltStore source in {out}")
+    have = list(base)
+    if promo:
+        put("etc/apt/sources.list.d/lamplight.sources", f"Types: deb\nURIs: https://{TWEAKS}/\nSuites: ./\n")
+        have += [{**r, "Version": BEHIND[r["Package"]]} for r in TWEAK_LIST]
+    put("var/lib/dpkg/status", "\n\n".join(control({k: v for k, v in r.items() if k not in skip}, Status="install ok installed") for r in have) + "\n")
+    print(f"{len(TWEAK_LIST)} tweaks, {len(have)} installed packages, 1 AltStore source in {out}")
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(sys.argv[1], "--promo" in sys.argv[2:])

@@ -1,6 +1,6 @@
 // Renders video.html frame by frame on its virtual clock and pipes the frames into ffmpeg (H.264, 60 fps, no audio).
 //
-//   node marketing/video/render.mjs <out dir> <out.mp4> [--h 1350|1920] [--fps 60] [--still t,t,… --stills <dir>]
+//   node marketing/video/render.mjs <out dir> <out.mp4> [--h 1350|1920] [--fps 60] [--page promo] [--still t,t,… --stills <dir>]
 //
 // <out dir> is make.sh's: it holds rec/ (capture.mjs's recordings). Their frames are unpacked into <out dir>/frames/
 // when they are older than the recording. A small static server (127.0.0.1, a free port) serves the repo, so
@@ -19,11 +19,12 @@ const repo = resolve(here, "../..");
 const args = process.argv.slice(2);
 const opt = (name, dflt) => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : dflt; };
 const H = Number(opt("--h", 1350)), FPS = Number(opt("--fps", 60));
+const page = opt("--page", "video"); // "promo": promo.html, cut from rec/promo.mp4 alone
 const stillsAt = opt("--still", null), stillsDir = opt("--stills", null);
 const [data, out] = args.map((a) => resolve(a));
-if (!data || (!out && !stillsAt)) { console.error("usage: render.mjs <out dir> <out.mp4> [--h 1350|1920] [--fps 60] [--still t,t --stills dir]"); process.exit(64); }
+if (!data || (!out && !stillsAt)) { console.error("usage: render.mjs <out dir> <out.mp4> [--h 1350|1920] [--fps 60] [--page promo] [--still t,t --stills dir]"); process.exit(64); }
 
-for (const name of ["lite", "jailbreak"]) {
+for (const name of (page === "promo" ? ["promo"] : ["lite", "jailbreak"])) {
   const mp4 = join(data, "rec", `${name}.mp4`), dir = join(data, "frames", name), done = join(dir, "done");
   const fresh = await stat(done).then(async (d) => d.mtimeMs > (await stat(mp4)).mtimeMs, () => false);
   if (fresh) continue;
@@ -67,10 +68,10 @@ const ev = async (expression) => { const r = await send("Runtime.evaluate", { ex
 
 await send("Page.enable"); await send("Runtime.enable");
 await send("Emulation.setDeviceMetricsOverride", { width: 1080, height: H, deviceScaleFactor: 1, mobile: false });
-await send("Page.navigate", { url: `${base}/marketing/video/video.html?h=${H}` });
+await send("Page.navigate", { url: `${base}/marketing/video/${page === "promo" ? "promo" : "video"}.html?h=${H}` });
 let duration = null;
 for (let i = 0; i < 100 && !duration; i++) { await sleep(200); try { duration = await ev("window.ready ? window.ready.then(() => window.DURATION) : null"); } catch {} }
-if (!duration) { console.error("video.html never got ready"); cleanup(); process.exit(1); }
+if (!duration) { console.error(`${page === "promo" ? "promo" : "video"}.html never got ready`); cleanup(); process.exit(1); }
 
 const shot = async (t, format = "jpeg") => {
   await ev(`window.render(${t}).then(() => new Promise((r) => requestAnimationFrame(() => r(1))))`);

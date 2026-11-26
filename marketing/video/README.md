@@ -54,6 +54,8 @@ marks, world updates) is in `capture.mjs`'s header.
 | `shots-lite.json`, `shots-jailbreak.json` | each recording's script: the steps, in the order `capture.mjs`'s header lists them |
 | `render.mjs` | the cut's renderer: unpacks the frames, serves the page, steps its clock and pipes the frames to ffmpeg (H.264, 60 fps, no audio) |
 | `video.html` | the cut as one page: the splash, the phones, the status bar, the captions (`say()`), the timing (`MAP`), the zooms and the end card |
+| `promo.html` | the jailbreak promo clip as one page: captions, timing and end card, cut from `rec/promo.mp4` alone (`render.mjs --page promo`) |
+| `shots-promo.json` | the promo recording's script: the jailbreak steps from the Changes badge through Upgrade, Confirm, the install, Complete and Theme |
 
 Re-render one cut from the recordings already in `OUT_DIR`:
 
@@ -65,3 +67,24 @@ Draw stills at some seconds instead of a video (no re-recording; the output name
     node marketing/video/render.mjs marketing/video/out --h 1350 --still 3,10 --stills <dir>
 
 Don't edit `make.sh` while it runs: `sh` reads a script as it goes.
+
+## The promo clip
+
+`promo.html` is a second timeline beside `video.html`, for the jailbreak clip: about 16 s, with the same phone, status
+bar, captions and end card, drawn from one recording (`rec/promo.mp4`) with its own marks and cuts. Its script is
+`shots-promo.json`, run in jailbreak mode by `make.sh`.
+
+`make_state.py --promo` makes its world: Lamplight is already a source and four of its tweaks are installed one release
+behind, so Changes has a badge of 4. The fake phone reports iOS 16.5 in jailbreak mode, so Theme offers iOS 6, 7 and 13
+only; iOS 26 appears on iOS 26 or later.
+
+Its cuts drop part of the install waits, as the showcase's do; nothing is sped up. The jump from Complete to Home skips
+the app's "Loading" reload, so the Changes list in this world still shows the 4 upgrades after the install.
+
+Cut it alone from the recording already in `OUT_DIR/rec/`:
+
+    node marketing/video/render.mjs marketing/video/out promo-4x5.mp4 --h 1350 --page promo
+    node marketing/video/render.mjs marketing/video/out promo-9x16.mp4 --h 1920 --page promo
+
+`make.sh` makes both after the showcase cuts, as `OUT_DIR/promo-4x5.mp4` and `OUT_DIR/promo-9x16.mp4`, with its world
+in `OUT_DIR/state-promo`.

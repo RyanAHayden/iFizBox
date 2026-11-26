@@ -1,0 +1,14 @@
+{ "name": "promo", "storage": { "ifizbox.appearance": "light" }, "steps": [
+ {"until": "!document.body.innerText.match(/Searcher Cache|Reloading|Updating/)", "max": 20000}, {"pause": 1000},
+ {"record": true}, {"mark": "home"}, {"pause": 800},
+ {"tap": "text=Changes", "nth": -1}, {"pause": 1000}, {"mark": "changes"},
+ {"swipe": [[330, 245], [60, 247]], "ms": 400}, {"pause": 900}, {"mark": "queued"},
+ {"tap": "text=Upgrade (4)"}, {"pause": 1000}, {"mark": "confirm"},
+ {"tap": "text=Confirm", "nth": -1}, {"pause": 700}, {"mark": "installing"},
+ {"until": "document.body.textContent.includes('Restart SpringBoard')", "max": 20000}, {"pause": 800}, {"mark": "done"},
+ {"tap": "text=Restart SpringBoard"}, {"pause": 500}, {"mark": "home2"},
+ {"tap": "text=Home", "nth": -1}, {"pause": 500}, {"tap": "text=Theme"}, {"pause": 800}, {"mark": "theme"},
+ {"tap": "text=iOS 7"}, {"pause": 1000}, {"mark": "ios7"},
+ {"tap": "text=iOS 13"}, {"pause": 1000}, {"mark": "ios13"},
+ {"tap": "text=iOS 6"}, {"pause": 1100}, {"mark": "ios6"}
+]}
