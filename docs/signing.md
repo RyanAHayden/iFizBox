@@ -122,23 +122,23 @@ fail with "zsign stopped … too big for this browser" (WebAssembly up to 4 GB, 
 
 A browser that still has an old push service worker registered drops it at the next visit (`app.js`).
 
-## Free Apple ID (website)
+## Free Apple ID
 
 For people with no certificate. The certificate route stays the recommended one: a free Apple ID signs 3 apps at a
 time, makes 10 App IDs a week, and its profiles last 7 days. iOS refuses apps with a free profile from a website
 (`MIInstallerErrorDomain` 111, "free provisioning profile … not allowed to be installed from this source"), so the
-website does the Apple side only: sign-in, the development certificate and the profiles. Installing is the app's job,
-through `installation_proxy` (pairing file + a loopback VPN), which the app doesn't have yet. Until it does, the first
-install takes a computer once (**Download for a Computer Install**, under Ready).
+website does the Apple side only: sign-in, the development certificate and the profiles. On the website, the first
+install takes a computer once (**Download for a Computer Install**, under Ready). The sideload app does the Apple side
+itself and installs with the identity it keeps (below).
 
-Where: How Signing Works (the walkthrough Install opens when there's no certificate), under the two steps, as
+On the website it sits in How Signing Works (the walkthrough Install opens when there's no certificate), under the two steps, as
 **Use a Free Apple ID**. It shows only when the Worker's Apple relay is on (`GET /apple/status` answers
 `{"on":true}`; off, `/apple/status` and every sign-in, developer-services and anisette path are a 404). The relay is
 off unless the deploy sets `APPLE_RELAY = "1"` (`worker/src/apple-relay.js`, `worker/README.md`), and ifizbox.com's
 deploy does (`worker/wrangler.ifizbox.toml`), so the site shows it. The App Store Connect pass-through for your own API key (below) is not part of it and works
 either way.
 
-The flow (`web/app/screens/free-apple-id.js`):
+The website's flow (`web/app/screens/free-apple-id.js`):
 
 1. **Sign in**: Apple ID and password. SRP runs in the browser (`core/gsa.js`), so the password never leaves it;
    anisette v3 comes from a public anisette server with a machine of this browser's own (kept in localStorage).
@@ -182,8 +182,9 @@ Push) and narrows a `TEAM.*` keychain group to the app's own (`TEAM.<bundle ID>`
 for); `freeExpiry` says "soon" 3 days before the 7-day profile ends
 (`FREE_EXPIRY_WARNING`), not the certificate route's setting.
 
-What leaves the browser: every Apple and anisette request goes through the Worker's relay (allow-listed hosts and
-paths, no logging); that includes the Xcode app token and the developer-portal replies, but not the password or
+What leaves the browser (the website's): every Apple and anisette request goes through the Worker's relay (allow-listed
+hosts and paths, no logging); in the sideload app there is no relay, and requests go straight to Apple and the anisette
+server. That relay path includes the Xcode app token and the developer-portal replies, but not the password or
 the private key. Only Download for a Computer Install sends the key out: inside the signed IPA, kept on the Worker for its
 10 minutes. Tests: `core/freeroute.test.js` (CSR checked with WebCrypto, the `.p12` opened by
 `checkP12Password` and decrypted back, a real zsign WebAssembly signing run with it, the checklist against a fake
@@ -191,6 +192,32 @@ portal, the limit and Cancel), `screens/free-apple-id.test.js` (the alerts' effe
 back by the import's unzip, the relay check), `worker/test.mjs` (`/apple/status`). The computer install:
 `screens/computer-install.test.js` (the sign job, the code from the Worker with KV in memory, the block's states) and
 `websign-free.test.js` (the free option's entitlements in zsign's own signature).
+
+**In the sideload app**
+
+The sideload build's Settings > Installation & Signing > Certificate (Settings > Signing when the Installation page is
+hidden) shows the same Free Apple ID group while no certificate is in use, or while the certificate in use is the Free
+Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows it.
+
+- **No relay.** The app asks Apple and the anisette server itself. Every HTTP request goes through the shell's
+  `net.request` (`native/Sources/Paid.swift`: https, GET/POST/PUT, text bodies; PUT is the SMS-code request), so CORS
+  doesn't apply, and the Worker's relay refuses other origins anyway. The anisette provisioning WebSocket goes straight
+  to the anisette server (`wss://<server>/v3/provisioning_session`). Register This iPhone takes its UDID from the shell
+  (`device.info`). See `screens/free-apple-id.js` (`nativeTransport`, `directWsUrl`).
+- **Ready** puts the certificate, its password and the 7-day profile into the Keychain as the app's signing identity
+  (`signing.import`, as Select All Files does), so Install and re-signing on the phone use them. There is no Save for
+  the App and no Download for a Computer Install. If the import fails, an alert says why, and a **Use for Signing**
+  button tries again.
+- **The weekly refresh** is Refresh Profile (or Sign In Again once Apple's session is gone): it makes a new profile and
+  imports it again.
+- **Forget Free Apple ID** also removes the Keychain identity, but only when its certificate's serial is the Free Apple
+  ID's; a certificate imported since stays.
+- **Names**: the App ID and profile are the website's (`<bundle ID>.<TEAMID>`, the app's own bundle ID). With Keep
+  Bundle IDs on, other apps keep their own bundle IDs and take that App ID only in their entitlements.
+- **The signer** keeps `get-task-allow` as the profile allows under Xcode's team profiles (named "iOS Team
+  Provisioning Profile: …", or with `LocalProvision`), which is every free Apple ID profile: iOS refuses such an app
+  signed with it false. Every other profile still signs apps that can't be debugged (`native/sign/Profile.swift`
+  `isTeamProfile`).
 
 ## Own provisioning profiles (App Store Connect API key)
 

@@ -2,7 +2,7 @@
 // Provider API, https://developer.getsileo.app/payment-providers). Vendors send no CORS headers and the spec wants
 // the payment secret in the Keychain, so these go through Swift:
 //
-//   net.request {method, url, headers, body}   -> {status, headers, body}  https only, GET or POST; body in is a
+//   net.request {method, url, headers, body}   -> {status, headers, body}  https only, GET, POST or PUT; body in is a
 //                                                 string (the JSON the page built) or null, body out is base64 like
 //                                                 net.fetch's
 //   device.info                                -> {udid, model}  MobileGestalt's UniqueDeviceID and hw.machine
@@ -80,7 +80,8 @@ enum Paid {
             return Apt.reply(c, nil, "bad_url: not an https URL")
         }
         let method = ((c.params["method"] as? String) ?? "GET").uppercased()
-        guard method == "GET" || method == "POST" else { return Apt.reply(c, nil, "bad_url: method \(method)") }
+        // PUT: the Free Apple ID sign-in's SMS code request (web/app/screens/free-apple-id.js nativeTransport)
+        guard ["GET", "POST", "PUT"].contains(method) else { return Apt.reply(c, nil, "bad_url: method \(method)") }
         var req = URLRequest(url: url)
         req.httpMethod = method
         for (k, v) in (c.params["headers"] as? [String: Any]) ?? [:] {
@@ -89,7 +90,7 @@ enum Paid {
             if ["host", "content-length", "connection", "transfer-encoding"].contains(k.lowercased()) { continue }
             req.setValue(v, forHTTPHeaderField: k)
         }
-        if method == "POST", let body = c.params["body"] as? String { req.httpBody = Data(body.utf8) }
+        if method != "GET", let body = c.params["body"] as? String { req.httpBody = Data(body.utf8) }
         Apt.session.dataTask(with: req) { data, resp, err in
             if let e = err as? URLError {
                 return Apt.reply(c, nil, "\(e.code == .timedOut ? "timeout" : "network"): \(e.localizedDescription)")
