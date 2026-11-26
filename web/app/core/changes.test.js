@@ -151,6 +151,18 @@ test("changes default scope: Installed with dpkg packages or recorded apps, All 
   assert.equal(defaultScope(installedIds(null, []).size), "all");
   assert.equal(defaultScope(installedIds([], undefined).size), "all");
   assert.equal(defaultScope(installedIds([{ id: "bash" }], []).size), "installed");
-  assert.equal(defaultScope(installedIds(null, [{ id: "com.delta" }]).size), "installed");
-  assert.deepEqual([...installedIds([{ id: "a" }], [{ id: "a" }, { id: "b" }])], ["a", "b"]);
+  assert.equal(defaultScope(installedIds(null, [{ id: "com.delta", source: "https://s/" }]).size), "installed");
+  assert.deepEqual([...installedIds([{ id: "a" }], [{ id: "a" }, { id: "b" }])], ["a"]); // no source of their own
+});
+
+test("B477: an installed app counts only on the source it was installed from", () => {
+  const own = "alt:https://apptesters.org/";
+  const installed = installedIds([{ id: "bash" }], [{ id: "com.x", source: "https://apptesters.org/" }, { id: "com.y", key: "alt:https://b/" }]);
+  const rows = [
+    { id: "com.x", key: "alt:https://fastsign.dev/" }, // fastsign's modded X, same bundle ID
+    { id: "com.x", key: own },
+    { id: "com.y", key: "alt:https://b/" },
+    { id: "bash", key: "apt:https://repo/" }, // dpkg packages stay by id
+  ];
+  assert.deepEqual(filterRows(rows, { scope: "installed", installed }).map((r) => r.key), [own, "alt:https://b/", "apt:https://repo/"]);
 });

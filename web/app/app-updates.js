@@ -21,7 +21,7 @@
 // <NAME> Updates is off (F285 withoutSelf). Sent again only when it changes.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { catalog } from "./catalog.js";
-import { altKey } from "./core/altstore.js";
+import { altKey, ownKey } from "./core/altstore.js";
 import { getBackend } from "./backend.js";
 import { apps } from "./core/installed.js";
 import { detectMode, selfUpdateAlertsOn } from "./core/settings.js";
@@ -38,7 +38,7 @@ let lastSent = null;
 // lookups that threw (the catalog not there), so a watch list isn't built from a half answer.
 // B476: only on the source the app was installed from (ownKey): another source listing the same bundle ID (a modded
 // X on fastsign beside AppTesters') is a different app, never its upgrade. No source of its own (My IPAs, a URL): none.
-export const ownKey = (r) => (r?.key && r.key !== "*" ? r.key : typeof r?.source === "string" && r.source ? altKey(r.source) : null);
+export { ownKey };
 
 async function candidates(records, lookup = (id, key) => catalog.package(id, key)) {
   const out = new Map();

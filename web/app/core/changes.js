@@ -17,6 +17,8 @@
 //   await recordRefresh(store, [[key, id, version], ...], Date.now())  -> number of new records
 //   changeGroups(await store.all(), rows)                              -> [{ seen, rows: [{ ...row, change }] }]
 
+import { isInstalledRow } from "./installed.js";
+
 const STORE = "seen";
 
 export const recordKey = (key, id, version) => `${key}\u0000${id}\u0000${version}`;
@@ -145,11 +147,11 @@ export function dayTitle(day, now = Date.now(), locale) {
 export const defaultScope = (installedCount) => (installedCount > 0 ? "installed" : "all");
 
 // The search field matches name, id, description and author, case-insensitively, every word; the Installed scope
-// keeps ids in `installed` (a Set).
+// keeps rows in `installed` (core/installed.js installedIds: dpkg ids, apps by source and id).
 export function filterRows(rows, { query = "", scope = "all", installed = new Set() } = {}) {
   const words = String(query).toLowerCase().split(/\s+/).filter(Boolean);
   return rows.filter((r) => {
-    if (scope === "installed" && !installed.has(r.id)) return false;
+    if (scope === "installed" && !isInstalledRow(installed, r)) return false;
     if (!words.length) return true;
     const hay = [r.name, r.id, r.short, r.author].filter(Boolean).join("\n").toLowerCase();
     return words.every((w) => hay.includes(w));

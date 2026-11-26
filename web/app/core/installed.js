@@ -12,6 +12,7 @@
 import { parseControl, description, compareVersions, parseRelations } from "./apt.js";
 import { sectionName, parseAuthor, compareNames, sectionGroup } from "./sections.js"; // C36: not catalog.js, which imports this file
 import { NAME } from "../brand.js";
+import { ownKey } from "./altstore.js";
 import { nativeBridge } from "../native.js";
 import { IdMap, IdSet, lowerId } from "./apt.js"; // B407: package names compare ignoring case
 
@@ -480,12 +481,16 @@ export function onAppsChange(f) {
 
 // F51: the ids of everything the user has installed, for the Changes tab's Installed scope: dpkg's packages
 // (parseStatus rows, or null without a status file) and the apps recorded on the device (appRecord records).
+// B477: an app counts only on the source it was installed from (ownKey), so it's kept as key + id: another source
+// listing the same bundle ID (a modded X on fastsign beside AppTesters') is another app. Test rows with isInstalledRow.
+const appMark = (key, id) => `${key}\u0000${id}`;
 export function installedIds(dpkgRows, appRecords) {
   const ids = new Set();
   for (const r of dpkgRows ?? []) if (r?.id) ids.add(r.id);
-  for (const r of appRecords ?? []) if (r?.id) ids.add(r.id);
+  for (const r of appRecords ?? []) { const key = ownKey(r); if (r?.id && key) ids.add(appMark(key, r.id)); }
   return ids;
 }
+export const isInstalledRow = (installed, r) => Boolean(r?.id && (installed?.has?.(r.id) || installed?.has?.(appMark(r.key, r.id))));
 
 // ---- F127: Installed's modes, type filters and search (Cydia's InstalledController) ----------------------------
 // Cydia 1.1's Installed tab has a segmented control in the nav bar: User, Expert, Recent (MobileCydia.mm
