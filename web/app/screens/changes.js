@@ -557,7 +557,7 @@ async function refresh(ctx) {
 // (false too when the bar's Cancel stopped it).
 export async function refreshInBar(ctx, { background = (c) => loadLazy("sources").then((m) => m.refreshInBackground(c)),
   settled = () => import("./home.js").then((m) => m.untilRefreshed()),
-  reload = async () => { if (catalog.statusSource() === "native") await catalog.reloadInstalled(); await load(); } } = {}) {
+  reload = async () => { if (catalog.statusSource() === "native") await catalog.reloadInstalled(); await load(); }, alert = showAlert } = {}) {
   if (state.busy) return false;
   state.busy = true;
   try {
@@ -565,8 +565,10 @@ export async function refreshInBar(ctx, { background = (c) => loadLazy("sources"
     await settled();
     await reload();
     return true;
-  } catch {
-    return false; // a source that failed shows on its row and in the bar's banner (sources.js bannerFailed)
+  } catch (e) {
+    // a source that failed shows on its row and in the bar's banner (sources.js bannerFailed); this is the list reload
+    await alert({ title: "Error", message: e?.message || String(e), buttons: ["OK"] });
+    return false;
   } finally {
     state.busy = false;
   }

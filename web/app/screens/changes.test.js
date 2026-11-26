@@ -179,6 +179,8 @@ test("Changes (B462): Refresh runs under the reload bar, no Reloading Data HUD; 
   assert.equal(await refreshInBar(ctx, { background: async () => "cancelled", settled: async () => after.push("settled"), reload: async () => after.push("reload") }), false);
   assert.deepEqual(after, []);
   // a failure frees the job for the next tap
-  assert.equal(await refreshInBar(ctx, { background: async () => { throw new Error("x"); }, reload: async () => {} }), false);
+  const alerts = [];
+  assert.equal(await refreshInBar(ctx, { background: async () => {}, settled: async () => {}, reload: async () => { throw new Error("x"); }, alert: async (a) => { alerts.push(a); } }), false);
+  assert.equal(alerts[0]?.title, "Error");
   assert.equal(await refreshInBar(ctx, { background: async () => {}, settled: async () => {}, reload: async () => {} }), true);
 });
