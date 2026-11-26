@@ -405,7 +405,7 @@ async function page(t, tag) {
   const look = () => ({ spinner: area.classList.contains("refreshing"), armed: area.classList.contains("armed"),
     title: title.textContent, shown: clip.classList.contains("on") });
   const flush = async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r)); };
-  return { t, fire, scroll, rows, look, flush, scroller, area, get refreshes() { return refreshes; } };
+  return { t, fire, scroll, rows, look, flush, scroller, area, clip, get refreshes() { return refreshes; } };
 }
 
 test("native rubber band: an armed release lets the list spring back, the hidden area spins; a second pull shows it", async (t) => {
@@ -469,4 +469,49 @@ test("script pull (no rubber band): rows follow the finger, spring back to none 
   await p.flush();
   t.mock.timers.tick(300);
   assert.deepEqual(p.look(), { spinner: false, armed: false, title: TEXT.pull, shown: false });
+});
+
+// ---- B463: the area shows only in the gap a pull opens, never over the page, the nav bar or the pinned headers ----
+
+test("hidden, the area is parked wholly above the clip, wherever iOS's last bounce event left it", async (t) => {
+  const p = await page(t, "parked");
+  p.fire("touchstart", 100);
+  for (const top of [-30, -90]) p.scroll(top);
+  p.fire("touchend");
+  p.scroll(-50); // the bounce's last event under 0 ...
+  assert.match(p.area.style.transform, /translateY\(-430px\)/);
+  p.scroll(0); // ... and the next one already back at the top
+  assert.equal(p.look().shown, false);
+  assert.match(p.area.style.transform, /translateY\(-480px\)/, "its foot on the clip's top, nothing of it inside");
+  t.mock.timers.tick(0);
+  await p.flush();
+  assert.equal(p.look().spinner, true); // the refresh runs: the spinner is on, the area still out of sight
+  assert.match(p.area.style.transform, /translateY\(-480px\)/);
+});
+
+test("a fling past the top measures the clip again: it starts where the list starts now", async (t) => {
+  const p = await page(t, "fling");
+  p.fire("touchstart", 100);
+  p.fire("touchend");
+  assert.equal(p.clip.style.top, "0px");
+  p.scroller.offsetTop = 52; // a strip or header above the list came since that touch
+  p.scroller.clientHeight = 548;
+  p.scroll(400);
+  p.scroll(-20); // a fling's overshoot, no finger down
+  assert.equal(p.clip.style.top, "52px");
+  assert.equal(p.clip.style.height, "548px");
+  assert.equal(p.look().shown, true);
+});
+
+test("the spinner shows and turns only inside a shown clip: visibility: visible on a child beats a hidden parent", () => {
+  const css = readFileSync(new URL("../style.css", import.meta.url), "utf8");
+  const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({ sel: m[1].replace(/\/\*[\s\S]*?\*\//g, "").trim(), body: m[2] }));
+  const pull = rules.filter((r) => /\.pull-(spinner|arrow|text|title|time|inner|refresh)\b/.test(r.sel));
+  for (const r of pull) {
+    for (const sel of r.sel.split(/,\s*/).filter((s) => /\.pull-/.test(s))) {
+      if (/visibility:\s*visible/.test(r.body)) assert.match(sel, /\.pull-clip\.on\b/, `${sel} shows through the hidden clip`);
+      if (/animation:\s*hud-spin/.test(r.body)) assert.match(sel, /\.pull-clip\.on\b/, `${sel} turns while hidden`);
+    }
+  }
+  assert.ok(pull.some((r) => /\.pull-clip\.on > \.pull-refresh\.refreshing \.pull-spinner/.test(r.sel) && /visibility:\s*visible/.test(r.body)));
 });

@@ -319,7 +319,7 @@ a.cell-inner, button.cell-inner { cursor: pointer; }
   75%, 87.499% { transform: rotate(270deg); }
   87.5%, 100% { transform: rotate(315deg); }
 }
-:root .hud-spinner, :root .reload-spinner, :root .pull-refresh.refreshing .pull-spinner, :root .badge.spinning::after,
+:root .hud-spinner, :root .reload-spinner, :root .pull-clip.on > .pull-refresh.refreshing .pull-spinner, :root .badge.spinning::after,
 :root .source-row.is-loading .cell-inner::after, :root .loading-spinner, :root .bar-button.is-reloading::after,
 :root .shots-spinner, :root .free-step.is-running .free-mark { animation-name: var(--spinner-turns, hud-spin); }
 /* Zoom (Settings > Appearance > Allow Zoom, off by default): iOS ignores user-scalable=no, so app.js also stops
@@ -530,7 +530,9 @@ html.has-reload :is(.page-body, .sheet-scroll, .search-results, .progress-scroll
 }
 .pull-refresh.armed .pull-arrow { transform: rotate(180deg); }
 .pull-spinner { position: absolute; left: 34px; top: 20px; width: 20px; height: 20px; visibility: hidden; }
-.pull-refresh.refreshing .pull-spinner { visibility: visible; animation: hud-spin .96s linear infinite; }
+/* B463: visible (and turning) only while the clip is on: a child's visibility: visible shows through a hidden parent,
+   so a spinner shown on the area alone was drawn over the page whenever a refresh ran, the clip hidden or not. */
+.pull-clip.on > .pull-refresh.refreshing .pull-spinner { visibility: visible; animation: hud-spin .96s linear infinite; }
 .pull-refresh.refreshing .pull-arrow { visibility: hidden; transition: transform 0s; }
 .pull-text {
   position: absolute; left: 80px; right: 10px; top: 13px; display: flex; flex-direction: column; gap: 3px;
