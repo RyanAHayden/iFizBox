@@ -21,7 +21,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
-- [~] **F442** (follow-up, normal) Control session 10 asked the person: "Is the new iFizBox showcase video with the splash opening good to put on the README and the 1.0.0 release? [Yes, use it / No, change it] https://omarchy-desktop.beetal-ling.ts.net:8771/concept/F441" Carry on from their answer (the session, closed while it waited: resume it with `claude --resume 58860833-27cb-438b-a042-071afd6602e8`). When the answer is to queue work in another project the question names, run `plan add` in that project's own checkout: the answer allows that one command there BLOCKED: DECIDE: Is the new iFizBox showcase video with the splash opening good to put on the README and the 1.0.0 release? [Yes, use it / No, change it] https://omarchy-desktop.beetal-ling.ts.net:8771/concept/F441 (asked 2026-11-26 10:43)
 ### Parked
 
 - [ ] **F107** (later, when the jailbreakme.dev exploit is ready) Upgrading & Jailbreaking Help stays unlocked on the website's locked Home (user 2026-11-18: 'we will not have the jailbreak tutorial thing locked when jailbreakme.dev exploit is ready, thats for later'): leave that row out of websign-gate's browsingLocked set in screens/home.js and point it at the jailbreak guide. | files: web/app/screens/home.js
