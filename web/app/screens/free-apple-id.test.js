@@ -254,3 +254,102 @@ test("F444: settings.js reads the Free Apple ID under free-apple-id.js's key", a
   const { FREE_ID_KEY } = await import("./settings.js");
   assert.equal(FREE_ID_KEY, FREE_KEY);
 });
+
+test("B473: the sign-in is kept across the Find UDID detour for 30 minutes at most, never past the token", async () => {
+  const { keepFreeSession, keptFreeSession, dropFreeSession, FREE_SESSION_KEY } = await import("./free-apple-id.js");
+  const store = memStore();
+  const now = Date.parse("2026-11-26T12:00:00Z");
+  keepFreeSession({ token: "tok", adsid: "000-1", team: { teamId: "T1", name: "Me", extra: "x" }, email: "a@b.c" }, store, now);
+  const s = keptFreeSession(store, now + 29 * 60000);
+  assert.deepEqual([s.token, s.adsid, s.team, s.email], ["tok", "000-1", { teamId: "T1", name: "Me" }, "a@b.c"]);
+  assert.doesNotMatch(store.getItem(FREE_SESSION_KEY), /password/i);
+  assert.equal(keptFreeSession(store, now + 31 * 60000), null);
+  assert.equal(store.getItem(FREE_SESSION_KEY), null, "an expired one is removed");
+  keepFreeSession({ token: "tok", adsid: "000-1", team: { teamId: "T1" }, expiry: now + 5 * 60000 }, store, now);
+  assert.ok(keptFreeSession(store, now + 4 * 60000));
+  assert.equal(keptFreeSession(store, now + 6 * 60000), null, "the token's own expiry, when sooner");
+  keepFreeSession({ token: "tok", adsid: "000-1", team: { teamId: "T1" } }, store, now);
+  dropFreeSession(store);
+  assert.equal(keptFreeSession(store, now), null);
+  keepFreeSession({ token: null, adsid: "000-1", team: { teamId: "T1" } }, store, now);
+  assert.equal(keptFreeSession(store, now), null, "nothing kept without a token");
+  store.setItem(FREE_SESSION_KEY, "{broken");
+  assert.equal(keptFreeSession(store, now), null);
+});
+
+test("B473: Register This iPhone failed with no UDID: the row offers Find This iPhone's UDID", async () => {
+  const { udidDetour, FREE_UDID_FOOTER, FREE_UDID_ELSEWHERE } = await import("./free-apple-id.js");
+  const { FIND_UDID, UDID_WAITING } = await import("./signing.js");
+  const failed = { device: { state: "failed", summary: "This iPhone's UDID isn't known yet." } };
+  const g = udidDetour(failed, { href: "#home/settings/signing/udid" });
+  assert.deepEqual(g.rows, [{ label: FIND_UDID, href: "#home/settings/signing/udid" }]);
+  assert.equal(g.footer, FREE_UDID_FOOTER);
+  const w = udidDetour(failed, { pending: true, href: "#x" });
+  assert.equal(w.rows[0].detail, "Waiting");
+  assert.equal(w.footer, UDID_WAITING);
+  assert.deepEqual(udidDetour(failed, { can: false }), { rows: [], footer: FREE_UDID_ELSEWHERE });
+  assert.equal(udidDetour(failed, { native: true }), null, "the app reads the UDID itself");
+  assert.equal(udidDetour(failed, { udid: "00008030-001A" }), null, "failed for another reason");
+  assert.equal(udidDetour({ device: { state: "done" }, certificate: { state: "failed" } }), null);
+  assert.equal(udidDetour({}), null);
+});
+
+test("B473: after a reload the kept sign-in comes back; with the UDID here Register This iPhone goes on", async () => {
+  const { fakeDocument, memStorage } = await import("../fakes.test-helper.js");
+  const { freeRouteBlock, keepFreeSession, keptFreeSession, resetRelayAnswer } = await import("./free-apple-id.js");
+  const { FIND_UDID, UDID_KEY } = await import("./signing.js");
+  const saved = { document: globalThis.document, localStorage: globalThis.localStorage, fetch: globalThis.fetch };
+  const doc = fakeDocument();
+  const ls = memStorage();
+  const asked = [];
+  const relayed = [];
+  globalThis.document = doc;
+  globalThis.localStorage = ls;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).endsWith("/apple/status")) return { ok: true, json: async () => ({ on: true }) };
+    relayed.push({ url: String(url), headers: init?.headers ?? {} });
+    return new Promise(() => {}); // Apple's answer never comes: enough to see what was asked
+  };
+  const wait = () => new Promise((r) => setTimeout(r, 5));
+  const nav = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  Object.defineProperty(globalThis, "navigator", { value: { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 27_0 like Mac OS X)" }, configurable: true });
+  try {
+    resetRelayAnswer();
+    keepFreeSession({ token: "tok", adsid: "000-1", team: { teamId: "T1", name: "Me" }, email: "a@b.c" }, ls);
+    const box = freeRouteBlock({ alert: async (o) => { asked.push(o); return { index: 0 }; } });
+    doc.body.append(box);
+    await wait();
+    // no UDID yet: back on the checklist, Register This iPhone red, the row offers Find This iPhone's UDID, no alert
+    assert.equal(box.hidden, false);
+    assert.match(box.textContent, /Setting Up Me/);
+    assert.ok(box.querySelector("li.free-step.is-failed"), "Register This iPhone failed");
+    const link = box.querySelectorAll("a").find((a) => a.textContent.includes(FIND_UDID));
+    assert.ok(link, `the Find This iPhone's UDID row: ${box.textContent}`);
+    assert.match(link.href, /signing\/udid$/);
+    assert.deepEqual(asked, [], "the row explains it: no iPhone Not Known alert");
+    assert.ok(keptFreeSession(ls), "still kept while on the detour");
+    assert.equal(relayed.length, 0, "nothing asked of Apple without a UDID");
+    // the UDID arrives (Find This iPhone's UDID saved it): the next draw goes on with the kept sign-in, no new sign-in
+    ls.setItem(UDID_KEY, JSON.stringify({ udid: "00008030001A2B3C4D5E6F70", product: "iPhone16,1" }));
+    const again = freeRouteBlock({ alert: async (o) => { asked.push(o); return { index: 0 }; } }); // back on Signing
+    await wait();
+    assert.ok(relayed.length > 0, "setup asked Apple again");
+    assert.ok(again.querySelectorAll("li.free-step")[0].classList.contains("is-running"), "Register This iPhone is running");
+    assert.doesNotMatch(again.textContent, /Sign In With a Free Apple ID/, "no new sign-in");
+    assert.deepEqual(asked, []);
+    // a real reload after the UDID was found: a fresh module (no sign-in in memory) picks the kept one up
+    relayed.length = 0;
+    const fresh = await import("./free-apple-id.js?reload");
+    const reloaded = fresh.freeRouteBlock({ alert: async (o) => { asked.push(o); return { index: 0 }; } });
+    await wait();
+    assert.match(reloaded.textContent, /Setting Up Me/);
+    assert.ok(reloaded.querySelectorAll("li.free-step")[0].classList.contains("is-running"), "Register This iPhone goes on");
+    assert.ok(relayed.length > 0, "asked Apple with the kept sign-in");
+    assert.deepEqual(asked, []);
+    fresh.dropFreeSession(ls);
+  } finally {
+    Object.assign(globalThis, saved);
+    Object.defineProperty(globalThis, "navigator", nav);
+    resetRelayAnswer();
+  }
+});

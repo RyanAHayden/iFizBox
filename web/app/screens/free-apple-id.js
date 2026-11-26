@@ -34,7 +34,8 @@ import { relayTransport, relayWsUrl, anisetteV3, AppleIdSession, DevPortal, sign
 import { runSetup, pickTeam, setupError, SETUP_STEPS, otherTool, freeExpiry } from "../core/freeroute.js";
 import { storedZip } from "../core/freecert.js";
 import { parseProfile } from "../core/signing.js";
-import { storedUdid } from "./signing.js";
+import { storedUdid, udidPending, watchUdid, canFindUdid, FIND_UDID, UDID_PAGE, UDID_WAITING } from "./signing.js";
+import { format, settingsRoute } from "../router.js";
 import { MERGED_PAGE } from "../core/signingpage.js";
 import { computerInstallBlock, resetComputerInstall } from "./computer-install.js"; // F436
 import { loadStyle } from "../nav/motion.js";
@@ -133,7 +134,40 @@ const AGREEMENT_URL = "https://developer.apple.com/account";
 
 // ---- the flow's state (kept across redraws of the Signing page) ----
 const flow = { open: false, view: "signin", email: "", busy: false, steps: {}, session: null, portal: null, team: null, phone: null, sms: null,
-  kept: null }; // the app: true once Ready's signing.import worked, false when it failed (Use for Signing tries again)
+  kept: null, // the app: true once Ready's signing.import worked, false when it failed (Use for Signing tries again)
+  auth: null, running: false }; // B473: the portal's token for keepFreeSession; setup is running
+
+// B473: the website's detour to Find This iPhone's UDID (Register This iPhone failed: no UDID) can reload the page, which
+// would lose the Apple sign-in. While on that detour the developer-portal session (the Xcode app token, its adsid, the
+// team, the Apple ID's name) is kept in this browser for at most 30 minutes (or the token's own expiry, if sooner),
+// and setup goes on with it when the page comes back. No password is kept. Dropped once setup is done, on Sign Out
+// and on Forget.
+//   keepFreeSession(s, store, now) / keptFreeSession(store, now) / dropFreeSession(store)
+//   udidDetour(steps, { udid, native, pending, can, href })   pure: the group under the checklist that offers
+//                                        Find This iPhone's UDID, or null
+export const FREE_SESSION_KEY = "ifizbox.freeid.session";
+const SESSION_MS = 30 * 60 * 1000;
+export function keepFreeSession({ token, adsid, team, email = "", expiry = null }, store, now = Date.now()) {
+  if (!token || !adsid || !team?.teamId) return;
+  const exp = Number(expiry) > 0 && Number(expiry) < 1e12 ? Number(expiry) * 1000 : Number(expiry); // seconds or ms
+  const until = exp > now ? Math.min(exp, now + SESSION_MS) : now + SESSION_MS;
+  writeJson(store, FREE_SESSION_KEY, { token, adsid, team: { teamId: team.teamId, name: team.name ?? null }, email, until });
+}
+export function keptFreeSession(store, now = Date.now()) {
+  const s = readJson(store, FREE_SESSION_KEY);
+  if (!s) return null;
+  if (!s.token || !s.adsid || !s.team?.teamId || !(Number(s.until) > now)) { writeJson(store, FREE_SESSION_KEY, null); return null; }
+  return s;
+}
+export const dropFreeSession = (store) => writeJson(store, FREE_SESSION_KEY, null);
+
+export const FREE_UDID_FOOTER = "Register This iPhone needs its UDID. You stay signed in while you find it.";
+export const FREE_UDID_ELSEWHERE = "Register This iPhone needs its UDID: open this page on the iPhone to find it.";
+export function udidDetour(steps = {}, { udid = null, native = false, pending = false, can = true, href = null } = {}) {
+  if (native || udid || steps.device?.state !== "failed") return null;
+  if (!can) return { rows: [], footer: FREE_UDID_ELSEWHERE };
+  return { rows: [{ label: FIND_UDID, href, ...(pending ? { detail: "Waiting" } : {}) }], footer: pending ? UDID_WAITING : FREE_UDID_FOOTER };
+}
 
 function anisetteStore(store) {
   return { load: () => readJson(store, ANISETTE_KEY), save: (s) => writeJson(store, ANISETTE_KEY, s) };
@@ -318,9 +352,12 @@ export function freeRouteBlock({ alert, store, onChange = () => {}, native = nul
   const box = el("div", "free-route");
   box.hidden = true;
   const ask = async (opts) => (alert ?? (await import("../nav/alert.js")).showAlert)(opts);
-  const draw = () => render(box, { ask, store, redraw: draw, onChange, native });
+  const ctx = { ask, store, onChange, native };
+  const draw = () => render(box, ctx);
+  ctx.redraw = draw;
   // the app needs no relay: it asks Apple itself (nativeTransport)
-  if (native?.call) { box.hidden = false; draw(); } else relayAvailable().then((on) => { if (on) { box.hidden = false; draw(); } });
+  if (native?.call) { box.hidden = false; draw(); }
+  else relayAvailable().then((on) => { if (on) { box.hidden = false; if (!resumeKept(ctx)) draw(); } });
   return box;
 }
 
@@ -427,7 +464,8 @@ async function afterLogin(ctx, r) {
     return ctx.redraw();
   }
   if (r.step !== "done") throw Object.assign(new Error(`Apple wants another step first (${r.au}). Sign in at appleid.apple.com, then try again.`), { step: "sign-in" });
-  const { token } = await flow.session.appToken();
+  const { token, expiry } = await flow.session.appToken();
+  flow.auth = { token, adsid: flow.session.adsid, expiry }; // B473: kept while on the Find UDID detour
   flow.portal = new DevPortal({ transport: flow.transport, anisette: flow.anisette, token, adsid: flow.session.adsid });
   const team = pickTeam(await flow.portal.listTeams());
   if (!team) throw Object.assign(new Error("Apple listed no developer team for this Apple ID."), { step: "listTeams" });
@@ -470,22 +508,57 @@ async function askRevoke(ctx, certs) {
 }
 
 async function setup(ctx) {
+  if (flow.running) return;
+  flow.running = true;
   flow.view = "setup";
   flow.steps = {};
   flow.phone = ctx.native ? null : storedUdid();
   ctx.redraw();
   const saved = loadFreeIdentity(ctx.store);
   try {
+    await runSetupOnce(ctx, saved);
+  } finally {
+    flow.running = false;
+  }
+}
+
+// B473: back from the detour to Find This iPhone's UDID after a reload: the kept session signs in again and setup goes
+// on (or stops at Register This iPhone again, with the Find row, when the UDID still isn't here). False: nothing kept.
+function resumeKept(ctx) {
+  if (ctx.native || flow.portal) return false;
+  const s = keptFreeSession(ctx.store);
+  if (!s) return false;
+  flow.transport = relayTransport();
+  flow.anisette = anisetteV3({ transport: flow.transport, storage: anisetteStore(ctx.store), wsUrl: relayWsUrl });
+  flow.portal = new DevPortal({ transport: flow.transport, anisette: flow.anisette, token: s.token, adsid: s.adsid });
+  flow.auth = { token: s.token, adsid: s.adsid, expiry: s.until };
+  flow.team = s.team;
+  flow.email = s.email || flow.email;
+  flow.open = true;
+  setup(ctx);
+  return true;
+}
+
+async function runSetupOnce(ctx, saved) {
+  try {
     if (ctx.native) flow.phone = await nativePhone(ctx.native);
     const r = await runSetup({ portal: flow.portal, teamId: flow.team.teamId, phone: flow.phone, saved, bundleId: BUNDLE_ID, appName: NAME,
       onStep: (s) => { flow.steps[s.id] = s; ctx.redraw(); }, askRevoke: (certs) => askRevoke(ctx, certs) });
     saveFreeIdentity({ ...r.identity, teamName: flow.team.name ?? null, profile: r.profile.data, appId: r.appId }, ctx.store);
     resetComputerInstall(); // F436: signed with the profile before this one
+    dropFreeSession(ctx.store); // B473
     flow.view = "ready";
     if (ctx.native) await keepInApp(ctx, loadFreeIdentity(ctx.store));
     ctx.redraw();
     ctx.onChange();
   } catch (e) {
+    if (e?.kind === "no-udid" && !ctx.native) {
+      // B473: the row under the checklist offers Find This iPhone's UDID (udidDetour); keep the sign-in across it
+      if (!keptFreeSession(ctx.store)) keepFreeSession({ ...flow.auth, team: flow.team, email: flow.email }, ctx.store);
+      ctx.redraw();
+      return;
+    }
+    if (e?.kind === "session") dropFreeSession(ctx.store);
     const a = e?.native ? { title: "iPhone Not Known", message: e.message } : setupError(e);
     const agreement = e?.kind === "agreement";
     await ctx.ask({ title: a.title, message: a.message, buttons: agreement ? ["OK", "Open developer.apple.com"] : ["OK"], cancel: 0,
@@ -542,7 +615,19 @@ function setupView(ctx) {
   const g = el("div", "group");
   g.append(el("h2", "group-header", `Setting Up${flow.team?.name ? ` ${flow.team.name}` : ""}`), ol);
   const failed = Object.values(flow.steps).some((s) => s.state === "failed");
-  return [g, ...(failed ? [button("Try Again", () => setup(ctx), "free-primary"), button("Sign Out", () => signOut(ctx))] : [])];
+  if (!failed) return [g];
+  // B473: Register This iPhone stopped for want of the UDID: offer Find This iPhone's UDID, and go on once it's here
+  const udid = ctx.native ? null : storedUdid()?.udid ?? null;
+  if (!ctx.native && !flow.running && udid && flow.steps.device?.state === "failed" && !flow.phone?.udid) {
+    queueMicrotask(() => setup(ctx));
+    return [g];
+  }
+  const pending = !ctx.native && Boolean(udidPending());
+  if (pending) watchUdid(() => ctx.redraw());
+  const detour = udidDetour(flow.steps, { udid: flow.phone?.udid ?? null, native: Boolean(ctx.native), pending, can: canFindUdid(),
+    href: format(settingsRoute(["signing", UDID_PAGE])) });
+  return [g, ...(detour ? [grouped([detour])] : []),
+    button("Try Again", () => setup(ctx), "free-primary"), button("Sign Out", () => signOut(ctx))];
 }
 
 // ---- ready ----
@@ -556,7 +641,8 @@ function download(bytes, name, type = "application/zip") {
 }
 
 function signOut(ctx) {
-  flow.session = null; flow.portal = null; flow.team = null; flow.steps = {};
+  flow.session = null; flow.portal = null; flow.team = null; flow.steps = {}; flow.auth = null;
+  dropFreeSession(ctx.store); // B473
   flow.view = "signin";
   ctx.redraw();
 }
