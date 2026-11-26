@@ -4,8 +4,8 @@ The user reported that some buttons on Home and Settings took a tap but did not 
 
 ## What the probe found
 
-A throwaway Chromium probe (in the session scratchpad, built from the setup in `tools/smoke/smoke.mjs`: fake bridge,
-390x844) pressed every visible tappable thing on Home, Settings and Sources with CDP mouse events at the centre, the
+A Chromium probe ([probe.mjs](probe.mjs), built from the setup in `tools/smoke/smoke.mjs`: fake bridge, 390x844;
+run `node probe.mjs web/app`, with `STYLE=ios13` and `HASHES="#/home,#/sources"` to choose) pressed every visible tappable thing on Home, Settings and Sources with CDP mouse events at the centre, the
 4 edge midpoints and the 4 corners (1 px in), with clicks blocked. It compared the computed styles (background, color,
 opacity, filter, box-shadow, transform, border-image, ::before and ::after) of the control and its children before and
 while held, in the iOS 6 and iOS 13 styles.
@@ -52,8 +52,11 @@ has a `.tab.is-pressed` twin, including the held chosen tab's dim.
 - On a real phone (iPhone 7 or 15). The change is web CSS and JS only, and Chromium covers it, so no phone run was made.
 - The iOS 26 style uses a native `UITabBar` (F369), which this web fix does not touch. If the user's "Settings" meant
   that bar, it is not covered here.
-- The iOS 7 and 13 glyph swap for the selected tab (`ios7.css` and `ios13.css` swap the glyph for `.active`) was not
-  mirrored for `.is-pressed`. There, only the colours change while held.
+- iOS 13's `.active` glyphs are the same as its plain ones, so a held tab there already wears the full selected look.
+  iOS 7 (`ios7.css`) does swap to a filled glyph for `.active`, and that swap is not mirrored for `.is-pressed`, so
+  only the colour changes while a tab is held. That is outside this task's files and styles: filed as a follow-up.
+- The node test (`press-hitbox.test.js`) checks which element a press marks, not geometry: node has no layout. The
+  edge and centre geometry check is the probe above, run by hand (it needs Chromium, like `tools/smoke`).
 
 ## Screenshots
 
