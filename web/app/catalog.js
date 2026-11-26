@@ -23,8 +23,8 @@ import { getBackend, getParser, getArch } from "./backend.js";
 import { repoLayout } from "./core/apt.js";
 import { openIndexCache } from "./core/cache.js";
 import { ALL, freshLists } from "./core/catalog.js";
-import { openSeenStore, recordRefresh, dayGroups } from "./core/changes.js";
-import { looksLikeStatus } from "./core/installed.js";
+import { openSeenStore, recordRefresh, dayGroups, ownPicks } from "./core/changes.js";
+import { looksLikeStatus, apps } from "./core/installed.js";
 import { isAltKey } from "./core/altstore.js";
 import { allSaved } from "./core/ipainfo.js";
 import { hiddenAltApps } from "./core/appoffer.js";
@@ -472,10 +472,14 @@ export const catalog = {
   runInfo: (items) => ask("runInfo", [items]), // F234: links, hashes, sizes and dependencies for the queue run
   // The Changes tab (F51): the last 7 days, [{ day, rows: [{ ...row, change: "new" | "updated", seen }] }],
   // newest day first (core/changes.js dayGroups).
+  // B482: plus each remembered app's own source's row where All Sources shows another source's copy (`own`).
   changes: async (now = Date.now()) => {
     const rows = await ask("list", [ALL, ALL]);
     const store = await seen();
-    return store ? dayGroups(await store.all(), rows, { now }) : [];
+    if (!store) return [];
+    const recs = await apps().then((s) => s.all()).catch(() => []);
+    const own = (await Promise.all(ownPicks(rows, recs).map(([key, id]) => ask("row", [id, key]).catch(() => null)))).filter(Boolean);
+    return dayGroups(await store.all(), rows, { now, own });
   },
   // The installed packages as rows (each with `installed`, its version), or null before a status file came.
   installed: () => ask("installed", []),

@@ -25,6 +25,7 @@
 //                                             aptVersionList } or { kind: "ipa", id, name, key, sourceUrl,
 //                                             versions: altVersionList }; null when unknown
 //   c.versions()                           -> [[key, id, version]] for every source (Changes, core/changes.js)
+//   c.row(id, key)                         -> that source's row for id (Newest Copy Only aside), or null
 //   c.categories()                         -> Browse (F46): [{ name, count }] in BROWSE_CATEGORIES order, empty
 //                                             ones and (Not Jailbroken) tweak categories left out
 //   c.browse(category)                     -> [row] in that Browse category, sorted by name
@@ -933,6 +934,15 @@ export function createCatalog() {
     });
   }
 
+  // B482: one source's own row for an id, as its list would show it but kept when another source has it newer
+  // (Newest Copy Only), or null. Changes asks for an installed app's own source's copy with it.
+  function row(id, key) {
+    if (key === ALL) return null;
+    const r = entries(key).get(id)?.row;
+    if (!r || !listed(r) || filteredOut(r) || systemTweak(r) || (device && misfit(r)) || isHidden(r)) return null;
+    return slim(r);
+  }
+
   function pkg(id, key = ALL) {
     const e = entryOf(id, key);
     if (!e) return installedOnly(id);
@@ -1195,7 +1205,7 @@ export function createCatalog() {
     return findUpgrades(installedPkgs, (id) => { const e = all.get(id); return e ? slim(e.row) : null; }, holds, opts);
   }
 
-  return { load, loadAlt, altSource, remove, setHidden, setHiddenAuthors, setBlocked, sections, list, search, author, package: pkg, history, has, versions, keys: () => [...sources.keys()],
+  return { load, loadAlt, altSource, remove, setHidden, setHiddenAuthors, setBlocked, sections, list, search, author, package: pkg, history, has, versions, row, keys: () => [...sources.keys()],
     categories, browse, popular, free, featured, collection: collectionRows, refine, roulette,
     setInstalled, installed, upgrades, setDevice, setIpaInfo, setFilters, setTweakVerdicts, setTweakKnown, shows,
     deps, aptProblems, queueInfo, runInfo };
@@ -1210,7 +1220,7 @@ export function installedBytes(st) {
 // Runs a catalog operation by name: the worker's entry point. Unknown ops throw.
 export function runCatalog(catalog, op, args = []) {
   const f = { load: catalog.load, loadAlt: catalog.loadAlt, altSource: catalog.altSource, remove: catalog.remove, sections: catalog.sections, list: catalog.list,
-    search: catalog.search, author: catalog.author, package: catalog.package, history: catalog.history, has: catalog.has, keys: catalog.keys,
+    search: catalog.search, author: catalog.author, package: catalog.package, history: catalog.history, has: catalog.has, keys: catalog.keys, row: catalog.row,
     versions: catalog.versions, setHidden: catalog.setHidden, setHiddenAuthors: catalog.setHiddenAuthors, setBlocked: catalog.setBlocked, setInstalled: catalog.setInstalled,
     installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice, setIpaInfo: catalog.setIpaInfo, setFilters: catalog.setFilters,
     setTweakVerdicts: catalog.setTweakVerdicts, setTweakKnown: catalog.setTweakKnown, shows: catalog.shows,
