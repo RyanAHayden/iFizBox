@@ -113,8 +113,8 @@ export async function createShell({ raster, state, mode, name, bundleId, version
       return { text: r.body.toString("utf8"), source: dir + "Packages" };
     },
     // the Lite build
-    "signing.status": async () => (mode === "jailbreak" ? null : { mode: "sideload", identity: { name: "Apple Development: Demo Team (DEMO123456)", team: "DEMO123456", expires: await inDays(300),
-      profile: { name: "Demo Wildcard", team: "Demo Team", appId: "DEMO123456.*", devices: 3, wildcard: true, expires: await inDays(300), device: { listed: true } } } }),
+    "signing.status": async () => (mode === "jailbreak" ? null : { mode: "sideload", identity: { name: "Apple Development: Demo Team (DEMO123456)", team: "DEMO123456", expires: await inDays(days()),
+      profile: { name: "Demo Wildcard", team: "Demo Team", appId: "DEMO123456.*", devices: 3, wildcard: true, expires: await inDays(days()), device: { listed: true } } } }),
     "signing.installed": async () => (aging(), { apps: await Promise.all([...signed.values()].map(async (a) => ({ ...a, expires: await inDays(a.expires) }))) }),
     "signing.checkCertificate": () => ({ status: "good" }),
     "signing.remind": () => ({ ok: true }),

@@ -22,7 +22,7 @@ const H = Number(opt("--h", 1350)), FPS = Number(opt("--fps", 60));
 const page = opt("--page", "video"); // "promo" (jailbreakers' clip) or "promo-lite" (sideloaders'): <page>.html, cut from rec/<page>.mp4 alone
 const stillsAt = opt("--still", null), stillsDir = opt("--stills", null);
 const [data, out] = args.map((a) => resolve(a));
-if (!data || (!out && !stillsAt)) { console.error("usage: render.mjs <out dir> <out.mp4> [--h 1350|1920] [--fps 60] [--page promo] [--still t,t --stills dir]"); process.exit(64); }
+if (!data || (!out && !stillsAt)) { console.error("usage: render.mjs <out dir> <out.mp4> [--h 1350|1920] [--fps 60] [--page promo|promo-lite] [--still t,t --stills dir]"); process.exit(64); }
 
 for (const name of (page === "video" ? ["lite", "jailbreak"] : [page])) {
   const mp4 = join(data, "rec", `${name}.mp4`), dir = join(data, "frames", name), done = join(dir, "done");

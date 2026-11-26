@@ -2,18 +2,18 @@
 
 ## Result
 
-- A ~15.5 s promo clip for the Lite build (no jailbreak, no computer). Frame 1 is the app, on Tidewell's Details page:
+- A ~15.2 s promo clip for the Lite build (no jailbreak, no computer). Frame 1 is the app, on Tidewell's Details page:
   no splash, no end card. Then Add Tweaks > ADD on Night Charts, Installed > Queue > Confirm, the phone signs Tidewell
   with the tweak, the Installed list shows the days left, Home > Settings > Installation & Signing > Signed Apps >
   Re-sign All > Confirm, and Signed Apps again with both apps at 7 days.
 - Captions in the band: "Pick a tweak from a repo", "Signed on your iPhone", "Days left on every app", "Re-sign All,
   before they expire", "No computer. No jailbreak."
-- The clip: H.264 High, yuv420p, 60 fps, 929 frames, 15.483 s, no audio stream.
+- The clip: H.264 High, yuv420p, 60 fps, 912 frames, 15.2 s, no audio stream. Known flaw: for about half a second after Re-sign All the Signed Apps page still shows Kiteline at 1 day (it does not redraw) before the clip goes Back and opens it again.
 
 | File | What it is |
 |---|---|
 | `promo-lite-4x5.mp4` | 1080x1350, 1.7 MB |
-| `promo-lite-9x16.mp4` | 1080x1920, 2.5 MB |
+| `promo-lite-9x16.mp4` | 1080x1920, 2.6 MB |
 | `stills/promo-lite-4x5-t0.jpg`, `-t2.5`, `-t6`, `-t10`, `-t14` | five frames of the 4:5 cut at the key beats |
 
 - Source: `marketing/video/` (README there). `make.sh` makes both MP4s into its OUT_DIR.
@@ -82,7 +82,7 @@ Installation & Signing > Certificate); the steps are done on the website.
 
 ## Checks
 
-- `ffprobe` on both MP4s: h264 High, yuv420p, 60/1, 929 frames, 15.483 s, no audio stream.
+- `ffprobe` on both MP4s: h264 High, yuv420p, 60/1, 912 frames, 15.2 s, no audio stream.
 - Contact sheet at 1 fps: the captions match the screen at each beat, the first frame is the app, and the end shows both
   apps at 7 days.
 

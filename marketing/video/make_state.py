@@ -126,9 +126,9 @@ BASE_LIST = [
 ]
 
 
-def deb_bytes(pid, dylib, ctl, bundle="com.apple.UIKit"):
+def deb_bytes(dylib, ctl, bundle):
     """A .deb the app can read (ar of debian-binary, control.tar.gz, data.tar.gz): one tweak dylib and its filter plist,
-    for the app `bundle` (any app: UIKit). The dylib's bytes are placeholders: the recordings sign nothing for real."""
+    for the app `bundle`. The dylib's bytes are placeholders: the recordings sign nothing for real."""
     def tgz(files):
         raw = io.BytesIO()
         with tarfile.open(fileobj=raw, mode="w") as t:
@@ -185,11 +185,10 @@ def main(out, promo=False):
         put(f"www/{host}/Packages", "\n\n".join(control(r) for r in rows) + "\n")
         put(f"www/{host}/Release", release(name))
         put(f"www/{host}/%s.svg" % REPO_ICON, ICONS[art])
-    for host, rows, bundle in ((TWEAKS, TWEAK_LIST, "com.apple.UIKit"), (SHORE, SHORE_LIST, f"example.demo.tidewell")):  # the tweaks' .debs
-        for r in rows:
-            d = out / "www" / host / r["Filename"][2:]
-            d.parent.mkdir(parents=True, exist_ok=True)
-            d.write_bytes(deb_bytes(r["Package"], r["Name"], control({k: v for k, v in r.items() if k not in ("Filename", "Size", "SHA256")}), bundle))
+    for r in SHORE_LIST:  # the Lite promo clip adds this tweak to Tidewell
+        d = out / "www" / SHORE / r["Filename"][2:]
+        d.parent.mkdir(parents=True, exist_ok=True)
+        d.write_bytes(deb_bytes(r["Name"], control({k: v for k, v in r.items() if k not in ("Filename", "Size", "SHA256")}), "example.demo.tidewell"))
     put("etc/apt/sources.list.d/fernhill.sources", f"Types: deb\nURIs: https://{BASE}/\nSuites: ./\n")
     skip = ("Filename", "Size", "SHA256")
     have = list(base)
