@@ -11,8 +11,9 @@
 // F77: a My IPAs row under the apps opens the user's own IPAs (screens/myipas.js, #installed/myipas/...).
 //
 // F87: in the jailbreak app, apps iFizBox remembers (core/installed.js) are on an Apps page one row down
-// (#installed/apps, the row above dpkg's packages, there only when it has any), listed at the version on the phone
-// (app-updates.js rememberedApps, I4) with the note where it differs from what iFizBox remembered.
+// (#installed/apps; F443: the IPAs and Apps row above dpkg's packages, always there, its Install IPAs row on top),
+// listed at the version on the phone (app-updates.js rememberedApps, I4) with the note where it differs from what
+// iFizBox remembered.
 //
 // F91: in the sideload app every app iFizBox signed (signing.installed) shows its signature's days left on the right,
 // a small pill (core/signing.js signatureState; packages.css .sig-pill): green outside the re-sign window (Settings >
@@ -287,7 +288,7 @@ export function init(ctx) {
   if (typeof window !== "undefined") {
     window.addEventListener("hashchange", () => {
       const r = mounted(parse(location.hash));
-      if (r.tab === "installed" && isRoot(r) && document.querySelector(".install-ipas-row")) loadIpaCounts();
+      if (r.tab === "installed" && isRoot(r) && (document.querySelector(".install-ipas-row") || document.querySelector(".ipas-apps-row"))) loadIpaCounts();
     });
   }
 }
@@ -475,9 +476,8 @@ function draw(state) {
   }
   body.classList.replace("grouped", "plain");
   updateWishButton(state); // F147: dpkg's list is in, so the count leaves installed packages out
-  // F87's Apps row (F147: F125's Wish List row is a nav-bar button now).
-  const top = [appCount ? appsRow(state.route, appCount) : null].filter(Boolean);
-  if (!recordsApps()) top.unshift(installIpasRow(state.route, ipaRowState.counts)); // F269: above the Apps row
+  // F443: the jailbreak app's one IPAs and Apps row (F147: F125's Wish List row is a nav-bar button now).
+  const top = recordsApps() ? [] : [ipasAppsRow(state.route, ipaRowState.counts, appCount)];
   if (!rows.length) {
     body.replaceChildren(...(top.length ? [topTable(top, state.route)] : []), note("No packages."));
     return;
@@ -518,11 +518,23 @@ async function jailbreakAppCount() {
   try { return (await (await apps()).all()).filter((r) => r?.id && !r.self).length; } catch { return 0; }
 }
 
-function appsRow(route, n) {
-  return { label: "Apps", subtitle: appsRowSubtitle(n), href: format({ tab: route.tab, path: [...route.path, APPS] }), cls: "installed-apps-row" };
+// F443: the jailbreak app's one row above the package list, in place of an Install IPAs row and an Apps row: the blue
+// install tile, "IPAs and Apps", the counts as its subtitle, the grey count of IPAs not installed yet (none at 0). It
+// opens the Apps page, whose own Install IPAs row heads the list (loadApps), so both stay one tap further on.
+export const IPAS_APPS_LABEL = "IPAs and Apps";
+export function ipasAppsRow(route, counts = null, apps = 0) {
+  const n = counts?.notInstalled ?? 0;
+  return { label: IPAS_APPS_LABEL, subtitle: ipasAppsSubtitle(counts, apps), href: format({ tab: route.tab, path: [APPS] }),
+    badge: n > 0 ? String(n) : undefined, icon: rowIcon("ipa"), cls: "ipas-apps-row" };
 }
 
-// B291: the jailbreak app's rows above the package list (Install IPAs, Apps) as plain rows of the list, edge to edge
+// "7 apps · 3 IPAs · 2 not installed": the apps iFizBox remembers (none: left out), then the IPA library's counts.
+export function ipasAppsSubtitle(counts, apps = 0) {
+  const ipas = counts ? ipaCountText(counts) : "Your own IPAs";
+  return apps > 0 ? `${apps === 1 ? "1 app" : `${apps} apps`} · ${ipas}` : ipas;
+}
+
+// B291: the jailbreak app's row above the package list (F443: IPAs and Apps) as a plain row of the list, edge to edge
 // at the package rows' height above the first letter header, not a rounded grouped card (packages.css .installed-top).
 export function topTable(rows, route) {
   const ul = ipaTagged(plain([{ rows }]), route);
@@ -532,26 +544,21 @@ export function topTable(rows, route) {
 
 // F269: the jailbreak app's top rows: the Install IPAs cell keeps its tab for paintIpaRows.
 function ipaTagged(frag, route) {
-  for (const li of frag.querySelectorAll?.(".install-ipas-row") ?? []) li.dataset.tab = route.tab;
+  for (const cls of [".install-ipas-row", ".ipas-apps-row"]) for (const li of frag.querySelectorAll?.(cls) ?? []) li.dataset.tab = route.tab;
   return frag;
 }
 
-export function appsRowSubtitle(n) {
-  return n === 1 ? "1 app installed from an app page" : `${n} apps installed from an app page`;
-}
-
 // B52: the root stays in the page stack under the Apps page, so a Delete or Remove there (onAppsChange) counts the
-// apps again for the root's Apps cell: its subtitle in place while the cell stays, the whole page when the cell
-// comes or goes (vlist.js measures where the list starts). Nothing until load() has drawn the root.
+// apps again for the root's IPAs and Apps cell (F443): its subtitle in place, the whole page only when the cell isn't
+// drawn. Nothing until load() has drawn the root.
 export async function refreshAppCount({ view = latest.dpkg, mode = detectMode(), count = jailbreakAppCount, redraw = () => draw(view) } = {}) {
   if (recordsApps(mode) || !view.body || view.rows === undefined) return;
   const seq = view.seq;
   const n = await count();
   if (seq !== view.seq || n === (view.appCount ?? 0)) return; // load() is reading it afresh, or nothing changed
-  const had = view.appCount ?? 0;
   view.appCount = n;
-  const sub = had && n ? view.body.querySelector(".installed-top")?.querySelector(".installed-apps-row")?.querySelector(".cell-subtitle") : null;
-  if (sub) sub.textContent = appsRowSubtitle(n);
+  const sub = view.body.querySelector?.(".installed-top")?.querySelector(".ipas-apps-row")?.querySelector(".cell-subtitle");
+  if (sub) sub.textContent = ipasAppsSubtitle(ipaRowState.counts, n);
   else redraw();
 }
 
@@ -722,7 +729,7 @@ async function catalogPkgs(id) {
 // The apps list functions below take the page's apps view (C25) as `appView`.
 async function loadApps(appView) {
   const seq = ++appView.seq;
-  if (recordsApps()) loadIpaCounts(); // F269: the Install IPAs row's counts, painted in when they come
+  loadIpaCounts(); // F269: the Install IPAs row's counts, painted in when they come (F443: the jailbreak app's Apps page too)
   let rows;
   try {
     rows = await rememberedApps(); // F87: the phone's versions and I4's notes in the jailbreak app
@@ -811,7 +818,8 @@ function drawAppList(appView) {
     appView.tail.unshift(note("No matches."));
   }
   // F269: the Install IPAs row heads the list (it replaced the footer's link; the empty state keeps its own).
-  if (recordsApps()) appView.tail.unshift(installIpasTable(route, appView));
+  // F443: in the jailbreak app too, where the root's IPAs and Apps row leads here.
+  appView.tail.unshift(installIpasTable(route, appView));
   if (recordsApps() && appView.tweakUps?.length) appView.tail.unshift(tweakUpdatesTable(appView)); // F302a
   if (recordsApps() && appView.managing) appView.tail.unshift(manageSummaryLine(appView));
   (appView.results?.parentNode === body ? appView.results : body).append(...appView.tail);
@@ -937,7 +945,17 @@ function paintIpaRows() {
     for (const li of view.body?.querySelectorAll?.(".install-ipas-row") ?? []) {
       li.replaceWith(installIpasCell({ tab: li.dataset.tab || "installed", path: [] }, view.kind === "apps" ? view : null));
     }
+    for (const li of view.body?.querySelectorAll?.(".ipas-apps-row") ?? []) { // F443
+      li.replaceWith(ipasAppsCell({ tab: li.dataset.tab || "installed", path: [] }, view.appCount ?? 0));
+    }
   }
+}
+
+// F443: the IPAs and Apps row's cell, its tab kept for paintIpaRows.
+function ipasAppsCell(route, apps) {
+  const li = plain([{ rows: [ipasAppsRow(route, ipaRowState.counts, apps)] }]).firstElementChild;
+  li.dataset.tab = route.tab;
+  return li;
 }
 
 // How many IPAs the library holds and how many of them the phone lacks, as the Install IPAs page counts them: the
