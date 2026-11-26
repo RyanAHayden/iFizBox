@@ -9,11 +9,11 @@
  {"mark": "signing"},
  {"tap": "text=Import Certificate"}, {"pause": 900},
  {"mark": "certpage"},
- {"tap": "text=Import Certificate"}, {"eval": "__pick.show()"}, {"pause": 1700},
+ {"tap": "text=Import Certificate"}, {"eval": "__pick.show()"}, {"pause": 1300},
  {"mark": "picker"},
  {"eval": "__pick.hide()"}, {"eval": "__pick.files()"}, {"pause": 500},
  {"mark": "importing"},
- {"pause": 1600},
+ {"pause": 1200},
  {"mark": "imported"}, {"pause": 1000},
 
  {"tap": "text=Remove Certificate"}, {"pause": 900},
@@ -48,7 +48,7 @@
  {"type": "driftwood.example", "cps": 40}, {"pause": 300},
  {"tap": "text=Add Source"},
  {"until": "document.body.textContent.includes('Add & Trust')"}, {"pause": 300},
- {"tap": "text=Add & Trust"}, {"pause": 2500},
+ {"tap": "text=Add & Trust"}, {"pause": 1500},
  {"tap": "text=Search", "nth": -1}, {"pause": 600},
  {"tap": "input", "nth": -1, "go": "search"}, {"pause": 250},
  {"type": "tide", "cps": 24},
@@ -106,6 +106,6 @@
  {"mark": "resigned"},
  {"tap": "text=Return to iFizBox"}, {"pause": 900},
  {"tap": "text=Back"}, {"pause": 800},
- {"tap": "text=Signed Apps"}, {"pause": 1800},
+ {"tap": "text=Signed Apps"}, {"pause": 1200},
  {"mark": "end"}
 ]}
