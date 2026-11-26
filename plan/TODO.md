@@ -11,7 +11,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
-- [ ] **B466** (follow-up, high) A scroll that starts and ends on a tappable item (row, cell, button) opens it as if tapped. Any touch that moved enough to scroll (or while the list is still scrolling/momentum) must cancel the tap and clear the pressed state, like UIKit: a drag is never a tap. Fix it in the shared press/tap code so it holds for every list and control. Check in Chromium with CDP touch events: drag from a row and release on the same row, list scrolls and nothing opens; a plain tap still opens. Add a node test for both cases. | files: web/app/app.js, web/app/scroll-tap.test.js | after: B465
 - [ ] **B467** (follow-up, low) iOS 7 style: a held tab bar item turns blue but keeps its outline glyph; the chosen tab shows a filled one (ios7.css swaps --glyph for .tab[data-tab].active). Add .tab[data-tab=X].is-pressed beside each .active glyph rule so the held look matches the chosen look. Check in Chromium with journal/2026-11-26-b465-tab-pressed/probe.mjs (STYLE=ios7). | files: web/app/ios7.css, web/app/press-hitbox.test.js | model: sonnet
 - [ ] **V29** Release 1.0.2 (patch) once B465 and B466 have landed. Simple release notes: one or two plain sentences on what users notice. | after: all
 - [ ] **T87** Free Apple ID setup: real test + promo clip and posts (split into T87a, T87b) | files: journal/**, docs/sideload.md

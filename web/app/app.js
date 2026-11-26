@@ -48,6 +48,7 @@ import { handoffRecent } from "./handoffclock.js";
 import { navButtons, MOVED_CLASS } from "./nav/navbuttons.js";
 import { holdButton } from "./nav/menu.js"; // F346
 import { setNavigator, pageHandle, backFollowsTitle } from "./nav/go.js";
+import { cancelDragTaps } from "./nav/tapguard.js"; // B466
 
 // F266: a Mac, PC or Android phone gets the Not-an-iPhone page first, and the app only starts once it's left (Look
 // Around Anyway, or What Is …? onto the FAQ). Decided by user agent before anything is drawn, so an iPhone, an iPad
@@ -453,6 +454,9 @@ document.getElementById("tabbar").addEventListener("click", (e) => {
 // A tab bar item (a.tab) wears its selected look while held, as UIKit's (B465: it had no held look at all).
 const PRESSABLE = ".bar-button, a.cell-inner, button.cell-inner, .alert-button, .del-confirm, a.browse-hero, .review-button, .review-report, .review-delete-own, .review-tap-remove, .action-button, a.tab";
 let pressed = null, pressedAt = 0;
+// B466: a drag is never a tap. A touch that moves past 10 px, scrolls its list or goes down on a still-gliding list
+// lets go of its row at once and its click never reaches a handler (nav/tapguard.js cancelDragTaps).
+const dragTaps = cancelDragTaps(document, { onDrag: () => dropPress() });
 // A quick tap still shows the held look for a moment, as UIKit does: otherwise a button that opens something (Browse's
 // file picker) never visibly goes down.
 const unpress = () => {
@@ -470,7 +474,7 @@ document.addEventListener("pointerdown", (e) => {
   for (const other of document.querySelectorAll(".is-pressed")) if (other !== el && !other.classList.contains("sel-ghost")) other.classList.remove("is-pressed");
   // While a row shows its Delete (a swipe), a tap on a row only puts the Delete away: no blue, as Cydia.
   const delShown = el?.closest("ul")?.querySelector(":scope > .armed") && !el.matches(".del-confirm");
-  if (el && !el.disabled && !delShown) { pressed = el; pressedAt = performance.now(); el.classList.add("is-pressed"); lastPress = { el, at: pressedAt }; }
+  if (el && !el.disabled && !delShown && !dragTaps.dragging()) { pressed = el; pressedAt = performance.now(); el.classList.add("is-pressed"); lastPress = { el, at: pressedAt }; }
 }, { passive: true });
 for (const type of ["pointerup", "pointercancel", "pointerleave"]) document.addEventListener(type, unpress, { passive: true });
 document.addEventListener("pointermove", (e) => {
