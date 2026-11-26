@@ -30,7 +30,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
-- [ ] **B470** (follow-up, normal) Lite: installing the app's own IPA from a source's app page (signing/install.js isSelfIpa route, installOnDevice host:true) still drops the picked own app icon, so the next launch asks 'Use Your Icon Again?'. Pass screens/appicon.js withOwnIcon({url}) as installOnDevice's params there, as essential-ui.js installSelfNow does since B469. Check: node --test with a test that the self route sends {ownIcon}. | files: web/app/signing/install.js, web/app/signing/install-ownicon.test.js | after: B469 | model: sonnet
 ### Parked
 
 - [ ] **F107** (later, when the jailbreakme.dev exploit is ready) Upgrading & Jailbreaking Help stays unlocked on the website's locked Home (user 2026-11-18: 'we will not have the jailbreak tutorial thing locked when jailbreakme.dev exploit is ready, thats for later'): leave that row out of websign-gate's browsingLocked set in screens/home.js and point it at the jailbreak guide. | files: web/app/screens/home.js
