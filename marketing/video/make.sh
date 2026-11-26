@@ -39,4 +39,12 @@ APP_VERSION=$version timeout 2400 node "$here/capture.mjs" "http://127.0.0.1:$po
 for cut in 4x5:1350 9x16:1920; do
   timeout 2400 node "$here/render.mjs" . "showcase-${cut%:*}.mp4" --h "${cut#*:}"
 done
-echo "done: $out/showcase-4x5.mp4 $out/showcase-9x16.mp4"
+# the promo clip for jailbreakers (promo.html): its own world (Lamplight installed, four tweaks a release behind), one
+# jailbreak recording, two cuts: OUT_DIR/promo-4x5.mp4 and OUT_DIR/promo-9x16.mp4
+python3 "$here/make_state.py" "$out/state-promo" --promo
+python3 "$repo/native/icon/alternates.py" thumbs "$out/state-promo/appicon"
+APP_VERSION=$version timeout 2400 node "$here/capture.mjs" "http://127.0.0.1:$port/" rec "$here/shots-promo.json" --state state-promo --mode jailbreak
+for cut in 4x5:1350 9x16:1920; do
+  timeout 2400 node "$here/render.mjs" . "promo-${cut%:*}.mp4" --h "${cut#*:}" --page promo
+done
+echo "done: $out/showcase-4x5.mp4 $out/showcase-9x16.mp4 $out/promo-4x5.mp4 $out/promo-9x16.mp4"
