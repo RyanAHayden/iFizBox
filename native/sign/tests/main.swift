@@ -202,6 +202,22 @@ test("profile rules") {
     check(try plistProfile("iOS Team Provisioning Profile: com.x", gta: false).entitlements(for: "com.x")["get-task-allow"].flatMap(plistBool) == false, "team profile that doesn't allow it")
     check(try plistProfile("Mine", gta: true, local: true).entitlements(for: "com.x")["get-task-allow"].flatMap(plistBool) == true, "LocalProvision counts as a team profile")
     check(try plistProfile("My Development Profile", gta: true).entitlements(for: "com.x")["get-task-allow"].flatMap(plistBool) == false, "other development profiles: never debuggable")
+    // B475: a free Apple ID's profile is a 7-day team profile; a paid team's lasts a year, other profiles never count
+    func datedProfile(_ name: String, days: Int) throws -> Profile {
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>Name</key><string>\(name)</string>
+        <key>TeamIdentifier</key><array><string>\(team)</string></array>
+        <key>CreationDate</key><date>2026-11-26T10:00:00Z</date>
+        <key>ExpirationDate</key><date>\(ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: 1795687200 + Double(days) * 86400)))</date>
+        <key>Entitlements</key><dict><key>application-identifier</key><string>\(team).com.x.\(team)</string>
+        <key>get-task-allow</key><true/></dict></dict></plist>
+        """
+        return try Profile(Data(xml.utf8))
+    }
+    check(try datedProfile("iOS Team Provisioning Profile: com.x.\(team)", days: 7).isFree, "7-day team profile is free")
+    check(try !datedProfile("iOS Team Provisioning Profile: com.x", days: 365).isFree, "paid team profile isn't free")
+    check(try !datedProfile("My Development Profile", days: 7).isFree, "other profiles aren't free")
+    check(!free.isFree, "no dates: not free")
     let x = try Profile(try fixture("profile-explicit.mobileprovision"))
     let xid = try x.bundleID(for: "dev.ifizbox.fixture")
     check(!x.isWildcard && xid == "com.me.fixture", "explicit renames")

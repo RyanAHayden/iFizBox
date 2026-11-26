@@ -81,6 +81,7 @@ enum SignBridge {
                 if let x = p.expires { prof["expires"] = iso.string(from: x) }
                 if let problem = p.problem(with: der) { prof["problem"] = problem.message }
                 prof["kind"] = p.kind.rawValue // F14
+                prof["free"] = p.isFree // B475: the Signing Server can't install its apps (core/signing.js freeProfile)
                 prof["push"] = p.pushEnvironment ?? NSNull() // F237: Keep Bundle IDs' warnings
                 prof["device"] = PhoneID.check(p).json // F236: {state: in|out|unknown|skip, udid?, count, shared}
                 if let x = p.signatureExpiry(certificate: der) { ident["signatureExpires"] = iso.string(from: x) }
