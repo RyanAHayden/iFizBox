@@ -20,6 +20,9 @@ Dockshade, Install, Confirm, the install, Complete. Then the phone slides down a
   move by sliding.
 - The install took about 5 s in the fake world, so no wait needed trimming.
 - 4:5 only, as the task says; no 9:16.
+- One line in `tools/test_sizeguard.py` (outside the task's files) lets the 3.3 MB MP4 into the journal, as the other
+  promo clips have.
+- A spec review found captions switching one screen late; they now name the screen they sit on.
 
 ## Checked
 - Stills of the cut at the title, the rise, and every step (sheet in this session), then ffprobe of the final MP4.
