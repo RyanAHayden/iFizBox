@@ -556,6 +556,10 @@ if (nativeBridge()) {
     const { handleIncoming } = await import("./incoming.js");
     await handleIncoming(link);
   }).catch(() => {});
+  // B474: a computer install's Free Apple ID record, so Signing keeps the group with Refresh Profile
+  // (the module loads only when the file is there)
+  fetch("free-id.json", { cache: "no-store" }).then((r) => r.ok && import("./screens/free-apple-id.js")
+    .then((m) => m.adoptBundledFreeId({ native: nativeBridge(), fetcher: async () => r }))).catch(() => {});
 }
 upgradeNotices.start();
 createPrefsMirror({ settings: settingsScreen.settings }).start(); // F70: N7's settings to the daemon

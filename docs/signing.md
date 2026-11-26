@@ -158,7 +158,8 @@ The website's flow (`web/app/screens/free-apple-id.js`):
 
 **Download for a Computer Install** signs the newest release's IPA in the browser with the free identity
 (`runSignJob` with `free`: `freeEntitlements`; the bundle ID becomes `<id>.<TEAMID>`, extensions left out; the
-identity goes in as `ifizbox-identity.plist`, with the website's settings link), uploads it (`/sign/upload`), and
+identity goes in as `ifizbox-identity.plist`, with the website's settings link; the Free Apple ID record goes in as
+`web/free-id.json`, which the sideload app takes on launch), uploads it (`/sign/upload`), and
 `POST /sign/setup` makes a code for its SHA-256 (the default bundle ID and pairing path). The code shows until it
 expires, with the two one-liners of sideload.md. **Make a New Code** re-uploads the same signed IPA. **Save the IPA**
 is the fallback for other tools. With the profile missing or expired, the group's row is Refresh Profile or Sign In
@@ -208,6 +209,11 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   (`signing.import`, as Select All Files does), so Install and re-signing on the phone use them. There is no Save for
   the App and no Download for a Computer Install. If the import fails, an alert says why, and a **Use for Signing**
   button tries again.
+- **After a computer install**: the signed app carries the Free Apple ID record (team, certificate serial, `.p12`, password,
+  profile, App ID) as `web/free-id.json`, next to `ifizbox-identity.plist`. On launch the app takes it into its own storage
+  (`adoptBundledFreeId` in `screens/free-apple-id.js`) when the Keychain's certificate has the same serial, once per file:
+  a Forget afterwards is not undone. So the Free Apple ID group shows right after a computer install, with Sign In Again
+  (Refresh Profile once signed in), and Home's expiry tile leads to it.
 - **The weekly refresh** is Refresh Profile (or Sign In Again once Apple's session is gone): it makes a new profile and
   imports it again.
 - **Forget Free Apple ID** also removes the Keychain identity, but only when its certificate's serial is the Free Apple

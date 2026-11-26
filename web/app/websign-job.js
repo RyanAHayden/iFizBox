@@ -15,14 +15,15 @@
 // bring (iFizBox's own IPA only, com.ryha.ifizbox): { identity: true } puts the .p12, password and profile inside the
 // app as ifizbox-identity.plist (the app imports it on first launch, native BundledIdentity) and { transfer: link }
 // writes the website's ifizbox://import link as web/transfer.link (app.js imports it once); both before zsign seals
-// the bundle, as the old server signer did.
+// the bundle, as the old server signer did. With the identity, { freeId: json } (B474, the computer install) writes the
+// Free Apple ID record as web/free-id.json (screens/free-apple-id.js adoptBundledFreeId takes it).
 // free (F436): a free Apple ID's profile: the entitlements are core/freeroute.js freeEntitlements' (get-task-allow as the
 // profile allows, no push) instead of the certificate route's.
 // groupFix (B211): the fix dylib's bytes (vendor/groupfix, signing-worker.js loads it); an app whose original
 // signature names app groups or keychain groups gets it injected (core/groupfix.js), iFizBox's own IPA never.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { isZip, profileInfo, signingIds, appEntitlements, originalDataProtection, plistXml, identityPlist, zsignArgs, zsignError, appInfo,
-  IFIZBOX_ID, IDENTITY_FILE, TRANSFER_FILE } from "./core/websign.js";
+  IFIZBOX_ID, IDENTITY_FILE, TRANSFER_FILE, FREE_ID_FILE } from "./core/websign.js";
 import { webSignerStamp, groupFixHash, signatureEnd } from "./core/websign.js"; // F342
 import { injectInto } from "./core/tweaks.js";
 import { entitlementsRead, groupFixPlan, withGroupFix, readConfig, GROUPFIX, groupFixLogLine, isNotificationExtension } from "./core/groupfix.js";
@@ -122,6 +123,10 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
     if (typeof bring.transfer === "string" && bring.transfer.startsWith("ifizbox://import?")) {
       try { FS.mkdir(`${appDir}/web`); } catch { /* there already */ }
       FS.writeFile(`${appDir}/${TRANSFER_FILE}`, bring.transfer);
+    }
+    if (bring.identity && typeof bring.freeId === "string" && bring.freeId.startsWith("{")) { // B474: computer install
+      try { FS.mkdir(`${appDir}/web`); } catch { /* there already */ }
+      FS.writeFile(`${appDir}/${FREE_ID_FILE}`, bring.freeId);
     }
   }
   // B211: the original signature's app groups and keychain groups, read before signing, decide whether the app gets
