@@ -501,6 +501,9 @@ From reading code, not from a phone:
   their package metadata and code. Untested on any iOS 26/27 jailbreak.
 - Apple's online checks (OCSP, PPQ, enterprise trust) are from general knowledge, not observed traffic.
 - Upstream zsign's per-extension profiles: seen in its README only, not in the code.
-- The computer setup: no install or pairing-file write has run on a phone yet; finding the iPhone, the trust check and Developer Mode's status were read from
-  an iPhone on iOS 27 with the Linux (x86_64, arm64 under qemu) and Windows x64 (under wine) builds. Not run on a
-  Mac or on real Windows; the Microsoft Store link to the Apple Devices app is from memory.
+- The computer setup: it runs end to end on an iPhone 15 Pro (iOS 27.0.1) from a Linux x86_64 computer with a free
+  Apple ID. The sign-in, the checklist, the code, the one-line command, the install, the pairing file, Trust and the
+  first launch work. The first on-phone re-sign with the free profile does not work: iOS refuses the Signing Server
+  route for a free profile, This iPhone needs Network Extensions (which a free profile lacks), and the app shows no
+  Free Apple ID group after a computer setup, so Refresh Profile cannot be reached. Not run on a Mac or on real
+  Windows; the Microsoft Store link to the Apple Devices app is from memory.
