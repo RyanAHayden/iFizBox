@@ -15,6 +15,7 @@ struct Profile {
     let created: Date?
     let devices: Int                  // -1: all (enterprise)
     let certificates: [Data]          // DeveloperCertificates, DER
+    let localProvision: Bool          // LocalProvision: Xcode made it for a team (isTeamProfile)
 
     init(_ data: Data) throws {
         self.data = data
@@ -33,6 +34,7 @@ struct Profile {
         if plist["ProvisionsAllDevices"].flatMap(plistBool) == true { devices = -1 }
         else { devices = (plist["ProvisionedDevices"] as? [Any])?.count ?? 0 }
         certificates = plist["DeveloperCertificates"] as? [Data] ?? []
+        localProvision = plist["LocalProvision"].flatMap(plistBool) == true
     }
 
     var isWildcard: Bool { appID == "*" || appID.hasSuffix(".*") }
@@ -85,9 +87,16 @@ struct Profile {
                 e["keychain-access-groups"] = Profile.keychainGroups(e["keychain-access-groups"], team: t, bundleID: bundleID, keptID: keptID ?? bundleID)
             }
         }
-        e["get-task-allow"] = false
+        // Never debuggable, except under Xcode's team profiles (a free Apple ID's are always one): iOS refuses an app
+        // signed with one and get-task-allow false ("integrity could not be verified"), so it keeps what the profile
+        // allows, as the website's free route does (web/app/core/freeroute.js freeEntitlements).
+        e["get-task-allow"] = isTeamProfile && entitlements["get-task-allow"].flatMap(plistBool) == true
         return e
     }
+
+    // Xcode's team provisioning profile (Apple names it "iOS Team Provisioning Profile: <App ID>"; free Apple IDs get
+    // no other kind), or one Xcode made on the Mac (LocalProvision).
+    var isTeamProfile: Bool { name.hasPrefix("iOS Team Provisioning Profile") || localProvision }
 
     // B413: a profile with every capability gives NSFileProtectionComplete, and an app that didn't ask for it can't read
     // its own preferences and files when it's launched in the background on a locked phone.

@@ -201,6 +201,14 @@ test("F134: the Signing page's groups, in order, for each build and state", asyn
   assert.ok(signingLayout({ mode: "sideload" }).includes("free"));
   assert.ok(signingLayout({ mode: "sideload", certificate: true, profile: true, freeKept: true }).includes("free"));
   assert.ok(!signingLayout({ mode: "sideload", certificate: true, profile: true }).includes("free"));
+  // freeKept: the certificate in use has the stored Free Apple ID's serial, not just any stored Free Apple ID
+  const { freeInUse, FREE_ID_KEY } = await import("./settings.js");
+  const store = (v) => ({ getItem: (k) => (k === FREE_ID_KEY ? v : null) });
+  assert.ok(freeInUse({ serial: "0a1b2c" }, store(JSON.stringify({ serial: "A1B2C" }))));
+  assert.ok(!freeInUse({ serial: "FFFF" }, store(JSON.stringify({ serial: "A1B2C" }))), "a certificate imported since");
+  assert.ok(!freeInUse(null, store(JSON.stringify({ serial: "A1B2C" }))));
+  assert.ok(!freeInUse({ serial: "A1B2C" }, store(null)));
+  assert.ok(!freeInUse({ serial: "A1B2C" }, store("{broken")));
   for (const certificate of [true, false]) for (const freeKept of [true, false]) {
     assert.ok(!signingLayout({ mode: "jailbreak", certificate, freeKept }).includes("free"), `jailbreak ${certificate} ${freeKept}`);
   }

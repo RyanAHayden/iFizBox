@@ -214,9 +214,10 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   ID's; a certificate imported since stays.
 - **Names**: the App ID and profile are the website's (`<bundle ID>.<TEAMID>`, the app's own bundle ID). With Keep
   Bundle IDs on, other apps keep their own bundle IDs and take that App ID only in their entitlements.
-- **Checked** in Chromium with a fake bridge whose `net.request` was a Node proxy (Apple's root CA added): anisette
-  provisioning over the direct WebSocket, `get_headers` and Apple's SRP init all answered. Not yet tried with a real
-  free Apple ID on a phone.
+- **The signer** keeps `get-task-allow` as the profile allows under Xcode's team profiles (named "iOS Team
+  Provisioning Profile: …", or with `LocalProvision`), which is every free Apple ID profile: iOS refuses such an app
+  signed with it false. Every other profile still signs apps that can't be debugged (`native/sign/Profile.swift`
+  `isTeamProfile`).
 
 ## Own provisioning profiles (App Store Connect API key)
 

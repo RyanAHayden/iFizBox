@@ -187,6 +187,21 @@ test("profile rules") {
     check(e["application-identifier"] as? String == "\(team).dev.ifizbox.fixture", "application-identifier")
     check(e["keychain-access-groups"] as? [String] == ["\(team).dev.ifizbox.fixture"], "keychain group narrowed")
     check(e["get-task-allow"].flatMap(plistBool) == false, "never debuggable")
+    // a free Apple ID's profile (Xcode's team profile) keeps get-task-allow as it allows: iOS refuses false there
+    func plistProfile(_ name: String, gta: Bool, local: Bool = false) throws -> Profile {
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>Name</key><string>\(name)</string>
+        <key>TeamIdentifier</key><array><string>\(team)</string></array>\(local ? "<key>LocalProvision</key><true/>" : "")
+        <key>Entitlements</key><dict><key>application-identifier</key><string>\(team).com.x.\(team)</string>
+        <key>get-task-allow</key>\(gta ? "<true/>" : "<false/>")</dict></dict></plist>
+        """
+        return try Profile(Data(xml.utf8))
+    }
+    let free = try plistProfile("iOS Team Provisioning Profile: com.x.\(team)", gta: true)
+    check(free.isTeamProfile && free.entitlements(for: "com.x.\(team)")["get-task-allow"].flatMap(plistBool) == true, "team profile: debuggable as allowed")
+    check(try plistProfile("iOS Team Provisioning Profile: com.x", gta: false).entitlements(for: "com.x")["get-task-allow"].flatMap(plistBool) == false, "team profile that doesn't allow it")
+    check(try plistProfile("Mine", gta: true, local: true).entitlements(for: "com.x")["get-task-allow"].flatMap(plistBool) == true, "LocalProvision counts as a team profile")
+    check(try plistProfile("My Development Profile", gta: true).entitlements(for: "com.x")["get-task-allow"].flatMap(plistBool) == false, "other development profiles: never debuggable")
     let x = try Profile(try fixture("profile-explicit.mobileprovision"))
     let xid = try x.bundleID(for: "dev.ifizbox.fixture")
     check(!x.isWildcard && xid == "com.me.fixture", "explicit renames")

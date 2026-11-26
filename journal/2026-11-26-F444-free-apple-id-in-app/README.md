@@ -17,6 +17,13 @@
 ## Not verified
 - A real sign-in, 2FA, setup and Ready on the iPhone 15 Pro: no free Apple ID login exists on this machine (same one T87a waits for).
 - That WKWebView's WebSocket to the anisette server is accepted from the app's origin (Chromium's from http://127.0.0.1 was).
-- That the native signer can install apps with a free development profile: it forces get-task-allow false (native/sign/Profile.swift entitlements), while R32 found free-profile apps need it true ("integrity could not be verified"); filed as B468.
+- That the native signer's apps install with a free development profile on a phone. After the spec review, the signer
+  keeps get-task-allow as the profile allows under Xcode team profiles (`isTeamProfile`: Name "iOS Team Provisioning
+  Profile…" or LocalProvision; R32 found false gives "integrity could not be verified"); checked only by
+  native/sign/tests/main.swift with hand-made profile plists. The Name is what R30 saw on a real free
+  profile (journal/2026-11-19-r30-free-apple-id/notes.md).
+  B468 (filed for this) was dropped.
+- Spec review also fixed: the group's "certificate in use is the Free Apple ID's" now compares serials (`freeInUse`),
+  not just "a Free Apple ID is stored".
 - Keep Bundle IDs on with a free explicit profile (apps keep their own IDs under the app's App ID): untried on a device.
 - The certificate the app makes is still named "<NAME> Website" in Apple's list (MACHINE_NAME); cosmetic.

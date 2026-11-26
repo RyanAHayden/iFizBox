@@ -27,7 +27,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
-- [ ] **B468** (follow-up, normal) Sideload app: sign with a free Apple ID's development profile. The on-phone signer forces get-task-allow false (native/sign/Profile.swift entitlements, 'never debuggable' in native/sign/tests/main.swift), but R32 found free-profile apps need it true as the profile allows, else iOS says 'integrity could not be verified' (the website's core/freeroute.js freeEntitlements does that). Keep the profile's get-task-allow for free (Personal Team) development profiles only, find how to tell them apart (LocalProvision key? team type?), and test with the native sign tests; a real install on the 15 once a free Apple ID login exists on the Tools page. | files: native/sign/Profile.swift, native/sign/tests/main.swift
 ### Parked
 
 - [ ] **F107** (later, when the jailbreakme.dev exploit is ready) Upgrading & Jailbreaking Help stays unlocked on the website's locked Home (user 2026-11-18: 'we will not have the jailbreak tutorial thing locked when jailbreakme.dev exploit is ready, thats for later'): leave that row out of websign-gate's browsingLocked set in screens/home.js and point it at the jailbreak guide. | files: web/app/screens/home.js

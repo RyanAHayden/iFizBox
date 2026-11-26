@@ -1589,10 +1589,15 @@ async function refreshCertificate(el) {
 // F284: the Signing rows' pages: Certificate (the certificate, files, profile, account and options groups, and Share
 // Your Certificate), Signing Server (Server, Check Server, Run Your Own), Signed Apps (Certificate Status and the list).
 const CERTIFICATE_PARTS = ["certificate", "files", "profile", "account", "options", "free"];
-// A Free Apple ID set up in this app (free-apple-id.js FREE_KEY, read here so the page needs no free-apple-id.js to
-// lay itself out).
+// Whether the certificate in use (signing.status's identity) is the Free Apple ID's set up in this app: the same serial
+// (free-apple-id.js FREE_KEY and sameSerial, read here so the page needs no free-apple-id.js to lay itself out).
 export const FREE_ID_KEY = "ifizbox.freeid";
-const freeKept = () => { try { return Boolean(globalThis.localStorage?.getItem(FREE_ID_KEY)); } catch { return false; } };
+export function freeInUse(kept, store = globalThis.localStorage) {
+  const n = (s) => String(s ?? "").replace(/[^0-9a-f]/gi, "").replace(/^0+/, "").toUpperCase();
+  let saved = null;
+  try { saved = JSON.parse(store?.getItem(FREE_ID_KEY) ?? "null"); } catch { return false; }
+  return Boolean(n(saved?.serial)) && n(saved.serial) === n(kept?.serial);
+}
 async function drawSigningSub(el, sub) {
   if (sub === "certificate") return drawDeviceSigning(el, { only: CERTIFICATE_PARTS });
   watchReturn();
@@ -1635,7 +1640,7 @@ async function drawDeviceSigning(el, { only = null } = {}) {
     free: () => freeRouteBlock({ native: nativeBridge(), onChange: () => redrawAll() }),
   };
   const layout = signingLayout({ mode: "sideload", certificate: Boolean(kept), staged, profile: split.profile.length > 0,
-    options: settings.sections().some((s) => s.page === "signing"), freeKept: freeKept() });
+    options: settings.sections().some((s) => s.page === "signing"), freeKept: freeInUse(kept) });
   if (only) { // F284: the Certificate page, with Share Your Certificate at its end
     parts.share = () => helpGroup({ howItWorks: false });
     showSigningPage(el, [...layout.filter((g) => only.includes(g)), "share"], parts);
@@ -1682,8 +1687,8 @@ const HELP_TITLE = "How Signing Works";
 // F134: which of SIGNING_GROUPS (core/settings.js, their order) the page shows. `certificate`: one is in use (the
 // Keychain's, or the browser's .p12 with its profile); `staged`: files are picked but not all in, or the password
 // is wrong; `profile`: there are profile rows; `options`: the build has Signing's settings. Pure, for the tests.
-// `freeKept`: a Free Apple ID is set up here (the sideload app keeps its group while that certificate is the one in use,
-// for Refresh Profile).
+// `freeKept`: the certificate in use is the Free Apple ID's set up here (freeInUse); the sideload app keeps the group
+// then, for Refresh Profile.
 export function signingLayout({ mode, certificate = false, staged = false, profile = false, options = false, ready = false,
   freeKept = false } = {}) {
   const site = mode === "site";
