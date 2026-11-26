@@ -148,10 +148,9 @@ test("another clickable thing under a step ends the search: WebKit clicks that o
   assert.equal(reachedControl(doc, 100, 45, PRESSABLE), row, "the row's own step comes first");
 });
 
-test("app.js marks the control a touch reaches, keeps it while in reach, and marks what a tap opened", () => {
+test("app.js marks the control a touch reaches and keeps it while in reach", () => {
   const app = read("app.js");
   assert.match(app, /const pressedBy = \(e\) => e\.target\.closest\?\.\(PRESSABLE\) \?\? \(e\.pointerType === "mouse" \? null : reachedControl\(document, e\.clientX, e\.clientY, PRESSABLE\)\)/);
-  assert.match(app, /addEventListener\("pointerdown", \(e\) => \{\s*unpress\(\);\s*const el = pressedBy\(e\);/);
+  assert.match(app, /addEventListener\("pointerdown", \(e\) => \{\s*unpress\(\);[^\n]*\n[^\n]*\n\s*const el = pressedBy\(e\);/);
   assert.match(app, /addEventListener\("pointermove"[\s\S]{0,200}reachedControl\(document, e\.clientX, e\.clientY, PRESSABLE\) !== pressed/);
-  assert.match(app, /addEventListener\("click", \(e\) => \{\s*if \(!e\.isTrusted \|\| e\.detail === 0\) return;[\s\S]{0,120}closest\?\.\(PRESSABLE\)[\s\S]{0,200}classList\.add\("is-pressed"\)/);
 });

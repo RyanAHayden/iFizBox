@@ -22,9 +22,7 @@ and not a press that was too short.
 - `web/app/app.js`:
   - pointerdown marks `pressedBy(e)`: `closest(PRESSABLE)`, or for touch and pen (not mouse) `reachedControl`.
   - pointermove keeps the press while the finger stays within reach.
-  - A new document click listener takes a trusted, real click (`detail > 0`) on a PRESSABLE that wasn't marked. It
-    gives that control the 140 ms quick-tap pressed look and counts it as `lastPress` (F163 keepSelected). This is a
-    safety net for the cases where WebKit's pick and ours differ.
+  - The `isPrimary` check runs before the search, so a second finger costs no lookups.
 - `web/app/press-hitbox.test.js`: the test helper's selector matcher now reads `[attr]` selectors. New tests cover
   WebKit's constants, a tile's edge and corners, the gap below a tile, the nav bar beside About, a clickable that
   ends the search, and app.js's wiring.
@@ -42,6 +40,9 @@ and not a press that was too short.
   rounded shape, and WebKit doesn't open them either; the grid check agrees.
 
 ## What failed or was tried
+- A click-time safety net (a document click listener flashing an unmarked control that opened) was dropped after the
+  spec review: it skipped pointerdown's guards (a row showing Delete gets no blue, a drag never presses) and the task
+  didn't ask for it.
 - The first probe run had every era as iOS 6. `Page.navigate` to the same URL with only a hash change doesn't reload,
   so the probe now passes the era as a `?era=` query.
 - A first probe server crashed: it called `writeHead` before an awaited `readFile`. Fixed by reading the file first
@@ -51,8 +52,10 @@ and not a press that was too short.
 - On a real iPhone (the iPhone 15 Pro or 7). The WebKit model was read from current WebKit source, not measured on a
   device, and iOS 15's WebKit on the iPhone 7 may differ in detail.
 - Chromium's own touch adjustment is not WebKit's, so the probe compares against a written model, not real clicks.
-- The click-time safety net (the flash on an unmarked control that opens) is checked only by a source test, not by a
-  real tap. In Chromium every click has a marking pointerdown, so the net never fires there.
+- A non-link element with its own click listener under the finger (or under a step) makes WebKit stop there; the
+  model can't see JS listeners, so it would step on and mark a control beside it. Home has none in the tiles' gaps or
+  around About (the probe's grid agrees), but other screens were not checked for it.
+- The node tests model the iOS 6 layout only; the other eras' geometry is checked by the probe, not by the gate.
 - Other screens' rows and buttons get the same reach through the shared press code, but I did not probe them one by one.
 - Per the AGENTS.md rule, phone checks are only for what Chromium can't check. The one thing a phone would add is how
   closely iOS's real tap retargeting matches the model here.

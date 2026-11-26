@@ -470,8 +470,8 @@ const unpress = () => {
 const pressedBy = (e) => e.target.closest?.(PRESSABLE) ?? (e.pointerType === "mouse" ? null : reachedControl(document, e.clientX, e.clientY, PRESSABLE));
 document.addEventListener("pointerdown", (e) => {
   unpress();
-  const el = pressedBy(e);
   if (!e.isPrimary) return; // one finger's button at a time, as UIKit does
+  const el = pressedBy(e);
   lastPress = null;
   // A new press clears any other still showing (a quick tap's lingering 140 ms included): one held look at a time.
   for (const other of document.querySelectorAll(".is-pressed")) if (other !== el && !other.classList.contains("sel-ghost")) other.classList.remove("is-pressed");
@@ -483,16 +483,6 @@ for (const type of ["pointerup", "pointercancel", "pointerleave"]) document.addE
 document.addEventListener("pointermove", (e) => {
   if (pressed && !pressed.contains(document.elementFromPoint(e.clientX, e.clientY)) && (e.pointerType === "mouse" || reachedControl(document, e.clientX, e.clientY, PRESSABLE) !== pressed)) unpress();
 }, { passive: true });
-// B471: a tap that opens a control it never marked (WebKit's pick differed from ours, or a click with no pointerdown
-// behind it) still shows the quick tap's held look, and counts as the press that opened it (F163 keepSelected).
-document.addEventListener("click", (e) => {
-  if (!e.isTrusted || e.detail === 0) return; // a click a handler swallowed (stopPropagation) never gets here
-  const el = e.target.closest?.(PRESSABLE);
-  if (!el || el.disabled || el.classList.contains("is-pressed") || lastPress?.el === el) return;
-  el.classList.add("is-pressed");
-  lastPress = { el, at: performance.now() };
-  setTimeout(() => { if (pressed !== el) el.classList.remove("is-pressed"); }, 140);
-});
 // A held row lets go the moment its list scrolls (UIKit cancels the cell's highlight when the pan starts); iOS's
 // pointercancel alone can come late or not at all after a long hold.
 document.addEventListener("scroll", () => { if (pressed) { pressed.classList.remove("is-pressed"); pressed = null; lastPress = null; } }, { capture: true, passive: true });

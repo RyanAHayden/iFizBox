@@ -91,7 +91,7 @@ for (const era of eras) {
     // run), against what app.js marks for a touch pointerdown there (a synthetic PointerEvent at the same point).
     // "opens, unmarked" is the bug; "marked, opens other" would be a wrong look.
     const cmp = await ev(`(() => {
-      const PRESS = ${JSON.stringify(PRESSABLE)}, CLICK = "a[href], button, input, select, textarea, label";
+      const PRESS = ${JSON.stringify(PRESSABLE)}, CLICK = "a[href], button, input, select, textarea, label, [role='button'], [role='switch'], .switch";
       const qual = (n) => n?.closest(CLICK) ?? document;
       const pick = (x, y) => {
         const q = qual(document.elementFromPoint(x, y));
