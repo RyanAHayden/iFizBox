@@ -73,7 +73,9 @@ export async function installSelfNow(row) {
   if (detectMode() === "sideload" && row?.ipa && hasNativeCall()) {
     // F280: a copy its signer renamed gets the update beside it (it keeps iFizBox's own ID now): said once
     if (await renamedUpdateNotice({ alert: showAlert }) === "cancel") return "cancelled";
-    const ok = await installOnDevice({ url: row.ipa, name: NAME, host: true });
+    // B469: with the picked own icon in it, so the reopened app doesn't ask to re-sign again
+    const params = await import("./screens/appicon.js").then((m) => m.withOwnIcon({ url: row.ipa })).catch(() => null);
+    const ok = await installOnDevice({ url: row.ipa, name: NAME, host: true, ...(params?.ownIcon ? { params } : {}) });
     return ok ? "installing" : "failed";
   }
   return installSelf(row, { alert: showAlert, open: openOutside });

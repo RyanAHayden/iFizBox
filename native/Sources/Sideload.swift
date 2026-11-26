@@ -267,6 +267,7 @@ enum Sideload {
             }
             return
         }
+        let ownIcon = ownIconPick(c) // B469
         if let tok = c.params["token"] as? String {
             SignBridge.queue.async {
                 guard let p = prepared.removeValue(forKey: tok) else {
@@ -275,7 +276,7 @@ enum Sideload {
                 }
                 log("Using the IPA downloaded for the look-first sheet (\(p.url))")
                 guard hashed(p.file) else { return }
-                signAndOpen(p.file, url: p.url, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish, serving: released, step: step,
+                signAndOpen(p.file, url: p.url, id: id, profile: profile, options: withOwnIcon(options, ownIcon, log: log), servers: servers, emit: emit, log: log, job: job, opened: finish, serving: released, step: step,
                             sha256: ipaSha) // F343
             }
             return
@@ -288,11 +289,39 @@ enum Sideload {
             case .failure(let e): finish(.failure(e))
             case .success(let file):
                 guard hashed(file) else { return }
-                signAndOpen(file, url: url.absoluteString, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish, serving: released, step: step,
+                signAndOpen(file, url: url.absoluteString, id: id, profile: profile, options: withOwnIcon(options, ownIcon, log: log), servers: servers, emit: emit, log: log, job: job, opened: finish, serving: released, step: step,
                             sha256: ipaSha) // F343
             }
         }
         job.onCancel { d.cancel() }
+    }
+
+    // ---- B469: an update of iFizBox itself keeps the picked own icon
+
+    // {ownIcon: <own icon>} on signing.install's url/token or signing.prepare, sent by the page only for an IPA of
+    // iFizBox itself (Changes' row, the queue's row for its own ID: screens/appicon.js withOwnIcon): the picture and
+    // the set on screen, read on the main queue (where bridge calls arrive). nil in the jailbreak build or without it.
+    struct OwnIconPick { let name: String; let current: String? }
+    static func ownIconPick(_ c: Bridge.Call) -> OwnIconPick? {
+        guard AppMode.current == .sideload, let n = c.params["ownIcon"] as? String, OwnIcons.isOwn(n) else { return nil }
+        return OwnIconPick(name: n, current: Thread.isMainThread ? AppIcon.onScreen : nil)
+    }
+
+    // `o` with that picture's own-icon set (OwnIcons.selfFiles), as F329a's selfIcon re-sign puts it in, so the update
+    // lands with the icon and the reopened app's app.icon only switches to it. A picture that can't go in (deleted,
+    // a build without own sets) is a Log line: the update goes on without it, and the page offers the re-sign as
+    // before. Off the main queue.
+    static func withOwnIcon(_ o: SignOptions, _ pick: OwnIconPick?, log: (String) -> Void) -> SignOptions {
+        guard let p = pick else { return o }
+        do {
+            var out = o
+            out.ownIconFiles = try OwnIcons.selfFiles(p.name, current: p.current)
+            log("Keeping your own app icon in this update")
+            return out
+        } catch {
+            log("Your own app icon can't go in this update (\(SignBridge.text(error))); it goes on without it")
+            return o
+        }
     }
 
     // ---- B252: kept running from Confirm on

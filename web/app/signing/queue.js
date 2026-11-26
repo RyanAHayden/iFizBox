@@ -29,11 +29,14 @@ import { getServer, defaultServer } from "./identity.js";
 import { serverFallback, rememberRouteFailure, clearRouteFailure, storedRoute } from "../core/installroute.js"; // F366
 import { cellularStopped } from "./cellular.js"; // F417
 import { chooseRoute, holdApp } from "./route.js";
-import { withSavedIpa, customInstallSave, listedOf } from "../core/appqueue.js"; // F379
+import { withSavedIpa, customInstallSave, listedOf, SELF_ID } from "../core/appqueue.js"; // F379
 export { hereLabel, shownName, finishHere } from "./common.js";
 
 export const ASK_WAIT = 600; // seconds the queue waits for Install on iOS's prompt before the row fails
 const SENT = Symbol("sent"); // B200: openPrepared's race: iOS had the whole IPA before the watch answered
+
+// B469: screens/appicon.js withOwnIcon, loaded only for Lite's own row
+const ownIconParams = (params) => import("../screens/appicon.js").then((m) => m.withOwnIcon(params)).catch(() => params);
 
 export function prepareParams(job) {
   if (!job) return null;
@@ -67,7 +70,7 @@ const rowError = (e, name) => {
   return Object.assign(new Error(why.message), { code: e?.code ?? null });
 };
 
-export async function prepareOnDevice(job, { tag, signal = null, progress = () => {}, log = () => {}, native, alert = showAlert } = {}) {
+export async function prepareOnDevice(job, { tag, signal = null, progress = () => {}, log = () => {}, native, alert = showAlert, ownIcon = ownIconParams } = {}) {
   job = await withSavedIpa(job, { call: (m, p) => bridge(native).call(m, p) }); // F379: a Re-sign signs the saved IPA
   let params = prepareParams(job);
   // F302a: the app's kept tweaks go with a plain install, an update and a tweak update (screens/tweaks.js), a line each
@@ -77,6 +80,8 @@ export async function prepareOnDevice(job, { tag, signal = null, progress = () =
   // F380: a Custom Install, saved in My IPAs once it lands (screens/queue.js saveCustomIpa), keeps its own download
   // there (signing.open's libraryFile, openPrepared below), so the save downloads nothing
   if (params?.url && customInstallSave(job)) params = { ...params, keepInLibrary: true };
+  // B469: Lite's own update keeps the picked own icon (the shell puts its own-icon set into the IPA)
+  if (job?.id === SELF_ID && params) params = await ownIcon(params);
   try {
     // B104: an http link with no https twin asks first (askInsecure); Cancel ends the row as its stop does
     const r = await askInsecure((extra) => abortable(native, "signing.prepare", { ...params, ...refusing(), ...extra }, (ev) => {

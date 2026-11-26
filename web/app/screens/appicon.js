@@ -28,6 +28,7 @@ import { createSwitch } from "../nav/switch.js";
 import { swipeDecide } from "../nav/rowswipe.js";
 import { coverDark } from "../nav/statusbar.js"; // B401
 import { NAME } from "../brand.js";
+import { iconOf } from "../appicon.js"; // B469
 
 export const OUT = 1024; // px: the stored picture (the shell draws it: OwnIcons.add)
 export const ZOOM = 4;   // Move and Scale zooms in to 4x the smallest scale that fills the square
@@ -157,6 +158,25 @@ export async function offerResign(name, store, { alert = null, install = null } 
   try { ok = await run({ params: { selfIcon: name }, name: NAME, host: true }); } catch { ok = false; }
   if (!ok) { back(); return "failed"; }
   return "installing";
+}
+
+// B469: an update of Lite itself (Changes' row, the queue's row for its own ID) keeps the picked own icon: the shell
+// puts that picture's own-icon set into the downloaded IPA ({ownIcon}, Sideload.swift OwnIcons.selfFiles), as the
+// re-sign above does with its own bundle, so the reopened app has it and tellIcon just switches to it. The picture
+// is the one the tone on screen shows, else the other tone's; null when neither picks an own icon.
+export function updateOwnIcon(read, onScreen = globalThis.document?.documentElement?.dataset.theme) {
+  const tones = onScreen === "dark" ? ["dark", "light"] : ["light", "dark"];
+  for (const t of tones) {
+    const n = read ? iconOf(t, read) : iconOf(t);
+    if (isOwnIcon(n)) return n;
+  }
+  return null;
+}
+// signing.install / signing.prepare params with {ownIcon} when an own icon is picked (Lite only).
+export function withOwnIcon(params, { mode = detectMode(), read, onScreen } = {}) {
+  if (mode !== "sideload" || !params) return params;
+  const n = updateOwnIcon(read, onScreen);
+  return n ? { ...params, ownIcon: n } : params;
 }
 
 // ---- Shell calls ----------------------------------------------------------------------------------------------

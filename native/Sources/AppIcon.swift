@@ -419,17 +419,31 @@ enum OwnIcons {
     // AppIcon.onScreen). Off the main queue.
     static func selfSource(_ name: String, current: String?, stop: () -> Bool = { false }) throws -> (ipa: URL, files: [String: Data]) {
         lock.lock(); defer { lock.unlock() }
-        let p: (slot: String, write: Bool, pngs: [Data])
-        do { p = try plan(name, current: current) } catch let e as BridgeError { throw SignError(e.code, e.message) }
-        guard ready(p.slot) else { throw SignError("old_build", "This build has no own icon sets.") }
-        var files = [String: Data]()
-        for (size, png) in zip(sizes, p.pngs) { files["IconOwn\(p.slot.uppercased())\(size.file).png"] = png }
+        let files = try setFiles(name, current: current)
         let out = SignBridge.work.appendingPathComponent("\(SignBridge.token())-self.ipa")
         do { try SelfIPA.make(app: Bundle.main.bundleURL, to: out, stop: stop) } catch {
             try? FileManager.default.removeItem(at: out)
             throw error
         }
         return (out, files)
+    }
+
+    // B469: the own-set files for `name` alone (SignOptions.ownIconFiles), for an IPA of the app itself downloaded as an
+    // update (Sideload.withOwnIcon): the slot is the one plan picks, so an update while the picture is on screen puts
+    // it in the set on screen and the reopened app's app.icon has nothing to switch. Off the main queue.
+    static func selfFiles(_ name: String, current: String?) throws -> [String: Data] {
+        lock.lock(); defer { lock.unlock() }
+        return try setFiles(name, current: current)
+    }
+
+    // The own-set files for `name` given the set on screen. Under `lock`.
+    private static func setFiles(_ name: String, current: String?) throws -> [String: Data] {
+        let p: (slot: String, write: Bool, pngs: [Data])
+        do { p = try plan(name, current: current) } catch let e as BridgeError { throw SignError(e.code, e.message) }
+        guard ready(p.slot) else { throw SignError("old_build", "This build has no own icon sets.") }
+        var files = [String: Data]()
+        for (size, png) in zip(sizes, p.pngs) { files["IconOwn\(p.slot.uppercased())\(size.file).png"] = png }
+        return files
     }
 
     // Copies AppIcons/Apply/ (render) into `slot` through the helper. Off the main queue.
