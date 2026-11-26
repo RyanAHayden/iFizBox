@@ -1,7 +1,7 @@
 # T87a: free Apple ID computer setup on the iPhone 15 Pro
 
 ## Result
-The free Apple ID computer setup ran end to end on an iPhone 15 Pro (iOS 27.0.1, iPhone16,1) on 2026-11-26, from a
+The free Apple ID computer setup ran up to the app's first launch on an iPhone 15 Pro (iOS 27.0.1, iPhone16,1) on 2026-11-26, from a
 Linux x86_64 desktop, with the spare free Apple ID. The computer setup works up to the first launch of the app. The
 first on-phone re-sign with the free profile does not work, and the app shows no Free Apple ID group after the
 computer setup, so the weekly refresh cannot be reached on the phone.
