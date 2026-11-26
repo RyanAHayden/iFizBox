@@ -11,7 +11,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
-- [ ] **V28** Release 1.0.1 (patch) once everything queued ahead has landed. Release notes: exactly 'UI fixes and improvements' (replace the waiting release-notes/*.md with that one line). tools/publish.sh 1.0.1 --notes FILE. | after: all
 ### Research (any time, parallel)
 
 ### Native jailbreak app (shape decided: docs/native.md)
