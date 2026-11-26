@@ -692,7 +692,7 @@ test("Remove from List on a remembered app iFizBox signed forgets the signature 
 });
 
 // ---- B52: the root's Apps count follows a Delete on the Apps page ------------------------------------------------
-import { refreshAppCount, appsRowSubtitle, topTable } from "./installed.js";
+import { refreshAppCount, ipasAppsRow, ipasAppsSubtitle, topTable } from "./installed.js";
 
 test("B291: the jailbreak app's Install IPAs row is a plain row of the list, not a grouped card, its tab kept", () => withDom(() => {
   const ul = topTable([{ label: "Install IPAs", subtitle: "3 IPAs", href: "#/installed/myipas", cls: "install-ipas-row" }], { tab: "home", path: [] });
@@ -712,30 +712,47 @@ test("B291: packages.css draws the top rows at the wide package rows' height, ed
   assert.doesNotMatch(css, /\.installed-top \{ margin-right/, "no inset card beside the A–Z index");
 });
 
-test("B52: a Delete under the Apps page updates the root's Apps count; the cell goes at 0", async () => {
-  const body = withDom(() => { // the root's Apps cell as draw() makes it (B291: topTable)
+test("B52 F443: a Delete under the Apps page updates the root's IPAs and Apps counts in place, at 0 too", async () => {
+  const body = withDom(() => { // the root's one top cell as draw() makes it (B291: topTable)
     const b = document.createElement("div");
-    b.append(topTable([{ label: "Install IPAs", subtitle: "3 IPAs", href: "#/installed/myipas", cls: "install-ipas-row" }, // F269
-      { label: "Apps", subtitle: appsRowSubtitle(2), href: "#/installed/apps", cls: "installed-apps-row" }], { tab: "installed", path: [] }));
+    b.append(topTable([ipasAppsRow({ tab: "installed", path: [] }, null, 2)], { tab: "installed", path: [] }));
     return b;
   });
-  const sub = () => body.querySelector(".installed-top").querySelector(".installed-apps-row").querySelector(".cell-subtitle").textContent;
-  assert.equal(sub(), "2 apps installed from an app page");
+  const sub = () => body.querySelector(".installed-top").querySelector(".ipas-apps-row").querySelector(".cell-subtitle").textContent;
+  assert.equal(sub(), "2 apps", "IPA counts not read yet: the apps alone");
   const view = { body, rows: [], appCount: 2, seq: 1 };
   let redraws = 0;
   const redraw = () => { redraws++; };
   await refreshAppCount({ view, mode: "jailbreak", count: async () => 1, redraw });
   assert.equal(view.appCount, 1);
-  assert.equal(sub(), "1 app installed from an app page", "in place, the list keeps its scroll");
-  assert.equal(redraws, 0);
+  assert.equal(sub(), "1 app", "in place, the list keeps its scroll");
+  body.querySelector(".ipas-apps-row").querySelector(".cell-subtitle").textContent = "untouched";
   await refreshAppCount({ view, mode: "jailbreak", count: async () => 1, redraw });
-  assert.equal(redraws, 0, "same count: nothing");
+  assert.equal(sub(), "untouched", "same count: nothing");
   await refreshAppCount({ view, mode: "jailbreak", count: async () => 0, redraw });
   assert.equal(view.appCount, 0);
-  assert.equal(redraws, 1, "the cell goes: the page draws again");
-  await refreshAppCount({ view, mode: "jailbreak", count: async () => 3, redraw });
-  assert.equal(redraws, 2, "the cell comes back: the page draws again");
+  assert.equal(sub(), "Your own IPAs and the apps you install", "the row stays at 0 apps");
+  assert.equal(redraws, 0, "the cell never comes or goes: no redraw");
+  const bare = { body: { querySelector: () => null }, rows: [], appCount: 0, seq: 0 };
+  await refreshAppCount({ view: bare, mode: "jailbreak", count: async () => 4, redraw });
+  assert.equal(redraws, 1, "no cell drawn: the page draws again");
 });
+
+test("F443: the jailbreak app's one top row links to the Apps page with both counts, sized as a package row", () => withDom(() => {
+  const route = { tab: "installed", path: [] };
+  const row = ipasAppsRow(route, { total: 3, notInstalled: 2 }, 7);
+  assert.equal(row.label, "IPAs and Apps");
+  assert.equal(row.href, "#/installed/apps");
+  assert.equal(row.subtitle, "7 apps · 3 IPAs · 2 not installed");
+  assert.equal(row.badge, "2");
+  assert.equal(row.cls, "ipas-apps-row");
+  assert.equal(ipasAppsRow(route, { total: 0, notInstalled: 0 }, 0).subtitle, "No IPAs yet");
+  assert.equal(ipasAppsRow(route, { total: 1, notInstalled: 0 }, 1).badge, undefined);
+  assert.equal(ipasAppsSubtitle({ total: 1, notInstalled: 0 }, 1), "1 app · 1 IPA");
+  const ul = topTable([row], route);
+  assert.equal(ul.querySelectorAll(".cell").length, 1, "one row, not Install IPAs over Apps");
+  assert.equal(ul.querySelector(".ipas-apps-row").dataset.tab, "installed", "paintIpaRows redraws it on its own tab");
+}));
 
 test("B52: no count refresh off the jailbreak app, before the root is drawn, or when load() runs meanwhile", async () => {
   let counted = 0;
