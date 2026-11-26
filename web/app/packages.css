@@ -586,6 +586,10 @@ html[data-theme="dark"] .price-btn.version-mark.added { color: var(--subtitle); 
    there when Browse's own bar scrolls away. With the queue run's strip the bars sit 30px lower (queue.css). */
 .page-body:has(> .browse-scope) ~ .section-index { top: calc(var(--nav-h) + var(--strip-room, 0px) + 44px + 6px); }
 .search-root:has(> .list-scope) > .section-index { top: calc(var(--nav-h) + var(--strip-room, 0px) + 88px + 6px); }
+/* B460: Installed's A–Z index starts below its search bar and kinds row, as Search's does, not beside them (the jailbreak
+   list has both; the apps list only the bar). */
+.search-root:has(> .installed-scope) > .section-index { top: calc(var(--nav-h) + var(--strip-room, 0px) + 88px + 6px); }
+.search-root:has(> .installed-search):not(:has(> .installed-scope)) > .section-index { top: calc(var(--nav-h) + var(--strip-room, 0px) + 44px + 6px); }
 body.qr-stripped .section-index { --strip-room: 30px; }
 /* On a phone on its side there is no room for 27 letters below the bars: they close up, inside the index's touch area. */
 :is(.page-body:has(> .browse-scope) ~ .section-index, .search-root:has(> .list-scope) > .section-index) > span { min-height: 0; }

@@ -815,3 +815,10 @@ test("F269: loadIpaCounts counts as the Install IPAs page does (phone's answer, 
     globalThis.ifizboxNative = native;
   }
 });
+
+test("B460: Installed's A–Z index starts below its search bar and kinds row", async () => {
+  const { readFileSync } = await import("node:fs");
+  const css = readFileSync(new URL("../packages.css", import.meta.url), "utf8");
+  assert.match(css, /\.search-root:has\(> \.installed-scope\) > \.section-index \{ top: calc\(var\(--nav-h\) \+ var\(--strip-room, 0px\) \+ 88px/);
+  assert.match(css, /:has\(> \.installed-search\):not\(:has\(> \.installed-scope\)\) > \.section-index \{ top: calc\([^}]*\+ 44px/);
+});
