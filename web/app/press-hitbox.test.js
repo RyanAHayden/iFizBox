@@ -61,6 +61,15 @@ test("the tab bar's tap handler acts only on what the press code marks", () => {
   assert.ok(PRESSABLE.split(",").map((s) => s.trim()).includes(sel), `${sel} missing from PRESSABLE`);
 });
 
+test("a held iOS 7 tab swaps to the chosen tab's filled glyph", () => {
+  const css = read("ios7.css");
+  const chosen = [...css.matchAll(/\.tab\[data-tab="(\w+)"\]\.active(?=[,\s{])/g)].map((m) => m[1]);
+  assert.ok(chosen.length >= 6, "a filled glyph per tab");
+  for (const t of chosen) {
+    assert.ok(css.includes(`.tab[data-tab="${t}"].is-pressed { --glyph`), `${t}: .is-pressed missing beside .active glyph`);
+  }
+});
+
 test("a held tab wears the selected look, in every era that draws the shared tab bar", () => {
   const css = read("ios6.css").replace(/\/\*[\s\S]*?\*\//g, "");
   const rules = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].map(([, sel, decl]) => ({ sels: sel.split(",").map((s) => s.trim()), decl }));

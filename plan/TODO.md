@@ -28,7 +28,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
-- [ ] **B467** (follow-up, low) iOS 7 style: a held tab bar item turns blue but keeps its outline glyph; the chosen tab shows a filled one (ios7.css swaps --glyph for .tab[data-tab].active). Add .tab[data-tab=X].is-pressed beside each .active glyph rule so the held look matches the chosen look. Check in Chromium with journal/2026-11-26-b465-tab-pressed/probe.mjs (STYLE=ios7). | files: web/app/ios7.css, web/app/press-hitbox.test.js | model: sonnet
 ### Parked
 
 - [ ] **F107** (later, when the jailbreakme.dev exploit is ready) Upgrading & Jailbreaking Help stays unlocked on the website's locked Home (user 2026-11-18: 'we will not have the jailbreak tutorial thing locked when jailbreakme.dev exploit is ready, thats for later'): leave that row out of websign-gate's browsingLocked set in screens/home.js and point it at the jailbreak guide. | files: web/app/screens/home.js
