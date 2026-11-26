@@ -34,6 +34,9 @@ export { str, httpUrl, tintOf, dateOf, compareOS, runsOn, parseAltSource, appSec
 const ALT_PREFIX = "alt:";
 export const isAltKey = (key) => String(key ?? "").startsWith(ALT_PREFIX);
 export const altKey = (url) => ALT_PREFIX + url;
+// B476: the source a remembered app record was installed from: its catalog key, else its AltStore source's. No
+// source of its own (My IPAs, a URL): null.
+export const ownKey = (r) => (r?.key && r.key !== "*" ? r.key : typeof r?.source === "string" && r.source ? altKey(r.source) : null);
 
 // How an app gets onto the phone. iOS installs an IPA over the air only from an itms-services link to a signed
 // manifest, so that is offered only where the source gives one: a downloadURL that already is itms-services://,

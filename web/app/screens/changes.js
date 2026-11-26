@@ -28,7 +28,7 @@ import { catalog } from "../catalog.js";
 import { getBackend } from "../backend.js";
 import { showAlert } from "../nav/alert.js";
 import { dayTitle, filterGroups, filterRows, defaultScope } from "../core/changes.js";
-import { apps, installedIds, onAppsChange } from "../core/installed.js";
+import { apps, installedIds, isInstalledRow, onAppsChange } from "../core/installed.js";
 import { signedAppsNamed } from "../core/installed.js"; // B150
 import { siteSignedApps, siteSignerNow } from "../core/installed.js"; // F342
 import { settings } from "../settings-store.js";
@@ -520,7 +520,7 @@ function draw(view) {
 //   await markRowNotInstalled(item, { mode, native, store }) -> true when anything was forgotten
 export function holdItems(item, { mode = detectMode(), installed = null } = {}) {
   if (!item?.id || (mode !== "sideload" && mode !== "site") || item.id === SELF_ID) return [];
-  const on = item.change === "resign" || item.change === "upgrade" || Boolean(installed?.has?.(item.id));
+  const on = item.change === "resign" || item.change === "upgrade" || isInstalledRow(installed, item);
   return on ? [{ kind: "forget", label: MARK_NOT_INSTALLED }] : [];
 }
 
