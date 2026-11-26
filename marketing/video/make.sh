@@ -53,4 +53,10 @@ APP_VERSION=$version timeout 2400 node "$here/capture.mjs" "http://127.0.0.1:$po
 for cut in 4x5:1350 9x16:1920; do
   timeout 2400 node "$here/render.mjs" . "promo-lite-${cut%:*}.mp4" --h "${cut#*:}" --page promo-lite
 done
-echo "done: $out/showcase-4x5.mp4 $out/showcase-9x16.mp4 $out/promo-4x5.mp4 $out/promo-9x16.mp4 $out/promo-lite-4x5.mp4 $out/promo-lite-9x16.mp4"
+# the sideload-only clip (promo-sideload.html): a fresh phone, a certificate imported, a Free Apple ID signed in (Apple's answers
+# stubbed, stubs/), an app, a tweak, an update and Re-sign All, with a splash first: OUT_DIR/promo-sideload-4x5.mp4 and -9x16.mp4
+APP_VERSION=$version timeout 2400 node "$here/capture.mjs" "http://127.0.0.1:$port/" rec "$here/shots-promo-sideload.json" --state state --mode sideload
+for cut in 4x5:1350 9x16:1920; do
+  timeout 2400 node "$here/render.mjs" . "promo-sideload-${cut%:*}.mp4" --h "${cut#*:}" --page promo-sideload
+done
+echo "done: $out/showcase-4x5.mp4 $out/showcase-9x16.mp4 $out/promo-4x5.mp4 $out/promo-9x16.mp4 $out/promo-lite-4x5.mp4 $out/promo-lite-9x16.mp4 $out/promo-sideload-4x5.mp4 $out/promo-sideload-9x16.mp4"
