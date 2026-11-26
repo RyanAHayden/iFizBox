@@ -40,7 +40,8 @@ function setup() {
   const click = (el = row) => win.fire("click", { detail: 1, target: el });
   const scroll = (el = list) => doc.fire("scroll", { target: el });
   const cancel = () => doc.fire("pointercancel", { pointerId: 1 });
-  return { st, list, row, sw, down, move, up, cancel, click, scroll, tick: (ms) => { now += ms; }, get drops() { return drops; }, get opened() { return opened; } };
+  const touch2 = (e) => doc.fire("touchmove", e);
+  return { st, list, row, sw, down, move, up, cancel, touch2, click, scroll, tick: (ms) => { now += ms; }, get drops() { return drops; }, get opened() { return opened; } };
 }
 
 test("a plain tap still opens the row", () => {
@@ -90,6 +91,17 @@ test("a touch on a still-gliding list stops it and opens nothing, and never pres
   s.tick(GLIDE_MS + 500);
   s.down(100, 200); s.up(100, 200); s.click();
   assert.equal(s.opened, 1, "once the list has stopped, a tap opens");
+});
+
+test("a second finger's moves don't make the first finger's tap a drag", () => {
+  const s = setup();
+  s.down(100, 200);
+  s.move(100, 200); // first finger, still
+  const two = { touches: [{ clientX: 300, clientY: 500 }, { clientX: 100, clientY: 200 }] };
+  s.touch2(two);
+  assert.equal(s.st.dragging(), false);
+  s.up(100, 200); s.click();
+  assert.equal(s.opened, 1);
 });
 
 test("a cancelled touch never clicks", () => {

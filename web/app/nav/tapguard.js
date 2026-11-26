@@ -89,7 +89,8 @@ export function cancelDragTaps(doc, { win = doc?.defaultView ?? globalThis.windo
     },
     pointermove(e) { if (t && e.pointerId === t.id) moveTo(e.clientX, e.clientY); },
     // iOS stops pointermove once it pans; the touch's own moves still come.
-    touchmove(e) { const p = e.touches?.[0]; if (p) moveTo(p.clientX, p.clientY); },
+    // One finger only: with a second one down, touches[0] may not be the tracked touch (its own pointermove counts).
+    touchmove(e) { const p = e.touches?.length === 1 ? e.touches[0] : null; if (p) moveTo(p.clientX, p.clientY); },
     pointerup(e) { if (t?.down && e.pointerId === t.id) { moveTo(e.clientX, e.clientY); t.down = false; t.upAt = now(); } },
     pointercancel(e) { if (t?.down && e.pointerId === t.id) { mark(); t.down = false; t.upAt = now(); } },
     // Only a pane holding the touch's target: a carousel elsewhere moving on its own is not this touch's scroll.

@@ -36,5 +36,9 @@ The code first went in a new module, `nav/scrolltap.js`. That took the static im
 ## Not verified
 
 - On a real iPhone (15 Pro or iPhone 7). The iOS-only case, WebKit sending a click after a drag that scrolled and came back, or after a tap that stopped momentum, was not reproduced on a device. The fix's logic is covered by the node test and by the Chromium short-drag case. The project rule is that web checks stay in Chromium and real-device checks are only used when Chromium cannot do the job. This one would need the phone, so it is left for normal use or a later phone pass.
+- A scroll set by code (an animated scroll to top, a restored `scrollTop`) counts as a glide for 100 ms too, so a tap
+  in that window is eaten. UIKit stops an animated scroll the same way; an instant one only blocks a tap landing
+  within 100 ms of it, which no page change allows (its slide is longer). Accepted, not measured on a phone.
+- Spec review: fixed a second finger's `touchmove` counting as the first finger's drag (new test).
 - The iOS 26 style's native `UITabBar` (not web, untouched by this change).
 - Controls with their own drag other than the switch and the banner (section index, settings reorder grip, roulette wheel, app icon stage) use `pointerup`, not `click`, so they are unaffected. They were not exercised in Chromium.
