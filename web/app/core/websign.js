@@ -69,6 +69,7 @@ export const isOutOfMemory = (message) => /out of memory/i.test(String(message ?
 export const IFIZBOX_ID = "com.ryha.ifizbox";
 export const IDENTITY_FILE = "ifizbox-identity.plist";
 export const TRANSFER_FILE = "web/transfer.link";
+export const FREE_ID_FILE = "web/free-id.json"; // B474: the Free Apple ID record (screens/free-apple-id.js FREE_ID_URL)
 
 const utf8 = (b) => new TextDecoder().decode(b);
 

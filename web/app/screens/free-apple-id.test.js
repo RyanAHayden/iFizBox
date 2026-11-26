@@ -353,3 +353,57 @@ test("B473: after a reload the kept sign-in comes back; with the UDID here Regis
     resetRelayAnswer();
   }
 });
+
+// B474: after a computer install the app has the free identity in its Keychain and the record the install carried
+// (web/free-id.json): Signing shows the Free Apple ID group with it, so Sign In Again / Refresh Profile are reachable.
+test("B474: the app takes the computer install's record when the Keychain's certificate is that one, once per file", async () => {
+  const { adoptBundledFreeId, freeRecord } = await import("./free-apple-id.js");
+  const { freeInUse, signingLayout } = await import("./settings.js");
+  const id = { teamId: "4549VNVVAG", teamName: "Spare", serial: "0A1B2C", password: "pw", p12: Uint8Array.of(1, 2),
+    profile: Uint8Array.of(3, 4, 5), expires: new Date("2027-11-26T00:00:00Z"), appId: "com.ryha.ifizbox.4549VNVVAG" };
+  const file = JSON.stringify(freeRecord(id));
+  const fetcher = async (u) => { assert.equal(u, "free-id.json"); return { ok: true, text: async () => file }; };
+  const kept = { serial: "0a:1b:2c" };
+  const native = { call: async (m) => { assert.equal(m, "signing.status"); return { identity: kept }; } };
+  const store = memStore();
+  assert.equal(freeInUse(kept, store), false, "before: no record, so no group");
+  assert.equal(signingLayout({ mode: "sideload", certificate: true, freeKept: freeInUse(kept, store) }).includes("free"), false);
+  assert.equal(await adoptBundledFreeId({ native, store, fetcher }), true);
+  const back = loadFreeIdentity(store);
+  assert.deepEqual([back.teamId, back.serial, back.password, [...back.p12], [...back.profile], back.appId],
+    ["4549VNVVAG", "0A1B2C", "pw", [1, 2], [3, 4, 5], id.appId]);
+  assert.equal(freeInUse(kept, store), true);
+  assert.ok(signingLayout({ mode: "sideload", certificate: true, freeKept: freeInUse(kept, store) }).includes("free"));
+  // once per file: a Forget afterwards isn't undone by the next launch
+  forgetFreeIdentity(store);
+  assert.equal(await adoptBundledFreeId({ native, store, fetcher }), false);
+  assert.equal(loadFreeIdentity(store), null);
+});
+
+test("B474: no record taken for another certificate, with no file, or outside the app", async () => {
+  const { adoptBundledFreeId, freeRecord } = await import("./free-apple-id.js");
+  const file = JSON.stringify(freeRecord({ teamId: "T", serial: "AA", password: "p", p12: Uint8Array.of(1), profile: Uint8Array.of(2) }));
+  const fetcher = async () => ({ ok: true, text: async () => file });
+  const other = { call: async () => ({ identity: { serial: "BB" } }) };
+  let store = memStore();
+  assert.equal(await adoptBundledFreeId({ native: other, store, fetcher }), false);
+  assert.equal(store.m.size, 0, "a certificate imported since stays the one in use, and the file is asked about again");
+  const same = { call: async () => ({ identity: { serial: "AA" } }) };
+  assert.equal(await adoptBundledFreeId({ native: same, store, fetcher: async () => ({ ok: false }) }), false);
+  assert.equal(await adoptBundledFreeId({ native: same, store, fetcher: async () => ({ ok: true, text: async () => "not json" }) }), false);
+  assert.equal(await adoptBundledFreeId({ native: null, store, fetcher }), false);
+  const down = { call: async () => { throw new Error("signing: refused"); } };
+  assert.equal(await adoptBundledFreeId({ native: down, store, fetcher }), false);
+  assert.equal(store.m.size, 0);
+  store = memStore();
+  assert.equal(await adoptBundledFreeId({ native: same, store, fetcher }), true);
+});
+
+test("B474: Home's tile counts a 7-day profile made minutes ago as 7 days left", async () => {
+  const { expiryWarning } = await import("../core/signing.js");
+  const now = new Date("2026-11-26T10:00:00Z");
+  const made = new Date(now.getTime() - 20 * 60 * 1000);
+  const profile = { expires: new Date(made.getTime() + 7 * 24 * 3600 * 1000).toISOString() };
+  const w = expiryWarning({ expires: "2027-11-26T00:00:00Z", profile }, { now });
+  assert.deepEqual([w.what, w.days, w.subtitle], ["Profile", 7, "Expires in 7 days · Renew in Signing"]);
+});

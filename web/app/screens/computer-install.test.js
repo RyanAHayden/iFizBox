@@ -38,6 +38,10 @@ test("signForComputer: the release's IPA with the free identity inside, under th
   assert.deepEqual([...new Uint8Array(job.p12), ...new Uint8Array(job.profile)], [1, 2]);
   assert.equal(id.p12.length, 1, "the identity isn't handed over (transferred) itself");
   assert.deepEqual(r, SIGNED);
+  // B474: the Free Apple ID record goes along, for the app's Signing page (free-apple-id.js adoptBundledFreeId)
+  await signForComputer(id, { download: async () => PK, transfer: async () => null, record: { teamId: "T", serial: "AA" },
+    worker: async (j) => { job = j; return { ipa: [PK], bundleId: SIGNED.bundleId }; } });
+  assert.deepEqual(JSON.parse(job.bring.freeId), { teamId: "T", serial: "AA" });
 });
 
 test("makeCode: uploads, and the Worker's code reads back this IPA, its hash and the pairing file's place", async () => {

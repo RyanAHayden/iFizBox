@@ -88,6 +88,19 @@ test("bring: only iFizBox's own IPA gets the certificate and the website's link,
   assert.equal([...seen.files.keys()].some((k) => k.includes("ifizbox-identity") || k.includes("transfer.link")), false, "switch off, bad link");
 });
 
+test("B474: the computer install's Free Apple ID record lands as web/free-id.json, only with the identity", async () => {
+  const rec = JSON.stringify({ teamId: "T", serial: "AA" });
+  let { create, seen } = fakeZsign({ plist: { CFBundleIdentifier: "com.ryha.ifizbox" }, appName: "iFizBox.app" });
+  await runSignJob(create, job({ bring: { identity: true, freeId: rec } }));
+  assert.equal(text(seen.files.get("/w/app/Payload/iFizBox.app/web/free-id.json")), rec);
+  ({ create, seen } = fakeZsign({ plist: { CFBundleIdentifier: "com.ryha.ifizbox" }, appName: "iFizBox.app" }));
+  await runSignJob(create, job({ bring: { identity: false, freeId: rec } }));
+  assert.equal([...seen.files.keys()].some((k) => k.includes("free-id")), false);
+  ({ create, seen } = fakeZsign());
+  await runSignJob(create, job({ bring: { identity: true, freeId: rec } }));
+  assert.equal([...seen.files.keys()].some((k) => k.includes("free-id")), false, "not another app");
+});
+
 test("appBundleId wins over the IPA's own ID: an old-ID iFizBox IPA is signed as iFizBox and gets its bring files", async () => {
   const { create, seen } = fakeZsign({ plist: { CFBundleIdentifier: "com.example.oldname", CFBundleName: "iFizBox" }, appName: "iFizBox.app" });
   const r = await runSignJob(create, job({ appBundleId: "com.ryha.ifizbox", bring: { identity: true, transfer: "ifizbox://import?d=abc" } }));

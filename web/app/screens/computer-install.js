@@ -8,7 +8,8 @@
 //   await makeCode(signed, deps)         { code, until }: uploads it and asks for the code
 //   computerSections(state, now)         pure: what the block shows: { stage: "off" | "start" | "code" | "expired", footer }
 //   setupCommands()                      pure: [{ header, prompt, cmd, footer }], one per kind of computer
-//   computerInstallBlock({ id, expired, fix, ask, save })   the block; fix: { label, onClick } renews the profile
+//   computerInstallBlock({ id, record, expired, fix, ask, save })   the block; fix: { label, onClick } renews the profile;
+//                                        record: the Free Apple ID record the app takes on launch (B474, web/free-id.json)
 //   resetComputerInstall()               forget the signed IPA and code (another profile, or the identity forgotten)
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped, el } from "../nav/ui.js";
@@ -49,13 +50,13 @@ export function computerSections({ expired = false, signed = null, code = null, 
 export async function signForComputer(id, deps = {}) {
   const [b, c, p] = deps.download ? [] : await Promise.all([import("../signing/browser.js"), import("../signing/common.js"),
     import("../signing/prompt.js")]);
-  const { download = b.downloadIpa, worker = c.runInWorker, transfer = p.websiteTransfer, set = () => {}, signal = null } = deps;
+  const { download = b.downloadIpa, worker = c.runInWorker, transfer = p.websiteTransfer, set = () => {}, signal = null, record = null } = deps;
   const own = (x) => new Uint8Array(x).slice().buffer;
   const sig = signal ? { signal } : {};
   const ipa = await download(APP_IPA_URL, { onProgress: (n) => set(`Downloading ${n}%`), ...sig });
   set("Signing");
   const r = await worker({ ipa: own(ipa), p12: own(id.p12), profile: own(id.profile), password: id.password ?? "",
-    bring: { identity: true, transfer: await transfer().catch(() => null) }, appBundleId: BUNDLE_ID, keepBundleId: false, free: true },
+    bring: { identity: true, transfer: await transfer().catch(() => null), ...(record ? { freeId: JSON.stringify(record) } : {}) }, appBundleId: BUNDLE_ID, keepBundleId: false, free: true },
   { onProgress: set, ...sig });
   return { data: joinPieces(r.ipa), bundleId: r.bundleId, name: r.name, version: r.version };
 }
@@ -89,13 +90,13 @@ export async function makeCode(signed, deps = {}) {
 
 // One run on the progress page: sign (unless it's signed already), then upload and ask for a code. A code that failed
 // leaves the signed IPA, which can still be saved.
-async function run(id, ask) {
+async function run(id, ask, record = null) {
   if (busy) return;
   busy = true;
   const { progressHUD } = await import("../nav/progress.js");
   const { failed, untilCancel } = await import("../signing/common.js");
   const h = progressHUD(state.signed ? "Uploading" : "Downloading");
-  const deps = { set: (t) => h.set(t), signal: h.signal };
+  const deps = { set: (t) => h.set(t), signal: h.signal, record };
   try {
     if (!state.signed) state.signed = await untilCancel(h, signForComputer(id, deps));
     Object.assign(state, { code: null, until: 0 });
@@ -113,13 +114,13 @@ async function run(id, ask) {
   }
 }
 
-export function computerInstallBlock({ id, expired = false, fix, ask, save }) {
+export function computerInstallBlock({ id, record = null, expired = false, fix, ask, save }) {
   const box = el("div", "free-computer");
   let timer = 0;
   const draw = () => {
     clearTimeout(timer);
     const s = computerSections({ ...state, expired });
-    const start = (label) => ({ label, cls: "free-primary", onClick: () => run(id, ask) });
+    const start = (label) => ({ label, cls: "free-primary", onClick: () => run(id, ask, record) });
     const parts = [];
     if (s.stage === "off") parts.push(grouped([{ header: "Computer Install", rows: [{ ...fix, cls: "free-button" }], footer: s.footer }]));
     else if (s.stage === "start") parts.push(grouped([{ header: "Computer Install", rows: [start(COMPUTER_LABEL)], footer: s.footer }]));
