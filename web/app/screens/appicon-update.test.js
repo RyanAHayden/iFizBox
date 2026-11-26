@@ -1,21 +1,22 @@
 // B469: an update of Lite itself keeps the picked own icon ({ownIcon} on signing.install / signing.prepare).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { updateOwnIcon, withOwnIcon } from "./appicon.js";
+import { updateOwnIcons, withOwnIcon } from "./appicon.js";
 import { prepareOnDevice } from "../signing/queue.js";
 import { SELF_ID } from "../core/appqueue.js";
 
 const reader = (o) => (k) => ({ iconMatch: false, lightIcon: "theme", darkIcon: "theme", ...o })[k];
 
-test("the own icon an update keeps: the tone on screen's, else the other tone's", () => {
+test("the own icons an update keeps: the tone on screen's first, then the other tone's", () => {
   const both = reader({ lightIcon: "owna1", darkIcon: "ownb2" });
-  assert.equal(updateOwnIcon(both, "light"), "owna1");
-  assert.equal(updateOwnIcon(both, "dark"), "ownb2");
-  assert.equal(updateOwnIcon(reader({ darkIcon: "ownb2" }), "light"), "ownb2");
-  assert.equal(updateOwnIcon(reader({ lightIcon: "owna1" }), "dark"), "owna1");
-  assert.equal(updateOwnIcon(reader({}), "light"), null);
+  assert.deepEqual(updateOwnIcons(both, "light"), ["owna1", "ownb2"]);
+  assert.deepEqual(updateOwnIcons(both, "dark"), ["ownb2", "owna1"]);
+  assert.deepEqual(updateOwnIcons(reader({ lightIcon: "owna1", darkIcon: "owna1" }), "dark"), ["owna1"]);
+  assert.deepEqual(updateOwnIcons(reader({ darkIcon: "ownb2" }), "light"), ["ownb2"]);
+  assert.deepEqual(updateOwnIcons(reader({ lightIcon: "owna1" }), "dark"), ["owna1"]);
+  assert.deepEqual(updateOwnIcons(reader({}), "light"), []);
   // Matching the theme (iconMatch on) shows the theme's icon, whatever the picks say
-  assert.equal(updateOwnIcon(reader({ iconMatch: true, lightIcon: "owna1" }), "light"), null);
+  assert.deepEqual(updateOwnIcons(reader({ iconMatch: true, lightIcon: "owna1" }), "light"), []);
 });
 
 test("withOwnIcon adds {ownIcon} only in Lite with an own icon picked", () => {
@@ -24,6 +25,8 @@ test("withOwnIcon adds {ownIcon} only in Lite with an own icon picked", () => {
   assert.deepEqual(withOwnIcon({ url: "u" }, { mode: "jailbreak", read, onScreen: "light" }), { url: "u" });
   assert.deepEqual(withOwnIcon({ url: "u" }, { mode: "sideload", read: reader({}), onScreen: "light" }), { url: "u" });
   assert.equal(withOwnIcon(null, { mode: "sideload", read }), null);
+  const both = reader({ lightIcon: "owna1", darkIcon: "ownb2" });
+  assert.deepEqual(withOwnIcon({ url: "u" }, { mode: "sideload", read: both, onScreen: "dark" }), { url: "u", ownIcon: "ownb2", ownIconOther: "owna1" });
 });
 
 test("the queue's row for Lite itself sends {ownIcon} with signing.prepare; other apps don't", async () => {

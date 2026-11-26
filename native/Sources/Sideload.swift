@@ -298,13 +298,15 @@ enum Sideload {
 
     // ---- B469: an update of iFizBox itself keeps the picked own icon
 
-    // {ownIcon: <own icon>} on signing.install's url/token or signing.prepare, sent by the page only for an IPA of
-    // iFizBox itself (Changes' row, the queue's row for its own ID: screens/appicon.js withOwnIcon): the picture and
-    // the set on screen, read on the main queue (where bridge calls arrive). nil in the jailbreak build or without it.
-    struct OwnIconPick { let name: String; let current: String? }
+    // {ownIcon: <own icon>, ownIconOther?} on signing.install's url/token or signing.prepare, sent by the page only for
+    // an IPA of iFizBox itself (Changes' row, the queue's row for its own ID: screens/appicon.js withOwnIcon): the
+    // picture (the other tone's too when it differs) and the set on screen, read on the main queue (where bridge calls
+    // arrive). nil in the jailbreak build or without it.
+    struct OwnIconPick { let name: String; let other: String?; let current: String? }
     static func ownIconPick(_ c: Bridge.Call) -> OwnIconPick? {
         guard AppMode.current == .sideload, let n = c.params["ownIcon"] as? String, OwnIcons.isOwn(n) else { return nil }
-        return OwnIconPick(name: n, current: Thread.isMainThread ? AppIcon.onScreen : nil)
+        let other = (c.params["ownIconOther"] as? String).flatMap { OwnIcons.isOwn($0) ? $0 : nil }
+        return OwnIconPick(name: n, other: other, current: Thread.isMainThread ? AppIcon.onScreen : nil)
     }
 
     // `o` with that picture's own-icon set (OwnIcons.selfFiles), as F329a's selfIcon re-sign puts it in, so the update
@@ -315,7 +317,7 @@ enum Sideload {
         guard let p = pick else { return o }
         do {
             var out = o
-            out.ownIconFiles = try OwnIcons.selfFiles(p.name, current: p.current)
+            out.ownIconFiles = try OwnIcons.selfFiles(p.name, other: p.other, current: p.current)
             log("Keeping your own app icon in this update")
             return out
         } catch {

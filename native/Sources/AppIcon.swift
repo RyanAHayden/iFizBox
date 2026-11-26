@@ -430,10 +430,17 @@ enum OwnIcons {
 
     // B469: the own-set files for `name` alone (SignOptions.ownIconFiles), for an IPA of the app itself downloaded as an
     // update (Sideload.withOwnIcon): the slot is the one plan picks, so an update while the picture is on screen puts
-    // it in the set on screen and the reopened app's app.icon has nothing to switch. Off the main queue.
-    static func selfFiles(_ name: String, current: String?) throws -> [String: Data] {
+    // it in the set on screen and the reopened app's app.icon has nothing to switch. `other`: the other tone's own
+    // icon when it differs, put in the other set (plan then finds it there when the tone changes); one that can't be
+    // drawn is left out. Off the main queue.
+    static func selfFiles(_ name: String, other: String? = nil, current: String?) throws -> [String: Data] {
         lock.lock(); defer { lock.unlock() }
-        return try setFiles(name, current: current)
+        var files = try setFiles(name, current: current)
+        guard let o = other, o != name, isOwn(o) else { return files }
+        let slot = files.keys.contains { $0.hasPrefix("IconOwnA") } ? "b" : "a"
+        guard ready(slot), let pngs = try? render(o) else { return files }
+        for (size, png) in zip(sizes, pngs) { files["IconOwn\(slot.uppercased())\(size.file).png"] = png }
+        return files
     }
 
     // The own-set files for `name` given the set on screen. Under `lock`.

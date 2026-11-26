@@ -163,20 +163,23 @@ export async function offerResign(name, store, { alert = null, install = null } 
 // B469: an update of Lite itself (Changes' row, the queue's row for its own ID) keeps the picked own icon: the shell
 // puts that picture's own-icon set into the downloaded IPA ({ownIcon}, Sideload.swift OwnIcons.selfFiles), as the
 // re-sign above does with its own bundle, so the reopened app has it and tellIcon just switches to it. The picture
-// is the one the tone on screen shows, else the other tone's; null when neither picks an own icon.
-export function updateOwnIcon(read, onScreen = globalThis.document?.documentElement?.dataset.theme) {
+// is the one the tone on screen shows, else the other tone's; when the two tones pick different own icons, the other
+// tone's goes in the other own set ({ownIconOther}), so switching tone needs no re-sign either. [] when neither picks
+// an own icon.
+export function updateOwnIcons(read, onScreen = globalThis.document?.documentElement?.dataset.theme) {
   const tones = onScreen === "dark" ? ["dark", "light"] : ["light", "dark"];
+  const out = [];
   for (const t of tones) {
     const n = read ? iconOf(t, read) : iconOf(t);
-    if (isOwnIcon(n)) return n;
+    if (isOwnIcon(n) && !out.includes(n)) out.push(n);
   }
-  return null;
+  return out;
 }
-// signing.install / signing.prepare params with {ownIcon} when an own icon is picked (Lite only).
+// signing.install / signing.prepare params with {ownIcon, ownIconOther} when an own icon is picked (Lite only).
 export function withOwnIcon(params, { mode = detectMode(), read, onScreen } = {}) {
   if (mode !== "sideload" || !params) return params;
-  const n = updateOwnIcon(read, onScreen);
-  return n ? { ...params, ownIcon: n } : params;
+  const [n, other] = updateOwnIcons(read, onScreen);
+  return n ? { ...params, ownIcon: n, ...(other ? { ownIconOther: other } : {}) } : params;
 }
 
 // ---- Shell calls ----------------------------------------------------------------------------------------------
