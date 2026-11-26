@@ -148,7 +148,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
       // B262: the download's last MB/s (the shell's once-a-second {rate}) stays on the label between its ticks
       if (ev?.phase === "downloading" && ev.rate != null) rate = Number(ev.rate) || 0;
       if (t) h.set(ev?.phase === "downloading" && rate > 0 ? `${t}, ${rateText(rate)}` : t);
-    }), { alert, url: params ? null : url }));
+    }), { alert, url: params ? params.url ?? null : url })); // B469: params with a url (Lite's own update with {ownIcon})
   } catch (e) {
     const stopped = wait.end();
     if (h.cancelled) return false;

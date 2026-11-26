@@ -61,6 +61,7 @@ enum SignAhead {
         guard let (id, profile) = Sideload.ready(c) else { return }
         let tag = (c.params["tag"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? SignBridge.token()
         let job = SignJob.begin(tag: tag)
+        let ownIcon = Sideload.ownIconPick(c) // B469: Lite's own update keeps the picked own icon
         // B257: KeepAlive from the call to its answer (as Sideload.install's), so the signing after the download's own
         // hold ends goes on with the app in the background; every answer below goes through `answer`, which lets go
         let released = Sideload.holdUntilAnswer()
@@ -122,7 +123,7 @@ enum SignAhead {
                             try? FileManager.default.removeItem(at: file)
                             throw error
                         }
-                        let (app, record, output) = try sign(file, url: source, id: id, profile: profile, options: options, emit: emit, log: log, job: job,
+                        let (app, record, output) = try sign(file, url: source, id: id, profile: profile, options: Sideload.withOwnIcon(options, ownIcon, log: log), emit: emit, log: log, job: job,
                                                              sha256: sha) // F343
                         signed = (app, record, output, sha)
                     } catch { return unsigned(error) }
