@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "1.0.1",
+          "date": "2026-11-26T16:32:16Z",
+          "localizedDescription": "UI fixes and improvements.",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v1.0.1/iFizBox.ipa",
+          "size": 31852079,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.0.0",
           "date": "2026-11-25T22:01:47Z",
           "localizedDescription": "Browse, search and install from APT repos and AltStore sources, with the iOS 6 look.\nSign, install, update and re-sign apps on your iPhone with your own certificate, no computer needed.\nAdd tweaks to apps without a jailbreak, from repos or your own files.\nJailbroken iPhones install and upgrade packages through apt, several at once, with a live log.",
