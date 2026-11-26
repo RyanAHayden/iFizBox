@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "1.0.2",
+          "date": "2026-11-26T18:07:12Z",
+          "localizedDescription": "Buttons, including the tab bar, now show they are pressed whenever you tap them.\nSmaller fixes: dragging or scrolling over a button no longer counts as a tap.",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v1.0.2/iFizBox.ipa",
+          "size": 31853787,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.0.1",
           "date": "2026-11-26T16:32:16Z",
           "localizedDescription": "UI fixes and improvements.",
