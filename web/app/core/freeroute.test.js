@@ -224,6 +224,25 @@ test("setup: at Apple's certificate limit it asks (ours first, other tools last)
   assert.equal(otherTool(certs[0]), true);
 });
 
+test("setup: at the limit an iloader certificate is offered last, below ours and unknown ones", async () => {
+  const certs = [
+    { serialNumber: "1DB66FCB", status: "Issued", machineName: "iloader" },
+    { serialNumber: "IL2", status: "Issued", name: "iloader" },
+    { serialNumber: "UNK", status: "Issued", machineName: "Some Mac" },
+    { serialNumber: "WEB", status: "Issued", machineName: MACHINE_NAME },
+  ];
+  const portal = fakePortal({ certs, limit: true });
+  let offered;
+  await runSetup({ portal, teamId: TEAM, phone: { udid: UDID }, bundleId: "com.x", make: fakeMake(portal),
+    askRevoke: async (list) => { offered = list.map((c) => c.serialNumber); return "WEB"; } });
+  assert.deepEqual(offered, ["WEB", "UNK", "1DB66FCB", "IL2"]);
+  assert.ok(portal.log.includes("revoke WEB"));
+  assert.ok(!portal.log.includes("revoke 1DB66FCB"));
+  assert.equal(otherTool(certs[0]), true);
+  assert.equal(otherTool(certs[1]), true);
+  assert.equal(otherTool(certs[2]), false);
+});
+
 test("setup: Cancel at the limit stops at the certificate step, nothing revoked", async () => {
   const portal = fakePortal({ certs: [{ serialNumber: "SS", status: "Issued" }], limit: true });
   const events = [];

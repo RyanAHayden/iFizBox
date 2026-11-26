@@ -48,8 +48,12 @@ const bytes = (v) => (v instanceof Uint8Array ? v : v ? new Uint8Array(v) : null
 const dateOf = (v) => (v instanceof Date ? v : v ? new Date(v) : null);
 
 // Certificates other tools made (SideStore, AltStore, Sideloadly...): revoking one stops every app that tool signed.
-export const otherTool = (c) => /sidestore|altstore|sideloadly|xcode|feather|livecontainer/i.test(String(c?.machineName ?? ""));
+// The alert shows machineName, else name, so both are checked.
+export const otherTool = (c) => /sidestore|altstore|sideloadly|xcode|feather|livecontainer|iloader/i
+  .test(`${c?.machineName ?? ""} ${c?.name ?? ""}`);
 export const MACHINE_NAME = `${NAME} Website`;
+// Revoke order: ours first, then certificates of unknown origin, other tools' last (stable within each).
+export const revokeRank = (c) => (String(c?.machineName ?? "").startsWith(NAME) ? 0 : otherTool(c) ? 2 : 1);
 
 // Apple's "you have too many development certificates" answers (7460 is the one AltStore and SideStore name).
 export const atCertLimit = (e) => Number(e?.code) === 7460 || /maximum|limit|already have a current/i.test(String(e?.message ?? ""));
@@ -69,7 +73,7 @@ async function certificate({ portal, teamId, saved, askRevoke, make, name }) {
     await portal.submitCsr(teamId, csr, MACHINE_NAME);
   } catch (e) {
     if (!atCertLimit(e)) throw e;
-    const choices = certs.filter(issued).sort((a, b) => Number(otherTool(a)) - Number(otherTool(b)));
+    const choices = certs.filter(issued).sort((a, b) => revokeRank(a) - revokeRank(b));
     const serial = await askRevoke(choices);
     if (!serial) throw Object.assign(new Error("No certificate was revoked, so Apple can't make a new one."), { kind: "cancelled", step: "certificate" });
     await portal.revokeCert(teamId, serial);
