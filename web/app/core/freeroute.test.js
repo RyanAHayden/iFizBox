@@ -180,6 +180,37 @@ test("setup: a revoked saved certificate is replaced", async () => {
   assert.equal(r.identity.made, true);
 });
 
+// B478, checked on the iPhone 15 Pro: Apple's listAllDevelopmentCerts serialNumber is the same upper-case hex as
+// certSerial() of its certContent, so the record a computer install carried (web/free-id.json) is reused as is.
+test("B478: a computer install's carried certificate is reused while Apple lists it as issued", async () => {
+  const spki = seq(seq(oid("1.2.840.113549.1.1.1")), tlv(0x03, Uint8Array.of(0, 4, 2)));
+  const cert = fakeCert(spki, [0x6c, 0x76, 0x16, 0xe2]);
+  const portal = fakePortal({ devices: [{ deviceNumber: UDID }], appIds: [{ identifier: `com.x.${TEAM}`, appIdId: "OLD" }], certs: [
+    { serialNumber: "1DB66FCB", status: "Issued", machineName: "iloader" },
+    { serialNumber: certSerial(cert), status: "Issued", machineName: MACHINE_NAME, certContent: cert }] });
+  const saved = { teamId: TEAM, serial: certSerial(cert), p12: Uint8Array.of(1), password: "s" };
+  const r = await runSetup({ portal, teamId: TEAM, phone: { udid: UDID }, saved, bundleId: "com.x", make: fakeMake(portal),
+    askRevoke: async () => assert.fail("no Certificate Limit alert while the carried certificate is issued") });
+  assert.equal(r.identity.made, false);
+  assert.equal(r.identity.serial, "6C7616E2");
+  assert.ok(!portal.log.some((l) => l.startsWith("submitCsr")));
+});
+
+// B478: what R103 saw. The carried certificate had been revoked elsewhere (another setup with the same Apple ID), so it is
+// not in Apple's list at all: a new one is needed, and at the limit the alert asks; Cancel stops with nothing revoked.
+test("B478: a carried certificate revoked elsewhere is not reused; at the limit Cancel revokes nothing", async () => {
+  const portal = fakePortal({ devices: [{ deviceNumber: UDID }], limit: true, certs: [
+    { serialNumber: "1DB66FCB", status: "Issued", machineName: "iloader" },
+    { serialNumber: "15B426F3", status: "Issued", machineName: MACHINE_NAME }] });
+  let offered = null;
+  await assert.rejects(runSetup({ portal, teamId: TEAM, phone: { udid: UDID }, bundleId: "com.x", make: fakeMake(portal),
+    saved: { teamId: TEAM, serial: "4C360FE9", p12: Uint8Array.of(1), password: "s" },
+    askRevoke: async (list) => { offered = list.map((c) => c.serialNumber).sort(); return null; } }),
+  (e) => e.kind === "cancelled" && /No certificate was revoked/.test(e.message));
+  assert.deepEqual(offered, ["15B426F3", "1DB66FCB"]);
+  assert.ok(!portal.log.some((l) => l.startsWith("revoke")));
+});
+
 test("setup: at Apple's certificate limit it asks (ours first, other tools last), revokes the pick, retries once", async () => {
   const certs = [{ serialNumber: "SS", status: "Issued", machineName: "SideStore" }, { serialNumber: "WEB", status: "Issued", machineName: MACHINE_NAME }];
   const portal = fakePortal({ certs, limit: true });
