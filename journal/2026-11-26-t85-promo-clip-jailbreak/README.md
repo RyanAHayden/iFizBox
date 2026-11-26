@@ -30,10 +30,10 @@
 
 ## Posts
 
-The X post (278 characters, with the URL counted as 23):
+The X post (266 characters, with the URL counted as 23):
 
 ```text
-Jailbroken? iFizBox is a free package manager with the classic iOS 6 look, for rootless jailbreaks (iOS 15+). Updates show as a badge on Changes, swipe a tweak to queue it, tap Confirm. Looks: iOS 6, 7 or 13. Open source (GPL-3.0). Add https://ifizbox.com/repo/ to Sileo or Zebra.
+Jailbroken? iFizBox is a free, open-source package manager with the iOS 6 look, for rootless jailbreaks (iOS 15+). Changes shows a badge for updates. Swipe a tweak to queue it, or tap Upgrade for all, then Confirm. iOS 6, 7 or 13 style. Repo: https://ifizbox.com/repo/
 ```
 
 The r/jailbreak title:
@@ -51,7 +51,7 @@ What it does:
 
 - Browse APT repos and AltStore sources in one catalog, and search across all of them.
 - Changes lists what's new and what you can upgrade. The tab shows a badge with the number of upgrades.
-- Swipe a row to queue it, then Confirm. Confirm shows the whole queue first (what gets downloaded and what changes), and the install runs through apt.
+- Swipe a row to queue it, or tap Upgrade to queue everything, then Confirm. Confirm shows the whole queue first (what gets downloaded and what changes), and the install runs through apt.
 - Background upgrade checks, and Shortcuts.
 - Installs IPAs without signing (AppSync Unified).
 - Three looks: iOS 6 (the default), iOS 7 and iOS 13, each with Light and Dark. On iOS 26 or later there's an iOS 26 look too.
@@ -73,7 +73,7 @@ Feedback and bug reports are welcome, here or on GitHub.
 
 Video choice: X gets the promo clips. Reddit gets the existing 40 s showcase 4x5 in `journal/2026-11-20-f290-showcase-video/`.
 
-The posts are not stored in the repo; the runner shows them to the person. The posts never use the old project's name as ours.
+The posts never use the old project's name as ours.
 
 Claims checked against `README.md` and the app: rootless iOS 15+ (iphoneos-arm64); the repo `https://ifizbox.com/repo/` for Sileo and Zebra; the Changes tab badge; swipe to queue; Confirm lists downloads and modifications and the install runs through apt; background upgrade checks and Shortcuts; IPAs install without signing (AppSync Unified); styles iOS 6, 7, 13 with Light and Dark, and iOS 26 on iOS 26 or later; GPL-3.0.
 
@@ -81,7 +81,7 @@ Claims checked against `README.md` and the app: rootless iOS 15+ (iphoneos-arm64
 
 - `ffprobe` on both MP4s: as in Result above, no audio stream.
 - Contact sheet of the 9:16 cut at 1 fps: the captions match the screen at each beat, and the first frame is the app.
-- Push check: n/a.
+- Known flaw in the clip: after the install the made-up world's Changes tab badge still reads 4 on the Theme beats (the fake apt status does not refresh the upgrade count). Left as is. The clip swipes one row (Dockshade) and then taps Upgrade (4), which queues the other three.
 - `https://sign.ifizbox.com/api/push` answered `enabled:true` today, so the showcase's Push beat no longer needs its caveat.
 
 ## Tried and failed

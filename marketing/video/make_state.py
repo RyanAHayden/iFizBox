@@ -163,7 +163,7 @@ def main(out, promo=False):
         put("etc/apt/sources.list.d/lamplight.sources", f"Types: deb\nURIs: https://{TWEAKS}/\nSuites: ./\n")
         have += [{**r, "Version": BEHIND[r["Package"]]} for r in TWEAK_LIST]
     put("var/lib/dpkg/status", "\n\n".join(control({k: v for k, v in r.items() if k not in skip}, Status="install ok installed") for r in have) + "\n")
-    print(f"{len(TWEAK_LIST)} tweaks, {len(base)} installed packages, 1 AltStore source in {out}")
+    print(f"{len(TWEAK_LIST)} tweaks, {len(have)} installed packages, 1 AltStore source in {out}")
 
 
 if __name__ == "__main__":

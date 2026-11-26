@@ -22,7 +22,7 @@ const H = Number(opt("--h", 1350)), FPS = Number(opt("--fps", 60));
 const page = opt("--page", "video"); // "promo": promo.html, cut from rec/promo.mp4 alone
 const stillsAt = opt("--still", null), stillsDir = opt("--stills", null);
 const [data, out] = args.map((a) => resolve(a));
-if (!data || (!out && !stillsAt)) { console.error("usage: render.mjs <out dir> <out.mp4> [--h 1350|1920] [--fps 60] [--still t,t --stills dir]"); process.exit(64); }
+if (!data || (!out && !stillsAt)) { console.error("usage: render.mjs <out dir> <out.mp4> [--h 1350|1920] [--fps 60] [--page promo] [--still t,t --stills dir]"); process.exit(64); }
 
 for (const name of (page === "promo" ? ["promo"] : ["lite", "jailbreak"])) {
   const mp4 = join(data, "rec", `${name}.mp4`), dir = join(data, "frames", name), done = join(dir, "done");
@@ -71,7 +71,7 @@ await send("Emulation.setDeviceMetricsOverride", { width: 1080, height: H, devic
 await send("Page.navigate", { url: `${base}/marketing/video/${page === "promo" ? "promo" : "video"}.html?h=${H}` });
 let duration = null;
 for (let i = 0; i < 100 && !duration; i++) { await sleep(200); try { duration = await ev("window.ready ? window.ready.then(() => window.DURATION) : null"); } catch {} }
-if (!duration) { console.error("video.html never got ready"); cleanup(); process.exit(1); }
+if (!duration) { console.error(`${page === "promo" ? "promo" : "video"}.html never got ready`); cleanup(); process.exit(1); }
 
 const shot = async (t, format = "jpeg") => {
   await ev(`window.render(${t}).then(() => new Promise((r) => requestAnimationFrame(() => r(1))))`);
