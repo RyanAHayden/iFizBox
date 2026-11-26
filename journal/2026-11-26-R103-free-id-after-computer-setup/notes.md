@@ -28,3 +28,6 @@ Check on the iPhone 15 Pro, after a real computer setup, what B474 promises:
 3. Run the setup one-liner on this Linux desktop.
 4. Developer Mode and Trust on the 15 Pro.
 5. Run the checks: the group, Refresh Profile, the tile's Renew, and the days left.
+
+## Rerun 2026-11-26 (later)
+Rechecked the three live files: still no `free-id.json` or `adoptBundledFreeId`. Still blocked on V32. **Not verified**: all four checks.
