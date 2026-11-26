@@ -166,3 +166,29 @@ test("B477: an installed app counts only on the source it was installed from", (
   ];
   assert.deepEqual(filterRows(rows, { scope: "installed", installed }).map((r) => r.key), [own, "alt:https://b/", "apt:https://repo/"]);
 });
+
+test("B482: Changes' Installed scope shows an installed app's own source's change when another source has it newer", async () => {
+  const { createCatalog, ALL } = await import("./catalog.js");
+  const { ownPicks } = await import("./changes.js");
+  const now = new Date(2026, 10, 26, 15, 0, 0).getTime();
+  const iso = (daysAgo) => new Date(now - daysAgo * DAY).toISOString();
+  const app = (version, versions) => ({ name: "X", bundleIdentifier: "com.x", developerName: "X", version,
+    downloadURL: "https://dl/x.ipa", localizedDescription: "x", versions: versions.map(([v, d]) => ({ version: v, date: iso(d), downloadURL: "https://dl/x.ipa" })) });
+  const own = "alt:https://apptesters.org/", fast = "alt:https://fastsign.dev/";
+  const c = createCatalog();
+  c.loadAlt(own, JSON.stringify({ name: "AppTesters", apps: [app("1.1", [["1.1", 0], ["1.0", 30]])] }));
+  c.loadAlt(fast, JSON.stringify({ name: "fastsign", apps: [app("2.0", [["2.0", 3]])] }));
+  const records = newRecords(new Set(), c.versions(), now - 40 * DAY);
+  const rows = c.list(ALL, ALL);
+  assert.deepEqual(rows.map((r) => [r.key, r.version]), [[fast, "2.0"]], "All Sources keeps the newest copy");
+  const recs = [{ id: "com.x", source: "https://apptesters.org/", version: "1.0" }];
+  assert.deepEqual(ownPicks(rows, recs), [[own, "com.x"]]);
+  assert.deepEqual(ownPicks(rows, [{ id: "com.x", key: fast }]), [], "installed from the source All shows: nothing extra");
+  const extra = ownPicks(rows, recs).map(([k, id]) => c.row(id, k));
+  const groups = dayGroups(records, rows, { now, own: extra });
+  const installed = installedIds(null, recs);
+  const mine = filterGroups(groups, { scope: "installed", installed });
+  assert.deepEqual(mine.map((g) => [g.day, g.rows.map((r) => [r.key, r.version, r.change])]), [[dayOf(now), [[own, "1.1", "updated"]]]]);
+  const all = filterGroups(groups, { scope: "all", installed });
+  assert.deepEqual(all.flatMap((g) => g.rows.map((r) => [r.key, r.version])), [[fast, "2.0"]], "All still shows fastsign's");
+});

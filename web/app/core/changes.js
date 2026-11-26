@@ -18,6 +18,7 @@
 //   changeGroups(await store.all(), rows)                              -> [{ seen, rows: [{ ...row, change }] }]
 
 import { isInstalledRow } from "./installed.js";
+import { ownKey } from "./altstore.js";
 
 const STORE = "seen";
 
@@ -107,26 +108,57 @@ export function daysBefore(now, days) {
 }
 
 const timeOf = (r) => r.date ?? r.first;
+const ownMark = (key, id) => `${key}\u0000${id}`;
 
-export function dayGroups(records, rows, { now = Date.now(), days = WINDOW_DAYS } = {}) {
+// B482: the catalog's rows are All Sources, one per id (the newest copy), so an app installed from one source is
+// replaced there by another source's newer copy of the same bundle ID (a modded X on fastsign beside AppTesters'),
+// which the Installed scope rightly leaves out. ownPicks lists, for each remembered app (core/installed.js apps())
+// whose All Sources row comes from another source, [key, id] of its own source (ownKey); the catalog fetches those
+// rows (catalog row()) and hands them to dayGroups as `own`.
+export function ownPicks(rows, appRecords) {
+  const shown = new Map();
+  for (const r of rows ?? []) if (r?.id) shown.set(r.id, r.key);
+  const out = [];
+  const seen = new Set();
+  for (const rec of appRecords ?? []) {
+    const key = ownKey(rec);
+    if (!rec?.id || !key || !shown.has(rec.id) || shown.get(rec.id) === key) continue;
+    const m = ownMark(key, rec.id);
+    if (seen.has(m)) continue;
+    seen.add(m);
+    out.push([key, rec.id]);
+  }
+  return out;
+}
+
+// B482: `own` are extra rows, an installed app's own source's copy where All Sources shows another source's (ownRows):
+// each is dated by its own source's records only, marked `own: true`, and shown only in the Installed scope.
+export function dayGroups(records, rows, { now = Date.now(), days = WINDOW_DAYS, own = [] } = {}) {
   let baseline = Infinity; // the first refresh: the earliest stamp of an undated record
   for (const r of records) if (r.date == null && r.first < baseline) baseline = r.first;
-  // id -> { first: earliest time of any version, byVersion: version -> earliest counted time }
+  const ownMarks = new Set(own.map((r) => ownMark(r.key, r.id)));
+  // id (and, for `own` rows, key + id) -> { first: earliest time of any version, byVersion: version -> earliest
+  // counted time }
   const times = new Map();
-  for (const r of records) {
-    const t = timeOf(r);
-    let p = times.get(r.id);
-    if (!p) times.set(r.id, (p = { first: t, byVersion: new Map() }));
+  const note = (at, r, t) => {
+    let p = times.get(at);
+    if (!p) times.set(at, (p = { first: t, byVersion: new Map() }));
     if (t < p.first) p.first = t;
-    if (r.date == null && r.first === baseline) continue; // the archive at the first load
+    if (r.date == null && r.first === baseline) return; // the archive at the first load
     const v = p.byVersion.get(r.version);
     if (v === undefined || t < v) p.byVersion.set(r.version, t);
+  };
+  for (const r of records) {
+    const t = timeOf(r);
+    note(r.id, r, t);
+    const m = ownMark(r.key, r.id);
+    if (ownMarks.has(m)) note(m, r, t);
   }
   const from = daysBefore(now, days - 1);
   const today = dayOf(now);
   const groups = new Map(); // day -> rows
-  for (const row of rows) {
-    const p = times.get(row.id);
+  for (const row of [...rows, ...own.map((r) => ({ ...r, own: true }))]) {
+    const p = times.get(row.own ? ownMark(row.key, row.id) : row.id);
     const seen = p?.byVersion.get(row.version ?? "");
     if (seen === undefined || seen < from) continue;
     const day = Math.min(dayOf(seen), today); // a date in the future (a wrong clock or source) counts as today
@@ -152,6 +184,7 @@ export function filterRows(rows, { query = "", scope = "all", installed = new Se
   const words = String(query).toLowerCase().split(/\s+/).filter(Boolean);
   return rows.filter((r) => {
     if (scope === "installed" && !isInstalledRow(installed, r)) return false;
+    if (scope !== "installed" && r.own) return false; // B482: All shows All Sources' copy instead
     if (!words.length) return true;
     const hay = [r.name, r.id, r.short, r.author].filter(Boolean).join("\n").toLowerCase();
     return words.every((w) => hay.includes(w));
