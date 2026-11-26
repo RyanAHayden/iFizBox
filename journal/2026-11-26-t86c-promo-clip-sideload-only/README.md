@@ -1,9 +1,10 @@
 # T86c: sideload-only promo clip
 
 ## Result
-- `promo-sideload-4x5.mp4`: 1080x1350, 4.0 MB. `promo-sideload-9x16.mp4`: 1080x1920, 5.3 MB.
-- Both: H.264 High, yuv420p, 60 fps, 2488 frames, 41.5 s, no audio.
+- `promo-sideload-4x5.mp4`: 1080x1350, 11.4 MB. `promo-sideload-9x16.mp4`: 1080x1920, 16.6 MB.
+- Both: H.264 High, yuv420p, 60 fps, 6417 frames, 106.95 s, no audio. Played at real time (1x), no speed-up.
 - Stills checked: `stills/promo-sideload-4x5-t5.png`, `stills/promo-sideload-4x5-t12.png`, `stills/promo-sideload-4x5-t25.png`.
+  These stills are from the earlier cut at x1.25 speeds, not the real-time clip, so their timings do not match the current video.
 - The X/r/sideloaded post text is T86a's and is untouched here.
 
 ## How it's built
@@ -15,7 +16,7 @@ Cut from one Lite recording with `promo-sideload.html`, run with `make.sh`. See 
 - The Home tab keeps the Certificate page open, so the script needs Back before the next tap.
 - "Upgrade (2)" appeared when Kiteline was aged before the update. Fixed by aging it afterwards.
 - Stills-mode mark times are not real times; a real recording is about 3x longer.
-- The first speeds gave a 50 s clip, so every segment is now x1.25.
+- The first speeds gave a 50 s clip; then every segment was x1.25 (41.5 s). Now every segment is 1x (real time, 106.95 s).
 
 ## Not verified
 - The Free Apple ID login is simulated: a made-up ID (`taylor@example.com`) and stubbed Apple answers. It was NOT
