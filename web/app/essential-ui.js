@@ -21,6 +21,9 @@ import { appQueue } from "./app-queue.js";
 import { SELF_ID } from "./core/essential.js";
 import { renamedUpdateNotice } from "./core/push.js";
 import { nativeBridge, hasNativeCall } from "./native.js";
+import { catalog } from "./catalog.js"; // B464
+import { settings } from "./settings-store.js"; // B464
+import { compareVersions as compareAptVersions } from "./core/apt.js"; // B464
 
 const native = () => nativeBridge();
 const storage = () => { try { return globalThis.localStorage; } catch { return null; } };
@@ -109,7 +112,7 @@ export async function unfinishedOnce(mode, { current = appVersion, banner = show
 }
 
 // The newer iFizBox the last check found, as Changes' row has it: sideload the source or GitHub's release, jailbreak
-// GitHub's (apt's row comes from the same release). Upgrade queues it and opens Confirm (B44). Once per version per
+// GitHub's, once apt's row has it too (B464, aptHasSelf). Upgrade queues it and opens Confirm (B44). Once per version per
 // session, unless Upgrade was tapped: then it comes back at the next check once iFizBox is out of the queue again
 // (user 2026-11-18: Upgrade, then Cancel on Confirm, and the banner never showed again).
 export const bannerSeen = { version: null };
@@ -118,13 +121,36 @@ const selfQueued = () => !!(installQueue.get(SELF_ID) || appQueue.get(SELF_ID));
 // Whether the banner for version `v` shows now: there is one, it hasn't shown this session, iFizBox isn't queued.
 export const bannerDue = (v, { shown = bannerSeen.version, queued = selfQueued() } = {}) => !!v && shown !== v && !queued;
 
-async function bannerOnce(mode) {
-  const current = await appVersion();
-  const release = newerRelease(storage(), current);
-  const v = mode === "sideload" ? selfUpgradeRow(selfInfoWith(loadInfo(storage()), release), current)?.version : release?.version;
-  if (!bannerDue(v)) return;
+// B464: the jailbreak banner's Upgrade queues apt's iFizBox row and Changes' Upgrade (N) counts apt's rows, but GitHub's
+// release can be out before apt's lists have it (the repo published later, or no refresh since). -> whether the catalog
+// has iFizBox's apt upgrade at `v` or newer, outside Ignored Upgrades as Changes reads them.
+const aptUpgrades = () => catalog.upgrades([...settings.holds.list(), ...settings.blocked.list()]);
+export async function aptHasSelf(v, { upgrades = aptUpgrades } = {}) {
+  const u = await Promise.resolve().then(upgrades).catch(() => null);
+  const row = (u?.available ?? []).find((r) => r?.id === SELF_ID);
+  return !!row && compareAptVersions(row.version, v) >= 0;
+}
+
+// Without apt's row yet the jailbreak banner waits for the next catalog load (a refresh) and looks again; one wait at a time.
+let aptWait = null;
+export async function bannerOnce(mode, { current = appVersion, banner = showBanner, aptHas = aptHasSelf,
+  onLoaded = (f) => catalog.onLoaded(f) } = {}) {
+  const now = await current();
+  const release = newerRelease(storage(), now);
+  const v = mode === "sideload" ? selfUpgradeRow(selfInfoWith(loadInfo(storage()), release), now)?.version : release?.version;
+  if (!bannerDue(v)) return false;
+  if (mode === "jailbreak" && !(await aptHas(v))) {
+    aptWait ??= onLoaded(() => {
+      aptWait?.();
+      aptWait = null;
+      bannerOnce(mode, { current, banner, aptHas, onLoaded }).catch(() => {});
+    });
+    return false;
+  }
+  if (!bannerDue(v)) return false; // shown while apt's row was read
   bannerSeen.version = v;
-  showBanner({ title: NAME, message: `${NAME} ${v} is out.`, action: { label: "Upgrade", onClick: () => { bannerUpgrade(); } } });
+  banner({ title: NAME, message: `${NAME} ${v} is out.`, action: { label: "Upgrade", onClick: () => { bannerUpgrade(); } } });
+  return true;
 }
 
 // B44: Upgrade queues iFizBox's own upgrade and opens Confirm (screens/changes.js upgradeSelf), or Changes when its row
