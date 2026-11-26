@@ -14,19 +14,19 @@ import { REFRESH_CONCURRENCY } from "./core/health.js";
 const PKG = (id) => `Package: ${id}\nVersion: 1\nArchitecture: iphoneos-arm64\nFilename: a.deb\nSize: 1\n`;
 const NAMES = Array.from({ length: 12 }, (_, i) => `r${i}`);
 
-// dead.test: added while it answers; once `hang()` is called apt can't fetch it (FAKE_DEAD) and its network reads
-// never answer. `slow`: ms each other net call takes.
+// dead.test: added while it answers; apt writes no list for it, so it is read over the network, and once `hang()` is
+// called those reads never answer. `slow`: ms each other net call takes.
 function setup(t, { timeout = 200, concurrency, slow = 0 } = {}) {
   const fx = makeFixture();
   t.after(fx.cleanup);
   const net = {};
   let hanging = false;
   for (const n of [...NAMES, "dead"]) {
-    writeFileSync(join(fx.remote, "lists", `${n}.test_._Packages`), PKG(`com.${n}.tweak`));
+    if (n !== "dead") writeFileSync(join(fx.remote, "lists", `${n}.test_._Packages`), PKG(`com.${n}.tweak`));
     net[`https://${n}.test/Packages`] = PKG(`com.${n}.tweak`);
     net[`https://${n}.test/Release`] = `Origin: ${n}\nArchitectures: iphoneos-arm64\n`;
   }
-  const native = createFakeNative({ prefix: fx.prefix, remote: fx.remote, net, env: { FAKE_DEAD: "https://dead.test/" } });
+  const native = createFakeNative({ prefix: fx.prefix, remote: fx.remote, net });
   let running = 0, most = 0;
   const wrapped = { ...native, call: async (method, params, onEvent) => {
     if (!/^net\./.test(method)) return native.call(method, params, onEvent);
@@ -59,7 +59,8 @@ test("B459: a source that never answers no longer holds Refresh: it ends with th
     assert.equal(r.count, 1);
   }
   const dead = rows.find((r) => String(r.uri).includes("dead.test"));
-  assert.ok(dead?.error, "the dead source says why");
+  assert.match(dead?.error ?? "", /Not responding/, "the dead source ran out of time and says so");
+  assert.equal(dead.count, 1, "and keeps the count it had");
   assert.equal(seen.length, rows.length, "each source landed through onEach");
 });
 

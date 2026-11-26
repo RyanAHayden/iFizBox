@@ -21,7 +21,7 @@
 - 60 s, not the site's 20 s, because a big list apt fetched is read and counted on the phone, which takes an iPhone 7 a while.
 
 ## Test
-- web/app/backend-native-refresh-timeout.test.js, with the fake native shell and helper (native/fake/): a source whose network reads never answer (and apt can't fetch, FAKE_DEAD) no longer holds refreshSources; at most REFRESH_CONCURRENCY sources read at once.
+- web/app/backend-native-refresh-timeout.test.js, with the fake native shell and helper (native/fake/): a source apt wrote no list for, whose network reads never answer, no longer holds refreshSources: it ends "Not responding" with its last count; at most REFRESH_CONCURRENCY sources read at once. A timed-out source's reads go on unawaited until the shell's own limits end them (as on the site); Cancel stops new sources, not reads under way.
 - Both tests failed on main's backend-native.js and pass with the fix. 142 tests across backend-native*, screens/changes*, screens/sources*, websign-refresh and incoming-sources-tab pass.
 
 ## On the phone
