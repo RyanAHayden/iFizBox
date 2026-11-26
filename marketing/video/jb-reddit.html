@@ -1,0 +1,135 @@
+<!doctype html>
+<!--
+  The r/jailbreak clip, as one page: about 40 s of the jailbreak build in one unbroken take (rec/jb-reddit.mp4,
+  shots-jb-reddit.json): a title card, then the phone slides up and the app is shown at its own speed (no cuts, no
+  speed-up, the app's own push slides between pages), a caption for each step, then the phone slides away and the end
+  card slides up. Nothing crossfades. Same engine as video.html (`--page jb-reddit`).
+
+    jb-reddit.html?h=1350     1350 (4:5); the width is 1080
+    window.DURATION       the length in seconds
+    window.render(t)      draws time t (a promise: the recording's frame is decoded)
+    window.ready          a promise: the marks and images are loaded
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>r/jailbreak clip</title>
+<style>
+  html, body { margin: 0; }
+  body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: var(--text); }
+  #stage { position: relative; width: 1080px; overflow: hidden; }
+  .ground { position: absolute; inset: 0; background: var(--grouped-ground); zoom: 3; }
+  .abs { position: absolute; left: 0; top: 0; }
+  .phone { position: absolute; left: 0; top: 0; background: #1d1e20; transform-origin: 0 0; }
+  .screen { position: absolute; overflow: hidden; background: #000; }
+  .screen img { position: absolute; left: 0; top: 0; width: 402px; height: 874px; }
+  .sb { position: absolute; left: 0; top: 0; width: 402px; height: 62px; color: #fff; font-size: 17px; font-weight: 600; }
+  .sb.dark { color: #111; }
+  .sb b { position: absolute; left: 40px; top: 22px; font-weight: 600; }
+  .sb i { position: absolute; bottom: 21px; width: 3px; border-radius: 1px; background: currentColor; }
+  .sb u { position: absolute; right: 36px; top: 25px; width: 23px; height: 11px; border: 1.4px solid currentColor; border-radius: 4px; box-sizing: border-box; }
+  .sb u::after { content: ""; position: absolute; inset: 1.4px 6px 1.4px 1.4px; background: currentColor; border-radius: 1.5px; }
+  #band { position: absolute; left: 0; top: 0; width: 1080px; overflow: hidden; }
+  .cap { position: absolute; left: 0; width: 1080px; text-align: center; font-size: 66px; line-height: 1.1; font-weight: 700; letter-spacing: -1px; text-shadow: var(--emboss); }
+  #title { position: absolute; left: 0; top: 0; width: 1080px; height: 100%; text-align: center; text-shadow: var(--emboss); }
+  #title img { width: 230px; height: 230px; border-radius: 51px; }
+  #title .name { font-size: 100px; font-weight: 700; letter-spacing: -2px; margin-top: 30px; }
+  #title .sub { font-size: 56px; font-weight: 500; color: var(--head); margin-top: 22px; line-height: 1.15; }
+  #end { width: 1080px; text-align: center; text-shadow: var(--emboss); }
+  #end img { width: 230px; height: 230px; border-radius: 51px; }
+  #end .name { font-size: 92px; font-weight: 700; letter-spacing: -2px; margin-top: 26px; }
+  #end .url { font-size: 68px; font-weight: 500; margin-top: 56px; }
+  #end .lic { font-size: 48px; color: var(--head); margin-top: 18px; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script type="module">
+import { NAME, DOMAIN } from "../../web/app/brand.js";
+
+const W = 1080, H = Number(new URLSearchParams(location.search).get("h") || 1350), TALL = H > 1500;
+const stage = document.getElementById("stage");
+stage.style.height = H + "px";
+const ios6 = await (await fetch("../../web/app/ios6.css")).text();
+for (const n of ["--pin-dark", "--pin-light", "--grouped-ground", "--text", "--head", "--emboss"]) {
+  const m = ios6.match(new RegExp(`${n}:\\s*([^;]+);`));
+  if (!m) throw new Error(`no ${n} in ios6.css`);
+  document.documentElement.style.setProperty(n, m[1]);
+}
+const mk = (cls, html = "", parent = stage) => { const e = document.createElement("div"); e.className = cls; e.innerHTML = html; parent.append(e); return e; };
+mk("ground");
+const clamp = (x) => Math.min(1, Math.max(0, x));
+const smooth = (x) => { x = clamp(x); return x * x * x * (x * (6 * x - 15) + 10); };
+const fade = (t, a, b, d = 0.22) => Math.min(smooth((t - a) / d), smooth((b - t) / d));
+const frame = (x) => Math.round(x * 60) / 60;
+
+const rec = await (await fetch("/rec/jb-reddit.json")).json();
+const at = (mark) => { const m = rec.marks.find((x) => x.name === mark); if (!m) throw new Error(`no mark ${mark} in jb-reddit`); return frame(m.t); };
+// the n-th tap (not a key) after a mark: when a step's screen starts to come
+const tapAfter = (mark, n = 0) => frame(rec.touches.filter((x) => x.t > at(mark) && !x.key)[n].t);
+
+// ---- the timeline: a title card, the phone slides up, the whole recording at 1x, the phone slides away, the end card
+const TITLE = 2.8, RISE = 0.9;
+const START = at("home"), LAST = at("end");
+const T0 = TITLE + RISE;                 // the recording's first frame
+const T = (src) => T0 + (src - START);   // a moment of the recording, on this clock
+const OUTRO = T(LAST) + 0.5;             // the phone leaves, the end card comes
+window.DURATION = Math.ceil((OUTRO + 2.6) * 60) / 60;
+
+// ---- the phone: a screen 402 points wide, scaled to fit under the words
+const PAD = 15, pw = 402 + 2 * PAD, ph = 874 + 2 * PAD;
+const el = mk("phone");
+el.style.width = pw + "px"; el.style.height = ph + "px"; el.style.borderRadius = "66px";
+const screen = mk("screen", "<img>", el);
+Object.assign(screen.style, { left: PAD + "px", top: PAD + "px", width: "402px", height: "874px", borderRadius: "52px" });
+const sb = mk("sb", `<b>12:30</b>${[5, 7, 9, 12].map((h, n) => `<i style="right:${82 - n * 5}px;height:${h}px;bottom:25px"></i>`).join("")}<u></u>`, screen);
+const img = screen.querySelector("img");
+let shown = 0;
+async function show(s) {
+  const n = Math.min(rec.frames, Math.max(1, Math.floor(s * rec.fps + 1e-6) + 1));
+  const look = rec.looks.filter((l) => l.t <= s + 1e-6).at(-1) ?? rec.looks[0];
+  sb.classList.toggle("dark", look.style !== "ios6" && look.theme !== "dark");
+  if (n === shown) return;
+  shown = n;
+  img.src = `/frames/jb-reddit/${String(n).padStart(5, "0")}.jpg`;
+  await img.decode();
+}
+
+// ---- the words: one at a time, each switched at the tap that brings its screen (no fades)
+const BAND = TALL ? 260 : 160, CAPY = TALL ? 122 : 46;
+const band = mk("", `<div class="ground"></div>`); band.id = "band"; band.style.height = BAND + "px";
+const words = [];
+const say = (a, b, text) => { const e = mk("cap", text); e.style.top = CAPY + "px"; words.push({ e, a, b }); };
+const steps = [ // each caption names what the screen it sits on is for, from the tap that brings the screen to the tap that leaves it
+  [T0, T(tapAfter("home")), "Open Sources"],
+  [T(tapAfter("home")), T(tapAfter("sources")), "Add a source"],
+  [T(tapAfter("sources")), T(tapAfter("add-source", 1)), "Type its address"],
+  [T(tapAfter("add-source", 1)), T(tapAfter("unknown-source")), "Unknown source? You decide"],
+  [T(tapAfter("unknown-source")), T(tapAfter("source-added")), "Source added"],
+  [T(tapAfter("source-added")), T(tapAfter("found")), "Search for a tweak"],
+  [T(tapAfter("found")), T(tapAfter("tweak")), "Open it, tap Install"],
+  [T(tapAfter("tweak")), T(tapAfter("confirm")), "Review, then Confirm"],
+  [T(tapAfter("confirm")), T(LAST - 2.4), "Installing"],
+  [T(LAST - 2.4), OUTRO, "Done. Restart SpringBoard"],
+];
+for (const [a, b, text] of steps) say(a, b, text);
+
+const title = mk("", `<img src="../../web/app/icons/icon-glossy-228.png"><div class="name">${NAME}</div><div class="sub">The package manager<br>for your jailbreak</div>`); title.id = "title";
+const end = mk("abs", `<img src="../../web/app/icons/icon-glossy-228.png"><div class="name">${NAME}</div><div class="url">${DOMAIN}</div><div class="lic">Free, GPL-3.0</div>`);
+end.id = "end";
+
+const s = (H - BAND - 34) / ph, px = (W - pw * s) / 2, py = BAND + 8;
+
+window.render = async (t) => {
+  const rise = smooth((t - TITLE) / RISE), out = smooth((t - OUTRO) / 0.7), e = smooth((t - OUTRO - 0.3) / 0.7);
+  // the phone slides up from below, the title card slides off the top; at the end the phone drops and the end card rises
+  el.style.transform = `translate(${px.toFixed(2)}px, ${(py + (1 - rise) * (H + 40) + out * (H + 40)).toFixed(2)}px) scale(${s.toFixed(5)})`;
+  title.style.transform = `translateY(${(H / 2 - 330 - rise * (H + 40)).toFixed(2)}px)`;
+  for (const w of words) w.e.style.visibility = t >= w.a && t < w.b ? "visible" : "hidden";
+  end.style.transform = `translateY(${(H / 2 - 330 + (1 - e) * (H + 40)).toFixed(2)}px)`;
+  if (rise > 0 && out < 1) await show(Math.min(Math.max(START + (t - T0), START), LAST));
+};
+window.ready = Promise.all([...end.querySelectorAll("img"), ...title.querySelectorAll("img")].map((i) => i.decode())).then(() => document.fonts.ready).then(() => window.render(0)).then(() => true);
+</script>
+</body>
+</html>
