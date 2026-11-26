@@ -1,0 +1,4 @@
+gate passed: tools/check.sh
+ticked B460
+8f2b54f7 B460 Installed: A–Z index starts below the search bar and kinds row
+pushed task/B460 -> origin
