@@ -18,6 +18,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 - [ ] **T85** Promo clip + posts for jailbreakers (split into T85a, T85b) | files: marketing/video/**, journal/**
 - [ ] **T85a** New 4:5 Reddit video for r/jailbreak of the current jailbreak app (the F290 showcase is outdated, too quick, odd page transitions): slower (~30-40 s, each screen readable), page changes as the app's push slide, no crossfades or jump cuts, short title card at the start. H.264 60 fps 1080x1350, no audio, journal if under 20 MB. Same marketing/video make.sh route. | files: marketing/video/**, journal/**
 - [ ] **T85b** Jailbreak posts artifact (https://claude.ai/artifact/TCQpUb4DMCxkJqtKaF7vP5): add the r/jailbreak title and body as copy-ready blocks with Copy buttons, give the page a proper title and description, swap in the new Reddit video from T85a (upload + download link). Then block CONFIRM as before. | files: journal/** | after: T85a | model: sonnet
+- [ ] **V30** Patch release once F444 (free Apple ID in the sideload IPA) has landed, so the T86 sideload promo video records the released Lite build | after: all
 ### Research (any time, parallel)
 
 ### Native jailbreak app (shape decided: docs/native.md)
