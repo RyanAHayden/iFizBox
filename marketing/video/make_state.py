@@ -11,14 +11,18 @@ Writes
     OUT_DIR/var/lib/dpkg/status        its installed packages
 Stdlib only.
 """
+import gzip
+import io
 import json
 import sys
+import tarfile
 from datetime import date, timedelta
 from pathlib import Path
 
 APPS = "harbor.example"     # the AltStore source the Lite recording adds
 TWEAKS = "lamplight.example"      # the APT repo the jailbreak recording adds
 REPO_ICON = "Cydia" + "Icon.png"  # the file name every APT repo's icon has
+SHORE = "driftwood.example"      # the APT repo the promo clip adds in the Lite build: a tweak made for Tidewell
 BASE = "fernhill.example"       # the one it already has
 
 
@@ -101,7 +105,10 @@ TWEAK_LIST = [
     stanza(TWEAKS, "example.lamplight.quietbar", "Quietbar", "2.0", "Tweaks", "Hides what you don't need in the status bar.", "quietbar"),
     stanza(TWEAKS, "example.lamplight.longnight", "Long Night", "1.1", "Themes", "Darker icons for the evening.", "longnight"),
 ]
+SHORE_LIST = [stanza(SHORE, "example.driftwood.nightcharts", "Night Charts", "1.0", "Tweaks", "A dark look for the charts in Tidewell.", "nightcharts")]
 ICONS.update({
+    "driftwood": icon("#9a8468", "#5a4a36", f'<path {W} d="M48 176c40-8 72-40 96-92M96 176c32-4 56-28 72-64"/>'),
+    "nightcharts": icon("#2a3a66", "#101a38", f'<path {W} d="M52 180V120M100 180V80M148 180V140M196 180V100"/>'),
     "softdock": icon("#6aa7e8", "#2d62b5", f'<rect x="36" y="150" width="184" height="60" rx="24" {W}/><path {W} d="M84 110h88"/>'),
     "dockshade": icon("#8b93a7", "#4a5166", f'<rect x="36" y="140" width="184" height="70" rx="18" fill="#fff" opacity=".55"/>'),
     "quietbar": icon("#58c2a3", "#23806a", f'<path {W} d="M40 80h176M40 128h104M40 176h52"/>'),
@@ -117,6 +124,28 @@ BASE_LIST = [
     ("nano", "nano", "7.2", "Text Editors", "A text editor."),
     ("preferenceloader", "PreferenceLoader", "2.2.6", "System", "Shows tweak settings in Settings."),
 ]
+
+
+def deb_bytes(dylib, ctl, bundle):
+    """A .deb the app can read (ar of debian-binary, control.tar.gz, data.tar.gz): one tweak dylib and its filter plist,
+    for the app `bundle`. The dylib's bytes are placeholders: the recordings sign nothing for real."""
+    def tgz(files):
+        raw = io.BytesIO()
+        with tarfile.open(fileobj=raw, mode="w") as t:
+            for path, data in files:
+                i = tarfile.TarInfo(path)
+                i.size = len(data)
+                t.addfile(i, io.BytesIO(data))
+        return gzip.compress(raw.getvalue(), mtime=0)
+    plist = ('<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>Filter</key><dict><key>Bundles</key><array>'
+             f'<string>{bundle}</string></array></dict></dict></plist>').encode()
+    base = f"Library/MobileSubstrate/DynamicLibraries/{dylib}"
+    members = [("debian-binary", b"2.0\n"), ("control.tar.gz", tgz([("control", ctl.encode())])),
+               ("data.tar.gz", tgz([(base + ".dylib", b"\xcf\xfa\xed\xfe" + bytes(60)), (base + ".plist", plist)]))]
+    out = b"!<arch>\n"
+    for name, data in members:
+        out += f"{name + '/':<16}{0:<12}{0:<6}{0:<6}{100644:<8}{len(data):<10}`\n".encode() + data + (b"\n" if len(data) % 2 else b"")
+    return out
 
 
 def control(f, **extra):
@@ -144,7 +173,7 @@ def main(out, promo=False):
 
     for update, top in ((False, "www"), (True, "www-update")):
         put(f"{top}/{APPS}/apps.json", apps_source(update))
-    for host in (APPS, TWEAKS, BASE):
+    for host in (APPS, TWEAKS, BASE, SHORE):
         for slug, svg in ICONS.items():
             put(f"www/{host}/icons/{slug}.svg", svg)
     for i, (bg, sun, bars, title) in enumerate([("#1d74ad", "#ffe08a", (70, 130, 210, 260, 220, 140, 80, 60), "Today"),
@@ -152,10 +181,14 @@ def main(out, promo=False):
                                                 ("#243b63", "#e8ecf7", (90, 60, 80, 150, 220, 250, 190, 120), "Tonight")]):
         put(f"www/{APPS}/shots/tidewell-{i + 1}.svg", shot(bg, sun, bars, title))
     base = [stanza(BASE, p, n, v, s, d) for p, n, v, s, d in BASE_LIST]
-    for host, name, art, rows in ((TWEAKS, "Lamplight", "lamplight", TWEAK_LIST), (BASE, "Fernhill", "fernhill", base)):
+    for host, name, art, rows in ((TWEAKS, "Lamplight", "lamplight", TWEAK_LIST), (BASE, "Fernhill", "fernhill", base), (SHORE, "Driftwood", "driftwood", SHORE_LIST)):
         put(f"www/{host}/Packages", "\n\n".join(control(r) for r in rows) + "\n")
         put(f"www/{host}/Release", release(name))
         put(f"www/{host}/%s.svg" % REPO_ICON, ICONS[art])
+    for r in SHORE_LIST:  # the Lite promo clip adds this tweak to Tidewell
+        d = out / "www" / SHORE / r["Filename"][2:]
+        d.parent.mkdir(parents=True, exist_ok=True)
+        d.write_bytes(deb_bytes(r["Name"], control({k: v for k, v in r.items() if k not in ("Filename", "Size", "SHA256")}), "example.demo.tidewell"))
     put("etc/apt/sources.list.d/fernhill.sources", f"Types: deb\nURIs: https://{BASE}/\nSuites: ./\n")
     skip = ("Filename", "Size", "SHA256")
     have = list(base)

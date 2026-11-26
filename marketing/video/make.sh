@@ -47,4 +47,10 @@ APP_VERSION=$version timeout 2400 node "$here/capture.mjs" "http://127.0.0.1:$po
 for cut in 4x5:1350 9x16:1920; do
   timeout 2400 node "$here/render.mjs" . "promo-${cut%:*}.mp4" --h "${cut#*:}" --page promo
 done
-echo "done: $out/showcase-4x5.mp4 $out/showcase-9x16.mp4 $out/promo-4x5.mp4 $out/promo-9x16.mp4"
+# the promo clip for sideloaders (promo-lite.html): one Lite recording (a tweak from a repo goes into an app, then Signed
+# Apps and Re-sign All), two cuts: OUT_DIR/promo-lite-4x5.mp4 and OUT_DIR/promo-lite-9x16.mp4
+APP_VERSION=$version timeout 2400 node "$here/capture.mjs" "http://127.0.0.1:$port/" rec "$here/shots-promo-lite.json" --state state --mode sideload
+for cut in 4x5:1350 9x16:1920; do
+  timeout 2400 node "$here/render.mjs" . "promo-lite-${cut%:*}.mp4" --h "${cut#*:}" --page promo-lite
+done
+echo "done: $out/showcase-4x5.mp4 $out/showcase-9x16.mp4 $out/promo-4x5.mp4 $out/promo-9x16.mp4 $out/promo-lite-4x5.mp4 $out/promo-lite-9x16.mp4"
