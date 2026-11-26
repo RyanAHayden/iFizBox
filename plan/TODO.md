@@ -26,7 +26,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
-- [ ] **F446** (follow-up, normal) Free Apple ID profile: make This iPhone work through the LocalDevVPN app (App Store loopback VPN, Device IP 10.7.0.1) instead of the built-in VPN. A build without Network Extensions skips LocalVPN.begin and connects to 10.7.0.1 when a tunnel is up (VPNCheck.tunnels), Set Up step 2 becomes Turn on LocalDevVPN with its App Store link and a Test Connection probe, install failures say Turn on LocalDevVPN, Restore My VPN and the Quiet Pairing Check's VPN branches are skipped. Check on the iPhone 15 Pro with a free-profile build: an install and a re-sign with no computer. See journal/2026-11-26-R104-free-route-loopback-vpn. | files: native/sideload/vpn/App/LocalVPN.swift, native/sideload/idevice/IDevice.swift, native/sideload/idevice/VPNCheck.swift
 ### Parked
 
 - [ ] **F107** (later, when the jailbreakme.dev exploit is ready) Upgrading & Jailbreaking Help stays unlocked on the website's locked Home (user 2026-11-18: 'we will not have the jailbreak tutorial thing locked when jailbreakme.dev exploit is ready, thats for later'): leave that row out of websign-gate's browsingLocked set in screens/home.js and point it at the jailbreak guide. | files: web/app/screens/home.js
