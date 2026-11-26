@@ -711,11 +711,16 @@ enum IDevice {
         let kind: Kind
         private var awake: LocalVPN.BackgroundHold? // B423: a check has no KeepAlive: leaving the app lets it end
         private var builtIn = false // through the built-in VPN, held (LocalVPN.begin) until deinit
-        var via: String { LocalVPN.name }
+        var via: String { LocalVPN.routeName }
 
-        /// Where to connect for `port`: the built-in VPN turns on here and the connect goes to 10.7.0.1 through it. A
-        /// build without Network Extensions (LocalVPN.available false) has no way in.
+        /// Where to connect for `port`: the built-in VPN turns on here and the connect goes to 10.7.0.1 through it.
+        /// F447: through LocalDevVPN (Connect Through, or a build without Network Extensions) nothing turns on: the
+        /// connect goes to 10.7.0.1 through its tunnel when that is up, and says to turn it on when not.
         private func endpoint(_ port: UInt16) throws -> (String, UInt16) {
+            if LocalVPN.viaApp {
+                guard VPNCheck.appUp() else { throw LocalVPN.appOff() }
+                return (address, port)
+            }
             guard LocalVPN.available else { throw Failure(code: "vpn_failed", text: "this build has no Network Extensions, so \(Brand.name) can't connect to this iPhone") }
             // it failed a moment ago: the same error again, not a new start
             if LocalVPN.failedNow() { throw Session.lastVPNFailure() }
@@ -1018,7 +1023,7 @@ enum IDevice {
                 return
             } catch let f as Failure where !run.connected && isEarlyEOF(f) && IDevice.pairing()?.kind == .remotePairing {
                 // B274: Pair Again, not the socket error (the row and its log say what to do)
-                let via = LocalVPN.name
+                let via = LocalVPN.routeName
                 ilog("first connect reset during pair-verify through \(via): \(f.text); the pairing is stale")
                 note("The first connection closed: \(f.errorDescription ?? f.text)") // B416: the raw text, grey
                 throw pairAgain(f, via: via)

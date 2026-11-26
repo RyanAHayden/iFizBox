@@ -27,6 +27,11 @@ enum VPNCheck {
         return out.sorted()
     }
 
+    /// F447: LocalDevVPN's tunnel is up, so a connect to 10.7.0.1 can go through it: a tunnel interface with an IPv4
+    /// address that isn't the built-in VPN's (LocalDevVPN's own is 10.7.1.1). Another app's VPN passes too; a connect
+    /// through one that doesn't reach this phone then fails as any connect does.
+    static func appUp() -> Bool { LocalVPN.otherVPNUp() }
+
     enum Probe { case connected, refused, silent }
 
     /// A TCP connect to 10.7.0.1:port with a deadline. Blocking.

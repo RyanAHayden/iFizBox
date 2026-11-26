@@ -23,7 +23,8 @@ import { leaveQuestion, LEAVE } from "../core/installroute.js";
 import { installStatus, CHECKING, CHECKING_SERVER, STATUS_ACTIONS } from "../core/installroute.js";
 import { routeFailure, rememberRouteFailure, clearRouteFailure, routeFailureOf, NO_ANSWER_FAILURE, FIX, takeFix } from "../core/installroute.js"; // B316, F409
 import { SETUP_FOOTER, setupSteps, iphoneStatus, fixQuestion } from "../core/installroute.js"; // F414
-import { builtinVPN, setupFooter, iphoneSetUp, HOW_STEPS, vpnTestResult, NO_VPN, BUILTIN_VPN } from "../core/installroute.js"; // F372
+import { builtinVPN, setupFooter, iphoneSetUp, vpnTestResult, NO_VPN, BUILTIN_VPN } from "../core/installroute.js"; // F372
+import { VPN_APP, VPN_APP_LINK, viaApp, canConnect, ownVPN, routeVPN, setVia, connectFooter, howSteps } from "../core/installroute.js"; // F447
 import { quietCheckDue, quietCheckAllowed, markQuietCheck } from "../core/installroute.js"; // F410b
 import { onCellular, cellularCheck, connectRefused } from "../core/installroute.js"; // B428a
 import { RESTORE_VPN, restoreShown, restoreFooter, setRestoreVPN } from "../core/installroute.js"; // F412
@@ -65,6 +66,7 @@ let lastShortcut = null, addingShortcut = false;
 // F420: the Restore My VPN Shortcut, adding it and its store run, and while that goes on (a row spins, a second tap waits)
 const restoreSetup = () => import("../signing/restoresetup.js");
 let settingRestore = false;
+let connectingVia = null; // F447: the Connect Through row being set (vpn.setVia), until the shell answers
 const isLate = (e) => e?.code === "not_responding";
 // idevice.status with its deadline: { st } (null when it failed) and `late` when it didn't answer in time.
 async function readStatus(native) {
@@ -133,19 +135,19 @@ function spinRows(frag, sections) {
 // F301: `late: {device}` idevice.status didn't answer in time: the status says Not Responding.
 export function installationGroups(choice, st, { pick = () => {}, test = () => {},
   reading = false, picking = false, hint = null, server = () => [],
-  late = {}, testing = false, failure = null, fix = () => {}, fixing = false, pairChecking = false, checkNow, forget, setUp, cellular, setCellular, shortcut, adding, addAgain, remember, remembering } = {}) {
+  late = {}, testing = false, failure = null, fix = () => {}, fixing = false, pairChecking = false, checkNow, forget, setUp, cellular, setCellular, shortcut, adding, addAgain, remember, remembering, connect, connecting } = {}) {
   const groups = [{
     header: "Install Apps With",
     rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", icon: rowIcon(ROUTE_ICON[o.value]), checked: o.value === choice, onClick: () => pick(o.value),
       ...(picking && o.value === choice ? { spin: true } : {}) })),
     footer: choice === "iphone"
-      ? `Signed apps go straight to iOS through ${BUILTIN_VPN}.`
+      ? `Signed apps go straight to iOS through ${routeVPN(st ?? hint)}.`
       : "The Signing Server hands iOS each app's install link.",
   }];
   if (choice !== "iphone") return [...groups, ...(server() ?? [])];
   // F372: the built-in VPN is the way in: This iPhone's page is Set Up and How It Works, drawn from the first frame
   // (rows Checking… until idevice.status answers). A profile without Network Extensions says so there (core NO_VPN).
-  return [...groups, ...localGroups(st ?? hint, { reading: reading && !hint && !st, pairChecking, test, testing, failure, fix, fixing, checkNow, forget, setUp, cellular, setCellular, shortcut, adding, addAgain, remember, remembering, late: Boolean(late.device) })];
+  return [...groups, ...localGroups(st ?? hint, { reading: reading && !hint && !st, pairChecking, test, testing, failure, fix, fixing, checkNow, forget, setUp, cellular, setCellular, shortcut, adding, addAgain, remember, remembering, connect, connecting, late: Boolean(late.device) })];
 }
 
 // ---- F372: This iPhone with the built-in VPN (core BUILTIN_VPN; native/sideload/vpn)
@@ -155,10 +157,11 @@ export function installationGroups(choice, st, { pick = () => {}, test = () => {
 // `testing`/`fixing`/`pairChecking` while a test, a check or Fix runs. A failed check or install (B316's `failure`) is
 // the status, red, and its action is Fix.
 export function localGroups(st, { reading = false, pairChecking = false, test = () => {}, testing = false, failure = null, fix = () => {}, fixing = false, late = false,
-  checkNow = () => {}, forget = () => {}, setUp = () => goTo("pair"), cellular = "ask", setCellular = () => {}, shortcut = false, adding = false, addAgain = () => {}, remember = () => {}, remembering = false } = {}) {
+  checkNow = () => {}, forget = () => {}, setUp = () => goTo("pair"), cellular = "ask", setCellular = () => {}, shortcut = false, adding = false, addAgain = () => {}, remember = () => {}, remembering = false,
+  connect = () => {}, connecting = null, openApp = () => openVPNApp() } = {}) {
   const howGroup = { rows: [{ label: "How It Works", icon: rowIcon("help"), href: route("how") }] };
-  // A profile without Network Extensions: nothing to set up, and the page says so instead of the VPN's rows
-  if (st && !reading && !late && !builtinVPN(st)) {
+  // A profile without Network Extensions on a shell that has no LocalDevVPN: nothing to set up, and the page says so
+  if (st && !reading && !late && !canConnect(st)) {
     return [{ header: "Set Up", rows: [{ label: "Network Extensions", detail: "Missing" }], footer: NO_VPN.message, warn: true }, howGroup];
   }
   const s = iphoneStatus(st, { reading, running: testing || fixing || pairChecking, late, failure });
@@ -167,9 +170,23 @@ export function localGroups(st, { reading = false, pairChecking = false, test = 
     { label: s.title, subtitle: s.subtitle, cls: "install-status", tone: s.tone, red: Boolean(s.red) },
     { label: STATUS_ACTIONS[s.action], cls: "install-action", dim: Boolean(s.dim), onClick: s.busy || s.dim ? () => {} : acts[s.action], ...(s.busy || s.dim ? { spin: true } : {}) },
   ], ...(s.state === "ready" && setupFooter(st) ? { footer: setupFooter(st) } : {}) }];
+  // F447 (concept K10): Connect Through, the built-in VPN or LocalDevVPN; a shell that keeps the choice says vpn.via.
+  // Without Network Extensions (a free Apple ID) the built-in row says Missing and LocalDevVPN is the one.
+  // `connecting`: the row just tapped, checked at once and spinning until the shell answers.
+  if (st && !reading && !late && typeof st.vpn?.via === "string") {
+    const via = connecting ?? st.vpn.via, own = builtinVPN(st);
+    const row = (value, label, subtitle, icon, more = {}) => ({ label, subtitle, cls: "route-row", icon: rowIcon(icon), checked: via === value,
+      ...(connecting === value ? { spin: true } : {}), ...more });
+    groups.push({ key: "via", header: CONNECT_THROUGH, footer: connectFooter({ vpn: { via } }), rows: [
+      row("builtin", BUILTIN_VPN, own ? "Built in, turns on by itself" : "Needs Network Extensions", "cellular",
+        own ? { onClick: () => connect("builtin") } : { dim: true, detail: "Missing" }),
+      row("app", VPN_APP, "Free app on the App Store", "testConnection", { onClick: () => connect("app") }),
+    ] });
+  }
   if (st && !iphoneSetUp(st)) {
-    groups.push({ header: "Set Up", rows: setupSteps(st).map((p) => ({ label: p.label, subtitle: p.subtitle, icon: rowIcon(STEP_ICON[p.key]),
-      ...(p.done ? { checked: true } : p.next ? { onClick: p.key === "pair" ? setUp : test, chevron: true } : {}) })), footer: SETUP_FOOTER });
+    // F447: the setup of the way in chosen (a new choice draws its own steps)
+    groups.push({ key: `setup-${viaApp(st) ? "app" : "builtin"}`, header: "Set Up", rows: setupSteps(st).map((p) => ({ label: p.label, subtitle: p.subtitle, icon: rowIcon(STEP_ICON[p.key]),
+      ...(p.done ? { checked: true } : p.app ? { onClick: openApp, chevron: true } : p.next ? { onClick: p.key === "pair" ? setUp : test, chevron: true } : {}) })), footer: SETUP_FOOTER });
   }
   // F412: not in the row's content: a repaint keeps the row, so the knob slides (syncRestore sets it)
   // F420: what is left to do, with its row; nothing left: remembering again, a group of its own
@@ -182,10 +199,11 @@ export function localGroups(st, { reading = false, pairChecking = false, test = 
   }
   // F417: what an install does on cellular data. F417b: `shortcut`: Cellular Installs can run here; `adding`: it's being added
   const onCell = cellular === "shortcut" && !shortcut ? "ask" : cellular;
-  if (st?.paired) groups.push({ key: "cellular", header: ON_CELLULAR, footer: cellularFooter(onCell), rows: cellularOptions(shortcut).map((o) => ({
+  // F447: its wait holds the built-in VPN, so On Cellular is the built-in VPN's only
+  if (st?.paired && ownVPN(st)) groups.push({ key: "cellular", header: ON_CELLULAR, footer: cellularFooter(onCell), rows: cellularOptions(shortcut).map((o) => ({
     label: o.label, subtitle: o.subtitle, cls: "route-row", icon: rowIcon(o.icon), checked: o.value === onCell, onClick: () => setCellular(o.value),
     ...(adding && o.value === "shortcut" && onCell !== "shortcut" ? { spin: true } : {}) })) });
-  if (st?.paired && onCell === "shortcut") groups.push({ key: "cellshortcut", rows: [{ label: ADD_AGAIN, cls: "sign-import", onClick: addAgain, ...(adding ? { spin: true } : {}) }], footer: ADD_AGAIN_FOOTER });
+  if (st?.paired && ownVPN(st) && onCell === "shortcut") groups.push({ key: "cellshortcut", rows: [{ label: ADD_AGAIN, cls: "sign-import", onClick: addAgain, ...(adding ? { spin: true } : {}) }], footer: ADD_AGAIN_FOOTER });
   if (st?.paired) groups.push({ rows: [{ label: "Forget Pairing", cls: "sign-import", onClick: forget }] });
   return [...groups, howGroup];
 }
@@ -202,7 +220,14 @@ function syncRestore(page, on) {
   const sw = page.querySelector?.(".restore-vpn .switch");
   if (sw && sw.getAttribute("aria-checked") !== String(on)) sw.setAttribute("aria-checked", String(on));
 }
-const STEP_ICON = { pair: "pairPhone", allow: "cellular", test: "testConnection" };
+const STEP_ICON = { pair: "pairPhone", allow: "cellular", app: "cellular", test: "testConnection" };
+// F447: Connect Through's header, and step 2's tap through LocalDevVPN: its App Store page (Open there once it's installed)
+const CONNECT_THROUGH = "Connect Through";
+export async function openVPNApp(native = nativeBridge()) {
+  try { if ((await native?.call?.("app.openURL", { url: VPN_APP_LINK }))?.opened === true) return true; } catch { /* an older shell */ }
+  try { globalThis.open?.(VPN_APP_LINK, "_blank", "noopener"); } catch { /* nowhere to open it */ }
+  return false;
+}
 // The status cell's tile and the action's dimming on the drawn rows (as mainPage's).
 function dressStatus(frag, sections) {
   const groups = [...frag.children];
@@ -224,10 +249,10 @@ function dressStatus(frag, sections) {
   return frag;
 }
 
-// How It Works (installation/how): the steps of one install, a row each (core HOW_STEPS).
-export function howGroups() {
+// How It Works (installation/how): the steps of one install, a row each (core howSteps: F447, through the way in chosen).
+export function howGroups(st = cachedStatus()) {
   return [
-    { header: "Each Install", rows: HOW_STEPS.map((s) => ({ ...s })), footer: "Takes a few seconds more than an install over Wi-Fi." },
+    { header: "Each Install", rows: howSteps(st).map((s) => ({ ...s })), footer: "Takes a few seconds more than an install over Wi-Fi." },
     { header: "Without Wi-Fi or Data", rows: [{ label: "Offline", detail: "Works" }],
       footer: "Apps you already downloaded install with no connection at all." },
   ];
@@ -394,6 +419,20 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
     } finally { settingRestore = false; redraws.get(el)?.(); }
     if (!can) await restoreToggles.get(el)?.(false); // it can't run here
   };
+  // F447: Connect Through: the tapped row is checked at once and spins until vpn.setVia answers with the VPN's status
+  // (each way in keeps its own test, so the Set Up steps follow it); a call that fails reads the status again.
+  const pickVia = async (v) => {
+    const st = view ?? lastStatus;
+    if (!st?.vpn || connectingVia || st.vpn.via === v) return;
+    connectingVia = v;
+    paint();
+    let vpn = null;
+    try { vpn = await within(setVia(native, v), TIMEOUTS.status); } catch { /* read again below */ }
+    const read = vpn && typeof vpn === "object" ? { ...(lastStatus ?? st), vpn } : (await readStatus(native)).st;
+    connectingVia = null;
+    if (read) { rememberStatus(read); view = lastStatus; }
+    redraw();
+  };
   // F412: shown at once; a call that fails reads the setting again (no answer: as it was)
   restoreToggles.set(el, async (on) => {
     const st = lastStatus ?? view;
@@ -448,6 +487,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
       shortcut: lastShortcut ? lastShortcut.available : onCellularChoice() === "shortcut",
       adding: addingShortcut, addAgain: () => addShortcut(),
       remembering: settingRestore, remember: () => setUpRestore(),
+      connect: (v) => pickVia(v), connecting: connectingVia, // F447
     });
     const shown = subGroups(sections, sub);
     const restore = Boolean((view ?? lastStatus)?.vpn?.restore);
@@ -470,7 +510,7 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
     }
     // B316: opened after a failure: the pairing is checked by itself; the page repaints when it passes or fails
     if (st?.paired && choice === "iphone") autoCheck(native, alert, () => { if (mine()) paint(); }, store);
-    if (st?.paired && builtinVPN(st)) readShortcut().then(() => { if (mine()) paint(); }).catch(() => {}); // F417b: after the page is painted
+    if (st?.paired && ownVPN(st)) readShortcut().then(() => { if (mine()) paint(); }).catch(() => {}); // F417b: after the page is painted
     const wasPicked = picked === choice;
     if (wasPicked) picked = null;
     if (choice !== "iphone" && !wasPicked) return; // nothing on the page waited on the answer
@@ -569,7 +609,7 @@ export function turnedDown(why, err) {
 // B428a: on cellular it can't tell: nothing is checked, kept or forgotten; `tell`: Fix or Pair Again asked for it, so it says so.
 export async function recheckPairing(native, alert, redraw, { spin = null, tell = false } = {}) {
   const st = await status(native);
-  if (!st?.paired || !builtinVPN(st)) return "skipped";
+  if (!st?.paired || !canConnect(st)) return "skipped";
   const sayCellular = async (s) => { if (tell) await alert(cellularCheck(s)); return "cellular"; };
   if (onCellular(st)) return sayCellular(st);
   const verify = async () => {
@@ -812,7 +852,7 @@ export function setupGroups(state, st, p, { retry = () => {}, check = () => {}, 
     return [intro,
       { rows: [{ label: "Paired", checked: true, cls: "pair-done" }] },
       { rows: [{ label: failing ? FIX : STATUS_ACTIONS.check, cls: "sign-import", onClick: check }],
-        footer: `Checks that ${NAME} can reach this iPhone through ${BUILTIN_VPN}.` },
+        footer: `Checks that ${NAME} can reach this iPhone through ${routeVPN(st)}.` },
       { rows: [{ label: "Forget Pairing", cls: "sign-import", onClick: forget }] }];
   }
   // F317: one group per numbered step (AGENTS.md, Hints), never the steps joined into one footer; the last step's
@@ -825,7 +865,8 @@ export function setupGroups(state, st, p, { retry = () => {}, check = () => {}, 
   if (state === "checking") return [intro, { spinner: "Checking…" }];
   if (state === "testing") return [intro, { spinner: TESTING_AFTER_PAIRING }]; // B357: pairing's last step (finishSetup)
   if (state === "noVPN") return [intro, { rows: [{ label: "Network Extensions", detail: "Missing" }], footer: NO_VPN.message, warn: true }];
-  const conn = { rows: [{ label: BUILTIN_VPN, detail: "On" }] }; // B277: the VPN that's on
+  // B277: the VPN that's on. F447: LocalDevVPN is the person's to turn on, so it says whether it is.
+  const conn = { rows: [{ label: routeVPN(st), detail: viaApp(st) && !st.vpn.otherVPN ? "Off" : "On" }] };
   // B436: where the code was, the code's end and a new one (the code pairs nothing any more)
   if (expired && !p) return [intro, conn, { header: "Pairing Code", rows: [{ label: NEW_CODE, cls: "sign-import", onClick: retry }], footer: CODE_EXPIRED },
     { header: "Where to Type It", guide: true }];
@@ -988,7 +1029,9 @@ if (typeof document !== "undefined" && typeof window !== "undefined") {
 // B357: with the built-in VPN, setting up ends with its test (vpn.test, as Test Connection runs it), right after
 // pairing, before the page says Paired: the first test is when iOS asks to add the VPN configuration (the one Allow),
 // so setup isn't Done until that's answered. `st` is the idevice.status from before pairing (it has `vpn`).
-export const needsTestAfterPairing = (st) => builtinVPN(st) && !st.vpn.tested;
+// F447: through LocalDevVPN there is no Allow to wait for: the test runs only while LocalDevVPN is up, else Set Up's
+// step 2 asks to turn it on.
+export const needsTestAfterPairing = (st) => (viaApp(st) ? Boolean(st.vpn.otherVPN) : builtinVPN(st)) && !st.vpn.tested;
 async function finishSetup(v, native, alert, store, redraw) {
   if (visit === v) redraw(); // Testing the Connection…, with the spinner
   const done = () => { if (!v.testing) return; v.testing = false; if (visit === v) redraw(); };
@@ -1220,7 +1263,7 @@ async function checkOnce(native, alert, redraw, store, mark, how) {
     st = await status(native);
     rememberStatus(st);
     if (onCellular(st)) return await cellular(st);
-    if (st && !builtinVPN(st)) { stop(); throw Object.assign(new Error("connect_failed: no Network Extensions"), { code: "connect_failed" }); }
+    if (st && !canConnect(st)) { stop(); throw Object.assign(new Error("connect_failed: no Network Extensions"), { code: "connect_failed" }); }
     await quietRun; // F410b: one at a time with the phone; this one's deadline starts after it
     await within(call(native, "idevice.verify", ...(how.quiet ? [{ quiet: true }] : [])), TIMEOUTS.verify);
     const noShortcut = await cellularInstalls();

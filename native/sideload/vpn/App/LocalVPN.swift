@@ -50,14 +50,38 @@ enum LocalVPN {
     }()
 
     static var available: Bool { AppMode.current != .jailbreak && providerID != nil && entitled }
-    static var tested: Bool { UserDefaults.standard.bool(forKey: testedKey) }
+    /// Set up through the way in chosen now (Connect Through): each keeps its own test.
+    static var tested: Bool { UserDefaults.standard.bool(forKey: viaApp ? appTestedKey : testedKey) }
 
     static func status() -> [String: Any] {
         let path = Path.now()
         lock.lock(); let on = cached?.connection.status == .connected; lock.unlock()
         return ["available": available, "bundled": providerID != nil, "entitled": entitled, "tested": tested, "on": on,
                 "cellular": path.cellular, "wifi": path.wifi, "otherVPN": otherVPNUp(), "restore": restore,
-                "remembered": RestoreBack.remembered, "restoreNever": RestoreBack.never, "name": name]
+                "remembered": RestoreBack.remembered, "restoreNever": RestoreBack.never, "name": name,
+                "via": viaApp ? "app" : "builtin"]
+    }
+
+    // ---- Connect Through (F447): the built-in VPN, or LocalDevVPN
+    // LocalDevVPN (free on the App Store) runs its own loopback VPN that reaches this phone at the same 10.7.0.1, so
+    // This iPhone connects through it with nothing of ours turned on. It's the only way in for a profile without
+    // Network Extensions (a free Apple ID). The person turns it on; iOS gives an app no way to switch another app's VPN.
+    //   vpn.setVia  {via: "builtin" | "app"} -> the status' vpn (`via`: the one in use)
+    static let appName = "LocalDevVPN"
+    static let viaKey = "ifizbox.vpn.via"
+    static let appTestedKey = "ifizbox.vpn.tested.app"
+    /// LocalDevVPN is the way in: chosen, or the only one (no Network Extensions).
+    static var viaApp: Bool { AppMode.current != .jailbreak && (!available || UserDefaults.standard.string(forKey: viaKey) == "app") }
+    /// The built-in VPN turns on for each connect.
+    static var inUse: Bool { available && !viaApp }
+    /// The way in by name, for the log and the errors.
+    static var routeName: String { viaApp ? appName : name }
+    static func appOff() -> IDevice.Failure {
+        IDevice.Failure(code: "vpn_app_off", text: "\(appName) is off: open it and tap Connect, then try again")
+    }
+    static func setVia(_ via: String) {
+        UserDefaults.standard.set(via == "app" ? "app" : "builtin", forKey: viaKey)
+        log("connect through: \(routeName)")
     }
 
     /// The keys of features this build no longer has: removed once at launch.
@@ -155,7 +179,7 @@ enum LocalVPN {
     /// B423: out of the app for awayGrace with the path still cellular, the wait pauses (pause()): its hold is let go,
     /// so the VPN goes off. Airplane Mode on isn't cellular, so the VPN is never dropped then.
     static func waitOffCellular(finishing: Bool, cancelled: () -> Bool, paused: (Pause) -> Void, waiting: () -> Void) throws -> Bool {
-        guard available, !failedNow() else { return false }
+        guard inUse, !failedNow() else { return false } // F447: LocalDevVPN's tunnel is the person's to hold
         if finishing || !mustWait() { // B428b: here too, so Cancel ends it, and cellular coming back is seen below
             let online = try waitForNetwork({ _ in
                 if cancelled() { throw IDevice.Failure(code: "cancelled", text: "Cancelled") }
@@ -256,7 +280,7 @@ enum LocalVPN {
 
     /// Before an install's first connect: blocking until the app is in front, when the VPN would have to start.
     static func waitForApp(cancelled: () -> Bool, paused: (Pause) -> Void) throws {
-        guard available, mustWait() else { return }
+        guard inUse, mustWait() else { return } // F447: nothing of ours to start through LocalDevVPN
         log("in the background: the install waits for the app to be opened")
         try pause(cancelled: cancelled, paused: paused)
     }
@@ -782,8 +806,23 @@ enum LocalVPNBridge {
             guard let on = c.params["on"] as? Bool else { return Apt.reply(c, nil, "bad_params: on") }
             quick(c) { LocalVPN.setRestore(on); return LocalVPN.status() }
         }
+        b.on("vpn.setVia") { c in
+            guard let via = c.params["via"] as? String, via == "app" || via == "builtin" else { return Apt.reply(c, nil, "bad_params: via") }
+            if via == "builtin" && !LocalVPN.available {
+                return Apt.reply(c, nil, "vpn_failed: this app can't run \(LocalVPN.name): its profile has no Network Extensions capability")
+            }
+            quick(c) { LocalVPN.setVia(via); return LocalVPN.status() }
+        }
         b.on("vpn.test") { c in
             IDeviceBridge.run(c) {
+                if LocalVPN.viaApp { // F447: through LocalDevVPN: nothing to turn on, only its tunnel to find
+                    guard VPNCheck.appUp() else { throw LocalVPN.appOff() }
+                    let t0 = Date()
+                    let kind = try IDevice.verify()
+                    let ms = Int(Date().timeIntervalSince(t0) * 1000)
+                    UserDefaults.standard.set(true, forKey: LocalVPN.appTestedKey)
+                    return ["ok": true, "ms": ms, "kind": kind.rawValue, "via": "app"]
+                }
                 guard LocalVPN.available else { throw IDevice.Failure(code: "vpn_failed", text: "this app can't run \(LocalVPN.name): its profile has no Network Extensions capability") }
                 // on first, so a VPN that doesn't start is this test's error (an install would go another way in)
                 try LocalVPN.begin()

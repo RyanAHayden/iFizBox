@@ -29,8 +29,28 @@ export const NO_VPN = {
   message: "This profile has no Network Extensions, so it can't connect. Sign with one that has them, or use the Signing Server.",
   short: "This profile has no Network Extensions.",
 };
-// This iPhone is set up: paired, and with the built-in VPN tested once (vpn.test). Using it waits for that.
-export const iphoneSetUp = (st) => Boolean(st?.paired) && builtinVPN(st) && Boolean(st.vpn.tested);
+// ---- F447: Connect Through: the built-in VPN, or LocalDevVPN (free on the App Store), whose own loopback VPN reaches
+// this iPhone the same way. The shell keeps the choice (vpn.setVia) and says the one in use as vpn.via ("builtin" or
+// "app"); a profile without Network Extensions (a free Apple ID) has LocalDevVPN only. An older shell says no `via`.
+export const VPN_APP = "LocalDevVPN";
+export const VPN_APP_LINK = "https://apps.apple.com/app/id6755608044";
+export const viaApp = (st) => st?.vpn?.via === "app";
+// This iPhone can connect at all: through the built-in VPN or through LocalDevVPN
+export const canConnect = (st) => builtinVPN(st) || viaApp(st);
+// The built-in VPN is the way in: its own branches (another VPN taken off, Restore My VPN, On Cellular's wait)
+export const ownVPN = (st) => builtinVPN(st) && !viaApp(st);
+// The way in by name, for the texts
+export const routeVPN = (st) => (viaApp(st) ? VPN_APP : BUILTIN_VPN);
+export const setVia = (native, via) => native.call("vpn.setVia", { via: via === "app" ? "app" : "builtin" });
+// LocalDevVPN is off when a connect needs it (the shell's vpn_app_off): Fix checks again once it's on
+export const APP_OFF = { title: `Turn On ${VPN_APP}`, again: false, fix: "check", button: FIX,
+  message: `${VPN_APP} is off, so nothing can reach this iPhone. Open it, tap Connect, then try again.`,
+  short: `${VPN_APP} is off. Turn it on first.` };
+export function connectFooter(st) {
+  return viaApp(st) ? `Turn ${VPN_APP} on before each install. Works with a free Apple ID.` : `${NAME} turns its VPN on for each install and off after.`;
+}
+// This iPhone is set up: paired, and the way in tested once (vpn.test). Using it waits for that.
+export const iphoneSetUp = (st) => Boolean(st?.paired) && canConnect(st) && Boolean(st.vpn.tested);
 // F368: on cellular iOS refuses the connects an install needs, so the install waits for Wi-Fi or Airplane Mode (LocalVPN.swift
 // waitOffCellular). AIRPLANE_ON: the wait; AIRPLANE_OFF: the connection is open; CELL_LINE: a failed check there.
 export const AIRPLANE_ON = "Waiting to leave cellular data";
@@ -43,7 +63,7 @@ export const AIRPLANE_OFF = "You can turn Airplane Mode off";
 export const CELL_LINE = "On cellular, check on Wi-Fi.";
 // B428a: a check can't connect there, so it doesn't try (and one that was refused and ends there says the same): no
 // Fix, no Pair Again, not kept as a Route Failure. Not set up yet: the test that finishes it is named.
-export const onCellular = (st) => builtinVPN(st) && Boolean(st.vpn.cellular);
+export const onCellular = (st) => canConnect(st) && Boolean(st.vpn.cellular); // F447: through LocalDevVPN too
 export function cellularCheck(st = null) {
   return { title: "Can't Check on Cellular", buttons: ["OK"],
     message: `Join Wi-Fi, then check again.${st?.vpn && !st.vpn.tested ? ` ${STATUS_ACTIONS.test} finishes setting up.` : ""}` };
@@ -59,7 +79,8 @@ export const AIRPLANE_TIMEOUT = { title: "Airplane Mode Not On", message: "Airpl
   short: "Airplane Mode wasn't turned on." };
 export const airplaneTimeout = (err) => (err?.code ?? String(err?.message ?? err ?? "").split(":")[0]) === "airplane_timeout";
 // C73: another VPN is up (or chosen in Settings > VPN): iOS runs one at a time, so an install turns it off.
-export const otherVPNOn = (st) => builtinVPN(st) && Boolean(st.vpn.otherVPN || st.vpn.otherVPNSelected);
+// F447: through LocalDevVPN, the other VPN is the way in, so nothing is taken off.
+export const otherVPNOn = (st) => ownVPN(st) && Boolean(st.vpn.otherVPN || st.vpn.otherVPNSelected);
 export const OTHER_VPN_LINE = "Your VPN goes off during installs. Turn it back on after.";
 // F414: the status group's footer once This iPhone is set up: one hint, or none. F412: with Restore My VPN on, its own footer says what becomes of the other VPN.
 export function setupFooter(st) {
@@ -71,9 +92,15 @@ export function setupFooter(st) {
 // allow the VPN (B357), so those two are done together.
 export const SET_UP = "Set Up This iPhone";
 export const SETUP_FOOTER = "Once is enough. It stays set up after updates and re-signing.";
+// F447: through LocalDevVPN, step 2 turns it on (`app`: a tap opens its App Store page) and step 3 tests with it on.
 export function setupSteps(st) {
   const paired = Boolean(st?.paired), tested = Boolean(st?.vpn?.tested);
   const test = { done: paired && tested, next: paired && !tested };
+  if (viaApp(st)) return [
+    { key: "pair", label: "1. Pair This iPhone", subtitle: pairState(st) === "file" ? "Import a pairing file from a computer" : "Type a 6-digit code in Settings", done: paired, next: !paired },
+    { key: "app", label: `2. Turn On ${VPN_APP}`, subtitle: "Free on the App Store. Open it, tap Connect.", done: paired && tested, next: !(paired && tested), app: true },
+    { key: "test", label: "3. Test Connection", subtitle: `With ${VPN_APP} on`, ...test },
+  ];
   return [
     { key: "pair", label: "1. Pair This iPhone", subtitle: pairState(st) === "file" ? "Import a pairing file from a computer" : "Type a 6-digit code in Settings", done: paired, next: !paired },
     { key: "allow", label: `2. Allow ${BUILTIN_VPN}`, subtitle: "iOS asks once, right after pairing", ...test },
@@ -84,20 +111,20 @@ export function setupSteps(st) {
 // (routeFailure) counts only while paired; `running`: a check, test or Fix runs; `late`: idevice.status didn't answer.
 export function iphoneStatus(st, { reading = false, running = false, late = false, failure = null } = {}) {
   const action = !st ? "check" : !st.paired ? "start" : failure ? "fix" : !st.vpn?.tested ? "test" : "check";
-  if (running) return { state: "checking", title: CHECKING.title, subtitle: "Turning on the VPN and reaching this iPhone.", tone: "wait", action, busy: true };
+  if (running) return { state: "checking", title: CHECKING.title, subtitle: viaApp(st) ? `Reaching this iPhone through ${VPN_APP}.` : "Turning on the VPN and reaching this iPhone.", tone: "wait", action, busy: true };
   if (late) return { state: "late", title: "Not Responding", subtitle: "This iPhone didn't answer.", tone: "warn", red: true, action: "check" };
   if (reading || !st) return { state: "checking", title: CHECKING.title, subtitle: CHECKING.subtitle, tone: "wait", action: "check", dim: true };
   if (!st.paired) return { state: "setup", title: "Not Set Up", subtitle: "Installs straight onto this iPhone, with no server and no popups.", tone: "warn", action };
   if (failure) { const f = failureStatus(failure); return { state: "failed", title: f.title, subtitle: f.subtitle, tone: f.tone, red: true, action }; }
   if (!st.vpn?.tested) return { state: "finish", title: "Almost Done", subtitle: FINISH_LINE, tone: "warn", action };
-  return { state: "ready", title: "Ready to Install", subtitle: `Straight onto this iPhone, through ${BUILTIN_VPN}.`, tone: "ok", action };
+  return { state: "ready", title: "Ready to Install", subtitle: `Straight onto this iPhone, through ${routeVPN(st)}.`, tone: "ok", action };
 }
 const FINISH_LINE = "Paired. Test the connection once to finish.";
 // F414: a failed check asks to fix: { title, message, buttons, cancel: 0 }. `why` is verifyFailure's (or Not Responding).
 export function fixQuestion(why, st = null) {
   const q = { title: why.title, message: why.message, buttons: ["Not Now", FIX], cancel: 0 };
   if (why.again) return { ...q, title: PAIRING_LOST, message: `This iPhone isn't paired with ${NAME} any more, so nothing can install. Fix it now?` };
-  if (why.title === "Couldn't Connect") q.message = `${BUILTIN_VPN} came on, but this iPhone didn't answer. Fix tries again from the start.${st?.vpn?.cellular ? ` ${CELL_LINE}` : ""}`;
+  if (why.title === "Couldn't Connect") q.message = `${routeVPN(st)} ${viaApp(st) ? "was on" : "came on"}, but this iPhone didn't answer. Fix tries again from the start.${st?.vpn?.cellular ? ` ${CELL_LINE}` : ""}`;
   return q;
 }
 // How It Works: the steps of one install, a row each.
@@ -108,10 +135,19 @@ export const HOW_STEPS = [
   { label: "4. Install", subtitle: "Copied straight to iOS. On cellular, as On Cellular says." },
   { label: `5. ${BUILTIN_VPN} Off`, subtitle: "Turn yours back on after." },
 ];
-// vpn.test's answer, or its error, as the alert's words.
+// F447: through LocalDevVPN nothing turns on or off: the person keeps it on.
+export const HOW_STEPS_APP = [
+  HOW_STEPS[0], HOW_STEPS[1],
+  { label: `3. ${VPN_APP} On`, subtitle: "Turn it on first: open it and tap Connect." },
+  { label: "4. Install", subtitle: `Copied straight to iOS through ${VPN_APP}.` },
+];
+export const howSteps = (st) => (viaApp(st) ? HOW_STEPS_APP : HOW_STEPS);
+// vpn.test's answer, or its error, as the alert's words. F447: `r.via` "app": the test went through LocalDevVPN.
 export function vpnTestResult(r, err = null) {
+  if (r?.ok && r.via === "app") return { title: "Connected", message: `${NAME} reached this iPhone through ${VPN_APP}${r.ms ? ` in ${r.ms} ms` : ""}.` };
   if (r?.ok) return { title: "Connected", message: `${BUILTIN_VPN} reached this iPhone${r.ms ? ` in ${r.ms} ms` : ""}, then turned off again.` };
   const raw = String(err?.message ?? err ?? "");
+  if (/^vpn_app_off:/.test(raw) || err?.code === "vpn_app_off") return { title: APP_OFF.title, message: APP_OFF.message };
   if (/^vpn_failed:/.test(raw)) return { title: `${BUILTIN_VPN} Didn't Start`, message: `${raw.replace(/^vpn_failed:\s*/, "")}.` };
   const why = verifyFailure(err, { paired: true, vpn: { available: true } });
   return { title: why.title, message: why.message, again: why.again };
@@ -132,7 +168,7 @@ export function decideRoute(choice, status, cellular = "ask") {
   if (choice !== "iphone") return { route: "server" };
   if (!status) return { route: "server", alert: "noStatus" };
   if (!status.paired) return { route: "server", alert: "notPaired" };
-  if (!builtinVPN(status)) return { route: "server", alert: "noVPN" };
+  if (!canConnect(status)) return { route: "server", alert: "noVPN" };
   if (cellular === "server" && onCellular(status)) return { route: "server", cellular: true };
   return { route: "idevice" };
 }
@@ -173,10 +209,10 @@ function routeStatus(choice, st, { host = DOMAIN, certificate } = {}) {
   if (st === undefined) return CHECKING;
   const later = `Installs use ${host} for now.`;
   if (!st) return { state: "noStatus", title: "Can't Reach This iPhone", subtitle: later, action: "fix", tone: "warn", local: false };
-  if (!builtinVPN(st)) return { state: "noVPN", title: NO_VPN.title, subtitle: `This profile can't connect. ${later}`, action: "fix", tone: "warn", local: false };
+  if (!canConnect(st)) return { state: "noVPN", title: NO_VPN.title, subtitle: `This profile can't connect. ${later}`, action: "fix", tone: "warn", local: false };
   if (!st.paired) return { state: "pair", title: SET_UP, subtitle: "Takes about a minute, once. Until then installs use the Signing Server.", action: "setup", tone: "warn", local: false };
   if (!st.vpn.tested) return { state: "finish", title: "Finish Setting Up", subtitle: FINISH_LINE, action: "setup", tone: "warn", local: true }; // F414
-  return { state: "ready", via: BUILTIN_VPN, title: "Ready to Install", subtitle: `Straight onto this iPhone, through ${BUILTIN_VPN}.`, action: "check", tone: "ok", local: true };
+  return { state: "ready", via: routeVPN(st), title: "Ready to Install", subtitle: `Straight onto this iPhone, through ${routeVPN(st)}.`, action: "check", tone: "ok", local: true };
 }
 
 // The Signing Server row's detail: This iPhone while installs go straight here, the server's host when they fall back.
@@ -213,7 +249,7 @@ export function setupState(status, pairing = null) {
   if (status === undefined) return "checking";
   const s = pairState(status);
   if (s !== "phone") return s;
-  return builtinVPN(status) ? "pairing" : "noVPN";
+  return canConnect(status) ? "pairing" : "noVPN";
 }
 
 // ---- Developer Mode (F300: no row of its own: an app this route installs can't open without it, iFizBox included)
@@ -335,7 +371,7 @@ const CONNECT_CODES = new Set(["refused", "pairing_rejected", "pair_again", "con
 export function routeRefused(st = null) {
   const cell = Boolean(st?.vpn?.cellular);
   return { title: "iPhone Refused", again: false, fix: "check", button: FIX,
-    message: `This iPhone refused every connection through ${BUILTIN_VPN}, so it isn't the pairing. ${cell ? CELL_LINE : "Try again."}`,
+    message: `This iPhone refused every connection through ${routeVPN(st)}, so it isn't the pairing. ${cell ? CELL_LINE : "Try again."}`,
     short: cell ? `Refused. ${CELL_LINE}` : "Every connection was refused. Try again." };
 }
 
@@ -343,7 +379,8 @@ export function routeRefused(st = null) {
 // { title, message, short, fix, button }, or null when the error isn't about reaching this iPhone (Developer Mode,
 // signing, a download): those don't make the route broken.
 // B378: vpn_failed: the built-in VPN didn't start (the shell says why, e.g. no network)
-const ROUTE_CODES = new Set([...CONNECT_CODES, "route_refused", "not_paired", "vpn_failed"]);
+// F447: vpn_app_off: LocalDevVPN is the way in and it's off
+const ROUTE_CODES = new Set([...CONNECT_CODES, "route_refused", "not_paired", "vpn_failed", "vpn_app_off"]);
 export function routeFailureOf(err, st = null) {
   const raw = String(err?.message ?? err ?? "");
   const code = err?.code ?? raw.split(":")[0];
@@ -411,7 +448,8 @@ export function vpnFailed(raw) {
 export function verifyFailure(err, st = null) {
   const raw = String(err?.message ?? err ?? "");
   const code = err?.code ?? raw.split(":")[0];
-  if (st && !builtinVPN(st)) return NO_VPN; // a profile without Network Extensions can't connect, whatever the error says
+  if (st && !canConnect(st)) return NO_VPN; // a profile without Network Extensions on an older shell can't connect, whatever the error says
+  if (code === "vpn_app_off") return APP_OFF; // F447
   if (code === "vpn_failed") return vpnFailed(raw); // B378
   if (code === "route_refused") return routeRefused(st);
   // B220: refused on every port RemotePairing is advertised on, or turned down: the phone no longer has the pairing
@@ -424,7 +462,7 @@ export function verifyFailure(err, st = null) {
   }
   // B416: a timeout, or a socket that failed any other way, isn't the pairing's fault
   if (code === "connect_failed" || code === "timeout" || (code !== "bad_pairing" && hasSocketText(raw))) { // F372: the shell had its own VPN on; nothing to turn on
-    return { title: "Couldn't Connect", message: `${BUILTIN_VPN} was on, but ${NAME} couldn't reach this iPhone through it. Try again.${st?.vpn?.cellular ? ` ${CELL_LINE}` : ""}`, again: false };
+    return { title: "Couldn't Connect", message: `${routeVPN(st)} was on, but ${NAME} couldn't reach this iPhone through it. Try again.${st?.vpn?.cellular ? ` ${CELL_LINE}` : ""}`, again: false };
   }
   return { title: "Pairing Didn't Work", message: `This iPhone didn't accept the pairing (${hasSocketText(raw) ? "the connection was lost" : raw || "no answer"}). Pair again.`, again: true };
 }
@@ -499,8 +537,11 @@ export function markQuietCheck({ storage = globalThis.localStorage, now = Date.n
 // `st` is idevice.status. Set up (a VPN not tested yet would make iOS ask to allow it), no other VPN up, not on
 // cellular, on Wi-Fi (with no network the VPN can't start), and the built-in VPN not on already (an install or a test
 // holds it; `again`: the check's own second try, seconds after its first, whose VPN may still be on).
+// F447: through LocalDevVPN nothing of ours starts, so the VPN's branches are skipped: it runs only while LocalDevVPN is
+// up (vpn.otherVPN), on Wi-Fi.
 export function quietCheckAllowed(choice, st, { again = false } = {}) {
   if (choice !== "iphone" || !iphoneSetUp(st)) return false;
+  if (viaApp(st)) return Boolean(st.vpn.otherVPN) && !st.vpn.cellular && Boolean(st.vpn.wifi);
   if (st.vpn.restore) return false; // F419: each check would need a trip to Shortcuts to bring the other VPN back
   if (otherVPNOn(st) || st.otherVPN || st.vpn.cellular || !st.vpn.wifi) return false;
   return again || !st.vpn.on;
@@ -509,7 +550,7 @@ export function quietCheckAllowed(choice, st, { again = false } = {}) {
 // Restore My VPN (sideload, built-in VPN): the kept setting, read as idevice.status's vpn.restore. Answers that vpn status.
 export const RESTORE_VPN = "Restore My VPN";
 // F412: shown when the shell can run the built-in VPN and knows the setting
-export const restoreShown = (st) => builtinVPN(st) && typeof st.vpn.restore === "boolean";
+export const restoreShown = (st) => ownVPN(st) && typeof st.vpn.restore === "boolean"; // F447: not through LocalDevVPN
 // F420: what is left to do before the Shortcut can bring the VPN back. Shortcuts never says whether it was added, so the
 // page keeps it (`kept`): "0" a run didn't find it, "1" added since the last store run that passed, "2" that run passed;
 // null: never kept, so vpn.remembered alone says. "" once nothing is left, or the shell doesn't say `remembered`.
