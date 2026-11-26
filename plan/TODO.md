@@ -25,6 +25,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
+- [~] **F448** (follow-up, normal) Control session 10 asked the person: "Should iFizBox release V32 now so the fix that stops other sources' apps showing up as updates reaches the phone, instead of staying held? [Release now / Keep V32 held]" Carry on from their answer (the session, closed while it waited: resume it with `claude --resume 00917b4a-8cbb-4a64-bfd4-fec6c639c84a`). When the answer is to queue work in another project the question names, run `plan add` in that project's own checkout: the answer allows that one command there BLOCKED: DECIDE: Should iFizBox release V32 now so the fix that stops other sources' apps showing up as updates reaches the phone, instead of staying held? [Release now / Keep V32 held] (asked 2026-11-26 17:51)
 ### Parked
 
 - [ ] **F107** (later, when the jailbreakme.dev exploit is ready) Upgrading & Jailbreaking Help stays unlocked on the website's locked Home (user 2026-11-18: 'we will not have the jailbreak tutorial thing locked when jailbreakme.dev exploit is ready, thats for later'): leave that row out of websign-gate's browsingLocked set in screens/home.js and point it at the jailbreak guide. | files: web/app/screens/home.js
