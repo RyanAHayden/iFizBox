@@ -5,7 +5,7 @@
   speed-up, the app's own push slides between pages), a caption for each step, then the phone slides away and the end
   card slides up. Nothing crossfades. Same engine as video.html (`--page jb-reddit`).
 
-    promo.html?h=1350     1350 (4:5) or 1920 (9:16); the width is 1080
+    jb-reddit.html?h=1350     1350 (4:5); the width is 1080
     window.DURATION       the length in seconds
     window.render(t)      draws time t (a promise: the recording's frame is decoded)
     window.ready          a promise: the marks and images are loaded
@@ -100,16 +100,16 @@ const BAND = TALL ? 260 : 160, CAPY = TALL ? 122 : 46;
 const band = mk("", `<div class="ground"></div>`); band.id = "band"; band.style.height = BAND + "px";
 const words = [];
 const say = (a, b, text) => { const e = mk("cap", text); e.style.top = CAPY + "px"; words.push({ e, a, b }); };
-const steps = [
-  [T0, T(tapAfter("home")), "This is Home"],
-  [T(tapAfter("home")), T(tapAfter("sources")), "Open Sources"],
-  [T(tapAfter("sources")), T(tapAfter("add-source", 1)), "Add a source"],
+const steps = [ // each caption names what the screen it sits on is for, from the tap that brings the screen to the tap that leaves it
+  [T0, T(tapAfter("home")), "Open Sources"],
+  [T(tapAfter("home")), T(tapAfter("sources")), "Add a source"],
+  [T(tapAfter("sources")), T(tapAfter("add-source", 1)), "Type its address"],
   [T(tapAfter("add-source", 1)), T(tapAfter("unknown-source")), "Unknown source? You decide"],
   [T(tapAfter("unknown-source")), T(tapAfter("source-added")), "Source added"],
   [T(tapAfter("source-added")), T(tapAfter("found")), "Search for a tweak"],
-  [T(tapAfter("found")), T(tapAfter("tweak")), "Open it"],
-  [T(tapAfter("tweak")), T(tapAfter("confirm")), "Tap Install"],
-  [T(tapAfter("confirm")), T(LAST - 2.4), "Confirm, and it installs"],
+  [T(tapAfter("found")), T(tapAfter("tweak")), "Open it, tap Install"],
+  [T(tapAfter("tweak")), T(tapAfter("confirm")), "Review, then Confirm"],
+  [T(tapAfter("confirm")), T(LAST - 2.4), "Installing"],
   [T(LAST - 2.4), OUTRO, "Done. Restart SpringBoard"],
 ];
 for (const [a, b, text] of steps) say(a, b, text);
