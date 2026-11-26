@@ -56,6 +56,8 @@ marks, world updates) is in `capture.mjs`'s header.
 | `video.html` | the cut as one page: the splash, the phones, the status bar, the captions (`say()`), the timing (`MAP`), the zooms and the end card |
 | `promo.html` | the jailbreak promo clip as one page: captions, timing and end card, cut from `rec/promo.mp4` alone (`render.mjs --page promo`) |
 | `shots-promo.json` | the promo recording's script: the jailbreak steps from the Changes badge through Upgrade, Confirm, the install, Complete and Theme |
+| `promo-lite.html` | the sideload promo clip as one page: captions, speed segments and the status bar (no end card), cut from `rec/promo-lite.mp4` alone (`render.mjs --page promo-lite`) |
+| `shots-promo-lite.json` | the sideload promo recording's script: Add Tweaks, the queue and Confirm, the signed install, the Installed days and Re-sign All |
 
 Re-render one cut from the recordings already in `OUT_DIR`:
 
@@ -88,3 +90,28 @@ Cut it alone from the recording already in `OUT_DIR/rec/`:
 
 `make.sh` makes both after the showcase cuts, as `OUT_DIR/promo-4x5.mp4` and `OUT_DIR/promo-9x16.mp4`, with its world
 in `OUT_DIR/state-promo`.
+
+## The Lite promo clip
+
+`promo-lite.html` is the sideload build's promo clip, about 15.5 s, with captions and a status bar like
+`promo.html`'s, and no end card. It is cut from one recording, `rec/promo-lite.mp4` (27.8 s), that is played through speed segments of 1.2x
+to 2.6x: faster in the signing runs and the Settings walk. Its script is `shots-promo-lite.json`, run in sideload mode
+by `capture.mjs` (rec name `promo-lite`) through the fake native bridge in `shell.mjs`.
+
+The clip adds a tweak from a made-up APT repo, `driftwood.example`, in `make_state.py`. Its one tweak, Night Charts, is
+in section Tweaks, and its description names Tidewell, so Add Tweaks lists it under Made for Tidewell. A tweak from a
+source shows in Add Tweaks only when its name or description names an app the user has, or a verdict exists. The
+script's `{"world": "aging"}` step makes a free certificate that signs for 7 days, and Kiteline (1.8) already signed
+with 1 day left, so Re-sign All brings both apps to 7 days. `shell.mjs` takes the re-sign from the phone's record and
+keeps the tweak names on the signed record.
+
+The Signed Apps page and the Installed list do not redraw after a Re-sign run, so the script goes Back and opens Signed
+Apps again before the last beat.
+
+Cut it alone from the recording already in `OUT_DIR/rec/`:
+
+    node marketing/video/render.mjs marketing/video/out promo-lite-4x5.mp4 --h 1350 --page promo-lite
+    node marketing/video/render.mjs marketing/video/out promo-lite-9x16.mp4 --h 1920 --page promo-lite
+
+`make.sh` makes both after the showcase and the jailbreak promo cuts, as `OUT_DIR/promo-lite-4x5.mp4` and
+`OUT_DIR/promo-lite-9x16.mp4`.

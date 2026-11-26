@@ -65,10 +65,8 @@
  {"pause": 1200},
  {"mark": "done"},
  {"tap": "text=Return to iFizBox"},
- {"pause": 1100},
+ {"pause": 2000},
  {"mark": "installed"},
- {"tap": "text=Home", "nth": -1},
- {"pause": 700},
  {"tap": "text=Home", "nth": -1},
  {"pause": 600},
  {"tap": "text=Settings"},
@@ -90,6 +88,10 @@
  {"pause": 900},
  {"mark": "resigned"},
  {"tap": "text=Return to iFizBox"},
- {"pause": 1500},
+ {"pause": 900},
+ {"tap": "text=Back"},
+ {"pause": 800},
+ {"tap": "text=Signed Apps"},
+ {"pause": 1800},
  {"mark": "end"}
 ]}

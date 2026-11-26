@@ -57,15 +57,17 @@ const at = (mark) => { const m = rec.marks.find((x) => x.name === mark); if (!m)
 // first segment starts the recording, so frame 1 is the app. Waits (the signing runs) and walking through Settings go fast;
 // what is read (the tweak, the days left, the Signed Apps list) plays near its own speed.
 const SPEED = [
-  ["details", "addtweaks", 1.5], ["addtweaks", "added", 1.3], ["added", "confirm", 1.6], ["confirm", "running", 1.2],
-  ["running", "done", 2.2], ["done", "installed", 1.5], ["installed", "settings", 1.4], ["settings", "signedapps", 2.2],
-  ["signedapps", "resignconfirm", 1.2], ["resignconfirm", "resigning", 1.3], ["resigning", "resigned", 2.2], ["resigned", "end", 1.2],
+  ["details", "addtweaks", 1.7], ["addtweaks", "added", 1.3], ["added", "confirm", 2.0], ["confirm", "running", 1.2],
+  ["running", "done", 2.6], ["done", "installed", 1.3], ["installed", "settings", 2.2], ["settings", "signedapps", 2.2],
+  ["signedapps", "resignconfirm", 1.2], ["resignconfirm", "resigning", 1.3], ["resigning", "resigned", 2.6], ["resigned", "end", 1.8],
 ];
 const segs = [];
 let out = 0;
 for (const [a, b, k] of SPEED) { const from = at(a), to = at(b), len = (to - from) / k; segs.push({ from, to, k, t0: out, t1: out + len }); out += len; }
 const src = (t) => { const s = segs.find((x) => t < x.t1) ?? segs.at(-1); return Math.min(s.to, s.from + (t - s.t0) * s.k); };
-const when = (mark) => { const m = at(mark); const s = segs.find((x) => m < x.to - 1e-6) ?? segs.at(-1); return s.t0 + (m - s.from) / s.k; };
+// the output time of a mark, `dx` recording seconds on (a mark sits at the end of the pause after its step: the screen it
+// names is up from a little before it)
+const when = (mark, dx = 0) => { const m = at(mark) + dx; const s = segs.find((x) => m < x.to - 1e-6) ?? segs.at(-1); return s.t0 + (m - s.from) / s.k; };
 window.DURATION = Math.ceil(out * 60) / 60;
 
 // ---- the phone: a screen 402 points wide, scaled to fit under the words
@@ -86,11 +88,11 @@ const band = mk("", `<div class="ground"></div>`); band.id = "band"; band.style.
 const words = [];
 const say = (a, b, text) => { const e = mk("cap", text); e.style.top = CAPY + "px"; words.push({ e, a, b }); };
 const D = window.DURATION;
-say(0, when("confirm") - 0.1, "Pick a tweak from a repo");
-say(when("confirm") - 0.1, when("done") + 0.2, "Signed on your iPhone");
-say(when("done") + 0.2, when("installed") + 1.2, "Days left on every app");
-say(when("installed") + 1.2, when("resigned") - 0.2, "Re-sign All, before they expire");
-say(when("resigned") - 0.2, D + 1, "No computer. No jailbreak.");
+say(0, when("confirm", -1.3), "Pick a tweak from a repo");
+say(when("confirm", -1.3), when("installed", -2.0), "Signed on your iPhone");
+say(when("installed", -2.0), when("installed", 0.3), "Days left on every app");
+say(when("installed", 0.3), when("resigned", -1.0), "Re-sign All, before they expire");
+say(when("resigned", -1.0), D + 1, "No computer. No jailbreak.");
 
 window.render = async (t) => {
   const s = src(t), n = Math.min(rec.frames, Math.max(1, Math.floor(s * rec.fps + 1e-6) + 1));
