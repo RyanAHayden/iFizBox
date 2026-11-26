@@ -51,6 +51,7 @@ import { MARK_NOT_INSTALLED } from "../core/appqueue.js"; // B358
 import { signedIndex } from "../core/signing.js"; // B358
 import { NAME } from "../brand.js"; // B358
 import { IdSet } from "../core/apt.js"; // B411
+import { load as loadLazy } from "../lazy.js"; // B462: Sources' refreshInBackground for Refresh
 
 export const title = "Changes";
 
@@ -546,10 +547,32 @@ async function runHoldItem(it, item) {
 }
 
 async function refresh(ctx) {
-  if (await reloadSources({ hud: ctx.showHUD })) settings.lastRefresh?.set(); // F270: pull to refresh's Last Updated
+  if (await refreshInBar(ctx)) settings.lastRefresh?.set(); // F270: pull to refresh's Last Updated
 }
 
-// F250: Changes' Refresh as one job, which the website also runs on Browse Anyway and on launch once browsing is
+// B462: the tab's Refresh (nav button, pull to refresh) as Home's Reload: the sources refreshed under the reload bar
+// (screens/sources.js refreshInBackground), which leaves the page usable, never the blocking Reloading Data HUD.
+// A refresh already running (launch, Home's Reload) is waited for, not started again; then the installed packages
+// are read again and the list reloaded. One at a time: a call while one runs does nothing. -> true when it ran
+// (false too when the bar's Cancel stopped it).
+export async function refreshInBar(ctx, { background = (c) => loadLazy("sources").then((m) => m.refreshInBackground(c)),
+  settled = () => import("./home.js").then((m) => m.untilRefreshed()),
+  reload = async () => { if (catalog.statusSource() === "native") await catalog.reloadInstalled(); await load(); } } = {}) {
+  if (state.busy) return false;
+  state.busy = true;
+  try {
+    if ((await background(ctx)) === "cancelled") return false;
+    await settled();
+    await reload();
+    return true;
+  } catch {
+    return false; // a source that failed shows on its row and in the bar's banner (sources.js bannerFailed)
+  } finally {
+    state.busy = false;
+  }
+}
+
+// F250: a source refresh as one job, which the website runs on Browse Anyway and on launch once browsing is
 // unlocked (websign-gate.js refreshSourcesNow / refreshOnLaunch): the enabled sources refreshed (this device's
 // filter), the Reloading Data HUD over it, then the lists reloaded. One at a time: a call while one runs does
 // nothing. -> true when it ran
