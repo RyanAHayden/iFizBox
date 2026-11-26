@@ -448,6 +448,8 @@ test("script pull (no rubber band): rows follow the finger, spring back to none 
   const seen = [];
   for (let y = 120; y <= 400; y += 8) { p.fire("touchmove", y); seen.push(parseFloat(p.rows()[0].slice(11)) || 0); }
   for (let i = 1; i < seen.length; i++) assert.ok(seen[i] > seen[i - 1], "follows every move, never stalls or snaps");
+  assert.equal(p.clip.parentNode, p.scroller);
+  assert.equal(p.clip.style.transform, p.rows()[0], "B472: the anchor, and so the area, moves with the rows");
   assert.equal(p.look().armed, true);
   p.fire("touchend");
   assert.deepEqual(p.look(), { spinner: false, armed: true, title: TEXT.armed, shown: true }); // springing away

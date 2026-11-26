@@ -13,6 +13,9 @@ Since F270 the area was not inside the scroller. It sat in a clip box (`.pull-cl
 - F270 first put the area inside the scroller at a negative top. The iPhone 7 showed a blank gap: WebKit does not paint content above a scroller's scroll origin on the scroller's own layer.
 - The fix here keeps the area in the scroller as a layer of its own (`will-change: transform`). WebKit does paint that in the rubber-band gap (checked on the iPhone 7).
 
+## Decisions
+- The anchor sits below the scroller's top padding (`.page-body` pads every page by the nav bar's height), so when pulled the area also covers that padding, under the nav bar. That is how UIKit treats content inset under a bar: the refresh area sits above the content's top, not above the inset. Anchoring at the padding box's top instead would let the plain padding slide down first and keep the arrow under the bar until the pull passed the bar's height. Under an opaque iOS 6 bar it cannot be seen. Under a translucent bar (other eras) the area's ground shows through the bar only while a pull is held. The spec review raised this; kept on purpose.
+
 ## Checks
 - `node --test web/app/`: 3785 pass.
 - Fresh .deb built from this branch (`native/build.sh deb`, com.ryha.ifizbox 1.0.3-6014) installed on the iPhone 7. No screen recording tool exists for the 7, so bursts of screenshots taken during `tools/ui-7.sh` swipes stood in for it (8-10 frames per gesture):
