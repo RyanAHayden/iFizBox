@@ -49,8 +49,18 @@ export async function createShell({ raster, state, mode, name, bundleId, version
   const prepared = new Map();
   const NAMES = { tidewell: "Tidewell", kiteline: "Kiteline" };
   // the promo clip's world ({"world": "aging"}): a free certificate signs for 7 days, and Kiteline was signed 6 days ago
-  const aging = () => { if (shell.world === "aging" && !signed.has("example.demo.kiteline")) signed.set("example.demo.kiteline", { name: "Kiteline", bundleId: "example.demo.kiteline", version: "1.8", expires: 1 }); };
-  const days = () => (shell.world === "aging" ? 7 : 300);
+  const aging = () => { if ((shell.world === "aging" || aged) && !signed.has("example.demo.kiteline")) signed.set("example.demo.kiteline", { name: "Kiteline", bundleId: "example.demo.kiteline", version: "1.8", expires: 1 }); };
+  // the Lite phone's Keychain: an imported certificate (own) lasts a year, a Free Apple ID's 7 days; {"phone": "fresh"} starts with none
+  let kept = mode === "jailbreak" ? null : { kind: "own" }, aged = false;
+  shell.phone = (what) => { if (what === "fresh") kept = null; else if (what === "aging") aged = true; else throw new Error("unknown phone " + what); };
+  const days = () => (shell.world === "aging" || aged || kept?.kind === "free" ? 7 : 300);
+  const phoneStatus = async () => {
+    if (mode === "jailbreak") return null;
+    if (!kept) return { mode: "sideload", identity: null };
+    const free = kept.kind === "free", expires = await inDays(days());
+    return { mode: "sideload", identity: { name: free ? "Apple Development: Demo Person (FREE123456)" : "Apple Development: Demo Team (DEMO123456)", team: free ? "FREE123456" : "DEMO123456", ...(free ? { serial: "0A1B2C3D4E5F" } : {}), expires,
+      profile: { name: free ? "Free Provisioning Profile" : "Demo Wildcard", team: free ? "Demo Person" : "Demo Team", appId: free ? "FREE123456.*" : "DEMO123456.*", devices: free ? 1 : 3, wildcard: true, expires, device: { state: "in", udid: "00008130-001A2B3C4D5E6F01", count: free ? 1 : 3, shared: 1 } } } };
+  };
   const steps = async (emit, phase, ms, from = 0) => { for (let t = 0; t <= ms; t += 100) { emit?.({ phase, progress: from + (1 - from) * Math.min(1, t / ms) }); await vsleep(100); } };
   // ---- the jailbroken phone
   let status = null;
@@ -113,8 +123,11 @@ export async function createShell({ raster, state, mode, name, bundleId, version
       return { text: r.body.toString("utf8"), source: dir + "Packages" };
     },
     // the Lite build
-    "signing.status": async () => (mode === "jailbreak" ? null : { mode: "sideload", identity: { name: "Apple Development: Demo Team (DEMO123456)", team: "DEMO123456", expires: await inDays(days()),
-      profile: { name: "Demo Wildcard", team: "Demo Team", appId: "DEMO123456.*", devices: 3, wildcard: true, expires: await inDays(days()), device: { listed: true } } } }),
+    "signing.status": () => phoneStatus(),
+    // the phone's Keychain: signing.import keeps the certificate (the Free Apple ID's carries its marker password), signing.remove drops it
+    async "signing.import"({ password }) { await vsleep(1100); kept = { kind: password === "free-apple-id" ? "free" : "own" }; return phoneStatus(); },
+    "signing.remove": () => { kept = null; return phoneStatus(); },
+    "device.info": () => ({ udid: "00008130-001A2B3C4D5E6F01", model: "iPhone" }),
     "signing.installed": async () => (aging(), { apps: await Promise.all([...signed.values()].map(async (a) => ({ ...a, expires: await inDays(a.expires) }))) }),
     "signing.checkCertificate": () => ({ status: "good" }),
     "signing.remind": () => ({ ok: true }),

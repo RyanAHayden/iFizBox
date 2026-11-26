@@ -5,7 +5,8 @@
     marketing/video/make.sh [OUT_DIR]     # default marketing/video/out (gitignored)
 
 It writes `OUT_DIR/rec/` (the recordings), then `OUT_DIR/showcase-4x5.mp4` (1080x1350) and `OUT_DIR/showcase-9x16.mp4`
-(1080x1920): 60 fps H.264, about 71 s, no sound.
+(1080x1920): 60 fps H.264, about 71 s, no sound. It then makes the promo clips, each in its own section below, as
+`OUT_DIR/promo-*.mp4`.
 
 Needs node 22+, python3, chromium and ffmpeg. No network and no phone: the world is made up (`.example` hosts, names
 and icons invented in `make_state.py`), and the app's native bridge is answered in Node by `shell.mjs`.
@@ -60,6 +61,9 @@ marks, world updates) is in `capture.mjs`'s header.
 | `shots-promo-lite.json` | the sideload promo recording's script: Add Tweaks, the queue and Confirm, the signed install, the Installed days and Re-sign All |
 | `jb-reddit.html` | the r/jailbreak clip as one page: the title card, the phone's slide in and out, the captions, and the end card, cut from `rec/jb-reddit.mp4` alone (`render.mjs --page jb-reddit`) |
 | `shots-jb-reddit.json` | the r/jailbreak recording's script: jailbreak mode, adds the Lamplight source, searches "dock", and installs Dockshade through Confirm to the Complete page, with pauses so each screen reads |
+| `promo-sideload.html` | the sideload-only clip as one page: a splash, the phone, the captions, the speed segments and the end card, cut from `rec/promo-sideload.mp4` alone (`render.mjs --page promo-sideload`) |
+| `shots-promo-sideload.json` | the sideload-only recording's script: the certificate import, the Free Apple ID sign-in, sources and an install, a tweak, the update and Re-sign All |
+| `stubs/` | the sideload-only recording's stand-ins, served at `/__video/<file>`: `gsa.js` and `freeroute.js` (Apple's answers, stubbed), `pick.js` (the iOS Files picker sheet), `profile.js` (a provisioning profile made at the page's "now") |
 
 Re-render one cut from the recordings already in `OUT_DIR`:
 
@@ -136,3 +140,45 @@ It is made in 4:5 only: 1080x1350, 60 fps H.264, no sound. `make.sh` makes it af
 `OUT_DIR/jb-reddit-4x5.mp4`. Cut it alone from the recording already in `OUT_DIR/rec/`:
 
     node marketing/video/render.mjs marketing/video/out jb-reddit-4x5.mp4 --h 1350 --page jb-reddit
+
+## The sideload-only clip
+
+`promo-sideload.html` is the sideload-only (Lite build) clip: 41.5 s, another timeline beside `video.html`,
+`promo.html`, `promo-lite.html` and `jb-reddit.html`. It has three parts: a splash (the app icon, the name and "no jailbreak, no
+computer"; the icon opens into the phone), then one recording, `rec/promo-sideload.mp4` (103 s raw), then an end card
+(the name and the domain). The recording plays through speed segments: `SPEED` in `promo-sideload.html` gives, per
+mark, how many times faster it plays up to the next mark (1x to 5x: waits fast, what is read slow), and `FASTER` (1.25)
+multiplies all of them to fit the length.
+
+The captions, in order: Import your own certificate / Or sign in with a free Apple ID / Install apps from AltStore
+sources / Tweaks, signed on your iPhone / Updates, one tap / Re-sign All, before they expire.
+
+Its script is `shots-promo-sideload.json`, run in sideload mode by `make.sh`. It starts on a fresh phone (`{"phone":
+"fresh"}`: no certificate in the fake Keychain) or an aging one (`{"phone": "aging"}`: Kiteline signed 6 days ago):
+
+- Settings > Installation & Signing > Certificate > Import Certificate. The iOS Files picker is drawn by `stubs/pick.js`
+  as a sheet, with the app's own icons, steps and `select-files-light.jpg`. The .p12 fixture, a profile made at the
+  page's "now" and a password file are put into the file input.
+- Remove Certificate.
+- Use a Free Apple ID. Apple's answers are stubbed: the script's `override` makes `capture.mjs` serve `stubs/gsa.js` and
+  `stubs/freeroute.js` in place of `core/gsa.js` and `core/freeroute.js`; each re-exports the real module from `?real`.
+  The Apple ID is made up (`taylor@example.com`). The sign-in page, the alerts and the Keychain import are the real app.
+- Sources and Install Tidewell, then Add Tweaks (Night Charts).
+- The update (a world update) with Upgrade.
+- Signed Apps > Re-sign All.
+
+`capture.mjs` gained the script key `override` and the key `liveKeyboard` (the keyboard follows focus through pauses),
+the step `{"phone": ...}`, and the path `/__video/<file>`, which serves `stubs/`. `finger.js` has "@" on the email
+field's "/" key and a number pad for code fields. `shell.mjs` answers `signing.import`, `signing.remove` and
+`device.info`, and its phone status starts with no certificate when fresh. A Free Apple ID's certificate lasts 7 days;
+an imported one lasts a year.
+
+The login uses no real Apple ID.
+
+Cut it alone from the recording already in `OUT_DIR/rec/`:
+
+    node marketing/video/render.mjs marketing/video/out promo-sideload-4x5.mp4 --h 1350 --page promo-sideload
+    node marketing/video/render.mjs marketing/video/out promo-sideload-9x16.mp4 --h 1920 --page promo-sideload
+
+`make.sh` makes both after the r/jailbreak cut, as `OUT_DIR/promo-sideload-4x5.mp4` and
+`OUT_DIR/promo-sideload-9x16.mp4`.
