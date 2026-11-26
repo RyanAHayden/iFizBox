@@ -67,6 +67,7 @@ import { lastDevice, openRoute } from "./device.js";
 import { onCellularChoice } from "../core/cellular.js"; // F417
 import { cellularAsk, cellularStopped } from "./cellular.js";
 import { followHereSelf, followSelfUpdate } from "./selfupdate.js";
+
 // Signs `url` (an IPA) on the phone and opens the install link: true once iOS was asked to install; false after an
 // error, which an alert explains (no_server and no_identity then open Settings > Signing).
 // F68: `params` replaces { url } with the look-first sheet's { token, name?, bundleId?, icon?, removeExtensions? }

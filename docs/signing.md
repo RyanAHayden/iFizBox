@@ -213,11 +213,19 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
 - **Forget Free Apple ID** also removes the Keychain identity, but only when its certificate's serial is the Free Apple
   ID's; a certificate imported since stays.
 - **Names**: the App ID and profile are the website's (`<bundle ID>.<TEAMID>`, the app's own bundle ID). With Keep
-  Bundle IDs on, other apps keep their own bundle IDs and take that App ID only in their entitlements.
+  Bundle IDs on, other apps keep their own bundle IDs and take that App ID only in their entitlements. iFizBox's own
+  update on a free profile is the exception (below).
 - **The signer** keeps `get-task-allow` as the profile allows under Xcode's team profiles (named "iOS Team
   Provisioning Profile: …", or with `LocalProvision`), which is every free Apple ID profile: iOS refuses such an app
   signed with it false. Every other profile still signs apps that can't be debugged (`native/sign/Profile.swift`
   `isTeamProfile`).
+- **A free profile can't install through the Signing Server.** A team profile lasting at most 8 days is free
+  (`native/sign/Profile.swift` `isFree`; `signing.status` reports it as `free`). On one, an install through the Signing Server
+  is refused before it downloads, and a signed-ahead copy before it uploads (`Sideload.refusesFree`): iOS
+  refuses such an app from a website, and This iPhone needs Network Extensions, which a free profile lacks. The
+  failure says so and points to a certificate (Settings > Installation & Signing) or a Computer Install.
+- **iFizBox's own update on a free profile** is signed as `<bundle ID>.<TEAMID>` whatever Keep Bundle IDs says: the ID
+  the Computer Install gave it (`web/app/signing/freeprofile.js`).
 
 ## Own provisioning profiles (App Store Connect API key)
 
