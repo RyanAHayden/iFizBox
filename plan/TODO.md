@@ -11,6 +11,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
+- [ ] **B459** Changes (jailbreak app, iPhone 7): with an upgrade waiting (iFizBox 1.0.0 banner shown), the Upgrade bar button was missing, only Refresh showed; and Refresh never finished (Downloading Packages bar stuck with Cancel). Find why Upgrade is missing and why the refresh hangs; check in Chromium with the fake bridge first. Screenshot: .runner/uploads/20261126-104415-IMG_0018.png | files: web/app/screens/changes.js, web/app/screens/changes.test.js
 ### Research (any time, parallel)
 
 ### Native jailbreak app (shape decided: docs/native.md)
