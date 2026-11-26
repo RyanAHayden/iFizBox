@@ -25,7 +25,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
-- [ ] **B464** (follow-up, low) Jailbreak app: the 'iFizBox X is out.' banner reads GitHub's release, but Changes' Upgrade (N) counts apt's rows, so when apt's lists don't have X yet (repo published after the release, or no refresh since) the banner shows with no Upgrade button on Changes, and the banner's Upgrade waits 20 s then opens Changes with nothing to upgrade. Show the jailbreak banner only once the catalog has iFizBox's apt row (or refresh first). Check with node tests in essential-ui/changes. | files: web/app/essential-ui.js, web/app/essential-ui.test.js
 ### Parked
 
 - [ ] **F107** (later, when the jailbreakme.dev exploit is ready) Upgrading & Jailbreaking Help stays unlocked on the website's locked Home (user 2026-11-18: 'we will not have the jailbreak tutorial thing locked when jailbreakme.dev exploit is ready, thats for later'): leave that row out of websign-gate's browsingLocked set in screens/home.js and point it at the jailbreak guide. | files: web/app/screens/home.js
