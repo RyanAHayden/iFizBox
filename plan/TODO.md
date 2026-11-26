@@ -25,7 +25,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
-- [ ] **R104** (follow-up, normal) On a free Apple ID profile no in-app install route works: iOS refuses the Signing Server (itms-services, error 111) and This iPhone needs the built-in VPN, which needs Network Extensions that a free profile can't have; so the free route needs a computer for every weekly re-sign. Research a route that works from the phone, e.g. This iPhone through a loopback VPN app from the App Store (LocalDevVPN or StosVPN, as Feather and SideStore do) instead of the built-in one, and what the app would change; check on the iPhone 15 Pro with the spare free Apple ID. | files: docs/sideload.md — your answer (DECIDE Free Apple ID route through the LocalDevVPN app: measured on the iPhone 15 Pro, journal, docs, follow-up F446. This is finished, but held because R104 was research, which changes no product. "Ship them" merges it with the findings. "Queue them as their own task" keeps only the findings now and queues the rest. Ship these changes? [Ship them (recommended) / Queue them as their own task]): Ship them
 ### Parked
 
 - [ ] **F107** (later, when the jailbreakme.dev exploit is ready) Upgrading & Jailbreaking Help stays unlocked on the website's locked Home (user 2026-11-18: 'we will not have the jailbreak tutorial thing locked when jailbreakme.dev exploit is ready, thats for later'): leave that row out of websign-gate's browsingLocked set in screens/home.js and point it at the jailbreak guide. | files: web/app/screens/home.js
