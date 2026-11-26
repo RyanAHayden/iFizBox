@@ -24,6 +24,7 @@ ALLOW = [
     "web/app/icons/*",  # the website's icons and launch images
     "plan/*.md",  # agent-runner's task list and its DONE log, which only grow
     "journal/2026-11-26-t85-promo-clip-jailbreak/promo-*.mp4",  # the two clips to post (3.8 MB); the download links point here
+    "journal/2026-11-26-t86-promo-clip-sideload/promo-lite-*.mp4",  # the two sideload clips to post (4.3 MB)
 ]
 
 # Already in history before the guard: they cost nothing more where they are, and removing them from the tip saves

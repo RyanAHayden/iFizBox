@@ -48,6 +48,9 @@ export async function createShell({ raster, state, mode, name, bundleId, version
   const signed = new Map();
   const prepared = new Map();
   const NAMES = { tidewell: "Tidewell", kiteline: "Kiteline" };
+  // the promo clip's world ({"world": "aging"}): a free certificate signs for 7 days, and Kiteline was signed 6 days ago
+  const aging = () => { if (shell.world === "aging" && !signed.has("example.demo.kiteline")) signed.set("example.demo.kiteline", { name: "Kiteline", bundleId: "example.demo.kiteline", version: "1.8", expires: 1 }); };
+  const days = () => (shell.world === "aging" ? 7 : 300);
   const steps = async (emit, phase, ms, from = 0) => { for (let t = 0; t <= ms; t += 100) { emit?.({ phase, progress: from + (1 - from) * Math.min(1, t / ms) }); await vsleep(100); } };
   // ---- the jailbroken phone
   let status = null;
@@ -110,19 +113,25 @@ export async function createShell({ raster, state, mode, name, bundleId, version
       return { text: r.body.toString("utf8"), source: dir + "Packages" };
     },
     // the Lite build
-    "signing.status": async () => (mode === "jailbreak" ? null : { mode: "sideload", identity: { name: "Apple Development: Demo Team (DEMO123456)", team: "DEMO123456", expires: await inDays(300),
-      profile: { name: "Demo Wildcard", team: "Demo Team", appId: "DEMO123456.*", devices: 3, wildcard: true, expires: await inDays(300), device: { listed: true } } } }),
-    "signing.installed": async () => ({ apps: await Promise.all([...signed.values()].map(async (a) => ({ ...a, expires: await inDays(a.expires) }))) }),
+    "signing.status": async () => (mode === "jailbreak" ? null : { mode: "sideload", identity: { name: "Apple Development: Demo Team (DEMO123456)", team: "DEMO123456", expires: await inDays(days()),
+      profile: { name: "Demo Wildcard", team: "Demo Team", appId: "DEMO123456.*", devices: 3, wildcard: true, expires: await inDays(days()), device: { listed: true } } } }),
+    "signing.installed": async () => (aging(), { apps: await Promise.all([...signed.values()].map(async (a) => ({ ...a, expires: await inDays(a.expires) }))) }),
     "signing.checkCertificate": () => ({ status: "good" }),
     "signing.remind": () => ({ ok: true }),
-    async "signing.prepare"({ url }, emit) {
+    async "signing.prepare"({ url, record, tweaks }, emit) {
+      if (record) { // a Re-sign from the phone's record: the same app, a fresh signature, the tweaks it now has
+        const a = signed.get(record);
+        await steps(emit, "signing", 700);
+        prepared.set("t-" + record, { ...a, expires: days(), tweaks: tweaks?.names ?? a.tweaks });
+        return { token: "t-" + record, bundleId: a.bundleId, name: a.name, version: a.version, expires: await inDays(days()) };
+      }
       const [, slug, v] = /\/([a-z]+)-([\d.]+)\.ipa/.exec(url ?? "") ?? [];
       const total = v === "2.4.0" ? 18_900_000 : 18_400_000; // make_state.py's sizes
       for (let t = 0; t <= 1200; t += 100) { emit?.({ phase: "downloading", progress: t / 1200, bytes: Math.round(total * t / 1200), total, rate: 10_200_000 }); await vsleep(100); }
       await steps(emit, "signing", 700);
       const id = `example.demo.${slug}`, name = NAMES[slug] ?? slug;
-      prepared.set("t-" + slug, { name, bundleId: id, version: v, expires: 300 });
-      return { token: "t-" + slug, bundleId: id, name, version: v, expires: await inDays(300) };
+      prepared.set("t-" + slug, { name, bundleId: id, version: v, expires: days(), ...(tweaks?.names ? { tweaks: tweaks.names } : {}) });
+      return { token: "t-" + slug, bundleId: id, name, version: v, expires: await inDays(days()) };
     },
     "idevice.status": () => ({ paired: "rp", vpn: { available: true, tested: true } }),
     "idevice.pairing": () => ({ paired: "rp" }),
