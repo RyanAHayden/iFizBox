@@ -11,7 +11,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
-- [ ] **B465** (follow-up, high) Some buttons take a tap without showing their pressed state: the user can tap Home and Settings (and others) and the action happens but the button never depresses, so the tappable area is bigger than (or offset from) the area that draws :active/.is-pressed. Find why (likely the press handler in app.js sets is-pressed on a different element than the hit target, or a child/padding/::before covers the button), fix it once in the shared press code/CSS so every tappable control (tab bar items like Home and Settings, bar buttons, cells, action/alert buttons) shows its pressed state across its whole hit area, in iOS 6 and iOS 13 styles. Check in Chromium (readme_shots/capture.mjs route): tap each control at its edges and centre and confirm the pressed look; add a node test that a tap anywhere in a control's hit box marks that control pressed. | files: web/app/app.js, web/app/ios6.css, web/app/press-hitbox.test.js
 ### Research (any time, parallel)
 
 ### Native jailbreak app (shape decided: docs/native.md)
@@ -22,6 +21,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
+- [ ] **B467** (follow-up, low) iOS 7 style: a held tab bar item turns blue but keeps its outline glyph; the chosen tab shows a filled one (ios7.css swaps --glyph for .tab[data-tab].active). Add .tab[data-tab=X].is-pressed beside each .active glyph rule so the held look matches the chosen look. Check in Chromium with journal/2026-11-26-b465-tab-pressed/probe.mjs (STYLE=ios7). | files: web/app/ios7.css, web/app/press-hitbox.test.js | model: sonnet
 ### Parked
 
 - [ ] **F107** (later, when the jailbreakme.dev exploit is ready) Upgrading & Jailbreaking Help stays unlocked on the website's locked Home (user 2026-11-18: 'we will not have the jailbreak tutorial thing locked when jailbreakme.dev exploit is ready, thats for later'): leave that row out of websign-gate's browsingLocked set in screens/home.js and point it at the jailbreak guide. | files: web/app/screens/home.js
