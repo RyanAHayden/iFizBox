@@ -81,3 +81,61 @@ test("the app page's nav button: Modify while queued, else Install / Upgrade / R
   assert.deepEqual(modifyActions({ queued: true }), ["Clear", "Install"]);
   assert.deepEqual(modifyActions({}), ["Install"]);
 });
+
+// B484: an app installed under a custom bundle ID upgrades under that ID, not the source's bundleIdentifier.
+test("B484: an upgrade of an app installed as com.me.x from source ID com.x signs as com.me.x", async () => {
+  const { withInstalledId, installedIdFor, customParams } = await import("./appqueue.js");
+  const { withInstalledIds, runAppQueue } = await import("../screens/queue.js");
+  const { prepareParams } = await import("../signing/queue.js");
+  const p = pkg("com.x", [{ version: "2.0", downloadURL: "https://s/x2.ipa" }, { version: "1.0", downloadURL: "https://s/x1.ipa" }]);
+  const signed = [{ bundleId: "com.me.x", originalBundleId: "com.x", version: "1.0" }];
+  // Installed's record is com.x at 1.0 (Changes' row and the app page's Upgrade both build this job)
+  const job = { ...appJob(p, { installed: "1.0" }), mode: "upgrade" };
+  assert.equal(job.id, "com.x");
+  assert.equal(installedIdFor(job, signed), "com.me.x");
+  const up = withInstalledId(job, { signed });
+  assert.equal(up.id, "com.x", "the queue and Installed's record keep the source's ID");
+  assert.equal(up.options.edits.bundleId, "com.me.x");
+  assert.equal(up.options.signsAs, "com.me.x");
+  assert.equal(customParams(up).bundleId, "com.me.x", "the one at a time run (installCustom)");
+  assert.equal(customParams(up).url, "https://s/x2.ipa");
+  assert.equal(prepareParams(up).bundleId, "com.me.x", "the sign-ahead run (signing.prepare)");
+  // the saved IPA's Sign Options (F379) go with it; the installed ID wins
+  const saved = [{ file: "x.ipa", bundleId: "com.x", version: "1.0", options: { bundleId: "com.me.x", name: "Mine" } }];
+  const named = withInstalledId(job, { signed, saved });
+  assert.deepEqual(named.options.edits, { bundleId: "com.me.x", name: "Mine" });
+  assert.equal(named.options.name, "Mine");
+  // left alone: a copy under its own ID too, no signed record, a fresh Install, a Custom Install's own choice, a Re-sign
+  assert.equal(withInstalledId(job, { signed: [...signed, { bundleId: "com.x", originalBundleId: "com.x" }] }), job);
+  assert.equal(withInstalledId(job, { signed: [] }), job);
+  assert.equal(withInstalledId(job, { signed: [{ bundleId: "com.x", originalBundleId: "com.x" }] }), job);
+  const fresh = appJob(p);
+  assert.equal(withInstalledId(fresh, { signed }), fresh);
+  const custom = { ...job, options: { edits: { bundleId: "com.other.x" } } };
+  assert.equal(withInstalledId(custom, { signed }), custom);
+  const resign = { id: "com.x", installed: "1.0", mode: "resign" };
+  assert.equal(withInstalledId(resign, { signed }), resign);
+  const self = { ...job, id: SELF_ID };
+  assert.equal(withInstalledId(self, { signed: [{ bundleId: `${SELF_ID}.T`, originalBundleId: SELF_ID }] }), self);
+
+  // the run reads the shell's records: Confirm's run signs com.me.x
+  const calls = [];
+  const native = { call: async (m) => { calls.push(m); return m === "signing.installed" ? { apps: signed } : { ipas: saved }; } };
+  const [ran] = await withInstalledIds([job], { native });
+  assert.equal(ran.options.edits.bundleId, "com.me.x");
+  assert.deepEqual(calls, ["signing.installed", "library.list"]);
+  const plain = appJob(pkg("com.y", [{ version: "1", downloadURL: "https://s/y.ipa" }]));
+  calls.length = 0;
+  assert.deepEqual(await withInstalledIds([plain], { native }), [plain], "nothing installed: no call");
+  assert.deepEqual(calls, []);
+  assert.deepEqual(await withInstalledIds([job], { native: null }), [job], "the website: as it is");
+  const failing = { call: async () => { throw new Error("no"); } };
+  assert.deepEqual(await withInstalledIds([job], { native: failing }), [job]);
+  const q = createAppQueue();
+  q.add(job);
+  const seen = [];
+  const n = await runAppQueue(q.list(), { queue: q, ready: async () => true, record: async () => {}, recount: () => {},
+    installedIds: (js) => withInstalledIds(js, { native }), install: async (j) => { seen.push(j.options?.edits?.bundleId); return true; } });
+  assert.equal(n, 1);
+  assert.deepEqual(seen, ["com.me.x"]);
+});
