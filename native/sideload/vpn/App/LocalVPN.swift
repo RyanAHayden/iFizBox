@@ -8,10 +8,11 @@
 // (RestoreBack.swift).
 // B423: in the background it starts only to finish an install already connected; anything else waits for the app.
 //   idevice.status      carries the VPN's state as `vpn`: {available, bundled, entitled, tested, on, cellular, wifi,
-//                       otherVPN, restore, remembered, restoreNever, name}
+//                       otherVPN, restore, remembered, restoreNever, name, via}
 //   vpn.setRestore      {on}: Restore My VPN (kept; off by default) -> the status' vpn
 //   vpn.test           the VPN on, one connect to iOS with the pairing (idevice.verify), the VPN off: {ok, ms, kind};
 //                       a pass marks This iPhone tested (set up)
+//   vpn.setVia         {via: "builtin" | "app"}: Connect Through, the built-in VPN or LocalDevVPN (kept) -> the status' vpn
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 import Network
@@ -66,7 +67,7 @@ enum LocalVPN {
     // LocalDevVPN (free on the App Store) runs its own loopback VPN that reaches this phone at the same 10.7.0.1, so
     // This iPhone connects through it with nothing of ours turned on. It's the only way in for a profile without
     // Network Extensions (a free Apple ID). The person turns it on; iOS gives an app no way to switch another app's VPN.
-    //   vpn.setVia  {via: "builtin" | "app"} -> the status' vpn (`via`: the one in use)
+    // vpn.setVia keeps the choice; the status' `via` says the one in use.
     static let appName = "LocalDevVPN"
     static let viaKey = "ifizbox.vpn.via"
     static let appTestedKey = "ifizbox.vpn.tested.app"

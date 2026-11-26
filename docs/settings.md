@@ -97,8 +97,10 @@ The pages under it:
   red reason) or Not Responding, with one action: Start Setup, Test Connection, Check Connection or Fix. Its footer
   shows once it's ready: the other-VPN line ("Your VPN goes off during installs. Turn it back on after.") when another
   VPN is up or chosen in Settings > VPN and Restore My VPN is off, else
-  none. Until This iPhone is set up, **Set Up** has three steps: 1. Pair This iPhone (opens Pairing),
-  2. Allow iFizBox VPN, 3. Test Connection. A step that's done is checked, and the next one is open. Steps 2 and 3
+  none. **Connect Through** is a group under the status: **iFizBox VPN** ("Built in, turns on by itself") or **LocalDevVPN**
+  ("Free app on the App Store"), one checked, the one in use; a tap picks it. A profile without Network Extensions has
+  LocalDevVPN only: the built-in row says Missing and can't be picked. Until This iPhone is set up, **Set Up** has three steps: 1. Pair This iPhone (opens Pairing),
+  2. Allow iFizBox VPN (through LocalDevVPN: 2. Turn On LocalDevVPN, which opens its App Store page), 3. Test Connection. A step that's done is checked, and the next one is open. Steps 2 and 3
   are done together: `vpn.test` turns the VPN on, connects once with the pairing and turns it off, and iOS asks to
   allow the VPN configuration the first time. The footer reads "Once is enough. It stays set up after updates and
   re-signing." Then **Restore My VPN**, a switch in a group of its own, off by default, shown when `idevice.status`'s
@@ -113,7 +115,7 @@ The pages under it:
   through installation_proxy never show iOS's install prompt. Under the choice, the chosen route's groups slide in:
   This iPhone's (below), or the Signing Server's (Server, Check Server, Run Your Own). A tap moves the checkmark at
   once, whether or not the iPhone is paired, and the row shows the grey spinner until `idevice.status` answers.
-- **This iPhone** (also `installation/iphone` on its own): the status group, then Set Up (until it's set up),
+- **This iPhone** (also `installation/iphone` on its own): the status group, then Connect Through (the pick between the built-in VPN and LocalDevVPN, the one in use checked), then Set Up (until it's set up),
   Restore My VPN (when shown, with its fix row and, once nothing is left, Remember VPN Again), Forget Pairing (once paired), then **How It Works**, as above. While `idevice.status` is read, the status says Checking… with a
   spinner, and the steps appear once it answers. The last answer of this app run shows at once while it's read again; a failed or late read (past its deadline, `TIMEOUTS`) says Not Responding, red. A profile without Network
   Extensions shows a Set Up group "Network Extensions: Missing" with the footer "This profile has no Network Extensions,

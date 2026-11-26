@@ -187,7 +187,7 @@ Signing Server in palera.in's place (below).
 library. The app talks to the phone's own lockdownd as if it were a computer on USB:
 
 - **Setup, once:** a pairing file (`pairingFile.plist`) made on a computer (with jitterbugpair, iloader or
-  idevice's tools) and imported, plus a loopback VPN, so the device is reachable at `10.7.0.1` (Feather uses the App Store app LocalDevVPN for that; iFizBox runs its own, below). Feather keeps a lockdown heartbeat alive in the background. iOS 17.4+ uses
+  idevice's tools) and imported, plus a loopback VPN, so the device is reachable at `10.7.0.1` (Feather uses the App Store app LocalDevVPN for that; iFizBox runs its own or uses LocalDevVPN (Connect Through), below). Feather keeps a lockdown heartbeat alive in the background. iOS 17.4+ uses
   the RSD/RemotePairing tunnel (`tunnel_create_rppairing`); older versions use plain TCP lockdown.
 - **Install:** AFC writes the IPA to `PublicStaging/`, then `installation_proxy_install_with_callback` asks
   installd to install it, with real progress callbacks. It can update the app itself (`suspend:` in the call).
@@ -272,8 +272,9 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   connection (iFizBox reconnects instead), a cancel, or a refusal about the IPA or the phone (other App ID, iOS too old,
   device family, architecture, extraction). Not known: whether iOS refuses a Developer package with Developer Mode off,
   or an enterprise-signed IPA. Choosing This iPhone
-  opens its page (`installation/iphone`): Set Up (1. Pair This iPhone, 2. Allow iFizBox VPN, 3. Test Connection,
-  the done ones checked) until it's set up, then How It Works. The status says Checking… until `idevice.status` answers;
+  opens its page (`installation/iphone`): the status, then Connect Through (iFizBox VPN or LocalDevVPN, the one in use
+  marked), then Set Up (1. Pair This iPhone, 2. Allow iFizBox VPN, or through LocalDevVPN 2. Turn On LocalDevVPN, 3. Test
+  Connection, the done ones checked) until it's set up, then How It Works. The status says Checking… until `idevice.status` answers;
   a failed or late answer says Not Responding. Pair This
   iPhone opens `installation/pair`, a page that runs by itself: one sentence on what it gives, then on iOS 27 pairing
   starts on its own, the 6-digit code big at the top and where to type it, a short line a step with a ringed screenshot
@@ -484,12 +485,11 @@ rest:
   `tools/setup/llvm-mingw.sh` fetches the llvm-mingw that the Windows on ARM build needs. release.sh finds both in
   their default folders.
 
-**Free Apple ID without a computer (a plan, not built)**: a free profile has no packet tunnel, so the built-in VPN
-can't start on it. The plan is for This iPhone to use LocalDevVPN (a free app on the App Store, not ours), which
-the person turns on by hand before an install, so the free profile needs no Network Extensions. Measured on an
-iPhone 15 Pro (iOS 27.0.1): LocalDevVPN's Device IP is 10.7.0.1/32, the address the app already uses, its Tunnel IP
-10.7.1.1/32, and iOS asked once to add its VPN configuration (Allow once). Not yet checked: whether the app's own
-connection through that tunnel, and an install over it, work. Until they are, the computer setup is the way in.
+**Free Apple ID without a computer**: a free profile has no packet tunnel, so the built-in VPN can't start on it.
+This iPhone connects through LocalDevVPN instead (a free app on the App Store, not ours), which the person turns on
+by hand before each install, so the free profile needs no Network Extensions. Measured on an iPhone 15 Pro
+(iOS 27.0.1): LocalDevVPN's Device IP is 10.7.0.1/32, the address the app already uses, its Tunnel IP 10.7.1.1/32,
+and iOS asks once to add its VPN configuration. The pairing file still comes from the one-time computer setup.
 
 **Jailbreak build**: the root helper's `install-ipa` installs an IPA through `LSApplicationWorkspace
 installApplication:withOptions:error:`, as AppSync's `appinst` does (`native/helper/README.md`). It needs AppSync

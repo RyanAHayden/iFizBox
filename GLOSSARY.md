@@ -222,7 +222,7 @@ _In code_: LocalVPN.waitOffCellular, AIRPLANE_ON, airplaneStatus
 _Avoid_: cellular pause, data off wait
 
 **Set Up Steps**:
-The numbered steps that set up This iPhone, in order: 1. Pair This iPhone, 2. Allow iFizBox VPN, 3. Test Connection. A step that's done is checked and the next one is open; the group is there until This iPhone is set up, and its footer says once is enough
+The numbered steps that set up This iPhone, in order: 1. Pair This iPhone, 2. Allow iFizBox VPN, 3. Test Connection. Through LocalDevVPN, step 2 is Turn On LocalDevVPN. A step that's done is checked and the next one is open; the group is there until This iPhone is set up, and its footer says once is enough
 _Said_: set up steps, setup steps
 _On screen_: This iPhone > Set Up
 _In code_: setupSteps, SETUP_FOOTER, iphoneStatus
@@ -318,3 +318,10 @@ _Said_: which apps it affects
 _On screen_: none
 _In code_: SignerStamp.reaches, WEB_REACHES, reach
 _Avoid_: scope
+
+**Connect Through**:
+This iPhone's choice of how installs reach iOS on the phone: the built-in VPN, or LocalDevVPN, a free App Store app the person turns on before each install; a free Apple ID has LocalDevVPN only
+_Said_: Connect Through, LocalDevVPN choice
+_On screen_: This iPhone > Connect Through: iFizBox VPN / LocalDevVPN
+_In code_: vpn.setVia, vpn.via, LocalVPN.viaApp, viaApp, canConnect, ownVPN, routeVPN
+_Avoid_: connect with, route, external VPN
