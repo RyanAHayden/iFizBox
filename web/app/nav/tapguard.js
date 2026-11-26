@@ -117,3 +117,31 @@ export function cancelDragTaps(doc, { win = doc?.defaultView ?? globalThis.windo
     },
   };
 }
+
+// B471: the control a touch at (x, y) opens, as iOS's WebKit picks it, so the pressed look covers the same area. A
+// touch on nothing clickable (a grouped table's edge, the gap between Home's tiles, the nav bar beside About) still
+// clicks a control close by: WebKit (WebCore LocalFrame::qualifyingNodeAtViewportLocation) takes the element under
+// the finger, climbs to the nearest one that listens for clicks (the document itself here: app.js listens there),
+// then tries REACH_STEPS in order, scaled by its 15 pt search radius, and clicks the first clickable element it hits
+// inside that one. So a control opens from up to 13 px below and right of it, and 4 px above and left.
+//
+//   reachedControl(document, x, y, PRESSABLE)   // the control, or null (nothing within reach, or another clickable first)
+//
+// Another clickable thing (a field, a switch, a plain link or button) under a step ends the search there: WebKit
+// clicks that one. Only for touch: a mouse clicks exactly what is under it.
+export const REACH = 15;
+export const REACH_STEPS = [[-0.3, -0.3], [-0.6, -0.6], [0.3, 0.3], [-0.9, -0.9]];
+export const CLICKABLE = "a[href], button, input, select, textarea, label, [role='button'], [role='switch'], .switch";
+export function reachedControl(doc, x, y, sel) {
+  const under = (px, py) => doc.elementFromPoint?.(px, py) ?? null;
+  const hit = under(x, y);
+  const own = hit?.closest?.(sel);
+  if (own || hit?.closest?.(CLICKABLE)) return own ?? null;
+  for (const [dx, dy] of REACH_STEPS) {
+    const t = under(x + Math.trunc(dx * REACH), y + Math.trunc(dy * REACH)); // WebKit's IntSize truncates
+    const control = t?.closest?.(sel);
+    if (control) return control;
+    if (t?.closest?.(CLICKABLE)) return null;
+  }
+  return null;
+}
