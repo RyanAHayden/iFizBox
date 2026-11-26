@@ -18,7 +18,7 @@ import { compat } from "../core/compat.js";
 import { currentDevice } from "../device.js";
 import { detectMode } from "../core/settings.js";
 import { apps, recordInstall, removeInstall, onAppsChange } from "../core/installed.js";
-import { recordOf } from "../core/installed.js"; // B358
+import { pageInstall } from "../core/installed.js"; // B358; B483: by the installed bundle ID, on its own source only
 import { signAndInstall, isSelfIpa, originalWarning } from "../signing/install.js";
 import { localSigning } from "../signing/common.js";
 import { TOO_BIG_FOOTER } from "../signing/toobig.js";
@@ -292,9 +292,14 @@ export function trackingSection(app, pkg, source, body = null, { store = apps, s
   const remark = () => { cancelHeldForget(app.bundleIdentifier); return draw(); };
   async function draw() {
     let rec = null;
-    const signed = held() ? null : await Promise.resolve().then(() => signedOf(app.bundleIdentifier)).catch(() => null);
+    let signed = held() ? null : await Promise.resolve().then(() => signedOf(app.bundleIdentifier)).catch(() => null);
     // B358: a custom bundle ID's record is under the installed ID, not the source's
-    if (!held()) try { rec = recordOf(await (await store()).all(), app.bundleIdentifier, signed); } catch { /* no store */ }
+    // B483: only this source's: another source's app under the same bundle ID leaves the page reading Install
+    if (!held()) {
+      let records = [];
+      try { records = await (await store()).all(); } catch { /* no store */ }
+      ({ rec, signed } = pageInstall(records, app.bundleIdentifier, signed, pkg?.key));
+    }
     const sigRow = signatureRow(signed); // F91
     const versions = app.versions.map((x) => x.version).filter(Boolean);
     const byHand = handMarking(); // F242: the jailbreak app knows what's installed: no marking rows there
@@ -412,12 +417,15 @@ export function cancelHeldForget(id) {
 
 // F392: the version the Version page marks as installed: the record's (B358: by the installed bundle ID first), or what
 // this app signed with no record; "" unknown, null not installed (a held forget too).
-export async function appVersionInstalled(app, { store = apps, signedOf = (id) => signedRecordOf(id) } = {}) {
+// B483: with `key` (the page's source), only that source's record or signature counts (pageInstall).
+export async function appVersionInstalled(app, { store = apps, signedOf = (id) => signedRecordOf(id), key = null } = {}) {
   const id = app?.bundleIdentifier;
   if (!id || forgetHeld(id)) return null;
-  const signed = await Promise.resolve().then(() => signedOf(id)).catch(() => null);
+  let signed = await Promise.resolve().then(() => signedOf(id)).catch(() => null);
   let rec = null;
-  try { rec = recordOf(await (await store()).all(), id, signed); } catch { /* no store */ }
+  let records = [];
+  try { records = await (await store()).all(); } catch { /* no store */ }
+  ({ rec, signed } = pageInstall(records, id, signed, key));
   return rec ? rec.version || "" : signed ? signed.version || "" : null;
 }
 
@@ -487,9 +495,13 @@ const signatureOf = async (app, signedOf) => {
 };
 
 // The toggle's on/off: an installed record or a signature of iFizBox's.
-async function markedOrSigned(app, store, signedOf) {
+// B483: only this source's (pageInstall): another source's app under the same bundle ID reads outline.
+async function markedOrSigned(app, store, signedOf, key = null) {
   if (forgetHeld(app.bundleIdentifier)) return false; // B372
-  return Boolean(await markedRecord(app, store)) || Boolean(await signatureOf(app, signedOf));
+  const rec = await markedRecord(app, store);
+  const signed = await signatureOf(app, signedOf);
+  const found = pageInstall(rec ? [rec] : [], app.bundleIdentifier, signed, key);
+  return Boolean(found.rec || found.signed);
 }
 
 // One tap's work: true when the app is now marked installed, false when it was forgotten.
@@ -499,8 +511,8 @@ export async function toggleMarked(app, pkg, source, { store = apps, signedOf = 
   forget = forgetListed, body = null, warn = forgetWarning } = {}) {
   if (cancelHeldForget(app.bundleIdentifier)) return true;
   const s = await store();
-  const signed = await signatureOf(app, signedOf);
-  const rec = recordOf(await s.all(), app.bundleIdentifier, signed); // B358: by the installed bundle ID first
+  // B358: by the installed bundle ID first; B483: only this source's (another source's same ID: the tap marks this one)
+  const { rec, signed } = pageInstall(await s.all(), app.bundleIdentifier, await signatureOf(app, signedOf), pkg?.key);
   if (rec || signed) {
     const run = () => forget({ id: rec?.id ?? app.bundleIdentifier, signed, signedOnly: !rec }, native ?? nativeBridge(), async (id) => removeInstall(s, id));
     if (body) {
@@ -527,8 +539,8 @@ export async function sectionMarkNotInstalled(app, pkg, source, { store = apps, 
   if (forgetHeld(app.bundleIdentifier)) return true;
   try {
     // nothing left to forget (gone since the row was drawn): never let the toggle mark it installed
-    const signed = await signatureOf(app, signedOf);
-    if (!signed && !recordOf(await (await store()).all(), app.bundleIdentifier, signed)) return false;
+    const found = pageInstall(await (await store()).all(), app.bundleIdentifier, await signatureOf(app, signedOf), pkg?.key); // B483
+    if (!found.signed && !found.rec) return false;
     return !(await toggleMarked(app, pkg, source, { store, signedOf, native, forget, body, warn }));
   } catch (e) {
     if (e?.forgetFailed) { try { await warn(e); } catch { /* no alert here */ } }
@@ -566,7 +578,7 @@ export function markToggle(app, pkg, source, { store = apps, signedOf = (id) => 
       if (e?.forgetFailed) { try { await warn(e); } catch { /* no alert here */ } }
     } finally { busy = false; }
   });
-  b.refresh = async () => show(await markedOrSigned(app, store, signedOf));
+  b.refresh = async () => show(await markedOrSigned(app, store, signedOf, pkg?.key));
   b.refreshed = b.refresh();
   return b;
 }
@@ -666,8 +678,13 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
   }
   if (mode !== "sideload" || !app) return false; // F89: the website queues nothing
   let rec = null;
-  const signed = held ? null : await Promise.resolve().then(() => signedOf(app.bundleIdentifier)).catch(() => null); // F91: Modify offers Re-sign
-  if (!held) try { rec = recordOf(await (await store()).all(), app.bundleIdentifier, signed); } catch { /* no store */ } // B358
+  let signed = held ? null : await Promise.resolve().then(() => signedOf(app.bundleIdentifier)).catch(() => null); // F91: Modify offers Re-sign
+  // B358; B483: only this source's: another source's app under the same bundle ID gets a fresh Install, not Modify
+  if (!held) {
+    let records = [];
+    try { records = await (await store()).all(); } catch { /* no store */ }
+    ({ rec, signed } = pageInstall(records, app.bundleIdentifier, signed, pkg?.key));
+  }
   const job = appJob(pkg, { installed: rec ? rec.version || null : null, version, source: source ? displayName(source) : null });
   if (!job || !(await ready())) return false;
   // F246: a fresh install (no record) asks F243's once-per-app question before it is queued; Cancel queues nothing.
@@ -739,7 +756,7 @@ export async function appPageJob(pkg, source, { mode = detectMode(), store = app
   if (mode !== "sideload" || !app) return null;
   const held = forgetHeld(app.bundleIdentifier);
   let rec = null;
-  if (!held) try { rec = recordOf(await (await store()).all(), app.bundleIdentifier, null); } catch { /* no store */ }
+  if (!held) try { rec = pageInstall(await (await store()).all(), app.bundleIdentifier, null, pkg?.key).rec; } catch { /* no store */ } // B483
   const job = appJob(pkg, { installed: rec ? rec.version || null : null, source: source ? displayName(source) : null });
   if (!job) return null;
   const j = rec ? job : await queueOriginalCheck(job, warn);

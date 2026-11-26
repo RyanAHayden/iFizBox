@@ -217,6 +217,21 @@ export function recordOf(records, id, signed = null) {
   return null;
 }
 
+// B483: what of an app counts as installed on one source's app page (`key`, the page's catalog key): the record
+// (recordOf's) only when the page's source is the record's own (ownKey), and iFizBox's signed record only when it was
+// signed from that source: its credit says which, else the record it stands for. Another source listing the same
+// bundle ID (fastsign's modded X while AppTesters' X is installed) is another app: { rec: null, signed: null }. A record
+// or signature that names no source of its own, or a page with no key, keeps counting (nothing says it is another app).
+//   pageInstall(records, id, signed, key) -> { rec, signed }
+export function pageInstall(records, id, signed = null, key = null) {
+  const any = recordOf(records, id, signed);
+  const ours = (r) => { const own = ownKey(r); return !key || !own || own === key; };
+  const rec = any && ours(any) ? any : null;
+  const credit = creditOf(signed);
+  const sig = !signed ? null : credit && ownKey(credit) ? (ours(credit) ? signed : null) : !any || rec ? signed : null;
+  return { rec, signed: sig };
+}
+
 export async function forgetInstalled({ id = null, signed = null } = {}, { store = apps, native = null } = {}) {
   let gone = false;
   if (signed?.bundleId && typeof native?.call === "function") {
