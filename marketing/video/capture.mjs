@@ -9,7 +9,7 @@
 // page's look through time, the touches) and <outdir>/<name>.txt (the words on screen at every mark).
 // --shots records no video: one PNG per mark and "shot" step, quickly. --upto stops after that mark.
 //
-// The script: { "name", "storage": {localStorage…}, "steps": [ … ] }. Steps before { "record": true } are off the record.
+// The script: { "name", "storage": {localStorage…}, "override": {module path: stubs/ file}, "liveKeyboard": true (the keyboard follows the page's focus through pauses and waits, not only after a touch), "steps": [ … ] }. Steps before { "record": true } are off the record.
 //   { "mark": "name" }                 a named moment in <name>.json
 //   { "pause": ms }                    the page runs, nothing is touched
 //   { "until": "js", "max": ms }       the page runs until the expression is true (fails after max virtual ms)
@@ -19,6 +19,7 @@
 //   { "key": "return" }                taps the keyboard's return key
 //   { "swipe": [[x, y], [x, y]], "ms": n, "rest": ms }   a drag; lifted moving unless rest holds it still first
 //   { "world": "update" }              make_state.py's www-update is laid over www from now on
+//   { "phone": "fresh" | "aging" }    the phone's Keychain starts without a certificate / Kiteline was signed 6 days ago
 //   { "eval": "js" }                   off the record, logged
 //   { "shot": "name" }                 with --shots: a PNG
 import { spawn } from "node:child_process";
@@ -159,15 +160,20 @@ async function find(sel, nth = 0) {
 const words = () => ev(`[...document.querySelectorAll("body *")].filter((e) => e.children.length === 0 && e.offsetParent !== null).filter((e) => { const r = e.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; }).map((e) => e.textContent.trim()).filter(Boolean).join(" | ")`);
 
 // ---- the keyboard: up while a field has the focus
-let kb = 0, goKey = "return";
+let kb = 0, goKey = "return", kind = "";
 const typing = () => ev(`(() => { const e = document.activeElement; return Boolean(e?.matches?.("input:not([type=checkbox]):not([type=range]), textarea")); })()`);
 async function keyboard() {
   const want = (await typing()) ? 1 : 0;
+  if (want && kb) { // already up: the field changed (email, password, code), so the keys do
+    const k = await ev(`(() => { const t = document.activeElement.type; return t === "email" ? "email" : t === "tel" ? "tel" : ""; })()`);
+    if (k !== kind) { kind = k; await ev(`__finger.keyboard(1, document.documentElement.dataset.theme === "dark", ${JSON.stringify(goKey)}, ${JSON.stringify(kind)})`); }
+  }
+  if (want) kind = await ev(`(() => { const t = document.activeElement.type; return t === "email" ? "email" : t === "tel" ? "tel" : ""; })()`);
   if (want === kb) return;
   const n = stills ? 1 : 17;
   for (let i = 1; i <= n; i++) {
     const k = 1 - (1 - i / n) ** 3;
-    await ev(`__finger.keyboard(${want ? k : 1 - k}, document.documentElement.dataset.theme === "dark", ${JSON.stringify(goKey)})`);
+    await ev(`__finger.keyboard(${want ? k : 1 - k}, document.documentElement.dataset.theme === "dark", ${JSON.stringify(goKey)}, ${JSON.stringify(kind)})`);
     await tick();
   }
   kb = want;
@@ -217,6 +223,10 @@ handlers.set("Fetch.requestPaused", async ({ requestId, request }) => {
   const answer = (status, type, body) => send("Fetch.fulfillRequest", { requestId, responseCode: status, responseHeaders: [{ name: "content-type", value: type }, { name: "access-control-allow-origin", value: "*" }], body: Buffer.from(body).toString("base64") });
   if (request.url.startsWith(base)) {
     if (u.pathname.endsWith(".css")) return answer(200, "text/css", touchCss(await (await fetch(request.url)).text()));
+    // stand-ins for what the phone's Apple would answer: the script's "override" ({"/core/gsa.js": "gsa.js"}) serves stubs/<file> in place of a
+    // module (which re-exports the real one from <path>?real), and /__video/<file> serves stubs/<file> as it is
+    const stub = script.override?.[u.pathname] ?? (u.pathname.startsWith("/__video/") ? u.pathname.slice(9) : null);
+    if (stub && u.search !== "?real") return answer(200, "text/javascript", await readFile(join(here, "stubs", stub)));
     if (u.pathname === "/tweak-sources.json") return answer(200, "application/json", "[]"); // a fresh install's tweak source is someone's real repo
     const thumb = /^\/appicon\/([\w-]+\.png)$/.exec(u.pathname); // what the native shell serves beside web/app
     if (thumb) { try { return await answer(200, "image/png", await readFile(join(state, "appicon", thumb[1]))); } catch { return answer(404, "text/plain", ""); } }
@@ -245,6 +255,7 @@ if (!touch.includes(DOT)) throw new Error("tools/concept/touch.js changed: its c
 await inject(touch.replace(DOT, ""));
 await inject(bridgeSource(mode));
 await inject(await readFile(join(here, "finger.js"), "utf8"));
+await inject(await readFile(join(here, "stubs/pick.js"), "utf8"));
 await send("Page.navigate", { url: base });
 for (let i = 0; i < 200; i++) { await sleep(100); try { if (await ev("Boolean(globalThis.__clock && document.body)")) break; } catch {} }
 // the app starts on the virtual clock, off the record
@@ -276,7 +287,7 @@ try {
       console.log("mark", s.mark, at());
       if (stills) await png(`${script.name}-${s.mark}`);
       if (upto === s.mark) break;
-    } else if (s.pause) await run(s.pause);
+    } else if (s.pause) { await run(s.pause); if (script.liveKeyboard) await keyboard(); }
     else if (s.until) {
       const t0 = now;
       while (!(await ev(`Boolean(${s.until})`))) {
@@ -284,11 +295,13 @@ try {
         await (stills || !recording ? tick(50) : tick());
         if (!recording || stills) await sleep(5);
       }
+      if (script.liveKeyboard) await keyboard();
     } else if (s.tap) { const p = await find(s.tap, s.nth ?? 0); await press(p.x + (s.dx ?? 0), p.y + (s.dy ?? 0), s.hold ?? 90); if (s.go) goKey = s.go; await keyboard(); }
     else if (s.type) { if (!kb) throw new Error("no field has the focus for " + s.type); await type(s.type, s.cps ?? 7); }
     else if (s.key) { await key(s.key, 90); await run(60); await keyboard(); }
     else if (s.swipe) { await drag(s.swipe, s.ms ?? 320, s.rest ?? 0); await keyboard(); }
     else if (s.world) shell.world = s.world;
+    else if (s.phone) shell.phone(s.phone);
     else if (s.eval) console.log("eval:", String(JSON.stringify(await ev(s.eval))).slice(0, 3000));
     else if (s.shot) { if (stills) await png(`${script.name}-${s.shot}`); }
     else throw new Error("unknown step " + JSON.stringify(s));

@@ -13,6 +13,7 @@
     #rec-kb i { position: absolute; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-style: normal;
       border-radius: 6px; background: #fdfdfe; height: 44px; }
     #rec-kb i.f { background: #b0b4bd; font-size: 15px; }
+    #rec-kb i.num { height: 48px; font-size: 26px; }
     #rec-kb i.go { background: #3b79d8; color: #fff; font-size: 15px; }
     #rec-kb.dark i { background: #66666a; } #rec-kb.dark i.f { background: #444447; }
     /* the iOS 26 style leaves the switch to WebKit, and Chromium has none: a plain one stands in for the phone's */
@@ -44,7 +45,15 @@
     put("shift", "", 3, 12 + 108, 42, "f"); put("delete", "", W - 45, 12 + 108, 42, "f");
     put("123", "123", 3, 12 + 162, 48, "f"); put("/", "/", 57, 12 + 162, 40); put(".", ".", W - 148, 12 + 162, 40);
     put(" ", "space", 103, 12 + 162, W - 103 - 154); put("return", "return", W - 102, 12 + 162, 99, "go");
+    // an email field's "/" is "@" (the phone's email keyboard), and a code field's keyboard is the number pad
+    keys["@"] = keys["/"];
+    const pw = (W - 2 * 6 - 2 * 14) / 3;
+    ["123", "456", "789", " 0 "].forEach((row, r) => [...row].forEach((c, n) => { if (c !== " ") put(c, c, 14 + n * (pw + 6), 12 + r * 54, pw, "num"); }));
+    const letterDelete = keys.delete;
+    put("delete", "", 14 + 2 * (pw + 6), 12 + 162, pw, "num f"); // the pad's own delete, in place of the letters'
+    keys.padDelete = keys.delete; keys.delete = letterDelete;
   }
+  const letters = () => kb.querySelectorAll("i:not(.num)");
   let dotAt = { x: 0, y: 0 };
   const place = (scale, o) => { dot.style.transform = `translate(${dotAt.x}px,${dotAt.y}px) scale(${scale})`; dot.style.opacity = o; };
   document.addEventListener("DOMContentLoaded", build);
@@ -52,7 +61,14 @@
     // k: 0 (off the glass) .. 1 (pressed)
     at(x, y, k) { build(); dotAt = { x, y }; place(1.35 - 0.35 * k, k * 0.95); },
     // k: 0 hidden .. 1 up
-    keyboard(k, dark = false, go = "return") { build(); kb.className = dark ? "dark" : ""; keys.return.el.textContent = go; kb.style.transform = `translateY(${(1 - k) * 100}%)`; },
+    // kind: "" (letters), "email" (the "/" key says "@") or "tel" (the number pad)
+    keyboard(k, dark = false, go = "return", kind = "") {
+      build(); kb.className = dark ? "dark" : "";
+      keys.return.el.textContent = go; kb.style.transform = `translateY(${(1 - k) * 100}%)`;
+      for (const e of letters()) e.style.display = kind === "tel" ? "none" : "";
+      for (const e of kb.querySelectorAll("i.num")) e.style.display = kind === "tel" ? "" : "none";
+      keys["/"].el.textContent = kind === "email" ? "@" : "/";
+    },
     key(c) { build(); const k = keys[c]; return k ? { x: k.x, y: innerHeight - 300 + k.y } : null; },
     press(c, on) { keys[c]?.el.classList.toggle("on", on); },
   };
