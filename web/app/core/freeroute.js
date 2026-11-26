@@ -11,7 +11,8 @@
 //   freeAppId(bundleId, teamId)          <bundleId>.<TEAMID>: App IDs are unique across Apple, so a free team's are
 //                                        always suffixed (Keep Bundle IDs stays off on this route)
 //   pickTeam(teams)                      the free (Personal) team, else the first
-//   await runSetup({ portal, teamId, phone, saved, bundleId, appName, onStep, askRevoke, make })
+//   await runSetup({ portal, teamId, phone, saved, bundleId, appName, onStep, askRevoke, make, app })
+//       `app` true in the app: summaries name no browser (reusedSummary)
 //       -> { identity, profile, appId, steps }; onStep({ id, state: "running" | "done" | "failed", summary })
 //       identity: { teamId, serial, p12, password, expires, made }: `made` true when this run made it (save it)
 //   freeEntitlements(appEnts, profile)   zsign's entitlements for an app on this route: get-task-allow as the
@@ -61,11 +62,14 @@ export const atAppIdLimit = (e) => Number(e?.code) === 9401 || /maximum.*app id|
 
 // The certificate step: ours if Apple still lists it as issued, else a new key and CSR. At the limit `askRevoke`
 // gets the issued certificates (ours first, other tools' last) and answers a serial to revoke, or null to stop.
-async function certificate({ portal, teamId, saved, askRevoke, make, name }) {
+// The reuse summary: the website keeps the record in the browser; the app's may come from the app or a computer install.
+export const reusedSummary = (app) => (app ? "Reused the saved certificate" : "Reused this browser's certificate");
+
+async function certificate({ portal, teamId, saved, askRevoke, make, name, app }) {
   let certs = await portal.listCerts(teamId);
   const mine = saved && saved.teamId === teamId && saved.p12 && saved.serial
     ? certs.find((c) => String(c.serialNumber ?? "").toUpperCase() === saved.serial && issued(c)) : null;
-  if (mine) return { identity: { ...saved, made: false }, summary: "Reused this browser's certificate" };
+  if (mine) return { identity: { ...saved, made: false }, summary: reusedSummary(app) };
 
   const key = await make.key();
   const csr = await make.csr({ privateKey: key.privateKey, spki: key.spki, cn: name });
@@ -92,7 +96,7 @@ async function certificate({ portal, teamId, saved, askRevoke, make, name }) {
 }
 
 export async function runSetup({ portal, teamId, phone, saved = null, bundleId, appName = "App", onStep = () => {},
-  askRevoke = async () => null, make = {}, name = MACHINE_NAME } = {}) {
+  askRevoke = async () => null, make = {}, name = MACHINE_NAME, app = false } = {}) {
   const mk = { key: makeKey, csr: makeCsr, p12: makeP12, password: newPassword, ...make };
   const steps = {};
   const run = async (id, fn) => {
@@ -118,7 +122,7 @@ export async function runSetup({ portal, teamId, phone, saved = null, bundleId, 
     return { summary: "Added to the account" };
   });
 
-  const { identity } = await run("certificate", () => certificate({ portal, teamId, saved, askRevoke, make: mk, name }));
+  const { identity } = await run("certificate", () => certificate({ portal, teamId, saved, askRevoke, make: mk, name, app }));
 
   const identifier = freeAppId(bundleId, teamId);
   const { appId } = await run("appId", async () => {

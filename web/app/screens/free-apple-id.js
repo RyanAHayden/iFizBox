@@ -569,7 +569,7 @@ function resumeKept(ctx) {
 async function runSetupOnce(ctx, saved) {
   try {
     if (ctx.native) flow.phone = await nativePhone(ctx.native);
-    const r = await runSetup({ portal: flow.portal, teamId: flow.team.teamId, phone: flow.phone, saved, bundleId: BUNDLE_ID, appName: NAME,
+    const r = await runSetup({ portal: flow.portal, teamId: flow.team.teamId, phone: flow.phone, saved, bundleId: BUNDLE_ID, appName: NAME, app: !!ctx.native,
       onStep: (s) => { flow.steps[s.id] = s; ctx.redraw(); }, askRevoke: (certs) => askRevoke(ctx, certs) });
     saveFreeIdentity({ ...r.identity, teamName: flow.team.name ?? null, profile: r.profile.data, appId: r.appId }, ctx.store);
     resetComputerInstall(); // F436: signed with the profile before this one
