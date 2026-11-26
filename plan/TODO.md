@@ -14,7 +14,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 - [ ] **F443** Installed (jailbreak app): the Install IPAs and Apps rows above the package list are much taller than the other rows. Merge them into one normal-height row (one link to IPAs and installed apps, its subtitle the counts), sized like the package rows. Screenshot: .runner/uploads/20261126-104415-IMG_0019.png | files: web/app/screens/installed.js, web/app/screens/installed.test.js | after: B460
 - [ ] **B461** Find More: row buttons (ADD/ADDED) draw on top of the pinned section header (Popular on Canister) when scrolling; the header must cover the rows' buttons. Screenshot: .runner/uploads/20261126-104415-IMG_0021.png | files: web/app/screens/findmore.js, web/app/screens/findmore.test.js | model: sonnet
 - [ ] **B460** Installed, sorted by name: the pinned letter header (A, B...) slides up under the search field and scope bar instead of pinning below them. Search's page already does this right; give Installed the same pinned top. Screenshots: .runner/uploads/20261126-104415-IMG_0019.png, .runner/uploads/20261126-104415-IMG_0020.png | files: web/app/screens/installed.js, web/app/screens/installed.test.js | model: sonnet
-- [ ] **B459** Changes (jailbreak app, iPhone 7): with an upgrade waiting (iFizBox 1.0.0 banner shown), the Upgrade bar button was missing, only Refresh showed; and Refresh never finished (Downloading Packages bar stuck with Cancel). Find why Upgrade is missing and why the refresh hangs; check in Chromium with the fake bridge first. Screenshot: .runner/uploads/20261126-104415-IMG_0018.png | files: web/app/screens/changes.js, web/app/screens/changes.test.js
 ### Research (any time, parallel)
 
 ### Native jailbreak app (shape decided: docs/native.md)
@@ -25,6 +24,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
+- [ ] **B464** (follow-up, low) Jailbreak app: the 'iFizBox X is out.' banner reads GitHub's release, but Changes' Upgrade (N) counts apt's rows, so when apt's lists don't have X yet (repo published after the release, or no refresh since) the banner shows with no Upgrade button on Changes, and the banner's Upgrade waits 20 s then opens Changes with nothing to upgrade. Show the jailbreak banner only once the catalog has iFizBox's apt row (or refresh first). Check with node tests in essential-ui/changes. | files: web/app/essential-ui.js, web/app/essential-ui.test.js
 ### Parked
 
 - [ ] **F107** (later, when the jailbreakme.dev exploit is ready) Upgrading & Jailbreaking Help stays unlocked on the website's locked Home (user 2026-11-18: 'we will not have the jailbreak tutorial thing locked when jailbreakme.dev exploit is ready, thats for later'): leave that row out of websign-gate's browsingLocked set in screens/home.js and point it at the jailbreak guide. | files: web/app/screens/home.js
