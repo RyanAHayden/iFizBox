@@ -61,7 +61,7 @@ marks, world updates) is in `capture.mjs`'s header.
 | `shots-promo-lite.json` | the sideload promo recording's script: Add Tweaks, the queue and Confirm, the signed install, the Installed days and Re-sign All |
 | `jb-reddit.html` | the r/jailbreak clip as one page: the title card, the phone's slide in and out, the captions, and the end card, cut from `rec/jb-reddit.mp4` alone (`render.mjs --page jb-reddit`) |
 | `shots-jb-reddit.json` | the r/jailbreak recording's script: jailbreak mode, adds the Lamplight source, searches "dock", and installs Dockshade through Confirm to the Complete page, with pauses so each screen reads |
-| `promo-sideload.html` | the sideload-only clip as one page: a splash, the phone, the captions, the speed segments and the end card, cut from `rec/promo-sideload.mp4` alone (`render.mjs --page promo-sideload`) |
+| `promo-sideload.html` | the sideload-only clip as one page: a splash, the phone, the captions, real-time playback (`SPEED` empty, `DEFAULT` and `FASTER` 1) and the end card, cut from `rec/promo-sideload.mp4` alone (`render.mjs --page promo-sideload`) |
 | `shots-promo-sideload.json` | the sideload-only recording's script: the certificate import, the Free Apple ID sign-in, sources and an install, a tweak, the update and Re-sign All |
 | `stubs/` | the sideload-only recording's stand-ins, served at `/__video/<file>`: `gsa.js` and `freeroute.js` (Apple's answers, stubbed), `pick.js` (the iOS Files picker sheet), `profile.js` (a provisioning profile made at the page's "now") |
 
@@ -143,12 +143,12 @@ It is made in 4:5 only: 1080x1350, 60 fps H.264, no sound. `make.sh` makes it af
 
 ## The sideload-only clip
 
-`promo-sideload.html` is the sideload-only (Lite build) clip: 41.5 s, another timeline beside `video.html`,
-`promo.html`, `promo-lite.html` and `jb-reddit.html`. It has three parts: a splash (the app icon, the name and "no jailbreak, no
-computer"; the icon opens into the phone), then one recording, `rec/promo-sideload.mp4` (103 s raw), then an end card
-(the name and the domain). The recording plays through speed segments: `SPEED` in `promo-sideload.html` gives, per
-mark, how many times faster it plays up to the next mark (1x to 5x: waits fast, what is read slow), and `FASTER` (1.25)
-multiplies all of them to fit the length.
+`promo-sideload.html` is the sideload-only (Lite build) clip: 107 s, another timeline beside `video.html`,
+`promo.html`, `promo-lite.html` and `jb-reddit.html`. It has three parts: a splash (3 s: the app icon, the name and "no jailbreak, no
+computer"; the icon opens into the phone), then one recording, `rec/promo-sideload.mp4` (100.85 s raw), then an end card
+(the name and the domain). The recording plays at real time (1x), with no speed-up and no jump cuts. `SPEED` in
+`promo-sideload.html` is empty, and `DEFAULT` and `FASTER` are 1. The length comes only from the pauses in
+`shots-promo-sideload.json`, never from speeding playback.
 
 The captions, in order: Import your own certificate / Or sign in with a free Apple ID / Install apps from AltStore
 sources / Tweaks, signed on your iPhone / Updates, one tap / Re-sign All, before they expire.
