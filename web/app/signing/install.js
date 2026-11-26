@@ -21,11 +21,15 @@ async function safetyFirst({ url, name, bundleId, version, source = null }) {
   } catch { return true; }
 }
 
+// B470: screens/appicon.js withOwnIcon, loaded only for Lite's own IPA; null when it fails to load.
+const ownIconParams = (url) => import("../screens/appicon.js").then((m) => m.withOwnIcon({ url })).catch(() => null);
+
 // Signs `url` (an IPA) on the phone and installs it. Resolves true once iOS was asked to install; false after an
 // error, which it shows in an alert; false in the jailbreak app (its pages use the helper, so this is only a guard).
 // F93: on the website, signs it in the browser (signInBrowser); `bring` (Install iFizBox App) carries the certificate.
 // F257: `size` (the source's listed size) and `iconUrl` are the website's: an app over its cap opens the Too Big alert.
-export async function signAndInstall({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "", bytes = null, size = null, iconUrl = null, listed = null }) {
+export async function signAndInstall({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "", bytes = null, size = null, iconUrl = null, listed = null },
+  { install = installOnDevice, ownIcon = ownIconParams } = {}) {
   // F291: Known Malware refuses, a reported version asks, the exploitable-iOS alert once (screens/safety.js)
   if (!isSelfIpa(url) && !(await safetyFirst({ url, name, bundleId, version }))) return false;
   if (browserSigning()) return (await import("./browser.js")).signInBrowser({ url, name, onInstalled, bring, bundleId, version, bytes, size, iconUrl });
@@ -36,7 +40,11 @@ export async function signAndInstall({ url, name = "", onInstalled = () => {}, b
   // iFizBox's own IPA: signed here on the phone like any app, then hosted on the Signing Server (host: true) since
   // iOS closes iFizBox, and its install server, while it installs over it. Straight to iOS's Install prompt.
   const l = listed ? { listed } : listedOf({ url, version, size }); // F400
-  if (isSelfIpa(url)) return installOnDevice({ url, name: name || NAME, onInstalled, host: true, ...l });
+  if (isSelfIpa(url)) {
+    // B470: with the picked own icon in it (as essential-ui.js installSelfNow), so the reopened app doesn't ask to re-sign
+    const params = await ownIcon(url);
+    return install({ url, name: name || NAME, onInstalled, host: true, ...(params?.ownIcon ? { params } : {}), ...l });
+  }
   // F75: the first Install with something missing says so, then opens the Signing walkthrough at that step.
   const step = await firstInstallCheck();
   if (step === "cancel") return false;
