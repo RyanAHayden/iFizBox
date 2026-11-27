@@ -55,6 +55,8 @@ export async function installs(req, env = {}, { now = Date.now() } = {}) {
   const salt = env.REVIEWS_SALT ?? "";
   const device = await hashOf("device", raw, salt);
   const ip = await hashOf("ip", req.headers.get("CF-Connecting-IP") ?? req.headers.get("X-Forwarded-For")?.split(",")[0].trim() ?? "unknown", salt);
+  // a device that counted this package already spends no limit budget: its repeat is just not counted
+  if (await db.prepare("SELECT 1 AS n FROM installs WHERE pkg = ? AND device = ?").bind(pkg, device).first()) return json({ ok: true, counted: false });
   const allowed = await allowReviewWrite(env, db, ip, device, now);
   if (allowed !== true) return fail("rate_limited", "Too many installs counted from here. Try again later.", 429);
   const r = await db.prepare("INSERT OR IGNORE INTO installs (pkg, device, at) VALUES (?, ?, ?)").bind(pkg, device, now).run();

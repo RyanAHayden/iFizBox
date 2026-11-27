@@ -13,3 +13,7 @@ Done:
   browse-home.test.js (order), reviews.test.js (client).
 
 **Not verified**: a deploy against real D1 and a phone install (no device used); the website install path counts through installRows' onInstall, checked by reading, not run.
+
+Review notes: a repeat from a device that already counted skips the rate limits. Not done: counting plain APT installs
+from sources (only linked .debs, which go through backend-native install(), and the app/site install rows); the rows'
+count key is `appId || bundleId`, which equals the package id only where the row's id is the bundle id.
