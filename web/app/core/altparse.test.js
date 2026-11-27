@@ -34,3 +34,23 @@ test("(Duplicate)-style variants without a version stay separate", () => {
   ] });
   assert.equal(src.apps.length, 3);
 });
+
+test("an iOS version in the bracket is not an app version", () => {
+  const src = parseAltSource({ apps: [
+    app("com.r", "R", "1.0", 1), app("com.r", "R (Duplicate, iOS 15.0)", "1.0", 2),
+  ] });
+  assert.equal(src.apps.length, 2);
+});
+
+test("[v2.3] merge orders versions newest first", () => {
+  const src = parseAltSource({ apps: [
+    app("com.a.b", "App", "2.3", 1), app("com.a.b", "App [v2.4]", "2.4", 2),
+  ] });
+  assert.deepEqual(src.apps[0].versions.map((v) => v.version), ["2.4", "2.3"]);
+});
+
+test("a repeat with the same build leaves no scratch flag", () => {
+  const src = parseAltSource({ apps: [app("com.a", "A", "1", 1), app("com.a", "A (Plus 1.0.1)", "1", 1)] });
+  assert.equal(src.apps.length, 1);
+  assert.equal("byVersion" in src.apps[0], false);
+});

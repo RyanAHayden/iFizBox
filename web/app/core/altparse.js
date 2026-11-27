@@ -184,7 +184,8 @@ function baseName(name) {
   const m = VERSIONED_TAIL.exec(name);
   if (!m) return name;
   const tail = name.slice(m[1].length);
-  return HAS_VERSION.test(tail) ? m[1] : name;
+  // "iOS 15.0" / "iPadOS 16.1" name a system version, not the app's own.
+  return HAS_VERSION.test(tail.replace(/\b(?:i|ipad|watch|tv|mac)?os\s*v?\d+(?:\.\d+)*/gi, "")) ? m[1] : name;
 }
 const entryKey = (app) => `${app.bundleIdentifier}\n${baseName(app.name).toLowerCase()}`;
 
@@ -241,7 +242,7 @@ export function parseAltSource(input) {
     if (!app) continue;
     const same = byName.get(entryKey(app));
     if (same) {
-      if (baseName(app.name) !== app.name || baseName(same.name) !== same.name || app.name !== same.name) {
+      if (baseName(app.name) !== app.name || baseName(same.name) !== same.name) {
         for (const v of app.versions) names.set(v, app.name);
         for (const v of same.versions) if (!names.has(v)) names.set(v, same.name);
         same.byVersion = true;
@@ -253,6 +254,7 @@ export function parseAltSource(input) {
     byName.set(entryKey(app), app);
     apps.push(app);
   }
+  for (const app of apps) if (app.byVersion && !app.merged) delete app.byVersion;
   for (const app of apps) if (app.merged) {
     if (app.byVersion) {
       // Entries that differ by a versioned bracket: newest version first, named by the newest entry's base name.
