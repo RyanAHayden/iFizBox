@@ -18,7 +18,7 @@ After the release:
 
 1. Check that /apple/mac-ani.jkcoxson.com/v3/client_info answers 200, and that the release tag contains ccdedd8b.
 2. Run `node <repo>/journal/2026-11-27-r108-relay-drop-rate/measure.mjs <repo> 20` for all listed servers. The script stops nothing early. About 8 servers x 20 rounds takes a while, so run it in the background or one server at a time.
-3. Read the TOTAL line for each server: sockets, dropped, ok, and the close codes.
+3. Read the TOTAL line for each server: sockets, dropped, stalled, ok, and the close codes. The drop rate is dropped / sockets, not ok (ok includes gsa.js's one retry). `stalled` counts provisioning that hit the 60 s time limit: a relay that stops forwarding without closing shows there, not in `dropped`. No stall has been seen, so that count is untested.
 
 The forward-or-not decision is already made.
 

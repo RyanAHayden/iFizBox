@@ -27,7 +27,7 @@ class Watched extends WebSocket {
   }
 }
 for (const server of only.length ? only : g.ANISETTE_SERVERS) {
-  const total = { sockets: 0, dropped: 0, ok: 0, codes: {} };
+  const total = { sockets: 0, dropped: 0, stalled: 0, ok: 0, codes: {} };
   for (let i = 1; i <= Number(rounds); i++) {
     sockets = [];
     const log = [];
@@ -41,6 +41,9 @@ for (const server of only.length ? only : g.ANISETTE_SERVERS) {
       if (s.last && s.last !== "ProvisioningSuccess" && !s.byUs) total.dropped++;
       total.codes[s.code] = (total.codes[s.code] ?? 0) + 1;
     }
+    // A socket left open until gsa.js's time limit is closed by us, so it isn't in `dropped`: count it on its own.
+    // gsa.js logs each failure once per attempt it gives up on ("trying ... once more" or "... failed").
+    total.stalled += log.filter((m) => m.includes("provisioning timed out")).length;
     console.log(server, i, result, JSON.stringify(sockets));
     if (result !== "OK") for (const m of log) console.log("   ", m);
   }
