@@ -1,0 +1,53 @@
+https://new.ani.sidestore.io 1 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://new.ani.sidestore.io 2 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://new.ani.sidestore.io 3 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://new.ani.sidestore.io 4 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://new.ani.sidestore.io 5 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+TOTAL https://new.ani.sidestore.io {"sockets":5,"dropped":0,"stalled":0,"ok":5,"codes":{"1000":5}}
+https://mac-ani.jkcoxson.com 1 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://mac-ani.jkcoxson.com 2 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://mac-ani.jkcoxson.com 3 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://mac-ani.jkcoxson.com 4 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://mac-ani.jkcoxson.com 5 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+TOTAL https://mac-ani.jkcoxson.com {"sockets":5,"dropped":0,"stalled":0,"ok":5,"codes":{"1000":5}}
+https://ani.iloader.app 1 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://ani.iloader.app 2 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://ani.iloader.app 3 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://ani.iloader.app 4 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://ani.iloader.app 5 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+TOTAL https://ani.iloader.app {"sockets":5,"dropped":0,"stalled":0,"ok":5,"codes":{"1000":5}}
+https://ani3.stikstore.app 1 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://ani3.stikstore.app 2 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://ani3.stikstore.app 3 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://ani3.stikstore.app 4 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://ani3.stikstore.app 5 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+TOTAL https://ani3.stikstore.app {"sockets":5,"dropped":0,"stalled":0,"ok":5,"codes":{"1000":5}}
+https://ani.jkcoxson.com 1 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://ani.jkcoxson.com 2 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://ani.jkcoxson.com 3 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://ani.jkcoxson.com 4 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://ani.jkcoxson.com 5 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+TOTAL https://ani.jkcoxson.com {"sockets":5,"dropped":0,"stalled":0,"ok":5,"codes":{"1000":5}}
+https://ani2.stikstore.app 1 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://ani2.stikstore.app 2 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://ani2.stikstore.app 3 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://ani2.stikstore.app 4 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://ani2.stikstore.app 5 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+TOTAL https://ani2.stikstore.app {"sockets":5,"dropped":0,"stalled":0,"ok":5,"codes":{"1000":5}}
+https://win.ani.sidestore.io 1 FAIL No anisette server could provision a machine (win.ani.sidestore.io answered HTTP 502) []
+    anisette: https://win.ani.sidestore.io failed: win.ani.sidestore.io answered HTTP 502
+https://win.ani.sidestore.io 2 FAIL No anisette server could provision a machine (win.ani.sidestore.io answered HTTP 502) []
+    anisette: https://win.ani.sidestore.io failed: win.ani.sidestore.io answered HTTP 502
+https://win.ani.sidestore.io 3 FAIL No anisette server could provision a machine (win.ani.sidestore.io answered HTTP 502) []
+    anisette: https://win.ani.sidestore.io failed: win.ani.sidestore.io answered HTTP 502
+https://win.ani.sidestore.io 4 FAIL No anisette server could provision a machine (win.ani.sidestore.io answered HTTP 502) []
+    anisette: https://win.ani.sidestore.io failed: win.ani.sidestore.io answered HTTP 502
+https://win.ani.sidestore.io 5 FAIL No anisette server could provision a machine (win.ani.sidestore.io answered HTTP 502) []
+    anisette: https://win.ani.sidestore.io failed: win.ani.sidestore.io answered HTTP 502
+TOTAL https://win.ani.sidestore.io {"sockets":0,"dropped":0,"stalled":0,"ok":0,"codes":{}}
+https://anisette.lillq.me 1 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://anisette.lillq.me 2 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://anisette.lillq.me 3 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://anisette.lillq.me 4 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+https://anisette.lillq.me 5 OK [{"last":"ProvisioningSuccess","code":1000,"byUs":true}]
+TOTAL https://anisette.lillq.me {"sockets":5,"dropped":0,"stalled":0,"ok":5,"codes":{"1000":5}}
