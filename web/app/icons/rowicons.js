@@ -137,7 +137,7 @@ export const ROW_ICONS = {
   sources: [C.blue, "list"], transfer: [C.green, "transfer"], hidden: [C.grey, "eyeSlash"], recommended: [C.gold, "star"],
   findMore: [C.purple, "globe"], // Manage > Find More Sources (Canister's repo index)
   // F450: the Filter panel's Sort rows (screens/listfilter.js listSorts)
-  sortName: [C.blue, "list"], sortNewest: [C.green, "clock"], sortRating: [C.orange, "star"], sortFeatured: [C.gold, "seal"],
+  sortName: [C.indigo, "list"], sortNewest: [C.green, "clock"], sortRating: [C.orange, "star"], sortFeatured: [C.gold, "seal"],
   sortPopular: [C.red, "pulse"], sortUpdated: [C.sky, "refresh"], sortDefault: [C.grey, "list"],
   moreSources: [C.blue, "plus"], // F327: More Sources (Sources tab, Home, Manage): a white plus, no badge
   share: [C.blue, "share"], copy: [C.grey, "copy"], saveFile: [C.teal, "save"], qr: [C.dark, "qr"],

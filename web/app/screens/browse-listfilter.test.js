@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fakeDocument, memStorage, tick } from "../fakes.test-helper.js";
 import { createCatalog } from "../core/catalog.js";
+import { rowIcon } from "../icons/rowicons.js";
 
 globalThis.localStorage ??= memStorage();
 globalThis.document = fakeDocument();
@@ -65,6 +66,7 @@ test("F450: every Sort row has its own icon, a list's own order too", () => {
   }
   const srcs = ["Name", "Newest", "Rating", "Featured"].map((l) => listSorts(l)[0].icon.src);
   assert.equal(new Set(srcs).size, 4, "Name, Newest, Rating and Featured each look different");
+  assert.ok(!srcs.includes(rowIcon("sources").src), "Name doesn't look like Sources' tile");
 });
 
 test("Section: only the list's groups and sections, and the one picked", () => {
