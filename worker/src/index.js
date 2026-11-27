@@ -40,6 +40,7 @@
 //   GET  /api/ipainfo?url=<IPA URL>          F160: MinimumOSVersion, UIDeviceFamily, bundle ID and version from the IPA's
 //                                           own Info.plist, read with Range requests (src/ipainfo.js); cached 30 days
 //   GET/POST/DELETE /reviews/<package id>[/<review id>[/report]]   F182: user reviews in D1 (src/reviews.js)
+//   GET /installs, POST /installs/<package id>   F452: install counts for Popular, in the same D1 (src/installs.js)
 //   GET  /repo/<file>                       B17: iFizBox's own flat APT repo (Release, Packages, Packages.gz, *.deb),
 //                                           the latest release's asset fetched here, redirects followed here
 //   GET  /repo/<tag>/<file>.deb             B73: an older release's .deb (Packages' Filename), from releases/download/<tag>/
@@ -54,6 +55,7 @@
 import { account, isAccountPath } from "./account.js";
 import { readIpaInfo, IpaError } from "./ipainfo.js";
 import { reviews, isReviewsPath } from "./reviews.js";
+import { installs, isInstallsPath } from "./installs.js";
 import { reports, isReportsPath } from "./reports.js";
 import { udid, isUdidPath } from "./udid.js";
 import { appleRelay, isApplePath } from "./apple-relay.js";
@@ -888,6 +890,7 @@ export default {
     const ttl = Math.max(60, Number(env.TTL) || 600);
     if (isAccountPath(u.pathname)) return account(req, env); // F97: iFizBox Account (src/account.js)
     if (isReviewsPath(u.pathname)) return reviews(req, env); // F182: user reviews (src/reviews.js)
+    if (isInstallsPath(u.pathname)) return installs(req, env); // F452: install counts for Popular (src/installs.js)
     if (isReportsPath(u.pathname)) return reports(req, env); // F291: Report as Malicious (src/reports.js)
     if (isUdidPath(u.pathname)) return udid(req, env); // F253: this iPhone's UDID via a profile (src/udid.js)
     if (isApplePath(u.pathname)) return appleRelay(req, env); // F251: Apple sign-in relay (src/apple-relay.js)

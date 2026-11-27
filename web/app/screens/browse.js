@@ -93,7 +93,7 @@ import { queueApp } from "./queue.js";
 import { fileOfToken } from "../core/myipas.js"; // F401
 import { worksInGroup, addToApp, addTweaksAppName, appsWith } from "./tweaks.js"; // F302, F401
 import { DETAILS_TITLE, packageRows, moreInfoShown, detailRows, descGroup, footerGroup,
-  detailsFooter, MORE_INFO_LABEL } from "./details.js"; // F350
+  detailsFooter, MORE_INFO_LABEL, installsLine } from "./details.js"; // F350
 import { rowIcon } from "../icons/rowicons.js";
 import { appInfoNodes } from "./altstore.js"; // F350: an app's More Information
 import { loadStyle } from "../nav/motion.js"; // F352: Add Tweaks' price button (myipas.css)
@@ -1438,6 +1438,14 @@ export async function renderPackage(body, route, key, id, ctx, { found = null } 
     section: section ? { href: deeper(route, token("section", section)) } : {},
     depends: { href: relationsHref("depends") }, conflicts: { href: relationsHref("conflicts") },
   }) }]));
+  // F453: "N installs" (the review server's count, F452) once past the minimum; no line when the server keeps none.
+  const installsSlot = el("div", "package-installs-slot");
+  details.append(installsSlot);
+  getBackend().installs?.counts?.().then((counts) => {
+    const line = installsLine(counts?.[pid]);
+    if (!line || !installsSlot.isConnected) return;
+    slideChange(installsSlot, () => installsSlot.replaceChildren(grouped([{ rows: [{ label: line }] }])));
+  }, () => {});
   // The same package from other sources, each with its version.
   const others = pkg.others.filter((o) => o.key !== pkg.key).map((o) => {
     const s = sourceOf(o.key);

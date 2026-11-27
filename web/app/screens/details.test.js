@@ -168,3 +168,13 @@ test("B361: an IPA's rows: an app's without Source, Category or the Version page
   assert.deepEqual(labels(bare.info), ["Size", "Bundle ID", "File"]);
   assert.equal(bare.version[0].detail, "—");
 });
+
+// F453: the "N installs" line shows only past the minimum count, and not at all without counts.
+import { installsLine } from "./details.js";
+test("F453 installsLine: only past the minimum", () => {
+  assert.equal(installsLine(undefined), null);
+  assert.equal(installsLine(0), null);
+  assert.equal(installsLine(5), null);
+  assert.equal(installsLine(6), "6 installs");
+  assert.equal(installsLine(1234), "1,234 installs");
+});

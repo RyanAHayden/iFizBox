@@ -101,6 +101,29 @@ export function reviewsApi({ base = "", fetcher = (...a) => globalThis.fetch(...
   };
 }
 
+// F452: install counts (worker/src/installs.js): the same anonymous device token, one count per device per package.
+//   installsApi({ base, fetcher, token }) -> { counts(), count(id) }
+//     counts()  -> { <package id>: n }: every counted package; {} when the server keeps none or can't be reached
+//     count(id) -> true when the server took the count; false (never throws) otherwise: a count is best effort
+export function installsApi({ base = "", fetcher = (...a) => globalThis.fetch(...a), token = () => deviceToken() } = {}) {
+  return {
+    async counts() {
+      try {
+        const r = await fetcher(`${base}/installs`);
+        const body = r.ok ? await r.json() : null;
+        return body?.counts && typeof body.counts === "object" ? body.counts : {};
+      } catch { return {}; }
+    },
+    async count(id) {
+      if (!id || typeof id !== "string") return false;
+      try {
+        const r = await fetcher(`${base}/installs/${encodeURIComponent(id)}`, { method: "POST", cache: "no-store", headers: { "X-Review-Token": await token() } });
+        return Boolean(r.ok);
+      } catch { return false; }
+    },
+  };
+}
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 export function reviewDate(ms, now = Date.now()) {
   const d = new Date(Number(ms));
