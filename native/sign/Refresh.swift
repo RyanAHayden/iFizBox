@@ -4,6 +4,7 @@
 // whose App ID has no fresh profile (it expired), is signed again.
 //   ProfileRefresh.plan(records, certificate:, profiles:, installed:)   what happens to each recorded app
 //   ProfileRefresh.run(plan, misagent:, resign:)                       does it; resign gets the rest, once
+//   ProfileRefresh.ownAppID(records, bundleID:, embedded:, certificate:)  F462: the running app's own, with no record
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 
@@ -13,7 +14,22 @@ protocol Misagent { func install(_ profile: Data) throws }
 enum ProfileRefresh {
     struct Renewal { let record: SignedRecord; let profile: Profile; let expires: Date? }
 
+    /// F462: the running app, installed by a Computer Install: no record, so its own profile is renewed from what it
+    /// carries. `profile` nil: no fresh one for its App ID.
+    struct Own { let bundleID: String; let appID: String; let profile: Profile? }
+
+    /// The App ID ("TEAM.identifier") of the running app's own profile when the refresh renews it by itself, as AltStore
+    /// refreshes itself: no record of it, no other recorded app on that App ID (its renewal installs the profile
+    /// already), and `embedded` (the app's embedded.mobileprovision) is a free one listing the current certificate.
+    static func ownAppID(_ records: [SignedRecord], bundleID: String?, embedded: Profile?, certificate: Data) -> String? {
+        guard let me = bundleID, let p = embedded, p.isFree, p.certificates.contains(certificate),
+              !records.contains(where: { $0.bundleID == me }) else { return nil }
+        let id = "\(p.team).\(p.appID)"
+        return records.contains { $0.appID == id } ? nil : id
+    }
+
     struct Plan {
+        var own: Own?
         var renew: [Renewal] = []
         var resign: [SignedRecord] = []
         var gone: [SignedRecord] = [] // iOS no longer has them: neither renewed nor installed again
@@ -31,7 +47,7 @@ enum ProfileRefresh {
     /// longer than a fresh free profile would (a paid certificate's) is left as it is. `busy` (F459): a task runs, so an
     /// app iOS doesn't list may still be installing: it is left alone, neither forgotten nor signed again.
     static func plan(_ records: [SignedRecord], certificate: Data, profiles: [Profile], installed: Set<String>?,
-                     busy: Bool = false, now: Date = Date()) -> Plan {
+                     busy: Bool = false, ownID: String? = nil, embedded: Profile? = nil, now: Date = Date()) -> Plan {
         var out = Plan()
         let current = serial(certificate)
         // only a free profile that this certificate can use; the latest to expire wins for an App ID
@@ -55,12 +71,19 @@ enum ProfileRefresh {
                 out.resign.append(r)
             }
         }
+        // F462: an app iOS no longer has doesn't share the App ID any more
+        let left = records.filter { !out.gone.contains($0) }
+        if let me = ownID, let id = ownAppID(left, bundleID: me, embedded: embedded, certificate: certificate) {
+            out.own = Own(bundleID: me, appID: id, profile: fresh[id])
+        }
         return out
     }
 
     struct Outcome {
         var renewed: [Renewal] = []
         var failed: [(record: SignedRecord, error: Error)] = []
+        var ownRenewed: String? // F462: the running app's bundle ID, once its new profile is in
+        var ownError: Error?
     }
 
     /// Installs each profile once (apps often share an App ID), then hands the apps to sign again to `resign`.
@@ -78,6 +101,15 @@ enum ProfileRefresh {
                 } catch { done[key] = .some(error) }
             }
             if let error = done[key] ?? nil { out.failed.append((r.record, error)) } else { out.renewed.append(r) }
+        }
+        if let own = plan.own {
+            if let p = own.profile {
+                do {
+                    try misagent.install(p.data)
+                    log("Installed the new profile for \(p.appID) (\(Brand.name) itself)")
+                    out.ownRenewed = own.bundleID
+                } catch { out.ownError = error }
+            } else { log("No new profile for \(own.appID): \(Brand.name)'s own isn't renewed") }
         }
         resign(plan.resign)
         return out

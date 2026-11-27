@@ -222,7 +222,8 @@ export async function otherProfiles({ portal, teamId, appIds = [], apps = [], ap
   return out;
 }
 
-// With no recorded app there is nothing to do: no progress page, no connection.
+// With no recorded app and no `own` (F462: signing.installed's App ID of the app's own profile, when it has no
+// record) there is nothing to do: no progress page, no connection.
 export async function refreshApps({ native, portal, teamId, appIds, appId, hud, alert, busy = () => false }) {
   let page = null;
   const fail = async (message) => {
@@ -230,7 +231,8 @@ export async function refreshApps({ native, portal, teamId, appIds, appId, hud, 
     await alert({ title: "Couldn't Refresh Apps", message, buttons: ["OK"], cancel: 0 });
   };
   try {
-    const apps = (await native.call("signing.installed", {}))?.apps ?? [];
+    const got = await native.call("signing.installed", {});
+    const apps = [...(got?.apps ?? []), ...(got?.own ? [{ appId: got.own }] : [])];
     if (!apps.length) return null;
     const profiles = (await otherProfiles({ portal, teamId, appIds, apps, appId })).map(b64encode);
     page = hud("Refreshing Apps");
