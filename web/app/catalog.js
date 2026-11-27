@@ -23,7 +23,6 @@ import { getBackend, getParser, getArch } from "./backend.js";
 import { repoLayout } from "./core/apt.js";
 import { openIndexCache } from "./core/cache.js";
 import { ALL, freshLists } from "./core/catalog.js";
-import { rankByRating } from "./core/ratingsort.js";
 import { openSeenStore, recordRefresh, dayGroups, ownPicks } from "./core/changes.js";
 import { looksLikeStatus, apps } from "./core/installed.js";
 import { isAltKey } from "./core/altstore.js";
@@ -438,7 +437,8 @@ function reviewRatings(now = Date.now()) {
   return Promise.race([ratingsKept.ratings, new Promise((done) => setTimeout(done, RATINGS_WAIT, {}))]);
 }
 async function refineByRating(rows, { sort, ...filters }) {
-  const [out, ratings] = await Promise.all([ask("refine", [rows, filters]), reviewRatings()]);
+  // loaded only now: one module fewer at startup (app.js's import cap)
+  const [out, ratings, { rankByRating }] = await Promise.all([ask("refine", [rows, filters]), reviewRatings(), import("./core/ratingsort.js")]);
   return rankByRating(out, ratings);
 }
 

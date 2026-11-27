@@ -91,7 +91,7 @@ import { depIndex, explain, explainApt } from "./deps.js";
 import { withIpaInfo } from "./ipainfo.js";
 import { IdMap, IdSet, sameId } from "./apt.js"; // B407: package names compare ignoring case
 import { needsRestart } from "./queue.js";
-import { ratingOf, compareRatings } from "./ratingsort.js"; // F450
+import { ratingOf, compareRatings } from "./sections.js"; // F450
 import { packageKind } from "./progress.js";
 import { injectableFromFields, hintMatcher } from "./tweakfields.js"; // F302; C32: not tweaks.js, which pulls unpack.js in
 import { NO_SECTION, sectionName, simpleSection, parseAuthor, compareNames, SECTION_GROUPS, sectionGroup, APP_TWEAKS } from "./sections.js";
@@ -202,7 +202,7 @@ export function mergeCategories(rows, { jailbroken = true } = {}) {
 }
 
 // Popular, until real install counts exist: [{ row, sources, date, rating }] -> rows, F450: the best rated here
-// first (`rating`, core/ratingsort.js ratingOf: highest average, then most ratings), then the unrated by how many
+// first (`rating`, core/sections.js ratingOf: highest average, then most ratings), then the unrated by how many
 // sources list them, then the newest update (`date`, epoch ms; AltStore versions carry one, APT packages don't),
 // then by name. At most `limit`.
 export function rankPopular(items, limit = 50) {

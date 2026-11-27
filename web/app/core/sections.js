@@ -52,6 +52,20 @@ export function parseAuthor(value) {
 const collator = new Intl.Collator("en", { sensitivity: "base", numeric: true });
 export const compareNames = (a, b) => collator.compare(a.name, b.name) || collator.compare(a.id, b.id);
 
+// F450: the stars given here (core/ratingsort.js re-exports these; here so the catalog adds no startup module).
+// `ratings` { <package id>: [average, count] } -> { avg, count } | null (unrated, or not a rating).
+export function ratingOf(ratings, id) {
+  // hasOwnProperty, not Object.hasOwn: that needs iOS 15.4 and the app runs on 15.0
+  const v = ratings && Object.prototype.hasOwnProperty.call(ratings, id) ? ratings[id] : null;
+  const avg = Array.isArray(v) ? Number(v[0]) : NaN;
+  return Number.isFinite(avg) && avg > 0 ? { avg, count: Number(v[1]) || 0 } : null;
+}
+// Rated before unrated, the highest average first, then the most ratings; 0 between two unrated or two equal.
+export function compareRatings(x, y) {
+  if (x && y) return y.avg - x.avg || y.count - x.count;
+  return x ? -1 : y ? 1 : 0;
+}
+
 // Search's segmented control (F35): a few broad kinds over Cydia's sections. A section belongs to a group by its
 // simple name (simpleSection): "Themes (SpringBoard)" is a Theme, "Tweaks" a Tweak.
 export const SECTION_GROUPS = ["Tweaks", "Themes", "Apps", "Utilities"];
