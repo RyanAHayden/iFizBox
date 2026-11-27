@@ -1,29 +1,27 @@
 // IndexedDB cache for parsed repo indexes, so a cold start shows the last known packages without a fetch or a
 // parse. One record per key (use the index file's URL), with the validators to revalidate it later:
 // {key, value, etag, lastModified, savedAt}. The IDBFactory is passed in so node tests can hand it a fake.
+import { idbRunner } from "./idb.js";
+
 const STORE = "indexes";
+export const INDEX_CACHE_FAILED = "Could not use the saved package list. Try refreshing again.";
 
 export function openIndexCache({ indexedDB: idb = globalThis.indexedDB, name = "ifizbox-index" } = {}) {
   if (!idb) return Promise.reject(new Error("IndexedDB is not available"));
-  return new Promise((resolve, reject) => {
+  const connect = () => new Promise((resolve, reject) => {
     const req = idb.open(name, 1);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: "key" });
     };
     req.onerror = () => reject(req.error);
-    req.onsuccess = () => resolve(wrap(req.result));
+    req.onsuccess = () => resolve(req.result);
   });
+  return connect().then((db) => wrap(idbRunner(db, connect, INDEX_CACHE_FAILED)));
 }
 
 function wrap(db) {
-  const run = (mode, f) => new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, mode);
-    const req = f(tx.objectStore(STORE));
-    tx.oncomplete = () => resolve(req.result);
-    tx.onerror = () => reject(tx.error ?? req.error);
-    tx.onabort = () => reject(tx.error ?? new Error("transaction aborted"));
-  });
+  const run = (mode, f) => db.run(STORE, mode, f);
   return {
     // The whole record, or undefined.
     get: (key) => run("readonly", (s) => s.get(key)),

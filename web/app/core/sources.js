@@ -14,6 +14,7 @@ import { isAltKey, neverLoaded } from "./altstore.js";
 import { releaseTime, fingerprint, healthFields, withTimeout, pool, REFRESH_TIMEOUT, REFRESH_CONCURRENCY } from "./health.js";
 import { githubApiRepo, isGithubSource, refreshGithubSource } from "./github.js"; // F304
 import { githubTweakUri } from "./github.js"; // F344a
+import { idbRunner } from "./idb.js";
 
 // F72: iFizBox's own repo names the oldest iFizBox that may run without upgrading first (core/essential.js).
 const MIN_FIELD = "x-ifizbox-minimum-version";
@@ -565,7 +566,7 @@ async function refreshTimed(backend, source, { timeout = REFRESH_TIMEOUT, ...res
 // tweak-sources.json); when it gives none the store isn't marked seeded, so the next open tries again.
 export function openSourceStore({ indexedDB: idb = globalThis.indexedDB, name = "ifizbox-sources", defaults = loadTweakSources } = {}) {
   if (!idb) return Promise.reject(new Error("IndexedDB is not available"));
-  return new Promise((resolve, reject) => {
+  const connect = () => new Promise((resolve, reject) => {
     const req = idb.open(name, 1);
     req.onupgradeneeded = () => {
       const db = req.result;
@@ -573,21 +574,19 @@ export function openSourceStore({ indexedDB: idb = globalThis.indexedDB, name = 
       if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta", { keyPath: "key" });
     };
     req.onerror = () => reject(req.error);
-    req.onsuccess = () => {
-      const store = wrap(req.result, defaults);
-      store.seed().then(() => resolve(store), reject);
-    };
+    req.onsuccess = () => resolve(req.result);
+  });
+  return connect().then(async (db) => {
+    const store = wrap(idbRunner(db, connect, SOURCE_STORE_FAILED), defaults);
+    await store.seed();
+    return store;
   });
 }
 
+export const SOURCE_STORE_FAILED = "Could not read or save your sources. Try again.";
+
 function wrap(db, defaults = []) {
-  const run = (storeName, mode, f) => new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, mode);
-    const req = f(tx.objectStore(storeName));
-    tx.oncomplete = () => resolve(req?.result);
-    tx.onerror = () => reject(tx.error ?? req?.error);
-    tx.onabort = () => reject(tx.error ?? new Error("transaction aborted"));
-  });
+  const run = db.run;
   const store = {
     async seed() {
       if (await run("meta", "readonly", (s) => s.get("seeded"))) return;
