@@ -99,6 +99,8 @@ class Publish(unittest.TestCase):
         self.write("native/VERSION", "0.1.0\n")
         self.write("web/app/tweak-index.json", "{}\n")
         self.write("tools/tweak-index.mjs", "process.exit(1)\n")
+        self.write("web/app/core/devstats.js", "old\n")
+        self.write("tools/dev_stats.py", "raise SystemExit(1)\n")  # F466: a failed count
         self.write("release-notes/README.md", "readme\n")
         self.write("release-notes/F1.md", "A raw note.\n")
         self.write("tools/release.sh", FAKE_RELEASE, 0o755)
@@ -150,6 +152,19 @@ class Publish(unittest.TestCase):
         self.assertEqual(git(self.repo, "ls-files", "release-notes"), "release-notes/README.md")
         with open(self.log) as f:
             self.assertIn("--notes " + os.path.join(self.tmp, "notes.md"), f.read())
+        # F466: the failed count kept the committed file and didn't stop the release
+        self.assertEqual(git(self.repo, "show", "origin/main:web/app/core/devstats.js"), "old")
+
+    def test_counts_in_the_version_commit(self):
+        self.write("tools/dev_stats.py", "open('web/app/core/devstats.js', 'w').write('new\\n')\n")
+        git(self.repo, "commit", "-qam", "count")
+        git(self.repo, "push", "-q", "origin", "main")
+        self.assertEqual(self.publish("--dry-run").returncode, 0)
+        self.assertEqual(git(self.repo, "status", "--porcelain", "--untracked-files=no"), "")  # a dry run doesn't count
+        self.assertEqual(self.publish(notes=GOOD).returncode, 7)
+        self.assertEqual(git(self.repo, "log", "-1", "--format=%s", "origin/main"), "Version 0.2.0")
+        self.assertIn("web/app/core/devstats.js", git(self.repo, "show", "--name-only", "--format=", "origin/main"))
+        self.assertEqual(git(self.repo, "show", "origin/main:web/app/core/devstats.js"), "new")
 
     def test_none_waiting(self):
         git(self.repo, "rm", "-q", "release-notes/F1.md")
