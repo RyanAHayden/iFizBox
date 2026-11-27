@@ -4,8 +4,8 @@
 //!
 //! Steps: find the iPhone over USB → make sure this computer is trusted (pair, "Trust This Computer") → ask for the
 //! code the website shows → read what it points at → download the signed IPA (size and SHA-256 checked) → install
-//! it (installation_proxy) → write the pairing file into the app's container (house_arrest) → say what's left on
-//! the phone (Developer Mode). It never asks for an Apple ID.
+//! it (installation_proxy) → before iOS 27, write the pairing file into the app's container (house_arrest) and say
+//! where to pick it → say what's left on the phone (Developer Mode). It never asks for an Apple ID.
 
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -246,6 +246,21 @@ pub fn ios_major(v: &str) -> Option<u32> {
     v.split('.').next()?.trim().parse().ok()
 }
 
+/// The first iOS where the app pairs on the iPhone itself and takes no pairing file
+/// (native/sideload/idevice/IDeviceBridge.swift pairOnPhone).
+pub const PAIRS_ON_PHONE: u32 = 27;
+
+/// The app never reads the file by itself: where to pick it. `path` is in the app's container, and the Files app shows
+/// its Documents folder as On My iPhone > the app.
+fn import_hint(app: &str, path: &str) -> String {
+    let file = path.strip_prefix("Documents/").unwrap_or(path);
+    format!(
+        "Put a pairing file in {app}, which {app} doesn't read by itself. To install apps on the iPhone, open {app} and go \
+         to Settings > Installation & Signing > This iPhone, tap Pair This iPhone, then Import Pairing File, and pick \
+         {file} (On My iPhone > {app})."
+    )
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeviceInfo {
     pub udid: String,
@@ -474,15 +489,16 @@ pub fn run(args: &Args, brand: &Brand, os: Os, ui: &mut dyn Ui, net: &mut dyn Ne
     dev.install(&got.path, ui).map_err(|e| fail(EXIT_INSTALL, format!("Install failed: {e}")))?;
     ui.say(&format!("Installed {}.", l.name));
 
-    // 6. the pairing file, for the app to reach the iPhone without a computer
-    if let Some(p) = &l.pairing {
+    // 6. before iOS 27, the pairing file, for the app to reach the iPhone without a computer. It's a full lockdown
+    // credential, and from iOS 27 the app pairs on the iPhone itself, so none is written there.
+    let major = ios_major(&d.ios).unwrap_or(0);
+    if let Some(p) = l.pairing.as_ref().filter(|_| major < PAIRS_ON_PHONE) {
         dev.write_file(&p.bundle_id, &parent_dirs(&p.path), &p.path, &pairing)
-            .map_err(|e| fail(EXIT_PAIRING, format!("Installed, but couldn't hand the app its pairing file: {e}")))?;
-        ui.say("Gave the app its pairing file.");
+            .map_err(|e| fail(EXIT_PAIRING, format!("Installed, but couldn't put the pairing file in the app: {e}")))?;
+        ui.say(&import_hint(&l.name, &p.path));
     }
 
     // 7. what's left on the phone
-    let major = ios_major(&d.ios).unwrap_or(0);
     if major >= 16 && dev.developer_mode() == Some(false) {
         let _ = dev.reveal_developer_mode();
         ui.say("Turn on Developer Mode: Settings > Privacy & Security > Developer Mode, then restart the iPhone and tap Turn On.");

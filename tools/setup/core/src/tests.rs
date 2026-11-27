@@ -231,7 +231,7 @@ fn whole_run_in_order() {
     let all = ui.all();
     assert!(all.contains("sign in on boxy.example"), "{all}");
     assert!(all.contains("Installed LiveContainer."));
-    assert!(all.contains("Gave the app its pairing file."));
+    assert!(all.contains("Put a pairing file in LiveContainer"), "{all}");
     assert!(!all.contains("Developer Mode")); // already on
     assert!(!all.to_lowercase().contains("password"));
 }
@@ -382,6 +382,29 @@ fn no_pairing_file_when_the_site_asks_for_none() {
     go(&[], &mut ui, &mut net, &mut dev).unwrap();
     assert!(!dev.log.iter().any(|l| l.starts_with("write")));
     assert!(!ui.all().contains("pairing file"));
+}
+
+#[test]
+fn before_ios_27_the_pairing_file_is_written_and_has_to_be_picked_in_the_app() {
+    let (mut ui, mut net, mut dev) = (FakeUi::typing(&["ABCD-2345"]), FakeNet::ok(), FakeDev::ok("26.5"));
+    go(&[], &mut ui, &mut net, &mut dev).unwrap();
+    assert!(dev.log.iter().any(|l| l.starts_with("write") && l.contains("Documents/pairingFile.plist")));
+    let all = ui.all();
+    assert!(all.contains("doesn't read by itself"), "{all}");
+    assert!(all.contains("Settings > Installation & Signing > This iPhone, tap Pair This iPhone, then Import Pairing File"), "{all}");
+    assert!(all.contains("pick pairingFile.plist (On My iPhone > LiveContainer)"), "{all}");
+}
+
+#[test]
+fn from_ios_27_no_pairing_file_is_written() {
+    for ios in ["27.0", "28.1"] {
+        let (mut ui, mut net, mut dev) = (FakeUi::typing(&["ABCD-2345"]), FakeNet::ok(), FakeDev::ok(ios));
+        dev.write = Err("must not be called".into());
+        go(&[], &mut ui, &mut net, &mut dev).unwrap();
+        assert!(dev.log.contains(&"pair".to_string())); // the computer still has to be trusted to install
+        assert!(!dev.log.iter().any(|l| l.starts_with("write")), "{:?}", dev.log);
+        assert!(!ui.all().to_lowercase().contains("pairing file"), "{}", ui.all());
+    }
 }
 
 #[test]
