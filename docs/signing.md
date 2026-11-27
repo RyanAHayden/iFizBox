@@ -318,7 +318,9 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   installs, from `signing.inspect`'s answer (`signing/route.js`), and a Re-sign hands in the recorded ones first. If Apple
   refuses one, it is logged and that extension is left out; the app still installs. An extension's keychain-access-groups
   name the app's group (`TEAM.<app's App ID>`) first, then its own, when the profile allows it, so the app and its
-  extensions read what the other keeps. The signed record keeps `extensionAppIDs` (`signing.installed` answers
+  extensions read what the other keeps. An app whose record names no extensions (installed before they had App IDs, or
+  with all of them refused) gets them with an update, an install or a queued Re-sign, not with Manage's Re-sign
+  (`signing.resign`). The signed record keeps `extensionAppIDs` (`signing.installed` answers
   `extensionAppIds`), and App Refresh and Re-sign All use them as described under App Refresh above. Tests:
   `native/sign/tests/sideload/main.swift`, `web/app/signing/freeappid.test.js`, `web/app/signing/route-freeappid.test.js`,
   `web/app/core/freeroute.test.js`.
