@@ -10,6 +10,7 @@ const make = document.createElement;
 document.createElement = (t) => Object.assign(make.call(document, t), { getBoundingClientRect: () => ({ bottom: 100 }) });
 globalThis.location = { hash: "#/home/browse" };
 globalThis.matchMedia = () => ({ matches: true, addEventListener() {}, removeEventListener() {} }); // Reduce Motion: nothing slides
+globalThis.Image ??= function Image() { return document.createElement("img"); }; // F449: Source rows' icons
 globalThis.requestAnimationFrame ??= () => 0;
 globalThis.cancelAnimationFrame ??= () => {};
 globalThis.addEventListener ??= () => {};
