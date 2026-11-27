@@ -338,7 +338,7 @@ const CURRENT_MAC = { client_info: "<MacBookPro18,3> <macOS;26.6;25F84> <com.app
   user_agent: "AuthKit/1 (Macintosh; OS X 26.6) (com.apple.akd/1.0)" };
 const NAMES_A_MAC = /<(macOS|Mac OS X);\d/;
 const identityKey = (server, clientInfo) => `${server}\n${clientInfo}`;
-const nowTime =() => new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+const nowTime = () =>new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 const uuidOf = (b) => { const h = hex(b); return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`; };
 const cpdOf = (h) => ({ bootstrap: true, icscrec: true, loc: "en_US", pbe: false, prkgen: true, svct: "iCloud", ...h });
 

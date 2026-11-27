@@ -11,6 +11,9 @@
 - Tests in `web/app/core/gsa.test.js` use a mocked GSA.
 - Probe script copied verbatim as `claims.mjs` in this folder.
 
+## Spec review
+- Nothing missing. Fixed a lost space in `gsa.js`. Kept as is: no Mac claim through a non-Mac server (BariStore's rule); the sign-in after a 2FA code rotates like any other, so a 503 there can land on another machine and Apple asks for a code again (the screen handles that step).
+
 ## Not done on purpose
 - No rotation on o=apptokens or the 2FA endpoints: the token belongs to the identity that signed in.
 - No BariStore rule of skipping a claim after two 503s (not asked), so the worst case is every server x claim (8 servers x 2).
