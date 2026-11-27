@@ -10,6 +10,8 @@
 use std::fmt;
 use std::path::{Path, PathBuf};
 
+pub mod phone; // F465: the same setup run on the iPhone itself, in Open Minis
+
 /// The product's name and domain: from native/brand.env, put in by ../cli/build.rs, never spelled here.
 #[derive(Clone, Debug)]
 pub struct Brand {

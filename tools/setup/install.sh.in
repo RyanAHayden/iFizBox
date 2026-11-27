@@ -29,7 +29,8 @@ esac
 [ "$sum" != none ] || die "@NAME@ setup: there's no build for this computer ($os $arch) yet."
 
 # usbmuxd is often started by udev when an iPhone is plugged in, so only its absence altogether stops here.
-if [ "$os" = Linux ] && [ -z "${USBMUXD_SOCKET_ADDRESS:-}" ] && [ ! -S /var/run/usbmuxd ] &&
+# Open Minis on the iPhone itself (it has minis-bonjour) needs no usbmuxd: the command sets up the iPhone it runs on.
+if [ "$os" = Linux ] && ! command -v minis-bonjour >/dev/null 2>&1 && [ -z "${USBMUXD_SOCKET_ADDRESS:-}" ] && [ ! -S /var/run/usbmuxd ] &&
    ! command -v usbmuxd >/dev/null 2>&1 && [ ! -x /usr/sbin/usbmuxd ]; then
   say "Linux talks to an iPhone through usbmuxd, which isn't running."
   say "Install it (Debian/Ubuntu: sudo apt install usbmuxd; Fedora: sudo dnf install usbmuxd; Arch: sudo pacman -S usbmuxd),"

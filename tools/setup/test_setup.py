@@ -92,6 +92,13 @@ class Names(unittest.TestCase):
             self.assertIn("@BIN@-" + s, read("install.sh.in"))
         self.assertIn('"@BIN@-windows-$arch.exe"', read("install.ps1.in"))  # $arch: x64 or arm64
 
+    def test_idevice_pin_is_the_apps(self):
+        pin = re.search(r"(?m)^IDEVICE_COMMIT=([0-9a-f]{40})",
+                        read("..", "..", "native", "sideload", "idevice", "pin.env")).group(1)
+        revs = re.findall(r'rev = "([0-9a-f]+)"', read("cli", "Cargo.toml"))
+        self.assertTrue(revs)
+        self.assertEqual(set(revs), {pin})
+
     def test_rust_never_spells_the_name(self):
         name = re.compile(r"\b%s\b|%s" % (re.escape(brand.NAME), re.escape(DOMAIN)), re.I)
         for d in ("core", "cli"):
@@ -152,6 +159,35 @@ class InstallSh(unittest.TestCase):
         self.assertNotIn("ran:", r.stdout)
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("Nothing was run", r.stderr)
+
+    @unittest.skipUnless(sys.platform == "linux" and (shutil.which("curl") or shutil.which("wget")), "Linux with curl or wget")
+    def test_open_minis_needs_no_usbmuxd(self):
+        # as a Linux without usbmuxd (this machine's own is hidden by renaming what the script looks for)
+        s = fill("install.sh.in", {**{k: "none" for k in ("SHA_MACOS", "SHA_LINUX_X86_64", "SHA_LINUX_ARM64",
+                                                          "SHA_WINDOWS_X64", "SHA_WINDOWS_ARM64")}, self.key: self.sum})
+        for found in ("/var/run/usbmuxd", "/usr/sbin/usbmuxd", "command -v usbmuxd"):
+            self.assertIn(found, s)
+            s = s.replace(found, found + "-hidden")
+        script = os.path.join(self.tmp, "install.sh")
+        with open(script, "w") as f:
+            f.write(s)
+        env = {k: v for k, v in os.environ.items() if k != "USBMUXD_SOCKET_ADDRESS"}
+        env["IFIZBOX_SETUP_BASE"] = "file://" + self.bindir
+
+        def go(path):
+            return subprocess.run(["sh", script, "ABCD-2345"], capture_output=True, text=True, timeout=60,
+                                  env={**env, "PATH": path}, stdin=subprocess.DEVNULL)
+
+        r = go(env["PATH"] if "PATH" in env else os.defpath)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("usbmuxd", r.stdout)
+        minis = os.path.join(self.tmp, "minis")
+        os.mkdir(minis)
+        with open(os.path.join(minis, "minis-bonjour"), "w") as f:
+            f.write("#!/bin/sh\n")
+        os.chmod(os.path.join(minis, "minis-bonjour"), 0o755)
+        r = go(minis + os.pathsep + os.environ.get("PATH", os.defpath))
+        self.assertIn("ran: ABCD-2345", r.stdout, r.stderr)
 
     def test_no_build_for_this_computer(self):
         r = self.run_script({})

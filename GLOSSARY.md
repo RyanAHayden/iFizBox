@@ -358,3 +358,10 @@ _Said_: Donate button
 _On screen_: Donate
 _In code_: screens/donate.js, #/home/donate, core/devstats.js, tools/dev_stats.py
 _Avoid_: tip jar
+
+**Phone Setup**:
+The free Apple ID route's first install with no computer (iOS 27): the setup command run on the iPhone itself, in the Open Minis app, pairs through Developer Mode and installs through LocalDevVPN
+_Said_: No-computer first install
+_On screen_: Install Without a Computer
+_In code_: core::phone, tools/setup/core/src/phone.rs, tools/setup/cli/src/minis.rs
+_Avoid_: helper, BariStore route

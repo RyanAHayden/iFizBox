@@ -490,6 +490,20 @@ rest:
   `tools/setup/llvm-mingw.sh` fetches the llvm-mingw that the Windows on ARM build needs. release.sh finds both in
   their default folders.
 
+**Phone Setup (iOS 27, no computer)**: the same setup command, run on the iPhone itself inside Open Minis (an App
+Store app). The website does not offer it yet.
+
+1. Install Open Minis and LocalDevVPN from the App Store. In Open Minis, allow Local Network and Notifications.
+2. Connect LocalDevVPN, and keep Wi-Fi on.
+3. In Open Minis, run the setup command with the code from the website.
+4. Developer Mode lists a "Pair with iFizBox" row while Open Minis runs in the background. The pairing code arrives as
+   a notification; the command asks for it.
+5. The command installs the app.
+
+The pairing is kept in memory only and is written to the app's container as `Documents/pairingFile.plist`. The app
+does not read that file yet. A pairing made here replaces an installed app's pairing of the same name, so the app
+shows Pairing Lost until it is paired again (Fix).
+
 **Free Apple ID without a computer**: a free profile has no packet tunnel, so the built-in VPN can't start on it.
 This iPhone connects through LocalDevVPN instead (a free app on the App Store, not ours), which the person turns on
 by hand before each install, so the free profile needs no Network Extensions. Measured on an iPhone 15 Pro
@@ -499,7 +513,7 @@ over RemotePairing in under a second, with nothing of iFizBox's VPN on. Pairing 
 This iPhone pairs on the phone with a 6-digit code (Settings > Privacy & Security > Developer Mode > Pair with iFizBox),
 and the computer's pairing file is not used, so the setup writes none there. Before iOS 27, the setup writes the file
 into the app's folder (`Documents/pairingFile.plist`) and says where to pick it: Settings > Installation & Signing >
-This iPhone, Pair This iPhone, then Import Pairing File.
+This iPhone, Pair This iPhone, then Import Pairing File. With no computer, Phone Setup does the pairing.
 
 **Jailbreak build**: the root helper's `install-ipa` installs an IPA through `LSApplicationWorkspace
 installApplication:withOptions:error:`, as AppSync's `appinst` does (`native/helper/README.md`). It needs AppSync
