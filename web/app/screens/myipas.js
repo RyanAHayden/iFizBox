@@ -1401,7 +1401,10 @@ async function renderOptions(body, route, file) {
   const ed = { name: o.name || "", bundleId: o.bundleId || "", icon: o.icon || null,
     removeExtensions: [...(o.removeExtensions ?? [])], fixArm64e: o.fixArm64e !== false,
     keepBundleId: keepStart(o) }; // F243
-  edits.set(file, { entry, ed });
+  // B508: on a free Apple ID's profile iOS installs an app only as its App ID, so there's no Keep Bundle ID choice
+  const { pinnedProfile } = await import("../signing/freeappid.js");
+  const appIdOnly = Boolean(await pinnedProfile(nativeBridge()));
+  edits.set(file, { entry, ed, appIdOnly });
   const { iconPNG } = await import("../signing-sheet.js");
   const { createSwitch } = await import("./settings.js");
   body.replaceChildren();
@@ -1468,6 +1471,7 @@ async function renderOptions(body, route, file) {
 
   // F243: Keep Bundle ID, as Custom Install's (signing-sheet.js): starts as this IPA's saved choice, else Settings >
   // Signing's; turning it off says what the old way does first; the footer warns when the original is on the phone.
+  if (appIdOnly) return; // B508
   const kg = el("div", "group");
   const kul = el("ul", "table grouped");
   const kli = el("li", "cell");
@@ -1556,7 +1560,9 @@ async function saveOptions(file) {
     await cur.tweaks.save();
   }
   // F243: the Keep Bundle ID switch is saved as it stands (library.options keepBundleId)
-  try { params = { ...optionsParams(cur.entry, cur.ed), keepBundleId: cur.ed.keepBundleId !== false }; } catch (e) {
+  // B508: with no switch (appIdOnly), only a choice saved before goes back
+  const keep = cur.appIdOnly ? cur.entry.options?.keepBundleId : cur.ed.keepBundleId !== false;
+  try { params = { ...optionsParams(cur.entry, cur.ed), ...(typeof keep === "boolean" ? { keepBundleId: keep } : {}) }; } catch (e) {
     await showAlert({ title: "Can't Save", message: e.message, buttons: ["OK"] });
     return;
   }
