@@ -11,6 +11,7 @@
 //   ifizbox://shared?route=…            N9: an .ipa or .deb shared with iFizBox, or why not (share.js)
 //   ifizbox://package?id=<id>           F96: the website's Install in iFizBox: that app's page (Search's package:<id>)
 //   ifizbox://account?k=<key>           F97: a iFizBox Account's link or QR code: Sign In With Key, filled in
+//   ifizbox://free-id#<key>             F460b: the website's Finish Setup: the computer install's certificate
 //   ifizbox://<tab>                     B14: home, sources, changes, installed, search, settings: that tab, at its root
 //   altstore://source?url=…, feather://install/<ipa>, …   F83: other sideloaders' links (core/otherlinks.js), when
 //                                      Settings > Sideloading > Open Other Apps' Links is on: a source goes to the Sources
@@ -143,7 +144,7 @@ export function onReceiving({ hud = liveHUD } = {}) {
 }
 
 export async function handleIncoming(url, { native = nativeBridge(), alert = showAlert, hud = showHUD,
-  review = null, add = null, shared = null, install = null, signIn = null, on = otherLinksOn, open = goHash, now = Date.now, reload = reloadInstalled, drop = dropMyIpas } = {}) {
+  review = null, add = null, shared = null, install = null, signIn = null, finish = null, on =otherLinksOn, open = goHash, now = Date.now, reload = reloadInstalled, drop = dropMyIpas } = {}) {
   const u = String(url ?? "");
   if (/^ifizbox:\/\/install\b/i.test(u)) {
     const ask = installAsk(u);
@@ -177,8 +178,13 @@ export async function handleIncoming(url, { native = nativeBridge(), alert = sho
     await run(u, { open });
     return "account";
   }
+  if (/^ifizbox:\/\/free-id\b/i.test(u)) {
+    const run = finish ?? (await import("./screens/free-apple-id.js")).finishSetupFromLink;
+    await run(u, { native, alert });
+    return "free-id";
+  }
   if (/^ifizbox:\/\/import\b/i.test(u)) {
-    const run = review ?? (await import("./screens/importlink.js")).reviewAndImport;
+    const run = review?? (await import("./screens/importlink.js")).reviewAndImport;
     await run(u, { native });
     return "import";
   }

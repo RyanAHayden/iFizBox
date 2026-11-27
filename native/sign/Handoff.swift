@@ -95,7 +95,8 @@ enum IncomingLink {
     // account: F97, a iFizBox Account's link (ifizbox://account?k=…)
     // B14: a tab's own link (ifizbox://sources, ifizbox://changes, …) opens that tab: web/app/router.js ALL_TABS
     static let tabs: Set<String> = ["home", "sources", "changes", "installed", "search", "settings"]
-    static let hosts: Set<String> = Set(["import", "install", "myipas", "add", "shared", "package", "account"]).union(tabs)
+    // free-id: F460b, the website's Finish Setup (ifizbox://free-id#<key>)
+    static let hosts: Set<String> = Set(["import", "install", "myipas", "add", "shared", "package", "account", "free-id"]).union(tabs)
     static let maxLength = 512 * 1024
 
     static func accepts(_ url: URL) -> Bool {

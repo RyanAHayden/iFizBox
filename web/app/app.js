@@ -563,10 +563,6 @@ if (nativeBridge()) {
     const { handleIncoming } = await import("./incoming.js");
     await handleIncoming(link);
   }).catch(() => {});
-  // B474: a computer install's Free Apple ID record, so Signing keeps the group with Refresh Profile
-  // (the module loads only when the file is there)
-  fetch("free-id.json", { cache: "no-store" }).then((r) => r.ok && import("./screens/free-apple-id.js")
-    .then((m) => m.adoptBundledFreeId({ native: nativeBridge(), fetcher: async () => r }))).catch(() => {});
 }
 upgradeNotices.start();
 createPrefsMirror({ settings: settingsScreen.settings }).start(); // F70: N7's settings to the daemon
@@ -649,7 +645,17 @@ addEventListener("pageshow", (e) => { if (e.persisted) homeTop.opened(); });
 
 // F75: ifizbox:// links from the website (Send Settings, Home's Open in iFizBox App) and elsewhere (incoming.js).
 // ifizbox://install (F89) is no longer sent by the website since F92/F95: only for links already out there.
-if (nativeBridge()) import("./incoming.js").then((m) => m.startIncoming()).catch(() => {});
+// B474: a computer install's Free Apple ID record, so Signing keeps the group with Refresh Profile; F460b: a sealed
+// one asks to finish setup, after a link that launched the app (its key) was taken. The module loads only with a file.
+if (nativeBridge()) {
+  import("./incoming.js").then((m) => m.startIncoming()).catch(() => {}).then(async () => {
+    const r = await fetch("free-id.json", { cache: "no-store" });
+    if (!r.ok) return;
+    const m = await import("./screens/free-apple-id.js");
+    await m.freeIdAtLaunch({ native: nativeBridge(), sideload: detectMode() === "sideload",
+      fetcher: async () => r.clone() });
+  }).catch(() => {});
+}
 
 // F345a, C70: the app's app.info decides whether this phone offers the iOS 26 style (theme-boot.js guessed for first paint)
 import("./native-controls.js").then((m) => m.initNativeControls()).catch(() => {});

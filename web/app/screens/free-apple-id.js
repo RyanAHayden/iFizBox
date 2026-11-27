@@ -30,9 +30,13 @@
 //   await adoptBundledFreeId({ native, store })
 //                                        after a computer install: the record it carried (web/free-id.json) under
 //                                        FREE_KEY, so the group and its Refresh Profile show (app.js, every launch)
+//   await freeIdAtLaunch({ native, store }) / finishSetupFromLink(url, { native, store })
+//                                        F460b: a sealed record: the launch's Finish Setup alert, and the link's key
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped, el } from "../nav/ui.js";
-import { NAME, BUNDLE_ID } from "../brand.js";
+import { NAME, BUNDLE_ID, DOMAIN } from "../brand.js";
+import { openRecord } from "../core/websign.js"; // F460b
+import { showAlert } from "../nav/alert.js";
 import { relayTransport, relayWsUrl, anisetteV3, AppleIdSession, DevPortal, signInAlert, b64encode, b64decode } from "../core/gsa.js";
 import { runSetup, pickTeam, setupError, SETUP_STEPS, otherTool, freeExpiry } from "../core/freeroute.js";
 import { storedZip } from "../core/freecert.js";
@@ -111,15 +115,38 @@ export const forgetFreeIdentity = (store) => { writeJson(store, FREE_KEY, null);
 // nothing under FREE_KEY, so Signing hid the Free Apple ID group (settings.js freeInUse) and with it Sign In Again /
 // Refresh Profile. The signed app also carries the website's record (web/free-id.json, websign-job.js bring.freeId):
 // take it while the Keychain's certificate is that record's (same serial), once per file. True: taken.
+// F460b: a computer install's file is sealed (core/websign.js sealRecord) and the app has no certificate for it: with
+// the key from ifizbox://free-id#<key> the record is opened and its certificate imported (adoptSealed).
 export const FREE_ID_URL = "free-id.json";
 const BUNDLED_KEY = KEYS.freeidBundled;
-export async function adoptBundledFreeId({ native, store, fetcher = globalThis.fetch } = {}) {
+const isSealed = (file) => file?.v === 1 && Boolean(file.iv && file.data);
+const sealedMark = (file) => `sealed:${file.iv}`;
+async function bundledText(fetcher) {
+  const r = await fetcher(FREE_ID_URL, { cache: "no-store" });
+  return r?.ok ? r.text() : null;
+}
+// The Keychain takes the record's certificate; bundled: true has the shell keep a held one unless the file's rules
+// replace it (SignBridge, BundledIdentity.replacesIdentity / replacesProfile). Marked once the shell has decided.
+async function adoptSealed({ native, store, text, key }) {
+  const mark = sealedMark(JSON.parse(text));
+  if (readJson(store, BUNDLED_KEY) === mark) return false;
+  const rec = await openRecord(text, key); // throws on a wrong key
+  if (!rec?.p12 || !rec?.profile || !rec?.teamId || !rec?.serial) return false;
+  const st = await native.call("signing.import", { ...importParams({ p12: b64decode(rec.p12),
+    profile: b64decode(rec.profile), password: rec.password }), bundled: true });
+  writeJson(store, BUNDLED_KEY, mark);
+  if (!sameSerial(st?.identity?.serial, rec.serial)) return false; // another certificate stays
+  writeJson(store, FREE_KEY, rec);
+  globalThis.dispatchEvent?.(new CustomEvent("ifizbox:signing-status", { detail: st.identity })); // Home's tile
+  return true;
+}
+export async function adoptBundledFreeId({ native, store, fetcher = globalThis.fetch, key = null } = {}) {
   if (!native?.call) return false;
   try {
-    const r = await fetcher(FREE_ID_URL, { cache: "no-store" });
-    if (!r?.ok) return false;
-    const text = await r.text();
+    const text = await bundledText(fetcher);
+    if (text == null) return false;
     const rec = JSON.parse(text);
+    if (isSealed(rec)) return key ? await adoptSealed({ native, store, text, key }) : false;
     if (!rec?.p12 || !rec?.teamId || !rec?.serial) return false;
     const mark = `${rec.serial}:${rec.profile?.length ?? 0}:${rec.profile?.slice(-32) ?? ""}`;
     if (readJson(store, BUNDLED_KEY) === mark) return false;
@@ -129,6 +156,42 @@ export async function adoptBundledFreeId({ native, store, fetcher = globalThis.f
     writeJson(store, BUNDLED_KEY, mark);
     return true;
   } catch { return false; } // no file (not a computer install), or the signer didn't answer: next launch asks again
+}
+
+// F460b: the sealed file this copy carries and hasn't taken yet, else null.
+async function waitingSealed({ store, fetcher }) {
+  try {
+    const file = JSON.parse((await bundledText(fetcher)) ?? "null");
+    return isSealed(file) && readJson(store, BUNDLED_KEY) !== sealedMark(file) ? file : null;
+  } catch { return null; }
+}
+
+export const FINISH_PAGE = `https://${DOMAIN}/${format(settingsRoute(["signing"]))}`;
+export const FINISH_ASK = { title: "Finish Setup",
+  message: `Open ${DOMAIN} in Safari and tap Finish Setup to give ${NAME} your certificate.` };
+export const FINISH_DONE = { title: "Setup Finished", message: "Your certificate is on this iPhone." };
+export const FINISH_FAILED = { title: "Setup Not Finished",
+  message: "That link didn't give this iPhone a certificate. Sign in with your Apple ID in Settings > Signing." };
+
+// The launch (app.js, after any link that opened the app): a plain record is taken as before; a sealed one the
+// sideload app can't open by itself says where to finish, once per file.
+export async function freeIdAtLaunch({ native, store, fetcher = globalThis.fetch, alert = showAlert, sideload = true } = {}) {
+  if (!native?.call) return;
+  if (await adoptBundledFreeId({ native, store, fetcher }) || !sideload) return;
+  const file = await waitingSealed({ store, fetcher });
+  if (!file || readJson(store, KEYS.freeidAsked) === sealedMark(file)) return;
+  writeJson(store, KEYS.freeidAsked, sealedMark(file));
+  const { index } = await alert({ ...FINISH_ASK, buttons: ["Not Now", `Open ${DOMAIN}`], cancel: 0 });
+  if (index === 1) await native.call("app.openURL", { url: FINISH_PAGE }).catch(() => {});
+}
+
+// ifizbox://free-id#<key> (incoming.js). Nothing to do (no sealed file, or taken already): nothing said.
+export async function finishSetupFromLink(url, { native, store, fetcher = globalThis.fetch, alert = showAlert } = {}) {
+  if (!native?.call || !(await waitingSealed({ store, fetcher }))) return false;
+  const key = String(url).split("#")[1] ?? "";
+  const done = Boolean(key) && await adoptBundledFreeId({ native, store, fetcher, key });
+  await alert({ ...(done ? FINISH_DONE : FINISH_FAILED), buttons: ["OK"], cancel: 0 });
+  return done;
 }
 
 const te = new TextEncoder();

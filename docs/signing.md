@@ -216,13 +216,19 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   (`signing.import`, as Select All Files does), so Install and re-signing on the phone use them. There is no Save for
   the App and no Download for a Computer Install. If the import fails, an alert says why, and a **Use for Signing**
   button tries again.
-- **After a computer install** (not finished yet: the app side that opens the sealed record is not built). The uploaded
-  IPA carries the Free Apple ID record as `web/free-id.json`, encrypted, and no `ifizbox-identity.plist`, so after a
-  computer install the app has no certificate until that side lands. Today `adoptBundledFreeId` (`screens/free-apple-id.js`)
-  takes only a plain record, as a Save the IPA copy carries it next to `ifizbox-identity.plist`: when the Keychain's
-  certificate has the same serial, once per file, so a Forget afterwards is not undone. Forget Free Apple ID also
-  removes the key from this browser; the next computer install makes a new one. Tests: `websign-job.test.js` and
-  `computer-install.test.js` (see Free Apple ID above).
+- **After a computer install**: the uploaded IPA carries the Free Apple ID record as `web/free-id.json`, sealed, and no
+  `ifizbox-identity.plist`, so the installed app starts with no certificate. On the first launch of a copy with a sealed
+  `free-id.json`, the app shows a **Finish Setup** alert (**Not Now** / **Open ifizbox.com**, which opens
+  `https://ifizbox.com/#/home/settings/signing` in Safari), once per file. Tapping Finish Setup there opens
+  `ifizbox://free-id#<key>`; the app opens the record with that key and imports its certificate and profile
+  (`signing.import` with `bundled: true`). A certificate already held is replaced only under the rules for the identity
+  file inside the app: a newer certificate replacing one a file or a Free Apple ID brought, or a newer profile for the
+  same certificate. The app then shows **Setup Finished**, or **Setup Not Finished** (wrong or missing key, or another
+  certificate kept). A plain record (Save the IPA) is taken as before: `adoptBundledFreeId` (`screens/free-apple-id.js`)
+  reads it when the Keychain's certificate has the same serial, once per file, so a Forget afterwards is not undone.
+  Forget Free Apple ID also removes the key from this browser; the next computer install makes a new one. Tests:
+  `websign-job.test.js`, `computer-install.test.js`, `free-apple-id.test.js`, `storagekeys.test.js`, `incoming.test.js`
+  (see Free Apple ID above).
 - **The weekly refresh** is Refresh Profile (or Sign In Again once Apple's session is gone): it makes a new profile and
   imports it again.
 - **Forget Free Apple ID** also removes the Keychain identity, but only when its certificate's serial is the Free Apple
