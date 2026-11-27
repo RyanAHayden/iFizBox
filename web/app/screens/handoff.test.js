@@ -7,7 +7,7 @@ import { fakeDocument } from "../fakes.test-helper.js";
 const ORIGIN = "https://ifizbox.com";
 const APT = { key: "deb:https://repo.example/:./", uri: "https://repo.example/", dist: "./" };
 const ALT = { key: "alt:https://alt.example/apps.json", kind: "altstore", uri: "https://alt.example/apps.json" };
-const kinds = (items) => items.map((i) => (i.kind === "open" ? i.label : i.kind));
+const kinds = (items) => items.filter((i) => i.kind !== "link").map((i) => (i.kind === "open" ? i.label : i.kind));
 
 test("an AltStore source: Copy Link, Add on Another Device, then every AltStore-format sideloader", () => {
   const items = shareItems(ALT, { origin: ORIGIN, jailbroken: false });
@@ -113,7 +113,7 @@ test("F194: the app page puts Share on its header (storeHeader's action), not in
   const { readFileSync } = await import("node:fs");
   const alt = readFileSync(new URL("./altstore.js", import.meta.url), "utf8");
   const app = alt.slice(alt.indexOf("export function renderApp("), alt.indexOf("export function storeLookup("));
-  assert.match(app, /storeHeader\(\{[^]*?action: headerShareButton\(source \?\? \{ key: pkg\.key \}, \{ app: true \}\)/);
+  assert.match(app, /storeHeader\(\{[^]*?action: headerShareButton\(source \?\? \{ key: pkg\.key \}, \{ app: true, appId: pkg\.row\?\.id \?\? pkg\.stanza\.package \}\)/);
   assert.doesNotMatch(app, /setSourceShare\(/, "one Share, on the header");
 });
 
@@ -122,4 +122,13 @@ test("a tweak page has Share on its header too, opening the row menu's package s
   const src = readFileSync(new URL("./browse.js", import.meta.url), "utf8");
   const page = src.slice(src.indexOf("async function renderPackage("));
   assert.match(page, /storeHeader\(\{[^]*?action: shareHeadButton\(\(\) => showPackageShare\(/);
+});
+
+test("F451: Share iFizBox link: a source's add link, an app's /app link", () => {
+  const src = shareItems(ALT, { origin: ORIGIN, jailbroken: false }).find((i) => i.kind === "link");
+  assert.equal(src.label, "Share iFizBox link");
+  assert.equal(src.url, "https://ifizbox.com/add?url=https%3A%2F%2Falt.example%2Fapps.json");
+  const app = shareItems(ALT, { app: true, appId: "com.x.y", origin: ORIGIN, jailbroken: false }).find((i) => i.kind === "link");
+  assert.equal(app.url, "https://ifizbox.com/app?id=com.x.y");
+  assert.equal(shareItems(ALT, { app: true, origin: ORIGIN }).some((i) => i.kind === "link"), false);
 });

@@ -50,6 +50,7 @@
     var p = l.pathname;
     if (!/^https?:$/.test(l.protocol) || p.lastIndexOf("/") <= 0) return;
     if (/(^|\/)add\/?$/.test(p)) return l.replace("/add" + l.search + l.hash);
+    if (/(^|\/)app\/?$/.test(p)) return l.replace("/app" + l.search + l.hash); // F451
     l.replace("/" + l.search + (l.hash && l.hash !== "#" ? l.hash : "#/" + p.split("/").filter(Boolean).join("/")));
   })(location);</script>
   <script src="theme-boot.js"></script>

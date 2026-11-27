@@ -32,7 +32,7 @@ import { sourceFilter } from "./core/sources.js";
 import { getBackend } from "./backend.js";
 import { appSchemeFor, openOutside } from "./core/applinks.js";
 import { launchURL } from "./launch.js";
-import { isAddPath, parseAddLink } from "./core/handoff.js";
+import { isAddPath, parseAddLink, isAppPath, parseAppLink } from "./core/handoff.js";
 import { lookForUpdates, appVersion } from "./essential-ui.js";
 import { showReloadBar } from "./nav/reloadbar.js";
 import { catalog } from "./catalog.js";
@@ -512,6 +512,11 @@ const installLink = takeInstallParam(window, { mode: detectMode() });
 const addFrom = isAddPath(location.pathname) ? parseAddLink(location.search) : null;
 if (isAddPath(location.pathname)) {
   history.replaceState(null, "", location.pathname.replace(/add\/?$/, "") + format({ tab: "sources" }));
+}
+// F451: /app?id=<id> (Share iFizBox link on an app's page) opens that app's page, Search's package:<id>.
+const appFrom = isAppPath(location.pathname) ? parseAppLink(location.search) : null;
+if (isAppPath(location.pathname)) {
+  history.replaceState(null, "", location.pathname.replace(/app\/?$/, "") + (appFrom ? format({ tab: "search", path: [`package:${appFrom}`] }) : ""));
 }
 // The Home Screen web app opens outside links in a sheet over itself, address bar on top. x-safari-https://… makes
 // iOS hand them to Safari instead, and from there to their own apps (Discord, GitHub). The app's shell sends them

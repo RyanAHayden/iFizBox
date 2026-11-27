@@ -6,7 +6,7 @@
 import { grouped } from "../nav/ui.js";
 import { showSheet } from "../nav/sheet.js";
 import { qrSvg } from "../core/qr.js";
-import { sourceLinks, packageLinks, addLink, siteOrigin, formatOf, isIpaFormat } from "../core/handoff.js";
+import { sourceLinks, packageLinks, addLink, appLink, siteOrigin, formatOf, isIpaFormat } from "../core/handoff.js";
 import { settings } from "../settings-store.js";
 import { detectMode } from "../core/settings.js";
 import { showShareSheet, setShare } from "../nav/sharesheet.js";
@@ -132,7 +132,7 @@ export function sourceUrlOf(source) {
 // Pure: what the sheet lists. [{ kind: "copy", label, text } | { kind: "qr", label, link } | { kind: "open", label,
 // url, letter, color }]. app: true on an app's page. mode: "site" | "jailbreak" | "sideload" (core/settings.js
 // detectMode); the jailbreak build lists no SIDELOAD_TOOLS (F194).
-export function shareItems(source, { app = false, jailbroken = settings.jailbroken(), origin = siteOrigin(globalThis.location),
+export function shareItems(source, { app = false, appId = null, jailbroken = settings.jailbroken(), origin = siteOrigin(globalThis.location),
   mode = detectMode() } = {}) {
   if (!source) return [];
   const items = [];
@@ -140,6 +140,9 @@ export function shareItems(source, { app = false, jailbroken = settings.jailbrok
   if (url) items.push({ kind: "copy", label: "Copy Link", text: url });
   const add = addLink(source, origin);
   if (add) items.push({ kind: "qr", label: "Add on Another Device", link: add });
+  // F451: iFizBox's own link: a source's opens iFizBox offering to add it, an app's opens that app's page.
+  const own = app ? appLink(appId, origin) : add;
+  if (own) items.push({ kind: "link", label: `Share ${NAME} link`, url: own, letter: NAME.charAt(0).toUpperCase(), color: "#2a6be0" });
   // An app's page lists them too (user 2026-11-17): they add the app's source to that app.
   const apt = formatOf(source) === "apt";
   if (apt && !jailbroken) return items;
@@ -147,9 +150,18 @@ export function shareItems(source, { app = false, jailbroken = settings.jailbrok
   return items;
 }
 
-function showShareFor(source, opts) {
+export async function shareLink(url, { nav = globalThis.navigator, copy = copyText } = {}) {
+  if (typeof nav?.share === "function") {
+    try { await nav.share({ url }); return "shared"; } catch (e) { if (e?.name === "AbortError") return "cancelled"; }
+  }
+  copy(url);
+  return "copied";
+}
+
+export function showShareFor(source, opts) {
   const items = shareItems(source, opts).map((it) => {
     if (it.kind === "copy") return { label: it.label, glyph: "copy", onSelect: () => copyText(it.text) };
+    if (it.kind === "link") return { label: it.label, letter: it.letter, color: it.color, onSelect: () => shareLink(it.url) };
     if (it.kind === "qr") return { label: it.label, glyph: "qr", onSelect: () => showAddQR(it.link) };
     return { label: it.label, letter: it.letter, color: it.color, image: appIcon(it.label), onSelect: () => { location.href = it.url; } };
   });
