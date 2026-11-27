@@ -201,15 +201,15 @@ export function mergeCategories(rows, { jailbroken = true } = {}) {
     .map((name) => ({ name, count: counts.get(name) }));
 }
 
-// Popular: [{ row, sources, date, rating, installs }] -> rows. F452: the most installed first (`installs`, the review
-// server's count, only from MIN_INSTALLS), then F450: the best rated here
-// first (`rating`, core/sections.js ratingOf: highest average, then most ratings), then the unrated by how many
-// sources list them, then the newest update (`date`, epoch ms; AltStore versions carry one, APT packages don't),
-// then by name. At most `limit`.
-export const MIN_INSTALLS = 5; // F452: installs count for the rank only from this many (one install never beats a well-rated package)
-const installsOf = (i) => (Number(i.installs) >= MIN_INSTALLS ? Number(i.installs) : 0);
+// Popular: [{ row, sources, date, rating, installs }] -> rows, in tiers (F452): 1) more than MIN_TIER ratings here
+// (`rating`, core/sections.js ratingOf), by average then count; 2) more than MIN_TIER installs (the review server's
+// count), the most installed first; 3) the rest: rated first (F450), then by how many sources list them, then the
+// newest update (`date`, epoch ms; AltStore versions carry one, APT packages don't), then by name. At most `limit`.
+export const MIN_TIER = 5;
+const tierOf = (i) => (Number(i.rating?.count) > MIN_TIER ? 1 : Number(i.installs) > MIN_TIER ? 2 : 3);
 export function rankPopular(items, limit = 50) {
-  return [...items].sort((a, b) => installsOf(b) - installsOf(a) || compareRatings(a.rating, b.rating) || b.sources - a.sources
+  return [...items].sort((a, b) => tierOf(a) - tierOf(b) || (tierOf(a) === 2 ? Number(b.installs) - Number(a.installs) : 0)
+    || compareRatings(a.rating, b.rating) || b.sources - a.sources
     || (b.date ?? 0) - (a.date ?? 0) || compareNames(a.row, b.row)).slice(0, limit);
 }
 

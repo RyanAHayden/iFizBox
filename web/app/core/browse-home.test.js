@@ -1,7 +1,7 @@
 // F46: Home's Browse: the category merge (AltStore categories + APT sections) and the Popular ranking.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createCatalog, runCatalog, browseCategory, mergeCategories, rankPopular, MIN_INSTALLS, BROWSE_CATEGORIES, ALL } from "./catalog.js";
+import { createCatalog, runCatalog, browseCategory, mergeCategories, rankPopular, MIN_TIER, BROWSE_CATEGORIES, ALL } from "./catalog.js";
 import { appSection } from "./altstore.js";
 
 const stanza = (f) => Object.entries(f).map(([k, v]) => `${k}: ${v}`).join("\n");
@@ -71,7 +71,7 @@ test("F450 rankPopular: rated first (highest average, then most ratings), the un
     item("Wide", 5), item("Liked", 1, { avg: 4, count: 3 }), item("Loved", 1, { avg: 5, count: 1 }),
     item("Liked More", 1, { avg: 4, count: 9 }), item("Narrow", 1),
   ]);
-  assert.deepEqual(ranked.map((i) => i.row.name), ["Loved", "Liked More", "Liked", "Wide", "Narrow"]);
+  assert.deepEqual(ranked.map((i) => i.row.name), ["Liked More", "Loved", "Liked", "Wide", "Narrow"]);
 });
 
 const REPO_A = packages(
@@ -149,12 +149,13 @@ test("catalog.popular: what most sources list first, each row with its source co
   assert.deepEqual(ids(rated.slice(0, 4)), ["com.example.cards", "com.x.lib", "com.x.shared", "com.x.util"]);
 });
 
-test("F452 rankPopular: installs first once past the minimum, then rating, then sources", () => {
+test("F452 rankPopular: tiers: over 5 ratings by rating, then over 5 installs by installs, then the rest", () => {
   const item = (name, installs, rating = null, sources = 1) => ({ row: { id: name.toLowerCase(), name }, sources, date: null, rating, installs });
   const ranked = rankPopular([
-    item("Rated", 0, { avg: 5, count: 20 }), item("One", 1), item("Few", 4, { avg: 3, count: 2 }),
-    item("Big", 50), item("Mid", 9, { avg: 2, count: 1 }), item("Mid Better", 9, { avg: 4, count: 3 }),
+    item("Few Rated", 0, { avg: 5, count: 5 }), item("One", 1), item("Wide", 3, null, 4), item("Five", 5),
+    item("Big", 50), item("Mid", 9, { avg: 5, count: 2 }), item("Top", 0, { avg: 4.5, count: 6 }),
+    item("Top More", 100, { avg: 4.5, count: 20 }), item("Low", 1000, { avg: 2, count: 8 }),
   ]);
-  assert.deepEqual(ranked.map((i) => i.row.name), ["Big", "Mid Better", "Mid", "Rated", "Few", "One"]);
-  assert.equal(MIN_INSTALLS, 5);
+  assert.deepEqual(ranked.map((i) => i.row.name), ["Top More", "Top", "Low", "Big", "Mid", "Few Rated", "Wide", "Five", "One"]);
+  assert.equal(MIN_TIER, 5);
 });

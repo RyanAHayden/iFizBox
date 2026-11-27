@@ -17,3 +17,7 @@ Done:
 Review notes: a repeat from a device that already counted skips the rate limits. Not done: counting plain APT installs
 from sources (only linked .debs, which go through backend-native install(), and the app/site install rows); the rows'
 count key is `appId || bundleId`, which equals the package id only where the row's id is the bundle id.
+
+Task changed to tiers: `rankPopular` now ranks 1) more than 5 ratings here by average then count, 2) more than 5 installs
+by installs, 3) the rest in the old order (rated, sources, date, name). `MIN_TIER` = 5 replaces `MIN_INSTALLS`. Tier 1 reads the
+merged rating's count (reviews here, plus a depiction's where it gives one). The F450 test's order changed with it.
