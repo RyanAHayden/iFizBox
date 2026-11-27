@@ -84,7 +84,8 @@ test("queueInstall: a fetched file through install-deb, a removal or an apt down
       return null;
     },
   };
-  const backend = createNativeBackend({ native, sourceOptions: { indexedDB: fakeIndexedDB(), mode: "jailbreak", queue: createQueue() } });
+  const installs = { count: async () => true }; // F454: no install counts sent to the real server
+  const backend = createNativeBackend({ native, sourceOptions: { indexedDB: fakeIndexedDB(), mode: "jailbreak", queue: createQueue(), installs } });
   const lines = [];
   assert.equal((await backend.queueInstall({ id: "com.a", op: "install", to: "1.0" }, { file: "x.deb", onEvent: (e) => lines.push(e.line) })).code, 0);
   assert.deepEqual(lines, ["pmstatus:com.a:50:Installing com.a"]);

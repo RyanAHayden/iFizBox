@@ -270,7 +270,7 @@ export function createNativeBackend({ native = globalThis.ifizboxNative, sourceO
   }
   // F182: user reviews on the app's server (core/reviews.js), straight from the web view (CORS), as Account does.
   backend.reviews = reviewsApi({ base: reviewsBase("app") });
-  backend.installs = installsApi({ base: reviewsBase("app") }); // F452
+  backend.installs = sourceOptions.installs ?? installsApi({ base: reviewsBase("app") }); // F452; tests pass their own
   backend.keepAwake = (on) => awake.set(on); // F287
   backend.awake = awake;
   return Object.assign(backend, sources);
@@ -287,7 +287,12 @@ function queueCalls(backend, q, call) {
     return r;
   };
   const joinOut = (a, b) => [a, b].filter(Boolean).join(a?.endsWith("\n") ? "" : "\n");
-  const links = linkedDebs(q, call);
+  // F452, F454: a successful install counts its package for Popular (the server keeps one per device per package).
+  const counted = (jobs, r) => {
+    if (r?.code === 0) for (const j of jobs) if (j.op === "install") backend.installs.count(j.id).catch(() => {});
+    return r;
+  };
+  const links = linkedDebs(q, call, counted);
   const aptSimulate = async (jobs) => {
     let r;
     try {
@@ -301,7 +306,7 @@ function queueCalls(backend, q, call) {
     }
     return { ok: r.code === 0, code: r.code, plan: planForJobs(parseSimulation(r.stdout), jobs), output: joinOut(r.stdout, r.stderr) };
   };
-  const aptApply = (jobs, onEvent) => run([onEvent ? "apply-ask" : "apply", ...queueWords(jobs)], onEvent);
+  const aptApply = async (jobs, onEvent) => counted(jobs, await run([onEvent ? "apply-ask" : "apply", ...queueWords(jobs)], onEvent));
   return {
     // { op: "install" | "remove", id, version, installed, name }: browse.js's package page and Version History.
     queue: (job) => q.add(job),
@@ -362,7 +367,7 @@ function queueCalls(backend, q, call) {
       if (row.op === "remove") return aptApply([{ op: "remove", id: row.id }], onEvent);
       if (file) {
         const r = await call("share.debInstall", { file, stream: Boolean(onEvent), ask: Boolean(onEvent) }, onEvent);
-        return { code: r?.code ?? -1, stdout: r?.stdout ?? "", stderr: r?.stderr ?? "" };
+        return counted([row], { code: r?.code ?? -1, stdout: r?.stdout ?? "", stderr: r?.stderr ?? "" });
       }
       return aptApply([{ op: "install", id: row.id, version: row.to }], onEvent);
     },
@@ -462,7 +467,7 @@ const isLinked = (j) => j?.op === "install" && typeof j.debUrl === "string" && /
 // once per job and link; simulate asks share.debSimulate (ifizbox-helper simulate-deb: apt-get -s install ./file.deb)
 // and install runs share.debInstall (install-deb, which removes the file). A file that went (a day's sweep) is fetched
 // again. Clearing a job, or the queue, discards what it had downloaded.
-function linkedDebs(q, call) {
+function linkedDebs(q, call, counted) {
   const staged = new Map(); // job id -> { url, file }
   const discard = (id) => {
     const s = staged.get(id);
@@ -531,13 +536,10 @@ function linkedDebs(q, call) {
         r = await run(file);
       }
       staged.delete(j.id); // install-deb's file is removed once it ran
-      if ((r?.code ?? -1) === 0) installCounter.count(j.id).catch(() => {}); // F452: one count per device per package
-      return { code: r?.code ?? -1, stdout: r?.stdout ?? "", stderr: r?.stderr ?? "" };
+      return counted([j], { code: r?.code ?? -1, stdout: r?.stdout ?? "", stderr: r?.stderr ?? "" });
     },
   };
 }
-
-const installCounter = installsApi({ base: reviewsBase("app") }); // F452
 
 // F234: a queue row's download (backend.queueFetch above).
 let fetchTag = 0;

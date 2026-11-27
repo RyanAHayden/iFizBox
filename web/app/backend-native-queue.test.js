@@ -24,7 +24,8 @@ function setup(t, { env = {}, mode = "jailbreak" } = {}) {
     "Name: Example Tweak\nDepends: mobilesubstrate\nFilename: debs/t_0.9.deb\nSize: 90\nDescription: an example tweak\n");
   const native = createFakeNative({ prefix: fx.prefix, remote: fx.remote, net: null, env });
   const queue = createQueue();
-  const backend = createNativeBackend({ native, sourceOptions: { indexedDB: fakeIndexedDB(), mode, queue } });
+  const installs = { count: async () => true }; // F454: no install counts sent to the real server
+  const backend = createNativeBackend({ native, sourceOptions: { indexedDB: fakeIndexedDB(), mode, queue, installs } });
   return { fx, native, backend, queue };
 }
 
