@@ -1,6 +1,9 @@
 # B497: 'transaction aborted' in the IndexedDB stores
 
-**Did.** New `web/app/core/idb.js` (`idbRunner`). An abort with no error, or an `InvalidStateError` from starting a
+**Tried and failed.** The helper first had its own module, `core/idb.js`. The gate failed: it was the 120th module
+in app.js's startup closure (`module-graph.test.js` caps it below 120). It moved into `core/cache.js`.
+
+**Did.** New `idbRunner` in `web/app/core/cache.js`. An abort with no error, or an `InvalidStateError` from starting a
 transaction, means the browser ended the connection: it reopens once (concurrent calls share the reopen), retries,
 and if that fails too throws a plain sentence per store. Real errors pass through with no retry. Used by
 `core/cache.js`, `core/sources.js`, `core/installed.js` (app store) and `core/altstore.js`. The behaviour matches
@@ -20,5 +23,9 @@ another open raised the cache database's version, the next read reopened and sur
 Tried and failed: `chromium --dump-dom` with `--virtual-time-budget` dumped the page before IndexedDB finished, so
 the page POSTed its result to a small local server instead. The AltStore list store was not in the Chromium smoke.
 
-**Not verified.** A real browser-initiated abort on an iPhone: iOS ending the connection in the background cannot be
+**Decided.** The review noted that a failed AltStore list read shows no sentence. Left as it was: that catch keeps
+the APT sources listed when the AltStore database fails, and "transaction aborted" never reached the screen there.
+
+**Not verified.** That each screen shows the thrown sentence when a store call fails (only the thrown message is
+tested). A real browser-initiated abort on an iPhone: iOS ending the connection in the background cannot be
 triggered on demand, so there was no phone test.

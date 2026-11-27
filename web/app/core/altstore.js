@@ -29,7 +29,7 @@ import { parseIpaSource } from "./sources/ipa.js";
 import { NAME } from "../brand.js";
 // The parse half lives in core/altparse.js (core/sources/ipa.js imports it from there, not from here: no cycle).
 import { str, httpUrl, looksLikeAltSource } from "./altparse.js";
-import { idbRunner } from "./idb.js";
+import { idbRunner } from "./cache.js";
 export { str, httpUrl, tintOf, dateOf, compareOS, runsOn, parseAltSource, appSection, appStanza } from "./altparse.js";
 
 const ALT_PREFIX = "alt:";

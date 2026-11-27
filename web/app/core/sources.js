@@ -14,7 +14,7 @@ import { isAltKey, neverLoaded } from "./altstore.js";
 import { releaseTime, fingerprint, healthFields, withTimeout, pool, REFRESH_TIMEOUT, REFRESH_CONCURRENCY } from "./health.js";
 import { githubApiRepo, isGithubSource, refreshGithubSource } from "./github.js"; // F304
 import { githubTweakUri } from "./github.js"; // F344a
-import { idbRunner } from "./idb.js";
+import { idbRunner } from "./cache.js";
 
 // F72: iFizBox's own repo names the oldest iFizBox that may run without upgrading first (core/essential.js).
 const MIN_FIELD = "x-ifizbox-minimum-version";
