@@ -216,7 +216,7 @@ enum SignAhead {
             try job.check()
             let record = SignedRecord(bundleID: app.bundleID, originalBundleID: app.originalBundleID, name: app.name,
                                       version: app.version, url: url, signed: Date(),
-                                      expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored,
+                                      expires: signer.profile.signatureExpiry(certificate: identity.certificate), options: options.stored, // B502a
                                       appID: app.appID, signer: app.stamp, // B259; B280: appID as signAndOpen's record
                                       sha256: Sideload.keepOriginal(input, app: app, source: url, sha256: sha256, log: log), // F343
                                       certSerial: app.certSerial) // F458

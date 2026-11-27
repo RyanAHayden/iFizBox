@@ -8,7 +8,7 @@
 //        -> {token, app: {name, bundleId, version, minimumOS, size, entitlements, permissions, extensions},
 //            icon (base64 PNG, may be Apple's CgBI form) | null, missing: [entitlement], signsAs, profileKind,
 //            appIdAs, keepBundleId, push, wildcard, profileAppId, profileGroups}   (params keepBundleId?: Keep Bundle IDs, absent on)
-//   signing.install {url | token, name?, bundleId?, icon?, removeExtensions?, fixArm64e?, keepBundleId?} (stream as I6)
+//        + pinned, freeAppId (B502a: a free Apple ID's explicit profile, and the App ID the app needs, <id>.TEAMID)//   signing.install {url | token, name?, bundleId?, icon?, removeExtensions?, fixArm64e?, keepBundleId?} (stream as I6)
 //        -> I6's reply + {fixedArm64e, expires}
 //   signing.progress {bundleId} (stream: {phase: "installing", progress}, {served: true} once iOS has the whole IPA)
 //                    -> {installed: true | false | null}
@@ -61,6 +61,9 @@ enum Sideload {
         IPASigner.idHolder = { bid, original in // B502
             FreeAppID.holder(of: bid, for: original, own: Bundle.main.bundleIdentifier, records: records(),
                              installed: { Workspace.isInstalled($0) })
+        }
+        IPASigner.appProfile = { asked, original, held, certificate in // B502a
+            appProfile(asked, original: original, held: held, certificate: certificate)
         }
         b.on("signing.inspect") { c in inspect(c) }
         b.on("signing.progress") { c in progress(c) }
@@ -136,8 +139,17 @@ enum Sideload {
         return (id, profile)
     }
 
+    // ---- B502a: a free Apple ID's profiles, one per app (sign/FreeAppID.swift)
+
+    static var appProfilesDir: URL { SignStore.dir.appendingPathComponent("AppProfiles", isDirectory: true) }
+
+    static func appProfile(_ asked: String, original: String, held: Profile, certificate: Data) -> Profile {
+        FreeAppID.profile(for: asked, original: original, held: held, kept: FreeAppID.kept(in: appProfilesDir),
+                          certificate: certificate, records: records(), installed: { Workspace.isInstalled($0) })
+    }
+
     static func inspect(_ c: Bridge.Call) {
-        guard let (_, profile) = ready(c) else { return }
+        guard let (id, held) = ready(c) else { return }
         guard let url = Apt.httpURL(c.params["url"]) else { return Apt.reply(c, nil, "bad_url: not an http(s) URL") }
         let throttle = Throttle()
         let tok = SignBridge.token()
@@ -161,10 +173,15 @@ enum Sideload {
                     // F237: signsAs follows Keep Bundle IDs (params keepBundleId, absent: on); appIdAs is the
                     // profile's App ID the entitlements get either way, and the sheet's warnings read push.
                     var o = SignOptions(); if let k = c.params["keepBundleId"] as? Bool { o.keepBundleID = k }
+                    // B502a: the answers below are the app's own free profile's, when one is held
+                    let certificate = held.pinsBundleID ? (try? KeychainIdentity(id).certificate) : nil
+                    let profile = certificate.map { appProfile(d.bundleID, original: d.bundleID, held: held, certificate: $0) } ?? held
+                    let freeAppID: Any = held.pinsBundleID ? FreeAppID.appID(for: d.bundleID, team: held.team) : NSNull()
                     let ids = (try? profile.signingIDs(for: d.bundleID, keep: o.keeps(d.bundleID))) ?? (bundleID: d.bundleID, entitlementsID: d.bundleID)
                     Apt.reply(c, ["token": tok, "app": d.json, "icon": icon, "missing": d.missing(from: profile),
                                   "signsAs": ids.bundleID, "appIdAs": ids.entitlementsID, "keepBundleId": o.keepBundleID && !profile.pinsBundleID, // B502
                                   "push": profile.pushEnvironment ?? NSNull(), "wildcard": profile.isWildcard, "profileAppId": profile.appID,
+                                  "pinned": held.pinsBundleID, "freeAppId": freeAppID, // B502a
                                   "profileGroups": profile.groups, "profileKind": profile.kind.rawValue], nil) // profileGroups: F413
                 } catch {
                     try? FileManager.default.removeItem(at: file)
@@ -606,7 +623,7 @@ enum Sideload {
         let tok = SignBridge.token()
         let output = SignBridge.work.appendingPathComponent("\(tok).ipa")
         defer { try? FileManager.default.removeItem(at: input) }
-        let app: SignedApp, identity: KeychainIdentity
+        let app: SignedApp, identity: KeychainIdentity, used: Profile // B502a: the profile it was signed with
         do {
             identity = try KeychainIdentity(id)
             if let log = log {
@@ -628,6 +645,7 @@ enum Sideload {
             if servers.host != nil { signer.level = 6 } // R41: uploaded to the server: small beats fast
             signer.installedAppID = { installedAppID($0, log: log) } // B138: an update keeps its App ID
             app = try signer.sign(input, to: output) { emit($0, $1) }
+            used = signer.profile
             log?("Signed \(options.shownName(app.name)) \(app.version) as \(app.bundleID), \(Sideload.size(output))")
             try job?.check()
         } catch {
@@ -638,7 +656,7 @@ enum Sideload {
         }
         let record = SignedRecord(bundleID: app.bundleID, originalBundleID: app.originalBundleID, name: app.name,
                                   version: app.version, url: url, signed: Date(),
-                                  expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored,
+                                  expires: used.signatureExpiry(certificate: identity.certificate), options: options.stored,
                                   appID: app.appID, signer: app.stamp, // B259
                                   sha256: keepOriginal(input, app: app, source: url, sha256: sha256, log: log), // F343
                                   certSerial: app.certSerial) // F458
@@ -1250,6 +1268,8 @@ enum Sideload {
             let certificate: Data
             do { certificate = try KeychainIdentity(id).certificate } catch { return Apt.reply(c, nil, SignBridge.text(error)) }
             let fetched = (c.params["profiles"] as? [String] ?? []).compactMap { Data(base64Encoded: $0).flatMap { try? Profile($0) } }
+            // B502a: an app signed again below takes its own renewed profile (keep refuses the ones that aren't one)
+            for p in fetched { _ = try? FreeAppID.keep(p.data, held: profile, certificate: certificate, in: appProfilesDir) }
             let list = records()
             let me = Bundle.main.bundleIdentifier, embedded = embeddedProfile()
             if list.isEmpty && ProfileRefresh.ownAppID(list, bundleID: me, embedded: embedded, certificate: certificate) == nil {
@@ -1332,7 +1352,10 @@ enum Sideload {
                                     }
                                 }, sha256: sha) // F343
                 }
-                if let e = FreeAppID.resignRefusal(r, profile) { fail(e); return next() } // B502
+                let own = profile.pinsBundleID ? (try? KeychainIdentity(id).certificate).map { // B502a: the app's own profile
+                    appProfile(SignOptions(r.options).bundleID ?? r.originalBundleID, original: r.originalBundleID, held: profile, certificate: $0)
+                } : nil
+                if let e = FreeAppID.resignRefusal(r, own ?? profile) { fail(e); return next() } // B502
                 // F329a: iFizBox signed from its own bundle (your own icon) signs from it again; the bundle keeps the picture
                 if r.url == SelfIPA.url {
                     let out = SignBridge.work.appendingPathComponent("\(SignBridge.token())-self.ipa")

@@ -29,6 +29,9 @@ final class IPASigner {
     // B502: under a profile that pins the bundle ID (the ID, the app's own), the name of another app it would
     // replace (FreeAppID.holder), or nil.
     static var idHolder: ((String, String) -> String?)?
+    // B502a: under a profile that pins the bundle ID (the ID asked, the app's own, that profile, the certificate DER),
+    // the profile to sign this app with (FreeAppID.profile); nil closure: the one given.
+    static var appProfile: ((String, String, Profile, Data) -> Profile)?
     let identity: SigningIdentity
     var time = Date()
     var maxMachO: UInt64 = 1 << 31   // a single binary held in memory while it's signed
@@ -153,6 +156,10 @@ final class IPASigner {
         }
         guard var main = bundles[appDir], let oldID = main.plist["CFBundleIdentifier"] as? String else {
             throw SignError("bad_ipa", "The app has no bundle ID.")
+        }
+        // B502a: a free Apple ID's app signs with the profile of its own App ID, when one was handed in
+        if profile.pinsBundleID, let pick = IPASigner.appProfile {
+            profile = pick(options.bundleID ?? oldID, oldID, profile, identity.certificate)
         }
         // F237: kept, Info.plist keeps the ID and only the entitlements carry the profile's App ID (entID).
         // B492: a bundle ID the user typed is kept too when the profile would sign the app as another one (the sheet

@@ -141,7 +141,13 @@ enum MyIPAs {
         let identity = try KeychainIdentity(id)
         if let p = DeviceCheck.problem(PhoneID.check(profile)) { throw p } // F236: before iOS's "integrity" alert
         var asked: (bundleID: String, appID: String)? // the installed App ID found below, so the signer doesn't ask again
-        if let s = library.signed(file, certificate: identity.certificate, keep: keep) {
+        // B502a: a free Apple ID's copy signed under another App ID than the app's own now would replace another app
+        let stale = { (s: IPALibrary.Signed) -> Bool in
+            profile.pinsBundleID && s.bundleID != Sideload.appProfile(SignOptions(s.options).bundleID ?? s.originalBundleID,
+                                                                      original: s.originalBundleID, held: profile,
+                                                                      certificate: identity.certificate).appID
+        }
+        if let s = library.signed(file, certificate: identity.certificate, keep: keep), !stale(s) {
             // A copy signed under another App ID than the installed app's (or one from before copies kept it) would be
             // refused by iOS (installd error 15): signed again below, where the signer keeps the installed one.
             guard let have = Sideload.installedAppID(s.bundleID, log: log), have != s.appID else { return s }
