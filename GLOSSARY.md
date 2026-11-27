@@ -339,3 +339,10 @@ _Said_: finish-setup page
 _On screen_: After the Install; Finish Setup
 _In code_: finishSetupSection, finishSetupLink, recordKey, ifizbox://free-id#<key>, ifizbox.freeid.key, sealRecord, openRecord
 _Avoid_: activation, pairing
+
+**App Refresh**:
+Giving installed free Apple ID apps a new profile so they last another week, without installing them again; apps that can't take one are signed again
+_Said_: Refresh
+_On screen_: Refreshing Apps
+_In code_: signing.refresh, ProfileRefresh, refreshApps
+_Avoid_: profile renewal pass

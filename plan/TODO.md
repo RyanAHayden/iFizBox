@@ -26,6 +26,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
+- [ ] **B502** (follow-up, normal) Free Apple ID in the app: installing an app with Keep Bundle IDs on (the default) is refused by iOS. Seen on the iPhone 15 Pro (iOS 27): the app keeps its own ID, its entitlements name the free explicit App ID com.ryha.ifizbox.TEAM, and installd answers ApplicationVerificationFailed 0xe8008016 'invalid entitlements'; with keepBundleId false it installs (but every app then takes the same ID <iFizBox>.TEAM, so a second app would replace the first: decide per-app App IDs). core/freeroute.js says Keep Bundle IDs stays off on this route, the native signer does not apply that. Check: on the 15 Pro a free Apple ID installs a test app with the default settings. Journal of F458. | files: native/Sources/Sideload.swift, native/sign/IPASigner.swift, native/sign/tests/sideload/main.swift
 - [ ] **C76** (follow-up, low) The other IndexedDB stores still handle an ended transaction their own way: core/myipas.js and signing/identity.js show 'IndexedDB aborted' with no retry, and core/changes.js keeps its own copy of the retry; move all three onto idbRunner in core/cache.js (added by B497). Check: node --test web/app/core web/app/signing | files: web/app/core/cache.js, web/app/core/changes.js, web/app/core/changes.test.js, web/app/core/myipas.js, web/app/signing/identity.js | held: yes — asked to cancel after 6 min: if it was stopped, what was done is on the newest wip/C76 branch, go on from there
 ### Parked
 
