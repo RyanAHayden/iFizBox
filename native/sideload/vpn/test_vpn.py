@@ -197,7 +197,7 @@ class App(unittest.TestCase):
         self.assertIn("if !run.connected { try LocalVPN.waitForApp(", idev)
         self.assertIn("Session(watch: w, finishing: run.connected, cancelled: ", idev)
         self.assertEqual(idev.count("finishing: run.connected"), 2)
-        stop = src[src.index("private static func stopLater()"):src.index("private static func stopNow(")]
+        stop = src[src.index("private static func stopLater("):src.index("private static func stopNow(")]
         self.assertLess(stop.index("BackgroundHold("), stop.index("asyncAfter"))
         # every stop: idle, checked again under startLock
         self.assertEqual(src.count("stopVPNTunnel()"), 1)  # takeDown's: downIfIdle, and a stalled start's

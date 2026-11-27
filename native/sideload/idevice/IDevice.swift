@@ -520,6 +520,8 @@ enum IDevice {
         var onConnect: (() -> Void)? // after an airplane wait: what to say once the connection is open
         var lookedInstalled = false // B251: a second look found the new copy while installd's step was quiet
         var cancelled: () -> Bool = { false } // B443: a first connect's VPN start ends on Cancel
+        /// B490: the copy, and the reconnects, end on Cancel too, so the VPN's hold goes at once.
+        func checkCancelled() throws { if cancelled() { throw Failure(code: "cancelled", text: "Cancelled") } }
         var plain = false       // B433: iOS refused the Developer package; the one retry goes without it
         func copyAgainPlain() {
             plain = true; copied = false; installSent = false; sent = 0
@@ -976,7 +978,8 @@ enum IDevice {
         var attempt = 0
         var firstDrop: Failure?
         LocalVPN.installBegan() // B395: its reconnects share one queue, so the VPN stays on through them
-        defer { LocalVPN.installEnded() }
+        // B490: after a Cancel, off with no linger; once installd was asked, iOS installs it anyway: the linger stays
+        defer { LocalVPN.installEnded(cancelled: cancelled() && !run.installSent) }
         let wait = UUID() // F417a2: Cellular Installs keeps cellular data off until this connection is open
         defer { CellularShortcut.connected(wait) }
         let paused = { (p: LocalVPN.Pause) -> Void in // B423
@@ -1027,7 +1030,7 @@ enum IDevice {
                 ilog("first connect reset during pair-verify through \(via): \(f.text); the pairing is stale")
                 note("The first connection closed: \(f.errorDescription ?? f.text)") // B416: the raw text, grey
                 throw pairAgain(f, via: via)
-            } catch let f as Failure where run.connected && HereRecheck.shouldReconnect(code: f.code, lib: f.lib, reconnecting: firstDrop != nil) {
+            } catch let f as Failure where run.connected && HereRecheck.shouldReconnect(code: f.code, lib: f.lib, reconnecting: firstDrop != nil) && !cancelled() {
                 attempt += 1
                 if firstDrop == nil { firstDrop = f }
                 let stage = run.installSent ? "while iOS was installing it" : run.copied ? "after the copy" : "during the copy (\(mb(run.sent)) of \(mb(size)))"
@@ -1076,7 +1079,10 @@ enum IDevice {
             }
         }
         if !run.copied {
-            try upload(run, session: s, watch: w, note: note, progress: progress)
+            do { try upload(run, session: s, watch: w, note: note, progress: progress) } catch let f as Failure where f.code == "cancelled" {
+                removeStaged(run.remote, session: s, watch: w) // B490: the part copied before Cancel
+                throw f
+            }
             run.copied = true
         }
         let ip = try s.installationProxy()
@@ -1109,6 +1115,7 @@ enum IDevice {
             guard let ctx = ctx else { return }
             Unmanaged<ProgressBox>.fromOpaque(ctx).takeUnretainedValue().f(pct)
         }
+        try run.checkCancelled() // B490: a Cancel during the copy installs nothing
         run.installSent = true
         lookWhileQuiet(run, watch: w)
         let developer = !run.plain && HerePackage.developer(bundleID: run.bundleID, own: Bundle.main.bundleIdentifier)
@@ -1370,6 +1377,7 @@ enum IDevice {
                     while at < end {
                         shared.lock.lock(); let bad = shared.failure != nil; shared.lock.unlock()
                         if bad { return }
+                        try run.checkCancelled()
                         guard let d = try fh.read(upToCount: min(chunk, end - at)), !d.isEmpty else { throw Failure(code: "upload_failed", text: "the file ended early") }
                         try d.withUnsafeBytes { try check(afc_file_write(f, $0.baseAddress?.assumingMemoryBound(to: UInt8.self), d.count), "upload_failed") }
                         at += d.count
@@ -1471,6 +1479,7 @@ enum IDevice {
         }
         do {
             while let d = try nextChunk(), !d.isEmpty {
+                try run.checkCancelled()
                 if pipelined { readAhead() }
                 try d.withUnsafeBytes { try check(afc_file_write(file, $0.baseAddress?.assumingMemoryBound(to: UInt8.self), d.count), "upload_failed") }
                 sent += d.count

@@ -79,9 +79,27 @@ enum RestoreBack {
     static func look() {
         guard owed, LocalVPN.restore else { return }
         if isClosing { return }
-        lock.lock(); let already = looking; looking = true; lock.unlock()
+        lock.lock()
+        let already = looking
+        looking = true
+        let woken = already && waitingIn.map(RestoreDue.wakes) == true // B490: ours just went off, after a Cancel too
+        if woken { waitingIn = nil }
+        lock.unlock()
+        if woken { wake.signal() }
         guard !already else { return }
         DispatchQueue.global(qos: .utility).async { turn() }
+    }
+
+    private static var waitingIn: RestoreDue.Step? // guarded by lock: the step a look waits in for its next turn
+    private static let wake = DispatchSemaphore(value: 0)
+    /// The next turn, `again` seconds on, or as soon as a look wakes it. A leftover wake only makes a turn come early.
+    private static func turnLater(_ s: RestoreDue.Step) {
+        DispatchQueue.global(qos: .utility).async {
+            lock.lock(); waitingIn = s; lock.unlock()
+            _ = wake.wait(timeout: .now() + again)
+            lock.lock(); waitingIn = nil; lock.unlock()
+            turn()
+        }
     }
 
     private static func turn() {
@@ -106,11 +124,11 @@ enum RestoreBack {
         case .later:
             if n.going { tell(false) } // not for a menu over the app
             say("waits; path: \(LocalVPN.Path.described())")
-            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + again) { turn() }
+            turnLater(step)
         case .ask:
             tell(true)
             // goes on looking: another VPN may come up meanwhile
-            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + again) { turn() }
+            turnLater(step)
         case .back:
             // under startLock: an install that starts now waits, so Set VPN never takes ours down
             let ran = LocalVPN.withNoStart { () -> Bool in

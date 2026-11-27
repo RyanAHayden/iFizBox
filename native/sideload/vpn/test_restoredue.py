@@ -63,6 +63,20 @@ class Due(unittest.TestCase):
         self.assertIn("forKey: neverKey", self.part("static func forget()"))
         self.assertIn('"restoreNever": RestoreBack.never', read("App", "LocalVPN.swift"))
 
+    def test_cancel_releases_at_once(self):
+        """B490: a Cancel ends the copy and the reconnects, ours goes off with no linger, and a waiting look turns now."""
+        idev = read("sideload", "idevice", "IDevice.swift", base=NATIVE)
+        self.assertIn("defer { LocalVPN.installEnded(cancelled: cancelled() && !run.installSent) }", idev)
+        self.assertIn("reconnecting: firstDrop != nil) && !cancelled() {", idev)
+        self.assertEqual(idev.count("try run.checkCancelled()"), 3)  # each copy loop, and before installd is asked
+        self.assertLess(idev.index("try run.checkCancelled() // B490"), idev.index("run.installSent = true"))
+        vpn = read("App", "LocalVPN.swift")
+        self.assertIn("RestoreDue.offAfter(linger: linger, cancelled: cancelled)", vpn[vpn.index("private static func stopLater("):])
+        look = self.part("static func look()")
+        self.assertOrder(look, ["RestoreDue.wakes", "wake.signal()", "guard !already"])
+        self.assertEqual(self.src.count("turnLater(step)"), 2)  # later and ask
+        self.assertIn("wake.wait(timeout: .now() + again)", self.part("private static func turnLater("))
+
     def test_remembered(self):
         src = read("App", "RestoreShortcutBridge.swift")
         self.assertIn("if k == .store { RestoreBack.stored() }", src)

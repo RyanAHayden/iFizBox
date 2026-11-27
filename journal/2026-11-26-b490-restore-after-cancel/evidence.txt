@@ -1,0 +1,61 @@
+# iPhone 15 Pro, iOS 27, Tailscale up, Restore My VPN on, 300 MB test app (com.ryha.ifizbox.b490test) by library.install,
+# This iPhone route; cancel.sh's lines, cut from the syslog (Tailscale "is connected" lines include SpringBoard's repeats).
+# before1: main 81510e8e. after1, after2: this branch. plain1: this branch, no Cancel.
+## before1
+cancel at 19:09:54.120 (script output; the log file lost this line)
+19:09:52.992260 iFizBox install: This iPhone: com.ryha.ifizbox.b490test 1.0, 314.6 MB
+19:09:52.997031 iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+19:09:53.191085] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is connected
+19:09:53.195406] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is connected
+19:09:54.023348 iFizBox install: AFC: 8.0 MB of 300.0 MB (19.7 MB/s, in front)
+19:10:06.394160 iFizBox install: AFC: copied 300.0 MB in 12.8 s: 23.5 MB/s in front (this run 23.5 MB/s, 1 MB chunks, one at a time)
+19:10:06.397786 iFizBox install: installd: install asked, package type Developer
+19:10:09.230493 iFizBox install: installd: Complete 2.8 s after the request
+19:10:09.247262 iFizBox install: install: done in 16.2 s
+19:10:09.261934 iFizBox install: This iPhone: com.ryha.ifizbox.b490test installed
+19:10:12.398353 iFizBox install: vpn: off (nothing left to do); the configuration stays
+19:10:12.506354ICE>: [FBSystemService][0x360b] Received request to open "com.apple.shortcuts" with url "shortcuts:<private>" from lsd:121 on behal
+19:10:16.687356] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is connected
+19:10:17.713703] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is connected
+## after1
+19:12:07.299902 iFizBox install: This iPhone: com.ryha.ifizbox.b490test 1.0, 314.6 MB
+19:12:07.332222 iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+19:12:07.470228] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is connected
+19:12:07.472437] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is connected
+19:12:08.460272 iFizBox install: AFC: 8.0 MB of 300.0 MB (21.7 MB/s, in front)
+19:12:08.558043 iFizBox install: install: FAILED at removing the staged IPA after 1.3 s: cancelled: Cancelled
+19:12:08.566673 iFizBox install: vpn: the install was cancelled: off now
+19:12:08.567079 iFizBox install: This iPhone: com.ryha.ifizbox.b490test failed: cancelled: Cancelled
+19:12:08.568380 iFizBox install: vpn: off (nothing left to do); the configuration stays
+19:12:08.756112ICE>: [FBSystemService][0x3ddf] Received request to open "com.apple.shortcuts" with url "shortcuts:<private>" from lsd:121 on behal
+19:12:11.570342] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is connected
+19:12:12.558990] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is connected
+19:12:12.939040] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is connected
+## after2
+cancel at 19:16:13.345
+19:16:12.144447 iFizBox install: This iPhone: com.ryha.ifizbox.b490test 1.0, 314.6 MB
+19:16:12.149569 iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+19:16:12.276890] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is connected
+19:16:12.279653] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is connected
+19:16:13.214675 iFizBox install: AFC: 8.0 MB of 300.0 MB (22.3 MB/s, in front)
+19:16:13.428569 iFizBox install: install: FAILED at removing the staged IPA after 1.3 s: cancelled: Cancelled
+19:16:13.430174 iFizBox install: vpn: the install was cancelled: off now
+19:16:13.430297 iFizBox install: This iPhone: com.ryha.ifizbox.b490test failed: cancelled: Cancelled
+19:16:13.430482 iFizBox install: vpn: off (nothing left to do); the configuration stays
+19:16:13.658793ICE>: [FBSystemService][0xd25e] Received request to open "com.apple.shortcuts" with url "shortcuts:<private>" from lsd:121 on behal
+19:16:16.117261] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is connected
+19:16:17.097693] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is connected
+19:16:17.454967] <NOTICE>: VPN Tailscale (089B21BA-1517-42BD-BF66-553E6630F129) is connected
+## plain1
+19:19:03.812491 iFizBox install: This iPhone: com.ryha.ifizbox.b490test 1.0, 314.6 MB
+19:19:03.821138 iFizBox install: vpn: Restore My VPN: another VPN is on: it is brought back after the queue
+19:19:04.901499 iFizBox install: AFC: 8.0 MB of 300.0 MB (21.0 MB/s, in front)
+19:19:17.412762 iFizBox install: AFC: copied 300.0 MB in 12.9 s: 23.3 MB/s in front (this run 23.3 MB/s, 1 MB chunks, one at a time)
+19:19:17.416802 iFizBox install: installd: install asked, package type Developer
+19:19:20.273077 iFizBox install: installd: Complete 2.9 s after the request
+19:19:20.277845 iFizBox install: install: done in 16.5 s
+19:19:20.317058 iFizBox install: This iPhone: com.ryha.ifizbox.b490test installed
+19:19:23.455472 iFizBox install: vpn: off (nothing left to do); the configuration stays
+19:19:23.601197ICE>: [FBSystemService][0x78f] Received request to open "com.apple.shortcuts" with url "shortcuts:<private>" from lsd:121 on behalf
+19:19:56.395142 iFizBox install: vpn: Restore My VPN Shortcut: back done
+19:19:59.530973 iFizBox install: vpn: Restore My VPN turned off

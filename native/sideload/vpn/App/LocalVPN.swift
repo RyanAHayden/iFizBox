@@ -665,17 +665,19 @@ enum LocalVPN {
     /// An install, its reconnects and the pauses between them (up to 15 s, HereRecheck.pause) are one queue: the VPN
     /// stays on through them, and goes off `linger` seconds after the last one.
     static func installBegan() { lock.lock(); installs += 1; lock.unlock(); beat() }
-    static func installEnded() {
+    /// cancelled: the install ended on Cancel (B490): no linger, so a back run owed follows at once.
+    static func installEnded(cancelled: Bool = false) {
         lock.lock(); installs = max(0, installs - 1); lock.unlock()
-        stopLater()
+        stopLater(cancelled: cancelled)
     }
 
-    private static func stopLater() {
+    private static func stopLater(cancelled: Bool = false) {
         lock.lock(); let gen = stopGen, idle = holds == 0 && installs == 0; lock.unlock()
         guard idle else { return }
         // B423: under a background task, so an app that iOS suspends meanwhile still takes it down
         let task = BackgroundHold("\(name) off") { stopNow() } // cut short: now, off the main thread
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + linger) {
+        if cancelled { log("the install was cancelled: off now") }
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + RestoreDue.offAfter(linger: linger, cancelled: cancelled)) {
             stopNow(gen: gen)
             task.end()
         }
