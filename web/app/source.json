@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "1.0.6",
+          "date": "2026-11-27T06:52:22Z",
+          "localizedDescription": "Signing in with a free Apple ID no longer stops with a \"could not provision\" error.\nAfter a computer install, tap Finish Setup on ifizbox.com; the server can't read your certificate.\nPopular now counts your package installs and ranks more apps by their App Store rating.\nModded apps no longer rank high in Popular on the original app's rating.",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v1.0.6/iFizBox.ipa",
+          "size": 31898835,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.0.5",
           "date": "2026-11-27T01:45:03Z",
           "localizedDescription": "Changes > Installed shows each app's update from the source you installed it from.\nUpgrading an app you installed with a changed bundle ID now updates it instead of adding a copy.\nA bundle ID you type before signing is now the ID the app installs as.\nBrowse lists can be sorted by rating, and Popular puts the best-rated packages first.",
