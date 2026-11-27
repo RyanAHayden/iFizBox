@@ -11,6 +11,11 @@
 //   freeAppId(bundleId, teamId)          <bundleId>.<TEAMID>: App IDs are unique across Apple, so a free team's are
 //                                        always suffixed (Keep Bundle IDs stays off on this route)
 //   pickTeam(teams)                      the free (Personal) team, else the first
+//   appIdExpired(appId, now)             F459: past its expirationDate (7 days after it was made)
+//   await ensureAppId({ portal, teamId, appIds, identifier, name, now })   -> { appId, made }: reused unless missing or expired
+//   extensionAppId(identifier, extensionBundleId, bundleId)                <app's App ID>.<ext>
+//   await appIdsFor({ portal, teamId, bundleId, appName, extensions, now })  -> { app, extensions }, each with its App ID
+//   forgetDeleted(records, phoneApps, { busy, idOf })   -> { records, forgotten }: drops apps deleted from the phone
 //   await runSetup({ portal, teamId, phone, saved, bundleId, appName, onStep, askRevoke, make, app })
 //       `app` true in the app: summaries name no browser (reusedSummary)
 //       -> { identity, profile, appId, appIds, steps }; onStep({ id, state: "running" | "done" | "failed", summary })
@@ -22,7 +27,7 @@
 //   FREE_EXPIRY_WARNING                  3 days: "Expiring soon" on this route (not the certificate route's setting)
 //   freeExpiry(expires, now)             { state: "ok" | "soon" | "expired", days }
 //   setupError(e)                        an alert { title, message } for a setup step that failed
-//   await refreshApps({ native, portal, teamId, appIds, appId, hud, alert })
+//   await refreshApps({ native, portal, teamId, appIds, appId, hud, alert, busy })
 //                                        F458, the app, after a setup: signing.refresh renews the installed apps'
 //                                        profiles (nothing signed or installed again) and signs the rest again
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -99,6 +104,59 @@ async function certificate({ portal, teamId, saved, askRevoke, make, name, app }
   };
 }
 
+// F459: App IDs. One ends 7 days after it was made (listAppIds gives its expirationDate); refreshing renews profiles,
+// never App IDs, so a new one is registered only when it is missing or expired.
+export function appIdExpired(appId, now = new Date()) {
+  const e = dateOf(appId?.expirationDate);
+  return Boolean(e) && e.getTime() <= now.getTime();
+}
+
+export async function ensureAppId({ portal, teamId, appIds, identifier, name, now = new Date() }) {
+  const have = appIds.find((a) => a.identifier === identifier && !appIdExpired(a, now));
+  if (have) return { appId: have, made: false };
+  try {
+    return { appId: await portal.addAppId(teamId, identifier, name), made: true };
+  } catch (e) {
+    if (atAppIdLimit(e)) e.kind = "appid-limit";
+    throw e;
+  }
+}
+
+// iOS wants an extension's ID to start with its app's: <app's App ID>.<what the extension adds to the app's bundle ID>.
+export function extensionAppId(identifier, extensionBundleId, bundleId) {
+  const ext = String(extensionBundleId ?? "");
+  const under = [identifier, bundleId].find((p) => p && ext.toLowerCase().startsWith(`${p}.`.toLowerCase()));
+  return `${identifier}.${under ? ext.slice(under.length + 1) : ext.split(".").pop()}`;
+}
+
+// The app's App ID and one per extension ([{ bundleId, name }]), from one listAppIds.
+export async function appIdsFor({ portal, teamId, bundleId, appName = "App", extensions = [], now = new Date() }) {
+  const { appIds } = await portal.listAppIds(teamId);
+  const identifier = freeAppId(bundleId, teamId);
+  const app = { bundleId, identifier, ...await ensureAppId({ portal, teamId, appIds, identifier, name: appName, now }) };
+  const out = [];
+  const taken = new Set();
+  for (const x of extensions) {
+    const base = extensionAppId(identifier, x.bundleId, bundleId);
+    let id = base;
+    for (let n = 2; taken.has(id.toLowerCase()); n++) id = `${base}${n}`;
+    taken.add(id.toLowerCase());
+    const got = await ensureAppId({ portal, teamId, appIds, identifier: id, name: x.name || appName, now });
+    out.push({ bundleId: x.bundleId, identifier: id, ...got });
+  }
+  return { app, extensions: out };
+}
+
+// Apps deleted from the phone are forgotten, so no refresh installs one again (App Refresh does the same in the shell,
+// sign/Refresh.swift). `phoneApps` is the phone's own app list (bundle IDs; not apps.isInstalled, which iOS 27 answers
+// false to for every app). Nothing is dropped while a task runs (`busy`) or when the list is empty or unknown.
+export function forgetDeleted(records = [], phoneApps, { busy = false, idOf = (r) => r.bundleId } = {}) {
+  const on = new Set([...(phoneApps ?? [])].map((id) => String(id).toLowerCase()));
+  if (busy || !on.size) return { records: [...records], forgotten: [] };
+  const here = (r) => !idOf(r) || on.has(String(idOf(r)).toLowerCase());
+  return { records: records.filter(here), forgotten: records.filter((r) => !here(r)) };
+}
+
 export async function runSetup({ portal, teamId, phone, saved = null, bundleId, appName = "App", onStep = () => {},
   askRevoke = async () => null, make = {}, name = MACHINE_NAME, app = false } = {}) {
   const mk = { key: makeKey, csr: makeCsr, p12: makeP12, password: newPassword, ...make };
@@ -132,14 +190,8 @@ export async function runSetup({ portal, teamId, phone, saved = null, bundleId, 
   let appIds = []; // F458: Apple's list, asked once: refreshApps reads it too
   const { appId } = await run("appId", async () => {
     ({ appIds } = await portal.listAppIds(teamId));
-    const have = appIds.find((a) => a.identifier === identifier);
-    if (have) return { appId: have, summary: `${identifier} (already made)` };
-    try {
-      return { appId: await portal.addAppId(teamId, identifier, appName), summary: identifier };
-    } catch (e) {
-      if (atAppIdLimit(e)) e.kind = "appid-limit";
-      throw e;
-    }
+    const got = await ensureAppId({ portal, teamId, appIds, identifier, name: appName });
+    return { appId: got.appId, summary: got.made ? identifier : `${identifier} (already made)` };
   });
 
   const { profile } = await run("profile", async () => {
@@ -156,14 +208,14 @@ export async function runSetup({ portal, teamId, phone, saved = null, bundleId, 
 }
 
 // F458: the profiles of the recorded apps' other App IDs than the setup's own (signing.installed's appId is
-// TEAM.identifier), one each. An App ID Apple no longer lists expired: no profile, so the app is signed again.
-export async function otherProfiles({ portal, teamId, appIds = [], apps = [], appId }) {
+// TEAM.identifier), one each. An expired App ID (or one Apple no longer lists): no profile, so the app is signed again.
+export async function otherProfiles({ portal, teamId, appIds = [], apps = [], appId, now = new Date() }) {
   const wanted = new Set(apps.map((a) => String(a?.appId ?? ""))
     .filter((id) => id.startsWith(`${teamId}.`)).map((id) => id.slice(teamId.length + 1)));
   wanted.delete(appId);
   const out = [];
   for (const a of appIds) {
-    if (!wanted.has(a.identifier)) continue;
+    if (!wanted.has(a.identifier) || appIdExpired(a, now)) continue;
     const data = bytes((await portal.downloadProfile(teamId, a.appIdId))?.encodedProfile);
     if (data) out.push(data);
   }
@@ -171,7 +223,7 @@ export async function otherProfiles({ portal, teamId, appIds = [], apps = [], ap
 }
 
 // With no recorded app there is nothing to do: no progress page, no connection.
-export async function refreshApps({ native, portal, teamId, appIds, appId, hud, alert }) {
+export async function refreshApps({ native, portal, teamId, appIds, appId, hud, alert, busy = () => false }) {
   let page = null;
   const fail = async (message) => {
     page?.fail(message);
@@ -182,7 +234,8 @@ export async function refreshApps({ native, portal, teamId, appIds, appId, hud, 
     if (!apps.length) return null;
     const profiles = (await otherProfiles({ portal, teamId, appIds, apps, appId })).map(b64encode);
     page = hud("Refreshing Apps");
-    const r = await callWithStall(native, "signing.refresh", { profiles, route: "idevice" }, (ev) => {
+    // F459: while the app queue runs, the shell forgets no app
+    const r = await callWithStall(native, "signing.refresh", { profiles, route: "idevice", busy: !!(await busy()) }, (ev) => {
       if (ev?.log) page?.page?.raw?.(ev.log);
       const t = resignLabel(ev);
       if (t) page?.set(t);

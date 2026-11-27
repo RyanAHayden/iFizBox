@@ -651,7 +651,7 @@ async function runSetupOnce(ctx, saved) {
     // F458: the installed apps get the new profile; only an old certificate's or a lapsed App ID's are signed again
     if (ctx.native && flow.kept) {
       await refreshApps({ native: ctx.native, portal: flow.portal, teamId: flow.team.teamId, appIds: r.appIds, appId: r.appId,
-        hud: progressHUD, alert: ctx.ask });
+        hud: progressHUD, alert: ctx.ask, busy: async () => (await import("./queue.js")).appQueueRunning() });
       ctx.onChange();
     }
   } catch (e) {

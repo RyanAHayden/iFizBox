@@ -955,6 +955,10 @@ test("free refresh: current certificate gets a profile install, an old one is re
     check(bad.renewed.isEmpty && bad.failed.map(\.record.bundleID) == ["com.a", "com.shared"], "iOS refused the profile")
     check(again == uploads, "a refused one isn't signed again")
     check(ProfileRefresh.plan(records, certificate: cert, profiles: [fresh], installed: [], now: now).gone.isEmpty, "an empty app list forgets nothing")
+    // F459: while a task runs, an app iOS doesn't list yet may still be installing
+    let running = ProfileRefresh.plan(records, certificate: cert, profiles: [fresh], installed: ["com.a"], busy: true, now: now)
+    check(running.gone.isEmpty, "a running task forgets nothing: \(running.gone.map(\.bundleID))")
+    check(running.renew.map(\.record.bundleID) == ["com.a"] && running.resign.isEmpty, "and installs nothing iOS doesn't list")
 }
 
 if failures == 0 { print("all passed") } else { print("\(failures) failed"); exit(1) }
