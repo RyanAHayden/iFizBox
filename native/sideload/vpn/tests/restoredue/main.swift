@@ -53,6 +53,17 @@ check(!RestoreDue.Now().going, "nothing goes on")
 for n in [RestoreDue.Now(waiting: true), RestoreDue.Now(down: false)] { check(n.going, "the question is withdrawn") }
 check(!RestoreDue.Now(active: false, online: false, down: nil).going, "not under a menu")
 
+// a Cancel (B490): the install's hold goes and ours goes off with no linger, and a waiting look turns at once
+check(RestoreDue.offAfter(linger: 3, cancelled: true) == 0, "cancelled: off now")
+check(RestoreDue.offAfter(linger: 3, cancelled: false) == 3, "the next of a queue still finds it on")
+check(step { $0.waiting = true; $0.down = false } == .later, "before the Cancel: an install goes on")
+check(step { $0.down = false } == .later, "cancelled, ours not off yet")
+check(step() == .back, "cancelled, ours off: the back run")
+check(step { $0.left = true } == .ask, "cancelled after it was left: asks")
+check(step { $0.waiting = true } == .later, "cancelled, the next app of the queue begins")
+check(RestoreDue.wakes(.later) && RestoreDue.wakes(.ask), "a wait for the next turn ends on a look")
+for s in [RestoreDue.Step.drop, .onReturn, .back] { check(!RestoreDue.wakes(s), "no wait to end: \(s)") }
+
 check(RestoreDue.stillDue("busy", active: true), "busy")
 check(RestoreDue.stillDue("vpn_on", active: true), "a start came in between")
 check(RestoreDue.stillDue("not_opened", active: false), "left as it was about to open")

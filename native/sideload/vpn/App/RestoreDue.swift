@@ -33,6 +33,14 @@ enum RestoreDue {
         return n.left ? .ask : .back
     }
 
+    /// How long ours stays on after the last install or connection ends: `linger`, so the next of a queue or a
+    /// reconnect finds it on; none after a Cancel, so the back run isn't held by a VPN nothing will use.
+    static func offAfter(linger: TimeInterval, cancelled: Bool) -> TimeInterval { cancelled ? 0 : linger }
+
+    /// A look that comes while one waits for its next turn (`later`, `ask`): that turn runs now. The look comes from
+    /// ours going off, the app's return or an answer, so what the wait was for may be over.
+    static func wakes(_ s: Step) -> Bool { s == .later || s == .ask }
+
     /// A Cellular Installs trip to Shortcuts doesn't count as leaving, unless the app stayed away this long after it
     /// (Home from Shortcuts is no second notice).
     static let tripLimit: TimeInterval = 60
