@@ -364,3 +364,33 @@ export async function withSavedIpa(job, { call } = {}) {
     return savedResignJob(job, (await call("library.list", {}))?.ipas, { match: savedIpa });
   } catch { return job; }
 }
+
+// ---- B484: an upgrade signs as the bundle ID the app was installed as -----------------------------------------------
+//
+// An app put on the phone under its own bundle ID (Custom Install changed it) keeps Installed's record under the
+// source's ID (the job's id), while the shell's signed record (signing.installed) has both: `bundleId` (com.me.x) and
+// `originalBundleId` (com.x). A plain Upgrade, Reinstall or Downgrade would sign as com.x and install a second copy,
+// so the run signs it as the installed ID, with the Sign Options its saved IPA in My IPAs keeps (name, icon, ...).
+//   installedIdFor(job, signedApps) -> the other bundle ID the job's app is installed as, or null (installed as its own
+//                        ID, or not signed by iFizBox)
+//   withInstalledId(job, { signed, saved }) -> the job with options.edits.bundleId (and the saved Sign Options) for an
+//                        installed app's upgrade, reinstall or downgrade; else the job as it is (a Custom Install's
+//                        own choice, a fresh Install, a Re-sign, a My IPAs file, iFizBox itself, a Remove)
+export function installedIdFor(job, signedApps = []) {
+  const id = job?.id;
+  if (typeof id !== "string" || !id) return null;
+  const apps = (Array.isArray(signedApps) ? signedApps : []).filter((a) => typeof a?.bundleId === "string" && a.bundleId);
+  if (apps.some((a) => a.bundleId === id)) return null; // a copy under its own ID: that one is upgraded
+  return apps.find((a) => a.originalBundleId === id)?.bundleId ?? null;
+}
+
+export function withInstalledId(job, { signed = [], saved = [] } = {}) {
+  if (!job || job.op === "remove" || job.mode === "resign" || job.library || !job.url || job.id === SELF_ID) return job;
+  if (!job.installed || job.options) return job;
+  const as = installedIdFor(job, signed);
+  if (!as) return job;
+  const entry = (Array.isArray(saved) ? saved : []).find((e) => e?.file && !e.error &&
+    (e.signed?.bundleId === as || e.options?.bundleId === as));
+  const kept = entry ? libraryJob(entry)?.options?.edits ?? {} : {};
+  return { ...job, options: { edits: { ...kept, bundleId: as }, name: kept.name ?? null, signsAs: as } };
+}

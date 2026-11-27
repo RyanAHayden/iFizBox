@@ -45,6 +45,7 @@ import { withLowerIds } from "../core/apt.js";
 import { appQueue } from "../app-queue.js";
 import { appPlan, runOrder, sizeText, SELF_ID, customParams, listedOf, APP_MODES, APP_MODE_LABEL } from "../core/appqueue.js";
 import { helperRefusal, refusalIds } from "../core/queuerefusal.js";
+import { withInstalledId } from "../core/appqueue.js"; // B484
 import { NAME } from "../brand.js";
 import { storedRoute } from "../core/installroute.js"; // B137
 import { rowIcon } from "../icons/rowicons.js";
@@ -692,13 +693,15 @@ export const recountChanges = () => import("./changes.js").then((m) => m.recount
 // B310: a package run has ended: Changes' badge and the icon's drop what it installed or removed at once.
 export const countAfterRun = (ids) => import("./changes.js").then((m) => m.badgeAfterRun(ids)).catch(() => {});
 
-export async function runAppQueue(jobs, { queue = appQueue, install = installApp, record = recordApp, ready = readyToInstall, recount = recountChanges } = {}) {
+export async function runAppQueue(jobs, { queue = appQueue, install = installApp, record = recordApp, ready = readyToInstall, recount = recountChanges,
+  installedIds = withInstalledIds } = {}) {
   if (appRunning) return 0;
   appRunning = true;
   updateAppChrome();
   let done = 0;
   try {
     if (!(await ready(jobs))) return 0;
+    jobs = await installedIds(jobs); // B484
     for (const j of runOrder(jobs)) {
       if (!queue.get(j.id)) continue; // cleared meanwhile
       let ok = false;
@@ -716,6 +719,19 @@ export async function runAppQueue(jobs, { queue = appQueue, install = installApp
   return done;
 }
 
+// B484: the run's jobs with the bundle ID each installed app was put on the phone as (core/appqueue.js
+// withInstalledId), read from the shell's signed records and My IPAs' saved Sign Options; the jobs as they are where
+// there's no shell (the website) or it can't say.
+export async function withInstalledIds(jobs, { native = nativeBridge() } = {}) {
+  if (typeof native?.call !== "function" || !(jobs ?? []).some((j) => j?.installed && !j.options && j.mode !== "resign")) return jobs;
+  let signed;
+  try { signed = (await native.call("signing.installed", {}))?.apps ?? []; } catch { return jobs; }
+  if (!jobs.some((j) => withInstalledId(j, { signed }) !== j)) return jobs;
+  let saved = [];
+  try { saved = (await native.call("library.list", {}))?.ipas ?? []; } catch { /* no saved Sign Options: the ID alone */ }
+  return jobs.map((j) => withInstalledId(j, { signed, saved }));
+}
+
 // F235: the sideload app signs every app first and hands them to iOS one at a time, on the black page with rows
 // (screens/apprun.js); the website keeps runAppQueue (it signs in the browser, one app at a time).
 async function useAppRun() {
@@ -730,7 +746,8 @@ async function useAppRun() {
 // B257: from Confirm (once the safety nets and the Signing walkthrough have let it run) the app is kept running in the
 // background (signing.hold) while any app signs or installs, and let go once none does or the page closes
 // (signing/queue.js heldLanes); `keep` stands in for holdApp (tests).
-export async function runAppQueueRun(jobs, { queue = appQueue, record = recordApp, ready = readyToInstall, run = null, lanes = null, keep = null, recount = recountChanges } = {}) {
+export async function runAppQueueRun(jobs, { queue = appQueue, record = recordApp, ready = readyToInstall, run = null, lanes = null, keep = null, recount = recountChanges,
+  installedIds = withInstalledIds } = {}) {
   if (appRunning) return null;
   appRunning = true;
   updateAppChrome();
@@ -747,7 +764,8 @@ export async function runAppQueueRun(jobs, { queue = appQueue, record = recordAp
     const phone = lanes ? null : phoneLanes(sc);
     held = sc.heldLanes(lanes ?? { ...phone, local: () => !phone.serverRoute() && storedRoute() === "iphone" }, { keep: hold });
     const lanesHeld = held;
-    return await (run ?? runAppRun)(jobs.filter((j) => queue.get(j.id)), {
+    const ids = await installedIds(jobs.filter((j) => queue.get(j.id))); // B484
+    return await (run ?? runAppRun)(ids, {
       queue, record, lanes: lanesHeld,
       // B264: each app's end counts the badge again once its record is written. Not held: in the background the page
       // can sleep mid-count, and a hold would keep the shell's silent audio going until then; the shell drops the
