@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "1.0.5",
+          "date": "2026-11-27T01:45:03Z",
+          "localizedDescription": "Changes > Installed shows each app's update from the source you installed it from.\nUpgrading an app you installed with a changed bundle ID now updates it instead of adding a copy.\nA bundle ID you type before signing is now the ID the app installs as.\nBrowse lists can be sorted by rating, and Popular puts the best-rated packages first.",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v1.0.5/iFizBox.ipa",
+          "size": 31883665,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.0.4",
           "date": "2026-11-26T22:36:30Z",
           "localizedDescription": "With a free Apple ID, this iPhone can connect through LocalDevVPN to install without a computer.\nFree Apple ID setup on the website can find your iPhone's UDID right there and carry on.\nUpdating the app from inside itself keeps your app icon and, on a free Apple ID, your ID.\nApps get updates only from the source you installed them from.",
