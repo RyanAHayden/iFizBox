@@ -43,4 +43,5 @@ native only, and the web half (the page makes each app's App ID and profile, and
 - On-device behaviour on the 15 Pro: nothing calls `signing.addProfile` yet, so there is nothing to check there. It
   belongs to B502a1.
 - That Apple's real per-app profile passes iOS's install: same, B502a1.
-- `native/Sources/*.swift` are only compile-checked by the gate's native build; they were not run.
+- `native/Sources/*.swift` are only compile-checked (`native/build.sh ipa` with `SWIFT_TOOLCHAIN` and `IOS_SDK` set
+  passed, after fixing one compile error it found); they were not run.

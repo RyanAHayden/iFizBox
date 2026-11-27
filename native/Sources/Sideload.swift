@@ -10,6 +10,7 @@
 //            appIdAs, keepBundleId, push, wildcard, profileAppId, profileGroups}   (params keepBundleId?: Keep Bundle IDs, absent on)
 //        + pinned, freeAppId (B502a: a free Apple ID's explicit profile, and the App ID the app needs, <id>.TEAMID)
 //   signing.addProfile {profile} -> {appId, expires}: B502a, one app's free profile, which its signing then uses
+//        (appId without the team, as freeAppId)
 //   signing.install {url | token, name?, bundleId?, icon?, removeExtensions?, fixArm64e?, keepBundleId?} (stream as I6)
 //        -> I6's reply + {fixedArm64e, expires}
 //   signing.progress {bundleId} (stream: {phase: "installing", progress}, {served: true} once iOS has the whole IPA)
@@ -160,7 +161,7 @@ enum Sideload {
             throw SignError("no_identity", "import a certificate in Settings > Signing first")
         }
         let p = try FreeAppID.keep(data, held: held, certificate: KeychainIdentity(id).certificate, in: appProfilesDir)
-        return ["appId": "\(p.team).\(p.appID)", "expires": p.expires.map { ISO8601DateFormatter().string(from: $0) as Any } ?? NSNull()]
+        return ["appId": p.appID, "expires": p.expires.map { ISO8601DateFormatter().string(from: $0) as Any } ?? NSNull()]
     }
 
     static func inspect(_ c: Bridge.Call) {
