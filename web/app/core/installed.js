@@ -15,6 +15,7 @@ import { NAME } from "../brand.js";
 import { ownKey } from "./altstore.js";
 import { nativeBridge } from "../native.js";
 import { IdMap, IdSet, lowerId } from "./apt.js"; // B407: package names compare ignoring case
+import { idbRunner } from "./cache.js";
 
 // Where dpkg keeps it: rootful, then rootless (Dopamine, palera1n rootless).
 export const STATUS_PATHS = ["/var/lib/dpkg/status", "/var/jb/var/lib/dpkg/status"];
@@ -440,30 +441,27 @@ export function memoryAppStore(initial = []) {
 
 export function openAppStore({ indexedDB: idb = globalThis.indexedDB, name = APP_DB } = {}) {
   if (!idb) return Promise.reject(new Error("IndexedDB is not available"));
-  return new Promise((resolve, reject) => {
+  const connect = () => new Promise((resolve, reject) => {
     const req = idb.open(name, 1);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(APP_STORE)) db.createObjectStore(APP_STORE, { keyPath: "id" });
     };
     req.onerror = () => reject(req.error);
-    req.onsuccess = () => {
-      const db = req.result;
-      const run = (mode, f) => new Promise((res, rej) => {
-        const tx = db.transaction(APP_STORE, mode);
-        const r = f(tx.objectStore(APP_STORE));
-        tx.oncomplete = () => res(r?.result);
-        tx.onerror = () => rej(tx.error ?? r?.error);
-        tx.onabort = () => rej(tx.error ?? new Error("transaction aborted"));
-      });
-      resolve({
-        all: () => run("readonly", (s) => s.getAll()),
-        put: (rec) => run("readwrite", (s) => s.put(rec)).then(() => rec),
-        remove: (id) => run("readwrite", (s) => s.delete(id)).then(() => undefined),
-      });
+    req.onsuccess = () => resolve(req.result);
+  });
+  return connect().then((first) => {
+    const db = idbRunner(first, connect, APP_STORE_FAILED);
+    const run = (mode, f) => db.run(APP_STORE, mode, f);
+    return {
+      all: () => run("readonly", (s) => s.getAll()),
+      put: (rec) => run("readwrite", (s) => s.put(rec)).then(() => rec),
+      remove: (id) => run("readwrite", (s) => s.delete(id)).then(() => undefined),
     };
   });
 }
+
+export const APP_STORE_FAILED = "Could not read or save your installed apps. Try again.";
 
 let shared = null;
 // Where IndexedDB is missing (Safari private mode can refuse it) the records last for this session only.

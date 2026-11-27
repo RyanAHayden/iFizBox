@@ -29,6 +29,7 @@ import { parseIpaSource } from "./sources/ipa.js";
 import { NAME } from "../brand.js";
 // The parse half lives in core/altparse.js (core/sources/ipa.js imports it from there, not from here: no cycle).
 import { str, httpUrl, looksLikeAltSource } from "./altparse.js";
+import { idbRunner } from "./cache.js";
 export { str, httpUrl, tintOf, dateOf, compareOS, runsOn, parseAltSource, appSection, appStanza } from "./altparse.js";
 
 const ALT_PREFIX = "alt:";
@@ -183,7 +184,7 @@ export const neverLoaded = (source) => Boolean(source) && source.updated == null
 // default the user deletes stays deleted.
 function openAltStore({ indexedDB: idb = globalThis.indexedDB, name = "ifizbox-altsources", defaults = [] } = {}) {
   if (!idb) return Promise.reject(new Error("IndexedDB is not available"));
-  return new Promise((resolve, reject) => {
+  const connect = () => new Promise((resolve, reject) => {
     const req = idb.open(name, 2);
     req.onupgradeneeded = () => {
       const db = req.result;
@@ -191,40 +192,32 @@ function openAltStore({ indexedDB: idb = globalThis.indexedDB, name = "ifizbox-a
       if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta", { keyPath: "key" });
     };
     req.onerror = () => reject(req.error);
-    req.onsuccess = () => {
-      const db = req.result;
-      const run = (mode, f) => new Promise((res, rej) => {
-        const tx = db.transaction("sources", mode);
-        const r = f(tx.objectStore("sources"));
-        tx.oncomplete = () => res(r?.result);
-        tx.onerror = () => rej(tx.error ?? r?.error);
-        tx.onabort = () => rej(tx.error ?? new Error("transaction aborted"));
-      });
-      const meta = (mode, f) => new Promise((res, rej) => {
-        const tx = db.transaction("meta", mode);
-        const r = f(tx.objectStore("meta"));
-        tx.oncomplete = () => res(r?.result);
-        tx.onerror = () => rej(tx.error ?? r?.error);
-        tx.onabort = () => rej(tx.error ?? new Error("transaction aborted"));
-      });
-      const store = {
-        list: () => run("readonly", (s) => s.getAll()),
-        get: (key) => run("readonly", (s) => s.get(key)),
-        put: (rec) => run("readwrite", (s) => s.put(rec)).then(() => rec),
-        remove: (key) => run("readwrite", (s) => s.delete(key)).then(() => undefined),
-      };
-      const seed = async () => {
-        if (!defaults || (Array.isArray(defaults) && !defaults.length)) return;
-        if (await meta("readonly", (s) => s.get("seeded"))) return;
-        const urls = (typeof defaults === "function" ? await defaults() : defaults) ?? [];
-        if (!urls.length) return;
-        for (const url of urls) if (!(await store.get(altKey(url)))) await store.put(seedRecord(url));
-        await meta("readwrite", (s) => s.put({ key: "seeded", at: Date.now() }));
-      };
-      seed().then(() => resolve(store), reject);
+    req.onsuccess = () => resolve(req.result);
+  });
+  return connect().then(async (first) => {
+    const db = idbRunner(first, connect, ALT_STORE_FAILED);
+    const run = (mode, f) => db.run("sources", mode, f);
+    const meta = (mode, f) => db.run("meta", mode, f);
+    const store = {
+      list: () => run("readonly", (s) => s.getAll()),
+      get: (key) => run("readonly", (s) => s.get(key)),
+      put: (rec) => run("readwrite", (s) => s.put(rec)).then(() => rec),
+      remove: (key) => run("readwrite", (s) => s.delete(key)).then(() => undefined),
     };
+    const seed = async () => {
+      if (!defaults || (Array.isArray(defaults) && !defaults.length)) return;
+      if (await meta("readonly", (s) => s.get("seeded"))) return;
+      const urls = (typeof defaults === "function" ? await defaults() : defaults) ?? [];
+      if (!urls.length) return;
+      for (const url of urls) if (!(await store.get(altKey(url)))) await store.put(seedRecord(url));
+      await meta("readwrite", (s) => s.put({ key: "seeded", at: Date.now() }));
+    };
+    await seed();
+    return store;
   });
 }
+
+export const ALT_STORE_FAILED = "Could not read or save your sources. Try again.";
 
 // F144: what Add says to an APT repo where APT sources aren't kept (withAltSources aptAllowed false): one short
 // alert (screens show `title` and `message`), the source not added.
