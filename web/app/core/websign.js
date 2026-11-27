@@ -17,6 +17,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { parsePlist, parseProfile } from "./signing.js";
 import { KEYS } from "./storagekeys.js";
+import { toB64url, fromB64url } from "./transfer.js"; // F460
 
 export const IPA_MAX = 512 * 1024 * 1024; // the Worker's own cap (worker/src/index.js MAX_UPLOAD)
 
@@ -71,6 +72,24 @@ export const IFIZBOX_ID = "com.ryha.ifizbox";
 export const IDENTITY_FILE = "ifizbox-identity.plist";
 export const TRANSFER_FILE = "web/transfer.link";
 export const FREE_ID_FILE = "web/free-id.json"; // B474: the Free Apple ID record (screens/free-apple-id.js FREE_ID_URL)
+
+// F460: the record as an uploaded IPA carries it, so the Worker only holds ciphertext. AES-256-GCM, a 12-byte IV, the
+// tag at the end of the ciphertext; the file is {"v":1,"alg":"A256GCM","iv":<base64url>,"data":<base64url>}. The key
+// reaches the app as ifizbox://free-id#<base64url key>.
+//   newRecordKey() -> base64url    sealRecord(record, key) -> the file's text    openRecord(text, key) -> record
+// openRecord throws on a wrong key or a changed file.
+export const newRecordKey = () => toB64url(crypto.getRandomValues(new Uint8Array(32)));
+const recordKey = (key, use) => crypto.subtle.importKey("raw", fromB64url(key), "AES-GCM", false, [use]);
+export async function sealRecord(record, key) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await recordKey(key, "encrypt"), new TextEncoder().encode(JSON.stringify(record)));
+  return JSON.stringify({ v: 1, alg: "A256GCM", iv: toB64url(iv), data: toB64url(data) });
+}
+export async function openRecord(text, key) {
+  const { iv, data } = JSON.parse(text);
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64url(iv) }, await recordKey(key, "decrypt"), fromB64url(data));
+  return JSON.parse(utf8(new Uint8Array(plain)));
+}
 
 const utf8 = (b) => new TextDecoder().decode(b);
 

@@ -40,7 +40,7 @@ import { parseProfile } from "../core/signing.js";
 import { storedUdid, udidPending, watchUdid, canFindUdid, FIND_UDID, UDID_PAGE, UDID_WAITING } from "./signing.js";
 import { format, settingsRoute } from "../router.js";
 import { MERGED_PAGE } from "../core/signingpage.js";
-import { computerInstallBlock, resetComputerInstall } from "./computer-install.js"; // F436
+import { computerInstallBlock, resetComputerInstall, finishSetupSection } from "./computer-install.js"; // F436
 import { loadStyle } from "../nav/motion.js";
 import { easeOut, TOP_MS } from "../nav/tabbar.js";
 import { KEYS } from "../core/storagekeys.js";
@@ -105,7 +105,7 @@ export const freeRecord = (id) => ({ teamId: id.teamId, teamName: id.teamName ??
   p12: b64encode(id.p12), expires: id.expires ? new Date(id.expires).toISOString() : null,
   profile: id.profile ? b64encode(id.profile) : null, appId: id.appId ?? null });
 export function saveFreeIdentity(id, store) { writeJson(store, FREE_KEY, freeRecord(id)); }
-export const forgetFreeIdentity = (store) => writeJson(store, FREE_KEY, null);
+export const forgetFreeIdentity = (store) => { writeJson(store, FREE_KEY, null); writeJson(store, KEYS.freeidKey, null); }; // F460
 
 // B474: an app installed by a computer install has the Free Apple ID's identity in its Keychain (BundledIdentity) but
 // nothing under FREE_KEY, so Signing hid the Free Apple ID group (settings.js freeInUse) and with it Sign In Again /
@@ -397,6 +397,9 @@ function render(box, ctx) {
   if (!(flow.open && (flow.view === "signin" || flow.view === "code"))) dropRoom(box); // B369: bringToTop's room
   if (!flow.open) {
     const has = saved ? "Set Up" : null;
+    // F460: the app sends the user here after a computer install, so Finish Setup shows without opening the group
+    const finish = ctx.native || !saved ? null : finishSetupSection(store);
+    if (finish) parts.push(grouped([finish]));
     parts.push(grouped([{ header: "Free Apple ID",
       rows: [{ label: "Use a Free Apple ID", detail: has, onClick: () => {
         flow.open = true;
@@ -700,7 +703,7 @@ function readyView(ctx, saved) {
   } else {
     out.push(button("Save for the App", () => download(handoffZip(saved), `${NAME} Free Apple ID.zip`), "free-primary", FREE_ZIP_FOOTER));
     out.push(computerInstallBlock({ id: saved, record: freeRecord(saved), // B474: the app takes it (adoptBundledFreeId)
-      expired: !prof || exp.state === "expired", ask: ctx.ask, save: download, // F436
+      expired: !prof || exp.state === "expired", ask: ctx.ask, save: download, store: ctx.store, // F436
       fix: { label: renewLabel, onClick: renew } }));
   }
   // F254i: the Developer Mode + Trust steps, a page of their own; gone once an app on this route installed fine
