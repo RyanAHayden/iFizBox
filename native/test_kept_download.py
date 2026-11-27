@@ -24,7 +24,7 @@ class SignAheadKeeps(unittest.TestCase):
         dl = prep[prep.index("let d = IPAFetch.run("):]
         self.assertIn("signHeld(file, keepIt ? IPALibrary.hold(file, in: SignBridge.work", dl)
         # the held name rides with the kept IPA, and goes when signing fails
-        self.assertIn("kept[tok] = Kept(output: output, app: app, record: record, mine: mine)", prep)
+        self.assertIn("kept[tok] = Kept(output: output, app: app, record: record, mine: mine, claim: claim)", prep)
         self.assertIn("} catch { return unsigned(error) }", prep)
         self.assertIn("if let m = mine { try? FileManager.default.removeItem(at: m) }", prep)
         # the other sources (iFizBox itself, a My IPAs file, a kept original) hold nothing
