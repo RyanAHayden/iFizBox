@@ -411,3 +411,88 @@ test("B474: Home's tile counts a 7-day profile made minutes ago as 7 days left",
   assert.equal(expiryWarning(at(23.5), { now }).title, "Profile Expires Today");
   assert.equal(expiryWarning(at(47.3), { now }).title, "Profile Expires Tomorrow");
 });
+
+// F460b: a computer install's sealed record (core/websign.js sealRecord) and the app's side of Finish Setup.
+async function sealedSetup({ held = null } = {}) {
+  const mod = await import("./free-apple-id.js");
+  const { sealRecord, newRecordKey } = await import("../core/websign.js");
+  const rec = mod.freeRecord({ teamId: "T", teamName: "Spare", serial: "0A1B", password: "pw", p12: Uint8Array.of(1, 2),
+    profile: Uint8Array.of(3, 4), appId: "com.ryha.ifizbox.T" });
+  const key = newRecordKey();
+  const file = await sealRecord(rec, key);
+  const fetcher = async () => ({ ok: true, text: async () => file });
+  const calls = [];
+  let serial = held;
+  const native = { call: async (m, p) => {
+    calls.push([m, p]);
+    if (m === "signing.import") { serial ??= "0a:1b"; return { identity: { serial } }; } // the shell keeps a held one
+    if (m === "signing.status") return { identity: serial ? { serial } : null };
+    return { opened: true };
+  } };
+  const alerts = [];
+  const alert = (index = 0) => async (a) => { alerts.push(a); return { index }; };
+  return { mod, rec, key, newRecordKey, fetcher, native, calls, alerts, alert, store: memStore() };
+}
+
+test("F460b: the link's key opens the sealed record and its certificate is imported, once per file", async () => {
+  const { mod, rec, key, fetcher, native, calls, alerts, alert, store } = await sealedSetup();
+  const { handleIncoming } = await import("../incoming.js");
+  const finish = (u, d) => mod.finishSetupFromLink(u, { ...d, store, fetcher });
+  assert.equal(await handleIncoming(`ifizbox://free-id#${key}`, { native, alert: alert(), finish }), "free-id");
+  assert.deepEqual(calls, [["signing.import", { p12: rec.p12, profile: rec.profile, password: "pw", bundled: true }]]);
+  assert.equal(loadFreeIdentity(store).serial, "0A1B");
+  assert.equal(alerts.at(-1).title, "Setup Finished");
+  // the link again, and the next launch: nothing more, a Forget stays
+  mod.forgetFreeIdentity(store);
+  assert.equal(await mod.finishSetupFromLink(`ifizbox://free-id#${key}`, { native, store, fetcher, alert: alert() }), false);
+  await mod.freeIdAtLaunch({ native, store, fetcher, alert: alert() });
+  assert.equal(calls.length, 1);
+  assert.equal(alerts.length, 1);
+  assert.equal(loadFreeIdentity(store), null);
+});
+
+test("F460b: a wrong or missing key leaves the app as it was", async () => {
+  const { mod, key, newRecordKey, fetcher, native, calls, alerts, alert, store } = await sealedSetup();
+  for (const url of [`ifizbox://free-id#${newRecordKey()}`, "ifizbox://free-id", "ifizbox://free-id#%%"]) {
+    assert.equal(await mod.finishSetupFromLink(url, { native, store, fetcher, alert: alert() }), false);
+    assert.equal(alerts.at(-1).title, "Setup Not Finished");
+  }
+  assert.deepEqual(calls, []);
+  assert.equal(loadFreeIdentity(store), null);
+  // a launch by that link shows no Finish Setup alert on top of its answer
+  const shown = alerts.length;
+  await mod.freeIdAtLaunch({ native, store, fetcher, alert: alert() });
+  assert.equal(alerts.length, shown);
+  // the right link still works afterwards
+  assert.equal(await mod.finishSetupFromLink(`ifizbox://free-id#${key}`, { native, store, fetcher, alert: alert() }), true);
+});
+
+test("F460b: another certificate the shell keeps: no record taken", async () => {
+  const { mod, key, fetcher, native, alerts, alert, store } = await sealedSetup({ held: "FF" });
+  assert.equal(await mod.finishSetupFromLink(`ifizbox://free-id#${key}`, { native, store, fetcher, alert: alert() }), false);
+  assert.equal(loadFreeIdentity(store), null);
+  assert.equal(alerts.at(-1).title, "Setup Not Finished");
+  assert.equal(store.m.has("ifizbox.freeid.bundled"), false, "not marked: the link works once that certificate is gone");
+});
+
+test("F460b: the first launch says to finish setup, once per file; its button opens the website in Safari", async () => {
+  const { mod, fetcher, native, calls, alerts, alert, store } = await sealedSetup();
+  await mod.freeIdAtLaunch({ native, store, fetcher, alert: alert(0), sideload: false });
+  assert.equal(alerts.length, 0, "not in the jailbreak app");
+  await mod.freeIdAtLaunch({ native, store, fetcher, alert: alert(1) });
+  await mod.freeIdAtLaunch({ native, store, fetcher, alert: alert(1) });
+  assert.equal(alerts.length, 1);
+  assert.equal(alerts[0].title, "Finish Setup");
+  assert.match(alerts[0].message, /ifizbox\.com/);
+  assert.deepEqual(calls, [["app.openURL", { url: "https://ifizbox.com/#/home/settings/signing" }]]);
+});
+
+test("F460b: a plain record (Save the IPA) is taken at launch as before, with no alert", async () => {
+  const { mod, rec, native, calls, alerts, alert, store } = await sealedSetup({ held: "0a:1b" });
+  const fetcher = async () => ({ ok: true, text: async () => JSON.stringify(rec) });
+  await mod.freeIdAtLaunch({ native, store, fetcher, alert: alert() });
+  assert.equal(loadFreeIdentity(store).serial, "0A1B");
+  assert.deepEqual(calls.map((c) => c[0]), ["signing.status"]);
+  assert.equal(await mod.finishSetupFromLink("ifizbox://free-id#x", { native, store, fetcher, alert: alert() }), false);
+  assert.equal(alerts.length, 0);
+});

@@ -4,6 +4,7 @@
 //   signing.status              {mode, identity: {name, team, expires, profile: {...}} | null, identityProblem?}: F69, why
 //                               a certificate that was imported doesn't show
 //   signing.import {p12, password, profile}   (both files base64) -> status; the .p12 goes into the Keychain
+//                                             (bundled: true, F460b: only as the file inside the app would)
 //   signing.remove              forgets the identity, the kept .p12 and the profile -> status
 //   signing.export              F73: {p12, profile, password} (files base64) as imported, for iFizBox Account's
 //                               certificate sync (screens/account.js) | null
@@ -48,6 +49,10 @@ enum SignBridge {
                     throw SignError("bad_p12", "A .p12 and a .mobileprovision are needed.")
                 }
                 let password = c.params["password"] as? String ?? ""
+                if c.params["bundled"] as? Bool == true { // F460b: the sealed record's, under the file's rules
+                    try importSealed(.init(p12: p12, password: password, profile: prof))
+                    return status()
+                }
                 _ = try SignStore.importIdentity(p12: p12, password: password, profile: prof)
                 try confirmImport(p12: p12, password: password) // F69: status must see what was imported
                 return status()
@@ -146,33 +151,50 @@ enum SignBridge {
                                                    hasIdentity: hasIdentity),
               let id = SignStore.identity(), let der = SignStore.certificateDER(id) else { return }
         let held = SignStore.profile()
-        let c = BundledIdentity.parse(data)
-        let fileCertificate = c.flatMap { SignStore.certificateDER(p12: $0.p12, password: $0.password) }
-        if let c = c, BundledIdentity.replacesIdentity(
-            fileProfile: try? Profile(c.profile), fileCertificate: fileCertificate, heldCertificate: der, heldProfile: held,
-            heldFromFile: defaults.string(forKey: BundledIdentity.importedCertKey) == sha256(der).base64EncodedString()) {
-            do {
-                _ = try SignStore.importIdentity(p12: c.p12, password: c.password, profile: c.profile)
-                try confirmImport(p12: c.p12, password: c.password)
-                rememberImportedCertificate()
-                NSLog("\(Brand.name): the certificate inside the app (serial %@) replaced the held one (serial %@)",
-                      fileCertificate.flatMap(ASC.serialHex) ?? "?", ASC.serialHex(der) ?? "?")
-            } catch {
-                NSLog("\(Brand.name): the certificate inside the app didn't replace the held one: %@", text(error))
+        var replaced = false
+        if let c = BundledIdentity.parse(data) {
+            do { replaced = try replaceHeld(with: c, certificate: der, held: held) } catch {
+                NSLog("\(Brand.name): the certificate or profile inside the app wasn't kept: %@", text(error))
                 return
             }
-        } else if let held = held, let c = c, let new = try? Profile(c.profile),
-           BundledIdentity.replacesProfile(new, held: held, certificate: der, fileCertificate: fileCertificate,
-                                           phone: PhoneID.current()) {
-            do { try SignStore.replaceProfile(new, line: BundledIdentity.replacedLine(new, held: held)) } catch {
-                NSLog("\(Brand.name): the profile inside the app wasn't kept: %@", text(error))
-                return
-            }
-        } else if held == nil {
-            return // the held profile can't be read: the next launch looks again
         }
+        if !replaced && held == nil { return } // the held profile can't be read: the next launch looks again
         defaults.set(digest, forKey: BundledIdentity.seenKey)
         defaults.set(digest, forKey: BundledIdentity.profileSeenKey)
+    }
+
+    // The file's identity or newer profile in place of the held one, by BundledIdentity's rules. False: what is held stays.
+    private static func replaceHeld(with c: BundledIdentity.Contents, certificate der: Data, held: Profile?) throws -> Bool {
+        let fileCertificate = SignStore.certificateDER(p12: c.p12, password: c.password)
+        if BundledIdentity.replacesIdentity(
+            fileProfile: try? Profile(c.profile), fileCertificate: fileCertificate, heldCertificate: der, heldProfile: held,
+            heldFromFile: UserDefaults.standard.string(forKey: BundledIdentity.importedCertKey) == sha256(der).base64EncodedString()) {
+            _ = try SignStore.importIdentity(p12: c.p12, password: c.password, profile: c.profile)
+            try confirmImport(p12: c.p12, password: c.password)
+            rememberImportedCertificate()
+            NSLog("\(Brand.name): the certificate inside the app (serial %@) replaced the held one (serial %@)",
+                  fileCertificate.flatMap(ASC.serialHex) ?? "?", ASC.serialHex(der) ?? "?")
+            return true
+        }
+        if let held = held, let new = try? Profile(c.profile),
+           BundledIdentity.replacesProfile(new, held: held, certificate: der, fileCertificate: fileCertificate,
+                                           phone: PhoneID.current()) {
+            try SignStore.replaceProfile(new, line: BundledIdentity.replacedLine(new, held: held))
+            return true
+        }
+        return false
+    }
+
+    // F460b: signing.import {bundled: true}, the certificate of the sealed record inside the app: imported when none is
+    // held, else only as a file's would replace it. Either way it then counts as brought by a file.
+    private static func importSealed(_ c: BundledIdentity.Contents) throws {
+        if let id = SignStore.identity(), let der = SignStore.certificateDER(id) {
+            _ = try replaceHeld(with: c, certificate: der, held: SignStore.profile())
+            return
+        }
+        _ = try SignStore.importIdentity(p12: c.p12, password: c.password, profile: c.profile)
+        try confirmImport(p12: c.p12, password: c.password)
+        rememberImportedCertificate()
     }
 
     // B479: the certificate now held came from a file (BundledIdentity.importedCertKey).

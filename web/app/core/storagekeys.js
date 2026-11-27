@@ -47,6 +47,7 @@ export const KEYS = Object.freeze({
   firstVisit: "ifizbox.firstVisit",
   freeid: "ifizbox.freeid",
   freeidAnisette: "ifizbox.freeid.anisette",
+  freeidAsked: "ifizbox.freeid.asked",
   freeidBundled: "ifizbox.freeid.bundled",
   freeidInstalled: "ifizbox.freeid.installed",
   freeidKey: "ifizbox.freeid.key",

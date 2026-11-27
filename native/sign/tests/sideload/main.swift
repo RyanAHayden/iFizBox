@@ -430,6 +430,7 @@ test("incoming ifizbox:// links") {
     check(IncomingLink.accepts(URL(string: "ifizbox://package?id=com.example.app")!), "package (F96)")
     check(IncomingLink.accepts(URL(string: "ifizbox://account?k=0123456789ABCDEFGHJKMNPQRS")!), "account (F97)")
     check(IncomingLink.accepts(URL(string: "ifizbox://sources")!), "a tab (B14)")
+    check(IncomingLink.accepts(URL(string: "ifizbox://free-id#0123456789abcdefghijklmnopqrstuvwxyzABCDE_-")!), "free-id (F460b)")
     check(IncomingLink.accepts(URL(string: "ifizbox://Changes")!), "a tab, any case (B14)")
     check(!IncomingLink.accepts(URL(string: "https://import/x")!), "other scheme")
     check(!IncomingLink.accepts(URL(string: "ifizbox://import?d=" + String(repeating: "A", count: 600_000))!), "too long")
