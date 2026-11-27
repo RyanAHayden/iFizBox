@@ -93,6 +93,7 @@ import { withIpaInfo } from "./ipainfo.js";
 import { IdMap, IdSet, sameId } from "./apt.js"; // B407: package names compare ignoring case
 import { needsRestart } from "./queue.js";
 import { ratingOf, compareRatings } from "./sections.js"; // F450
+import { isStoreName } from "./applookup.js"; // F457
 import { packageKind } from "./progress.js";
 import { injectableFromFields, hintMatcher } from "./tweakfields.js"; // F302; C32: not tweaks.js, which pulls unpack.js in
 import { NO_SECTION, sectionName, simpleSection, parseAuthor, compareNames, SECTION_GROUPS, sectionGroup, APP_TWEAKS } from "./sections.js";
@@ -204,7 +205,8 @@ export function mergeCategories(rows, { jailbroken = true } = {}) {
 
 // Popular: [{ row, sources, date, rating, installs }] -> rows, in tiers (F452): 1) more than MIN_TIER ratings here
 // (`rating`, core/sections.js ratingOf), by average then count; 2) more than MIN_TIER installs (the review server's
-// count), the most installed first; 3) IPA apps with an App Store rating (F455; `store` { avg, count }), by average
+// count), the most installed first; 3) IPA apps with an App Store rating (F455; `store` { avg, count }; popular() gives it
+// only to an app named as the App Store names it, F457), by average
 // then count; 4) the rest. Within a tier, ties (and all of tier 4): rated here first (F450), then by how many sources
 // list them, then the newest update (`date`, epoch ms; AltStore versions carry one, APT packages don't), then by
 // name. At most `limit`.
@@ -1010,12 +1012,19 @@ export function createCatalog() {
     return (id) => lists.reduce((n, byId) => n + (byId.has(id) ? 1 : 0), 0);
   };
 
-  // `store`: App Store stars by bundle ID (core/applookup.js storeRatingsLoader).
+  // F457: the App Store's stars for a row: none for a package, or an app not named as the App Store names it.
+  const storeRating = (row, store) => {
+    const id = store && bundleOf(row.id);
+    const stars = id ? ratingOf(store, id) : null;
+    return stars && isStoreName(row.name, store[id][2]) ? stars : null;
+  };
+
+  // `store`: App Store stars and name by bundle ID (core/applookup.js storeRatingsLoader).
   function popular({ limit = 50, ratings = null, installs = null, store = null } = {}) {
     const count = listedIn();
     const items = visibleOf(ALL).map((row) => ({
       row, sources: count(row.id), date: dateOf(row.id), rating: ratingOf(ratings, row.id), installs: installs?.[row.id] ?? 0,
-      store: store && bundleOf(row.id) ? ratingOf(store, bundleOf(row.id)) : null,
+      store: storeRating(row, store),
     }));
     return rankPopular(items, limit).map(({ row, sources: n }) => ({ ...slim(row), sources: n }));
   }

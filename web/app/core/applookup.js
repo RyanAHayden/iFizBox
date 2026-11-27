@@ -57,8 +57,18 @@ export function batchLookupUrl(ids, c = "us", { base = "", direct = false } = {}
   return direct ? `https://itunes.apple.com/lookup?${new URLSearchParams({ bundleId: list.join(","), country: country(c) })}`
     : `${base}/api/applookup-batch?${new URLSearchParams({ bundleIds: list.join(","), country: country(c) })}`;
 }
-// A batch answer (JSON or text) -> { <bundle id, lower case>: [average, count] }, the rated apps only; null when it
-// isn't a lookup answer.
+// F457: a modded app keeps the original's bundle ID, so the App Store's stars count only for an app named as the App
+// Store names it: the whole name or its first words ("Spotify Music" of "Spotify: Music and Podcasts"). "+" is part of
+// a word, so "Instagram++" isn't "Instagram".
+const nameWords = (s) => str(s).normalize("NFC").toLowerCase().replace(/['’]/g, "").split(/[^\p{L}\p{M}\p{N}+]+/u).filter(Boolean);
+export function isStoreName(appName, trackName) {
+  const app = nameWords(appName).join("");
+  let lead = "";
+  return app !== "" && nameWords(trackName).some((w) => (lead += w) === app);
+}
+
+// A batch answer (JSON or text) -> { <bundle id, lower case>: [average, count, App Store name] }, the rated apps only;
+// null when it isn't a lookup answer.
 export function parseBatch(input) {
   let json = input;
   if (typeof input === "string") { try { json = JSON.parse(input); } catch { return null; } }
@@ -66,18 +76,18 @@ export function parseBatch(input) {
   const out = {};
   for (const r of json.results) {
     const avg = Number(r?.averageUserRating);
-    if (typeof r?.bundleId === "string" && Number.isFinite(avg) && avg > 0) out[r.bundleId.toLowerCase()] = [Math.min(5, avg), Number(r.userRatingCount) || 0];
+    if (typeof r?.bundleId === "string" && Number.isFinite(avg) && avg > 0) out[r.bundleId.toLowerCase()] = [Math.min(5, avg), Number(r.userRatingCount) || 0, str(r.trackName)];
   }
   return out;
 }
 
 export const STORE_RATINGS_TTL = 24 * 3600 * 1000;
-// -> load(bundleIds, wait ms) -> Promise<{ <bundle id, lower case>: [average, count] }>. get(url) -> Promise<text>.
+// -> load(bundleIds, wait ms) -> Promise<{ <bundle id, lower case>: [average, count, App Store name] }>. get(url) -> Promise<text>.
 // An answer (an app with no stars too) is kept a day, in `store` (localStorage-like) across launches; a failed request
 // isn't kept. After `wait` it answers with what it has; the requests go on and are there next time.
 export function storeRatingsLoader({ get, country: c = "us", direct = false, store = null, now = () => Date.now() }) {
-  const key = `ifizbox.storeratings.${country(c)}`;
-  const kept = new Map(); // id -> [asked at, [average, count] | null]
+  const key = `ifizbox.storeratings2.${country(c)}`; // 2: with the App Store name (F457)
+  const kept = new Map(); // id -> [asked at, [average, count, name] | null]
   const busy = new Map(); // id -> the request asking for it
   const fresh = (id) => kept.has(id) && now() - kept.get(id)[0] < STORE_RATINGS_TTL;
   try {

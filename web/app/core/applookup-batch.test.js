@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BATCH, batchLookupUrl, parseBatch, storeRatingsLoader, STORE_RATINGS_TTL } from "./applookup.js";
+import { BATCH, batchLookupUrl, isStoreName, parseBatch,storeRatingsLoader, STORE_RATINGS_TTL } from "./applookup.js";
 
 const memStore = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, v) }; };
 const idsOf = (url) => { const q = new URL(url, "https://site.test").searchParams; return (q.get("bundleIds") ?? q.get("bundleId")).split(","); };
@@ -18,6 +18,18 @@ test("batch URL: the Worker on the site, Apple's comma list in the app", () => {
   assert.deepEqual(parseBatch({ results: [{ bundleId: "A.B", averageUserRating: 0 }] }), {});
 });
 
+test("F457 isStoreName: the App Store's whole name or its first words, else no", () => {
+  for (const [app, track] of [["Instagram", "Instagram"], ["spotify music", "Spotify: Music and Podcasts"], ["TikTok", "TikTok - Videos, Shop & LIVE"],
+    ["WhatsApp", "WhatsApp Messenger"], ["YouTube", "You Tube"], ["Disney+", "Disney+"], ["Delta", "Delta – Game Emulator"]]) {
+    assert.equal(isStoreName(app, track), true, `${app} / ${track}`);
+  }
+  for (const [app, track] of [["RyukGram", "Instagram"], ["Instagram++", "Instagram"], ["Instagram (Rocket)", "Instagram"], ["Insta", "Instagram"],
+    ["YouTube Plus", "YouTube"], ["Instagram", ""], ["", "Instagram"], ["Instagram", undefined]]) {
+    assert.equal(isStoreName(app, track), false, `${app} / ${track}`);
+  }
+  assert.deepEqual(parseBatch({ results: [{ bundleId: "A.B", trackName: "Ab", averageUserRating: 4, userRatingCount: 2 }] }), { "a.b": [4, 2, "Ab"] });
+});
+
 test("loader: batches, keeps answers a day across launches, asks a failed batch again", async () => {
   const store = memStore(), asked = [];
   let fail = true, at = 1000;
@@ -28,7 +40,7 @@ test("loader: batches, keeps answers a day across launches, asks a failed batch 
   assert.equal(asked.length, 2);
   fail = false;
   const got = await load(ids);
-  assert.deepEqual(got["app.n0"], [4, 7]);
+  assert.deepEqual(got["app.n0"], [4, 7, ""]);
   assert.equal(Object.keys(got).length, BATCH);
   assert.equal(asked.length, 4);
   const next = storeRatingsLoader({ get, store, now: () => at }); // the next launch
@@ -46,5 +58,5 @@ test("loader: a slow answer doesn't hold the list; it is there next time", async
   assert.deepEqual(await load(["a.a"], 5), {});
   assert.equal(calls, 1);
   release();
-  assert.deepEqual(await load(["a.a"], 1000), { "a.a": [4, 7] });
+  assert.deepEqual(await load(["a.a"], 1000), { "a.a": [4, 7, ""] });
 });
