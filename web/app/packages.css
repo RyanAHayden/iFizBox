@@ -441,6 +441,17 @@ html[data-theme="dark"]:not([data-style="ios7"]):not([data-style="ios13"]):not([
 }
 .filter-sheet .filter-clear .cell-label { color: var(--detail); }
 /* ==== } look-only ==== */
+/* F449: the Source rows' icons, as on the Sources tab: the source's picture over its letter; All Sources keeps the
+   generic folder. */
+.filter-sheet .filter-source-icon { position: relative; overflow: hidden; }
+.filter-sheet .filter-source-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* ==== look-only { ==== filter source icons */
+.filter-sheet .filter-source-icon img { background: #fff; }
+.filter-sheet .filter-source-icon img:not(.loaded) { opacity: 0; }
+.filter-sheet .filter-all-icon {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%238e8e93'/%3E%3Cpath d='M5.5 10V7.2c0-.7.5-1.2 1.2-1.2h7.6c.5 0 .9.3 1.1.7L16.2 8H25c.7 0 1.2.5 1.2 1.2V10z' fill='%23eaeaeb'/%3E%3Crect x='3' y='9.5' width='26' height='17.5' rx='1.6' fill='%23fff'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+}
+/* ==== } look-only ==== */
 
 /* ---- Compatibility marks (F35): a small round mark beside every package, like the old Cydia tweak that drew a
    check or an X: green check works, red X doesn't, grey ? the package doesn't say. Drawn as SVG; Settings > Show

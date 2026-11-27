@@ -7,7 +7,8 @@ import { compatFilterOn } from "../device.js";
 import { settings } from "../settings-store.js";
 import { createSwitch } from "../nav/switch.js";
 import { SECTION_GROUPS } from "../core/catalog.js";
-import { displayName, sourcesFor } from "../core/sources.js";
+import { displayName, sourcesFor, sourceIcons } from "../core/sources.js";
+import { sourceIconImage } from "../source-icon.js";
 import { orderSources, loadOrder } from "../core/sourcelist.js";
 import { getBackend } from "../backend.js";
 import { grouped, el } from "../nav/ui.js";
@@ -20,14 +21,22 @@ export { emptyFilters, searchFilters };
 // F53: the Filter panel's Source rows: only the sources the device type shows (Not Jailbroken: AltStore ones,
 // core/sources.js sourcesFor), in the Sources tab's order (Manage > Sources, F45) and by its display name.
 export function sourceChoices(list, type, order = null) {
-  return sourcesFor(orderSources(list, order), type).shown.map((s) => ({ label: displayName(s), value: s.key }));
+  return sourcesFor(orderSources(list, order), type).shown.map((s) => ({ label: displayName(s), value: s.key, source: s }));
 }
 
 // One choice group: a row per option (with its `icon` when given), the chosen one checked; a tap picks it and redraws.
+// F449: an option with a `source` shows that source's icon as on the Sources tab (its letter until the picture loads).
 function choiceGroup(header, options, current, pick, footer) {
-  return grouped([{ header, footer, rows: options.map((o) => ({
-    label: o.label, ...(o.icon ? { icon: o.icon } : {}), checked: (o.value ?? null) === (current ?? null), onClick: () => pick(o.value ?? null),
+  const g = grouped([{ header, footer, rows: options.map((o) => ({
+    label: o.label,
+    ...(o.source ? { icon: { text: displayName(o.source)[0]?.toUpperCase() ?? "?", cls: "filter-source-icon" } } : o.icon ? { icon: o.icon } : {}),
+    checked: (o.value ?? null) === (current ?? null), onClick: () => pick(o.value ?? null),
   })) }]);
+  const cells = g.querySelectorAll(".cell");
+  options.forEach((o, i) => {
+    if (o.source) cells[i]?.querySelector(".cell-icon")?.append(sourceIconImage(o.source.key, sourceIcons(o.source), getBackend()));
+  });
+  return g;
 }
 
 let shown = null; // the one open panel: { close() }
@@ -85,7 +94,7 @@ export function openFilterPanel({ filters: f, anchor, alive, changed, closed, so
     catalog.statusSource() === "upload" ? "Installed packages come from the dpkg status file uploaded on the Installed page." : null));
     box.append(choiceGroup("Price", [{ label: "Free and Paid" }, { label: "Free", value: "free" }, { label: "Paid", value: "paid" }],
       f.price, (v) => set("price", v)));
-    box.append(choiceGroup("Source", [{ label: "All Sources" }, ...sources],
+    box.append(choiceGroup("Source", [{ label: "All Sources", icon: { text: "", cls: "filter-all-icon" } }, ...sources],
       f.source, (v) => set("source", v)));
     const own = sectionRows?.();
     const groupRows = (own?.groups ?? SECTION_GROUPS).map((g) => ({ label: `All ${g}`, value: `group:${g}` }));
