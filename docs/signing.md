@@ -246,7 +246,10 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   `signing.refresh`'s profiles, so the app gets it through misagent when it is on the current certificate (nothing
   signed), and is otherwise signed again with it. The setup's own App ID is the one setup has just ensured, so it is not
   made again here. If Apple refuses one (for example, 10 App IDs a week), the progress page's log says why, the other
-  apps go on, and that app fails as the shell reports it. An ended Apple session stops the refresh with an alert. A
+  apps go on, and that app fails as the shell reports it. An app's extensions get their profiles the same way, from the
+  recorded `extensionAppIDs`, and are installed through misagent with the app's; an extension with no fresh profile still
+  lets the app's others install, lists the app as failed with that reason, leaves its expiry as it was, and the app is
+  not signed again. An ended Apple session stops the refresh with an alert. A
   recorded app already deleted from the phone also gets its App ID made once, since the shell only drops its record
   during the refresh. An app iOS no longer has is dropped from the record, except while
   the app queue runs (`busy`): it may still be installing, so it is neither dropped nor signed again. An app that
@@ -282,8 +285,8 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   profile of its own App ID, `<app's App ID>.<what the extension adds to the app's bundle ID>` (two that would get one
   ID are numbered: `native/sign/FreeAppID.swift` `extensionIDs`), taken from the kept profiles handed in with
   `signing.addProfile`, and takes that as its bundle ID. An extension with no usable profile is left out, and so are
-  Watch apps (`native/sign/Profile.swift` `pinsBundleID`, `native/sign/IPASigner.swift`). The page does not hand
-  extension profiles in yet, so in practice extensions are still left out. `native/sign/FreeAppID.swift` refuses an app (`app_id_taken`) when another installed
+  Watch apps (`native/sign/Profile.swift` `pinsBundleID`, `native/sign/IPASigner.swift`). The page makes those profiles
+  and hands them in (**Extensions' App IDs**, below), so an extension goes in with its app. `native/sign/FreeAppID.swift` refuses an app (`app_id_taken`) when another installed
   or recorded app already has the App ID it would be signed as, since installing would replace that app and its data.
   iFizBox updating itself
   and re-signing the same app are allowed. Re-sign refuses (`app_id_mismatch`) an app installed under another bundle
@@ -295,7 +298,7 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   Signing under a free explicit profile uses the kept profile for `<bundle ID>.<TEAMID>` (the typed bundle ID if one was
   typed), so that app signs as its own App ID and sits beside other apps. With none kept for it, the app signs as the
   held profile's App ID, and a second such app is refused (`app_id_taken`). An app already installed under the held
-  profile's App ID stays there. `signing.inspect` answers `pinned` and `freeAppId`.
+  profile's App ID stays there. `signing.inspect` answers `pinned`, `freeAppId` and `extensionAppIds` (below).
 - **Making each app's App ID.** Before the app queue signs an app under a free explicit profile (an install, an update
   or a queued Re-sign), `web/app/signing/freeappid.js` (called by `signing/queue.js` `prepareOnDevice`; installs outside
   the queue use the same step, see Outside the app queue below) makes or reuses
@@ -305,6 +308,20 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   queued Re-sign renews the App ID the app is installed under. If the IPA's own bundle ID differs from the one listed,
   its App ID is made too and the app is downloaded and signed a second time. If Apple refuses (for example, 10 App IDs
   a week), the sign still goes ahead; if the shell then refuses `app_id_taken`, the row shows Apple's reason.
+- **Extensions' App IDs.** Each extension on a free profile takes one of the free Apple ID's App IDs (10 a week). The shell
+  works out the App IDs the extensions sign as (`native/sign/FreeAppID.swift` `extensionsToSign`, the page never derives
+  them): `signing.inspect` answers them as `extensionAppIds` [{path, appId, name}] (params `bundleId`, `removeExtensions`;
+  `{token}` instead of `{url}` asks about an IPA already looked at, with no download). `signing.prepare` answers
+  `missingExtensionAppIds`, the ones left out for want of a profile. `web/app/signing/freeappid.js` `withOwnAppId` makes
+  those App IDs (`core/freeroute.js` `ensureExtensionAppIds`), hands each profile in with `signing.addProfile`, discards
+  that signed copy and signs once more. A Custom Install or plain install (`signing.install`) hands them in before it
+  installs, from `signing.inspect`'s answer (`signing/route.js`), and a Re-sign hands in the recorded ones first. If Apple
+  refuses one, it is logged and that extension is left out; the app still installs. An extension's keychain-access-groups
+  name the app's group (`TEAM.<app's App ID>`) first, then its own, when the profile allows it, so the app and its
+  extensions read what the other keeps. The signed record keeps `extensionAppIDs` (`signing.installed` answers
+  `extensionAppIds`), and App Refresh and Re-sign All use them as described under App Refresh above. Tests:
+  `native/sign/tests/sideload/main.swift`, `web/app/signing/freeappid.test.js`, `web/app/signing/route-freeappid.test.js`,
+  `web/app/core/freeroute.test.js`.
 - **Apple's session** for those App IDs is kept in the page's memory only (`screens/free-apple-id.js` `freeSession`,
   ended by `endFreeSession`), so after the app is relaunched there is none until the user signs in again (Use a Free
   Apple ID > Sign In Again). With no session the sign goes ahead with whatever profile the shell already keeps, and
