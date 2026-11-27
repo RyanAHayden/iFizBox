@@ -30,13 +30,13 @@ test("sideload: nothing new to show, and the shell is told what to follow", asyn
   const up = await withAppUpgrades({ available: [], ignored: [] }, [], { mode: "sideload", native, store, lookup });
   assert.deepEqual(up, { available: [], ignored: [] });
   await new Promise((r) => setTimeout(r, 0));
-  assert.deepEqual(calls, [["updates.watch", { apps: [
+  assert.deepEqual(calls.filter((c) => c[0] !== "signing.installed"), [["updates.watch", { apps: [
     { id: "com.ryha.ifizbox", name: "iFizBox", version: "0.2.6", source: SELF_ALT_URL },
     { id: "delta", name: "Delta", version: "1.5", source: SRC }], known: [] }]]);
   // The same list again isn't sent twice.
   await withAppUpgrades({ available: [], ignored: [] }, [], { mode: "sideload", native, store, lookup });
   await new Promise((r) => setTimeout(r, 0));
-  assert.equal(calls.length, 1);
+  assert.equal(calls.filter((c) => c[0] === "updates.watch").length, 1);
 });
 
 test("the shell's known list is every upgrade already counted on screen", () => {
@@ -214,4 +214,24 @@ test("B476: another source listing the same bundle ID offers no upgrade; the app
   assert.deepEqual(up.available.map((r) => [r.id, r.version]), [["com.google.ios.youtube", "19.1"]]);
   assert.ok(asked.every(([, key]) => key === `alt:${SRC}`), "only the install's own source is asked");
   assert.ok(!asked.some(([id]) => id === "com.local.ipa"), "an app with no source of its own is not looked up");
+});
+
+// B489: an app kept under its custom bundle ID gets its upgrade from the source's package, and queues from it.
+test("a custom-ID record's upgrade looks up the signed record's original ID and queues the source's package", async () => {
+  const native = { call: async (m) => (m === "signing.installed" ? { apps: [{ bundleId: "com.me.x", originalBundleId: "com.x" }] } : { scheduled: true }) };
+  const store = async () => memoryAppStore([{ id: "com.me.x", name: "X", version: "1.0", source: SRC, date: 1 }]);
+  const asked = [];
+  const lookup = async (id) => { asked.push(id); return id === "com.x" ? { key: `alt:${SRC}`, stanza: { version: "2.0" }, row: { name: "X" } } : null; };
+  const up = await withAppUpgrades({ available: [], ignored: [] }, [], { mode: "sideload", native, store, lookup });
+  assert.ok(asked.includes("com.x") && !asked.includes("com.me.x"));
+  assert.equal(up.available.length, 1);
+  assert.equal(up.available[0].id, "com.me.x");
+  assert.equal(up.available[0].sourceId, "com.x");
+  const { queueUpgrades } = await import("./screens/changes.js");
+  const queued = [];
+  const pkgOf = (id) => (id === "com.x" ? { id: "com.x", name: "X", key: `alt:${SRC}`, stanza: { kind: "ipa", ipa: { bundleIdentifier: id, name: "X", sourceUrl: "https://a.example/", versions: [{ version: "2.0", downloadURL: "https://a.example/x.ipa", size: 10 }] } }, row: { id, name: "X" } } : null);
+  const jobs = await queueUpgrades(up.available, { add: (j) => queued.push(j), pkgOf });
+  assert.equal(jobs.length, 1);
+  assert.equal(queued[0].id, "com.x");
+  assert.equal(queued[0].installed, "1.0");
 });

@@ -40,15 +40,31 @@ let lastSent = null;
 // X on fastsign beside AppTesters') is a different app, never its upgrade. No source of its own (My IPAs, a URL): none.
 export { ownKey };
 
-async function candidates(records, lookup = (id, key) => catalog.package(id, key)) {
+// B489: an app kept under its custom bundle ID (com.me.x) is listed by its source as com.x: `signed` (signing.installed's
+// apps) says so through originalBundleId. The row keeps the record's id; `sourceId` is the source's, which Changes'
+// queueUpgrades builds the job from (the run signs it as com.me.x, B484).
+async function candidates(records, lookup = (id, key) => catalog.package(id, key), signed = []) {
   const out = new Map();
   let failed = 0;
+  const sourceIdOf = (id) => {
+    const s = (signed ?? []).find((a) => a?.bundleId === id && a.originalBundleId && a.originalBundleId !== id);
+    return s ? s.originalBundleId : id;
+  };
   await Promise.all(records.filter((r) => r?.id && !r.self && ownKey(r)).map(async (r) => {
     const key = ownKey(r);
-    const p = await Promise.resolve().then(() => lookup(r.id, key)).catch(() => { failed++; return null; });
-    if (p?.key === key && p.stanza?.version) out.set(r.id, { ...(p.row ?? {}), id: r.id, version: p.stanza.version, key: p.key });
+    const sid = sourceIdOf(r.id);
+    const p = await Promise.resolve().then(() => lookup(sid, key)).catch(() => { failed++; return null; });
+    if (p?.key === key && p.stanza?.version) {
+      out.set(r.id, { ...(p.row ?? {}), id: r.id, ...(sid !== r.id ? { sourceId: sid } : {}), version: p.stanza.version, key: p.key });
+    }
   }));
   return { cands: out, failed };
+}
+
+// The shell's signed apps, [] where there's no shell or it can't say.
+async function signedApps(native) {
+  if (typeof native?.call !== "function") return [];
+  try { return (await native.call("signing.installed", {}))?.apps ?? []; } catch { return []; }
 }
 
 // What the shell follows: the watch list, plus iFizBox itself at the version it runs.
@@ -104,7 +120,7 @@ export async function withAppUpgrades(upgrades, holds = [], { mode = detectMode(
   }
   let records = [];
   try { records = await (await store()).all(); } catch { return withIgnoredVersions(upgrades, [], iv); }
-  const { cands, failed } = records.length ? await candidates(records, lookup) : { cands: new Map(), failed: 0 };
+  const { cands, failed } = records.length ? await candidates(records, lookup, mode === "sideload" ? await signedApps(native) : []) : { cands: new Map(), failed: 0 };
   const merged = await withIgnoredVersions(mergeUpgrades(upgrades, rememberedUpgrades(records, (id) => cands.get(id) ?? null, holds)), records, iv);
   // B47: a lookup that threw leaves the shell's last list as it is, rather than dropping apps Changes would count.
   // F281: an app whose version on offer is ignored (Ignore This Version) is still followed, its version counted as

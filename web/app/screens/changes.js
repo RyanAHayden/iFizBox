@@ -310,7 +310,8 @@ export async function queueUpgrades(available = [], { pkgOf = (id) => catalog.pa
   const jobs = [];
   for (const r of available ?? []) {
     if (!r?.id) continue;
-    const p = await Promise.resolve().then(() => pkgOf(r.id)).catch(() => null);
+    const sid = r.sourceId || r.id; // B489: an app kept under a custom bundle ID is the source's package
+    const p = await Promise.resolve().then(() => pkgOf(sid)).catch(() => null);
     let job = p ? appJob(p, { installed: r.installed ?? null, version: r.version ?? null }) : null;
     if (!job && typeof r.ipa === "string" && /^https?:\/\//.test(r.ipa)) {
       job = { id: r.id, name: r.name ?? null, version: r.version ?? null, installed: r.installed ?? null, url: r.ipa, size: null,
@@ -322,7 +323,7 @@ export async function queueUpgrades(available = [], { pkgOf = (id) => catalog.pa
       job = { ...job, version: r.version, url: r.ipa, size: null };
     }
     if (!job) continue;
-    job = { ...job, id: r.id, name: job.name || r.name || null };
+    job = { ...job, id: sid, name: job.name || r.name || null };
     jobs.push(job);
   }
   for (const job of jobs) add(job);
