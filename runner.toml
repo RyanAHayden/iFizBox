@@ -5,7 +5,7 @@ journal = "journal"
 
 [run]
 auto_upgrade = true  # upgrade agent-runner by itself when a newer release is out, between merges
-weekly_max = 98
+weekly_max = 100
 test = "tools/check.sh"
 slots = 5
 auto_release = false  # a release every 20 landed tasks, and when the run goes idle with landed work (user 2026-11-22)
@@ -19,6 +19,7 @@ pass_env = ["SWIFT_TOOLCHAIN", "IOS_SDK"]
 # A session that ends or is dropped gives back the phone UI locks its task holds (iPhone 15, 7, 4S), so none
 # waits out the 30-minute stale timeout.
 on_exit = "tools/ui-release.sh"
+session_max = 100
 
 [git]
 push = "origin"
