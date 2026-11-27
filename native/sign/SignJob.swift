@@ -28,6 +28,9 @@ final class SignJob {
     // B427a: an app is being downloaded, signed or installed, by any of the jobs.
     static var anyGoing: Bool { lock.lock(); defer { lock.unlock() }; return running != nil || !tagged.isEmpty }
 
+    // B494: how many jobs go on (the untagged current one and the tagged).
+    static var goingCount: Int { lock.lock(); defer { lock.unlock() }; return (running != nil ? 1 : 0) + tagged.count }
+
     // Stops the current job. False when none runs (or it was already cancelled).
     @discardableResult
     static func cancelCurrent() -> Bool {
@@ -83,9 +86,14 @@ final class SignJob {
         SignJob.lock.lock()
         if SignJob.running === self { SignJob.running = nil }
         if let t = tag, SignJob.tagged[t] === self { SignJob.tagged[t] = nil }
+        let idle = SignJob.running == nil && SignJob.tagged.isEmpty
         SignJob.lock.unlock()
         lock.lock(); stops.removeAll(); lock.unlock()
+        if idle { SignJob.onIdle?() }
     }
+
+    // B494: called when the last job ends, so a Restore My VPN look held by `anyGoing` runs at once.
+    static var onIdle: (() -> Void)?
 
     var cancelled: Bool { lock.lock(); defer { lock.unlock() }; return stopped }
 

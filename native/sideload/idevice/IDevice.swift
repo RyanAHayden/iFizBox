@@ -979,7 +979,8 @@ enum IDevice {
         var firstDrop: Failure?
         LocalVPN.installBegan() // B395: its reconnects share one queue, so the VPN stays on through them
         // B490: after a Cancel, off with no linger; once installd was asked, iOS installs it anyway: the linger stays
-        defer { LocalVPN.installEnded(cancelled: cancelled() && !run.installSent) }
+        var succeeded = false // B494: the install ended well: ours goes off at once when no other install is queued
+        defer { LocalVPN.installEnded(cancelled: cancelled() && !run.installSent, finished: succeeded) }
         let wait = UUID() // F417a2: Cellular Installs keeps cellular data off until this connection is open
         defer { CellularShortcut.connected(wait) }
         let paused = { (p: LocalVPN.Pause) -> Void in // B423
@@ -1017,12 +1018,14 @@ enum IDevice {
                 try watched(attempt == 0 ? "install" : "install, connection \(attempt + 1)") { (w: Watch) -> Void in
                     try installTry(run, wait: wait, watch: w, note: note, progress: progress)
                 }
+                succeeded = true
                 return
             } catch where run.lookedInstalled {
                 // B251: a second look found the new copy while the install's own connection was quiet
                 ilog("installed (seen on a second connection); the first one ended with: \(error.localizedDescription)")
                 note("iOS lists \(run.bundleID ?? "the app") \(run.version ?? ""): installed")
                 progress(.install(1))
+                succeeded = true
                 return
             } catch let f as Failure where !run.connected && isEarlyEOF(f) && IDevice.pairing()?.kind == .remotePairing {
                 // B274: Pair Again, not the socket error (the row and its log say what to do)
