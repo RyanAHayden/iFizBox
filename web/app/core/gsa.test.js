@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import {
   processReply, bytesToBig, bigToBytes, modPow, utf8, concat, gsaPasswordKey, GSA_GROUP, encodePlist, decodePlist,
   decodeAny, decodeBinaryPlist, b64encode, AppleIdSession, AppleIdError, DevPortal, DevPortalError, anisetteV3,
-  relayTransport, relayWsUrl, signInAlert, XCODE_APP,
+  relayTransport, relayWsUrl, signInAlert, XCODE_APP, ANISETTE_SERVERS,
 } from "./gsa.js";
 
 const hx = (s) => { const c = s.replace(/\s+/g, ""); return Uint8Array.from(c.match(/../g).map((x) => parseInt(x, 16))); };
@@ -277,4 +277,80 @@ test("anisette v3: provisions a machine over the WebSocket, then gets headers", 
   await again.get();
   assert.equal(sent.length, 0);
   assert.equal(gets.at(-1).identifier, saved.identifier);
+});
+
+// B498: a fake provisioning socket and MidService, with Apple's 503s and dropped sockets on demand.
+function rig({ statuses = {}, drops = [] } = {}) {
+  const mids = [], sockets = [];
+  const ok = (o) => ({ status: 200, headers: {}, body: utf8(JSON.stringify(o)) });
+  const transport = async ({ url }) => {
+    const u = new URL(url);
+    if (u.pathname === "/v3/client_info") return ok({ client_info: "<ci>", user_agent: "ua" });
+    if (u.pathname === "/v3/get_headers") return ok({ result: "Headers", "X-Apple-I-MD": "md", "X-Apple-I-MD-M": "mdm" });
+    if (!u.pathname.includes("MidService")) return { status: 404, headers: {}, body: new Uint8Array() };
+    const step = u.pathname.endsWith("startMachineProvisioning") ? "start" : "finish";
+    mids.push(step);
+    const status = statuses[step]?.shift() ?? 200;
+    return { status, headers: {}, body: utf8(encodePlist({ Response: { spim: "SPIM", ptm: "PTM", tk: "TK" } })) };
+  };
+  class Ws {
+    constructor(url) {
+      this.drop = drops.shift(); // how many messages arrive before the socket breaks
+      this.script = [{ result: "GiveIdentifier" }, { result: "GiveStartProvisioningData" }, { result: "GiveEndProvisioningData", cpim: "C" },
+        { result: "ProvisioningSuccess", adi_pb: "ADIPB" }];
+      sockets.push(new URL(url).pathname.split("/")[2]);
+      setTimeout(() => this.next(), 0);
+    }
+    next() {
+      if (this.drop === 0) return this.onerror();
+      if (this.drop) this.drop--;
+      this.onmessage({ data: JSON.stringify(this.script.shift()) });
+    }
+    send() { setTimeout(() => this.next(), 0); }
+    close() {}
+  }
+  const ani = anisetteV3({ transport, servers: ["https://a.example", "https://b.example"], wsUrl: (s) => relayWsUrl(s, "https://site.example"),
+    WebSocketImpl: Ws, retryDelay: 0 });
+  return { ani, mids, sockets };
+}
+
+test("anisette v3: one more try after MidService's 503, on the same socket", async () => {
+  const r = rig({ statuses: { start: [503], finish: [503] } });
+  await r.ani.get();
+  assert.deepEqual(r.mids, ["start", "start", "finish", "finish"]);
+  assert.deepEqual(r.sockets, ["a.example"]);
+});
+
+test("anisette v3: a second 503 moves on to the next server", async () => {
+  const r = rig({ statuses: { start: [503, 503] } });
+  assert.equal((await r.ani.get()).server, "https://b.example");
+  assert.deepEqual(r.sockets, ["a.example", "b.example"]);
+});
+
+test("anisette v3: a socket dropped part way is tried once more; one that never talks isn't", async () => {
+  const once = rig({ drops: [3] });
+  assert.equal((await once.ani.get()).server, "https://a.example");
+  assert.deepEqual(once.sockets, ["a.example", "a.example"]);
+  const twice = rig({ drops: [3, 3] });
+  assert.equal((await twice.ani.get()).server, "https://b.example");
+  assert.deepEqual(twice.sockets, ["a.example", "a.example", "b.example"]);
+  const dead = rig({ drops: [0] });
+  await dead.ani.get();
+  assert.deepEqual(dead.sockets, ["a.example", "b.example"]);
+});
+
+test("anisette: every server is on the relay's list, in the same order", async () => {
+  const { ANISETTE_HOSTS } = await import("../../../worker/src/apple-relay.js");
+  assert.deepEqual(ANISETTE_SERVERS.map((s) => new URL(s).host), ANISETTE_HOSTS);
+});
+
+test("anisette: a server on Apple's Android library is skipped before any provisioning", async () => {
+  const asked = [], opened = [];
+  for (const client_info of ["<MacBookPro13,2> <macOS;13.1;22C65> <x>", "<MacBookPro15,1> <Mac OS X;10.15.2;19C57> <x>", "<Pixel> <Android;14> <x>"]) {
+    const transport = async ({ url }) => { asked.push(new URL(url).pathname); return { status: 200, headers: {}, body: utf8(JSON.stringify({ client_info, user_agent: "ua" })) }; };
+    const ani = anisetteV3({ transport, servers: ["https://a.example"], wsUrl: (s) => s, WebSocketImpl: class { constructor(u) { opened.push(u); } } });
+    await assert.rejects(ani.get(), /Android library/);
+  }
+  assert.deepEqual([...new Set(asked)], ["/v3/client_info"]);
+  assert.deepEqual(opened, []);
 });

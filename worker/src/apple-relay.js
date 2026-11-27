@@ -24,9 +24,9 @@ const TIMEOUT_MS = 20000;
 export const MAX_REQUEST = 64 * 1024; // GrandSlam plists and a CSR are a few KB
 export const MAX_REPLY = 2 * 1024 * 1024; // a provisioning profile is ~15 KB, a device or App ID list more
 
-// Public anisette servers (SideStore's list, the ones that answered every probe in R30 and speak v3).
-export const ANISETTE_HOSTS = ["ani.sidestore.io", "ani.sidestore.app", "ani.sidestore.zip", "ani.846969.xyz",
-  "new.ani.sidestore.io"];
+// Public anisette servers from SideStore's list that speak v3: gsa.js ANISETTE_SERVERS, in its order.
+export const ANISETTE_HOSTS = ["new.ani.sidestore.io", "mac-ani.jkcoxson.com", "ani.iloader.app", "ani3.stikstore.app",
+  "ani.jkcoxson.com", "ani2.stikstore.app", "win.ani.sidestore.io", "anisette.lillq.me"];
 const ANISETTE_PATHS = [/^\/v3\/client_info$/, /^\/v3\/get_headers$/, /^\/$/];
 
 export const ASC_HOST = "api.appstoreconnect.apple.com";
