@@ -467,16 +467,17 @@ rest:
 - **The command** (`cli/`, on idevice, the commit `native/sideload/idevice/pin.env` pins; the steps and their words
   are `core/`, tested with fakes): finds the iPhone over USB (waits for it to be plugged in); makes sure the computer
   is trusted, reusing usbmuxd's pairing record when the iPhone takes it, else pairing (the iPhone asks Trust and its
-  passcode) and saving the record to usbmuxd, with `EnableWifiConnections` on so the app can use it over the built-in VPN; asks for the code (three tries); reads `GET /sign/setup/<code>`; downloads the signed IPA (size and,
+  passcode) and saving the record to usbmuxd, with `EnableWifiConnections` on for an app that imports the record (before iOS 27) to use it over the built-in VPN; asks for the code (three tries); reads `GET /sign/setup/<code>`; downloads the signed IPA (size and,
   when the website sent one, SHA-256 checked); installs it with installation_proxy; writes the pairing file into
-  the app's container (house_arrest `VendContainer`, the path the website chose); and says what's left on the phone
+  the app's container (house_arrest `VendContainer`, the path the website chose), which the app never reads by itself
+  (only Import Pairing File brings a file in); and says what's left on the phone
   (Developer Mode, Trust the developer). It never asks for an Apple ID. `--check` only looks (found, trusted,
   Developer Mode), `--download-only` saves the IPA without an iPhone.
 - **The code** (`worker/src/setup.js`): the website uploads the signed IPA as usual (`/sign/upload`), then
   `POST /sign/setup?token=…[&bundleid=…][&pairing=<path>][&sha256=…]` gives `ABCD-2345`, 8 characters without
-  look-alikes, living as long as the upload (the TTL from its `done`). `pairing=` empty writes no pairing file (for
-  an iOS that pairs by itself). The Worker also serves the scripts and binaries from the GitHub release tagged
-  `setup`.
+  look-alikes, living as long as the upload (the TTL from its `done`). `pairing=` empty writes no pairing file. The
+  website never sends it, so the default `Documents/pairingFile.plist` is written on every iOS version. The Worker also
+  serves the scripts and binaries from the GitHub release tagged `setup`.
 - **Release**: `tools/setup/release.sh --probe` names what each build needs; `--dry-run` builds into
   `tools/setup/dist`; without it, it publishes them as the `setup` release's assets (a pre-release, so the app's
   self-update and the APT repo never see it). macOS is cross-built on Linux with `MACOS_SDK` (a MacOSX.sdk's
@@ -490,8 +491,10 @@ This iPhone connects through LocalDevVPN instead (a free app on the App Store, n
 by hand before each install, so the free profile needs no Network Extensions. Measured on an iPhone 15 Pro
 (iOS 27.0.1): LocalDevVPN's Device IP is 10.7.0.1/32, the address the app already uses, its Tunnel IP 10.7.1.1/32,
 and iOS asks once to add its VPN configuration. Through it, Test Connection, an install and a re-sign each connect
-over RemotePairing in under a second, with nothing of iFizBox's VPN on. The pairing file still comes from the
-one-time computer setup.
+over RemotePairing in under a second, with nothing of iFizBox's VPN on. Pairing after a Computer Install: on iOS 27,
+This iPhone pairs on the phone with a 6-digit code (Settings > Privacy & Security > Developer Mode > Pair with iFizBox),
+and the computer's pairing file is not used. Before iOS 27, the file the setup left in the app's folder
+(`Documents/pairingFile.plist`) has to be picked with Import Pairing File.
 
 **Jailbreak build**: the root helper's `install-ipa` installs an IPA through `LSApplicationWorkspace
 installApplication:withOptions:error:`, as AppSync's `appinst` does (`native/helper/README.md`). It needs AppSync
@@ -512,9 +515,11 @@ From reading code, not from a phone:
 - Upstream zsign's per-extension profiles: seen in its README only, not in the code.
 - The computer setup (checked on a phone, not from code): on an iPhone 15 Pro (iOS 27.0.1), from a Linux x86_64
   computer, with a free Apple ID, the sign-in, the checklist, the code, the one-line command, the install, the pairing
-  file, Trust and the first launch worked. An in-app install on the free profile does not work: iOS refuses the
-  Signing Server's app (error 111 is the expected cause; the device log was not read), and This iPhone needs Network
-  Extensions, which a free profile lacks. The app now says why instead of the log saying Completed. So no in-app
-  route installs on a free profile, and each weekly re-sign needs a computer. The app showed no Free Apple ID group
-  after the setup, so Refresh Profile was out of reach. Not run on a Mac or on real Windows, or
-  for a second week's refresh; the Microsoft Store link to the Apple Devices app is from memory.
+  file written (not read by the app: that was not tested), Trust and the first launch worked. An in-app install on the
+  free profile does not work: iOS refuses the Signing Server's app (error 111 is the expected cause; the device log
+  was not read), and This iPhone needs Network Extensions, which a free profile lacks. The app now says why instead of
+  the log saying Completed. So no in-app route installs on a free profile, and each weekly re-sign needs a computer.
+  The app showed no Free Apple ID group after the setup, so Refresh Profile was out of reach. Not run on a Mac or on
+  real Windows, or for a second week's refresh; the Microsoft Store link to the Apple Devices app is from memory.
+- The Files app showing `pairingFile.plist` (On My iPhone > iFizBox) and Import Pairing File before iOS 27, and on-phone
+  pairing after a free-profile Computer Install on iOS 27: not run on a phone.
