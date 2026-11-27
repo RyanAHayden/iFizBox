@@ -477,12 +477,24 @@ async function refineByRating(rows, { sort, ...filters }) {
   const [out, ours, mod] = await Promise.all([ask("refine", [rows, filters]), reviewRatings(), import("./core/ratingsort.js")]);
   return mod.rankByRating(out, await depictionRatings(out, ours, mod).catch(() => ours));
 }
+// F455: the App Store's stars for the IPA apps (Popular's third tier): the Worker on the site, Apple itself in the app.
+let storeLoader = null;
+async function storeRatings() {
+  const ids = await ask("storeCandidates");
+  if (!ids.length) return {};
+  storeLoader ??= import("./core/applookup.js").then((m) => {
+    const backend = getBackend(), direct = backend.kind !== "http";
+    const get = direct ? (url) => backend.text(url) : (url) => globalThis.fetch(url).then((r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))));
+    return m.storeRatingsLoader({ get, direct, country: m.regionOf(globalThis.navigator?.language), store: globalThis.localStorage ?? null });
+  });
+  return (await storeLoader)(ids, RATINGS_WAIT);
+}
 async function popularByRating(opts) {
   const [ours, installs] = await Promise.all([reviewRatings(), installCounts()]);
   const mod = await import("./core/ratingsort.js");
   const wide = await ask("popular", [{ ...opts, limit: 200, ratings: ours, installs }]);
-  const ratings = await depictionRatings(wide, ours, mod).catch(() => ours);
-  return ask("popular", [{ ...opts, ratings, installs }]);
+  const [ratings, store] = await Promise.all([depictionRatings(wide, ours, mod).catch(() => ours), storeRatings().catch(() => ({}))]);
+  return ask("popular", [{ ...opts, ratings, installs, store }]);
 }
 
 export const catalog = {

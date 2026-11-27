@@ -504,3 +504,26 @@ test("search finds Havoc's paid Aerial in the jailbreak and sideload builds (B36
   lite.setHidden(["App Tweaks"]);
   assert.deepEqual(ids(lite.search("aerial")), ["com.x.aerialphotos"], "a hidden App Tweaks stays out");
 });
+
+// F455: Popular's third tier: IPA apps without enough reviews or installs rank by their App Store rating.
+test("F455 popular: reviews > 5, installs > 5, then App Store rating (average, count), tweaks fall through", async () => {
+  const { rankPopular } = await import("./catalog.js");
+  const item = (name, o = {}) => ({ row: { id: name.toLowerCase(), name }, sources: 1, date: null, rating: null, installs: 0, store: null, ...o });
+  const ranked = rankPopular([
+    item("Tweak", { sources: 9 }), item("Store Low", { store: { avg: 3, count: 900 } }), item("Store High Few", { store: { avg: 4.8, count: 10 } }),
+    item("Store High Many", { store: { avg: 4.8, count: 500 } }), item("Installed", { installs: 6 }),
+    item("Reviewed", { rating: { avg: 2, count: 6 }, store: { avg: 5, count: 9999 } }), item("Own Few", { rating: { avg: 5, count: 1 }, store: { avg: 4, count: 5 } }),
+  ]).map((i) => i.row.name);
+  assert.deepEqual(ranked, ["Reviewed", "Installed", "Store High Many", "Store High Few", "Own Few", "Store Low", "Tweak"]);
+});
+test("F455 popular(): store ratings count for IPA apps only, by the real bundle ID; storeCandidates lists them", () => {
+  const c = createCatalog();
+  const app = (name, id) => ({ name, bundleIdentifier: id, versions: [{ version: "1", downloadURL: `https://x.dev/${name}.ipa` }] });
+  runCatalog(c, "loadAlt", ["alt:https://x.dev/s.json", JSON.stringify({ name: "S", apps: [app("Alpha", "com.X.Alpha"), app("Beta", "com.x.beta"), app("Gamma", "com.x.beta")] }), null, null]);
+  c.load("j", "Package: com.x.tweak\nName: Tweak\nVersion: 1\nArchitecture: iphoneos-arm64\n");
+  assert.deepEqual(runCatalog(c, "storeCandidates", []).sort(), ["com.x.alpha", "com.x.beta"], "no tweak, no `~name` suffix, no repeat");
+  assert.equal(c.storeCandidates(1).length, 1);
+  const names = (store) => c.popular({ store }).map((r) => r.name);
+  assert.deepEqual(names({ "com.x.alpha": [4, 100], "com.x.beta": [4.5, 100], "com.x.tweak": [5, 100] }), ["Beta", "Gamma", "Alpha", "Tweak"]);
+  assert.deepEqual(names({ "com.x.alpha": [4, 100] }), ["Alpha", "Beta", "Gamma", "Tweak"]);
+});
