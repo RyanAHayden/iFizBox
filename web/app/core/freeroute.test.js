@@ -332,10 +332,10 @@ test("F458: setup hands back Apple's App ID list, asked once", async () => {
   assert.equal(portal.log.filter((l) => l === "listAppIds").length, 1);
 });
 
-test("F458: one profile per other App ID of the team; none for the setup's own, a lapsed one or another team's", async () => {
+test("F458: one profile per other App ID of the team; none for the setup's own, an unknown one not ours or another team's", async () => {
   const portal = fakePortal();
   const got = await otherProfiles({ portal, teamId: TEAM, appIds: appIdList, appId: `com.x.${TEAM}`,
-    apps: recorded(`${TEAM}.com.x.${TEAM}`, `${TEAM}.com.other`, `${TEAM}.com.other`, `${TEAM}.com.lapsed`, "ZZZZZZZZZZ.com.other", undefined) });
+    apps: recorded(`${TEAM}.com.x.${TEAM}`, `${TEAM}.com.other`, `${TEAM}.com.other`, `${TEAM}.com.unsuffixed`, "ZZZZZZZZZZ.com.other", undefined) });
   assert.equal(got.length, 1);
   assert.deepEqual(portal.log, ["downloadProfile OTHER"]);
 });
@@ -445,10 +445,51 @@ test("F459: only a missing or expired App ID is registered; the limit is named",
   await assert.rejects(run(refuse(Object.assign(new Error("full"), { code: 9401 })), []), (e) => e.kind === "appid-limit");
 });
 
-test("F459: a refresh fetches no profile for an expired App ID, so that app is signed again", async () => {
-  const portal = fakePortal();
-  const appIds = [{ identifier: "com.old", appIdId: "OLD", expirationDate: "2026-11-26T00:00:00Z" },
-    { identifier: "com.live", appIdId: "LIVE", expirationDate: "2026-11-28T00:00:00Z" }];
-  await otherProfiles({ portal, teamId: TEAM, appIds, appId: "none", apps: recorded(`${TEAM}.com.old`, `${TEAM}.com.live`), now: at });
-  assert.deepEqual(portal.log, ["downloadProfile LIVE"]);
+// A portal whose lapsed App ID is made anew under a new id; its profile's bytes are the appIdId.
+function remakingPortal({ refuse = null } = {}) {
+  const log = [];
+  return { log,
+    addAppId: async (team, identifier, name) => {
+      log.push(`addAppId ${identifier} ${name}`);
+      if (refuse) throw refuse;
+      return { identifier, appIdId: `NEW-${identifier}` };
+    },
+    downloadProfile: async (team, appIdId) => { log.push(`downloadProfile ${appIdId}`); return { encodedProfile: new TextEncoder().encode(appIdId) }; },
+    listAppIds: async () => ({ appIds: lapsed }),
+  };
+}
+const old = `com.old.${TEAM}`;
+const lapsed = [{ identifier: old, appIdId: "OLD", expirationDate: "2026-11-26T00:00:00Z" },
+  { identifier: "com.live", appIdId: "LIVE", expirationDate: "2026-11-28T00:00:00Z" }];
+const text = (b64) => Buffer.from(b64, "base64").toString();
+
+test("B502a1b: an expired App ID, and one Apple no longer lists, are made again; a live one is reused", async () => {
+  const portal = remakingPortal();
+  const got = await otherProfiles({ portal, teamId: TEAM, appIds: lapsed, appId: "none",
+    apps: recorded(`${TEAM}.${old}`, `${TEAM}.com.live`, `${TEAM}.com.gone.${TEAM}`), now: at });
+  assert.deepEqual(portal.log, [`addAppId ${old} App 0`, `downloadProfile NEW-${old}`, "downloadProfile LIVE",
+    `addAppId com.gone.${TEAM} App 2`, `downloadProfile NEW-com.gone.${TEAM}`]);
+  assert.equal(got.length, 3);
+});
+
+test("B502a1b: an App ID Apple refuses is logged and the others go on; an ended session stops", async () => {
+  const lines = [];
+  const apps = recorded(`${TEAM}.${old}`, `${TEAM}.com.live`);
+  const got = await otherProfiles({ portal: remakingPortal({ refuse: new Error("10 a week") }), teamId: TEAM, appIds: lapsed,
+    appId: "none", apps, now: at, log: (l) => lines.push(l) });
+  assert.equal(got.length, 1);
+  assert.match(lines[0], new RegExp(`No App ID ${old}: 10 a week`));
+  const ended = remakingPortal({ refuse: Object.assign(new Error("ended"), { kind: "session" }) });
+  await assert.rejects(otherProfiles({ portal: ended, teamId: TEAM, appIds: lapsed, appId: "none", apps, now: at }), /ended/);
+});
+
+test("B502a1b: the remade App ID's profile is in signing.refresh's profiles", async () => {
+  const calls = [], raw = [];
+  const native = { call: async (m, p) => { calls.push([m, p]); return m === "signing.installed" ? { apps: recorded(`${TEAM}.${old}`) } : { failed: [] }; } };
+  await refreshApps({ native, portal: remakingPortal(), teamId: TEAM, appIds: lapsed, appId: `com.x.${TEAM}`,
+    hud: () => ({ set() {}, done() {}, fail() {}, page: { raw: (l) => raw.push(l) } }), alert: async () => {} });
+  const [method, params] = calls.at(-1);
+  assert.equal(method, "signing.refresh");
+  assert.deepEqual(params.profiles.map(text), [`NEW-${old}`]);
+  assert.deepEqual(raw, [`Made the App ID ${old}`]);
 });

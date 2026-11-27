@@ -618,7 +618,7 @@ export async function installCustom(job, { sc, follow = null, now = Date.now(), 
 // F221: a marked app's re-sign (core/appqueue.js markedResignJob) has no record on the phone to sign from: its url,
 // the installed version on the source, is downloaded, signed and installed over the app as an Install is
 // (`deps`: installOnDevice's, for tests). signing.install records it, so it is a signed app with a pill from then on.
-export async function resignApp(job, { sc, native = nativeBridge(), hud = null, alert = showAlert, deps, stallOpts = null } = {}) {
+export async function resignApp(job, { sc, native = nativeBridge(), hud = null, alert = showAlert, deps, stallOpts = null, session = null } = {}) {
   sc ??= await import("../signing-client.js");
   if (job.url) {
     if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "", ...listedOf(job) }, deps);
@@ -634,12 +634,15 @@ export async function resignApp(job, { sc, native = nativeBridge(), hud = null, 
   try {
     if (!native?.call) throw new Error(`Re-signing needs the ${NAME} app.`);
     // B65: a phase that goes quiet fails the job with where it stopped (callWithStall); the shell's lines go to the log
-    r = await callWithStall(native, "signing.resign", { bundleId: job.id, manifestServer: sc.getServer(), ...(job.id === SELF_ID && !route.route ? { host: true } : {}), ...route },
+    const sign = () => callWithStall(native, "signing.resign", { bundleId: job.id, manifestServer: sc.getServer(), ...(job.id === SELF_ID && !route.route ? { host: true } : {}), ...route },
       (ev) => {
         if (ev?.log) h.page?.raw?.(ev.log);
         const t = resignLabel(ev);
         if (t) h.set(t.replace(/ \(1 of 1\)$/, ""));
       }, stallOpts ?? undefined);
+    // B502a1b: a free Apple ID: the installed App ID is made again if lapsed, its profile handed in first
+    const { withOwnAppId } = await import("../signing/freeappid.js");
+    r = await withOwnAppId(job, { record: job.id }, sign, { native, alert, log: (line) => h.page?.raw?.(line), ...(session ? { session } : {}) });
   } catch (e) {
     const why = deviceError(e, job.name || job.id);
     fail(why.message);

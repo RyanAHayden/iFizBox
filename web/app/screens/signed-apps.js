@@ -165,8 +165,30 @@ export async function queueResignAll(rows, { add = null } = {}) {
   return jobs;
 }
 
+// B502a1b: a free Apple ID (and Apple's session of its team): the recorded apps' App IDs, lapsed ones made again, and
+// their profiles handed in, as the shell signs an app under a free profile only with its own App ID's. Never throws:
+// without them the shell names the apps it can't sign.
+export async function handFreeProfiles(native, { session = null } = {}) {
+  let s = null;
+  try {
+    // lazily, as signing/queue.js does
+    const [{ liveSession, pinnedProfile }, { otherProfiles }, { b64encode }] = await Promise.all(
+      [import("../signing/freeappid.js"), import("../core/freeroute.js"), import("../core/gsa.js")]);
+    s = await (session ?? liveSession)();
+    const held = s && await pinnedProfile(native);
+    if (!held || s.teamId !== held.team) return;
+    const apps = (await native.call("signing.installed", {}))?.apps ?? [];
+    const { appIds } = await s.portal.listAppIds(held.team);
+    for (const p of await otherProfiles({ portal: s.portal, teamId: held.team, appIds, apps })) {
+      await native.call("signing.addProfile", { profile: b64encode(p) });
+    }
+  } catch (e) {
+    if (e?.kind === "session") s?.end?.();
+  }
+}
+
 // Before F91: signing.resignAll straight away, the HUD following each app. Kept for a caller that wants it at once.
-export async function resignAll(count, { redraw, native, alert, hud }) {
+export async function resignAll(count, { redraw, native, alert, hud, session }) {
   const { index } = await alert({ title: "Re-sign All?",
     message: `${count === 1 ? "The app is" : `All ${count} apps are`} downloaded again, signed with your current certificate and installed, one after another. iOS asks before each install.`,
     buttons: ["Cancel", "Re-sign"], cancel: 0 });
@@ -175,6 +197,7 @@ export async function resignAll(count, { redraw, native, alert, hud }) {
   if (!route) return;
   const h = hud("Re-signing");
   let r;
+  await handFreeProfiles(native, { session });
   try {
     // F75: each install takes its manifest from the Signing Server, as signing.install does (This iPhone: none)
     r = await callWithStall(native, "signing.resignAll", { manifestServer: getServer(), ...route }, (ev) => { const t = resignLabel(ev); if (t) h.set(t); }); // B65
