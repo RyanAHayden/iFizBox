@@ -62,7 +62,8 @@ function setup(t, { served = { [URL_DEB]: DEB }, env = {} } = {}) {
     },
   };
   const queue = createQueue();
-  const backend = createNativeBackend({ native, sourceOptions: { indexedDB: fakeIndexedDB(), mode: "jailbreak", queue } });
+  const installs = { count: async () => true }; // F454: no install counts sent to the real server
+  const backend = createNativeBackend({ native, sourceOptions: { indexedDB: fakeIndexedDB(), mode: "jailbreak", queue, installs } });
   return { fx, backend, queue, calls, debDir };
 }
 
