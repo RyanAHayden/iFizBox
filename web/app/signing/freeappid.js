@@ -47,7 +47,22 @@ const liveSession = async () => {
   return s ? { ...s, end: m.endFreeSession } : null;
 };
 
-const openSigning = () => { location.hash = format(settingsRoute(["signing"])).replace(/^#/, ""); };
+// B502a1c: the alert's Open. The run's page covers the app, so it goes first (closed once its run is over, put aside
+// while it goes on); then the page holding the Free Apple ID group opens (Certificate, or Signing where Installation &
+// Signing isn't one page) and slides to the group, which is drawn a moment after the page.
+export const SHOW_TRIES = 20;
+export async function openFreeGroup({ runPage, path, show,nav = globalThis.location, wait = (ms) => new Promise((ok) => setTimeout(ok, ms)) } = {}) {
+  const page = (runPage ?? (await import("../screens/apprun.js")).runPage)();
+  if (page?.busy) page.putAside(); else await page?.dismiss();
+  const to = (path ?? (await import("../screens/settings.js")).freeIdPath)();
+  nav.hash = format(settingsRoute(to)).replace(/^#/, "");
+  const reveal = show ?? (await import("../screens/free-apple-id.js")).showFreeGroup;
+  for (let i = 0; i < SHOW_TRIES; i += 1) {
+    await wait(200);
+    if (reveal()) return true;
+  }
+  return false;
+}
 
 // One prompt at a time, and never waited for: the run's other rows go on.
 let asking = false;
@@ -68,7 +83,7 @@ async function staysOnHeld(native, held, original) {
 }
 
 export async function withOwnAppId(job, params, sign, { native, discard = () => {}, log = () => {}, alert = null,
-  session = liveSession, go = openSigning } = {}) {
+  session = liveSession, go = openFreeGroup } = {}) {
   // With no session nothing is asked of the shell first: only its refusal (a free profile's alone) matters.
   const held = native?.call && await session() ? await pinnedProfile(native) : null;
   let failure = null; // why no profile could be handed in: the reason of a refusal that follows

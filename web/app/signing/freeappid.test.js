@@ -1,7 +1,8 @@
 // B502a1: a free Apple ID's apps each get an App ID and profile of their own before the app queue signs them.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { withOwnAppId, pinnedProfile, SIGN_IN_ROW, SIGN_IN_TITLE } from "./freeappid.js";
+import { withOwnAppId, pinnedProfile, openFreeGroup, SHOW_TRIES, SIGN_IN_ROW, SIGN_IN_TITLE } from "./freeappid.js";
+import { freeIdPath } from "../screens/settings.js";
 import { prepareOnDevice } from "./queue.js";
 import { b64encode } from "../core/gsa.js";
 
@@ -104,6 +105,21 @@ test("no session: app_id_taken shows one sign-in prompt, and Open goes to Signin
   answer({ index: 1 });
   await new Promise((ok) => setImmediate(ok));
   assert.equal(opened, 1);
+});
+
+test("Open: the run's page goes, then the group's page opens and slides to the group", async () => {
+  assert.deepEqual([freeIdPath(true), freeIdPath(false)], [["signing", "certificate"], ["signing"]]);
+  for (const busy of [false, true]) {
+    const did = [];
+    const nav = { set hash(h) { did.push(h); } };
+    let drawn = 0;
+    const ok = await openFreeGroup({ nav, wait: async () => {}, path: () => freeIdPath(true), show: () => ++drawn === 3,
+      runPage: () => ({ busy, putAside: () => did.push("aside"), dismiss: async () => did.push("closed") }) });
+    assert.deepEqual([ok, drawn, did], [true, 3, [busy ? "aside" : "closed", "/home/settings/signing/certificate"]]);
+  }
+  let tries = 0;
+  assert.equal(await openFreeGroup({ nav: {}, wait: async () => {}, runPage: () => null, path: () => ["signing"], show: () => { tries += 1; return false; } }), false);
+  assert.equal(tries, SHOW_TRIES);
 });
 
 test("Apple's refusal is the row's reason; an ended session is dropped", async () => {
