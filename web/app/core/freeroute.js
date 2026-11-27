@@ -30,6 +30,7 @@
 //   await refreshApps({ native, portal, teamId, appIds, appId, hud, alert, busy })
 //                                        F458, the app, after a setup: signing.refresh renews the installed apps'
 //                                        profiles (nothing signed or installed again) and signs the rest again
+//   await otherProfiles({ portal, teamId, appIds, apps, appId, log })  -> their profiles; B502a1b: lapsed App IDs remade
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { parseProfile, normalUdid, callWithStall, resignLabel, deviceError } from "./signing.js";
 import { b64encode } from "./gsa.js";
@@ -208,15 +209,30 @@ export async function runSetup({ portal, teamId, phone, saved = null, bundleId, 
 }
 
 // F458: the profiles of the recorded apps' other App IDs than the setup's own (signing.installed's appId is
-// TEAM.identifier), one each. An expired App ID (or one Apple no longer lists): no profile, so the app is signed again.
-export async function otherProfiles({ portal, teamId, appIds = [], apps = [], appId, now = new Date() }) {
-  const wanted = new Set(apps.map((a) => String(a?.appId ?? ""))
-    .filter((id) => id.startsWith(`${teamId}.`)).map((id) => id.slice(teamId.length + 1)));
+// TEAM.identifier), one each. B502a1b: an expired App ID (or one Apple no longer lists) is made again, so the shell
+// has a profile to sign that app with; only ours (<bundle id>.<TEAMID>). One Apple refuses is logged and left out.
+export async function otherProfiles({ portal, teamId, appIds = [], apps = [], appId, now = new Date(), log = () => {} }) {
+  const wanted = new Map();
+  for (const a of apps) {
+    const id = String(a?.appId ?? "");
+    if (id.startsWith(`${teamId}.`)) wanted.set(id.slice(teamId.length + 1), a?.name || wanted.get(id.slice(teamId.length + 1)));
+  }
   wanted.delete(appId);
   const out = [];
-  for (const a of appIds) {
-    if (!wanted.has(a.identifier) || appIdExpired(a, now)) continue;
-    const data = bytes((await portal.downloadProfile(teamId, a.appIdId))?.encodedProfile);
+  for (const [identifier, name] of wanted) {
+    let id = appIds.find((a) => a.identifier === identifier && !appIdExpired(a, now));
+    if (!id) {
+      if (identifier.includes("*") || freeAppId(identifier, teamId) !== identifier) continue;
+      try {
+        ({ appId: id } = await ensureAppId({ portal, teamId, appIds, identifier, name: name || "App", now }));
+        log(`Made the App ID ${identifier}`);
+      } catch (e) {
+        if (e?.kind === "session") throw e;
+        log(`No App ID ${identifier}: ${e?.message ?? e}`);
+        continue;
+      }
+    }
+    const data = bytes((await portal.downloadProfile(teamId, id.appIdId))?.encodedProfile);
     if (data) out.push(data);
   }
   return out;
@@ -234,8 +250,8 @@ export async function refreshApps({ native, portal, teamId, appIds, appId, hud, 
     const got = await native.call("signing.installed", {});
     const apps = [...(got?.apps ?? []), ...(got?.own ? [{ appId: got.own }] : [])];
     if (!apps.length) return null;
-    const profiles = (await otherProfiles({ portal, teamId, appIds, apps, appId })).map(b64encode);
-    page = hud("Refreshing Apps");
+    page = hud("Refreshing Apps"); // B502a1b: first, as making an App ID again takes a moment and is logged
+    const profiles = (await otherProfiles({ portal, teamId, appIds, apps, appId, log: (line) => page?.page?.raw?.(line) })).map(b64encode);
     // F459: while the app queue runs, the shell forgets no app
     const r = await callWithStall(native, "signing.refresh", { profiles, route: "idevice", busy: !!(await busy()) }, (ev) => {
       if (ev?.log) page?.page?.raw?.(ev.log);

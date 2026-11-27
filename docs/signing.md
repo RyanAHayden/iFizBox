@@ -239,9 +239,16 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   imports it again, then runs **App Refresh** on the apps installed with the Free Apple ID.
 - **App Refresh** runs after every setup in the app. An installed app still signed with the current certificate gets the
   new profile for its App ID through the phone's misagent service over This iPhone's route
-  (`com.apple.misagent.shim.remote`): nothing is signed or copied. An app on another certificate, whose App ID Apple no
-  longer lists or has expired (7 days after it was made, so no new profile is asked for it), or recorded without a
-  certificate serial is signed again, iFizBox last. An app iOS no longer has is dropped from the record, except while
+  (`com.apple.misagent.shim.remote`): nothing is signed or copied. An app on another certificate, or recorded without a
+  certificate serial, is signed again, iFizBox last. A lapsed App ID (expired, 7 days after it was made, or no longer
+  listed by Apple) of the form `<bundle ID>.<TEAMID>` that a recorded app, or iFizBox itself, is installed under is made
+  again first (`core/freeroute.js` `otherProfiles`, through `ensureAppId`): its profile is downloaded and passed in
+  `signing.refresh`'s profiles, so the app gets it through misagent when it is on the current certificate (nothing
+  signed), and is otherwise signed again with it. The setup's own App ID is the one setup has just ensured, so it is not
+  made again here. If Apple refuses one (for example, 10 App IDs a week), the progress page's log says why, the other
+  apps go on, and that app fails as the shell reports it. An ended Apple session stops the refresh with an alert. A
+  recorded app already deleted from the phone also gets its App ID made once, since the shell only drops its record
+  during the refresh. An app iOS no longer has is dropped from the record, except while
   the app queue runs (`busy`): it may still be installing, so it is neither dropped nor signed again. An app that
   already lasts longer than a free profile (a paid certificate's) is left alone. Apple is asked once per run, one
   profile per App ID. A profile iOS refuses is reported, not signed again. iFizBox's own profile is renewed too when
@@ -310,8 +317,15 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   `signing.inspect` (to learn the IPA's own bundle ID), and installed by that look's token; a Custom Install sheet's token
   uses the bundle ID the callers pass (`bundleId`), and a typed bundle ID names the App ID. With no session, an
   `app_id_taken` refusal shows the same **Sign In Needed** alert as the queue, with no second failure alert (the progress
-  page shows the reason). An older shell without `signing.inspect` installs as before. App Refresh and Re-sign All don't
-  make a lapsed App ID again first. Tests: `web/app/signing/freeappid.test.js`, `web/app/signing/route-freeappid.test.js`.
+  page shows the reason). An older shell without `signing.inspect` installs as before.
+- **Re-signs outside the app queue** make a lapsed App ID again too. A Re-sign from Installed's Manage (`signing.resign`,
+  `screens/queue.js` `resignApp`) goes through `withOwnAppId` as an install does: the app's App ID is made again if
+  lapsed, its profile handed in, then the shell signs. `resignAll` (`screens/signed-apps.js`) first runs
+  `handFreeProfiles`, which makes the lapsed App IDs of the recorded apps and hands their profiles in before
+  `signing.resignAll` signs. The Re-sign All button queues its re-signs, and the queue makes their App IDs as above.
+  With no Apple session of the same team nothing is made, and the shell may refuse `app_id_mismatch`. An app installed
+  under the setup's App ID stays under it. Tests: `web/app/signing/freeappid.test.js`, `web/app/signing/route-freeappid.test.js`,
+  `web/app/screens/resign-freeappid.test.js`, `web/app/core/freeroute.test.js`.
 
 ## Own provisioning profiles (App Store Connect API key)
 
