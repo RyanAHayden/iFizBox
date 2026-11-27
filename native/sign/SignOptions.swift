@@ -13,6 +13,9 @@ struct SignOptions {
     // F237: keep the app's own bundle ID in Info.plist (the profile's App ID only in the entitlements), so the signed
     // app replaces the original rather than sitting beside it, and gets its own pushes. False: the old way.
     var keepBundleID = true
+    // B509: false when the page's params had no keepBundleId: signing still keeps the ID (above), but saved Sign
+    // Options record no choice (IPALibrary.setOptions), so Settings' Keep Bundle IDs decides.
+    var keepChosen = true
     // F288: tweaks to inject (Tweaks.swift), unpacked and prepared by the page; nil for none.
     var tweaks: TweakSet?
     // F329a: the Lite app's own re-sign with your own icon (AppIcon.swift OwnIcons.selfSource): files of Info.plist's
@@ -59,7 +62,7 @@ struct SignOptions {
         }
         removeExtensions = (p["removeExtensions"] as? [String] ?? []).map { $0.hasSuffix("/") ? String($0.dropLast()) : $0 }
         if let f = p["fixArm64e"] as? Bool { fixArm64e = f }
-        if let k = p["keepBundleId"] as? Bool { keepBundleID = k } // F237: absent keeps it (the default)
+        if let k = p["keepBundleId"] as? Bool { keepBundleID = k } else { keepChosen = false } // F237: absent keeps it (the default)
         tweaks = try TweakSet(json: p["tweaks"]) // F288
         credit = SourceCredit(json: p["credit"]) // B247
     }
