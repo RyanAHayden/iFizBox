@@ -75,7 +75,7 @@ export async function inspectAndInstall({ url, name = "", onInstalled = () => {}
         started = true;
         close();
         const shown = params.name || info.app?.name || name;
-        resolve(await install({ url, name: shown, onInstalled, params, ...(listed ? { listed } : {}),
+        resolve(await install({ url, name: shown, onInstalled, params, bundleId: info.app?.bundleId ?? null, ...(listed ? { listed } : {}), // B502a1a
           after: (result, hh) => followInstall(native, installedId(result, params, info), hh, { later, name: shown, device: result?.device }) }));
       },
       onClose: () => { if (!started) resolve(false); },

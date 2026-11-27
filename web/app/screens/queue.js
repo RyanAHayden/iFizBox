@@ -608,7 +608,8 @@ export async function installCustom(job, { sc, follow = null, now = Date.now(), 
   if (params.token) job.options.token = null;
   const after = follow ?? (async (result, h) => (await import("../signing-sheet.js")).followInstall(native, result?.bundleId || job.options.signsAs || "", h));
   return sc.installOnDevice({ url: job.url, name: job.options.name || job.name || "", params,
-    after, ...listedOf(job), ...(sc.isSelfIpa(job.url) ? { host: true } : {}) });
+    ...(params.token ? { bundleId: job.id } : {}), // B502a1a: the look's token says no bundle ID of its own
+    after,...listedOf(job), ...(sc.isSelfIpa(job.url) ? { host: true } : {}) });
 }
 
 // F91: a "resign" job: signing.resign {bundleId} signs the app again from the phone's record (Re-sign All's path,

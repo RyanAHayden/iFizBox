@@ -107,8 +107,9 @@ function serverRetry(opts, deps) {
 
 // F400: `listed` ({ version, size }, core/appqueue.js listedOf): what the source lists for `url`; the shell uses an IPA
 // it kept from a failed install of that url only when it still matches
-async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, params = null, after = null, host = false, server = false, listed = null },
-  { native, hud = progressHUD, alert = showAlert, go = openRoute, later = setTimeout, follow = null } = {}) {
+// B502a1a: `bundleId`: the app's own ID when `params` holds a look's token (a free Apple ID's App ID is named after it)
+async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, params = null, after = null, host = false, server = false, listed = null, bundleId = null },
+  { native, hud = progressHUD, alert = showAlert, go = openRoute, later = setTimeout, follow = null, session = null } = {}) {
   forgetRoute();
   // F366: `server`: this install goes through the default Signing Server whatever Install Apps With says
   const route = server ? {} : await chooseRoute({ native, alert });
@@ -131,10 +132,9 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   let result;
   const wait = cellularAsk({ alert }).watch(() => stopNative(native)); // F417
   h.onCancel?.(() => wait.end());
+  let own = null; // B502a1a
   try {
-    // manifestServer: the signing server hands iOS the manifest while iFizBox serves the IPA over plain HTTP at
-    // 127.0.0.1 (nothing to set up on the phone; the server sees only the app's ID, version and name).
-    result = await untilCancel(h, askInsecure((extra) => bridge(native).call("signing.install", { ...withKeep(params ?? { url }), ...(listed ? { listed } : {}), manifestServer, ...refusing(), ...(host ? { host: true } : {}), ...route, ...extra }, (ev) => {
+    const onEvent = (ev) => {
       if (ev?.log) h.page?.raw?.(ev.log); // the shell's console lines (Sideload.swift install's log)
       // B111: This iPhone: the copy's and installd's own percents ({here}), not the overall "Installing on this iPhone"
       const here = route.route ? hereLabel(ev) : null;
@@ -152,7 +152,22 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
       // B262: the download's last MB/s (the shell's once-a-second {rate}) stays on the label between its ticks
       if (ev?.phase === "downloading" && ev.rate != null) rate = Number(ev.rate) || 0;
       if (t) h.set(ev?.phase === "downloading" && rate > 0 ? `${t}, ${rateText(rate)}` : t);
-    }), { alert, url: params ? params.url ?? null : url })); // B469: params with a url (Lite's own update with {ownIcon})
+    };
+    let sending = params ?? { url };
+    // B502a1a: only This iPhone installs a free profile's app (the shell answers free_profile on the server route)
+    if (route.route) {
+      own = await untilCancel(h, ownAppId({ native, params: sending, listed, name, bundleId, self, h, alert, go, session, onEvent }));
+      sending = own.params;
+    }
+    // manifestServer: the signing server hands iOS the manifest while iFizBox serves the IPA over plain HTTP at
+    // 127.0.0.1 (nothing to set up on the phone; the server sees only the app's ID, version and name).
+    const send = () => {
+      // B502a1a: Cancel tapped while the App ID was being made: nothing is installed
+      if (h.cancelled) return Promise.reject(Object.assign(new Error("Cancelled"), { code: "cancelled" }));
+      return untilCancel(h, askInsecure((extra) => bridge(native).call("signing.install", { ...withKeep(sending), ...(listed ? { listed } : {}), manifestServer, ...refusing(), ...(host ? { host: true } : {}), ...route, ...extra }, onEvent),
+        { alert, url: sending.url ?? null })); // B469: params with a url (Lite's own update with {ownIcon})
+    };
+    result = await (own ? untilCancel(h, own.install(send)) : send());
   } catch (e) {
     const stopped = wait.end();
     if (h.cancelled) return false;
@@ -166,6 +181,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
       return false;
     }
     if (e?.code === "cancelled") { h.hide(); return false; } // B104: Cancel on This Download Is Not Secure
+    if (own?.asked(e)) { failed(h, `${e.message}.`); return false; } // B502a1a: the Sign In Needed prompt is up
     let why = deviceError(e, name);
     if (route.route) why = await routeWords(e, why, native); // B316: the route's own words; kept until a check passes
     failed(h, why.message);
@@ -229,4 +245,42 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   // iOS asks "Install …?" over the app: the progress page ends on Done (signed and handed to iOS), Return under it.
   later(() => (h.done ? h.done("Done") : h.hide()), 1200);
   return true;
+}
+
+// ---- B502a1a: a free Apple ID: the app's own App ID before signing.install ---------------------------------------
+// As the app queue's signing.prepare (signing/freeappid.js withOwnAppId): the App ID <bundle id>.<TEAMID> is made or
+// reused and its profile handed in before the shell signs; app_id_taken shows the Sign In Needed prompt. The App ID is
+// named after the IPA's own bundle ID, which signing.install only answers once it is installed, so with Apple's session
+// an IPA not looked at yet is looked at first (signing.inspect) and installed by that look's token.
+//   -> { params (signing.install's), install(send), asked(error): the prompt is already up for it }
+async function ownAppId({ native, params, listed, name, bundleId, self, h, alert, go, session, onEvent }) {
+  const free = await import("./freeappid.js");
+  const n = bridge(native);
+  const live = session ?? free.liveSession;
+  let sending = params;
+  const job = { id: self ? IFIZBOX_ID : bundleId, name };
+  if (!self && !params.token && params.url) {
+    const s = await live();
+    const held = s ? await free.pinnedProfile(n) : null;
+    if (held && s.teamId === held.team) {
+      const { url, ...edits } = params;
+      try {
+        const info = await askInsecure((extra) => n.call("signing.inspect",
+          { ...withKeep({ url }), ...(listed ? { listed } : {}), ...extra }, onEvent), { alert, url });
+        sending = { ...edits, token: info.token };
+        job.id = info.app?.bundleId;
+        job.name = name || info.app?.name;
+      } catch (e) {
+        if (!/unknown method/i.test(String(e?.message ?? e))) throw e; // an older shell: install as before
+      }
+    }
+  }
+  return {
+    params: sending,
+    asked: (e) => e?.message === free.SIGN_IN_ROW,
+    // The answer is wrapped: withOwnAppId signs again when it names another bundle ID, and an install is done once.
+    install: async (send) => (await free.withOwnAppId(job, sending, async () => ({ result: await send() }), {
+      native: n, alert, session: live, log: (line) => h.page?.raw?.(line), go: () => { h.hide(); go(["signing"]); },
+    })).result,
+  };
 }

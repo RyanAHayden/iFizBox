@@ -286,7 +286,8 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   held profile's App ID, and a second such app is refused (`app_id_taken`). An app already installed under the held
   profile's App ID stays there. `signing.inspect` answers `pinned` and `freeAppId`.
 - **Making each app's App ID.** Before the app queue signs an app under a free explicit profile (an install, an update
-  or a queued Re-sign), `web/app/signing/freeappid.js` (called by `signing/queue.js` `prepareOnDevice`) makes or reuses
+  or a queued Re-sign), `web/app/signing/freeappid.js` (called by `signing/queue.js` `prepareOnDevice`; installs outside
+  the queue use the same step, see Outside the app queue below) makes or reuses
   the App ID `<bundle ID>.<TEAMID>` (`core/freeroute.js` `ensureAppId`), downloads its profile and hands it in with
   `signing.addProfile`. The bundle ID is the typed one if one was typed, else the one the source, the library or the
   record lists. An app already installed under the held profile's App ID stays there, and no App ID is made for it; a
@@ -297,9 +298,16 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   ended by `endFreeSession`), so after the app is relaunched there is none until the user signs in again (Use a Free
   Apple ID > Sign In Again). With no session the sign goes ahead with whatever profile the shell already keeps, and
   installs that need no App ID of their own still work. If the shell then refuses `app_id_taken`, a **Sign In Needed**
-  alert (**Cancel** / **Open**) goes to Signing, and the row says to sign in and install again.
-- **Outside the app queue**, an install (`signing.install`, such as Custom Install's progress page) makes no App ID.
-  App Refresh and Re-sign All don't make a lapsed App ID again first. Tests: `web/app/signing/freeappid.test.js`.
+  alert (**Cancel** / **Open**) goes to Signing, and the row (or an install's progress page) says to sign in and install again.
+- **Outside the app queue**, an install (`signing.install`: plain Install with its progress page, Custom Install, Install a
+  Copy) makes or reuses the App ID and hands its profile in before signing too, through `signing/freeappid.js`
+  `withOwnAppId` (called from `ownAppId` in `signing/route.js`), and only on the This iPhone route. When there is a free
+  explicit profile and Apple's session of the same team, an IPA not looked at yet is first looked at with
+  `signing.inspect` (to learn the IPA's own bundle ID), and installed by that look's token; a Custom Install sheet's token
+  uses the bundle ID the callers pass (`bundleId`), and a typed bundle ID names the App ID. With no session, an
+  `app_id_taken` refusal shows the same **Sign In Needed** alert as the queue, with no second failure alert (the progress
+  page shows the reason). An older shell without `signing.inspect` installs as before. App Refresh and Re-sign All don't
+  make a lapsed App ID again first. Tests: `web/app/signing/freeappid.test.js`, `web/app/signing/route-freeappid.test.js`.
 
 ## Own provisioning profiles (App Store Connect API key)
 

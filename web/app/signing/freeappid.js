@@ -41,7 +41,7 @@ export async function addAppProfile({ native, portal, teamId, bundleId, name = n
   return { identifier, made };
 }
 
-const liveSession = async () => {
+export const liveSession = async () => {
   const m = await import("../screens/free-apple-id.js");
   const s = m.freeSession();
   return s ? { ...s, end: m.endFreeSession } : null;
