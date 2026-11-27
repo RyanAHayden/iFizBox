@@ -1029,7 +1029,7 @@ enum IDevice {
                 ilog("first connect reset during pair-verify through \(via): \(f.text); the pairing is stale")
                 note("The first connection closed: \(f.errorDescription ?? f.text)") // B416: the raw text, grey
                 throw pairAgain(f, via: via)
-            } catch let f as Failure where run.connected && !cancelled() && HereRecheck.shouldReconnect(code: f.code, lib: f.lib, reconnecting: firstDrop != nil) {
+            } catch let f as Failure where run.connected && HereRecheck.shouldReconnect(code: f.code, lib: f.lib, reconnecting: firstDrop != nil) && !cancelled() {
                 attempt += 1
                 if firstDrop == nil { firstDrop = f }
                 let stage = run.installSent ? "while iOS was installing it" : run.copied ? "after the copy" : "during the copy (\(mb(run.sent)) of \(mb(size)))"
