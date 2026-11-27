@@ -235,7 +235,7 @@ test("Re-sign Reminder: shown in the sideload build, and its value goes to signi
   assert.equal(await syncReminder(s.get, async () => { throw new Error("unknown method"); }), null);
 });
 
-test("the sheet on a free Apple ID's profile (pinned): no Keep Bundle ID switch or notes, and no keepBundleId sent", async () => {
+test("the sheet on a free Apple ID's profile (pinned): no Keep Bundle ID switch or notes", async () => {
   const as = "com.rileytestut.Delta.TEAM123456";
   const free = { ...INFO, pinned: true, keepBundleId: false, signsAs: as, appIdAs: as, profileAppId: as };
   const draw = (info) => withDocument(async (doc) => {
@@ -254,9 +254,8 @@ test("the sheet on a free Apple ID's profile (pinned): no Keep Bundle ID switch 
   assert.ok(!pinned.labels.includes("Keep Bundle ID"));
   assert.doesNotMatch(pinned.footers, /original|keeps its own ID|notifications/i);
   assert.equal(pinned.edits.bundleId, as);
-  assert.equal("keepBundleId" in pinned.edits, false);
-  assert.deepEqual(installParams(free, pinned.edits), { token: "tok1" });
-  // any other profile keeps the switch and sends it
+  assert.deepEqual(installParams(free, pinned.edits), { token: "tok1", keepBundleId: false }); // as inspect answered
+  // any other profile keeps the switch
   const other = await draw({ ...INFO, pinned: false, keepBundleId: true });
   assert.equal(other.keep, 1);
   assert.ok(other.labels.includes("Keep Bundle ID"));

@@ -185,10 +185,9 @@ export function openSignSheet(info, { onSign, onClose = () => {}, fallbackName =
   const app = info?.app ?? {};
   // F237: keepBundleId, the Keep Bundle ID switch below, starts as the global setting (inspect echoes what it got)
   const keep0 = typeof info?.keepBundleId === "boolean" ? info.keepBundleId : storedKeep();
-  // B502a2: a free Apple ID's profile (pinned): iOS installs the app only as its App ID, so there's no choice to show or send
+  const edits = { name: app.name || fallbackName, bundleId: signsAsFor(info, keep0), icon: null, removeExtensions: [], keepBundleId: keep0 };
+  // B502a2: a free Apple ID's profile (pinned): iOS installs the app only as its App ID, so there's no choice to show
   const pinned = info?.pinned === true;
-  const edits = { name: app.name || fallbackName, bundleId: signsAsFor(info, pinned ? undefined : keep0), icon: null, removeExtensions: [],
-    ...(pinned ? {} : { keepBundleId: keep0 }) };
   const box = el("div", "sheet-scroll page-body grouped sign-sheet");
 
   // The head: the icon, the name and what it signs as, like an App Store page's top.
