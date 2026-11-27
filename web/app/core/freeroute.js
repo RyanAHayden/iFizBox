@@ -27,7 +27,7 @@
 //   FREE_EXPIRY_WARNING                  3 days: "Expiring soon" on this route (not the certificate route's setting)
 //   freeExpiry(expires, now)             { state: "ok" | "soon" | "expired", days }
 //   setupError(e)                        an alert { title, message } for a setup step that failed
-//   await refreshApps({ native, portal, teamId, appIds, appId, hud, alert })
+//   await refreshApps({ native, portal, teamId, appIds, appId, hud, alert, busy })
 //                                        F458, the app, after a setup: signing.refresh renews the installed apps'
 //                                        profiles (nothing signed or installed again) and signs the rest again
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -223,7 +223,7 @@ export async function otherProfiles({ portal, teamId, appIds = [], apps = [], ap
 }
 
 // With no recorded app there is nothing to do: no progress page, no connection.
-export async function refreshApps({ native, portal, teamId, appIds, appId, hud, alert }) {
+export async function refreshApps({ native, portal, teamId, appIds, appId, hud, alert, busy = () => false }) {
   let page = null;
   const fail = async (message) => {
     page?.fail(message);
@@ -234,7 +234,8 @@ export async function refreshApps({ native, portal, teamId, appIds, appId, hud, 
     if (!apps.length) return null;
     const profiles = (await otherProfiles({ portal, teamId, appIds, apps, appId })).map(b64encode);
     page = hud("Refreshing Apps");
-    const r = await callWithStall(native, "signing.refresh", { profiles, route: "idevice" }, (ev) => {
+    // F459: while the app queue runs, the shell forgets no app
+    const r = await callWithStall(native, "signing.refresh", { profiles, route: "idevice", busy: !!(await busy()) }, (ev) => {
       if (ev?.log) page?.page?.raw?.(ev.log);
       const t = resignLabel(ev);
       if (t) page?.set(t);

@@ -340,7 +340,7 @@ test("F458: one profile per other App ID of the team; none for the setup's own, 
   assert.deepEqual(portal.log, ["downloadProfile OTHER"]);
 });
 
-function refreshRig({ apps, reply = { renewed: ["b0"], done: [], failed: [] }, throws = null }) {
+function refreshRig({ apps, reply = { renewed: ["b0"], done: [], failed: [] }, throws = null, busy }) {
   const calls = [], page = [], alerts = [];
   const native = { async call(method, params, onEvent) {
     calls.push([method, params]);
@@ -351,7 +351,7 @@ function refreshRig({ apps, reply = { renewed: ["b0"], done: [], failed: [] }, t
   } };
   const hud = (label) => { page.push(label); return { set: (t) => page.push(t), done: (t) => page.push(t), fail: (m) => page.push(`fail ${m}`),
     page: { raw: (l) => page.push(l) } }; };
-  const run = () => refreshApps({ native, portal: fakePortal(), teamId: TEAM, appIds: appIdList, appId: `com.x.${TEAM}`, hud, alert: async (a) => alerts.push(a) });
+  const run = () => refreshApps({ native, portal: fakePortal(), teamId: TEAM, appIds: appIdList, appId: `com.x.${TEAM}`, hud, alert: async (a) => alerts.push(a), busy });
   return { run, calls, page, alerts };
 }
 
@@ -382,6 +382,14 @@ test("F458: an app that couldn't be refreshed is named", async () => {
 });
 
 // ---- F459: App IDs as BariStore keeps them ----
+test("F459: the refresh tells the shell when the app queue runs", async () => {
+  for (const running of [false, true]) {
+    const rig = refreshRig({ apps: recorded(`${TEAM}.com.other`), busy: () => running });
+    await rig.run();
+    assert.equal(rig.calls.at(-1)[1].busy, running);
+  }
+});
+
 const at = new Date("2026-11-27T00:00:00Z");
 
 test("F459: an app deleted from the phone is forgotten; a running task or an empty list drops nothing", () => {
