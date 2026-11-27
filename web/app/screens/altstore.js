@@ -128,9 +128,6 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
   queue = null, name = "", { custom = localSigning() && !ipaInstallAvailable(), customize = null, jailbreak = ipaInstallAvailable(),
     ipaInstall = openIpaInstall, site = detectMode() === "site", needsCertificate = siteCertificateAlert, appId = null,
     gate = siteGateRows, bundleId = null, sign = signAndInstall, iconUrl = null } = {}) {
-  // F452: a successful install counts once for Popular (best effort; the App Store hand-off below isn't counted)
-  const counted = onInstall;
-  onInstall = () => { try { (getBackend().installs ?? null)?.count(appId || bundleId)?.catch?.(() => {}); } catch { /* best effort */ } counted(); };
   const o = installOptions(version, sourceUrl);
   // F257: the listed size (and the icon, for Install IPAs' row) go to the website's Install, which checks the size first
   const own = { bundleId: bundleId || null, version: version?.version ?? "", size: Number(version?.size) || null, iconUrl: iconUrl || null };
@@ -140,7 +137,7 @@ export function installRows(version, sourceUrl, opener = (u) => window.open(u, "
     rows.push({ label: o.itms ? "Install IPA" : "Install", subtitle: "With the jailbreak",
       onClick: () => ipaInstall({ url: o.download, name, ...listedOf({ url: o.download, version: own.version, size: own.size }), onInstalled: () => onInstall() }) });
   } else if (o.itms) {
-    rows.push({ label: "Install", subtitle: "Signed by the source", onClick: () => { counted(); location.href = o.itms; } });
+    rows.push({ label: "Install", subtitle: "Signed by the source", onClick: () => { onInstall(); location.href = o.itms; } });
   } else if (o.download && site && !isSelfIpa(o.download)) {
     // F96: other apps go to iFizBox first; Install on the Website (F93's browser signing) waits for the warning.
     const install = () => sign({ url: o.download, name, ...own, onInstalled: () => onInstall() });

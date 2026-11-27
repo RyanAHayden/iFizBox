@@ -436,15 +436,6 @@ function reviewRatings(now = Date.now()) {
   }
   return Promise.race([ratingsKept.ratings, new Promise((done) => setTimeout(done, RATINGS_WAIT, {}))]);
 }
-// F452: install counts for Popular, kept like the ratings (5 minutes; no answer in RATINGS_WAIT = no counts this time).
-let installsKept = null; // { at, counts: Promise }
-function installCounts(now = Date.now()) {
-  if (!installsKept || now - installsKept.at > RATINGS_FOR) {
-    const api = getBackend().installs;
-    installsKept = { at: now, counts: api?.counts ? api.counts().catch(() => ({})) : Promise.resolve({}) };
-  }
-  return Promise.race([installsKept.counts, new Promise((done) => setTimeout(done, RATINGS_WAIT, {}))]);
-}
 // F450a: a package with no rating here falls back to its depiction's (Sileo) stars. Per list at most DEPICTION_CAP
 // depictions are fetched, DEPICTION_PARALLEL at a time, each once per session (a miss is kept too); what isn't
 // back within DEPICTION_WAIT ranks unrated this time and is there next time.
@@ -478,11 +469,11 @@ async function refineByRating(rows, { sort, ...filters }) {
   return mod.rankByRating(out, await depictionRatings(out, ours, mod).catch(() => ours));
 }
 async function popularByRating(opts) {
-  const [ours, installs] = await Promise.all([reviewRatings(), installCounts()]);
+  const ours = await reviewRatings();
   const mod = await import("./core/ratingsort.js");
-  const wide = await ask("popular", [{ ...opts, limit: 200, ratings: ours, installs }]);
+  const wide = await ask("popular", [{ ...opts, limit: 200, ratings: ours }]);
   const ratings = await depictionRatings(wide, ours, mod).catch(() => ours);
-  return ask("popular", [{ ...opts, ratings, installs }]);
+  return ask("popular", [{ ...opts, ratings }]);
 }
 
 export const catalog = {
