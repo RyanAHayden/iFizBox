@@ -129,7 +129,8 @@ For people with no certificate. The certificate route stays the recommended one:
 time, makes 10 App IDs a week, and its profiles last 7 days. iOS refuses apps with a free profile from a website
 (`MIInstallerErrorDomain` 111, "free provisioning profile … not allowed to be installed from this source"), so the
 website does the Apple side only: sign-in, the development certificate and the profiles. On the website, the first
-install takes a computer once (**Download for a Computer Install**, under Ready). The sideload app does the Apple side
+install takes a computer once (**Download for a Computer Install**, under Ready), or on iOS 27 the iPhone itself
+(**Install Without a Computer**, sideload.md "Phone Setup"). The sideload app does the Apple side
 itself and installs with the identity it keeps (below).
 
 On the website it sits in How Signing Works (the walkthrough Install opens when there's no certificate), under the two steps, as
@@ -156,7 +157,8 @@ The website's flow (`web/app/screens/free-apple-id.js`):
 3. **Ready**: the team, certificate and profile dates, **Save for the App** (a `.zip` with the `.p12`, its password
    and the profile, which the app's Select All Files imports), **Download for a Computer Install**
    (`screens/computer-install.js`; once an install has made a key, **Finish Setup** is the link that gives the app that
-   key), the Developer Mode + Trust note, Refresh Profile, and Forget Free Apple ID
+   key; once a code shows, on iOS 27 or later and only when the website offers Phone Setup, **Install Without a Computer**
+   follows it, sideload.md), the Developer Mode + Trust note, Refresh Profile, and Forget Free Apple ID
    (removes the key and certificate from this browser; Apple's copy isn't revoked).
 
 **Download for a Computer Install** signs the newest release's IPA in the browser with the free identity
@@ -166,7 +168,9 @@ website's settings link goes in as `web/transfer.link`). The Free Apple ID recor
 `ifizbox-identity.plist` goes in: it would hold the same certificate and password in the clear. The key is made once
 and kept in this browser (localStorage `ifizbox.freeid.key`); it never goes to the Worker. The IPA is uploaded
 (`/sign/upload`), and `POST /sign/setup` makes a code for its SHA-256 (the default bundle ID and pairing path). The code
-shows until it expires, with the two one-liners of sideload.md. **Make a New Code** re-uploads the same signed IPA.
+shows until it expires, with the two one-liners of sideload.md. On iOS 27 and later, when the website offers Phone Setup
+(the published setup script has it; not with an expired profile), the code also shows **Install Without a Computer**: the
+Open Minis line with that code (sideload.md "Phone Setup"). **Make a New Code** re-uploads the same signed IPA.
 **Finish Setup** is the link `ifizbox://free-id#<key>` (Safari never sends a fragment to a server), in the group
 headed After the Install. **Save the IPA** signs a second time, apart, with the record in the clear and
 `ifizbox-identity.plist`, for other tools; its finished page has a Save the IPA button. With the profile missing or
@@ -199,7 +203,7 @@ stays in the browser and reaches the phone by Finish Setup's link, never through
 portal, the limit and Cancel), `screens/free-apple-id.test.js` (the alerts' effects, storage, the hand-off zip read
 back by the import's unzip, the relay check), `worker/test.mjs` (`/apple/status`). The computer install:
 `screens/computer-install.test.js` (the key, Finish Setup's link, the code from the Worker with KV in memory, the block's
-states), `websign-job.test.js` (the uploaded IPA's `free-id.json` decrypts with the kept key, no identity plist in it) and
+states, and when Install Without a Computer shows), `websign-job.test.js` (the uploaded IPA's `free-id.json` decrypts with the kept key, no identity plist in it) and
 `websign-free.test.js` (the free option's entitlements in zsign's own signature).
 
 **In the sideload app**

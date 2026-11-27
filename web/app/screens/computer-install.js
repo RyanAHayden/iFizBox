@@ -12,9 +12,14 @@
 //   await makeCode(signed, deps)         { code, until }: uploads it and asks for the code
 //   computerSections(state, now)         pure: what the block shows: { stage: "off" | "start" | "code" | "expired", footer }
 //   setupCommands()                      pure: [{ header, prompt, cmd, footer }], one per kind of computer
+//   phoneSetupOffered(ios, script)       pure (F465b): Install Without a Computer is offered: iOS 27 or later, and the
+//                                        published setup script has Phone Setup
+//   phoneSetupCommand(code)              pure: the line for Open Minis
 //   computerInstallBlock({ id, record, expired, fix, ask, save, store })   the block; fix: { label, onClick } renews the profile;
-//                                        record: the Free Apple ID record the app takes on launch (B474, web/free-id.json)
-//   resetComputerInstall()               forget the signed IPA and code (another profile, or the identity forgotten)
+//                                        record: the Free Apple ID record the app takes on launch (B474, web/free-id.json);
+//                                        ios, fetcher: this iPhone's (the user agent's) and the page's fetch, for the tests
+//   resetComputerInstall(next)           forget the signed IPA and code (another profile, or the identity forgotten);
+//                                        next: what the block holds instead (tests)
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped, el } from "../nav/ui.js";
 import { NAME, DOMAIN, BUNDLE_ID } from "../brand.js";
@@ -24,6 +29,8 @@ import { joinPieces } from "../core/pieces.js";
 import { sha256Hex } from "../core/sha256.js";
 import { newRecordKey, sealRecord } from "../core/websign.js"; // F460
 import { KEYS } from "../core/storagekeys.js";
+import { iosFromUserAgent } from "../core/compat.js"; // F465b
+import { VPN_APP, VPN_APP_LINK } from "../core/installroute.js"; // F465b
 
 export const COMPUTER_LABEL = "Download for a Computer Install";
 export const COMPUTER_FOOTER = `Signs ${NAME} here and shows a code. A computer with the iPhone plugged in installs it, once.`;
@@ -43,8 +50,48 @@ export const setupCommands = () => [
 
 export const FINISH_HEADER = "After the Install";
 export const FINISH_LABEL = "Finish Setup";
-export const FINISH_FOOTER = `Once the computer has installed ${NAME}, tap this on the iPhone to give it your certificate.`;
+export const FINISH_FOOTER = `Once ${NAME} is installed, tap this on the iPhone to give it your certificate.`;
 export const FINISH_URL = "ifizbox://free-id#";
+
+// F465b: Phone Setup (docs/sideload.md), the same setup command run on the iPhone inside Open Minis. It is offered only
+// once the published setup script has it (PHONE_SETUP_MARK, in tools/setup/install.sh.in): the site may be deployed
+// before the setup command is released.
+export const PHONE_HEADER = "Install Without a Computer";
+export const OPEN_MINIS = "Open Minis";
+export const OPEN_MINIS_LINK = "https://apps.apple.com/app/id6759188481";
+export const PHONE_APPS_FOOTER = `Free App Store apps. Let ${OPEN_MINIS} use Local Network and Notifications, then connect ${VPN_APP} on Wi-Fi.`;
+export const PHONE_LINE_FOOTER = `Run this in the ${OPEN_MINIS} terminal. It asks for a pairing code, which arrives as a notification.`;
+export const PHONE_START_FOOTER = `Signs ${NAME} here and shows a code. A computer installs it once, or this iPhone can.`;
+export const PHONE_SETUP_MARK = "minis-bonjour";
+
+export const phoneSetupCommand = (code) => `wget -qO- https://${DOMAIN}/sign/setup.sh | sh -s -- ${code}`;
+const phoneIos = (ios) => Number.parseInt(ios, 10) >= 27;
+export const phoneSetupOffered = (ios, script) => phoneIos(ios) && String(script ?? "").includes(PHONE_SETUP_MARK);
+
+// The published script, read once a page load (per fetch); no answer is asked again the next time.
+const published = new WeakMap();
+async function publishedScript(fetcher) {
+  if (published.has(fetcher)) return published.get(fetcher);
+  try {
+    const res = await fetcher("/sign/setup.sh", { cache: "no-store" });
+    if (!res.ok) return "";
+    const script = await res.text();
+    published.set(fetcher, script);
+    return script;
+  } catch { return ""; } // offline: not offered this time
+}
+
+function terminalGroup(header, cmd, prompt, footer) {
+  const g = el("div", "group");
+  if (header) g.append(el("h2", "group-header", header));
+  g.append(terminal([{ cmd, prompt }], cmd), el("p", "group-footer", footer));
+  return g;
+}
+const phoneParts = (code) => [
+  grouped([{ header: PHONE_HEADER, rows: [{ label: `Get ${OPEN_MINIS}`, href: OPEN_MINIS_LINK }, { label: `Get ${VPN_APP}`, href: VPN_APP_LINK }],
+    footer: PHONE_APPS_FOOTER }]),
+  terminalGroup(null, phoneSetupCommand(code), "$ ", PHONE_LINE_FOOTER),
+];
 
 const local = (store) => {
   if (store !== undefined) return store;
@@ -77,7 +124,7 @@ export function finishSetupSection(store) {
 
 const state = { signed: null, code: null, until: 0, plain: null }; // plain: Save the IPA's, signed apart (F460)
 let busy = false, redraw = () => {}; // redraw: the block on the page now
-export function resetComputerInstall() { Object.assign(state, { signed: null, code: null, until: 0, plain: null }); }
+export function resetComputerInstall(next = {}) { Object.assign(state, { signed: null, code: null, until: 0, plain: null, ...next }); }
 
 export function computerSections({ expired = false, signed = null, code = null, until = 0 } = {}, now = Date.now()) {
   if (expired) return { stage: "off", footer: COMPUTER_OFF_FOOTER };
@@ -186,25 +233,24 @@ async function savePlain(id, ask, record, save) {
   }
 }
 
-export function computerInstallBlock({ id, record = null, expired = false, fix, ask, save, store }) {
+export function computerInstallBlock({ id, record = null, expired = false, fix, ask, save, store,
+  ios = iosFromUserAgent(globalThis.navigator?.userAgent), fetcher = globalThis.fetch }) {
   const box = el("div", "free-computer");
-  let timer = 0;
+  let timer = 0, phone = false;
   const draw = () => {
     clearTimeout(timer);
     const s = computerSections({ ...state, expired });
     const start = (label) => ({ label, cls: "free-primary", onClick: () => run(id, ask, record, store) });
     const parts = [];
     if (s.stage === "off") parts.push(grouped([{ header: "Computer Install", rows: [{ ...fix, cls: "free-button" }], footer: s.footer }]));
-    else if (s.stage === "start") parts.push(grouped([{ header: "Computer Install", rows: [start(COMPUTER_LABEL)], footer: s.footer }]));
+    else if (s.stage === "start") parts.push(grouped([{ header: "Computer Install", rows: [start(COMPUTER_LABEL)],
+      footer: phone ? PHONE_START_FOOTER : s.footer }]));
     else {
       const row = s.stage === "code" ? { label: "Code", detail: state.code, cls: "free-setup-code" } : start("Make a New Code");
       parts.push(grouped([{ header: "Computer Install", rows: [row], footer: s.footer }]));
       if (s.stage === "code") {
-        for (const c of setupCommands()) {
-          const g = el("div", "group");
-          g.append(el("h2", "group-header", c.header), terminal([{ cmd: c.cmd, prompt: c.prompt }], c.cmd), el("p", "group-footer", c.footer));
-          parts.push(g);
-        }
+        for (const c of setupCommands()) parts.push(terminalGroup(c.header, c.cmd, c.prompt, c.footer));
+        if (phone) parts.push(...phoneParts(state.code));
         timer = setTimeout(draw, Math.max(0, state.until - Date.now()) + 50);
         timer.unref?.();
       }
@@ -219,5 +265,12 @@ export function computerInstallBlock({ id, record = null, expired = false, fix, 
   };
   redraw = draw;
   draw();
+  if (!expired && phoneIos(ios)) {
+    publishedScript(fetcher).then((script) => {
+      if (!phoneSetupOffered(ios, script)) return;
+      phone = true;
+      draw();
+    });
+  }
   return box;
 }
