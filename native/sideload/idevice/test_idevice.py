@@ -226,6 +226,21 @@ class OnePairingAtATime(unittest.TestCase):
         self.assertIn('"canceled: pairing stopped"', cancel)  # the left page's call still ends at once
 
 
+class HandedPairing(unittest.TestCase):
+    # F465a: a setup leaves its pairing in Documents/pairingFile.plist; the app takes it at launch. What it does with
+    # each kind of file runs for real in native/tests/pairlimit (test_pair_limit.py).
+    def test_taken_at_launch(self):
+        with open(os.path.join(NATIVE, "Sources", "App.swift")) as f:
+            app = f.read()
+        launch = app[app.index("didFinishLaunchingWithOptions"):app.index("return true")]
+        self.assertIn("IDeviceBridge.takeHandedPairing()", launch)
+
+    def test_the_setups_path(self):
+        self.assertIn('static let handedName = "pairingFile.plist"', read("IDeviceBridge.swift"))
+        with open(os.path.join(NATIVE, "..", "worker", "src", "setup.js")) as f:
+            self.assertIn('"Documents/pairingFile.plist"', f.read())
+
+
 class Built(unittest.TestCase):
     # The built IPA is checked by mkipa.py check right after native/build.sh builds it (the gate's last step). A
     # check here would read whatever native/build/ipa a checkout last built, from before a merge brought idevice in.

@@ -17,6 +17,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: notices)
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: notices)
         SignBridge.importBundled() // F75: the certificate the website put inside iFizBox's own IPA (bring, F93)
+        IDeviceBridge.takeHandedPairing() // F465a: the pairing Phone Setup or the computer setup left in Documents
         BackgroundCheck.register() // I3: before launch ends, as BGTaskScheduler requires (sideload build)
         return true
     }

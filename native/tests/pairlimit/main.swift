@@ -92,7 +92,13 @@ enum IDevice {
             usleep(2000)
         }
     }
-    static func importPairing(_ d: Data) throws -> Kind { .lockdown }
+    static let imported = Guarded<String?>(nil), importFails = Guarded<String?>(nil) // F465a
+    static func isLockdownRecord(_ d: Data) -> Bool { String(decoding: d, as: UTF8.self).hasPrefix("lockdown") }
+    static func importPairing(_ d: Data) throws -> Kind {
+        if let code = importFails.value { throw Failure(code: code, text: "no") }
+        imported.with { $0 = String(decoding: d, as: UTF8.self) }
+        return isLockdownRecord(d) ? .lockdown : .remotePairing
+    }
     static func verify() throws -> Kind { .remotePairing }
     static func deletePairing(_ k: Kind) {}
     static func pairing() -> (kind: Kind, data: Data)? { nil }
@@ -223,6 +229,33 @@ do { // the permission alert answered after the limit
     idle()
     Notes.grant.value?()
     check("notifications allowed too late post no expired code", Notes.shown.value == nil)
+}
+do { // F465a: the pairing a setup left in Documents
+    let dir = URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent().appendingPathComponent("documents")
+    try! FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let file = dir.appendingPathComponent("pairingFile.plist")
+    func take(_ contents: String, ios: Int = 27, fails: String? = nil) -> (took: String?, left: Bool) {
+        try! Data(contents.utf8).write(to: file)
+        IDevice.imported.with { $0 = nil }
+        IDevice.importFails.with { $0 = fails }
+        IDeviceBridge.takeHandedPairing(in: dir, ios: ios)
+        let left = FileManager.default.fileExists(atPath: file.path)
+        try? FileManager.default.removeItem(at: file)
+        return (IDevice.imported.value, left)
+    }
+    var r = take("rp record")
+    check("a handed pairing is taken and its file deleted", r.took == "rp record" && !r.left)
+    r = take("lockdown record", ios: 26)
+    check("a lockdown record is taken before iOS 27", r.took == "lockdown record" && !r.left)
+    r = take("lockdown record", ios: 27)
+    check("a lockdown record on iOS 27 is deleted, not taken", r.took == nil && !r.left)
+    r = take("junk", fails: "bad_pairing")
+    check("a file that is no pairing is deleted", r.took == nil && !r.left)
+    r = take("rp record", fails: "keychain")
+    check("a pairing the Keychain won't keep stays for the next launch", r.took == nil && r.left)
+    IDevice.imported.with { $0 = nil }
+    IDeviceBridge.takeHandedPairing(in: dir, ios: 27)
+    check("no file, nothing taken", IDevice.imported.value == nil)
 }
 print(bad == 0 ? "all passed" : "\(bad) failed")
 exit(bad == 0 ? 0 : 1)

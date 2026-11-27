@@ -82,6 +82,33 @@ enum IDeviceBridge {
         }
     }
 
+    /// F465a: where Phone Setup and the computer setup leave the pairing they made, in the app's Documents.
+    static let handedName = "pairingFile.plist"
+
+    /// F465a: at launch, before the page asks for idevice.status: keeps the pairing a setup left in Documents (it
+    /// replaces the one kept) and deletes the file, a full credential for the phone that file sharing shows. A file
+    /// that is no pairing is deleted too; so is a lockdown record on iOS 27+, which can't connect there and must not
+    /// replace a pairing that does. It stays for the next launch when it can't be read or the Keychain won't keep it.
+    /// Sideload build only: the jailbreak app's Documents isn't its own.
+    static func takeHandedPairing(in dir: URL? = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first,
+                                  ios: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion) {
+        guard AppMode.current != .jailbreak, let file = dir?.appendingPathComponent(handedName),
+              let data = try? Data(contentsOf: file) else { return }
+        if ios >= 27 && IDevice.isLockdownRecord(data) {
+            IDevice.log("a lockdown record in Documents can't be used on iOS \(ios): deleted")
+        } else {
+            do {
+                let kind = try IDevice.importPairing(data)
+                IDevice.log("took the \(kind.rawValue) pairing left in Documents")
+            } catch let e as IDevice.Failure where e.code == "bad_pairing" {
+                IDevice.log("\(handedName) in Documents is no pairing: deleted (\(e.text))")
+            } catch {
+                return IDevice.log("the pairing in Documents is kept for the next launch: \(error.localizedDescription)")
+            }
+        }
+        do { try FileManager.default.removeItem(at: file) } catch { IDevice.log("\(handedName): \(error.localizedDescription)") }
+    }
+
     static func register(_ b: Bridge) {
         // Not on IDevice.queue: a connect can hold it, and the page asks for these meanwhile.
         b.on("idevice.status") { c in quick(c) { status() } }

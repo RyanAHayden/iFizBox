@@ -186,8 +186,8 @@ Signing Server in palera.in's place (below).
 `IDeviceSwift/InstallationProxy/InstallationProxy.swift` and `Heartbeat/` in IDeviceKit, over the Rust idevice
 library. The app talks to the phone's own lockdownd as if it were a computer on USB:
 
-- **Setup, once:** a pairing file (`pairingFile.plist`) made on a computer (with jitterbugpair, iloader or
-  idevice's tools) and imported, plus a loopback VPN, so the device is reachable at `10.7.0.1` (Feather uses the App Store app LocalDevVPN for that; iFizBox runs its own or uses LocalDevVPN (Connect Through), below). Feather keeps a lockdown heartbeat alive in the background. iOS 17.4+ uses
+- **Setup, once:** a pairing file (`pairingFile.plist`) made on a computer (the computer setup writes one; so do jitterbugpair, iloader or
+  idevice's tools) and handed to the app: taken from Documents at launch, or imported, plus a loopback VPN, so the device is reachable at `10.7.0.1` (Feather uses the App Store app LocalDevVPN for that; iFizBox runs its own or uses LocalDevVPN (Connect Through), below). Feather keeps a lockdown heartbeat alive in the background. iOS 17.4+ uses
   the RSD/RemotePairing tunnel (`tunnel_create_rppairing`); older versions use plain TCP lockdown.
 - **Install:** AFC writes the IPA to `PublicStaging/`, then `installation_proxy_install_with_callback` asks
   installd to install it, with real progress callbacks. It can update the app itself (`suspend:` in the call).
@@ -283,7 +283,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   "Paired" with a check, Check Connection (`idevice.verify`, Fix while it fails) and Forget Pairing. On cellular without Wi-Fi, iOS refuses
   the connect, so Check Connection, Fix and the other checks that the user asked for read `idevice.status` first and say
   "Can't Check on Cellular" instead, with nothing kept as a Route Failure; the automatic checks stay silent.
-  Before iOS 27 a pairing file made on a computer is imported instead. Settings shows no Developer Mode row (iOS needs it
+  Before iOS 27 a pairing file made on a computer is taken from Documents at launch (the computer setup puts it there), or imported. Settings shows no Developer Mode row (iOS needs it
   for every kind of profile, iOS 27's Ad Hoc too, and an app can't open without it): an install that fails because of it
   says so in its alert, with the steps to turn it on (core/installroute.js `developerModeFailure`). Each install
   (`chooseRoute`, signing-client.js) asks `idevice.status`: paired, with the app's profile carrying Network Extensions,
@@ -309,7 +309,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   still takes it down),
   so a queue of installs or a reconnect finds it on. A queue holds through an install's reconnects, however long the pauses between them (`installBegan` and `installEnded` in `IDevice.install`). The configuration is never On Demand. It is never removed, with Restore My VPN on or off (below), so it stays in
   Settings > VPN, only connected during installs, and iOS's "Add VPN Configurations" Allow comes once.
-  Setting up asks it: right after pairing (or importing a pairing file), the pairing page runs the same test as
+  Setting up asks it: right after pairing (or after a pairing file is taken or imported), the pairing page runs the same test as
   Test Connection (`vpn.test`) before it says Paired. iOS runs one VPN at a time, so your VPN pauses for the install, and since ours keeps Settings > VPN's checkmark, that VPN stays off until you open Settings > VPN, or, with Restore My VPN on (below), until the Shortcut turns it back on after the queue.
   On cellular, iOS refuses these connections and starts no VPN without a network, but keeps one that is up. So before
   each connect, `IDevice.install` calls `LocalVPN.waitOffCellular`. The built-in VPN comes on while data is on, then the
@@ -470,8 +470,8 @@ rest:
   passcode) and saving the record to usbmuxd, with `EnableWifiConnections` on for an app that imports the record
   (before iOS 27) to use it over the built-in VPN; asks for the code (three tries); reads `GET /sign/setup/<code>`;
   downloads the signed IPA (size and, when the website sent one, SHA-256 checked); installs it with installation_proxy; then, before
-  iOS 27, writes the pairing file into the app's container (house_arrest `VendContainer`, the path the website chose) and says where
-  to pick it, since the app never reads it by itself (only Import Pairing File brings a file in). From iOS 27 it writes nothing and
+  iOS 27, writes the pairing file into the app's container (house_arrest `VendContainer`, the path the website chose), which
+  the app takes at its next launch. The printed text still tells the person to pick it by hand (Import Pairing File); changing those words is a planned follow-up. From iOS 27 it writes nothing and
   says nothing about it, as the app pairs on the phone. Then it says what's left on the phone
   (Developer Mode, Trust the developer). The computer is trusted on every iOS, since the install needs it. It never asks for an
   Apple ID. `--check` only looks (found, trusted, Developer Mode), `--download-only` saves the IPA without an iPhone. The setup
@@ -501,8 +501,9 @@ Store app). The website does not offer it yet.
 5. The command installs the app.
 
 The pairing is kept in memory only and is written to the app's container as `Documents/pairingFile.plist`. The app
-does not read that file yet. A pairing made here replaces an installed app's pairing of the same name, so the app
-shows Pairing Lost until it is paired again (Fix).
+takes that file at its next launch (not when it comes back to the foreground): it keeps the pairing in place of its
+own and deletes the file, so no second pairing is needed. Until the app is next started after the file is written, it
+can show Pairing Lost (Fix).
 
 **Free Apple ID without a computer**: a free profile has no packet tunnel, so the built-in VPN can't start on it.
 This iPhone connects through LocalDevVPN instead (a free app on the App Store, not ours), which the person turns on
@@ -512,8 +513,10 @@ and iOS asks once to add its VPN configuration. Through it, Test Connection, an 
 over RemotePairing in under a second, with nothing of iFizBox's VPN on. Pairing after a Computer Install: on iOS 27,
 This iPhone pairs on the phone with a 6-digit code (Settings > Privacy & Security > Developer Mode > Pair with iFizBox),
 and the computer's pairing file is not used, so the setup writes none there. Before iOS 27, the setup writes the file
-into the app's folder (`Documents/pairingFile.plist`) and says where to pick it: Settings > Installation & Signing >
-This iPhone, Pair This iPhone, then Import Pairing File. With no computer, Phone Setup does the pairing.
+into the app's folder (`Documents/pairingFile.plist`). The app takes it at its next launch, so nothing needs importing.
+The command's printed text still tells the person to pick the file by hand (Settings > Installation & Signing > This
+iPhone, Pair This iPhone, then Import Pairing File); changing those words is a planned follow-up. Import Pairing File
+still brings in a file made another way. With no computer, Phone Setup does the pairing.
 
 **Jailbreak build**: the root helper's `install-ipa` installs an IPA through `LSApplicationWorkspace
 installApplication:withOptions:error:`, as AppSync's `appinst` does (`native/helper/README.md`). It needs AppSync
@@ -534,15 +537,18 @@ From reading code, not from a phone:
 - Upstream zsign's per-extension profiles: seen in its README only, not in the code.
 - The computer setup (checked on a phone, not from code): on an iPhone 15 Pro (iOS 27.0.1), from a Linux x86_64
   computer, with a free Apple ID, the sign-in, the checklist, the code, the one-line command, the install, the pairing
-  file written (not read by the app: that was not tested; that run used an earlier command, which wrote the file on
+  file written (not taken by the app: that run used an earlier command, which wrote the file on
   iOS 27 too), Trust and the first launch worked. An in-app install on the
   free profile does not work: iOS refuses the Signing Server's app (error 111 is the expected cause; the device log
   was not read), and This iPhone needs Network Extensions, which a free profile lacks. The app now says why instead of
   the log saying Completed. So no in-app route installs on a free profile, and each weekly re-sign needs a computer.
   The app showed no Free Apple ID group after the setup, so Refresh Profile was out of reach. Not run on a Mac or on
   real Windows, or for a second week's refresh; the Microsoft Store link to the Apple Devices app is from memory.
+- That a Phone Setup or computer setup run with this build leaves a file the app takes: not run end to end. The app's
+  taking of a file at launch was checked on an iPhone 15 Pro (iOS 27.0.1) with a file put in Documents by hand. No
+  lockdown record was tried on a phone before iOS 27 (the harness used stand-ins only).
 - The Files app showing `pairingFile.plist` (On My iPhone > iFizBox) and Import Pairing File before iOS 27, and on-phone
   pairing after a free-profile Computer Install on iOS 27: not run on a phone. The in-app path the command prints
   (Settings > Installation & Signing > This iPhone) was checked against the app's source, not on a screen, and no
-  setup run of the current command on a pre-27 phone has been made. Whether the computer's record connects
+  setup run of the current command on a pre-27 phone has been made, so the printed hand-pick words are untested there. Whether the computer's record connects
   over loopback on iOS 17.4 to 26 is not known.

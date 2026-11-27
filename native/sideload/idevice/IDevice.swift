@@ -73,11 +73,15 @@ enum IDevice {
                        kSecAttrAccount as String: kind.rawValue] as CFDictionary)
     }
 
+    static func isLockdownRecord(_ data: Data) -> Bool {
+        let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+        return plist?["HostCertificate"] != nil
+    }
+
     /// Which kind of pairing a file is: a lockdown pairing record (idevice_pair, jitterbugpair: a plist with
     /// HostCertificate/HostPrivateKey) or a RemotePairing one (idevice's rp_pairing_file). Checked by idevice itself.
     static func importPairing(_ data: Data) throws -> Kind {
-        let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
-        if plist?["HostCertificate"] != nil {
+        if isLockdownRecord(data) {
             var pf: OpaquePointer?
             try data.withUnsafeBytes { try check(idevice_pairing_file_from_bytes($0.baseAddress?.assumingMemoryBound(to: UInt8.self), UInt(data.count), &pf), "bad_pairing") }
             idevice_pairing_file_free(pf)
