@@ -167,3 +167,40 @@ test("Home passes each list's own order and which lists are of one kind", () => 
   for (const re of [/fresh\("new"\), headers: dayHeaders, order: "Newest"/, /fresh\("updated"\), headers: dayHeaders, order: "Recently Updated"/,
     /popular\(\), order: "Popular"/, /featuredRows, order: "Featured"/, /free\("apps"\), letters: true, oneKind: true/]) assert.match(src, re);
 });
+
+test("B486: a Source picked on a list cut short (Popular's 50) filters the whole pool, not only the rows that made the cut", async () => {
+  const be = (await import("../backend.js")).getBackend();
+  const was = { sources: be.sources, assetUrl: be.assetUrl, Image: globalThis.Image };
+  be.sources = async () => [{ key: "A", uri: "https://a.example/", name: "Alpha" }, { key: "B", uri: "https://b.example/", name: "Beta" }];
+  be.assetUrl = (u) => u;
+  globalThis.Image = function () { return document.createElement("img"); };
+  try {
+    real.load("B", [deb("y.bee", "Bee", "Tweaks"), deb("y.cee", "Cee", "Tweaks"), deb("x.zed", "Zed", "Tweaks")].join("\n\n") + "\n");
+    const whole = ["x.zed", "x.mid", "x.ann", "x.net", "y.bee", "y.cee"].map((id) => real.list().find((r) => r.id === id));
+    const p = { rows: whole.slice(0, 2) };
+    const page2 = async () => {
+      const body = document.createElement("div"), host = document.createElement("div");
+      host.append(body);
+      document.body.append(host);
+      await browse.renderSearchableList(body, { tab: "home", path: ["browse", "popular"] }, async () => p.rows,
+        { order: "Popular", wide: { rows: async () => whole, limit: 50 } });
+      return body;
+    };
+    const body = await page2();
+    const vlist = body.querySelector(".pkg-vlist");
+    const height = () => Number.parseInt(vlist.style.height, 10);
+    assert.equal(height(), 2 * ROW, "the cut list as it came");
+    body.querySelector(".scope-filter").click();
+    await tick(); await tick();
+    for (let i = 0; i < 5; i++) await tick();
+    await pick("BBeta");
+    assert.equal(height(), 3 * ROW, "Beta's three packages, two of them not in the cut");
+    await pick("AAlpha");
+    assert.equal(height(), 4 * ROW, "Alpha's four, two of them not in the cut");
+    await pick("All Sources");
+    assert.equal(height(), 2 * ROW, "back to the list as it came");
+  } finally {
+    Object.assign(be, { sources: was.sources, assetUrl: was.assetUrl });
+    globalThis.Image = was.Image;
+  }
+});

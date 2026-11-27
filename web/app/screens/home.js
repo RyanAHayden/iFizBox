@@ -300,7 +300,7 @@ const BROWSE_ROUTES = [
     render: (body, route, ctx, b) => {
       const v = LIST_VIEW[b.value];
       return browse.renderSearchableList(body, route, v.rows, { letters: Boolean(v.letters), headers: v.headers ?? null, order: v.order, oneKind: v.oneKind,
-        empty: v.empty, label: `Search ${browseList(b.value).title}` });
+        wide: v.wide, empty: v.empty, label: `Search ${browseList(b.value).title}` });
     } },
   { match: "category", nav: (route, b) => ({ title: b.value || "Browse", style: "plain" }),
     render: (body, route, ctx, b) => browse.renderSearchableList(body, route, () => catalog.browse(b.value), { letters: true, label: `Search ${b.value}`, oneKind: true }) },
@@ -1048,7 +1048,7 @@ const LIST_VIEW = {
     empty: `Nothing new in the last ${FRESH_DAYS} days. Packages your sources add show up here after a refresh.` },
   updated: { rows: () => catalog.fresh("updated"), headers: dayHeaders, order: "Recently Updated",
     empty: `No updates in the last ${FRESH_DAYS} days. New versions show up here after a refresh.` },
-  popular: { rows: () => catalog.popular(), order: "Popular" }, // F450: best rated first (catalog.popular)
+  popular: { rows: () => catalog.popular(), order: "Popular", wide: { rows: () => catalog.popular({ limit: Number.MAX_SAFE_INTEGER }), limit: 50 } }, // F450: best rated first (catalog.popular)
   featured: { rows: featuredRows, order: "Featured", empty: "None of your sources features packages." },
   "free-apps": { rows: () => catalog.free("apps"), letters: true, oneKind: true },
   "free-tweaks": { rows: () => catalog.free("tweaks"), letters: true, oneKind: true },
