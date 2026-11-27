@@ -57,7 +57,7 @@ export function idbRunner(first, reopen, failed) {
     try { tx = d.transaction(store, mode); } catch (e) { reject(e?.name === "InvalidStateError" ? { ended: true } : e); return; }
     const req = f(tx.objectStore(store));
     tx.oncomplete = () => resolve(req?.result);
-    tx.onerror = () => reject(tx.error ?? req?.error);
+    tx.onerror = () => reject(tx.error ?? req?.error ?? new Error("IndexedDB failed"));
     tx.onabort = () => reject(tx.error ?? { ended: true });
   });
   return {

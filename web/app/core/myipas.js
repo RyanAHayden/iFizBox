@@ -32,6 +32,7 @@ import { IPA_MAX } from "./websign.js";
 import { NAME } from "../brand.js";
 import { SELECT, DESELECT } from "./installed.js"; // F224: Manage's words, as Installed's (F222)
 import { KEYS } from "./storagekeys.js";
+import { idbRunner } from "./cache.js";
 
 export const MYIPAS = "myipas"; // the Installed tab's path segment for the library
 
@@ -209,26 +210,23 @@ export function memoryIpaStore() {
   return { files: m, put: async (file, blob) => { m.set(file, blob); }, get: async (file) => m.get(file) ?? null, remove: async (file) => { m.delete(file); } };
 }
 
+export const IPA_STORE_FAILED = "Could not use the files kept in this browser. Try again.";
+
 export function openIpaStore({ indexedDB: idb = globalThis.indexedDB, name = IPA_DB } = {}) {
   if (!idb) return Promise.reject(new Error("This browser can't keep files (no IndexedDB): add the IPA From URL instead."));
-  return new Promise((resolve, reject) => {
+  const connect = () => new Promise((resolve, reject) => {
     const req = idb.open(name, 1);
     req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains(IPA_STORE)) req.result.createObjectStore(IPA_STORE); };
     req.onerror = () => reject(req.error ?? new Error("IndexedDB failed"));
-    req.onsuccess = () => {
-      const db = req.result;
-      const run = (mode, f) => new Promise((res, rej) => {
-        const tx = db.transaction(IPA_STORE, mode);
-        const r = f(tx.objectStore(IPA_STORE));
-        tx.oncomplete = () => res(r?.result);
-        tx.onerror = () => rej(tx.error ?? r?.error ?? new Error("IndexedDB failed"));
-        tx.onabort = () => rej(tx.error ?? new Error("IndexedDB aborted"));
-      });
-      resolve({
-        put: (file, blob) => run("readwrite", (st) => st.put(blob, file)).then(() => undefined),
-        get: (file) => run("readonly", (st) => st.get(file)).then((v) => v ?? null),
-        remove: (file) => run("readwrite", (st) => st.delete(file)).then(() => undefined),
-      });
+    req.onsuccess = () => resolve(req.result);
+  });
+  return connect().then((first) => {
+    const db = idbRunner(first, connect, IPA_STORE_FAILED);
+    const run = (mode, f) => db.run(IPA_STORE, mode, f);
+    return {
+      put: (file, blob) => run("readwrite", (st) => st.put(blob, file)).then(() => undefined),
+      get: (file) => run("readonly", (st) => st.get(file)).then((v) => v ?? null),
+      remove: (file) => run("readwrite", (st) => st.delete(file)).then(() => undefined),
     };
   });
 }
@@ -254,6 +252,7 @@ export async function addSiteFile(file, { storage = globalThis.localStorage, sto
   for (let n = 2; taken.has(name); n++) name = `${base.slice(0, -4)} ${n}.ipa`;
   try { await store.put(name, file); } catch (e) {
     if (e?.name === "QuotaExceededError" || /quota|space|room/i.test(String(e?.message))) throw noRoom(size);
+    if (e?.message === IPA_STORE_FAILED) throw e; // already a sentence
     throw new Error(`Safari couldn't keep the IPA: ${e?.message ?? e}.`);
   }
   const entry = { file: name, stored: true, name: info.name, bundleId: info.bundleId, version: info.version || "", size,

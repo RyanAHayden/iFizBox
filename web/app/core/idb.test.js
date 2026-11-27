@@ -4,7 +4,9 @@ import { openIndexCache, INDEX_CACHE_FAILED } from "./cache.js";
 import { openSourceStore, SOURCE_STORE_FAILED } from "./sources.js";
 import { openAppStore, APP_STORE_FAILED } from "./installed.js";
 import { withAltSources, ALT_STORE_FAILED } from "./altstore.js";
-import { fakeIndexedDB } from "../fakes.test-helper.js";
+import { openIpaStore, IPA_STORE_FAILED, addSiteFile } from "./myipas.js";
+import { saveIdentity, loadIdentity, clearIdentity, IDENTITY_STORE_FAILED } from "../signing/identity.js";
+import { fakeIndexedDB, memStorage } from "../fakes.test-helper.js";
 
 // A fake IndexedDB the "browser" can end: while `bad.left` > 0 a transaction is aborted with no error (or, with
 // `bad.closed`, refused as on a closed connection). `bad.opens` counts the connections made.
@@ -41,6 +43,7 @@ const stores = [
   ["index cache", (indexedDB) => openIndexCache({ indexedDB }), (s) => s.put("k", "v"), (s) => s.get("k"), INDEX_CACHE_FAILED],
   ["source store", (indexedDB) => openSourceStore({ indexedDB, defaults: [] }), (s) => s.put({ key: "k" }), (s) => s.get("k"), SOURCE_STORE_FAILED],
   ["app store", (indexedDB) => openAppStore({ indexedDB }), (s) => s.put({ id: "k" }), (s) => s.all(), APP_STORE_FAILED],
+  ["IPA store", (indexedDB) => openIpaStore({ indexedDB }), (s) => s.put("k", "v"), (s) => s.get("k"), IPA_STORE_FAILED],
 ];
 
 for (const [what, open, write, read, failed] of stores) {
@@ -92,4 +95,29 @@ test("AltStore list: retried once, then a plain sentence", async () => {
   assert.equal(bad.opens, opens + 1);
   bad.left = 2; // a list that can't be read counts as empty, so the sentence shows on a write
   await assert.rejects(calls.removeSource("alt:https://a.example/"), { message: ALT_STORE_FAILED });
+});
+
+test("Add IPA: a store ended twice shows the store's sentence as it is", async () => {
+  const bad = {};
+  const store = await openIpaStore({ indexedDB: endingIndexedDB(bad) });
+  bad.left = 2;
+  const file = { name: "a.ipa", size: 1 };
+  const read = async () => ({ name: "A", bundleId: "com.a" });
+  await assert.rejects(addSiteFile(file, { storage: memStorage(), store, read }), { message: IPA_STORE_FAILED });
+});
+
+// Signing's identity opens its database through globalThis.indexedDB, a connection for each transaction.
+test("signing identity: retried once, then a plain sentence", async () => {
+  const bad = {};
+  globalThis.indexedDB = endingIndexedDB(bad);
+  try {
+    await saveIdentity({ p12Name: "a.p12" });
+    bad.left = 1;
+    assert.equal((await loadIdentity()).p12Name, "a.p12");
+    bad.left = 1;
+    await clearIdentity();
+    assert.equal(await loadIdentity(), null);
+    bad.left = 2;
+    await assert.rejects(clearIdentity(), { message: IDENTITY_STORE_FAILED });
+  } finally { delete globalThis.indexedDB; }
 });

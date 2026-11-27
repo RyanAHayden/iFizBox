@@ -3,6 +3,7 @@ import { browserSigning, localSigning, sleep } from "./common.js";
 import { readyStatus, statusReady } from "./device.js";
 import { confirmSoon, needsConfirm } from "./password.js";
 import { KEYS } from "../core/storagekeys.js";
+import { idbRunner } from "../core/cache.js";
 import { defaultServer, getServer, setServer } from "./common.js";
 export { defaultServer, getServer, setServer };
 
@@ -26,17 +27,12 @@ function openDb() {
   });
 }
 
+export const IDENTITY_STORE_FAILED = "Could not use the saved certificate. Try again.";
+
+// A connection for each transaction, closed after it; one the browser ends is retried (core/cache.js idbRunner).
 async function tx(mode, fn) {
-  const db = await openDb();
-  try {
-    return await new Promise((resolve, reject) => {
-      const t = db.transaction(STORE, mode);
-      const req = fn(t.objectStore(STORE));
-      t.oncomplete = () => resolve(req?.result);
-      t.onerror = () => reject(t.error ?? new Error("IndexedDB failed"));
-      t.onabort = () => reject(t.error ?? new Error("IndexedDB aborted"));
-    });
-  } finally { db.close(); }
+  const db = idbRunner(await openDb(), openDb, IDENTITY_STORE_FAILED);
+  try { return await db.run(STORE, mode, fn); } finally { db.close(); }
 }
 
 export async function loadIdentity() {
