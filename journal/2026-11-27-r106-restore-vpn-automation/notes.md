@@ -1,62 +1,112 @@
 # R106: Restore My VPN from a Shortcuts automation
 
-Research task, no product change. **Parked and interim.** The iPhone 15 Pro is not on this desktop's USB
-(`tools/ui-15.sh state` exits 69; lsusb lists no Apple device), so **nothing was measured** and there is no yes/no.
-A later session resumes from the plan below. Everything here is desk reading of the repo and earlier journals.
+## Result
 
-## Question
+**No. Do not build it now.** An App Intent of ours ("Restore My VPN if due") in a Shortcut run by an automation
+(App: iFizBox, Closed) works as a mechanism, but every run that actually switches from the built-in VPN to another
+VPN ends with Set VPN's error after it has switched, and the automation posts a failure notification even with
+Notify off. That is the common case for this feature, so users would see an error each time it works.
+Today's Restore My VPN stays as the fallback.
 
-Can an App Intent of ours ("Restore My VPN if due") live in a Shortcut that a plain Shortcuts automation,
-"iFizBox Is Closed", runs with Run Immediately? The intent sets the remembered VPN back only when no install runs;
-otherwise it leaves the **Restore My VPN** question to today's back run, or to the page on return.
-Today's Restore My VPN stays as the fallback either way.
+Measured on the iPhone 15 Pro, iOS 27, Wi-Fi only, no SIM service, on 2026-11-27.
 
-## Desk facts (not measured)
+| # | Question | Answer | One line |
+|---|---|---|---|
+| 1 | Does the mechanism work | Yes | The trigger fires on leaving the app, the intent runs in a killed app and reads the restore state, with no Shortcuts screen and no prompt after setup. |
+| 2 | Does the switch end cleanly | No | Every captured run that switched from the built-in VPN to another VPN ended with NEVPNErrorDomain error 2 after switching. |
+| 3 | What would change the answer | A way to stop Set VPN raising error 2 | None known. Catching the action's error inside the Shortcut was not tried. |
+| 4 | Effort to set up | About 14 taps and 2 typed searches | Plus first-run prompts. |
+| 5 | Versions | iOS 27 only | iOS below 27 was not measured. |
 
-- A third-party App Intent cannot set a VPN. Set VPN is Shortcuts' own action, so the shape is:
-  our intent returns due yes/no, then If due, then Set VPN (stored content "own VPN", as
-  `tools/shortcuts/restore-vpn.plist`), then end If, then Nothing.
-- A Shortcut whose last action has output makes iOS ask over the app, so the new Shortcut ends with Nothing.
-  Today's restore intents return nothing for this reason.
-- iOS asks Allow per action and per content source (journal F418b). Our intent goes before the stored content
-  read, and each run is checked for prompts.
-- State is in `native/sideload/vpn/App/RestoreBack.swift`. "owed" is a file in Application Support
-  (`ifizbox.vpn.backOwed`). "remembered" and "never" are UserDefaults, which gave a stale read after our own update
-  (F438a). "left" and whether an install goes on are memory only, so a freshly launched process runs no install.
-- `RestoreDue.step` (`RestoreDue.swift`) is the rule set. It also needs ours down and no other VPN up.
-  An intent that restores must clear owed and withdraw the question the page shows.
-- Design hazards to measure: Is Closed may also fire when iFizBox opens Shortcuts itself (the back run of
-  Restore My VPN, Cellular Installs), when the person leaves during an install that keeps running (then the intent
-  must say not due), and maybe on iFizBox's own update.
-- R80 (`journal/2026-11-23-install-switch-no-flip/automation-followup.md`): a Notification automation ran silently
-  with the app killed and the phone locked, but its editor offered no Run Immediately choice. Triggers were dropped
-  for a while after a run that ended in an error, so the action must not be able to error. Set VPN often ends with
-  NEVPNErrorDomain error 2 after a switch (R100b), which matters here.
-- The App trigger (Is Opened, Is Closed) has never been measured.
+## Setup
 
-## Test plan (for the next session)
+- Other VPN: Tailscale with Connect On Demand, stood in for an app's VPN. It is on demand only while selected;
+  a run that was not due left it off.
+- Throwaway build from a scratch worktree, never merged. One probe intent, "Probe Due", logs owed, remembered,
+  LocalVPN.restore, LocalVPN.waiting, LocalVPN.state, LocalVPN.otherVPNUp and the pid. It answers due when
+  (owed file or a force file) and not waiting and ours down. Most trigger runs used the force file.
+- Restore My VPN's own setting was off (restore false) throughout.
+- Probe Shortcut "R106 Due":
+  - If it has input: Get Current VPN, store as "own VPN" (the store run).
+  - Else: Probe Due, If has any value, get stored "own VPN", Set VPN Connect, End If.
+  - Then: Nothing.
+- Automation: App, iFizBox, Closed, with one action, Run Shortcut > R106 Due.
 
-1. Lock with `tools/ui-15.sh`. Note the installed build, VPN state, and existing Shortcuts and automations.
-2. Throwaway build from a scratch worktree, never merged: one probe intent that logs owed and remembered state
-   through `IDevice.ilog` (read with pymobiledevice3 syslog) and returns due yes/no. Add its name to
-   `SIDELOAD_INTENTS` in `build.sh` in the scratch copy only.
-3. Probe Shortcut: probe intent, If due, stored content "own VPN" (kept by one store run of Restore My VPN),
-   Set VPN, end If, Nothing. Build by hand, or sign on the MBA with `tools/shortcuts/sign.sh`.
-4. Automation by hand: App, iFizBox, Is Closed only, Run Immediately. Record every tap for the walkthrough, and
-   whether Notify When Run is offered.
-5. With Tailscale as the other VPN and the built-in VPN current, measure Home, app switch, kill from the switcher,
-   force quit while in background, and lock. For each: did it fire, did Shortcuts show, any banner or prompt,
-   did the VPN change, did the intent run and read the state.
-6. Hazards: leave during an install; Restore My VPN's own trip to Shortcuts; Set VPN ending in error (does a later
-   Is Closed still fire).
-7. Put everything back: delete the probe Shortcut and automation, reinstall the plain build, restore VPN state,
-   unlock.
+## Triggers measured
+
+Automation App: iFizBox, Closed. Each row is one trigger with the built-in VPN selected.
+
+| Trigger | Fired | Result |
+|---|---|---|
+| Home from iFizBox | Yes | Intent ran within about 1 s; the other VPN connected within about 7 s; no Shortcuts screen. |
+| Switch straight to another app | Yes | VPN restored. |
+| Lock the screen with iFizBox in front | Yes | VPN restored. |
+| Open the app switcher | No | Did not fire by itself. |
+| Swipe away in the switcher, iFizBox in front | Yes, when the switcher was dismissed | Did not fire while the switcher stayed open. iOS started a new background process of iFizBox for the intent (new pid); VPN restored. |
+| Swipe away an iFizBox already in the background | No | It had already fired on leaving, so it did not fire again. |
+| Open iFizBox | No | Closed only. |
+
+- A fresh process after a kill read the real state from disk. A hand-written owed file "1" was read as owed true
+  (nothing forced), the VPN was restored, and remembered was read true.
+- Not due: no VPN change and no notification, when the intent returns a list (see gotchas).
+- All expected triggers ran, including runs about 30 s after an erroring run. The syslog showed no rate limiting or
+  debouncing for the lock run. R80's dropped-triggers effect was not seen here.
+
+## Error 2 after a switch
+
+- Every captured run that switched from the built-in VPN to the other VPN ended in NEVPNErrorDomain error 2 after
+  the switch, and posted "Run Shortcut: The operation couldn't be completed. (NEVPNErrorDomain error 2.)" as a
+  notification, with Notify off. Three of three were captured in the syslog. The first manual run did the same.
+- Runs with Tailscale already up, or runs that were not due, had no error.
+
+## Prompts and the automation editor
+
+- At the first foreground run of the Shortcut, answered once:
+  - 'Allow "R106 Due" to run actions from "iFizBox"?' (Allow)
+  - 'Allow "R106 Due" to share 1 vpn and 1 text item with "Settings"?' (Always Allow)
+- The earlier single-branch probe also asked 'Allow ... to access "Settings"?' (Always Allow).
+- The automation runs after that asked nothing.
+- The iOS 27 automation editor has no Run Immediately choice: only an "Automation" switch (on) and "Notify"
+  (off by default). Saving also adds a Shortcut named "Run Shortcut" to All Shortcuts.
+- Setup walkthrough: Shortcuts > Library > Automation > + > Edit > search "opened" > App > App field > search
+  iFizBox > pick > Opened > Closed > search "Run Shortcut" > pick > Shortcut field > pick the Shortcut > Back.
+
+## Shortcut gotchas
+
+- An intent that returns an empty String still counts as "has any value": Set VPN ran on a not-due answer.
+  Returning a list ([String], empty when not due) works.
+- Stored content "own VPN" appears to be per Shortcut (inferred). A second Shortcut's Get returned "No VPN was passed"
+  after another Shortcut had stored it, and also before. The same Shortcut stored it and read it back. So the due
+  branch must sit inside the Restore My VPN Shortcut itself, not in a new Shortcut.
+- With two installed copies of iFizBox, the app picker shows two identical "iFizBox" rows.
+
+## Design points if built later
+
+- The intent must clear the owed file and withdraw the question the page shows (restore.due).
+- It must answer not due:
+  - while an install runs (LocalVPN.waiting, in the same process);
+  - while another VPN is up;
+  - during iFizBox's own trips to Shortcuts, because Closed fires on every leave.
+- RestoreDue.step holds the rules.
+- The intent sits before the stored content read.
+- Error 2 has to be solved before this is worth building.
+
+## Phone left as found
+
+- Automation and the four test Shortcuts deleted. The older R100 and Cellular Data Shortcuts were not touched.
+- Probe files removed from Documents. Owed file set back to "0". iFizBox VPN selected, not connected.
+- Plain build of this branch (1.0.5) installed over com.ryha.ifizbox (1.0.4 was installed before). Lock released.
 
 ## Not verified
 
-Nothing in this task is verified, because the phone is not connected. Open:
-
-1. Does Set VPN run silently from the automation, with no Shortcuts switch and no Allow prompt?
-2. Does Is Closed fire on Home, on app switch, and on a kill from the switcher?
-3. Does our intent run while the app is closed or killed, and does it read the restore state?
-4. **Yes/no for building it: not decided.** The setup walkthrough and the intent wait on items 1 to 3.
+- Leaving during a real install (LocalVPN.waiting true): no install was run.
+- Restore My VPN's own back run and Cellular Installs trips firing Closed at the same time as their Shortcut runs:
+  not run. Switching to another app fires Closed, so it is expected to.
+- iFizBox's own update closing the app: not run.
+- Restore My VPN setting on, with a real owed state made by an install: the owed file was written by hand.
+- Force quit from a debugger, a crash or a memory kill: only the switcher swipe was tried.
+- What an automation run does when the first-run prompts were never answered: the prompts were answered in the
+  foreground first.
+- Any way around error 2: none tried.
+- VPNs other than Tailscale; cellular data; iOS below 27.
+- The tap count of about 14 was not re-counted on a clean phone.
