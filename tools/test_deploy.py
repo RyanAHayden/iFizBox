@@ -9,12 +9,16 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
 import plistlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path[:0] = [os.path.join(ROOT, "tools"), os.path.join(ROOT, "native")]
+import mkdeb  # noqa: E402
+import selfrepo  # noqa: E402
 
 # Logs each call (its directory, its arguments, and whether web/app/build.json is there) and answers whoami.
 FAKE_NPX = r"""#!/usr/bin/env bash
@@ -185,18 +189,74 @@ class Deploy(unittest.TestCase):
 BUILD = os.path.join(ROOT, "native", "build")
 
 
-def built_version():
-    """The CFBundleShortVersionString of the last native build (check.sh builds it first), or None."""
-    try:
-        with zipfile.ZipFile(os.path.join(BUILD, "iFizBox.ipa")) as z:
-            plist = next(n for n in z.namelist() if n.endswith(".app/Info.plist") and n.count("/") == 2)
-            return plistlib.loads(z.read(plist)).get("CFBundleShortVersionString")
-    except (OSError, StopIteration, zipfile.BadZipFile):
-        return None
+with open(os.path.join(ROOT, "native", "VERSION")) as _f:
+    VERSION = _f.read().strip()
 
 
-@unittest.skipUnless(shutil.which("git") and built_version() and os.path.isfile(os.path.join(BUILD, "iFizBox.deb")),
-                     "no native build (native/build/iFizBox.ipa and .deb) to publish")
+def ipa_version(path):
+    with zipfile.ZipFile(path) as z:
+        plist = next(n for n in z.namelist() if n.endswith(".app/Info.plist") and n.count("/") == 2)
+        return plistlib.loads(z.read(plist)).get("CFBundleShortVersionString")
+
+
+def deb_version(path):
+    """The .deb's Version without its -<build>, as release.sh compares it."""
+    return mkdeb.control_fields(selfrepo.control_text(path)).get("Version", "").split("-")[0]
+
+
+def unpublishable(build, version):
+    """Why release.sh can't publish the native build in `build` as `version`, or None. A slot without the native
+    toolchain skips the build, so what an earlier task left there can be missing or of another version."""
+    for name, read in (("iFizBox.ipa", ipa_version), ("iFizBox.deb", deb_version)):
+        try:
+            found = read(os.path.join(build, name))
+        except Exception as e:  # missing or half-written: nothing to publish either way
+            return "no native build to publish: native/build/%s unreadable (%s)" % (name, type(e).__name__)
+        if found != version:
+            return "stale native build: native/build/%s is %s, native/VERSION is %s" % (name, found, version)
+    return None
+
+
+class Unpublishable(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+
+    def build(self, ipa, deb):
+        with zipfile.ZipFile(os.path.join(self.tmp, "iFizBox.ipa"), "w") as z:
+            z.writestr("Payload/x.app/Info.plist", plistlib.dumps({"CFBundleShortVersionString": ipa}))
+        root, debian = os.path.join(self.tmp, "root"), os.path.join(self.tmp, "debian")
+        os.makedirs(root, exist_ok=True)
+        os.makedirs(debian, exist_ok=True)
+        with open(os.path.join(debian, "control"), "w") as f:
+            f.write("Package: x\nVersion: %s-6016\n" % deb)
+        mkdeb.build(root, debian, os.path.join(self.tmp, "iFizBox.deb"))
+
+    def test_matching_build(self):
+        self.build("1.0.7", "1.0.7")
+        self.assertIsNone(unpublishable(self.tmp, "1.0.7"))
+
+    def test_stale_deb(self):
+        self.build("1.0.7", "1.0.3")
+        self.assertEqual(unpublishable(self.tmp, "1.0.7"),
+                         "stale native build: native/build/iFizBox.deb is 1.0.3, native/VERSION is 1.0.7")
+
+    def test_stale_ipa(self):
+        self.build("1.0.3", "1.0.7")
+        self.assertIn("iFizBox.ipa is 1.0.3", unpublishable(self.tmp, "1.0.7"))
+
+    def test_missing_or_broken(self):
+        self.assertIn("iFizBox.ipa unreadable", unpublishable(self.tmp, "1.0.7"))
+        self.build("1.0.7", "1.0.7")
+        with open(os.path.join(self.tmp, "iFizBox.deb"), "wb") as f:
+            f.write(b"half")
+        self.assertIn("iFizBox.deb unreadable", unpublishable(self.tmp, "1.0.7"))
+
+
+UNPUBLISHABLE = unpublishable(BUILD, VERSION)
+
+
+@unittest.skipIf(not shutil.which("git") or UNPUBLISHABLE, UNPUBLISHABLE or "no git")
 class TagSource(unittest.TestCase):
     """A real release.sh run (fake gh, a local bare repo as origin) with --tag-source: the tag's commit is the built
     commit plus the new web/app/source.json, and main is left alone."""
@@ -212,9 +272,8 @@ class TagSource(unittest.TestCase):
                 "native/launch_check.py", "native/carfile.py", "tools/release.sh", "tools/stray-check.sh",
                 "tools/sync-piracy-list.py", "tools/selfrepo.py", "tools/altsource.py", "web/app/source.json",
                 "web/app/core/piracy-list.js")
-        self.version = built_version()
-        with open(os.path.join(self.repo, "native/VERSION"), "w") as f:
-            f.write(self.version + "\n")
+        self.version = VERSION
+        copy_in(self.repo, "native/VERSION")
         with open(os.path.join(self.repo, ".gitignore"), "w") as f:
             f.write("__pycache__/\n")
         git(self.repo, "add", "-A")
