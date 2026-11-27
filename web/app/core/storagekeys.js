@@ -49,6 +49,7 @@ export const KEYS = Object.freeze({
   freeidAnisette: "ifizbox.freeid.anisette",
   freeidBundled: "ifizbox.freeid.bundled",
   freeidInstalled: "ifizbox.freeid.installed",
+  freeidKey: "ifizbox.freeid.key",
   freeidSession: "ifizbox.freeid.session",
   freeidWait: "ifizbox.freeid.wait",
   hiddenTweakSources: "ifizbox.hiddenTweakSources",

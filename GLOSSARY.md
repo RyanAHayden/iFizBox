@@ -332,3 +332,10 @@ _Said_: the toast, the bottom bar
 _On screen_: Updating Sources; Some sources couldn't be updated.; Cancel; Show Info
 _In code_: nav/reloadbar.js, showReloadBar, showReloadFailure, .reload-bar
 _Avoid_: toast
+
+**Finish Setup**:
+The step after a Computer Install: a link on the website, tapped on the iPhone, that gives the installed app the key to the Free Apple ID record it carries
+_Said_: finish-setup page
+_On screen_: After the Install; Finish Setup
+_In code_: finishSetupSection, finishSetupLink, recordKey, ifizbox://free-id#<key>, ifizbox.freeid.key, sealRecord, openRecord
+_Avoid_: activation, pairing

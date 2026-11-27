@@ -5,7 +5,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { computerSections, computerInstallBlock, signForComputer, makeCode, setupCommands, resetComputerInstall, codeFooter,
-  COMPUTER_LABEL, COMPUTER_FOOTER, COMPUTER_OFF_FOOTER, CODE_EXPIRED_FOOTER, CODE_MISSING_FOOTER, SAVE_IPA_FOOTER } from "./computer-install.js";
+  COMPUTER_LABEL, COMPUTER_FOOTER, COMPUTER_OFF_FOOTER, CODE_EXPIRED_FOOTER, CODE_MISSING_FOOTER, SAVE_IPA_FOOTER,
+  recordKey, finishSetupLink, finishSetupSection, FINISH_LABEL, FINISH_FOOTER } from "./computer-install.js";
+import { openRecord } from "../core/websign.js";
+import { KEYS } from "../core/storagekeys.js";
 import { uploadSigned } from "../signing/browser.js";
 import { APP_IPA_URL } from "../core/appoffer.js";
 import { fakeDocument } from "../nav/fakedom.test-helper.js";
@@ -27,6 +30,39 @@ function site() {
   return (path, init) => worker.fetch(new Request(`https://${DOMAIN}${path}`, init), env, { waitUntil() {} });
 }
 
+const memory = (init = {}) => {
+  const kv = new Map(Object.entries(init));
+  return { getItem: (k) => kv.get(k) ?? null, setItem: (k, v) => kv.set(k, String(v)), removeItem: (k) => kv.delete(k) };
+};
+
+test("F460: Finish Setup opens ifizbox://free-id#<the kept key>, the same key for every install", async () => {
+  const store = memory();
+  assert.equal(finishSetupLink(store), null);
+  assert.equal(finishSetupSection(store), null);
+  const key = recordKey(store);
+  assert.match(key, /^[A-Za-z0-9_-]{43}$/); // 256 bits, base64url
+  assert.equal(recordKey(store), key);
+  assert.equal(store.getItem(KEYS.freeidKey), key);
+  assert.equal(finishSetupLink(store), `ifizbox://free-id#${key}`);
+  assert.equal(new URL(finishSetupLink(store)).hash, `#${key}`, "in the fragment");
+  assert.deepEqual(finishSetupSection(store).rows.map((r) => [r.label, r.href]), [[FINISH_LABEL, `ifizbox://free-id#${key}`]]);
+  assert.throws(() => recordKey({ getItem: () => null, setItem() { throw new Error("quota"); } }), /Private Browsing/);
+});
+
+test("F460: the block shows Finish Setup once an install was made, also after a reload and with the profile expired", () => {
+  const saved = globalThis.document;
+  globalThis.document = fakeDocument();
+  try {
+    resetComputerInstall();
+    const base = { id: {}, ask: async () => {}, save() {}, fix: { label: "Sign In Again", onClick() {} } };
+    assert.doesNotMatch(computerInstallBlock({ ...base, store: memory() }).textContent, new RegExp(FINISH_LABEL));
+    const store = memory();
+    recordKey(store);
+    assert.match(computerInstallBlock({ ...base, store }).textContent, new RegExp(FINISH_LABEL));
+    assert.match(computerInstallBlock({ ...base, store, expired: true }).textContent, new RegExp(FINISH_LABEL));
+  } finally { globalThis.document = saved; }
+});
+
 test("signForComputer: the release's IPA with the free identity inside, under the profile's ID", async () => {
   const id = { p12: Uint8Array.of(1), profile: Uint8Array.of(2), password: "pw" };
   let job = null, asked = null;
@@ -42,6 +78,14 @@ test("signForComputer: the release's IPA with the free identity inside, under th
   await signForComputer(id, { download: async () => PK, transfer: async () => null, record: { teamId: "T", serial: "AA" },
     worker: async (j) => { job = j; return { ipa: [PK], bundleId: SIGNED.bundleId }; } });
   assert.deepEqual(JSON.parse(job.bring.freeId), { teamId: "T", serial: "AA" });
+  // F460: for the upload, the record sealed and no identity in the clear; never without a record to seal
+  const key = recordKey(memory());
+  await signForComputer(id, { download: async () => PK, transfer: async () => null, record: { teamId: "T", serial: "AA" }, sealKey: key,
+    worker: async (j) => { job = j; return { ipa: [PK], bundleId: SIGNED.bundleId }; } });
+  assert.deepEqual(Object.keys(job.bring), ["transfer", "sealedFreeId"]);
+  assert.deepEqual(await openRecord(job.bring.sealedFreeId, key), { teamId: "T", serial: "AA" });
+  await assert.rejects(signForComputer(id, { download: async () => PK, transfer: async () => null, sealKey: key,
+    worker: async () => ({ ipa: [PK] }) }), /no Free Apple ID record/);
 });
 
 test("makeCode: uploads, and the Worker's code reads back this IPA, its hash and the pairing file's place", async () => {
@@ -75,7 +119,7 @@ test("the one-liners are docs/sideload.md's, and every footer is one or two shor
   const { readFile } = await import("node:fs/promises");
   const doc = await readFile(new URL("../../../docs/sideload.md", import.meta.url), "utf8");
   for (const c of setupCommands()) assert.ok(doc.includes(c.cmd), c.cmd);
-  for (const f of [COMPUTER_FOOTER, COMPUTER_OFF_FOOTER, CODE_EXPIRED_FOOTER, CODE_MISSING_FOOTER, SAVE_IPA_FOOTER, codeFooter(0),
+  for (const f of [COMPUTER_FOOTER, COMPUTER_OFF_FOOTER, CODE_EXPIRED_FOOTER, CODE_MISSING_FOOTER, SAVE_IPA_FOOTER, FINISH_FOOTER, codeFooter(0),
     ...setupCommands().map((c) => c.footer)]) {
     assert.ok(f.length <= 140 && f.split(/(?<=[.!?])\s+/).length <= 2, f);
   }

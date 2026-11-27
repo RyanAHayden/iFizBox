@@ -17,6 +17,8 @@
 // writes the website's ifizbox://import link as web/transfer.link (app.js imports it once); both before zsign seals
 // the bundle, as the old server signer did. With the identity, { freeId: json } (B474, the computer install) writes the
 // Free Apple ID record as web/free-id.json (screens/free-apple-id.js adoptBundledFreeId takes it).
+// { sealedFreeId: text } (F460, the uploaded computer install) writes the record encrypted (core/websign.js sealRecord)
+// as web/free-id.json instead, and then never ifizbox-identity.plist: it holds the same key in the clear.
 // free (F436): a free Apple ID's profile: the entitlements are core/freeroute.js freeEntitlements' (get-task-allow as the
 // profile allows, no push) instead of the certificate route's.
 // groupFix (B211): the fix dylib's bytes (vendor/groupfix, signing-worker.js loads it); an app whose original
@@ -119,14 +121,16 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   const ents = free ? freeEntitlements(narrowed, prof) : narrowed; // F436
   FS.writeFile("/w/ents.plist", plistXml(ents));
   if (bring && own === IFIZBOX_ID) {
-    if (bring.identity) FS.writeFile(`${appDir}/${IDENTITY_FILE}`, identityPlist({ p12, password, profile }));
+    const sealed = typeof bring.sealedFreeId === "string" && bring.sealedFreeId.startsWith("{") ? bring.sealedFreeId : null; // F460
+    if (bring.identity && !sealed) FS.writeFile(`${appDir}/${IDENTITY_FILE}`, identityPlist({ p12, password, profile }));
     if (typeof bring.transfer === "string" && bring.transfer.startsWith("ifizbox://import?")) {
       try { FS.mkdir(`${appDir}/web`); } catch { /* there already */ }
       FS.writeFile(`${appDir}/${TRANSFER_FILE}`, bring.transfer);
     }
-    if (bring.identity && typeof bring.freeId === "string" && bring.freeId.startsWith("{")) { // B474: computer install
+    const record = sealed ?? (bring.identity && typeof bring.freeId === "string" && bring.freeId.startsWith("{") ? bring.freeId : null);
+    if (record) { // B474: computer install
       try { FS.mkdir(`${appDir}/web`); } catch { /* there already */ }
-      FS.writeFile(`${appDir}/${FREE_ID_FILE}`, bring.freeId);
+      FS.writeFile(`${appDir}/${FREE_ID_FILE}`, record);
     }
   }
   // B211: the original signature's app groups and keychain groups, read before signing, decide whether the app gets
