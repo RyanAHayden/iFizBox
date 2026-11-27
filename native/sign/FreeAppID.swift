@@ -1,8 +1,8 @@
 // B502: a free Apple ID's explicit profile. iOS installs an app signed with it only when the app's bundle ID is the
 // profile's App ID (0xe8008016 otherwise), so Keep Bundle IDs doesn't apply: an app signs as the ID of the profile it
 // is signed with, and a second app under one ID would replace the first with its data, which is refused.
-// B502a: each app has an App ID of its own (<bundle id>.<TEAMID>); the page hands its profile in (signing.addProfile),
-// kept here one file per App ID, and the signer picks it. With none for an app, it signs with the setup's (the held one).
+// B502a: each app has an App ID of its own (<bundle id>.<TEAMID>); its profile is kept here, one file per App ID (App
+// Refresh's go in), and the signer picks it. With none for an app, it signs with the setup's (the held one).
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 
@@ -12,7 +12,7 @@ enum FreeAppID {
         bundleID.uppercased().hasSuffix(".\(team.uppercased())") ? bundleID : "\(bundleID).\(team)"
     }
 
-    // signing.addProfile: keeps an app's profile in `dir`, in place of an earlier one for its App ID. Refused unless the
+    // Keeps an app's profile in `dir`, in place of an earlier one for its App ID. Refused unless the
     // held profile pins the bundle ID and this one is a free explicit profile of the same team for this certificate.
     @discardableResult
     static func keep(_ data: Data, held: Profile, certificate: Data, in dir: URL, now: Date = Date()) throws -> Profile {

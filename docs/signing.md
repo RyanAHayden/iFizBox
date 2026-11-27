@@ -274,14 +274,13 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   and re-signing the same app are allowed. Re-sign refuses (`app_id_mismatch`) an app installed under another bundle
   ID, which would otherwise install a second copy. iOS 27 can't say whether an app is installed, so a recorded one counts
   until it is removed from Signed Apps.
-- **Per-app profiles.** The sideload app's shell keeps one free profile per app. `signing.addProfile {profile: base64}`
-  takes one (only while the held profile is a free explicit one of the same team and certificate) and answers
-  `{appId, expires}`; it is kept in Application Support/Signing/AppProfiles, one file per App ID. Signing under a free
-  explicit profile uses the kept profile for `<bundle ID>.<TEAMID>` (the typed bundle ID if one was typed), so that app
-  signs as its own App ID and sits beside other apps. With none kept for it, the app signs as the held profile's App ID,
-  and a second such app is refused (`app_id_taken`). An app already installed under the held profile's App ID stays
-  there, and App Refresh keeps the profiles it was given. `signing.inspect` also answers `pinned` and `freeAppId`. The
-  app's page does not call `signing.addProfile` yet, so in the app every app still signs as the setup's App ID.
+- **Per-app profiles.** The sideload app's shell keeps one free profile per app, in Application Support/Signing/AppProfiles,
+  one file per App ID. A kept profile is a free explicit one of the held profile's team and certificate, not lapsed.
+  Signing under a free explicit profile uses the kept profile for `<bundle ID>.<TEAMID>` (the typed bundle ID if one was
+  typed), so that app signs as its own App ID and sits beside other apps. With none kept for it, the app signs as the
+  held profile's App ID, and a second such app is refused (`app_id_taken`). An app already installed under the held
+  profile's App ID stays there. Today only App Refresh puts profiles in the store, and it keeps the ones it was given,
+  so an app with no kept profile still signs as the setup's App ID. `signing.inspect` answers `pinned` and `freeAppId`.
 
 ## Own provisioning profiles (App Store Connect API key)
 
