@@ -1135,4 +1135,58 @@ test("free Apple ID: each app signs with its own App ID's profile (B502a)") {
     check(Set(ids).count == 2, "side by side: \(ids)")
 }
 
+// F463: each extension has an App ID and profile of its own.
+test("free Apple ID: an extension signs under its own App ID with its own profile (F463)") {
+    let now = Date(), day: TimeInterval = 86400, team = "TEAM123456"
+    func profile(_ app: String, made: TimeInterval = 0) throws -> Profile {
+        let d: [String: Any] = ["Name": "iOS Team Provisioning Profile: \(app)", "TeamIdentifier": [team],
+                                "CreationDate": now.addingTimeInterval(made * day), "ExpirationDate": now.addingTimeInterval((made + 7) * day),
+                                "DeveloperCertificates": [identity.certificate],
+                                "Entitlements": ["application-identifier": "\(team).\(app)", "get-task-allow": true,
+                                                 "keychain-access-groups": ["\(team).*"]]]
+        return try Profile(PropertyListSerialization.data(fromPropertyList: d, format: .xml, options: 0))
+    }
+    check(FreeAppID.extensionIDs(app: "com.x.T", original: "com.x", ["com.x.share", "com.x.a.b", "COM.X.Up", "other.kit"])
+          == ["com.x.T.share", "com.x.T.a.b", "com.x.T.Up", "com.x.T.kit"], "what each adds to the app's ID")
+    check(FreeAppID.extensionIDs(app: "com.x.T", original: "com.x", ["a.share", "b.share"]) == ["com.x.T.share", "com.x.T.share2"],
+          "one each")
+
+    let ipa = fixtures.appendingPathComponent("edit.ipa")
+    let app = "\(try Inspect.ipa(ipa).bundleID).\(team)", share = "\(app).share"
+    let dir = work.appendingPathComponent("extension-profiles")
+    let appProfile = try profile(app), shareProfile = try profile(share)
+    try FreeAppID.keep(shareProfile.data, held: appProfile, certificate: identity.certificate, in: dir)
+    // lapsed since it was kept (written as `keep` names it: the test certificate is too new to keep it back then)
+    try profile("\(app).widget", made: -8).data.write(to: dir.appendingPathComponent("\(app).widget.mobileprovision"))
+    var asked: [String] = []
+    IPASigner.extensionProfile = { id, held, certificate in
+        asked.append(id)
+        return FreeAppID.usable(id, among: FreeAppID.kept(in: dir), held: held, certificate: certificate)
+    }
+    defer { IPASigner.extensionProfile = nil }
+    let out = work.appendingPathComponent("extensions.ipa")
+    let signed = try IPASigner(profile: appProfile, identity: identity).sign(ipa, to: out)
+    check(asked == [share, "\(app).widget"], "asked \(asked)")
+    let d = try Inspect.ipa(out)
+    check(d.extensions.map(\.bundleID) == [share], "only the one with a usable profile: \(d.extensions.map(\.bundleID))")
+    check(signed.removed.contains("PlugIns/Widget.appex"), "the other left out: \(signed.removed)")
+    let zip = try ZipReader(url: out)
+    func file(_ path: String) throws -> Data {
+        guard let e = zip.entries.first(where: { $0.name.hasSuffix(".app/" + path) }) else { throw SignError("missing", path) }
+        return try zip.data(e)
+    }
+    check(try file("PlugIns/Share.appex/embedded.mobileprovision") == shareProfile.data, "its own profile")
+    check(try file("embedded.mobileprovision") == appProfile.data, "the app keeps its own")
+    let ents = Inspect.entitlements(try file("PlugIns/Share.appex/Share")) ?? [:]
+    check(ents["application-identifier"] as? String == "\(team).\(share)", "its App ID: \(ents)")
+    check(ents["keychain-access-groups"] as? [String] == ["\(team).\(share)"], "its group: \(ents)")
+    check(d.entitlements["application-identifier"] as? String == "\(team).\(app)", "the app's: \(d.entitlements)")
+
+    let left = IPASigner(profile: appProfile, identity: identity)
+    left.options = try SignOptions(json: ["removeExtensions": ["PlugIns/Share.appex"]])
+    let without = work.appendingPathComponent("extensions-removed.ipa")
+    _ = try left.sign(ipa, to: without)
+    check(try Inspect.ipa(without).extensions.isEmpty, "one the user left out stays out")
+}
+
 if failures == 0 { print("all passed") } else { print("\(failures) failed"); exit(1) }

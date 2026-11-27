@@ -32,6 +32,9 @@ final class IPASigner {
     // B502a: under a profile that pins the bundle ID (the ID asked, the app's own, that profile, the certificate DER),
     // the profile to sign this app with (FreeAppID.profile); nil closure: the one given.
     static var appProfile: ((String, String, Profile, Data) -> Profile)?
+    // F463: under such a profile, the profile for an extension's own App ID (FreeAppID.extensionIDs; that ID, the app's
+    // profile, the certificate DER), or nil, which leaves the extension out; nil closure: all are left out.
+    static var extensionProfile: ((String, Profile, Data) -> Profile?)?
     let identity: SigningIdentity
     var time = Date()
     var maxMachO: UInt64 = 1 << 31   // a single binary held in memory while it's signed
@@ -189,12 +192,29 @@ final class IPASigner {
             entID = m.entitlementsID // the bundle ID stays the one it is installed as
         }
 
+        // F463: a free Apple ID's extensions: each signs with the profile of its own App ID, and takes that as its bundle ID
+        var own = [String: Profile]() // extension folder -> its profile
+        if profile.pinsBundleID, let pick = IPASigner.extensionProfile {
+            let found = bundles.keys.compactMap { dir -> (dir: String, id: String)? in
+                let rel = dir.dropFirst(appDir.count).split(separator: "/")
+                guard rel.count == 2, ["PlugIns", "Extensions"].contains(String(rel[0])), rel[1].hasSuffix(".appex"),
+                      let id = bundles[dir]?.plist["CFBundleIdentifier"] as? String else { return nil }
+                return (dir, id)
+            }.sorted { $0.dir.dropLast() < $1.dir.dropLast() }
+            let ids = FreeAppID.extensionIDs(app: newID, original: oldID, found.map(\.id))
+            for (x, id) in Swift.zip(found, ids) { // `zip` here is the IPA
+                guard let p = pick(id, profile, identity.certificate) else { continue }
+                own[x.dir] = p
+                log("\(x.dir.dropFirst(appDir.count).dropLast()): its own App ID \(p.team).\(p.appID)")
+            }
+        }
+
         // An explicit profile covers one app ID: extensions (and Watch apps) would need their own, so they go. Kept
         // IDs keep them (R25): each extension keeps its own Info.plist ID, prefixed by the app's as iOS requires,
         // and is signed under the app's application-identifier.
         var cut = [String]()
         if !profile.isWildcard && !keep {
-            for dir in bundles.keys.sorted() where dir != appDir && (dir.hasSuffix(".appex/") || dir.hasSuffix(".app/")) { // sorted: a Dictionary's order changes per run
+            for dir in bundles.keys.sorted() where dir != appDir && own[dir] == nil && (dir.hasSuffix(".appex/") || dir.hasSuffix(".app/")) { // sorted: a Dictionary's order changes per run
                 cut.append(dir)
             }
         }
@@ -218,7 +238,7 @@ final class IPASigner {
         var changed = [String: Data]() // path -> new contents
         for (dir, var b) in bundles where dir.hasSuffix(".app/") || dir.hasSuffix(".appex/") {
             var pl = b.plist
-            if let id = pl["CFBundleIdentifier"] as? String { pl["CFBundleIdentifier"] = moved(id) }
+            if let id = pl["CFBundleIdentifier"] as? String { pl["CFBundleIdentifier"] = own[dir]?.appID ?? moved(id) }
             if let id = pl["WKCompanionAppBundleIdentifier"] as? String { pl["WKCompanionAppBundleIdentifier"] = moved(id) }
             if var ext = pl["NSExtension"] as? [String: Any], var at = ext["NSExtensionAttributes"] as? [String: Any],
                let id = at["WKAppBundleIdentifier"] as? String {
@@ -374,7 +394,8 @@ final class IPASigner {
             }
             for (k, f) in signedLoose.enumerated() { if let f = f { files[loose[k]] = f } }
             if !loose.isEmpty { progress?("signing", (Double(n) + Double(loose.count) / Double(loose.count + 1)) / Double(dirs.count)) }
-            if isApp { files[dir + "embedded.mobileprovision"] = .data(profile.data, mode: 0o100644) }
+            let signing = own[dir] ?? profile // F463
+            if isApp { files[dir + "embedded.mobileprovision"] = .data(signing.data, mode: 0o100644) }
             let infoData = try contents(dir + "Info.plist", files, zip)
             let resources = try codeResources(dir: dir, exe: exe, files: files, order: order + newPaths(files, order),
                                               spelling: spelling)
@@ -383,7 +404,7 @@ final class IPASigner {
                 guard files[exe] != nil else { throw SignError("bad_ipa", "\(exe.dropFirst(appDir.count)) is missing.") }
                 var data = fixed(exe, try contents(exe, files, zip))
                 // B413: each bundle's own original signature says whether it gets the profile's data protection
-                let dataProtection = isApp ? profile.originalDataProtection(Inspect.entitlements(data), signedBefore: signedBefore) : nil
+                let dataProtection = isApp ? signing.originalDataProtection(Inspect.entitlements(data), signedBefore: signedBefore) : nil
                 if dir == appDir, let t = tweaks, !t.inject.isEmpty { // F288
                     (data, injected) = try MachOEdit.inject(data, t.inject)
                     for i in injected { log("Injected \(i)") }
@@ -398,8 +419,9 @@ final class IPASigner {
                         log("Group fix in \(name)")
                     } catch { log("No group fix in \(name): its executable couldn't take it") }
                 }
+                let ownID = own[dir]?.appID ?? (keep || id == newID ? entID : id)
                 let params = CodeSignParams(identifier: id, team: profile.team,
-                                            entitlements: isApp ? profile.entitlements(for: keep || id == newID ? entID : id, keptID: keep ? newID : nil,
+                                            entitlements: isApp ? signing.entitlements(for: ownID, keptID: keep ? newID : nil,
                                                                                          dataProtection: dataProtection) : nil,
                                             infoPlist: infoData, codeResources: resources)
                 let m = mode(exe, files)

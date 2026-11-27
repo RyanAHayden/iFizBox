@@ -67,6 +67,9 @@ enum Sideload {
         IPASigner.appProfile = { asked, original, held, certificate in // B502a
             appProfile(asked, original: original, held: held, certificate: certificate)
         }
+        IPASigner.extensionProfile = { appID, held, certificate in // F463
+            FreeAppID.usable(appID, among: FreeAppID.kept(in: appProfilesDir), held: held, certificate: certificate)
+        }
         b.on("signing.inspect") { c in inspect(c) }
         b.on("signing.addProfile") { c in // B502a1
             SignBridge.run(c) { try addProfile(c.params["profile"] as? String ?? "") }

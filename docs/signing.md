@@ -267,8 +267,12 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   the Computer Install gave it (`web/app/signing/freeprofile.js`).
 - **One App ID per app on a free profile.** iOS installs an app signed with a free profile's explicit App ID only when
   the app's bundle ID is that App ID (any other is refused, 0xe8008016). So an app on a free profile is signed as its own
-  App ID whatever Keep Bundle IDs says, and its extensions are left out (`native/sign/Profile.swift` `pinsBundleID`,
-  `native/sign/IPASigner.swift`). `native/sign/FreeAppID.swift` refuses an app (`app_id_taken`) when another installed
+  App ID whatever Keep Bundle IDs says. Each extension (`.appex` in `PlugIns/` or `Extensions/`) signs under a free
+  profile of its own App ID, `<app's App ID>.<what the extension adds to the app's bundle ID>` (two that would get one
+  ID are numbered: `native/sign/FreeAppID.swift` `extensionIDs`), taken from the kept profiles handed in with
+  `signing.addProfile`, and takes that as its bundle ID. An extension with no usable profile is left out, and so are
+  Watch apps (`native/sign/Profile.swift` `pinsBundleID`, `native/sign/IPASigner.swift`). The page does not hand
+  extension profiles in yet, so in practice extensions are still left out. `native/sign/FreeAppID.swift` refuses an app (`app_id_taken`) when another installed
   or recorded app already has the App ID it would be signed as, since installing would replace that app and its data.
   iFizBox updating itself
   and re-signing the same app are allowed. Re-sign refuses (`app_id_mismatch`) an app installed under another bundle

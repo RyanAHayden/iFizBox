@@ -41,10 +41,7 @@ enum FreeAppID {
         let there = records.contains { $0.bundleID == held.appID && $0.originalBundleID == original }
             && installed(held.appID) != false
         let want = there ? held.appID : appID(for: asked, team: held.team)
-        let usable = ([held] + kept).filter {
-            $0.pinsBundleID && $0.team == held.team && $0.appID == want && $0.problem(with: certificate, now: now) == nil
-        }
-        return usable.max { ($0.expires ?? .distantPast) < ($1.expires ?? .distantPast) } ?? held
+        return usable(want, among: [held] + kept, held: held, certificate: certificate, now: now) ?? held
     }
 
     // The name of the other app that has `bundleID`, or nil when signing `originalID` as it replaces nothing else.
@@ -57,6 +54,29 @@ enum FreeAppID {
         guard let r = records.first(where: { $0.bundleID == bundleID }), r.originalBundleID != originalID,
               installed(bundleID) != false else { return nil }
         return r.shownName
+    }
+
+    // F463: iOS wants an extension's ID to start with its app's, and a free profile pins it too, so each extension has
+    // an App ID of its own: <the app's App ID>.<what the extension adds to the app's bundle ID>, two that would get one
+    // ID numbered. `extensions`: their own bundle IDs, in Inspect's order; `original`: the app's own. The IDs in the
+    // same order, as core/freeroute.js appIdsFor.
+    static func extensionIDs(app: String, original: String, _ extensions: [String]) -> [String] {
+        var taken = Set<String>()
+        return extensions.map { ext in
+            let under = [app, original].first { !$0.isEmpty && ext.lowercased().hasPrefix($0.lowercased() + ".") }
+            let tail = under.map { String(ext.dropFirst($0.count + 1)) } ?? String(ext.split(separator: ".").last ?? "")
+            let base = "\(app).\(tail)"
+            var id = base, n = 2
+            while taken.contains(id.lowercased()) { id = "\(base)\(n)"; n += 1 }
+            taken.insert(id.lowercased())
+            return id
+        }
+    }
+
+    // The longest-lasting usable profile of the held one's team for exactly `appID`, or nil.
+    static func usable(_ appID: String, among profiles: [Profile], held: Profile, certificate: Data, now: Date = Date()) -> Profile? {
+        profiles.filter { $0.pinsBundleID && $0.team == held.team && $0.appID == appID && $0.problem(with: certificate, now: now) == nil }
+            .max { ($0.expires ?? .distantPast) < ($1.expires ?? .distantPast) }
     }
 
     // Why Re-sign can't renew `r` under `profile` (the one it would be signed with), or nil: signed as the profile's
