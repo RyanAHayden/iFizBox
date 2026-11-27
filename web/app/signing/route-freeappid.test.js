@@ -114,6 +114,17 @@ test("app_id_taken with no session: only the queue's sign-in prompt, and Open cl
   assert.deepEqual(went, [[format(settingsRoute(["signing", "certificate"])).replace(/^#/, ""), true]]);
 });
 
+test("Open leaves a progress page another job still runs on", async () => {
+  const n = shell({ install: () => { throw taken(); } });
+  const h = page();
+  h.page.finished = false;
+  const openGroup = (deps) => openFreeGroup({ ...deps, nav: {}, path: () => ["signing"], wait: async () => {}, show: () => true });
+  await run({ url: "https://e.example/a.ipa", name: "A" },
+    { native: n, session: async () => null, alert: async () => ({ index: 1 }), openGroup, h });
+  await new Promise((r) => setImmediate(r));
+  assert.equal(h.closed, undefined);
+});
+
 test("Cancel while the App ID is made: nothing is installed", async () => {
   const n = shell(), p = portal(), h = page();
   const list = p.listAppIds;

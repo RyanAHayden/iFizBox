@@ -281,8 +281,9 @@ async function ownAppId({ native, params, listed, name, bundleId, self, h, alert
     // The answer is wrapped: withOwnAppId signs again when it names another bundle ID, and an install is done once.
     install: async (send) => (await free.withOwnAppId(job, sending, async () => ({ result: await send() }), {
       native: n, alert, session: live, log: (line) => h.page?.raw?.(line),
-      // T89: the finished progress page covers the app (h.hide only completes it): closed, then the group's page
-      go: () => (openGroup ?? free.openFreeGroup)({ runPage: () => h.page && { dismiss: () => h.page.close?.() } }),
+      // T89: the finished progress page covers the app (h.hide only completes it): closed, then the group's page.
+      // A page another job still runs on stays: nothing would bring it back.
+      go: () => (openGroup ?? free.openFreeGroup)({ runPage: () => h.page && { dismiss: () => (h.page.finished === false ? undefined : h.page.close?.()) } }),
     })).result,
   };
 }
