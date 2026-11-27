@@ -15,7 +15,7 @@ import { freshUrl } from "./core/sources.js";
 import { sourceCalls, sortSources, loadAppSources } from "./core/sources.js";
 import { withAltSources } from "./core/altstore.js";
 import { validatorCache } from "./core/health.js";
-import { reviewsApi } from "./core/reviews.js";
+import { installsApi, reviewsApi } from "./core/reviews.js";
 import { createKeepAwake, wakeLockScreen } from "./core/keepawake.js";
 
 export class BackendError extends Error {
@@ -106,6 +106,7 @@ export function createHttpBackend({ base = "", fetchFn = globalThis.fetch.bind(g
   };
   // F182: user reviews, on the same server as the proxy (core/reviews.js; worker/src/reviews.js).
   backend.reviews = reviewsApi({ base, fetcher: fetchFn });
+  backend.installs = installsApi({ base, fetcher: fetchFn }); // F452
   // F287: keepAwake(on) from a job runner (core/apprun.js): the screen stays on (Screen Wake Lock, where the browser
   // has it) from the first job's true to the last one's false. Counted, so overlapping runs share it.
   const awake = createKeepAwake(screen);

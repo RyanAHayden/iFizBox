@@ -201,12 +201,15 @@ export function mergeCategories(rows, { jailbroken = true } = {}) {
     .map((name) => ({ name, count: counts.get(name) }));
 }
 
-// Popular, until real install counts exist: [{ row, sources, date, rating }] -> rows, F450: the best rated here
+// Popular: [{ row, sources, date, rating, installs }] -> rows. F452: the most installed first (`installs`, the review
+// server's count, only from MIN_INSTALLS), then F450: the best rated here
 // first (`rating`, core/sections.js ratingOf: highest average, then most ratings), then the unrated by how many
 // sources list them, then the newest update (`date`, epoch ms; AltStore versions carry one, APT packages don't),
 // then by name. At most `limit`.
+export const MIN_INSTALLS = 5; // F452: installs count for the rank only from this many (one install never beats a well-rated package)
+const installsOf = (i) => (Number(i.installs) >= MIN_INSTALLS ? Number(i.installs) : 0);
 export function rankPopular(items, limit = 50) {
-  return [...items].sort((a, b) => compareRatings(a.rating, b.rating) || b.sources - a.sources
+  return [...items].sort((a, b) => installsOf(b) - installsOf(a) || compareRatings(a.rating, b.rating) || b.sources - a.sources
     || (b.date ?? 0) - (a.date ?? 0) || compareNames(a.row, b.row)).slice(0, limit);
 }
 
@@ -996,11 +999,11 @@ export function createCatalog() {
   // The date popular() and refine()'s newest rank by: the candidate's AltStore version date; APT has none.
   const dateOf = (id) => entries(ALL).get(id)?.stanza.ipa?.versions?.[0]?.date ?? null;
 
-  function popular({ limit = 50, ratings = null } = {}) {
+  function popular({ limit = 50, ratings = null, installs = null } = {}) {
     const lists = [...sources].filter(([k]) => counts(k)).map(([, { byId }]) => byId);
     const items = visibleOf(ALL).map((row) => ({
       row, sources: lists.reduce((n, byId) => n + (byId.has(row.id) ? 1 : 0), 0),
-      date: dateOf(row.id), rating: ratingOf(ratings, row.id),
+      date: dateOf(row.id), rating: ratingOf(ratings, row.id), installs: installs?.[row.id] ?? 0,
     }));
     return rankPopular(items, limit).map(({ row, sources: n }) => ({ ...slim(row), sources: n }));
   }
