@@ -12,7 +12,8 @@ nothing to revert.
 - Core: `core/applookup.js` `batchLookupUrl` and `parseBatch`. `storeRatingsLoader` asks in batches of 50. Answers are
   kept a day in localStorage `ifizbox.storeratings.<country>`, unrated apps too. A failed batch is asked again. It
   waits at most 3 s.
-- `core/catalog.js` `storeCandidates` picks up to 200 IPA apps (most sources, then newest) and looks them up by their
+- `core/catalog.js` `storeCandidates` picks up to 500 IPA apps (10 requests; Apple allows an address about 20 a
+  minute, a figure from its documentation, not tried) (most sources, then newest) and looks them up by their
   real bundle ID.
 - `web/app/catalog.js` asks the Worker on the site and Apple directly in the app.
 
@@ -31,7 +32,9 @@ nothing to revert.
 - Tests: `web/app/core/applookup-batch.test.js`, `web/app/core/catalog.test.js`, `worker/test-applookup.mjs`.
 - End to end with `worker/node.mjs` and headless Chromium on the default sources: one batch request, 200 response,
   18 apps asked, 4 rated.
-- An app beyond the 200 candidates is never looked up.
+- An app beyond the 500 candidates is never looked up, so it ranks with the rest.
+- The Worker's day-long cache is per list, not per app as `/api/applookup`'s: visitors with the same sources share
+  it, others mostly don't. Per-app entries would pass the Cache API call limit.
 
 ## Process slip
 

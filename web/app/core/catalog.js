@@ -1004,7 +1004,7 @@ export function createCatalog() {
   const dateOf = (id) => entries(ALL).get(id)?.stanza.ipa?.versions?.[0]?.date ?? null;
 
   // F455: an IPA app's real bundle ID, lower case (its row id may carry a `~name` suffix); null for a package.
-  const bundleOf = (id) => entries(ALL).get(id)?.app?.bundleIdentifier.toLowerCase() ?? null;
+  const bundleOf = (id) => entries(ALL).get(id)?.app?.bundleIdentifier?.toLowerCase() ?? null;
   const listedIn = () => {
     const lists = [...sources].filter(([k]) => counts(k)).map(([, { byId }]) => byId);
     return (id) => lists.reduce((n, byId) => n + (byId.has(id) ? 1 : 0), 0);
@@ -1021,7 +1021,8 @@ export function createCatalog() {
   }
 
   // F455: the bundle IDs whose App Store stars Popular asks for: the IPA apps listed by most sources, then newest.
-  function storeCandidates(limit = 200) {
+  // At most 500 (10 requests): Apple allows an address about 20 a minute, and app pages ask too.
+  function storeCandidates(limit = 500) {
     const count = listedIn();
     const items = visibleOf(ALL).filter((row) => bundleOf(row.id)).map((row) => ({ row, sources: count(row.id), date: dateOf(row.id) }));
     return [...new Set(rankPopular(items, Infinity).map((i) => bundleOf(i.row.id)))].slice(0, limit);
