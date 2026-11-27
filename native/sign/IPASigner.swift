@@ -26,6 +26,9 @@ final class IPASigner {
     // this app (its bundle ID, the imported profile, the certificate DER, the log), or nil to keep the imported one.
     // Asked only when the app keeps its bundle ID (Keep Bundle IDs).
     static var autoProfile: ((String, Profile, Data, (String) -> Void) throws -> Profile?)?
+    // B502: under a profile that pins the bundle ID (the ID, the app's own), the name of another app it would
+    // replace (FreeAppID.holder), or nil.
+    static var idHolder: ((String, String) -> String?)?
     let identity: SigningIdentity
     var time = Date()
     var maxMachO: UInt64 = 1 << 31   // a single binary held in memory while it's signed
@@ -155,13 +158,17 @@ final class IPASigner {
         // B492: a bundle ID the user typed is kept too when the profile would sign the app as another one (the sheet
         // pre-fills the profile's ID with Keep Bundle ID off, so an untouched field still signs the old way).
         let typed = options.bundleID.map { (try? profile.bundleID(for: $0)) != $0 } ?? false
-        let keep = options.keeps(options.bundleID ?? oldID) || typed
+        let keep = !profile.pinsBundleID && (options.keeps(options.bundleID ?? oldID) || typed) // B502
         let imported = profile
         if keep, let auto = IPASigner.autoProfile, let made = try auto(options.bundleID ?? oldID, profile, identity.certificate, log) {
             profile = made
         }
         let (newID, firstEntID) = try profile.signingIDs(for: options.bundleID ?? oldID, keep: keep)
         var entID = firstEntID
+        if profile.pinsBundleID {
+            if let other = IPASigner.idHolder?(newID, oldID) { throw FreeAppID.taken(by: other) }
+            log("Free Apple ID: iOS installs it only as \(newID), so its own bundle ID isn't kept")
+        }
         // B138: an app on the phone keeps the application-identifier it was installed with
         if let have = installedAppID?(newID), have != "\(profile.team).\(entID)" {
             let others = [profile, imported].reduce(into: [Profile]()) { l, p in if !l.contains(where: { $0.data == p.data }) { l.append(p) } }
