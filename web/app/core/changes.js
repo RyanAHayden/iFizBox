@@ -203,33 +203,62 @@ export async function recordRefresh(store, current, now = Date.now()) {
   return add.length;
 }
 
+const connect = (idb, name) => new Promise((resolve, reject) => {
+  const req = idb.open(name, 1);
+  req.onupgradeneeded = () => {
+    const db = req.result;
+    if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: "k" });
+  };
+  req.onerror = () => reject(req.error);
+  req.onsuccess = () => resolve(req.result);
+});
+
 export function openSeenStore({ indexedDB: idb = globalThis.indexedDB, name = "ifizbox-changes" } = {}) {
   if (!idb) return Promise.reject(new Error("IndexedDB is not available"));
-  return new Promise((resolve, reject) => {
-    const req = idb.open(name, 1);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: "k" });
-    };
-    req.onerror = () => reject(req.error);
-    req.onsuccess = () => resolve(wrap(req.result));
-  });
+  return connect(idb, name).then((db) => wrap(db, () => connect(idb, name)));
 }
 
-function wrap(db) {
-  const run = (mode, f) => new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, mode);
-    const req = f(tx.objectStore(STORE));
+// An abort with no error means the browser ended the transaction (the connection closed when the app went to the
+// background, or another open asked for a version change). That is not a failure of the data: reopen, retry once.
+export const SEEN_STORE_FAILED = "Could not save what changed. Try refreshing again.";
+
+function wrap(first, reopen) {
+  let db = first;
+  const watch = (d) => {
+    d.onclose = () => { if (db === d) db = null; };
+    d.onversionchange = () => { if (db === d) db = null; d.close(); };
+    return d;
+  };
+  watch(db);
+  const attempt = (mode, f) => new Promise((resolve, reject) => {
+    let tx;
+    let req;
+    try {
+      tx = db.transaction(STORE, mode);
+      req = f(tx.objectStore(STORE));
+    } catch (e) { reject({ browser: true, error: e }); return; }
     tx.oncomplete = () => resolve(req?.result);
-    tx.onerror = () => reject(tx.error ?? req?.error);
-    tx.onabort = () => reject(tx.error ?? new Error("transaction aborted"));
+    tx.onerror = () => reject({ error: tx.error ?? req?.error });
+    tx.onabort = () => reject(tx.error ? { error: tx.error } : { browser: true });
   });
+  const run = async (mode, f) => {
+    for (let n = 0; ; n++) {
+      try {
+        if (!db) db = watch(await reopen());
+        return await attempt(mode, f);
+      } catch (e) {
+        if (e?.browser && n === 0) { try { db?.close(); } catch {} db = null; continue; }
+        if (e?.browser) throw new Error(SEEN_STORE_FAILED);
+        throw e?.error ?? e;
+      }
+    }
+  };
   return {
     all: () => run("readonly", (s) => s.getAll()),
     keys: () => run("readonly", (s) => s.getAllKeys()),
     // One transaction for the whole refresh: BigBoss alone is ~30k records on the first load.
     putMany: (records) => run("readwrite", (s) => { for (const r of records) s.put(r); return null; }).then(() => undefined),
     clear: () => run("readwrite", (s) => s.clear()).then(() => undefined),
-    close: () => db.close(),
+    close: () => db?.close(),
   };
 }

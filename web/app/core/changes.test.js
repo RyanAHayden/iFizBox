@@ -192,3 +192,47 @@ test("B482: Changes' Installed scope shows an installed app's own source's chang
   const all = filterGroups(groups, { scope: "all", installed });
   assert.deepEqual(all.flatMap((g) => g.rows.map((r) => [r.key, r.version])), [[fast, "2.0"]], "All still shows fastsign's");
 });
+
+// A fake IndexedDB whose first `aborts` transactions are aborted by the "browser" (no tx.error) mid-write.
+function abortingIndexedDB(aborts) {
+  const real = fakeIndexedDB();
+  let left = aborts;
+  return {
+    open(name, version) {
+      const req = {};
+      const inner = real.open(name, version);
+      inner.onupgradeneeded = () => { req.result = inner.result; req.onupgradeneeded?.(); };
+      inner.onsuccess = () => {
+        const db = inner.result;
+        req.result = {
+          objectStoreNames: db.objectStoreNames, createObjectStore: (...a) => db.createObjectStore(...a),
+          close: () => db.close(),
+          transaction(n, mode) {
+            const tx = db.transaction(n, mode);
+            if (mode === "readwrite" && left > 0) {
+              left--;
+              const o = {};
+              o.objectStore = () => ({ put: () => ({}), clear: () => ({}) });
+              setTimeout(() => o.onabort?.(), 0);
+              return o;
+            }
+            return tx;
+          },
+        };
+        req.onsuccess?.();
+      };
+      return req;
+    },
+  };
+}
+
+test("changes store: a transaction the browser aborts is retried once on a fresh connection", async () => {
+  const store = await openSeenStore({ indexedDB: abortingIndexedDB(1), name: "b496a" });
+  assert.equal(await recordRefresh(store, [["r1", "a", "1"]], 1000), 1);
+  assert.deepEqual((await store.all()).map((r) => r.id), ["a"]);
+});
+
+test("changes store: a second abort reads as a plain sentence, not 'transaction aborted'", async () => {
+  const store = await openSeenStore({ indexedDB: abortingIndexedDB(2), name: "b496b" });
+  await assert.rejects(recordRefresh(store, [["r1", "a", "1"]], 1000), (e) => !/transaction aborted/.test(e.message) && /Try refreshing/.test(e.message));
+});
