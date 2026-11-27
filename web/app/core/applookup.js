@@ -78,7 +78,7 @@ export const STORE_RATINGS_TTL = 24 * 3600 * 1000;
 // An answer (an app with no stars too) is kept a day, in `store` (localStorage-like) across launches; a failed request
 // isn't kept. After `wait` it answers with what it has; the requests go on and are there next time.
 export function storeRatingsLoader({ get, country: c = "us", direct = false, store = null, now = () => Date.now() }) {
-  const key = `ifizbox.storeratings.${country(c)}`;
+  const key = `${KEY_PREFIXES.storeRatings}${country(c)}`;
   const kept = new Map(); // id -> [asked at, [average, count] | null]
   const busy = new Map(); // id -> the request asking for it
   const fresh = (id) => kept.has(id) && now() - kept.get(id)[0] < STORE_RATINGS_TTL;

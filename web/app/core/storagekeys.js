@@ -101,4 +101,5 @@ export const KEY_PREFIXES = Object.freeze({
   ipaInfo: "ifizbox.ipainfo.",
   payment: "ifizbox.payment:",
   previews: "ifizbox.previews.",
+  storeRatings: "ifizbox.storeratings.",
 });
