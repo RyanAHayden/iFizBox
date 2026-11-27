@@ -339,3 +339,8 @@ _Said_: finish-setup page
 _On screen_: After the Install; Finish Setup
 _In code_: finishSetupSection, finishSetupLink, recordKey, ifizbox://free-id#<key>, ifizbox.freeid.key, sealRecord, openRecord
 _Avoid_: activation, pairing
+
+**Claim**:
+The client Apple's sign-in is told it is talking to: the one an anisette server advertises, or a current Mac.
+_In code_: claim, CURRENT_MAC, anisette.use
+_Avoid_: client identity, persona

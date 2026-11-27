@@ -310,20 +310,14 @@ function rig({ statuses = {}, drops = [] } = {}) {
     close() {}
   }
   const ani = anisetteV3({ transport, servers: ["https://a.example", "https://b.example"], wsUrl: (s) => relayWsUrl(s, "https://site.example"),
-    WebSocketImpl: Ws, retryDelay: 0 });
+    WebSocketImpl: Ws });
   return { ani, mids, sockets };
 }
 
-test("anisette v3: one more try after MidService's 503, on the same socket", async () => {
-  const r = rig({ statuses: { start: [503], finish: [503] } });
-  await r.ani.get();
-  assert.deepEqual(r.mids, ["start", "start", "finish", "finish"]);
-  assert.deepEqual(r.sockets, ["a.example"]);
-});
-
-test("anisette v3: a second 503 moves on to the next server", async () => {
-  const r = rig({ statuses: { start: [503, 503] } });
+test("anisette v3: MidService's 503 moves on to the next server, without asking again", async () => {
+  const r = rig({ statuses: { start: [503] } });
   assert.equal((await r.ani.get()).server, "https://b.example");
+  assert.deepEqual(r.mids, ["start", "start", "finish"]);
   assert.deepEqual(r.sockets, ["a.example", "b.example"]);
 });
 
@@ -364,4 +358,149 @@ test("anisette: a server on Apple's Android library is skipped before any provis
   }
   assert.deepEqual([...new Set(asked)], ["/v3/client_info"]);
   assert.deepEqual(opened, []);
+});
+
+// B498c: sign-in rotating servers x claims, against the fake GrandSlam behind two anisette servers.
+const OLD_MAC = "<MacBookPro13,3> <Mac OS X;10.12.6;16G29> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
+const NEW_MAC = "<MacBookPro18,3> <macOS;26.6;25F84> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
+const NEW_UA = "AuthKit/1 (Macintosh; OS X 26.6) (com.apple.akd/1.0)";
+
+// refuse(server, claim, op) -> 503 | -23782 | another ec | undefined (Apple takes it).
+function routed({ refuse = () => {}, infos = {}, saved = null, twoFactor = null } = {}) {
+  const apple = fakeApple({ twoFactor }), tried = [], provisioned = [];
+  let store = saved, asking = null, inits = [];
+  const ok = (o) => ({ status: 200, headers: {}, body: utf8(JSON.stringify(o)) });
+  const transport = async (req) => {
+    const u = new URL(req.url);
+    if (u.pathname === "/v3/client_info") {
+      const i = infos[u.host] ?? { client_info: OLD_MAC, user_agent: "" };
+      return i === "down" ? { status: 502, headers: {}, body: new Uint8Array() } : ok(i);
+    }
+    if (u.pathname === "/v3/get_headers") { asking = u.host; return ok({ result: "Headers", "X-Apple-I-MD": "md-value", "X-Apple-I-MD-M": "mdm" }); }
+    if (u.pathname.includes("MidService")) return { status: 200, headers: {}, body: utf8(encodePlist({ Response: { spim: "S", ptm: "P", tk: "T" } })) };
+    if (u.pathname === "/grandslam/GsService2" && req.method === "POST") {
+      const r = decodePlist(req.body).Request;
+      const claim = req.headers["X-MMe-Client-Info"] === NEW_MAC ? "mac" : "advertised";
+      if (r.o === "init") { inits.push(req.headers); tried.push(`${asking[0]} ${claim}`); }
+      const no = refuse(asking[0], claim, r.o);
+      if (no === 503) return { status: 503, headers: {}, body: new Uint8Array() };
+      if (no) return { status: 200, headers: {}, body: utf8(encodePlist({ Response: { Status: { ec: no, em: "refused" } } })) };
+    }
+    return apple.transport(req);
+  };
+  class Ws {
+    constructor(url) {
+      this.host = new URL(url).pathname.split("/")[2];
+      this.script = [{ result: "GiveIdentifier" }, { result: "ProvisioningSuccess", adi_pb: `PB${provisioned.length}` }];
+      setTimeout(() => this.next(), 0);
+    }
+    next() { this.onmessage({ data: JSON.stringify(this.script.shift()) }); }
+    send(s) { provisioned.push({ host: this.host[0], identifier: JSON.parse(s).identifier }); setTimeout(() => this.next(), 0); }
+    close() {}
+  }
+  const storage = { load: () => store, save: (s) => { store = structuredClone(s); } };
+  const make = () => anisetteV3({ transport, servers: ["https://a.example", "https://b.example"], storage,
+    wsUrl: (s) => relayWsUrl(s, "https://site.example"), WebSocketImpl: Ws });
+  const session = () => new AppleIdSession({ transport, anisette: make() });
+  return { session, make, tried, inits, provisioned, apple, get store() { return store; } };
+}
+
+test("sign-in: exactly the advertised client, akd's user agent when none, the email lowercased", async () => {
+  const r = routed();
+  const s = r.session();
+  assert.equal((await s.login(`  ${EMAIL.toUpperCase()} `, PASSWORD)).step, "done"); // the fake knows only the lowercase one
+  assert.equal(s.email, EMAIL);
+  assert.equal(r.inits[0]["X-MMe-Client-Info"], OLD_MAC);
+  assert.equal(r.inits[0]["User-Agent"], "akd/1.0 CFNetwork/808.1.4");
+  const own = routed({ infos: { "a.example": { client_info: `${OLD_MAC} `, user_agent: "akd/x" } } });
+  await own.session().login(EMAIL, PASSWORD);
+  assert.equal(own.inits[0]["X-MMe-Client-Info"], `${OLD_MAC} `);
+  assert.equal(own.inits[0]["User-Agent"], "akd/x");
+});
+
+test("sign-in: a 503 moves to the next server x claim, never the same one twice", async () => {
+  const r = routed({ refuse: (server, claim) => (server === "a" || claim === "advertised" ? 503 : undefined) });
+  assert.equal((await r.session().login(EMAIL, PASSWORD)).step, "done");
+  assert.deepEqual(r.tried, ["a advertised", "a mac", "b advertised", "b mac"]);
+  assert.deepEqual([r.store.server, r.store.claim], ["https://b.example", "mac"]);
+  // a 503 on the password check, after init, rotates too
+  const late = routed({ refuse: (server, claim, op) => (op === "complete" && server === "a" ? 503 : undefined) });
+  assert.equal((await late.session().login(EMAIL, PASSWORD)).step, "done");
+  assert.deepEqual(late.tried, ["a advertised", "a mac", "b advertised"]);
+  const all = routed({ refuse: () => 503 });
+  await assert.rejects(all.session().login(EMAIL, PASSWORD), (e) => e.status === 503);
+  assert.equal(all.tried.length, 4);
+});
+
+test("sign-in: -23782 retries as a current Mac, only through a server that names a Mac", async () => {
+  const r = routed({ refuse: (server, claim) => (claim === "advertised" ? -23782 : undefined) });
+  assert.equal((await r.session().login(EMAIL, PASSWORD)).step, "done");
+  assert.deepEqual(r.tried, ["a advertised", "a mac"]);
+  assert.equal(r.inits[1]["X-MMe-Client-Info"], NEW_MAC);
+  assert.equal(r.inits[1]["User-Agent"], NEW_UA);
+  const win = routed({ infos: { "a.example": { client_info: "<PC> <Windows;6.2(0,0);9200> <x>", user_agent: "w" } },
+    refuse: (server, claim) => (server === "a" ? -23782 : undefined) });
+  await win.session().login(EMAIL, PASSWORD);
+  assert.deepEqual(win.tried, ["a advertised", "b advertised"]);
+});
+
+test("sign-in: credential errors and anything else Apple says stop the rotation", async () => {
+  for (const ec of [-22406, -20101, -20970, -36607]) {
+    const r = routed({ refuse: () => ec });
+    await assert.rejects(r.session().login(EMAIL, PASSWORD), (e) => e.code === ec);
+    assert.deepEqual(r.tried, ["a advertised"], String(ec));
+  }
+  const wrong = routed();
+  await assert.rejects(wrong.session().login(EMAIL, "not it"), (e) => e.code === -20101);
+  assert.deepEqual(wrong.tried, ["a advertised"]);
+});
+
+test("sign-in: a server that's down is passed over; with none up, the anisette error", async () => {
+  const r = routed({ infos: { "a.example": "down" } });
+  await r.session().login(EMAIL, PASSWORD);
+  assert.deepEqual(r.tried, ["b advertised"]);
+  const none = routed({ infos: { "a.example": "down", "b.example": "down" } });
+  await assert.rejects(none.session().login(EMAIL, PASSWORD), /No anisette server could provision.*502/);
+});
+
+test("anisette: one identity per (server, client info), kept and reused", async () => {
+  const r = routed({ refuse: (server, claim) => (server === "a" || claim === "advertised" ? 503 : undefined) });
+  await r.session().login(EMAIL, PASSWORD);
+  assert.deepEqual(r.provisioned.map((p) => p.host), ["a", "a", "b", "b"]);
+  assert.equal(new Set(r.provisioned.map((p) => p.identifier)).size, 4);
+  // a new page signs in on the pair that worked, then the others find their identities again
+  r.tried.length = 0;
+  const ani = r.make();
+  assert.deepEqual(ani.current, { server: "https://b.example", claim: "mac" });
+  assert.equal((await ani.get()).clientInfo, NEW_MAC);
+  await ani.use("https://a.example", "advertised");
+  await ani.use("https://a.example", "mac");
+  await ani.use("https://b.example", "advertised");
+  assert.equal(r.provisioned.length, 4);
+  assert.equal(r.store.identifier, r.provisioned[2].identifier);
+  assert.equal(Object.keys(r.store.others).length, 3);
+  await ani.use("https://b.example", "mac");
+  const again = r.session(); // loads the stored pair
+  await again.login(EMAIL, PASSWORD);
+  assert.deepEqual(r.tried, ["b mac"]);
+});
+
+test("anisette: a machine saved without its client info is the advertised one's", async () => {
+  const saved = { identifier: b64encode(new Uint8Array(16)), adi_pb: "OLD", server: "https://a.example" };
+  const r = routed({ saved });
+  const ani = r.make();
+  await ani.use("https://a.example", "mac");
+  assert.equal(r.provisioned.length, 1);
+  await ani.use("https://a.example", "advertised");
+  assert.equal(r.provisioned.length, 1);
+  assert.deepEqual([r.store.identifier, r.store.adi_pb], [saved.identifier, "OLD"]);
+});
+
+test("sign-in: the code check signs in again with the same server and claim", async () => {
+  const r = routed({ twoFactor: "device", refuse: (server, claim) => (claim === "advertised" ? -23782 : undefined) });
+  const s = r.session();
+  assert.equal((await s.login(EMAIL, PASSWORD)).step, "device");
+  r.tried.length = 0;
+  assert.equal((await s.verifyDeviceCode("123456")).step, "done");
+  assert.deepEqual(r.tried, ["a mac"]);
 });

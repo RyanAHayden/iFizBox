@@ -310,7 +310,10 @@ export function relayWsUrl(server, origin = globalThis.location?.origin) {
 }
 
 // ---- anisette v3 ----
-// A machine of our own: a random 16-byte identifier and the adi.pb that provisioning returns, kept by the caller.
+// A machine of our own: a random 16-byte identifier and the adi.pb that provisioning returns, kept by the caller. One
+// per (server, client info): the current one at the top of the stored state, the rest under `others`.
+// A claim is the client Apple is told it talks to: "advertised" (the server's own client_info and user_agent) or "mac"
+// (a current Mac, only through a server that names a Mac).
 // Provisioning (once, no Apple ID): WebSocket <server>/v3/provisioning_session: GiveIdentifier -> {identifier};
 // GiveStartProvisioningData -> POST gsa MidService startMachineProvisioning, send {spim}; GiveEndProvisioningData
 // {cpim} -> POST finishMachineProvisioning, send {ptm, tk}; ProvisioningSuccess {adi_pb}.
@@ -330,15 +333,20 @@ const MID_FINISH = "https://gsa.apple.com/grandslam/MidService/finishMachineProv
 export const XCODE_APP = "com.apple.gs.xcode.auth";
 export const USER_AGENT = "akd/1.0 CFNetwork/978.0.7 Darwin/18.7.0";
 export const XCODE_VERSION = "27.0 (27A5218g)";
-const nowTime = () => new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+const AKD_USER_AGENT = "akd/1.0 CFNetwork/808.1.4"; // for a server that advertises no user_agent
+const CURRENT_MAC = { client_info: "<MacBookPro18,3> <macOS;26.6;25F84> <com.apple.AuthKit/1 (com.apple.akd/1.0)>",
+  user_agent: "AuthKit/1 (Macintosh; OS X 26.6) (com.apple.akd/1.0)" };
+const NAMES_A_MAC = /<(macOS|Mac OS X);\d/;
+const identityKey = (server, clientInfo) => `${server}\n${clientInfo}`;
+const nowTime =() => new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 const uuidOf = (b) => { const h = hex(b); return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`; };
 const cpdOf = (h) => ({ bootstrap: true, icscrec: true, loc: "en_US", pbe: false, prkgen: true, svct: "iCloud", ...h });
 
-// storage: { load() -> { identifier, adi_pb, server } | null, save(state) }: the caller keeps it private (IndexedDB).
+// storage: { load() -> state | null, save(state) }: the caller keeps it private (IndexedDB).
 export function anisetteV3({ transport, servers = ANISETTE_SERVERS, storage, wsUrl = relayWsUrl, log = () => {},
-  WebSocketImpl = globalThis.WebSocket, provisionTimeout = 60000, retryDelay = 1000 }) {
-  let state = storage?.load?.() ?? null;
-  let info = null; // { client_info, user_agent } of state.server
+  WebSocketImpl = globalThis.WebSocket, provisionTimeout = 60000 }) {
+  let state = storage?.load?.() ?? {};
+  let info = null; // { client_info, user_agent } claimed on the current server
   let urls = null;
   const ident = () => b64decode(state.identifier);
   const deviceId = () => uuidOf(ident());
@@ -352,9 +360,9 @@ export function anisetteV3({ transport, servers = ANISETTE_SERVERS, storage, wsU
   }
   async function clientInfo(server) {
     const j = await json(`${server}/v3/client_info`);
-    if (!j.client_info || !j.user_agent) throw new Error(`${server}: no client_info`);
+    if (!j.client_info) throw new Error(`${server}: no client_info`);
     if (ANDROID_CLIENT.test(j.client_info)) throw new Error(`${server} runs Apple's Android library, which Apple refuses`);
-    return j;
+    return { client_info: j.client_info, user_agent: j.user_agent || AKD_USER_AGENT };
   }
   async function midUrls() {
     if (urls) return urls;
@@ -367,23 +375,16 @@ export function anisetteV3({ transport, servers = ANISETTE_SERVERS, storage, wsU
     return urls;
   }
   async function midCall(url, request) {
-    const send = async () => transport({ url, method: "POST", body: utf8(encodePlist({ Header: {}, Request: request })), headers: {
+    const r = await transport({ url, method: "POST", body: utf8(encodePlist({ Header: {}, Request: request })), headers: {
       "Content-Type": "text/x-xml-plist", Accept: "text/x-xml-plist", "User-Agent": info.user_agent, "X-MMe-Client-Info": info.client_info,
       "X-Xcode-Version": XCODE_VERSION, "X-Apple-App-Info": XCODE_APP, "X-Apple-I-MD-LU": await mdLu(), "X-Mme-Device-Id": deviceId(),
       "X-Apple-I-Client-Time": nowTime(), "X-Apple-Locale": "en_US", "X-Apple-I-TimeZone": "UTC" } });
-    let r = await send();
-    if (r.status === 503) { // Apple's throttle, often gone a moment later: once more
-      log(`anisette: ${new URL(url).pathname} HTTP 503, trying once more`);
-      await new Promise((done) => setTimeout(done, retryDelay));
-      r = await send();
-    }
     if (r.status !== 200) throw new Error(`${new URL(url).pathname} HTTP ${r.status}`);
     const p = decodePlist(r.body), resp = p.Response ?? p, st = resp.Status ?? {};
     if (st.ec) throw new Error(`${new URL(url).pathname}: ${st.em || "error"} [${st.ec}]`);
     return resp;
   }
   async function provision(server) {
-    info = await clientInfo(server);
     const { start, finish } = await midUrls();
     const url = wsUrl(server);
     log(`anisette: provisioning a new machine on ${server}`);
@@ -415,7 +416,7 @@ export function anisetteV3({ transport, servers = ANISETTE_SERVERS, storage, wsU
             }
             case "ProvisioningSuccess":
               done = true; clearTimeout(timer);
-              state = { ...state, adi_pb: m.adi_pb, server, provisionedAt: new Date().toISOString() };
+              state = { ...state, adi_pb: m.adi_pb, provisionedAt: new Date().toISOString() };
               storage?.save?.(state);
               try { ws.close(); } catch { /* closed */ }
               resolve(); break;
@@ -425,21 +426,42 @@ export function anisetteV3({ transport, servers = ANISETTE_SERVERS, storage, wsU
       };
     });
   }
+  // Switches to (server, claim) with that pair's own identity, provisioning it first when it has none. A failure
+  // leaves the current one as it was.
+  async function use(server, claim = "advertised") {
+    const advertised = await clientInfo(server).catch((e) => { throw Object.assign(e, { noServer: true }); });
+    const next = claim !== "mac" ? advertised : NAMES_A_MAC.test(advertised.client_info) ? CURRENT_MAC : null;
+    if (!next) throw new Error(`${server} names no Mac, so it can't claim a current one`);
+    const prev = state, prevInfo = info, others = { ...state.others };
+    let { identifier, adi_pb, provisionedAt } = state;
+    // A state saved without clientInfo was provisioned as its server advertised.
+    const was = state.clientInfo ?? (state.server === server ? advertised.client_info : "");
+    if (state.server !== server || was !== next.client_info) {
+      if (adi_pb) others[identityKey(state.server, was)] = { identifier, adi_pb, provisionedAt };
+      const keys = [identityKey(server, next.client_info), ...(claim === "mac" ? [] : [identityKey(server, "")])];
+      ({ identifier, adi_pb, provisionedAt } = others[keys.find((k) => others[k])] ?? {});
+      for (const k of keys) delete others[k];
+    }
+    state = { identifier: identifier || b64encode(crypto.getRandomValues(new Uint8Array(16))), adi_pb: adi_pb ?? null, provisionedAt,
+      server, claim, clientInfo: next.client_info, others };
+    info = next;
+    try {
+      if (state.adi_pb) return void storage?.save?.(state);
+      await provision(server).catch((e) => {
+        if (!e.dropped) throw e;
+        log(`anisette: ${e.message}, trying ${server} once more`);
+        return provision(server);
+      });
+    } catch (e) { state = prev; info = prevInfo; throw e; }
+  }
+  const candidates = () => [state.server, ...servers].filter((s, i, a) => s && a.indexOf(s) === i);
   async function ensure(force = false) {
-    if (!state?.identifier || force) state = { identifier: b64encode(crypto.getRandomValues(new Uint8Array(16))), adi_pb: null, server: null };
-    if (state.adi_pb && !info) info = await clientInfo(state.server).catch(() => null);
+    if (force) { state = { ...state, identifier: null, adi_pb: null }; info = null; }
     if (state.adi_pb && info) return;
     let last;
-    for (const s of [state.server, ...servers].filter((s, i, a) => s && a.indexOf(s) === i)) {
-      try {
-        if (state.adi_pb && s === state.server) { info = await clientInfo(s); return; }
-        await provision(s).catch((e) => {
-          if (!e.dropped) throw e;
-          log(`anisette: ${e.message}, trying ${s} once more`);
-          return provision(s);
-        });
-        return;
-      } catch (e) { last = e; log(`anisette: ${s} failed: ${e.message}`); }
+    for (const s of candidates()) {
+      try { return await use(s, s === state.server ? state.claim : "advertised"); }
+      catch (e) { last = e; log(`anisette: ${s} failed: ${e.message}`); }
     }
     throw new Error(`No anisette server could provision a machine (${last?.message})`);
   }
@@ -464,6 +486,7 @@ export function anisetteV3({ transport, servers = ANISETTE_SERVERS, storage, wsU
   return {
     get machine() { return state?.identifier ? { deviceId: deviceId(), server: state.server, provisioned: !!state.adi_pb } : null; },
     ensure, get: () => headers(), resync: (sim) => headers(sim), reset: () => ensure(true),
+    use, get servers() { return candidates(); }, get current() { return { server: state.server ?? null, claim: state.claim ?? "advertised" }; },
   };
 }
 
@@ -478,6 +501,9 @@ const GS_URLS = {
   validateCode: "https://gsa.apple.com/grandslam/GsService2/validate",
 };
 const CLIENT_INFO = "<MacBookPro13,3> <Mac OS X;10.12.6;16G29> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
+// Apple turned the claim down: its front end's 503, which comes before the password check, or -23782 (macOS 10.13
+// required). Anything else, credential errors (-20101, -20970, -22406) first of all, ends the sign-in.
+const claimRefused = (e) => e instanceof AppleIdError && (e.status === 503 || e.code === -23782);
 function gsStatus(resp, step = null) {
   const st = resp?.Status ?? resp ?? {};
   if (st.ec && st.ec !== 0) throw new AppleIdError(st.em || `Apple error ${st.ec}`, { code: st.ec, step });
@@ -541,10 +567,39 @@ export class AppleIdSession {
     return { resp, eph, cpd: ani.cpd };
   }
 
+  // Signs in through each server x claim in turn, the current server first (and its claim first on it), moving on
+  // when a server can't serve or Apple refuses the claim; never the same pair twice.
   async login(email, password) {
-    if (email) this.email = email;
+    if (email) this.email = String(email).trim().toLowerCase();
     if (password) this.password = password;
     if (!this.email || !this.password) throw new AppleIdError("Apple ID and password needed");
+    const ani = this.anisette;
+    if (!ani.use) return this.signInOnce(); // a fixed anisette source: nothing to rotate
+    const current = ani.current;
+    let refused = null, down = null;
+    for (const server of ani.servers) {
+      const claims = server === current.server && current.claim === "mac" ? ["mac", "advertised"] : ["advertised", "mac"];
+      for (const claim of claims) {
+        try {
+          await ani.use(server, claim);
+          await this.freshAnisette();
+        } catch (e) {
+          down = e;
+          this.log(`sign-in: ${server} (${claim}) unusable: ${e.message}`);
+          if (e.noServer) break;
+          continue;
+        }
+        try { return await this.signInOnce(); } catch (e) {
+          if (!claimRefused(e)) throw e;
+          refused = e;
+          this.log(`sign-in: ${server} (${claim}) refused: ${e.message}`);
+        }
+      }
+    }
+    throw refused ?? new Error(`No anisette server could provision a machine (${down?.message})`);
+  }
+
+  async signInOnce() {
     const { resp, eph, cpd } = await this.init(this.email);
     gsStatus(resp, "SRP init");
     const { s: salt, B, i: iterations, c, sp } = resp;
