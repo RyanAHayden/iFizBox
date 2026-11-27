@@ -431,6 +431,14 @@ html[data-theme="dark"] .scope-filter.selected, html[data-theme="dark"] .scope-f
   border-color: var(--scope-seg-dark-selected-edge); background: var(--dk-btn-pressed); background-origin: border-box;
 }
 html[data-theme="dark"] .scope-segments, html[data-theme="dark"] .scope-filter { box-shadow: 0 1px 0 var(--dk-ctl-hi); }
+/* B487: a Filter that is on wears the held look already (.selected), so a press of it showed no change: darken it,
+   the way the 4S's pressed art sits darker than the resting art. iOS 6 only (the eras' own :active rules are theirs). */
+html:not([data-style="ios7"]):not([data-style="ios13"]):not([data-style="ios26"]) .scope-filter.selected:active {
+  background: linear-gradient(rgba(0,0,0,.2), rgba(0,0,0,.2)), var(--scope-seg-selected); background-origin: border-box;
+}
+html[data-theme="dark"]:not([data-style="ios7"]):not([data-style="ios13"]):not([data-style="ios26"]) .scope-filter.selected:active {
+  background: linear-gradient(rgba(0,0,0,.35), rgba(0,0,0,.35)), var(--dk-btn-pressed); background-origin: border-box;
+}
 .filter-sheet .filter-clear .cell-label { color: var(--detail); }
 /* ==== } look-only ==== */
 
