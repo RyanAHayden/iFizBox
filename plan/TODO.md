@@ -22,7 +22,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
-- [ ] **R105** (follow-up, low) After a release with B479 (a second computer install's new Free Apple ID certificate replaces the held one): on the iPhone 15 Pro, run a computer install (ifizbox.com Computer Install, setup.sh) over the installed Lite copy with a newly made Free Apple ID certificate, then check signing.status's identity serial and localStorage ifizbox.freeid both carry the new serial, and the log says the certificate inside the app replaced the held one. Making the certificate revokes the spare Apple ID's current 'iFizBox Website' one: check Apple's list first. Not checked in B479: computer installs install the published build. | files: journal/** | after: B479 — Start only once release 1.0.5 (V33) is published with B479 in it: the computer install installs the published build. — reopened: V33 landed
 ### Parked
 
 - [ ] **F107** (later, when the jailbreakme.dev exploit is ready) Upgrading & Jailbreaking Help stays unlocked on the website's locked Home (user 2026-11-18: 'we will not have the jailbreak tutorial thing locked when jailbreakme.dev exploit is ready, thats for later'): leave that row out of websign-gate's browsingLocked set in screens/home.js and point it at the jailbreak guide. | files: web/app/screens/home.js
