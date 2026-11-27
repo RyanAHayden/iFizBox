@@ -385,6 +385,15 @@ function slideTo(scroller, to, win) {
   raf.call(win, frame);
 }
 
+// B502a1c: slides the page to the Free Apple ID group, as far as the page goes; false while it isn't drawn.
+export function showFreeGroup(doc = globalThis.document, win = globalThis) {
+  const group = doc.querySelector(".free-route:not([hidden]) .group");
+  const scroller = group?.closest(".page-body, [data-scroller]");
+  if (!scroller) return false;
+  slideTo(scroller, targetFor(group, scroller, win), win);
+  return true;
+}
+
 function bringToTop(box, win = globalThis) {
   const group = box.querySelector?.(".group");
   const scroller = group?.closest?.(".page-body, [data-scroller]");

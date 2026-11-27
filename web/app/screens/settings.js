@@ -89,6 +89,8 @@ export const MERGED_TITLE = "Installation & Signing";
 const merged = () => localSigning() && settings.isShown("installRoute");
 // Pure, for the tests: whether `path` opens the merged page.
 export const opensMerged = ([first, second] = [], on = true) => on && !second && (first === "signing" || first === INSTALLATION);
+// B502a1c: the sideload build's path to the page with the Free Apple ID group.
+export const freeIdPath = (on = merged()) => (on ? ["signing", "certificate"] : ["signing"]);
 // The title is wider than the nav bar leaves at 375pt beside "Settings": it shrinks to fit (settings.css
 // .nav-title-fit) instead of ending in "…", and the pages above it (This iPhone, How Signing Works) say Back, as iOS
 // does for a title too long for the back button.
