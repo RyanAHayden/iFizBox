@@ -9,6 +9,7 @@
 import { plain, collapse, note } from "../nav/ui.js";
 import * as browse from "./browse.js";
 import { showAlert } from "../nav/alert.js";
+import { showShareFor } from "./handoff.js";
 import { showMenu, longPress, copyText, nativeHasUrl } from "../nav/menu.js";
 import { format } from "../router.js";
 import { getBackend } from "../backend.js";
@@ -849,7 +850,10 @@ function attachRowGestures(ul) {
     const src = byKey(li.dataset.key);
     const trust = src && li.dataset.trust !== "safe"
       ? [{ label: trustMenuLabel(src), onClick: () => { toggleTrust(src); drawAll(); } }] : [];
-    showMenu(li, [...open, { label: "Copy URL", onClick: () => copyText(li.dataset.url) }, ...trust], { x: e.clientX });
+    // F451: a plain row opens the share popup (screens/handoff.js); a row with Refresh or Trust keeps the menu, Share first
+    const share = () => showShareFor(src ?? { key: li.dataset.key, uri: li.dataset.url });
+    if (!open.length && !trust.length) { share(); return; }
+    showMenu(li, [...open, { label: "Share…", onClick: share }, { label: "Copy URL", onClick: () => copyText(li.dataset.url) }, ...trust], { x: e.clientX });
   });
   let start = null;   // the pointer that may become a swipe
   let swiped = false; // the click that ends a swipe opens nothing

@@ -8,6 +8,8 @@
 //   isIpaFormat(format)        -> true for every alt: (IPA) format
 //   addLink(source, origin)    -> "<origin>/add?url=…[&suite=…&component=…]"
 //   parseAddLink(search)       -> { url, dist?, components? } or null, from /add's query string
+//   appLink(id, origin)        -> "<origin>/app?id=…" (F451: an app's page; Share iFizBox link)
+//   parseAppLink(search)       -> the app's id or null, from /app's query string; isAppPath(pathname)
 //
 // In the jailbreak app these rows give way to the real install queue (N4).
 import { isAltKey } from "./altstore.js";
@@ -178,3 +180,18 @@ export function parseAddLink(search) {
 
 // True on the /add page (any base path): app.js then opens Add Source instead of the start page.
 export const isAddPath = (pathname) => /(^|\/)add\/?$/.test(String(pathname ?? ""));
+
+// F451: Share iFizBox link on an app's page: /app?id=<id> opens iFizBox on that app's page (Search's package:<id>).
+export function appLink(id, origin = PUBLIC_SITE) {
+  const v = String(id ?? "").trim();
+  return v && v.length <= 300 && !/[/\s]/.test(v) ? `${String(origin).replace(/\/+$/, "")}/app?id=${enc(v)}` : null;
+}
+
+// /app's query string -> the app's id, or null.
+export function parseAppLink(search) {
+  const v = (new URLSearchParams(String(search ?? "").replace(/^\?/, "")).get("id") ?? "").trim();
+  return v && v.length <= 300 && !/[/\s]/.test(v) ? v : null;
+}
+
+// True on the /app page (any base path): app.js then opens that app's page.
+export const isAppPath = (pathname) => /(^|\/)app\/?$/.test(String(pathname ?? ""));

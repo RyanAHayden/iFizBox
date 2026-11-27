@@ -966,7 +966,7 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
   const sourceName = app.sourceName || (source ? displayName(source) : "") || app.sourceUrl;
   // F194: Share sits on the header, where the App Store's install button was (the nav bar keeps Install / Modify).
   const header = storeHeader({ art: icon, name: app.name, author: app.developerName || null,
-    action: headerShareButton(source ?? { key: pkg.key }, { app: true }),
+    action: headerShareButton(source ?? { key: pkg.key }, { app: true, appId: pkg.row?.id ?? pkg.stanza.package }),
     line: headerLine({ version: `${v.version}${v.buildVersion ? ` (${v.buildVersion})` : ""}`, size, price: "Free" }) });
   page.append(header.head);
 
