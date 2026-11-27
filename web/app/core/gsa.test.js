@@ -339,6 +339,17 @@ test("anisette v3: a socket dropped part way is tried once more; one that never 
   assert.deepEqual(dead.sockets, ["a.example", "b.example"]);
 });
 
+// B498a: BariStore's working order, then lillq.me, which provisioned end to end in B498's checks.
+test("anisette: the servers, in the order they're tried", () => {
+  assert.deepEqual(ANISETTE_SERVERS.map((s) => new URL(s).host), ["new.ani.sidestore.io", "mac-ani.jkcoxson.com", "ani.iloader.app",
+    "ani3.stikstore.app", "ani.jkcoxson.com", "ani2.stikstore.app", "win.ani.sidestore.io", "anisette.lillq.me"]);
+});
+
+test("Apple sign-in: with no anisette client info, the fallback isn't an Android-library one", () => {
+  const info = new AppleIdSession({}).baseHeaders()["X-MMe-Client-Info"];
+  assert.match(info, /^<MacBookPro13,3> <Mac OS X;10\.12\.6;16G29> /);
+});
+
 test("anisette: every server is on the relay's list, in the same order", async () => {
   const { ANISETTE_HOSTS } = await import("../../../worker/src/apple-relay.js");
   assert.deepEqual(ANISETTE_SERVERS.map((s) => new URL(s).host), ANISETTE_HOSTS);
