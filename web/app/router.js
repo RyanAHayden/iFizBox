@@ -145,6 +145,7 @@ export function lazyFor(route) {
     else if (r.tab === IN_HOME) for (const n of SETTINGS_PARTS) out.add(n);
     else if (r.tab === "home" && (r.path[0] === "browse" || r.path[0] === "wishlist")) for (const n of BROWSE_PARTS) out.add(n);
     else if (r.tab === "home" && r.path[0] === "guides") out.add("guides"); // C32
+    else if (r.tab === "home" && r.path[0] === "donate") out.add("donate"); // F464
   }
   return [...out];
 }

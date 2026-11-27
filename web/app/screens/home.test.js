@@ -75,8 +75,7 @@ test("F123/F135: Home's list starts with Settings in its own group, with its ico
     { label: "Theme", href: "#/home/settings/theme", icon: { cls: "home-glyph glyph-theme" }, cls: "home-settings-row" }] });
   assert.equal(groups[1].rows[0].label, "Upgrading & Jailbreaking Help", "the help links come right after Settings");
   assert.equal(groups[2].header, "User Guides");
-  assert.equal(groups.at(-1).rows[0].label, "Credits / Thank You");
-  assert.equal(groups.at(-1).rows.length, 1);
+  assert.deepEqual(groups.at(-1).rows.map((r) => r.label), ["Credits / Thank You", "Donate"]); // F464
 });
 
 test("F123: the Signing tile shows only while signing isn't set up, where something signs", async () => {

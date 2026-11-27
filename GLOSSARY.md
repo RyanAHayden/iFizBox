@@ -351,3 +351,10 @@ _Said_: Refresh
 _On screen_: Refreshing Apps
 _In code_: signing.refresh, ProfileRefresh, refreshApps
 _Avoid_: profile renewal pass
+
+**Donate page**:
+The page from Home or Credits with the Ko-fi link and what the app took to build.
+_Said_: Donate button
+_On screen_: Donate
+_In code_: screens/donate.js, #/home/donate, core/devstats.js, tools/dev_stats.py
+_Avoid_: tip jar
