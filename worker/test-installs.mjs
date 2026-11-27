@@ -1,7 +1,8 @@
 // F452: install counts (src/installs.js) against Node's SQLite with D1's API. The gate runs every worker/test*.mjs.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import assert from "node:assert/strict";
-import { installs, isInstallsPath } from "./src/installs.js";
+import { installs, isInstallsPath, INSTALL_WRITES, INSTALL_DAILY, INSTALL_DAILY_PER_PKG } from "./src/installs.js";
+import { reviews } from "./src/reviews.js";
 import { d1 } from "./src/d1-sqlite.js";
 import w from "./src/index.js";
 
@@ -41,8 +42,33 @@ assert.deepEqual((await (await call("/installs")).json()).counts, { "com.x": 2, 
 const viaWorker = await w.fetch(new Request("https://ifizbox.example/installs"), env);
 assert.equal((await viaWorker.json()).counts["com.x"], 2);
 
-// rate limit: one token, a minute
-let limited = 0;
-for (let i = 0; i < 8; i++) if ((await call(`/installs/com.z${i}`, { method: "POST", token: tok("c"), ip: "203.0.113.9" })).status === 429) limited++;
-assert.ok(limited > 0, "rate limited like reviews");
+// B499: an Upgrade All of many packages from one device and address is all counted, and a review still goes through.
+// `now` is fixed, so the minute's limit can't roll over mid-loop.
+const now = Date.now();
+const count = async (pkg, { token = tok("c"), ip = "203.0.113.9", at = now, e = env } = {}) => (await installs(
+  new Request("https://ifizbox.example/installs/" + pkg, { method: "POST", headers: { "CF-Connecting-IP": ip, "X-Review-Token": token } }), e, { now: at })).status;
+for (let i = 0; i < 120; i++) assert.equal(await count(`com.z${i}`), 200);
+assert.equal(Object.keys((await (await call("/installs")).json()).counts).filter((k) => k.startsWith("com.z")).length, 120);
+const review = await reviews(new Request("https://ifizbox.example/reviews/com.x", { method: "POST",
+  headers: { "CF-Connecting-IP": "203.0.113.9", "X-Review-Token": tok("c"), "Content-Type": "application/json" },
+  body: JSON.stringify({ stars: 5 }) }), env, { now });
+assert.equal(review.status, 200);
+
+// its own limits: a minute per address
+for (let i = 120; i < INSTALL_WRITES; i++) assert.equal(await count(`com.z${i}`), 200);
+assert.equal(await count("com.over"), 429);
+assert.equal(await count("com.over", { at: now + 60000 }), 200);
+
+// a day, one package from one address: new tokens add no more than INSTALL_DAILY_PER_PKG
+const nth = (i) => String(i).padStart(32, "t");
+for (let i = 0; i < INSTALL_DAILY_PER_PKG; i++) assert.equal(await count("com.pad", { token: nth(i), ip: "203.0.113.10", at: now + 120000 }), 200);
+assert.equal(await count("com.pad", { token: nth(999), ip: "203.0.113.10", at: now + 180000 }), 429);
+assert.equal(await count("com.other", { token: nth(999), ip: "203.0.113.10", at: now + 180000 }), 200);
+assert.equal(await count("com.pad", { token: nth(999), ip: "203.0.113.10", at: now + 120000 + 86400000 }), 200);
+
+// a day per address, whatever the packages
+const full = { REVIEWS: d1() };
+let n = 0;
+for (let i = 0; i <= INSTALL_DAILY; i++) if ((await count(`com.d${i}`, { ip: "203.0.113.11", at: now + Math.floor(i / 200) * 60000, e: full })) === 200) n++;
+assert.equal(n, INSTALL_DAILY);
 console.log("ok installs");
