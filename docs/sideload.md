@@ -485,13 +485,27 @@ rest:
   `tools/setup/llvm-mingw.sh` fetches the llvm-mingw that the Windows on ARM build needs. release.sh finds both in
   their default folders.
 
+**Phone Setup (iOS 27, no computer)**: the same setup command, run on the iPhone itself inside Open Minis (an App
+Store app). The website does not offer it yet.
+
+1. Install Open Minis and LocalDevVPN from the App Store. In Open Minis, allow Local Network and Notifications.
+2. Connect LocalDevVPN, and keep Wi-Fi on.
+3. In Open Minis, run the setup command with the code from the website.
+4. Developer Mode lists a "Pair with iFizBox" row while Open Minis runs in the background. The pairing code arrives as
+   a notification; the command asks for it.
+5. The command installs the app.
+
+The pairing is kept in memory only and is written to the app's container as `Documents/pairingFile.plist`. The app
+does not read that file yet. A pairing made here replaces an installed app's pairing of the same name, so the app
+shows Pairing Lost until it is paired again (Fix).
+
 **Free Apple ID without a computer**: a free profile has no packet tunnel, so the built-in VPN can't start on it.
 This iPhone connects through LocalDevVPN instead (a free app on the App Store, not ours), which the person turns on
 by hand before each install, so the free profile needs no Network Extensions. Measured on an iPhone 15 Pro
 (iOS 27.0.1): LocalDevVPN's Device IP is 10.7.0.1/32, the address the app already uses, its Tunnel IP 10.7.1.1/32,
 and iOS asks once to add its VPN configuration. Through it, Test Connection, an install and a re-sign each connect
-over RemotePairing in under a second, with nothing of iFizBox's VPN on. The pairing file still comes from the
-one-time computer setup.
+over RemotePairing in under a second, with nothing of iFizBox's VPN on. The pairing file comes from the one-time
+computer setup or from Phone Setup.
 
 **Jailbreak build**: the root helper's `install-ipa` installs an IPA through `LSApplicationWorkspace
 installApplication:withOptions:error:`, as AppSync's `appinst` does (`native/helper/README.md`). It needs AppSync

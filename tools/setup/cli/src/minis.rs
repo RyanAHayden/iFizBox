@@ -36,6 +36,8 @@ const LOOPBACK: [u8; 4] = [10, 7, 0, 1];
 const USUAL_PORT: u16 = 49152;
 const WAIT_FOR_DEVICE: Duration = Duration::from_secs(10 * 60);
 const TRIES: u32 = 3;
+/// Open Minis runs on older iOS too, which has no "Pair with" row, and the shell can't tell the iOS version.
+const OLDER_IOS: &str = "This needs iOS 27 or later: with no \"Pair with\" row, use a computer instead.";
 /// Spoken at volume 0 and the slowest rate, about a minute each time.
 const QUIET: &str = "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen \
     seventeen eighteen nineteen twenty";
@@ -176,6 +178,7 @@ async fn tunnel(pairing: &mut RpPairingFile) -> Result<Tunnel, String> {
         }
     }
     // 64 at a time: a refused port answers at once, and Minis's emulator can't take thousands of sockets.
+    println!("Looking for the iPhone's pairing service on other ports; this can take a few minutes…");
     let mut next = u32::from(USUAL_PORT) + 1;
     while next <= u32::from(u16::MAX) {
         let batch: Vec<_> = (next..(next + 64).min(u32::from(u16::MAX) + 1))
@@ -220,7 +223,8 @@ async fn pair_on_phone(ui: &mut dyn Ui) -> Result<RpPairingFile, String> {
     notify(&format!("{NAME} setup"), "The pairing code comes as a notification.").await;
     ui.say(&format!(
         "Open Settings > Privacy & Security > Developer Mode, tap \"Pair with {NAME}\" and enter the iPhone's passcode. \
-         The 6-digit code then comes as a notification (and shows here). Allow notifications if asked."
+         The 6-digit code then comes as a notification (and shows here). Allow notifications if asked.\n\
+         {OLDER_IOS}"
     ));
     let deadline = Instant::now() + WAIT_FOR_DEVICE;
     let mut why = String::new();
@@ -228,7 +232,7 @@ async fn pair_on_phone(ui: &mut dyn Ui) -> Result<RpPairingFile, String> {
         let left = deadline.saturating_duration_since(Instant::now());
         let (stream, _) = tokio::time::timeout(left, listener.accept())
             .await
-            .map_err(|_| "Settings didn't connect within 10 minutes".to_string())?
+            .map_err(|_| format!("Settings didn't connect within 10 minutes. {OLDER_IOS}"))?
             .map_err(|e| e.to_string())?;
         let mut file = identity.clone();
         let mut host = PairableHost::new(RpPairingSocket::new_device(stream), info.clone());

@@ -92,6 +92,13 @@ class Names(unittest.TestCase):
             self.assertIn("@BIN@-" + s, read("install.sh.in"))
         self.assertIn('"@BIN@-windows-$arch.exe"', read("install.ps1.in"))  # $arch: x64 or arm64
 
+    def test_idevice_pin_is_the_apps(self):
+        pin = re.search(r"(?m)^IDEVICE_COMMIT=([0-9a-f]{40})",
+                        read("..", "..", "native", "sideload", "idevice", "pin.env")).group(1)
+        revs = re.findall(r'rev = "([0-9a-f]+)"', read("cli", "Cargo.toml"))
+        self.assertTrue(revs)
+        self.assertEqual(set(revs), {pin})
+
     def test_rust_never_spells_the_name(self):
         name = re.compile(r"\b%s\b|%s" % (re.escape(brand.NAME), re.escape(DOMAIN)), re.I)
         for d in ("core", "cli"):
