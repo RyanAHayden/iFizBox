@@ -424,6 +424,24 @@ const ask = async (op, args) => {
   return getParser().catalog(op, args);
 };
 
+// F450: the Rating sort. The worker filters (no sort); the stars come from the review server (every rated package in
+// one answer, kept here 5 minutes) and core/ratingsort.js ranks by them, unrated last.
+// A server that doesn't answer in RATINGS_WAIT leaves the list unrated this time (the answer is still kept for the next).
+const RATINGS_FOR = 5 * 60 * 1000, RATINGS_WAIT = 3000;
+let ratingsKept = null; // { at, ratings: Promise }
+function reviewRatings(now = Date.now()) {
+  if (!ratingsKept || now - ratingsKept.at > RATINGS_FOR) {
+    const api = getBackend().reviews;
+    ratingsKept = { at: now, ratings: api?.ratings ? api.ratings().catch(() => ({})) : Promise.resolve({}) };
+  }
+  return Promise.race([ratingsKept.ratings, new Promise((done) => setTimeout(done, RATINGS_WAIT, {}))]);
+}
+async function refineByRating(rows, { sort, ...filters }) {
+  // loaded only now: one module fewer at startup (app.js's import cap)
+  const [out, ratings, { rankByRating }] = await Promise.all([ask("refine", [rows, filters]), reviewRatings(), import("./core/ratingsort.js")]);
+  return rankByRating(out, ratings);
+}
+
 export const catalog = {
   ensure: () => (first = ensure()),
   status: (key) => loaded.get(key) ?? null,
@@ -442,14 +460,15 @@ export const catalog = {
   author: (name) => ask("author", [name]),
   categories: () => ask("categories"), // F46: Home's Browse (core/catalog.js)
   browse: (category) => ask("browse", [category]),
-  popular: (opts) => ask("popular", opts ? [opts] : []),
+  popular: async (opts) => ask("popular", [{ ...opts, ratings: await reviewRatings() }]), // F450: best rated first
   // F124, Browse's lists (core/catalog.js): Free Apps / Tweaks / Themes, Featured (refs [{ key, id }]), and New or
   // Recently Updated (`kind` "new" | "updated") from the Changes tab's records; with no IndexedDB, from the
   // sources' own version dates only.
   free: (kind) => ask("free", [kind]),
   featured: (refs) => ask("featured", [refs]),
   collection: (id) => ask("collection", [id]), // F154: Browse's Collections (core/catalog.js COLLECTIONS)
-  refine: (rows, opts) => ask("refine", opts ? [rows, opts] : [rows]), // F426b: a list's filters and sort (core/catalog.js refine)
+  refine: (rows, opts) => (opts?.sort === "rating" ? refineByRating(rows, opts) // F450
+    : ask("refine", opts ? [rows, opts] : [rows])), // F426b: a list's filters and sort (core/catalog.js refine)
   roulette: (opts) => ask("roulette", opts ? [opts] : []), // F154: Tweak Roulette's pool (core/catalog.js roulettePool)
   fresh: async (kind, now = Date.now()) => {
     const rows = await ask("list", [ALL, ALL]);

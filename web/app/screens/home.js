@@ -1011,7 +1011,7 @@ export const BROWSE_SUBTITLE = "Featured, New, Top 25, Roulette";
 // then the categories.
 export function browseGroups(cats, { jailbroken = true } = {}) {
   const lists = { rows: browseListsFor(jailbroken).map((l) => ({ label: l.title, href: format({ tab: "home", path: ["browse", l.id] }) })),
-    footer: `New and Recently Updated reach back ${FRESH_DAYS} days. Popular: what the most sources list.` };
+    footer: `New and Recently Updated reach back ${FRESH_DAYS} days. Popular: the best rated first, then what the most sources list.` };
   if (!cats.length) return [lists, { footer: "Add a source to browse its packages." }];
   return [lists, {
     header: "Categories",
@@ -1048,7 +1048,7 @@ const LIST_VIEW = {
     empty: `Nothing new in the last ${FRESH_DAYS} days. Packages your sources add show up here after a refresh.` },
   updated: { rows: () => catalog.fresh("updated"), headers: dayHeaders, order: "Recently Updated",
     empty: `No updates in the last ${FRESH_DAYS} days. New versions show up here after a refresh.` },
-  popular: { rows: () => catalog.popular(), order: "Most Sources" },
+  popular: { rows: () => catalog.popular(), order: "Popular" }, // F450: best rated first (catalog.popular)
   featured: { rows: featuredRows, order: "Featured", empty: "None of your sources features packages." },
   "free-apps": { rows: () => catalog.free("apps"), letters: true, oneKind: true },
   "free-tweaks": { rows: () => catalog.free("tweaks"), letters: true, oneKind: true },

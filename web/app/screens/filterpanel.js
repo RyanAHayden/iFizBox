@@ -23,10 +23,10 @@ export function sourceChoices(list, type, order = null) {
   return sourcesFor(orderSources(list, order), type).shown.map((s) => ({ label: displayName(s), value: s.key }));
 }
 
-// One choice group: a row per option, the chosen one checked; a tap picks it and redraws.
+// One choice group: a row per option (with its `icon` when given), the chosen one checked; a tap picks it and redraws.
 function choiceGroup(header, options, current, pick, footer) {
   return grouped([{ header, footer, rows: options.map((o) => ({
-    label: o.label, checked: (o.value ?? null) === (current ?? null), onClick: () => pick(o.value ?? null),
+    label: o.label, ...(o.icon ? { icon: o.icon } : {}), checked: (o.value ?? null) === (current ?? null), onClick: () => pick(o.value ?? null),
   })) }]);
 }
 

@@ -4,16 +4,24 @@
 import { settings } from "../settings-store.js";
 import { SECTION_GROUPS, sectionGroup } from "../core/sections.js";
 import { el, segments } from "../nav/ui.js";
+import { rowIcon } from "../icons/rowicons.js";
 import { SCOPES, scopesFor, scopeIndex, sheetActive, emptyFilters, searchFilters } from "./searchscope.js";
 
 // The panel loads after the page: imported from the top it would close an import cycle (it imports sources.js, which
 // imports browse.js).
 const panel = () => import("./filterpanel.js");
 
-// The Sort rows: the list's own order first, under the list's name for it, then the catalog's sorts not called the same.
+// F450: each Sort row's icon, by its label (a list's own order has one too).
+export const SORT_ICONS = { Name: "sortName", Newest: "sortNewest", Rating: "sortRating", Featured: "sortFeatured",
+  Popular: "sortPopular", "Recently Updated": "sortUpdated", Default: "sortDefault" };
+const sortIcon = (label) => rowIcon(SORT_ICONS[label] ?? "sortDefault");
+
+// The Sort rows: the list's own order first, under the list's name for it, then the catalog's sorts not called the same
+// (F450: Rating is the stars given here, catalog.refine's "rating"; unrated last).
 export function listSorts(order) {
-  const rest = [["Name", "name"], ["Newest", "newest"], ["Most Sources", "popular"]];
-  return [{ label: order }, ...rest.filter(([label]) => label !== order).map(([label, value]) => ({ label, value }))];
+  const rest = [["Name", "name"], ["Newest", "newest"], ["Rating", "rating"]];
+  return [{ label: order, icon: sortIcon(order) },
+    ...rest.filter(([label]) => label !== order).map(([label, value]) => ({ label, value, icon: sortIcon(label) }))];
 }
 
 // The panel's Section rows: the groups and sections the list's rows are in, plus the one picked now (it stays to be

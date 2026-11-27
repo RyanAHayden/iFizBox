@@ -1,0 +1,15 @@
+[
+{"wait": 1500},
+{"eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"},
+{"nav": "#/home/browse/popular", "ms": 12000},
+{"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"},
+{"eval": "[...document.querySelectorAll('.page.is-top .pkg-name, .page.is-top .pkg-row .name')].slice(0,5).map(e=>e.textContent).join(' | ') || document.querySelector('.page.is-top').innerText.slice(0,300)"},
+{"shot": "popular-rated-first"},
+{"tap": ".scope-filter", "ms": 1500},
+{"shot": "panel"},
+{"tap": "panel:Name", "ms": 1500},
+{"tap": "panel:Rating", "ms": 2000},
+{"tap": ".scope-filter", "ms": 1500},
+{"eval": "document.querySelector('.page.is-top').innerText.slice(0,400)"},
+{"shot": "rating-sort"}
+]
