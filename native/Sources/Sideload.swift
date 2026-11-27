@@ -65,7 +65,7 @@ enum Sideload {
     static func register(_ b: Bridge) {
         IPASigner.idHolder = { bid, original in // B502
             FreeAppID.holder(of: bid, for: original, own: Bundle.main.bundleIdentifier, records: records(),
-                             installed: { Workspace.isInstalled($0) })
+                             claimed: FreeAppID.claims.all, installed: { Workspace.isInstalled($0) }) // B512
         }
         IPASigner.appProfile = { asked, original, held, certificate in // B502a
             appProfile(asked, original: original, held: held, certificate: certificate)
@@ -702,8 +702,11 @@ enum Sideload {
                                   sha256: keepOriginal(input, app: app, source: url, sha256: sha256, log: log), // F343
                                   certSerial: app.certSerial, // F458
                                   extensionAppIDs: app.extensionAppIDs) // F463c
+        // B512: its App ID is taken while it installs, before there is a record to say so
+        let claim = used.pinsBundleID ? FreeAppID.claims.add(record) : nil
         // F343: an install that fails drops the IPA staged for it; the one kept before stays
         let answered = { (r: Result<(SignedApp, SignedRecord), Error>) in
+            FreeAppID.claims.release(claim) // B512: installed (recorded by now) or failed
             if case .failure = r { SignBridge.queue.async { dropOriginal(app.bundleID, sha256: record.sha256) } }
             else if !servers.local { emit("prompt", 0) } // B424: iOS has the link; Re-sign All waits here
             opened(r)

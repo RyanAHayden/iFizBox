@@ -75,13 +75,35 @@ enum FreeAppID {
         return e
     }
 
+    // B512: the signed copies iOS doesn't have yet. An app is recorded once it is installed, and the app queue signs the
+    // next one before that, so each copy claims its App ID from its signing until it is installed or dropped.
+    final class Claims {
+        private let lock = NSLock()
+        private var copies = [UUID: SignedRecord]()
+        var all: [SignedRecord] { lock.lock(); defer { lock.unlock() }; return Array(copies.values) }
+        func add(_ r: SignedRecord) -> UUID {
+            lock.lock(); defer { lock.unlock() }
+            let id = UUID()
+            copies[id] = r
+            return id
+        }
+        func release(_ id: UUID?) {
+            guard let id = id else { return }
+            lock.lock(); defer { lock.unlock() }
+            copies[id] = nil
+        }
+    }
+    static let claims = Claims()
+
     // The name of the other app that has `bundleID`, or nil when signing `originalID` as it replaces nothing else.
-    // `own`: the running app's bundle ID (a computer install on a free Apple ID has the profile's). `installed`:
-    // what iOS says; nil (it can't be asked: iOS 27) counts as installed.
+    // `own`: the running app's bundle ID (a computer install on a free Apple ID has the profile's). `claimed`: the
+    // signed copies not installed yet (`claims`). `installed`: what iOS says; nil (it can't be asked: iOS 27) counts as
+    // installed.
     static func holder(of bundleID: String, for originalID: String, own: String?, records: [SignedRecord],
-                       installed: (String) -> Bool?) -> String? {
+                       claimed: [SignedRecord] = [], installed: (String) -> Bool?) -> String? {
         if originalID == bundleID { return nil } // that app itself, signed again
         if own == bundleID { return originalID == SignOptions.selfBundleID ? nil : Brand.name }
+        if let c = claimed.first(where: { $0.bundleID == bundleID && $0.originalBundleID != originalID }) { return c.shownName }
         guard let r = records.first(where: { $0.bundleID == bundleID }), r.originalBundleID != originalID,
               installed(bundleID) != false else { return nil }
         return r.shownName

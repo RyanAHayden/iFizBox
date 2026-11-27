@@ -1057,6 +1057,29 @@ test("free Apple ID: signed as the App ID, replacing no other app (B502)") {
     check(holder(SignOptions.selfBundleID, own: appID, [], installed: nil) == nil, "\(Brand.name) updating itself")
     check(holder(appID, own: appID, [], installed: nil) == nil, "an IPA with that ID already")
     check(FreeAppID.taken(by: Brand.name).code == "app_id_taken", "the running app: no delete advice")
+    // B512: a signed copy iOS doesn't have yet (no record) has its App ID too, until it is installed or dropped
+    let claims = FreeAppID.Claims()
+    func claimed(_ original: String) -> String? {
+        FreeAppID.holder(of: appID, for: original, own: "com.you.else", records: [], claimed: claims.all) { _ in false }
+    }
+    let claim = claims.add(rec("com.a"))
+    check(claimed("com.b") == "Other App", "signed, not installed yet")
+    check(claimed("com.a") == nil, "the same app signed again")
+    let again = claims.add(rec("com.a"))
+    claims.release(claim)
+    check(claimed("com.b") == "Other App", "its other copy still has it")
+    claims.release(again)
+    claims.release(nil)
+    check(claimed("com.b") == nil, "released")
+    // two new apps one after the other, as the app queue signs them: the second is refused
+    IPASigner.idHolder = { bid, original in
+        FreeAppID.holder(of: bid, for: original, own: "com.you.else", records: [], claimed: claims.all) { _ in false }
+    }
+    let first = claims.add(rec("com.a"))
+    check(throwsCode("app_id_taken") {
+        _ = try IPASigner(profile: free, identity: identity).sign(fixtures.appendingPathComponent("edit.ipa"), to: work.appendingPathComponent("second.ipa"))
+    }, "a copy not installed yet has the ID")
+    claims.release(first)
     var own = rec("com.a")
     check(try FreeAppID.resignRefusal(own, free) == nil && FreeAppID.resignRefusal(own, profile(appID, days: 365)) == nil, "renews")
     own.bundleID = "com.a"

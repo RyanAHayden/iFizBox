@@ -26,7 +26,8 @@ import Foundation
 
 enum SignAhead {
     // F380: `mine`, the download held for My IPAs (keepInLibrary), moved into the library once opened
-    private struct Kept { let output: URL; let app: SignedApp; let record: SignedRecord; var mine: URL? = nil }
+    // B512: `claim`, a free Apple ID's App ID the copy holds (FreeAppID.claims) until it is installed or forgotten
+    private struct Kept { let output: URL; let app: SignedApp; let record: SignedRecord; var mine: URL? = nil; var claim: UUID? = nil }
     private static var kept = [String: Kept]() // on SignBridge.queue
     // B263: the signer's own lane (one app at a time, as before), off SignBridge.queue so signing.open isn't held by it
     private static let signer = DispatchQueue(label: "ifizbox.sign.ahead", qos: .userInitiated)
@@ -51,6 +52,7 @@ enum SignAhead {
     @discardableResult
     private static func forget(_ tok: String) -> Bool {
         guard let k = kept.removeValue(forKey: tok) else { return false }
+        FreeAppID.claims.release(k.claim) // B512
         try? FileManager.default.removeItem(at: k.output)
         if let m = k.mine { try? FileManager.default.removeItem(at: m) } // F380: never installed, not saved
         Sideload.dropOriginal(k.app.bundleID, sha256: k.record.sha256) // F343: never installed
@@ -127,11 +129,13 @@ enum SignAhead {
                                                              sha256: sha) // F343
                         signed = (app, record, output, sha)
                     } catch { return unsigned(error) }
+                    // B512: here on `signer`, so the next app's signing already finds the App ID taken
+                    let claim = profile.pinsBundleID ? FreeAppID.claims.add(signed.1) : nil
                     SignBridge.queue.async {
                         let (app, record, output, sha) = signed
                         keepInLibrary(c, output: output, app: app, record: record, options: options, id: id, log: log) // B229
                         let tok = SignBridge.token()
-                        kept[tok] = Kept(output: output, app: app, record: record, mine: mine)
+                        kept[tok] = Kept(output: output, app: app, record: record, mine: mine, claim: claim)
                         SignBridge.queue.asyncAfter(deadline: .now() + life) { forget(tok) }
                         job.end()
                         var j: [String: Any] = ["token": tok, "bundleId": app.bundleID, "originalBundleId": app.originalBundleID,
@@ -244,6 +248,7 @@ enum SignAhead {
             }
             let job = SignJob.begin(tag: tag) // until iOS has fetched the IPA (serveAndOpen ends it)
             if job.cancelled {
+                FreeAppID.claims.release(k.claim) // B512
                 try? FileManager.default.removeItem(at: k.output)
                 if let m = k.mine { try? FileManager.default.removeItem(at: m) } // F380
                 job.end()
@@ -264,6 +269,9 @@ enum SignAhead {
                 return true
             }
             let opened = { (r: Result<(SignedApp, SignedRecord), Error>) in
+                // B512: installed (recorded by now) or failed. A copy kept again (B337) holds no claim: only the
+                // Signing Server opens it, which refuses a free Apple ID.
+                FreeAppID.claims.release(k.claim)
                 switch r {
                 case .failure(let e):
                     job.end()
