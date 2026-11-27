@@ -1,0 +1,20 @@
+[
+{"wait": 1500},
+{"eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"},
+{"nav": "#/changes", "ms": 12000},
+{"eval": "import('/backend.js').then(m=>m.getBackend().addSource('http://127.0.0.1:8765/dead.json')).then(s=>s.key, e=>'ERR '+e.message)"},
+{"nav": "#/changes", "ms": 12000},
+{"eval": "setInterval(()=>document.querySelectorAll('.banner').forEach(b=>b.remove()),200); 'ok'"},
+{"unlink": "/home/ryha/.cache/claude-tmp/claude-1000/-home-ryha-runs-iFizBox-s2/d2581ecc-287b-479c-8606-420797039dde/scratchpad/srv/dead.json"},
+{"tap": "doc:text:Refresh", "ms": 300},
+{"eval": "new Promise(r=>{const t=Date.now();const i=setInterval(()=>{const b=document.querySelector('.reload-bar button');if(b&&b.textContent==='Show Info'||Date.now()-t>60000){clearInterval(i);r(document.querySelector('.reload-bar')?.innerText)}},100)})"},
+{"wait": 400},
+{"shot": "bar"},
+{"tap": "doc:.reload-cancel", "ms": 1500},
+{"shot": "log"},
+{"eval": "document.querySelector('.progress-out')?.innerText"},
+{"tap": "doc:.progress-finish", "ms": 1200},
+{"eval": "document.querySelector('.page.is-top').innerText.slice(0,300)"},
+{"shot": "after"},
+{"eval": "document.documentElement.getAttribute('data-style')"}
+]

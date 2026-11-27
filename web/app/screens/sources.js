@@ -36,9 +36,8 @@ import { lockMark } from "../nav/lock.js";
 import { searchBar, pinned } from "../nav/searchbar.js";
 import { pullToRefresh } from "../nav/pullrefresh.js";
 import { reloadSteps } from "../core/reloadsteps.js";
-import { showBanner } from "../nav/banner.js";
-import { go as navGo } from "../nav/go.js";
-import { failedBanner, FAILED_BANNER_MS } from "../core/aptupdate.js";
+import { showReloadFailure } from "../nav/reloadbar.js"; // F456
+import { refreshFailures } from "../core/refreshfailures.js"; // F456
 import { refreshRows, tabBadge, coalesce, ROW } from "../core/refreshrows.js";
 import { labelSource, toggleTrust, trustMenuLabel } from "./safety.js"; // F291
 import { labelCanister } from "./findmore.js"; // F305
@@ -238,6 +237,7 @@ function firstLoad(ctx, { fresh = false, backend = getBackend(), retry = null } 
   let run = null;
   const job = (async () => {
     let done = null;
+    const failures = []; // F456: a repo that fails to load or parse shows in the bar
     try {
       if (fresh) state.sources = await backend.sources();
       // F150: the reload bar instead of a HUD, so the list stays usable while the new sources load.
@@ -251,13 +251,14 @@ function firstLoad(ctx, { fresh = false, backend = getBackend(), retry = null } 
         onRow: (k, st, why) => run?.onRow(k, st, why),
       });
       if (done && !run?.cancelled) {
+        failures.push(...refreshFailures(done));
         state.sources = await backend.sources();
         drawAll();
       }
-    } catch {
-      // a failed first load leaves the rows as they were; Refresh shows the error
+    } catch (e) {
+      failures.push(refreshError(e)); // the rows stay as they were
     } finally {
-      if (run && !run.cancelled) { clearLoading(ctx); run.end(); }
+      if (!run?.cancelled) { if (run) clearLoading(ctx); endRun(run, failures); }
       state.busy = false;
       state.current = null;
       runAgain(ctx, run?.cancelled);
@@ -468,33 +469,33 @@ export async function refreshInBackground(ctx) {
   if (state.busy) return;
   state.busy = true;
   let run = null;
+  const failures = [];
   try {
     state.sources = await getBackend().sources();
     const filter = refreshFilter(); // F302: Tweak Sources too, in the sideload app
     run = startRun(ctx, state.sources.filter(filter ?? (() => true)).map((x) => x.key));
     const job = getBackend().refreshSources(run.onEach, { filter, signal: run.signal, onRow: run.onRow });
     if (await run.until(job)) return "cancelled";
-    bannerFailed(await job);
+    failures.push(...refreshFailures(await job)); // F456: shown by the bar once the run ends
     state.sources = await getBackend().sources();
     drawAll();
     if (await run.until(run.data())) return "cancelled";
-  } catch {
-    // a failed refresh shows per source (its row) once it has failed
+  } catch (e) {
+    failures.push(refreshError(e)); // F456: a source that failed also shows on its row
   } finally {
-    if (!run?.cancelled) { clearLoading(ctx); run?.end(); }
+    if (!run?.cancelled) { clearLoading(ctx); endRun(run, failures); }
     state.busy = false;
     runAgain(ctx, run?.cancelled); // B75
     settle();
   }
 }
 
-// B23: the sources apt-get update failed on (refreshSources' `failed`, the jailbreak app) in a banner that goes by
-// itself and opens Sources when tapped, never an alert: their rows are marked (Not Responding) for Edit to remove.
-export function bannerFailed(rows, { banner = showBanner, go = navGo } = {}) {
-  const words = failedBanner(rows?.failed);
-  if (!words) return false;
-  banner({ ...words, duration: FAILED_BANNER_MS, onTap: () => go(format({ tab: "sources", path: [] })) });
-  return true;
+// F456: a run's end. Its failures (core/refreshfailures.js, and anything it threw) show in the reload bar
+// (nav/reloadbar.js), never an alert: their rows are marked (Not Responding) for Edit to remove.
+const refreshError = (e) => ({ title: "Refresh", detail: e?.message || String(e) });
+function endRun(run, failures) {
+  if (run) run.end(failures);
+  else showReloadFailure(failures);
 }
 
 // ---- F150: one refresh under the reload bar -----------------------------------------------------------------
@@ -528,7 +529,8 @@ export function startRun(ctx, keys) {
       steps.cache();
       await ctx?.buildCache?.();
     },
-    end() { bar?.hide(); },
+    // F456: with failures, the bar turns into the failure line instead of leaving.
+    end(failures = []) { if (failures.length) bar?.add?.(failures); bar?.hide(); },
   };
   const cancel = () => {
     if (ac.signal.aborted) return;
@@ -935,21 +937,20 @@ async function refresh(ctx) {
   if (state.busy) return;
   state.busy = true;
   let run = null;
+  const failures = [];
   try {
     const filter = refreshFilter(); // F302: Tweak Sources too, in the sideload app
     run = startRun(ctx, (state.sources ?? []).filter(filter ?? (() => true)).map((x) => x.key));
     const job = getBackend().refreshSources(run.onEach, { filter, signal: run.signal, onRow: run.onRow });
     if (await run.until(job)) return; // F41: only what's shown
-    bannerFailed(await job);
+    failures.push(...refreshFailures(await job));
     state.sources = await getBackend().sources();
     drawAll();
     await run.until(run.data());
   } catch (e) {
-    if (run?.cancelled) return;
-    run?.end();
-    await showAlert({ title: "Error", message: e.message, buttons: ["OK"] });
+    failures.push(refreshError(e)); // F456: in the bar, no alert
   } finally {
-    if (!run?.cancelled) { clearLoading(ctx); run?.end(); }
+    if (!run?.cancelled) { clearLoading(ctx); endRun(run, failures); }
     state.busy = false;
     runAgain(ctx, run?.cancelled); // B75
     settle();

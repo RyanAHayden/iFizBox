@@ -35,7 +35,7 @@ import { appSchemeFor, openOutside } from "./core/applinks.js";
 import { launchURL } from "./launch.js";
 import { isAddPath, parseAddLink, isAppPath, parseAppLink } from "./core/handoff.js";
 import { lookForUpdates, appVersion } from "./essential-ui.js";
-import { showReloadBar } from "./nav/reloadbar.js";
+import { showReloadBar, showReloadFailure } from "./nav/reloadbar.js";
 import { catalog } from "./catalog.js";
 import { createUpgradeNotices } from "./settings.js";
 import { createPrefsMirror } from "./settings.js";
@@ -115,6 +115,7 @@ const ctx = {
   loadData: () => catalog.ensure().catch(() => {}),
   buildCache: () => catalog.sections().catch(() => {}),
 };
+catalog.onLoadFailed((bad) => showReloadFailure(bad)); // F456: a repo that didn't load or parse, in the reload bar
 
 const stacks = createStacks({ tabs: BAR_TABS, create: makePage });
 
