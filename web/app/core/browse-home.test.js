@@ -65,6 +65,15 @@ test("rankPopular: most sources first, then newest update, then name; capped", (
   assert.equal(rankPopular([item("a", 1), item("b", 2), item("c", 3)], 2).length, 2);
 });
 
+test("F450 rankPopular: rated first (highest average, then most ratings), the unrated after by sources", () => {
+  const item = (name, sources, rating = null) => ({ row: { id: name.toLowerCase(), name }, sources, date: null, rating });
+  const ranked = rankPopular([
+    item("Wide", 5), item("Liked", 1, { avg: 4, count: 3 }), item("Loved", 1, { avg: 5, count: 1 }),
+    item("Liked More", 1, { avg: 4, count: 9 }), item("Narrow", 1),
+  ]);
+  assert.deepEqual(ranked.map((i) => i.row.name), ["Loved", "Liked More", "Liked", "Wide", "Narrow"]);
+});
+
 const REPO_A = packages(
   deb("com.x.shared", "Tweaks", { Name: "Shared Tweak" }),
   deb("com.x.theme", "Themes_(SpringBoard)", { Name: "A Theme" }),
@@ -135,4 +144,7 @@ test("catalog.popular: what most sources list first, each row with its source co
   assert.equal(top.find((r) => r.id === "com.x.old"), undefined, "packages for another arch are not in the catalog");
   assert.deepEqual(runCatalog(c, "popular", [{ limit: 2 }]).map((r) => r.id), ["com.x.shared", "com.x.util"]);
   assert.equal(ALL, "*");
+  // F450: the stars given here come first (catalog.js passes the review server's { id: [average, count] })
+  const rated = c.popular({ ratings: { "com.x.lib": [4.5, 2], "com.example.cards": [5, 1], "com.x.none": [3, 1] } });
+  assert.deepEqual(ids(rated.slice(0, 4)), ["com.example.cards", "com.x.lib", "com.x.shared", "com.x.util"]);
 });

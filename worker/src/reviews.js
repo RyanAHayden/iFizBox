@@ -3,7 +3,9 @@
 // and sends it as X-Review-Token; only its salted SHA-256 is kept, so one device has one review per package, and a
 // second POST replaces the first.
 //
-//   GET    /reviews/<package id>?page=0&per=20   {enabled, average, count, histogram: [n5..n1], reviews: [review],
+//   GET    /reviews                              {enabled, ratings: {<package id>: [average, count]}}: every rated
+//                                                package at once (a list's Rating sort); cached 5 minutes
+//   GET    /reviews/<package id>?page=0&per=20  {enabled, average, count, histogram: [n5..n1], reviews: [review],
 //                                                page, per, more, mine}: hidden reviews never count; `reviews` are
 //                                                the ones with a title or text, newest first; `mine` (this token's
 //                                                own, hidden or not) only with X-Review-Token
@@ -133,9 +135,21 @@ function sameSecret(a, b) {
 
 const randomId = () => hex(crypto.getRandomValues(new Uint8Array(8)));
 
+// F450: GET /reviews -> {enabled, ratings: {<package id>: [average, count]}}: every rated package's stars in one
+// answer (hidden reviews never count), for a list's Rating sort. Kept 5 minutes by browsers and caches.
+async function allRatings(db) {
+  if (!db?.prepare) return json({ enabled: false, ratings: {} });
+  await schema(db);
+  const { results = [] } = await db.prepare("SELECT pkg, COUNT(*) AS n, AVG(stars) AS a FROM reviews WHERE hidden = 0 GROUP BY pkg").all();
+  const ratings = {};
+  for (const r of results) ratings[r.pkg] = [Math.round(Number(r.a) * 10) / 10, Number(r.n)];
+  return json({ enabled: true, ratings }, 200, { "Cache-Control": "public, max-age=300" });
+}
+
 export async function reviews(req, env = {}, { now = Date.now() } = {}) {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   const u = new URL(req.url);
+  if (req.method === "GET" && /^\/reviews\/?$/.test(u.pathname)) return allRatings(env.REVIEWS);
   const m = PATH.exec(u.pathname);
   let pkg = "";
   try { pkg = m ? decodeURIComponent(m[1]) : ""; } catch { /* bad escape */ }

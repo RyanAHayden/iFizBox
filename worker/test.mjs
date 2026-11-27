@@ -691,6 +691,13 @@ import { d1 } from "./src/d1-sqlite.js";
   assert.deepEqual(j.reviews.map((x) => x.title), ["Okay"], "a hidden review is gone from the list");
   assert.equal(j.count, 2, "and from the counts");
   assert.equal(j.mine.hidden, true, "its author still sees it, marked hidden");
+  // F450: every rated package at once, hidden reviews left out
+  r = await call("/reviews");
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get("Cache-Control"), /max-age=300/);
+  j = await r.json();
+  assert.deepEqual(j, { enabled: true, ratings: { "com.example.velvet": [4, 2], "com.example.other": [1, 1] } });
+  assert.deepEqual(await (await call("/reviews", { env: {} })).json(), { enabled: false, ratings: {} });
   assert.equal((await call(`/reviews/com.example.velvet/${"0".repeat(16)}/report`, { method: "POST", token: tok("e") })).status, 404);
 
   // owner delete

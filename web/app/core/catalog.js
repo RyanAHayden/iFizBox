@@ -29,7 +29,8 @@
 //   c.categories()                         -> Browse (F46): [{ name, count }] in BROWSE_CATEGORIES order, empty
 //                                             ones and (Not Jailbroken) tweak categories left out
 //   c.browse(category)                     -> [row] in that Browse category, sorted by name
-//   c.popular({ limit })                   -> [row] ranked by how many sources list it, then newest (rankPopular),
+//   c.popular({ limit, ratings })          -> [row] ranked by the stars given here (`ratings`, { id: [average,
+//                                             count] }), then how many sources list it, then newest (rankPopular),
 //                                             each with `sources` (that count)
 //   c.collection(id)                       -> F154: [row] in Browse's collection `id` (COLLECTIONS)
 //   c.refine(rows, { section, source, installed, price, sort }) -> F426b: a list's [row] filtered with search()'s
@@ -90,6 +91,7 @@ import { depIndex, explain, explainApt } from "./deps.js";
 import { withIpaInfo } from "./ipainfo.js";
 import { IdMap, IdSet, sameId } from "./apt.js"; // B407: package names compare ignoring case
 import { needsRestart } from "./queue.js";
+import { ratingOf, compareRatings } from "./ratingsort.js"; // F450
 import { packageKind } from "./progress.js";
 import { injectableFromFields, hintMatcher } from "./tweakfields.js"; // F302; C32: not tweaks.js, which pulls unpack.js in
 import { NO_SECTION, sectionName, simpleSection, parseAuthor, compareNames, SECTION_GROUPS, sectionGroup, APP_TWEAKS } from "./sections.js";
@@ -199,12 +201,13 @@ export function mergeCategories(rows, { jailbroken = true } = {}) {
     .map((name) => ({ name, count: counts.get(name) }));
 }
 
-// Popular, until real install counts exist: [{ row, sources, date }] -> rows, most sources first (what most
-// sources list), then the newest update (`date`, epoch ms; AltStore versions carry one, APT packages don't), then
-// by name. At most `limit`.
+// Popular, until real install counts exist: [{ row, sources, date, rating }] -> rows, F450: the best rated here
+// first (`rating`, core/ratingsort.js ratingOf: highest average, then most ratings), then the unrated by how many
+// sources list them, then the newest update (`date`, epoch ms; AltStore versions carry one, APT packages don't),
+// then by name. At most `limit`.
 export function rankPopular(items, limit = 50) {
-  return [...items].sort((a, b) => b.sources - a.sources || (b.date ?? 0) - (a.date ?? 0) || compareNames(a.row, b.row))
-    .slice(0, limit);
+  return [...items].sort((a, b) => compareRatings(a.rating, b.rating) || b.sources - a.sources
+    || (b.date ?? 0) - (a.date ?? 0) || compareNames(a.row, b.row)).slice(0, limit);
 }
 
 // ---- Browse's lists (F124) ----------------------------------------------------------------------------------
@@ -993,11 +996,11 @@ export function createCatalog() {
   // The date popular() and refine()'s newest rank by: the candidate's AltStore version date; APT has none.
   const dateOf = (id) => entries(ALL).get(id)?.stanza.ipa?.versions?.[0]?.date ?? null;
 
-  function popular({ limit = 50 } = {}) {
+  function popular({ limit = 50, ratings = null } = {}) {
     const lists = [...sources].filter(([k]) => counts(k)).map(([, { byId }]) => byId);
     const items = visibleOf(ALL).map((row) => ({
       row, sources: lists.reduce((n, byId) => n + (byId.has(row.id) ? 1 : 0), 0),
-      date: dateOf(row.id),
+      date: dateOf(row.id), rating: ratingOf(ratings, row.id),
     }));
     return rankPopular(items, limit).map(({ row, sources: n }) => ({ ...slim(row), sources: n }));
   }

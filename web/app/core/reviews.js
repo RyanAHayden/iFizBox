@@ -6,7 +6,7 @@
 //   checkDraft({ stars, title, name, text, version }) -> { ok, draft } | { ok: false, error, field }
 //   deviceToken({ storage, native, rand })   -> Promise<token>  this device's one random token, made once: the app's
 //     Keychain (native reviews.token.get/set) where the shell has it, else localStorage (`ifizbox.reviewToken`)
-//   reviewsApi({ base, fetcher, token })     -> { list(id, page), post(id, draft), report(id, reviewId), remove(id, reviewId?) }
+//   reviewsApi({ base, fetcher, token })     -> { list(id, page), ratings(), post(id, draft), report(id, reviewId), remove(id, reviewId?) }
 //     list() answers { enabled: false, ... } when the server keeps no reviews (an older or self-hosted Worker,
 //     anything that isn't its JSON), so the tab still shows the depiction's and the App Store's.
 //   reviewsBase(mode)                         "" on the website (its own origin), the app's server in the app
@@ -84,6 +84,15 @@ export function reviewsApi({ base = "", fetcher = (...a) => globalThis.fetch(...
       } catch { body = null; }
       if (!body || typeof body !== "object" || !Array.isArray(body.reviews)) return { ...OFF, error: r ? null : "network" };
       return { ...OFF, ...body, enabled: body.enabled !== false };
+    },
+    // F450: every package rated here -> { <package id>: [average, count] }; {} when the server keeps none or can't
+    // be reached (a list's Rating sort then puts everything under unrated).
+    async ratings() {
+      try {
+        const r = await fetcher(`${base}/reviews`);
+        const body = r.ok ? await r.json() : null;
+        return body?.ratings && typeof body.ratings === "object" ? body.ratings : {};
+      } catch { return {}; }
     },
     post: async (id, draft) => send(url(id), { method: "POST", headers: await headers({ "Content-Type": "application/json" }), body: JSON.stringify(draft) }),
     report: async (id, reviewId) => send(url(id, `/${reviewId}/report`), { method: "POST", headers: await headers() }),

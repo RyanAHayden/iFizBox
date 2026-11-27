@@ -287,8 +287,8 @@ _Avoid_: filter sheet, filter menu
 **Sort**:
 The order a list opened from Browse is shown in, picked in its Filter panel; the list's own order comes first
 _Said_: sort, sorting options
-_On screen_: Sort: Name | Newest | Most Sources
-_In code_: filters.sort, listSorts
+_On screen_: Sort: Name | Newest | Rating
+_In code_: filters.sort, listSorts, SORT_ICONS
 _Avoid_: order by, ranking
 
 **Run Strip**:

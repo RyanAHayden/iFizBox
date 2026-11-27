@@ -52,10 +52,19 @@ const pick = async (label) => { await panelRow(label).click(); await tick(); awa
 const ROW = 58, HEAD = 23;
 
 test("Sort: the list's own order first under its name, no label twice", () => {
-  assert.deepEqual(listSorts("Newest").map((s) => s.label), ["Newest", "Name", "Most Sources"]);
+  assert.deepEqual(listSorts("Newest").map((s) => s.label), ["Newest", "Name", "Rating"]);
   assert.equal(listSorts("Newest")[0].value, undefined, "its own order");
-  assert.deepEqual(listSorts("Name").map((s) => s.value), [undefined, "newest", "popular"]);
-  assert.deepEqual(listSorts("Featured").map((s) => s.label), ["Featured", "Name", "Newest", "Most Sources"]);
+  assert.deepEqual(listSorts("Name").map((s) => s.value), [undefined, "newest", "rating"]);
+  assert.deepEqual(listSorts("Featured").map((s) => s.label), ["Featured", "Name", "Newest", "Rating"]);
+  assert.deepEqual(listSorts("Popular").map((s) => s.label), ["Popular", "Name", "Newest", "Rating"]);
+});
+
+test("F450: every Sort row has its own icon, a list's own order too", () => {
+  for (const order of ["Newest", "Featured", "Popular", "Recently Updated", "Name", "Default"]) {
+    for (const s of listSorts(order)) assert.match(s.icon?.src ?? "", /^data:image\/svg\+xml,/, `${order}: ${s.label}`);
+  }
+  const srcs = ["Name", "Newest", "Rating", "Featured"].map((l) => listSorts(l)[0].icon.src);
+  assert.equal(new Set(srcs).size, 4, "Name, Newest, Rating and Featured each look different");
 });
 
 test("Section: only the list's groups and sections, and the one picked", () => {
@@ -96,7 +105,8 @@ test("New: day headers in its own order, letters and the index by name; filters 
   await pick("Name");
   assert.equal(p.height(), 4 * ROW + 4 * HEAD, "A, M, N, Z");
   assert.equal(p.index(), true);
-  await pick("Most Sources");
+  assert.ok(panelRow("Name").querySelector(".row-icon"), "Sort rows draw their icons");
+  await pick("Rating");
   assert.equal(p.height(), 4 * ROW, "no headers");
   assert.equal(p.index(), false);
   await pick("All Tweaks");
@@ -153,5 +163,5 @@ test("a choice made while the list is asked again (Show Incompatible) keeps the 
 test("Home passes each list's own order and which lists are of one kind", () => {
   const src = readFileSync(new URL("./home.js", import.meta.url), "utf8");
   for (const re of [/fresh\("new"\), headers: dayHeaders, order: "Newest"/, /fresh\("updated"\), headers: dayHeaders, order: "Recently Updated"/,
-    /popular\(\), order: "Most Sources"/, /featuredRows, order: "Featured"/, /free\("apps"\), letters: true, oneKind: true/]) assert.match(src, re);
+    /popular\(\), order: "Popular"/, /featuredRows, order: "Featured"/, /free\("apps"\), letters: true, oneKind: true/]) assert.match(src, re);
 });

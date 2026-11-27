@@ -2467,8 +2467,8 @@ export function filterView(id, { fresh, popular, refine }) {
   const f = browseFilter(id);
   if (f.id === "new") return { id: "new", ...newRows({ fresh, refine }), ranked: false, order: "Newest",
     empty: "Nothing new lately. Packages your sources add show up here after a refresh." };
-  if (f.id === "top") return { id: "top", ...topRows({ popular, refine }, TOP_LIMIT), ranked: true, order: "Most Sources",
-    empty: "Add a source to see what's popular.", footer: "Ranked by how many of your sources list each package." };
+  if (f.id === "top") return { id: "top", ...topRows({ popular, refine }, TOP_LIMIT), ranked: true, order: "Popular",
+    empty: "Add a source to see what's popular.", footer: "Ranked by rating, then by how many of your sources list each package." };
   return { id: "featured" };
 }
 
