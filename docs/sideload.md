@@ -451,7 +451,8 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   `fetch`, `CFBundleDocumentTypes` for `.ipa`, `.p12` and `.mobileprovision`, and the `ifizbox://` URL scheme.
 
 **Free Apple ID: the one-time computer setup** (`tools/setup/`). iOS refuses a free-profile app from
-itms-services (error 111), so the first install of the free route needs a computer once. The person signs in on
+itms-services (error 111), so the first install of the free route needs a computer once, or on iOS 27 the iPhone
+itself (Phone Setup, below). The person signs in on
 the website on the phone, the website signs the app and shows a short code, and one line on the computer does the
 rest:
 
@@ -491,11 +492,14 @@ rest:
   their default folders.
 
 **Phone Setup (iOS 27, no computer)**: the same setup command, run on the iPhone itself inside Open Minis (an App
-Store app). The website does not offer it yet.
+Store app). The website's Ready page offers it as **Install Without a Computer**, under the computer's code, on iOS 27
+or later, and only once the published setup script has Phone Setup (a site deployed before that shows nothing new). It
+is not offered with an expired or missing profile. The group has the App Store links for Open Minis and LocalDevVPN,
+then the line `wget -qO- https://ifizbox.com/sign/setup.sh | sh -s -- <code>`, with the code the website shows.
 
 1. Install Open Minis and LocalDevVPN from the App Store. In Open Minis, allow Local Network and Notifications.
 2. Connect LocalDevVPN, and keep Wi-Fi on.
-3. In Open Minis, run the setup command with the code from the website.
+3. In Open Minis, run that line with the code from the website.
 4. Developer Mode lists a "Pair with iFizBox" row while Open Minis runs in the background. The pairing code arrives as
    a notification; the command asks for it.
 5. The command installs the app.

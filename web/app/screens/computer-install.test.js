@@ -6,12 +6,14 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { computerSections, computerInstallBlock, signForComputer, makeCode, setupCommands, resetComputerInstall, codeFooter,
   COMPUTER_LABEL, COMPUTER_FOOTER, COMPUTER_OFF_FOOTER, CODE_EXPIRED_FOOTER, CODE_MISSING_FOOTER, SAVE_IPA_FOOTER,
-  recordKey, finishSetupLink, finishSetupSection, FINISH_LABEL, FINISH_FOOTER } from "./computer-install.js";
+  recordKey, finishSetupLink, finishSetupSection, FINISH_LABEL, FINISH_FOOTER, phoneSetupOffered, phoneSetupCommand, PHONE_HEADER,
+  PHONE_APPS_FOOTER, PHONE_LINE_FOOTER, PHONE_START_FOOTER, PHONE_SETUP_MARK, OPEN_MINIS_LINK } from "./computer-install.js";
+import { VPN_APP_LINK } from "../core/installroute.js";
 import { openRecord } from "../core/websign.js";
 import { KEYS } from "../core/storagekeys.js";
 import { uploadSigned } from "../signing/browser.js";
 import { APP_IPA_URL } from "../core/appoffer.js";
-import { fakeDocument } from "../nav/fakedom.test-helper.js";
+import { fakeDocument, tick } from "../nav/fakedom.test-helper.js";
 import { DOMAIN, BUNDLE_ID } from "../brand.js";
 import worker from "../../../worker/src/index.js";
 
@@ -119,7 +121,9 @@ test("the one-liners are docs/sideload.md's, and every footer is one or two shor
   const { readFile } = await import("node:fs/promises");
   const doc = await readFile(new URL("../../../docs/sideload.md", import.meta.url), "utf8");
   for (const c of setupCommands()) assert.ok(doc.includes(c.cmd), c.cmd);
+  assert.ok(doc.includes(phoneSetupCommand("<code>")), "the Open Minis line");
   for (const f of [COMPUTER_FOOTER, COMPUTER_OFF_FOOTER, CODE_EXPIRED_FOOTER, CODE_MISSING_FOOTER, SAVE_IPA_FOOTER, FINISH_FOOTER, codeFooter(0),
+    PHONE_APPS_FOOTER, PHONE_LINE_FOOTER, PHONE_START_FOOTER,
     ...setupCommands().map((c) => c.footer)]) {
     assert.ok(f.length <= 140 && f.split(/(?<=[.!?])\s+/).length <= 2, f);
   }
@@ -137,4 +141,54 @@ test("the block: the button, or the row that renews the profile in its place", (
     assert.match(off.textContent, /Sign In Again/);
     assert.doesNotMatch(off.textContent, new RegExp(COMPUTER_LABEL));
   } finally { globalThis.document = saved; }
+});
+
+test("F465b: offered on iOS 27 and later, only once the published setup script has Phone Setup", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const script = await readFile(new URL("../../../tools/setup/install.sh.in", import.meta.url), "utf8");
+  assert.ok(script.includes(PHONE_SETUP_MARK), "the script the next setup release publishes carries the mark");
+  assert.equal(phoneSetupOffered("27.0", script), true);
+  assert.equal(phoneSetupOffered("28", script), true);
+  assert.equal(phoneSetupOffered("26.4", script), false);
+  assert.equal(phoneSetupOffered(null, script), false);
+  assert.equal(phoneSetupOffered("27.0", "#!/bin/sh\n# the published script from before Phone Setup\n"), false);
+  assert.equal(phoneSetupCommand("ABCD-2345"), `wget -qO- https://${DOMAIN}/sign/setup.sh | sh -s -- ABCD-2345`);
+});
+
+test("F465b: the block shows Install Without a Computer beside the code, with Computer Install still there", async () => {
+  const saved = globalThis.document;
+  globalThis.document = fakeDocument();
+  const base = { id: {}, ask: async () => {}, save() {}, fix: { label: "Sign In Again", onClick() {} }, store: memory() };
+  const served = (text, ok = true) => {
+    const asked = [];
+    return Object.assign(async (url) => { asked.push(url); return { ok, text: async () => text }; }, { asked });
+  };
+  const show = async (o) => { const box = computerInstallBlock({ ...base, ...o }); await tick(); return box; };
+  try {
+    resetComputerInstall({ signed: SIGNED, code: "ABCD-2345", until: Date.now() + 60_000 });
+    const fetcher = served(PHONE_SETUP_MARK);
+    const box = await show({ ios: "27.0", fetcher });
+    assert.deepEqual(fetcher.asked, ["/sign/setup.sh"]);
+    for (const s of [PHONE_HEADER, "Get Open Minis", "Get LocalDevVPN", phoneSetupCommand("ABCD-2345"), PHONE_APPS_FOOTER,
+      PHONE_LINE_FOOTER, ...setupCommands().map((c) => c.cmd)]) assert.ok(box.textContent.includes(s), s);
+    assert.deepEqual(box.querySelectorAll("a.cell-inner").map((a) => a.href).filter((h) => h?.startsWith("https:")),
+      [OPEN_MINIS_LINK, VPN_APP_LINK]);
+
+    for (const [why, o] of [["iOS 26", { ios: "26.4", fetcher: served(PHONE_SETUP_MARK) }],
+      ["the old published script", { ios: "27.0", fetcher: served("#!/bin/sh\n") }],
+      ["no script published", { ios: "27.0", fetcher: served(PHONE_SETUP_MARK, false) }],
+      ["offline", { ios: "27.0", fetcher: async () => { throw new TypeError("Load failed"); } }],
+      ["an expired profile", { ios: "27.0", fetcher: served(PHONE_SETUP_MARK), expired: true }]]) {
+      assert.ok(!(await show(o)).textContent.includes(PHONE_HEADER), why);
+    }
+
+    resetComputerInstall();
+    const start = await show({ ios: "27.0", fetcher: served(PHONE_SETUP_MARK) });
+    assert.ok(start.textContent.includes(PHONE_START_FOOTER));
+    assert.ok(!start.textContent.includes(PHONE_HEADER), "no line without a code");
+    assert.ok((await show({ ios: "26.4", fetcher: served(PHONE_SETUP_MARK) })).textContent.includes(COMPUTER_FOOTER));
+  } finally {
+    resetComputerInstall();
+    globalThis.document = saved;
+  }
 });
