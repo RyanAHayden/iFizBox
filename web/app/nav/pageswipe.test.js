@@ -71,7 +71,7 @@ test("blocked: text fields, sliders and the custom drag areas step aside", () =>
     el("", { tag: "input" }),
     el("", { tag: "textarea" }),
     el("", { attrs: { contenteditable: "" } }),
-    el("roulette-wheel"), el("switch", { tag: "button" }), el("section-index"), el("theme-preview-grip"),
+    el("roulette-wheel"), el("switch", { tag: "button" }), el("section-index"), el("list-scope"), el("theme-preview-grip"),
     el("theme-preview-top"), el("crop-stage"), el("shot-zoom"), el("edge-swipe"),
     el("sheet", { attrs: { role: "dialog" } }),
   ];
