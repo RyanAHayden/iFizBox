@@ -3,6 +3,7 @@ ledger, and never writes lower counts over higher ones. Runs on made-up transcri
 import contextlib
 import io
 import json
+import os
 import re
 import sys
 import tempfile
@@ -73,6 +74,16 @@ class DevStats(unittest.TestCase):
         self.transcript(f"{name}/b.jsonl", user("two", "u2"))
         _, stats = self.run_it()
         self.assertEqual((stats["prompts"], stats["sessions"]), (2, 2))
+
+    def test_a_file_with_nothing_of_its_own_leaves_the_ledger(self):
+        name = dev_stats.NAMES[0]
+        a = self.transcript(f"{name}/a.jsonl", user("one", "u1"))
+        os.utime(a, (2000, 2000))
+        self.run_it()
+        copy = self.transcript(f"{name}/b.jsonl", user("one", "u1"), user("two", "u2"))
+        os.utime(copy, (1000, 1000))  # scanned first now: a.jsonl has nothing left to count
+        _, stats = self.run_it()
+        self.assertEqual((stats["prompts"], stats["sessions"]), (2, 1))
 
     def test_never_counts_down(self):
         dev_stats.OUT.write_text('export const DEV_STATS = {\n  "sessions": 5\n};\n')

@@ -6,7 +6,8 @@
 Reads the Claude Code transcripts of every checkout and slot of this project (~/.claude/projects/, directory names
 holding the app's name or its old one), subagents included. Numbers only, never transcript text. The ledger
 (~/.local/share/<name>/dev-stats.json, out of git: it names local session paths) keeps each transcript's counts by
-file, so a transcript Claude Code later deletes still counts. tools/publish.sh runs it at each release.
+file, so a transcript Claude Code later deletes still counts. Run it to bring the counts up to date, then commit the
+file it writes.
 
 Prompt = a user message typed by the user: not a tool result, slash command, task notification, compaction summary,
 interrupt marker, or the unattended runners' (agent-runner) and `claude -p` launch prompts.
@@ -84,8 +85,11 @@ def main():
     files = [f for d in PROJECTS.glob('*') if any(n in d.name.lower() for n in NAMES) for f in d.rglob('*.jsonl')]
     seen = set()
     for f in sorted(files, key=lambda f: f.stat().st_mtime):
-        if (n := scan(f, seen))['first']:  # skip transcripts with nothing counted
-            ledger[str(f.relative_to(PROJECTS))] = n
+        n, key = scan(f, seen), str(f.relative_to(PROJECTS))
+        if n['first']:
+            ledger[key] = n
+        else:  # nothing of its own (all counted in an earlier file): no stale entry from an earlier run
+            ledger.pop(key, None)
     if not ledger or len(ledger) < previous_sessions():
         print(f'dev_stats: only {len(ledger)} sessions found, fewer than counted before: nothing written',
               file=sys.stderr)
@@ -100,7 +104,7 @@ def main():
              'sessions': len(ledger), 'commits': int(commits.stdout),
              'since': min(v['first'] for v in ledger.values())[:10],
              'updated': max(v['last'] for v in ledger.values())[:10]}
-    OUT.write_text('// Written by tools/dev_stats.py (tools/publish.sh runs it at each release). Do not edit.\n'
+    OUT.write_text('// Written by tools/dev_stats.py. Do not edit.\n'
                    f'export const DEV_STATS = {json.dumps(stats, indent=2)};\n')
     print(json.dumps(stats))
 

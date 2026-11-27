@@ -47,8 +47,10 @@ import { markiFizBoxInstalled, browsingLocked, askToBrowse } from "../websign-ga
 // C32: Home's root needs only the guide list (guide-index.js); the guides load at #/home/guides (lazy.js).
 import { guideRows, JAILBREAK_INFO_URL, isLite } from "./guide-index.js";
 const guides = lazyNs("guides");
+const donate = lazyNs("donate"); // F464: the Donate page (#/home/donate), loaded when its route opens
+// F464: Home's and Credits' row to it.
+export const DONATE_ROW = { label: "Donate", href: "#/home/donate" };
 import * as why from "./why.js"; // F303: Why <NAME> (#/home/why)
-import { DONATE_ROW, donateSections } from "./donate.js"; // F464: Donate (#/home/donate)
 import { NAME } from "../brand.js";
 import { rowIcon, PAGE_ICONS } from "../icons/rowicons.js";
 import { nativeBridge } from "../native.js";
@@ -273,7 +275,7 @@ export function browsePage(path) {
 // unknown), `nav` its bar, `render` its page. nav() and render() below only look the route up here.
 const ROUTES = [
   { match: "credits", nav: () => ({ title: "Credits" }), render: (body) => renderCredits(body) },
-  { match: "donate", nav: () => ({ title: "Donate" }), render: (body) => { body.append(wrap(grouped(donateSections()))); } }, // F464
+  { match: "donate", nav: () => ({ title: "Donate" }), render: (body) => { body.append(wrap(grouped(donate.donateSections()))); } }, // F464
   { match: "guides", nav: (route) => guides.nav(route, guidesLite()), render: (body, route) => { guides.render(body, route, { lite: guidesLite() }); } }, // F157
   { match: "help", nav: () => ({ title: "Help" }), render: (body) => renderHelp(body) },
   { match: "why", nav: () => why.nav(), render: (body) => { why.render(body, { mode: settings.mode, install: () => installiFizBox() }); } }, // F303

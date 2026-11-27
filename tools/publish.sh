@@ -6,9 +6,8 @@
 #   1. checks: on main, no uncommitted changes, up to date with origin, X.Y.Z newer than the last v* tag; the --notes
 #      file is in the notes format (tools/publish_notes.py; docs/release.md, "Release notes"), and there is one when
 #      release-notes/*.md has notes waiting (a dry run without --notes prints those as a raw list)
-#   2. writes native/VERSION, the Tweak Index file (web/app/tweak-index.json from the live index, tools/
-#      tweak-index.mjs; the last one stays when that fails) and the Donate page's counts (web/app/core/devstats.js
-#      from tools/dev_stats.py; the last one stays when that fails), deletes release-notes/*.md (README.md stays; a dry run's
+#   2. writes native/VERSION and the Tweak Index file (web/app/tweak-index.json from the live index, tools/
+#      tweak-index.mjs; the last one stays when that fails), deletes release-notes/*.md (README.md stays; a dry run's
 #      raw list is made from a copy), commits "Version X.Y.Z" and pushes it
 #   3. builds that commit in a clean temporary worktree and publishes it with tools/release.sh --tag-source:
 #      iFizBox.ipa, the .debs and iFizBox's own APT repo, as the repo owner's GitHub account, under tag vX.Y.Z on a
@@ -78,13 +77,10 @@ echo "publish: ${#notefiles[@]} release note(s) in release-notes/"
 if [ $dry = 0 ]; then
   # F398: the Tweak Index the app and the site ship with; a failed read keeps the committed file
   timeout 600 node tools/tweak-index.mjs || echo "publish: the Tweak Index couldn't be read: the last file stays" >&2
-  # F464: the Donate page's counts; a failed count keeps the committed file
-  timeout 600 python3 tools/dev_stats.py >/dev/null || echo "publish: the dev stats couldn't be counted: the last file stays" >&2
-  stats=(); [ ! -f web/app/core/devstats.js ] || stats=(web/app/core/devstats.js)
-  git add native/VERSION web/app/tweak-index.json "${stats[@]}"
+  git add native/VERSION web/app/tweak-index.json
   [ ${#notefiles[@]} = 0 ] || git rm -q -- "${notefiles[@]}"
-  if ! git diff --cached --quiet -- native/VERSION release-notes web/app/tweak-index.json "${stats[@]}"; then
-    git commit -q -m "Version $version" -- native/VERSION release-notes web/app/tweak-index.json "${stats[@]}"
+  if ! git diff --cached --quiet -- native/VERSION release-notes web/app/tweak-index.json; then
+    git commit -q -m "Version $version" -- native/VERSION release-notes web/app/tweak-index.json
     git push -q origin main
   fi
 fi

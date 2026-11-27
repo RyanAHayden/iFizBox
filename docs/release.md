@@ -132,20 +132,11 @@ must be logged in (`tools/deploy.sh --check-auth`). A failed or empty read keeps
 A dry run doesn't run it. The live site has no `/api/tweaks.json` until the first release, which is why the tool reads
 D1 directly.
 
-## Donate page counts
-
-`tools/publish.sh` runs `tools/dev_stats.py` at each release (not on a dry run). It writes `web/app/core/devstats.js`,
-the numbers the Donate page shows, into the version commit. It reads the Claude Code transcripts under `~/.claude/projects/`
-for this project, in the current and the old name folders, and keeps numbers only. A ledger at
-`~/.local/share/ifizbox/dev-stats.json` (outside git) remembers the sessions already counted, so the counts survive when
-old transcripts are deleted. If a run would count fewer sessions than the committed file (another machine, a lost
-ledger), it writes nothing and the last file stays. Transcripts from other machines are not counted.
-
 ## Cutting one
 
 Do the simplify step in "Release notes" first, so the notes file exists. One command does all of it:
 `tools/publish.sh X.Y.Z [--notes FILE] [--minimum X.Y.Z] [--dry-run]`. It checks main is
-clean and current and the version is new, checks the `--notes` file, writes the Tweak Index file and the Donate page counts, commits and pushes `native/VERSION` and those files, builds that exact commit in a clean
+clean and current and the version is new, checks the `--notes` file, writes the Tweak Index file, commits and pushes `native/VERSION` and that file, builds that exact commit in a clean
 temporary worktree, publishes it with `tools/release.sh` as the repo owner's GitHub account (whichever gh account
 is active; `tools/release.sh --check-auth` runs first, so a missing login stops it before the version commit is
 pushed; `tools/deploy.sh --check-auth` checks wrangler's login the same way), tags a commit that adds the updated

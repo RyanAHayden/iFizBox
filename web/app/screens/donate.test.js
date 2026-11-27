@@ -2,8 +2,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { count, day, donateSections, DONATE_ROW } from "./donate.js";
-import { homeLinks, nav, openWhileLocked } from "./home.js";
+import { count, day, donateSections } from "./donate.js";
+import { homeLinks, nav, openWhileLocked, DONATE_ROW } from "./home.js";
+import { format, lazyFor } from "../router.js";
 import { DEV_STATS } from "../core/devstats.js";
 
 const STATS = { prompts: 1910, tokens: 8767364993, sessions: 2808, commits: 6397, since: "2026-11-17", updated: "2026-11-27" };
@@ -34,7 +35,8 @@ test("the Ko-fi row opens ko-fi.com/fizlo", () => {
 
 test("Home's row sits under Credits / Thank You, Credits has one too, and both open the page unlocked", () => {
   assert.deepEqual(homeLinks().at(-1).rows.map((r) => r.label), ["Credits / Thank You", "Donate"]);
-  assert.equal(DONATE_ROW.href, "#/home/donate");
+  assert.equal(DONATE_ROW.href, format({ tab: "home", path: ["donate"] }));
+  assert.deepEqual(lazyFor({ tab: "home", path: ["donate"] }), ["donate"]);
   assert.equal(openWhileLocked(DONATE_ROW.href), true);
   assert.equal(nav({ tab: "home", path: ["donate"] }).title, "Donate");
   const js = readFileSync(new URL("./home.js", import.meta.url), "utf8");

@@ -1,10 +1,8 @@
 // F464: the Donate page (#/home/donate), opened from Home and from Credits: the Ko-fi link, then what it took to build
-// the app (core/devstats.js, written by tools/dev_stats.py).
+// the app (core/devstats.js, written by tools/dev_stats.py). Loaded when its route opens (lazy.js).
 import { KOFI_URL, NAME } from "../brand.js";
 import { DEV_STATS } from "../core/devstats.js";
-import { format } from "../router.js";
 
-export const DONATE_ROW = { label: "Donate", href: format({ tab: "home", path: ["donate"] }) };
 export const DONATE_FOOTER = `${NAME} is free, with no paid features. If it helps you, you can support its work on Ko-fi.`;
 
 export const count = (n) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)} billion` : n >= 1e6 ? `${(n / 1e6).toFixed(1)} million`
