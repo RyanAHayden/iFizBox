@@ -56,6 +56,10 @@ enum Sideload {
     private static var prepared = [String: Prepared]() // on SignBridge.queue
 
     static func register(_ b: Bridge) {
+        IPASigner.idHolder = { bid, original in // B502
+            FreeAppID.holder(of: bid, for: original, own: Bundle.main.bundleIdentifier, records: records(),
+                             installed: { Workspace.isInstalled($0) })
+        }
         b.on("signing.inspect") { c in inspect(c) }
         b.on("signing.progress") { c in progress(c) }
         // B83: iFizBox's own update after the prompt (CloseForUpdate): streams {state} and answers the last one
@@ -157,7 +161,7 @@ enum Sideload {
                     var o = SignOptions(); if let k = c.params["keepBundleId"] as? Bool { o.keepBundleID = k }
                     let ids = (try? profile.signingIDs(for: d.bundleID, keep: o.keeps(d.bundleID))) ?? (bundleID: d.bundleID, entitlementsID: d.bundleID)
                     Apt.reply(c, ["token": tok, "app": d.json, "icon": icon, "missing": d.missing(from: profile),
-                                  "signsAs": ids.bundleID, "appIdAs": ids.entitlementsID, "keepBundleId": o.keepBundleID,
+                                  "signsAs": ids.bundleID, "appIdAs": ids.entitlementsID, "keepBundleId": o.keepBundleID && !profile.pinsBundleID, // B502
                                   "push": profile.pushEnvironment ?? NSNull(), "wildcard": profile.isWildcard, "profileAppId": profile.appID,
                                   "profileGroups": profile.groups, "profileKind": profile.kind.rawValue], nil) // profileGroups: F413
                 } catch {
@@ -1306,6 +1310,7 @@ enum Sideload {
                                     }
                                 }, sha256: sha) // F343
                 }
+                if let e = FreeAppID.resignRefusal(r, profile) { fail(e); return next() } // B502
                 // F329a: iFizBox signed from its own bundle (your own icon) signs from it again; the bundle keeps the picture
                 if r.url == SelfIPA.url {
                     let out = SignBridge.work.appendingPathComponent("\(SignBridge.token())-self.ipa")

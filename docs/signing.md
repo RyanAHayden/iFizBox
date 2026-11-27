@@ -259,6 +259,14 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   failure says so and points to a certificate (Settings > Installation & Signing) or a Computer Install.
 - **iFizBox's own update on a free profile** is signed as `<bundle ID>.<TEAMID>` whatever Keep Bundle IDs says: the ID
   the Computer Install gave it (`web/app/signing/freeprofile.js`).
+- **One app at a time on a free profile.** iOS installs an app signed with a free profile's explicit App ID only when
+  the app's bundle ID is that App ID (any other is refused, 0xe8008016). So an app on a free profile is signed as the
+  App ID whatever Keep Bundle IDs says, and its extensions are left out (`native/sign/Profile.swift` `pinsBundleID`,
+  `native/sign/IPASigner.swift`). `native/sign/FreeAppID.swift` refuses an app (`app_id_taken`) when another installed
+  or recorded app already has that ID, since installing would replace that app and its data. iFizBox updating itself
+  and re-signing the same app are allowed. Re-sign refuses (`app_id_mismatch`) an app installed under another bundle
+  ID, which would otherwise install a second copy. iOS 27 can't say whether an app is installed, so a recorded one counts
+  until it is removed from Signed Apps.
 
 ## Own provisioning profiles (App Store Connect API key)
 

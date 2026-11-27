@@ -62,12 +62,16 @@ struct Profile {
     // F237 (R25's verdict): the IDs one app is signed with. `keep` (Keep Bundle IDs, on by default): Info.plist and
     // the code signature keep the app's own ID (or the one the user typed), and only the entitlements'
     // application-identifier and keychain group take the profile's App ID (explicit, or the wildcard narrowed:
-    // bundleID(for:)); iOS's installer never compares the two. Off: the old way, the app becomes a copy under the
+    // bundleID(for:)); iOS's installer doesn't compare the two, except under a free Apple ID's explicit profile
+    // (pinsBundleID, B502), where it's off whatever was asked. Off: the old way, the app becomes a copy under the
     // profile's ID.
     func signingIDs(for appBundleID: String, keep: Bool) throws -> (bundleID: String, entitlementsID: String) {
         let ent = try bundleID(for: appBundleID)
-        return (keep ? appBundleID : ent, ent)
+        return (keep && !pinsBundleID ? appBundleID : ent, ent)
     }
+
+    // B502: FreeAppID.swift
+    var pinsBundleID: Bool { isFree && !isWildcard }
 
     // The profile's entitlements narrowed to one bundle, the way Xcode signs (I5's app_entitlements). The keychain
     // group comes first from the app's own ID (keptID, its Info.plist's) when the profile's groups allow it (TEAM.*

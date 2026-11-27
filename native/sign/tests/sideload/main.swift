@@ -961,4 +961,59 @@ test("free refresh: current certificate gets a profile install, an old one is re
     check(running.renew.map(\.record.bundleID) == ["com.a"] && running.resign.isEmpty, "and installs nothing iOS doesn't list")
 }
 
+// B502: a free Apple ID's explicit profile: iOS installs an app only as the profile's App ID.
+test("free Apple ID: signed as the App ID, replacing no other app (B502)") {
+    let now = Date(), day: TimeInterval = 86400, team = "TEAM123456", appID = "com.you.box.TEAM123456"
+    func profile(_ app: String, days: TimeInterval = 7) throws -> Profile {
+        let d: [String: Any] = ["Name": "iOS Team Provisioning Profile: \(app)", "TeamIdentifier": [team],
+                                "CreationDate": now, "ExpirationDate": now.addingTimeInterval(days * day),
+                                "Entitlements": ["application-identifier": "\(team).\(app)", "get-task-allow": true,
+                                                 "keychain-access-groups": ["\(team).*"]]]
+        return try Profile(PropertyListSerialization.data(fromPropertyList: d, format: .xml, options: 0))
+    }
+    let free = try profile(appID)
+    check(free.pinsBundleID, "free and explicit")
+    check(try !profile("*").pinsBundleID && !profile(appID, days: 365).pinsBundleID, "a wildcard, or a paid team's: not pinned")
+    check(try free.signingIDs(for: "com.other.app", keep: true).bundleID == appID, "keep is off")
+    for (n, json) in [[:], ["bundleId": "com.me.asked"]].enumerated() as EnumeratedSequence<[[String: Any]]> {
+        let s = IPASigner(profile: free, identity: identity)
+        s.options = try SignOptions(json: json)
+        let out = work.appendingPathComponent("free\(n).ipa")
+        let app = try s.sign(fixtures.appendingPathComponent("edit.ipa"), to: out)
+        let d = try Inspect.ipa(out)
+        check(app.bundleID == appID && d.bundleID == appID, "default settings: \(app.bundleID) \(d.bundleID)")
+        check(d.entitlements["application-identifier"] as? String == "\(team).\(appID)", "entitlements \(d.entitlements)")
+        check(d.entitlements["keychain-access-groups"] as? [String] == ["\(team).\(appID)"], "groups \(d.entitlements)")
+        check(d.extensions.isEmpty, "extensions left out: \(d.extensions.map(\.bundleID))")
+    }
+
+    IPASigner.idHolder = { bid, original in bid == appID && original != appID ? "Other App" : nil }
+    defer { IPASigner.idHolder = nil }
+    check(throwsCode("app_id_taken") {
+        _ = try IPASigner(profile: free, identity: identity).sign(fixtures.appendingPathComponent("edit.ipa"), to: work.appendingPathComponent("taken.ipa"))
+    }, "another app has the ID")
+
+    func rec(_ original: String) -> SignedRecord {
+        SignedRecord(bundleID: appID, originalBundleID: original, name: "Other App", version: "1", url: "https://x.example/a.ipa", signed: now,
+                     expires: now.addingTimeInterval(day), options: .init(name: nil, bundleID: nil, icon: nil, removeExtensions: [], fixArm64e: false))
+    }
+    func holder(_ original: String, own: String? = "com.you.else", _ records: [SignedRecord], installed: Bool?) -> String? {
+        FreeAppID.holder(of: appID, for: original, own: own, records: records) { _ in installed }
+    }
+    check(holder("com.b", [], installed: nil) == nil, "nothing has it")
+    check(holder("com.b", [rec("com.a")], installed: true) == "Other App", "an installed app")
+    check(holder("com.b", [rec("com.a")], installed: nil) == "Other App", "iOS can't be asked: counted as installed")
+    check(holder("com.b", [rec("com.a")], installed: false) == nil, "deleted")
+    check(holder("com.a", [rec("com.a")], installed: true) == nil, "its own update")
+    check(holder("com.b", own: appID, [], installed: nil) == Brand.name, "the running app has it")
+    check(holder(SignOptions.selfBundleID, own: appID, [], installed: nil) == nil, "\(Brand.name) updating itself")
+    check(holder(appID, own: appID, [], installed: nil) == nil, "an IPA with that ID already")
+    check(FreeAppID.taken(by: Brand.name).code == "app_id_taken", "the running app: no delete advice")
+    var own = rec("com.a")
+    check(try FreeAppID.resignRefusal(own, free) == nil && FreeAppID.resignRefusal(own, profile(appID, days: 365)) == nil, "renews")
+    own.bundleID = "com.a"
+    check(try FreeAppID.resignRefusal(own, free)?.code == "app_id_mismatch" && FreeAppID.resignRefusal(own, profile("*")) == nil,
+          "installed under its own ID: not re-signed as a second copy")
+}
+
 if failures == 0 { print("all passed") } else { print("\(failures) failed"); exit(1) }
