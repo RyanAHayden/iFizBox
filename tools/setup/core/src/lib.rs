@@ -5,7 +5,8 @@
 //! Steps: find the iPhone over USB → make sure this computer is trusted (pair, "Trust This Computer") → ask for the
 //! code the website shows → read what it points at → download the signed IPA (size and SHA-256 checked) → install
 //! it (installation_proxy) → before iOS 27, write the pairing file into the app's container (house_arrest) and say
-//! where to pick it → say what's left on the phone (Developer Mode). It never asks for an Apple ID.
+//! what happens to it (this app takes it when opened; elsewhere, where to pick it) → say what's left on the phone
+//! (Developer Mode). It never asks for an Apple ID.
 
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -252,9 +253,18 @@ pub fn ios_major(v: &str) -> Option<u32> {
 /// (native/sideload/idevice/IDeviceBridge.swift pairOnPhone).
 pub const PAIRS_ON_PHONE: u32 = 27;
 
-/// The app never reads the file by itself: where to pick it. `path` is in the app's container, and the Files app shows
-/// its Documents folder as On My iPhone > the app.
-fn import_hint(app: &str, path: &str) -> String {
+/// The one file this app takes from its own container when it opens, and then deletes
+/// (native/sideload/idevice/IDeviceBridge.swift takeHandedPairing).
+const HANDED_PAIRING: &str = "Documents/pairingFile.plist";
+
+/// What the person has to do with the pairing file just written. This app takes its own by itself. Any other app, or
+/// another place, doesn't: where to pick it. `path` is in the app's container, and the Files app shows its Documents
+/// folder as On My iPhone > the app.
+fn import_hint(brand: &Brand, l: &Lookup, p: &PairingTarget) -> String {
+    let (app, path) = (&l.name, p.path.as_str());
+    if *app == brand.name && p.bundle_id == l.bundle_id && path == HANDED_PAIRING {
+        return format!("Put a pairing file in {app}. {app} picks it up when you open it, so there's nothing to import.");
+    }
     // Only a path under Documents has a place in the Files app to name.
     let place = match path.strip_prefix("Documents/") {
         Some(file) => format!("{file} (On My iPhone > {app})"),
@@ -501,7 +511,7 @@ pub fn run(args: &Args, brand: &Brand, os: Os, ui: &mut dyn Ui, net: &mut dyn Ne
     if let Some(p) = l.pairing.as_ref().filter(|_| major < PAIRS_ON_PHONE) {
         dev.write_file(&p.bundle_id, &parent_dirs(&p.path), &p.path, &pairing)
             .map_err(|e| fail(EXIT_PAIRING, format!("Installed, but couldn't put the pairing file in the app: {e}")))?;
-        ui.say(&import_hint(&l.name, &p.path));
+        ui.say(&import_hint(brand, &l, p));
     }
 
     // 7. what's left on the phone
