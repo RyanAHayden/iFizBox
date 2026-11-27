@@ -25,7 +25,7 @@
 - Open Minis is no longer on the App Store as of the afternoon of 2026-11-27. The link in Open Minis' own GitHub README (`https://apps.apple.com/app/id6759188481`) shows "App Not Available" on the iPhone 15 Pro. `apps.apple.com` returns 404 for us, gb and cn. Apple's iTunes lookup returns 0 results by id (us, gb) and by bundle ID `com.openminis.app`, while the same lookup finds LocalDevVPN.
 - It was installed from the App Store on that phone earlier the same day (F465) and is still installed (1.16).
 - Its TestFlight public link (`https://testflight.apple.com/join/3BdkA5c3`) answers with a join page. Not tried on the phone.
-- The reason for the removal is not known; it may be temporary. A question was put to the person before finishing.
+- The reason for the removal is not known; it may be temporary. What to do about it is a person's call, filed as a follow-up part of F465b together with the phone check.
 - Tried and failed: `ui-15.sh` screenshots of the iPhone 15 Pro came back all black, although WebDriverAgent's page source showed the App Store in front. The App Store alert was read from the page source.
 
 ## Not verified

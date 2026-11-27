@@ -68,7 +68,7 @@ export const phoneSetupCommand = (code) => `wget -qO- https://${DOMAIN}/sign/set
 const phoneIos = (ios) => Number.parseInt(ios, 10) >= 27;
 export const phoneSetupOffered = (ios, script) => phoneIos(ios) && String(script ?? "").includes(PHONE_SETUP_MARK);
 
-// The published script, read once a page load (per fetch); no answer is asked again the next time.
+// The published script, kept once read (per fetch); a fetch that got no script is tried again the next time.
 const published = new WeakMap();
 async function publishedScript(fetcher) {
   if (published.has(fetcher)) return published.get(fetcher);
