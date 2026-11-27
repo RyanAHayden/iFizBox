@@ -56,11 +56,14 @@ struct IPALibrary {
         var signed: Date
         var expires: Date?
         var signer: SignerStamp? = nil // B259: nil in a copy signed before stamps, which signed() no longer hands out
+        var certSerial: String? = nil  // F458: for the record of its install; nil in an older copy
         var appID: String? = nil       // the application-identifier it was signed with (TEAM.id); nil in an older copy
 
         var app: SignedApp {
-            SignedApp(bundleID: bundleID, originalBundleID: originalBundleID, name: name, version: version, removed: removed,
-                      fixedArm64e: fixedArm64e, appID: appID)
+            var a = SignedApp(bundleID: bundleID, originalBundleID: originalBundleID, name: name, version: version, removed: removed,
+                              fixedArm64e: fixedArm64e, appID: appID)
+            a.certSerial = certSerial
+            return a
         }
     }
 
@@ -215,7 +218,7 @@ struct IPALibrary {
         let s = Signed(sourceSize: size, sourceModified: modified, certificate: IPALibrary.hex(sha1(certificate)),
                        options: opts.stored, bundleID: app.bundleID, originalBundleID: app.originalBundleID, name: app.name,
                        version: app.version, removed: app.removed, fixedArm64e: app.fixedArm64e, signed: signer.time,
-                       expires: expires, signer: app.stamp, appID: app.appID)
+                       expires: expires, signer: app.stamp, certSerial: app.certSerial, appID: app.appID)
         dropSigned(file)
         try FileManager.default.moveItem(at: tmp, to: signedURL(file))
         try IPALibrary.encoder.encode(s).write(to: side(file, ".signed.json"), options: .atomic)
@@ -239,7 +242,7 @@ struct IPALibrary {
         let s = Signed(sourceSize: size, sourceModified: modified, certificate: IPALibrary.hex(sha1(certificate)),
                        options: options.stored, bundleID: app.bundleID, originalBundleID: app.originalBundleID, name: app.name,
                        version: app.version, removed: app.removed, fixedArm64e: app.fixedArm64e, signed: signed, expires: expires,
-                       signer: app.stamp, appID: app.appID)
+                       signer: app.stamp, certSerial: app.certSerial, appID: app.appID)
         dropSigned(file)
         try FileManager.default.moveItem(at: tmp, to: signedURL(file))
         try IPALibrary.encoder.encode(s).write(to: side(file, ".signed.json"), options: .atomic)

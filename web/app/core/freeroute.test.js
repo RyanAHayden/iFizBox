@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { makeKey, makeCsr, makeP12, unpem, tlv, seq, oid, OIDS, certSpki, certSerial, sameKey, storedZip, crc32 } from "./freecert.js";
 import { runSetup, freeAppId, pickTeam, freeEntitlements, freeExpiry, FREE_EXPIRY_WARNING, setupError, SETUP_STEPS,
-  atCertLimit, otherTool, MACHINE_NAME } from "./freeroute.js";
+  atCertLimit, otherTool, MACHINE_NAME, otherProfiles, refreshApps } from "./freeroute.js";
 import { der, children, checkP12Password, oidString } from "./signing.js";
 import { unzipEntries } from "./certfiles.js";
 import { DevPortal, encodePlist } from "./gsa.js";
@@ -318,4 +318,64 @@ test("zsign WebAssembly signs with a .p12 from makeP12", async (t) => {
   const r = await runSignJob(quiet, { ipa: fx("tiny-ifizbox.ipa"), p12, password: "abc123", profile });
   assert.equal(r.ipa[0][0], 0x50);
   assert.equal(r.bundleId, "com.ryha.ifizbox");
+});
+
+// ---- F458: refresh without signing again ----
+const appIdList = [{ identifier: `com.x.${TEAM}`, appIdId: "OWN" }, { identifier: "com.other", appIdId: "OTHER" }];
+const recorded = (...ids) => ids.map((id, i) => ({ bundleId: `b${i}`, name: `App ${i}`, appId: id }));
+
+test("F458: setup hands back Apple's App ID list, asked once", async () => {
+  const portal = fakePortal({ appIds: [{ identifier: `com.x.${TEAM}`, appIdId: "OLD" }] });
+  const r = await runSetup({ portal, teamId: TEAM, phone: { udid: UDID }, bundleId: "com.x", make: fakeMake(portal) });
+  assert.deepEqual(r.appIds.map((a) => a.appIdId), ["OLD"]);
+  assert.equal(portal.log.filter((l) => l === "listAppIds").length, 1);
+});
+
+test("F458: one profile per other App ID of the team; none for the setup's own, a lapsed one or another team's", async () => {
+  const portal = fakePortal();
+  const got = await otherProfiles({ portal, teamId: TEAM, appIds: appIdList, appId: `com.x.${TEAM}`,
+    apps: recorded(`${TEAM}.com.x.${TEAM}`, `${TEAM}.com.other`, `${TEAM}.com.other`, `${TEAM}.com.lapsed`, "ZZZZZZZZZZ.com.other", undefined) });
+  assert.equal(got.length, 1);
+  assert.deepEqual(portal.log, ["downloadProfile OTHER"]);
+});
+
+function refreshRig({ apps, reply = { renewed: ["b0"], done: [], failed: [] }, throws = null }) {
+  const calls = [], page = [], alerts = [];
+  const native = { async call(method, params, onEvent) {
+    calls.push([method, params]);
+    if (method === "signing.installed") return { apps };
+    if (throws) throw new Error(throws);
+    onEvent?.({ log: "Installed the new profile" });
+    return reply;
+  } };
+  const hud = (label) => { page.push(label); return { set: (t) => page.push(t), done: (t) => page.push(t), fail: (m) => page.push(`fail ${m}`),
+    page: { raw: (l) => page.push(l) } }; };
+  const run = () => refreshApps({ native, portal: fakePortal(), teamId: TEAM, appIds: appIdList, appId: `com.x.${TEAM}`, hud, alert: async (a) => alerts.push(a) });
+  return { run, calls, page, alerts };
+}
+
+test("F458: the app asks the shell to refresh over This iPhone, with the other profiles", async () => {
+  const rig = refreshRig({ apps: recorded(`${TEAM}.com.other`) });
+  await rig.run();
+  const [method, params] = rig.calls.at(-1);
+  assert.equal(method, "signing.refresh");
+  assert.equal(params.route, "idevice");
+  assert.equal(params.profiles.length, 1);
+  assert.deepEqual(rig.page, ["Refreshing Apps", "Installed the new profile", "Done"]);
+  assert.equal(rig.alerts.length, 0);
+});
+
+test("F458: with no recorded app nothing is asked of the shell or shown", async () => {
+  const rig = refreshRig({ apps: [] });
+  assert.equal(await rig.run(), null);
+  assert.deepEqual(rig.calls.map((c) => c[0]), ["signing.installed"]);
+  assert.deepEqual(rig.page, []);
+  assert.equal(rig.alerts.length, 0);
+});
+
+test("F458: an app that couldn't be refreshed is named", async () => {
+  const rig = refreshRig({ apps: recorded(`${TEAM}.com.x.${TEAM}`), reply: { renewed: [], done: [], failed: [{ name: "App 0", error: "iOS said no" }] } });
+  await rig.run();
+  assert.equal(rig.alerts[0].title, "Couldn't Refresh Apps");
+  assert.match(rig.alerts[0].message, /App 0: iOS said no/);
 });

@@ -13,7 +13,7 @@
 //   pickTeam(teams)                      the free (Personal) team, else the first
 //   await runSetup({ portal, teamId, phone, saved, bundleId, appName, onStep, askRevoke, make, app })
 //       `app` true in the app: summaries name no browser (reusedSummary)
-//       -> { identity, profile, appId, steps }; onStep({ id, state: "running" | "done" | "failed", summary })
+//       -> { identity, profile, appId, appIds, steps }; onStep({ id, state: "running" | "done" | "failed", summary })
 //       identity: { teamId, serial, p12, password, expires, made }: `made` true when this run made it (save it)
 //   freeEntitlements(appEnts, profile)   zsign's entitlements for an app on this route: get-task-allow as the
 //                                        profile allows (R32: false gave "integrity could not be verified"), no
@@ -22,8 +22,12 @@
 //   FREE_EXPIRY_WARNING                  3 days: "Expiring soon" on this route (not the certificate route's setting)
 //   freeExpiry(expires, now)             { state: "ok" | "soon" | "expired", days }
 //   setupError(e)                        an alert { title, message } for a setup step that failed
+//   await refreshApps({ native, portal, teamId, appIds, appId, hud, alert })
+//                                        F458, the app, after a setup: signing.refresh renews the installed apps'
+//                                        profiles (nothing signed or installed again) and signs the rest again
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { parseProfile, normalUdid } from "./signing.js";
+import { parseProfile, normalUdid, callWithStall, resignLabel, deviceError } from "./signing.js";
+import { b64encode } from "./gsa.js";
 import { makeKey, makeCsr, makeP12, sameKey, certSerial, newPassword } from "./freecert.js";
 import { NAME } from "../brand.js";
 
@@ -125,8 +129,9 @@ export async function runSetup({ portal, teamId, phone, saved = null, bundleId, 
   const { identity } = await run("certificate", () => certificate({ portal, teamId, saved, askRevoke, make: mk, name, app }));
 
   const identifier = freeAppId(bundleId, teamId);
+  let appIds = []; // F458: Apple's list, asked once: refreshApps reads it too
   const { appId } = await run("appId", async () => {
-    const { appIds } = await portal.listAppIds(teamId);
+    ({ appIds } = await portal.listAppIds(teamId));
     const have = appIds.find((a) => a.identifier === identifier);
     if (have) return { appId: have, summary: `${identifier} (already made)` };
     try {
@@ -147,7 +152,49 @@ export async function runSetup({ portal, teamId, phone, saved = null, bundleId, 
     return { profile: { data, info }, summary: `Good until ${until}` };
   });
 
-  return { identity, profile, appId: identifier, steps };
+  return { identity, profile, appId: identifier, appIds, steps };
+}
+
+// F458: the profiles of the recorded apps' other App IDs than the setup's own (signing.installed's appId is
+// TEAM.identifier), one each. An App ID Apple no longer lists expired: no profile, so the app is signed again.
+export async function otherProfiles({ portal, teamId, appIds = [], apps = [], appId }) {
+  const wanted = new Set(apps.map((a) => String(a?.appId ?? ""))
+    .filter((id) => id.startsWith(`${teamId}.`)).map((id) => id.slice(teamId.length + 1)));
+  wanted.delete(appId);
+  const out = [];
+  for (const a of appIds) {
+    if (!wanted.has(a.identifier)) continue;
+    const data = bytes((await portal.downloadProfile(teamId, a.appIdId))?.encodedProfile);
+    if (data) out.push(data);
+  }
+  return out;
+}
+
+// With no recorded app there is nothing to do: no progress page, no connection.
+export async function refreshApps({ native, portal, teamId, appIds, appId, hud, alert }) {
+  let page = null;
+  const fail = async (message) => {
+    page?.fail(message);
+    await alert({ title: "Couldn't Refresh Apps", message, buttons: ["OK"], cancel: 0 });
+  };
+  try {
+    const apps = (await native.call("signing.installed", {}))?.apps ?? [];
+    if (!apps.length) return null;
+    const profiles = (await otherProfiles({ portal, teamId, appIds, apps, appId })).map(b64encode);
+    page = hud("Refreshing Apps");
+    const r = await callWithStall(native, "signing.refresh", { profiles, route: "idevice" }, (ev) => {
+      if (ev?.log) page?.page?.raw?.(ev.log);
+      const t = resignLabel(ev);
+      if (t) page?.set(t);
+    });
+    const failed = r?.failed ?? [];
+    if (failed.length) await fail(failed.map((f) => `${f.name || f.bundleId}: ${f.error || "failed"}`).join("\n"));
+    else page.done("Done");
+    return r;
+  } catch (e) {
+    await fail(deviceError(e).message);
+    return null;
+  }
 }
 
 export function freeEntitlements(appEnts = {}, profile) {

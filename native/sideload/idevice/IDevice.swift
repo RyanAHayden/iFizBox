@@ -883,6 +883,19 @@ enum IDevice {
             return c
         }
 
+        // F458: misagent keeps the phone's provisioning profiles (RSD's com.apple.misagent.shim.remote)
+        func misagent() throws -> OpaquePointer {
+            watch.begin("connecting to misagent", Limit.service)
+            var c: OpaquePointer?
+            switch kind {
+            case .remotePairing: try check(misagent_connect_rsd(adapter, handshake, &c), "profile_failed")
+            case .lockdown: try check(misagent_connect(provider, &c), "profile_failed")
+            }
+            guard let client = c else { throw Failure(code: "profile_failed", text: "idevice made no misagent client") }
+            ilog("misagent connected")
+            return client
+        }
+
         deinit {
             beating = false
             watch.releaseCloser()
@@ -1524,5 +1537,55 @@ enum IDevice {
         let rate = Double(sent - from) / 1_048_576 / max(Date().timeIntervalSince(t0), 0.001)
         ilog("AFC: copied \(mb(sent)) in \(String(format: "%.1f", secs)) s: \(run.speed.summary) (this run \(String(format: "%.1f", rate)) MB/s, \(chunk >> 20) MB chunks, \(pipelined ? "pipelined" : "one at a time"))")
         note("Copied \(mb(sent)) to iOS")
+    }
+
+    // ---- F458: a free Apple ID's refresh (native/sign/Refresh.swift): new profiles only, nothing signed or copied
+
+    private struct ProfileInstaller: Misagent {
+        let client: OpaquePointer, watch: Watch
+        func install(_ profile: Data) throws {
+            watch.begin("installing a provisioning profile (misagent)", Limit.service)
+            try profile.withUnsafeBytes {
+                try IDevice.check(misagent_install(client, $0.baseAddress?.assumingMemoryBound(to: UInt8.self), $0.count), "profile_failed")
+            }
+            IDevice.ilog("misagent installed a profile (\(profile.count) bytes)")
+        }
+    }
+
+    /// One connection for the whole refresh: the user apps iOS lists (installation_proxy Browse; nil when it won't
+    /// say), then misagent for the profiles `body` installs. Blocking; call it on `queue`.
+    static func withMisagent<T>(_ body: @escaping (_ installed: Set<String>?, _ misagent: Misagent) throws -> T) throws -> T {
+        try watched("refresh") { (w: Watch) -> T in
+            let s = try Session(watch: w)
+            let installed = try? userApps(s, watch: w)
+            let client = try s.misagent()
+            defer { misagent_client_free(client) }
+            return try withExtendedLifetime(s) { try body(installed, ProfileInstaller(client: client, watch: w)) }
+        }
+    }
+
+    private static func userApps(_ s: Session, watch w: Watch) throws -> Set<String> {
+        let ip = try s.installationProxy()
+        defer { installation_proxy_client_free(ip) }
+        w.begin("asking installation_proxy for this iPhone's apps", Limit.service)
+        let opts = plist_new_dict()
+        defer { plist_free(opts) } // browse copies it
+        plist_dict_set_item(opts, "ApplicationType", plist_new_string("User"))
+        let attrs = plist_new_array()
+        plist_array_append_item(attrs, plist_new_string("CFBundleIdentifier"))
+        plist_dict_set_item(opts, "ReturnAttributes", attrs)
+        var list: UnsafeMutablePointer<plist_t?>?
+        var n = 0
+        try check(installation_proxy_browse(ip, opts, &list, &n), "appid_failed")
+        defer { if let l = list { idevice_plist_array_free(l, UInt(n)) } }
+        var out = Set<String>()
+        guard let l = list else { return out }
+        for i in 0..<n {
+            guard let app = l[i], let v = plist_dict_get_item(app, "CFBundleIdentifier"), plist_get_node_type(v) == PLIST_STRING else { continue }
+            var p: UnsafeMutablePointer<CChar>?
+            plist_get_string_val(v, &p)
+            if let c = p { out.insert(String(cString: c)); plist_mem_free(c) }
+        }
+        return out
     }
 }

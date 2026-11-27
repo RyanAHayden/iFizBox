@@ -38,7 +38,8 @@ import { NAME, BUNDLE_ID, DOMAIN } from "../brand.js";
 import { openRecord } from "../core/websign.js"; // F460b
 import { showAlert } from "../nav/alert.js";
 import { relayTransport, relayWsUrl, anisetteV3, AppleIdSession, DevPortal, signInAlert, b64encode, b64decode } from "../core/gsa.js";
-import { runSetup, pickTeam, setupError, SETUP_STEPS, otherTool, freeExpiry } from "../core/freeroute.js";
+import { runSetup, refreshApps, pickTeam, setupError, SETUP_STEPS, otherTool, freeExpiry } from "../core/freeroute.js";
+import { progressHUD } from "../nav/progress.js"; // F458
 import { storedZip } from "../core/freecert.js";
 import { parseProfile } from "../core/signing.js";
 import { storedUdid, udidPending, watchUdid, canFindUdid, FIND_UDID, UDID_PAGE, UDID_WAITING } from "./signing.js";
@@ -647,6 +648,12 @@ async function runSetupOnce(ctx, saved) {
     if (ctx.native) await keepInApp(ctx, loadFreeIdentity(ctx.store));
     ctx.redraw();
     ctx.onChange();
+    // F458: the installed apps get the new profile; only an old certificate's or a lapsed App ID's are signed again
+    if (ctx.native && flow.kept) {
+      await refreshApps({ native: ctx.native, portal: flow.portal, teamId: flow.team.teamId, appIds: r.appIds, appId: r.appId,
+        hud: progressHUD, alert: ctx.ask });
+      ctx.onChange();
+    }
   } catch (e) {
     if (e?.kind === "no-udid" && !ctx.native) {
       // B473: the row under the checklist offers Find This iPhone's UDID (udidDetour); keep the sign-in across it

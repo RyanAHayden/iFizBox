@@ -17,6 +17,7 @@ struct SignedApp {
     var appID: String? = nil       // B138: the application-identifier it was signed with (TEAM.id)
     var injected: [String] = []    // F288: load paths added to the app's executable (Tweaks.swift)
     var groupFix: String? = nil    // B259: the group fix dylib's hash (SignerStamp.hash) when the app got it
+    var certSerial: String? = nil  // F458: the signing certificate's serial (ProfileRefresh.serial)
 }
 
 final class IPASigner {
@@ -428,7 +429,8 @@ final class IPASigner {
                          name: main.plist["CFBundleDisplayName"] as? String ?? main.plist["CFBundleName"] as? String ?? "",
                          version: main.plist["CFBundleShortVersionString"] as? String ?? main.plist["CFBundleVersion"] as? String ?? "",
                          removed: removed.sorted(), fixedArm64e: fixedArm64e.sorted(), skipped: skipped.sorted(),
-                         appID: "\(profile.team).\(entID)", injected: injected, groupFix: groupFix)
+                         appID: "\(profile.team).\(entID)", injected: injected, groupFix: groupFix,
+                         certSerial: ProfileRefresh.serial(identity.certificate))
     }
 
     private struct Read { let sha1: Data, sha256: Data, macho: Bool }

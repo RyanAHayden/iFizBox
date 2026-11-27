@@ -753,7 +753,8 @@ export function callWithStall(native, method, params, onEvent = () => {}, { limi
 //   loggedBridge(native, store)   `native` with call() keeping those calls; any other call, or no store, as it was
 //   sideloadRunTitle(method, params, result)   "Install Delta", "Sign Delta", "Re-sign Delta", "Re-sign All"
 export const SIDELOAD_RUNS = { "signing.install": "Install", "signing.open": "Install", "library.install": "Install",
-  "signing.prepare": "Sign", "library.sign": "Sign", "signing.resign": "Re-sign", "signing.resignAll": "Re-sign" };
+  "signing.prepare": "Sign", "library.sign": "Sign", "signing.resign": "Re-sign", "signing.resignAll": "Re-sign",
+  "signing.refresh": "Refresh" };
 let sideloadLogs = null;
 export function logSideloadRuns(store) { sideloadLogs = store ?? null; }
 const preparedNames = new Map(); // signing.prepare's token -> the app's name, for signing.open's title
@@ -762,6 +763,7 @@ const fileTitle = (s) => String(s ?? "").split(/[?#]/)[0].split("/").pop().repla
 export function sideloadRunTitle(method, params = {}, result = null) {
   const verb = SIDELOAD_RUNS[method] ?? "Run";
   if (method === "signing.resignAll") return "Re-sign All";
+  if (method === "signing.refresh") return "Refresh Apps"; // F458
   const name = result?.name || params?.name || (params?.token && preparedNames.get(params.token)) || params?.bundleId ||
     result?.bundleId || fileTitle(params?.file) || fileTitle(params?.url) || "App";
   return `${verb} ${String(name).replace(/\.ipa$/i, "")}`;

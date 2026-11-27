@@ -344,3 +344,10 @@ _Avoid_: activation, pairing
 The client Apple's sign-in is told it is talking to: the one an anisette server advertises, or a current Mac.
 _In code_: claim, CURRENT_MAC, anisette.use
 _Avoid_: client identity, persona
+
+**App Refresh**:
+Giving installed free Apple ID apps a new profile so they last another week, without installing them again; apps that can't take one are signed again
+_Said_: Refresh
+_On screen_: Refreshing Apps
+_In code_: signing.refresh, ProfileRefresh, refreshApps
+_Avoid_: profile renewal pass
