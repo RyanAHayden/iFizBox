@@ -126,7 +126,7 @@ async function bundledText(fetcher) {
   return r?.ok ? r.text() : null;
 }
 // The Keychain takes the record's certificate; bundled: true has the shell keep a held one unless the file's rules
-// replace it (SignBridge, BundledIdentity.replacesIdentity / replacesProfile). Marked once the shell has decided.
+// replace it (SignBridge, BundledIdentity.replacesIdentity / replacesProfile). Marked once the record is taken.
 async function adoptSealed({ native, store, text, key }) {
   const mark = sealedMark(JSON.parse(text));
   if (readJson(store, BUNDLED_KEY) === mark) return false;
@@ -134,8 +134,8 @@ async function adoptSealed({ native, store, text, key }) {
   if (!rec?.p12 || !rec?.profile || !rec?.teamId || !rec?.serial) return false;
   const st = await native.call("signing.import", { ...importParams({ p12: b64decode(rec.p12),
     profile: b64decode(rec.profile), password: rec.password }), bundled: true });
+  if (!sameSerial(st?.identity?.serial, rec.serial)) return false; // another certificate stays; not marked, as a plain file
   writeJson(store, BUNDLED_KEY, mark);
-  if (!sameSerial(st?.identity?.serial, rec.serial)) return false; // another certificate stays
   writeJson(store, FREE_KEY, rec);
   globalThis.dispatchEvent?.(new CustomEvent("ifizbox:signing-status", { detail: st.identity })); // Home's tile
   return true;
@@ -187,7 +187,9 @@ export async function freeIdAtLaunch({ native, store, fetcher = globalThis.fetch
 
 // ifizbox://free-id#<key> (incoming.js). Nothing to do (no sealed file, or taken already): nothing said.
 export async function finishSetupFromLink(url, { native, store, fetcher = globalThis.fetch, alert = showAlert } = {}) {
-  if (!native?.call || !(await waitingSealed({ store, fetcher }))) return false;
+  const file = native?.call ? await waitingSealed({ store, fetcher }) : null;
+  if (!file) return false;
+  writeJson(store, KEYS.freeidAsked, sealedMark(file)); // they've been to the website: no launch alert on top
   const key = String(url).split("#")[1] ?? "";
   const done = Boolean(key) && await adoptBundledFreeId({ native, store, fetcher, key });
   await alert({ ...(done ? FINISH_DONE : FINISH_FAILED), buttons: ["OK"], cancel: 0 });

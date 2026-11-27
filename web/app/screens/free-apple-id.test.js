@@ -458,7 +458,11 @@ test("F460b: a wrong or missing key leaves the app as it was", async () => {
     assert.equal(alerts.at(-1).title, "Setup Not Finished");
   }
   assert.deepEqual(calls, []);
-  assert.equal(store.m.size, 0);
+  assert.equal(loadFreeIdentity(store), null);
+  // a launch by that link shows no Finish Setup alert on top of its answer
+  const shown = alerts.length;
+  await mod.freeIdAtLaunch({ native, store, fetcher, alert: alert() });
+  assert.equal(alerts.length, shown);
   // the right link still works afterwards
   assert.equal(await mod.finishSetupFromLink(`ifizbox://free-id#${key}`, { native, store, fetcher, alert: alert() }), true);
 });
@@ -468,6 +472,7 @@ test("F460b: another certificate the shell keeps: no record taken", async () => 
   assert.equal(await mod.finishSetupFromLink(`ifizbox://free-id#${key}`, { native, store, fetcher, alert: alert() }), false);
   assert.equal(loadFreeIdentity(store), null);
   assert.equal(alerts.at(-1).title, "Setup Not Finished");
+  assert.equal(store.m.has("ifizbox.freeid.bundled"), false, "not marked: the link works once that certificate is gone");
 });
 
 test("F460b: the first launch says to finish setup, once per file; its button opens the website in Safari", async () => {

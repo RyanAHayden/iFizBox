@@ -287,10 +287,19 @@ class HandoffSourceTest(unittest.TestCase):
         # B420: with an identity held, the profile; B479: the certificate only when replacesIdentity says so
         start = bridge.index("static func refreshBundledProfile(")
         body = bridge[start:bridge.index("\n    }\n", start)]
-        for part in ("BundledIdentity.shouldCompareProfile", "BundledIdentity.replacesProfile", "SignStore.replaceProfile",
-                     "forKey: BundledIdentity.seenKey", "forKey: BundledIdentity.profileSeenKey",
-                     "BundledIdentity.replacesIdentity(", "BundledIdentity.importedCertKey", "rememberImportedCertificate()"):
+        for part in ("BundledIdentity.shouldCompareProfile", "replaceHeld(with: c",
+                     "forKey: BundledIdentity.seenKey", "forKey: BundledIdentity.profileSeenKey"):
             self.assertIn(part, body)
+        # F460b: the rules themselves, shared with the sealed record's import
+        start = bridge.index("static func replaceHeld(")
+        body = bridge[start:bridge.index("\n    }\n", start)]
+        for part in ("BundledIdentity.replacesProfile", "SignStore.replaceProfile", "BundledIdentity.replacesIdentity(",
+                     "BundledIdentity.importedCertKey", "rememberImportedCertificate()"):
+            self.assertIn(part, body)
+        start_sealed = bridge.index("static func importSealed(")
+        sealed = bridge[start_sealed:bridge.index("\n    }\n", start_sealed)]
+        self.assertIn("replaceHeld(with: c", sealed)
+        self.assertLess(sealed.index("replaceHeld("), sealed.index("SignStore.importIdentity("))
         self.assertEqual(body.count("importIdentity("), 1)
         self.assertLess(body.index("BundledIdentity.replacesIdentity("), body.index("SignStore.importIdentity("))
 

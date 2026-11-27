@@ -144,7 +144,7 @@ export function onReceiving({ hud = liveHUD } = {}) {
 }
 
 export async function handleIncoming(url, { native = nativeBridge(), alert = showAlert, hud = showHUD,
-  review = null, add = null, shared = null, install = null, signIn = null, finish = null, on =otherLinksOn, open = goHash, now = Date.now, reload = reloadInstalled, drop = dropMyIpas } = {}) {
+  review = null, add = null, shared = null, install = null, signIn = null, finish = null, on = otherLinksOn, open = goHash, now = Date.now, reload = reloadInstalled, drop = dropMyIpas } = {}) {
   const u = String(url ?? "");
   if (/^ifizbox:\/\/install\b/i.test(u)) {
     const ask = installAsk(u);
@@ -184,7 +184,7 @@ export async function handleIncoming(url, { native = nativeBridge(), alert = sho
     return "free-id";
   }
   if (/^ifizbox:\/\/import\b/i.test(u)) {
-    const run = review?? (await import("./screens/importlink.js")).reviewAndImport;
+    const run = review ?? (await import("./screens/importlink.js")).reviewAndImport;
     await run(u, { native });
     return "import";
   }
