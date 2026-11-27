@@ -1215,7 +1215,8 @@ import { appleRelay, relayTarget, MAX_REQUEST, MAX_REPLY } from "./src/apple-rel
   assert.equal(out.url, "https://gsa.apple.com/grandslam/GsService2");
   assert.equal(out.init.redirect, "manual");
   assert.ok(out.init.signal);
-  assert.deepEqual([...out.init.headers.keys()].sort(), ["content-type", "security-code", "user-agent", "x-apple-i-md"]);
+  assert.deepEqual([...out.init.headers.keys()].sort(), ["connection", "content-type", "security-code", "user-agent", "x-apple-i-md"]);
+  assert.equal(out.init.headers.get("connection"), "close"); // B498d: the relay's own, a fresh connection for GrandSlam
   assert.equal(out.init.headers.get("user-agent"), "akd/1.0");
   assert.equal(new TextDecoder().decode(out.init.body), "<plist/>");
 
