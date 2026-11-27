@@ -288,6 +288,9 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   Watch apps (`native/sign/Profile.swift` `pinsBundleID`, `native/sign/IPASigner.swift`). The page makes those profiles
   and hands them in (**Extensions' App IDs**, below), so an extension goes in with its app. `native/sign/FreeAppID.swift` refuses an app (`app_id_taken`) when another installed
   or recorded app already has the App ID it would be signed as, since installing would replace that app and its data.
+  A signed copy that is not installed yet holds its App ID too (`native/sign/FreeAppID.swift` `claims`) until it is installed,
+  fails to install, is discarded, or expires after 30 minutes, so the app queue, which signs the next app before the first is
+  installed, refuses a second app with the same App ID. Claims are kept in memory only.
   iFizBox updating itself
   and re-signing the same app are allowed. Re-sign refuses (`app_id_mismatch`) an app installed under another bundle
   ID, which would otherwise install a second copy. iOS 27 can't say whether an app is installed, so a recorded one counts
