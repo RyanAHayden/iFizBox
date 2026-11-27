@@ -4,10 +4,17 @@ from source with only the features the route uses, the bridge registers every ca
 jailbreak build, and (where native/build.sh has built the app) the executable carries idevice statically."""
 import os
 import re
+import shutil
+import subprocess
+import sys
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 NATIVE = os.path.normpath(os.path.join(HERE, "..", ".."))
+sys.path.insert(0, NATIVE)
+
+from test_sign import toolchain  # noqa: E402
+import disktmp  # noqa: E402
 
 
 def read(*p):
@@ -239,6 +246,92 @@ class HandedPairing(unittest.TestCase):
         self.assertIn('static let handedName = "pairingFile.plist"', read("IDeviceBridge.swift"))
         with open(os.path.join(NATIVE, "..", "worker", "src", "setup.js")) as f:
             self.assertIn('"Documents/pairingFile.plist"', f.read())
+
+
+# Security's Keychain calls over a dictionary, one pairing per account; `refuse` is what a write answers instead.
+KEYCHAIN_STANDIN = """
+import Foundation
+typealias CFDictionary = NSDictionary
+typealias CFTypeRef = AnyObject
+typealias OSStatus = Int32
+let errSecSuccess: OSStatus = 0, errSecDuplicateItem: OSStatus = -25299, errSecItemNotFound: OSStatus = -25300
+let kSecClass = "class", kSecClassGenericPassword = "genp", kSecAttrService = "svce", kSecAttrAccount = "acct"
+let kSecValueData = "v_Data", kSecReturnData = "r_Data"
+let kSecAttrAccessible = "pdmn", kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly = "cku"
+var items: [String: Data] = [:]
+var refuse: OSStatus? = nil
+func account(_ q: CFDictionary) -> String { q[kSecAttrAccount] as! String }
+func SecItemAdd(_ q: CFDictionary, _ out: AnyObject?) -> OSStatus {
+    if let st = refuse { return st }
+    if items[account(q)] != nil { return errSecDuplicateItem }
+    items[account(q)] = (q[kSecValueData] as! Data)
+    return errSecSuccess
+}
+func SecItemUpdate(_ q: CFDictionary, _ value: CFDictionary) -> OSStatus {
+    if items[account(q)] == nil { return errSecItemNotFound }
+    if let st = refuse { return st }
+    items[account(q)] = (value[kSecValueData] as! Data)
+    return errSecSuccess
+}
+func SecItemDelete(_ q: CFDictionary) -> OSStatus {
+    return items.removeValue(forKey: account(q)) == nil ? errSecItemNotFound : errSecSuccess
+}
+func SecItemCopyMatching(_ q: CFDictionary, _ out: inout CFTypeRef?) -> OSStatus {
+    guard let d = items[account(q)] else { return errSecItemNotFound }
+    out = d as NSData
+    return errSecSuccess
+}
+"""
+
+KEYCHAIN_CASES = """
+let old = Data("old".utf8), new = Data("new".utf8)
+func check(_ ok: Bool, _ what: String) { if !ok { print("failed: \\(what)"); exit(1) } }
+func save(_ d: Data, _ k: IDevice.Kind) -> Bool { do { try IDevice.savePairing(d, kind: k); return true } catch { return false } }
+for (had, saved) in [(IDevice.Kind.remotePairing, IDevice.Kind.lockdown), (.lockdown, .remotePairing),
+                     (.remotePairing, .remotePairing), (.lockdown, .lockdown)] {
+    let what = "\\(had) then \\(saved)"
+    items = [:]; refuse = nil
+    check(save(old, had), "first save, " + what)
+    refuse = -34018
+    check(!save(new, saved), "a refused save throws, " + what)
+    check(items == [had.rawValue: old], "a refused save leaves the old pairing, " + what)
+    check(IDevice.pairing()?.data == old, "the old pairing is still read, " + what)
+    refuse = nil
+    check(save(new, saved), "a save, " + what)
+    check(items == [saved.rawValue: new], "one pairing at a time, " + what)
+    check(IDevice.pairing()?.kind == saved, "the new pairing is read, " + what)
+}
+print("all passed")
+"""
+
+
+@unittest.skipUnless(toolchain(), "no Swift toolchain (SWIFT_TOOLCHAIN or swiftc on PATH): pairing save not tested")
+class SavePairing(unittest.TestCase):
+    # B507: the real savePairing, pairing and deletePairing, built on Linux over a stand-in Keychain.
+    def test_a_refused_save_keeps_the_old_pairing(self):
+        src = read("IDevice.swift")
+        part = src[src.index("    enum Kind: String"):src.index("    static func isLockdownRecord")]
+        tmp = disktmp.build_dir("ifizbox-savepairing-")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        main = os.path.join(tmp, "main.swift")
+        with open(main, "w") as f:
+            f.write(KEYCHAIN_STANDIN
+                    + "enum IDevice {\n    struct Failure: Error { let code: String, text: String }\n"
+                    + part + "}\n" + KEYCHAIN_CASES)
+        env = disktmp.swift_env(dict(os.environ), tmp)
+        # The ubuntu toolchain wants libncurses.so.6; Arch has only the wide one (as native/build.sh does).
+        if os.path.exists("/usr/lib/libncursesw.so.6") and not os.path.exists("/usr/lib/libncurses.so.6"):
+            shim = os.path.join(tmp, "libshim")
+            os.makedirs(shim)
+            os.symlink("/usr/lib/libncursesw.so.6", os.path.join(shim, "libncurses.so.6"))
+            env["LD_LIBRARY_PATH"] = ":".join(p for p in (shim, env.get("LD_LIBRARY_PATH")) if p)
+        binary = os.path.join(tmp, "savepairing")
+        r = subprocess.run([toolchain(), "-swift-version", "5", "-module-cache-path", os.path.join(tmp, "modules"),
+                            main, "-o", binary], capture_output=True, text=True, env=env, timeout=600)
+        self.assertEqual(r.returncode, 0, (r.stdout + r.stderr)[-4000:])
+        out = subprocess.run([binary], capture_output=True, text=True, env=env, timeout=300)
+        self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
+        self.assertIn("all passed", out.stdout)
 
 
 class Built(unittest.TestCase):
