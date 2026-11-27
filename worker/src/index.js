@@ -56,6 +56,7 @@ import { account, isAccountPath } from "./account.js";
 import { readIpaInfo, IpaError } from "./ipainfo.js";
 import { reviews, isReviewsPath } from "./reviews.js";
 import { installs, isInstallsPath } from "./installs.js";
+import { appLookupBatch } from "./applookup.js"; // F455
 import { reports, isReportsPath } from "./reports.js";
 import { udid, isUdidPath } from "./udid.js";
 import { appleRelay, isApplePath } from "./apple-relay.js";
@@ -903,6 +904,7 @@ export default {
 
     if (u.pathname === "/api/fetch" && req.method === "GET") return apiFetch(u, uploadCap(env), env.GITHUB_TOKEN ?? null, env, req.headers.get("Range"));
     if (u.pathname === "/api/applookup" && req.method === "GET") return appLookup(u, env, { fetcher: env.FETCH });
+    if (u.pathname === "/api/applookup-batch" && req.method === "GET") return appLookupBatch(u, env, { fetcher: env.FETCH }); // F455
     if (u.pathname === "/api/appreviews" && req.method === "GET") return appReviews(u, env, { fetcher: env.FETCH }); // B37
     if (u.pathname === "/api/ipainfo" && req.method === "GET") return ipaInfo(u, env, { fetcher: env.FETCH }); // F160
     if (u.pathname === "/repo" || u.pathname.startsWith("/repo/")) return repo(req, u, env);

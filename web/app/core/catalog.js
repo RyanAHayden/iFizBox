@@ -206,9 +206,11 @@ export function mergeCategories(rows, { jailbroken = true } = {}) {
 // count), the most installed first; 3) the rest: rated first (F450), then by how many sources list them, then the
 // newest update (`date`, epoch ms; AltStore versions carry one, APT packages don't), then by name. At most `limit`.
 export const MIN_TIER = 5;
-const tierOf = (i) => (Number(i.rating?.count) > MIN_TIER ? 1 : Number(i.installs) > MIN_TIER ? 2 : 3);
+// F455: between 2 and the rest, 3) apps with an App Store rating (`store` { avg, count }), by average then count.
+const tierOf = (i) => (Number(i.rating?.count) > MIN_TIER ? 1 : Number(i.installs) > MIN_TIER ? 2 : i.store ? 3 : 4);
 export function rankPopular(items, limit = 50) {
   return [...items].sort((a, b) => tierOf(a) - tierOf(b) || (tierOf(a) === 2 ? Number(b.installs) - Number(a.installs) : 0)
+    || (tierOf(a) === 3 ? compareRatings(a.store, b.store) : 0)
     || compareRatings(a.rating, b.rating) || b.sources - a.sources
     || (b.date ?? 0) - (a.date ?? 0) || compareNames(a.row, b.row)).slice(0, limit);
 }
@@ -999,11 +1001,12 @@ export function createCatalog() {
   // The date popular() and refine()'s newest rank by: the candidate's AltStore version date; APT has none.
   const dateOf = (id) => entries(ALL).get(id)?.stanza.ipa?.versions?.[0]?.date ?? null;
 
-  function popular({ limit = 50, ratings = null, installs = null } = {}) {
+  function popular({ limit = 50, ratings = null, installs = null, store = null } = {}) {
     const lists = [...sources].filter(([k]) => counts(k)).map(([, { byId }]) => byId);
     const items = visibleOf(ALL).map((row) => ({
       row, sources: lists.reduce((n, byId) => n + (byId.has(row.id) ? 1 : 0), 0),
       date: dateOf(row.id), rating: ratingOf(ratings, row.id), installs: installs?.[row.id] ?? 0,
+      store: entries(ALL).get(row.id)?.app ? ratingOf(store, row.id.toLowerCase()) : null, // F455: IPA apps only
     }));
     return rankPopular(items, limit).map(({ row, sources: n }) => ({ ...slim(row), sources: n }));
   }

@@ -47,6 +47,27 @@ export function workerLookupUrl(bundleId, c = "us", base = "") {
   return `${base}/api/applookup?${new URLSearchParams({ bundleId: str(bundleId), country: country(c) })}`;
 }
 
+// F455: many apps' App Store stars at once (Popular's third tier). The Worker's /api/applookup-batch on the site, Apple
+// directly (the same comma-separated bundleId list) in the app; at most BATCH ids a request.
+export const BATCH = 100;
+export function batchLookupUrl(ids, c = "us", { base = "", direct = false } = {}) {
+  const list = [...new Set((ids ?? []).map(str))].filter((x) => BUNDLE.test(x)).slice(0, BATCH);
+  if (!list.length) return null;
+  return direct ? `https://itunes.apple.com/lookup?${new URLSearchParams({ bundleId: list.join(","), country: country(c) })}`
+    : `${base}/api/applookup-batch?${new URLSearchParams({ bundleIds: list.join(","), country: country(c) })}`;
+}
+// A batch answer (JSON or text) -> { <bundle id as asked, lower case>: [average, count] }, the rated ones only.
+export function parseBatch(input) {
+  let json = input;
+  if (typeof input === "string") { try { json = JSON.parse(input); } catch { return {}; } }
+  const out = {};
+  for (const r of Array.isArray(json?.results) ? json.results : []) {
+    const avg = Number(r?.averageUserRating);
+    if (typeof r?.bundleId === "string" && Number.isFinite(avg) && avg > 0) out[r.bundleId.toLowerCase()] = [Math.min(5, avg), Number(r.userRatingCount) || 0];
+  }
+  return out;
+}
+
 // The device's region from its locale ("en-GB" -> "gb", "zh-Hant-TW" -> "tw"); "us" when it names none.
 export function regionOf(locale) {
   const parts = str(locale).replace(/_/g, "-").split("-").slice(1);
