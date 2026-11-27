@@ -351,3 +351,10 @@ _Said_: Refresh
 _On screen_: Refreshing Apps
 _In code_: signing.refresh, ProfileRefresh, refreshApps
 _Avoid_: profile renewal pass
+
+**Phone Setup**:
+The free Apple ID route's first install with no computer (iOS 27): the setup command run on the iPhone itself, in the Open Minis app, pairs through Developer Mode and installs through LocalDevVPN
+_Said_: No-computer first install
+_On screen_: Install Without a Computer
+_In code_: core::phone, tools/setup/core/src/phone.rs, tools/setup/cli/src/minis.rs
+_Avoid_: helper, BariStore route

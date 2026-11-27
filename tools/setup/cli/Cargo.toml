@@ -20,6 +20,13 @@ serde_json = "1"
 sha2 = "0.10"
 uuid = { version = "1", features = ["v4"] }
 
+# F465: Phone Setup (src/minis.rs, in Open Minis on the iPhone) is Linux only.
+[target.'cfg(target_os = "linux")'.dependencies]
+idevice = { git = "https://github.com/jkcoxson/idevice.git", rev = "2dca9a58a9a1dd02ec7d6213fcfd8fe861e74132", default-features = false, features = [
+  "ring", "remote_pairing", "rsd", "tunnel_tcp_stack",
+] }
+tokio = { version = "1", features = ["net", "process", "time"] }
+
 [profile.release]
 opt-level = "z"
 lto = true

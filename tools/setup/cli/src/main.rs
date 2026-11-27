@@ -18,6 +18,9 @@ use ifizbox_setup_core as core;
 use ifizbox_setup_core::{DevError, Device, DeviceInfo, Downloaded, Lookup, Net, NetError, PairError, PairingTarget, Ui};
 use sha2::{Digest, Sha256};
 
+#[cfg(target_os = "linux")]
+mod minis; // F465: Phone Setup, in Open Minis on the iPhone
+
 const NAME: &str = env!("BRAND_NAME");
 const DOMAIN: &str = env!("BRAND_DOMAIN");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -403,7 +406,16 @@ fn main() {
             finish(&mut ui, r);
         }
         Ok(core::Cmd::Run(a)) => {
-            let r = core::run(&a, &b, core::Os::this(), &mut ui, &mut Http::new(a.keep_ipa), &mut Usb::new());
+            let mut net = Http::new(a.keep_ipa);
+            // F465: inside Open Minis the iPhone to set up is this one, so there is no USB side.
+            #[cfg(target_os = "linux")]
+            let r = if minis::inside() {
+                core::phone::run(&a, &b, &mut ui, &mut net, &mut minis::Minis::new())
+            } else {
+                core::run(&a, &b, core::Os::this(), &mut ui, &mut net, &mut Usb::new())
+            };
+            #[cfg(not(target_os = "linux"))]
+            let r = core::run(&a, &b, core::Os::this(), &mut ui, &mut net, &mut Usb::new());
             if !a.keep_ipa {
                 let _ = std::fs::remove_file(std::env::temp_dir().join(format!("{}-setup-{}.ipa", NAME.to_lowercase(), std::process::id())));
             }
