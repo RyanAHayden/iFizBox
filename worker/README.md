@@ -101,7 +101,7 @@ Then put that `https://` address in **Settings > Installation & Signing > Signin
   developerservices2.apple.com's Xcode API and a few public anisette servers, from this site's own pages, with size
   and time caps, and it never logs or keeps what passes through. Off, `/apple/status` and those paths are a 404, and
   the website hides Use a Free Apple ID; ifizbox.com turns it on (`wrangler.ifizbox.toml`). Self-hosted with `node.mjs`, gsa.apple.com needs
-  Apple Root CA (`NODE_EXTRA_CA_CERTS`). Requests to gsa.apple.com ask for a fresh connection (Apple answers a reused one with 5xx): `node.mjs` sends `Connection: close`, but Cloudflare's fetch drops that header, so on ifizbox.com the relay cannot force one.
+  Apple Root CA (`NODE_EXTRA_CA_CERTS`). Requests to gsa.apple.com ask for a fresh connection (Apple answers a reused one with 5xx): `node.mjs` sends `Connection: close`, but a Cloudflare Worker's runtime drops that header, so on ifizbox.com the relay cannot force one.
   `/apple/api.appstoreconnect.apple.com/v1/{devices,certificates,bundleIds,bundleIdCapabilities,profiles}` is not
   part of it and passes through **even with `APPLE_RELAY` off**: the website's own provisioning profiles with your
   App Store Connect API key (`web/app/core/asc.js`; Apple sends no CORS headers). Only for that host the

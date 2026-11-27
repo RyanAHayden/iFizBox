@@ -17,8 +17,10 @@ Three details from BariStore (`AGENTS.md` "Apple sign-in", `src/apple/gsa.rs`, `
 - Local workerd 1.20261127.1: drops the `Connection` header and reuses one socket for 3 requests, with and without it.
 - So on ifizbox.com (Cloudflare) the relay cannot force fresh connections through `fetch()`. The only way found is `cloudflare:sockets` with hand-written HTTP/1.1. Not done: no 5xx has been tied to reuse on the hosted relay.
 
+- Live probe 2026-11-27 (`resync.mjs`, made-up address, no password, Apple's root CA in `NODE_EXTRA_CA_CERTS`): `win.ani.sidestore.io` answered HTTP 502 twice, so its 434 was not seen. `new.ani.sidestore.io`, the control, got init `ec -20970 hsc 200`.
+
 ## Not verified
-- No live sign-in against Apple (needs an account and 2FA). The 434 resync was tested only against a fake, not a real Windows-library server.
+- No live sign-in against Apple (needs an account and 2FA). The 434 resync was tested only against a fake: the real Windows-library server was down (502).
 - Cloudflare production egress connection reuse: only local workerd was measured.
 - The native one-off session on a device: compiled by the gate's native build only.
 - Whether URLSession opens a new TCP connection per session on iOS: documented behaviour (each session has its own connection pool), not measured.
