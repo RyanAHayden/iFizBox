@@ -180,12 +180,15 @@ export async function followInstall(_native, bundleId, h, { later = setTimeout, 
 
 // The sheet itself. `onSign(edits)` with { name, bundleId, icon (base64 PNG | null), removeExtensions: [path] }.
 // Returns the sheet's close().
-function openSignSheet(info, { onSign, onClose = () => {}, fallbackName = "" } = {}) {
+export function openSignSheet(info, { onSign, onClose = () => {}, fallbackName = "" } = {}) {
   style();
   const app = info?.app ?? {};
   // F237: keepBundleId, the Keep Bundle ID switch below, starts as the global setting (inspect echoes what it got)
   const keep0 = typeof info?.keepBundleId === "boolean" ? info.keepBundleId : storedKeep();
-  const edits = { name: app.name || fallbackName, bundleId: signsAsFor(info, keep0), icon: null, removeExtensions: [], keepBundleId: keep0 };
+  // B502a2: a free Apple ID's profile (pinned): iOS installs the app only as its App ID, so there's no choice to show or send
+  const pinned = info?.pinned === true;
+  const edits = { name: app.name || fallbackName, bundleId: signsAsFor(info, pinned ? undefined : keep0), icon: null, removeExtensions: [],
+    ...(pinned ? {} : { keepBundleId: keep0 }) };
   const box = el("div", "sheet-scroll page-body grouped sign-sheet");
 
   // The head: the icon, the name and what it signs as, like an App Store page's top.
@@ -304,7 +307,7 @@ function openSignSheet(info, { onSign, onClose = () => {}, fallbackName = "" } =
     onClick: () => { close(); if (globalThis.location) globalThis.location.hash = keepGuideHref().replace(/^#/, ""); } });
   const kfoot = el("p", "group-footer", "");
   kg.append(kul, kfoot);
-  box.append(kg);
+  if (!pinned) box.append(kg);
   let orig = { installed: false, ours: false };
   function drawKeep() {
     const { notes, guide } = sheetNotes(info, { keep: edits.keepBundleId, ...orig, name: edits.name || app.name });
@@ -314,7 +317,7 @@ function openSignSheet(info, { onSign, onClose = () => {}, fallbackName = "" } =
     else if (!guide && guideLi.parentNode) guideLi.remove();
   }
   drawKeep();
-  originalState(nativeBridge(), app.bundleId).then((s) => { orig = s; drawKeep(); }, () => {});
+  if (!pinned) originalState(nativeBridge(), app.bundleId).then((s) => { orig = s; drawKeep(); }, () => {});
 
   box.append(grouped(inspectGroups(info)));
   // The missing group's rows are a warning: red, as Settings' warnings are.

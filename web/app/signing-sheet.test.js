@@ -3,8 +3,8 @@
 // the re-sign reminder call. A fake ifizboxNative stands in for native/Sources/Sideload.swift.
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { fakeNative } from "./fakes.test-helper.js";
-import { inspectAndInstall, followInstall } from "./signing-sheet.js";
+import { fakeNative, withDocument, tick } from "./fakes.test-helper.js";
+import { inspectAndInstall, followInstall, openSignSheet } from "./signing-sheet.js";
 import { installOnDevice } from "./signing-client.js";
 import { progressHUD } from "./nav/progress.js";
 import {
@@ -233,4 +233,32 @@ test("Re-sign Reminder: shown in the sideload build, and its value goes to signi
   assert.deepEqual(native.calls.map((c) => c.params), [{ days: 2 }, { days: 7 }, { days: 0 }]);
   assert.equal(await syncReminder(s.get, null), null);
   assert.equal(await syncReminder(s.get, async () => { throw new Error("unknown method"); }), null);
+});
+
+test("the sheet on a free Apple ID's profile (pinned): no Keep Bundle ID switch or notes, and no keepBundleId sent", async () => {
+  const as = "com.rileytestut.Delta.TEAM123456";
+  const free = { ...INFO, pinned: true, keepBundleId: false, signsAs: as, appIdAs: as, profileAppId: as };
+  const draw = (info) => withDocument(async (doc) => {
+    const signed = [];
+    openSignSheet(info, { onSign: (e) => signed.push(e) });
+    await tick();
+    const labels = doc.body.querySelectorAll(".cell-label").map((n) => n.textContent);
+    const footers = doc.body.querySelectorAll(".group-footer").map((n) => n.textContent).join(" ");
+    const keep = doc.body.querySelectorAll(".ss-keep").length;
+    await doc.body.querySelector(".ss-install").click();
+    for (let i = 0; i < 5; i++) await tick();
+    return { labels, footers, keep, edits: signed[0] };
+  });
+  const pinned = await draw(free);
+  assert.equal(pinned.keep, 0);
+  assert.ok(!pinned.labels.includes("Keep Bundle ID"));
+  assert.doesNotMatch(pinned.footers, /original|keeps its own ID|notifications/i);
+  assert.equal(pinned.edits.bundleId, as);
+  assert.equal("keepBundleId" in pinned.edits, false);
+  assert.deepEqual(installParams(free, pinned.edits), { token: "tok1" });
+  // any other profile keeps the switch and sends it
+  const other = await draw({ ...INFO, pinned: false, keepBundleId: true });
+  assert.equal(other.keep, 1);
+  assert.ok(other.labels.includes("Keep Bundle ID"));
+  assert.equal(other.edits.keepBundleId, true);
 });
