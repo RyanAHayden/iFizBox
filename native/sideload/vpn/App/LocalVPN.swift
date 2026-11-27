@@ -666,9 +666,18 @@ enum LocalVPN {
     /// stays on through them, and goes off `linger` seconds after the last one.
     static func installBegan() { lock.lock(); installs += 1; lock.unlock(); beat() }
     /// cancelled: the install ended on Cancel (B490): no linger, so a back run owed follows at once.
-    static func installEnded(cancelled: Bool = false) {
+    /// B494: finished the same: the last install of the queue (nothing else waiting or signing) takes ours down at once,
+    /// so the back run starts as the finished button shows. The linger stays while another install is queued.
+    static func installEnded(cancelled: Bool = false, finished: Bool = false) {
         lock.lock(); installs = max(0, installs - 1); lock.unlock()
-        stopLater(cancelled: cancelled)
+        stopLater(cancelled: cancelled || (finished && !othersQueued()))
+    }
+
+    /// Another install waits (a pause) or another app's job goes on. The ending install's own job still counts until it
+    /// ends, so one job alone is no queue.
+    private static func othersQueued() -> Bool {
+        lock.lock(); let n = pauses; lock.unlock()
+        return n > 0 || SignJob.goingCount > 1
     }
 
     private static func stopLater(cancelled: Bool = false) {
@@ -799,6 +808,7 @@ enum LocalVPN {
 enum LocalVPNBridge {
     static func register(_ b: Bridge) {
         LocalVPN.Path.start()
+        SignJob.onIdle = { RestoreBack.look() } // B494: the last app's job ended: a look it held runs now
         LocalVPN.clearOldKeys()
         CellularShortcutBridge.register(b) // cellular.*
         RestoreShortcutBridge.register(b) // restore.*
