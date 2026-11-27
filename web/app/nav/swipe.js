@@ -99,7 +99,7 @@ export function pageSwipeDecide(dx, dy) {
 export const PAGE_SWIPE_SKIP = [
   "input:not([type=button]):not([type=submit]):not([type=reset]):not([type=checkbox]):not([type=radio]):not([type=file])",
   "textarea", "select", "[contenteditable]:not([contenteditable=false])",
-  ".edge-swipe", ".switch", ".roulette-wheel", ".section-index", ".theme-preview-grip", ".theme-preview-top",
+  ".edge-swipe", ".list-scope", ".switch", ".roulette-wheel", ".section-index", ".theme-preview-grip", ".theme-preview-top",
   ".crop-stage", ".shot-zoom", '[aria-modal="true"]', '[role="dialog"]', '[role="alertdialog"]',
 ].join(", ");
 
