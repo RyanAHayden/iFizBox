@@ -52,6 +52,8 @@ import { signedIndex } from "../core/signing.js"; // B358
 import { NAME } from "../brand.js"; // B358
 import { IdSet } from "../core/apt.js"; // B411
 import { load as loadLazy } from "../lazy.js"; // B462: Sources' refreshInBackground for Refresh
+import { showReloadFailure } from "../nav/reloadbar.js"; // F456
+import { refreshFailures } from "../core/refreshfailures.js"; // F456
 
 export const title = "Changes";
 
@@ -459,6 +461,8 @@ async function autoHttpNow(upgrades) {
   return autoHttpIds(upgrades?.available, sources, { autoInstall, marked: (id) => Boolean(settings.autoMarked?.has(id)) });
 }
 
+const listFailure = (e) => ({ title: "Changes", detail: e?.message || String(e) });
+
 async function load() {
   const seq = ++state.seq;
   let groups, upgrades, installed, resign, vendorSold, autoHttp;
@@ -472,12 +476,8 @@ async function load() {
     autoHttp = await autoHttpNow(upgrades).catch(() => new Set()); // B192
   } catch (e) {
     if (seq !== state.seq) return;
-    for (const v of views.all()) {
-      if (!v.note) continue;
-      v.ph?.remove();
-      v.note.textContent = e.message;
-      v.note.hidden = false;
-    }
+    for (const v of views.all()) v.ph?.remove();
+    showReloadFailure([listFailure(e)]); // F456: in the bar, never raw text on the page; the last list stays
     return;
   }
   if (seq !== state.seq) return;
@@ -558,7 +558,7 @@ async function refresh(ctx) {
 // (false too when the bar's Cancel stopped it).
 export async function refreshInBar(ctx, { background = (c) => loadLazy("sources").then((m) => m.refreshInBackground(c)),
   settled = () => import("./home.js").then((m) => m.untilRefreshed()),
-  reload = async () => { if (catalog.statusSource() === "native") await catalog.reloadInstalled(); await load(); }, alert = showAlert } = {}) {
+  reload = async () => { if (catalog.statusSource() === "native") await catalog.reloadInstalled(); await load(); }, failed = showReloadFailure } = {}) {
   if (state.busy) return false;
   state.busy = true;
   try {
@@ -567,8 +567,8 @@ export async function refreshInBar(ctx, { background = (c) => loadLazy("sources"
     await reload();
     return true;
   } catch (e) {
-    // a source that failed shows on its row and in the bar's banner (sources.js bannerFailed); this is the list reload
-    await alert({ title: "Error", message: e?.message || String(e), buttons: ["OK"] });
+    // a source that failed shows on its row and in the reload bar (sources.js); this is the list reload
+    failed([listFailure(e)]);
     return false;
   } finally {
     state.busy = false;
@@ -579,17 +579,18 @@ export async function refreshInBar(ctx, { background = (c) => loadLazy("sources"
 // unlocked (websign-gate.js refreshSourcesNow / refreshOnLaunch): the enabled sources refreshed (this device's
 // filter), the Reloading Data HUD over it, then the lists reloaded. One at a time: a call while one runs does
 // nothing. -> true when it ran
-export async function reloadSources({ hud = state.ctx?.showHUD ?? showHUD, backend = () => getBackend(), alert = showAlert,
+export async function reloadSources({ hud = state.ctx?.showHUD ?? showHUD, backend = () => getBackend(), failed = showReloadFailure,
   reload = async () => { if (catalog.statusSource() === "native") await catalog.reloadInstalled(); await load(); } } = {}) {
   if (state.busy) return false;
   const hide = hud("Reloading Data");
   state.busy = true;
   try {
-    await backend().refreshSources(undefined, { filter: sourceFilter(settings.deviceType()) }); // F41
+    const rows = await backend().refreshSources(undefined, { filter: sourceFilter(settings.deviceType()) }); // F41
     await reload();
+    const bad = refreshFailures(rows); // F456
+    if (bad.length) failed(bad);
   } catch (e) {
-    hide();
-    await alert({ title: "Error", message: e.message, buttons: ["OK"] });
+    failed([listFailure(e)]);
   } finally {
     hide();
     state.busy = false;

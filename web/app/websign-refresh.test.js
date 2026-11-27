@@ -79,11 +79,16 @@ test("reloadSources: Changes' Refresh job, one at a time, HUD shown and hidden",
   assert.equal(reloaded, 1);
 });
 
-test("reloadSources: an error shows the Error alert and frees the job", async () => {
-  const alerts = [];
+test("reloadSources: an error, or a source that failed, goes to the reload bar and frees the job", async () => {
+  const bad = [];
+  const failed = (f) => bad.push(...f);
   const backend = () => ({ refreshSources: async () => { throw new Error("offline"); } });
-  await reloadSources({ hud: () => () => {}, backend, alert: async (a) => { alerts.push(a); }, reload: async () => {} });
-  assert.equal(alerts[0]?.message, "offline");
+  await reloadSources({ hud: () => () => {}, backend, failed, reload: async () => {} });
+  assert.equal(bad[0]?.detail, "offline");
+  bad.length = 0;
+  await reloadSources({ hud: () => () => {}, failed, reload: async () => {},
+    backend: () => ({ refreshSources: async () => [{ key: "a", name: "Repo A", error: "HTTP 404" }, { key: "b", name: "Repo B", error: null }] }) });
+  assert.deepEqual(bad, [{ title: "Repo A", detail: "HTTP 404" }]);
   let ran = 0;
   assert.equal(await reloadSources({ hud: () => () => {}, backend: () => ({ refreshSources: async () => { ran++; } }), reload: async () => {} }), true);
   assert.equal(ran, 1);

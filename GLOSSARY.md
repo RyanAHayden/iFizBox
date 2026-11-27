@@ -325,3 +325,10 @@ _Said_: Connect Through, LocalDevVPN choice
 _On screen_: This iPhone > Connect Through: iFizBox VPN / LocalDevVPN
 _In code_: vpn.setVia, vpn.via, LocalVPN.viaApp, viaApp, canConnect, ownVPN, routeVPN
 _Avoid_: connect with, route, external VPN
+
+**Reload Bar**:
+The strip above the tab bar that says what a refresh is doing, and where a failure with no page of its own is told, with Show Info for the log
+_Said_: the toast, the bottom bar
+_On screen_: Updating Sources; Some sources couldn't be updated.; Cancel; Show Info
+_In code_: nav/reloadbar.js, showReloadBar, showReloadFailure, .reload-bar
+_Avoid_: toast
