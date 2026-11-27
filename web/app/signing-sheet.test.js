@@ -4,7 +4,7 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { fakeNative, withDocument, tick } from "./fakes.test-helper.js";
-import { inspectAndInstall, followInstall, openSignSheet } from "./signing-sheet.js";
+import { inspectAndInstall, inspectToQueue, followInstall, openSignSheet } from "./signing-sheet.js";
 import { installOnDevice } from "./signing-client.js";
 import { progressHUD } from "./nav/progress.js";
 import {
@@ -297,4 +297,12 @@ test("B511: pinned, before the app's App ID is made: the row and footer say <bun
   assert.equal(there.id, held);
   assert.ok(there.footers.includes(`Your profile signs it as ${held}.`));
   assert.deepEqual(there.sent, { token: "tok1" });
+  // the queue's job is told the same ID, and sends no bundleId either
+  let job = null;
+  const sheet = (shown, { onSign }) => { setTimeout(() => onSign({ bundleId: shown.signsAs }), 0); return () => {}; };
+  const ui = fakeUI();
+  await inspectToQueue({ url: "https://e.com/d.ipa", queue: (o) => { job = o; } },
+    { native: fakeNative({ "signing.inspect": info, "signing.installed": { apps: [] } }), hud: ui.hud, alert: ui.alert, sheet });
+  assert.equal(job.signsAs, own);
+  assert.deepEqual(job.edits, {});
 });

@@ -52,7 +52,7 @@ export async function withRealId(info, native) {
   if (info?.pinned !== true || !own || !held || own.toLowerCase() === held.toLowerCase()) return info;
   const { staysOnHeld } = await import("./signing/freeappid.js");
   if (await staysOnHeld(native, { appId: held }, info.app?.bundleId)) return info;
-  return { ...info, signsAs: own, appIdAs: own };
+  return { ...info, signsAs: own };
 }
 
 export async function inspectAndInstall({ url, name = "", onInstalled = () => {}, listed = null },
