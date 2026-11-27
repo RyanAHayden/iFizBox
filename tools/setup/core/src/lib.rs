@@ -263,7 +263,7 @@ const HANDED_PAIRING: &str = "Documents/pairingFile.plist";
 fn import_hint(brand: &Brand, l: &Lookup, p: &PairingTarget) -> String {
     let (app, path) = (&l.name, p.path.as_str());
     if *app == brand.name && p.bundle_id == l.bundle_id && path == HANDED_PAIRING {
-        return format!("Put a pairing file in {app}. {app} picks it up when you open it, so there's nothing to import.");
+        return format!("Wrote a pairing file to {app}. {app} picks it up when you open it, so there's nothing to import.");
     }
     // Only a path under Documents has a place in the Files app to name.
     let place = match path.strip_prefix("Documents/") {
