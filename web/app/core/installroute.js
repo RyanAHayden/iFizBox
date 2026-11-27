@@ -52,14 +52,13 @@ export function connectFooter(st) {
 // This iPhone is set up: paired, and the way in tested once (vpn.test). Using it waits for that.
 export const iphoneSetUp = (st) => Boolean(st?.paired) && canConnect(st) && Boolean(st.vpn.tested);
 // F368: on cellular iOS refuses the connects an install needs, so the install waits for Wi-Fi or Airplane Mode (LocalVPN.swift
-// waitOffCellular). AIRPLANE_ON: the wait; AIRPLANE_OFF: the connection is open; CELL_LINE: a failed check there.
+// waitOffCellular). AIRPLANE_ON: the wait; CELL_LINE: a failed check there.
 export const AIRPLANE_ON = "Waiting to leave cellular data";
 export const AIRPLANE_ASK = "Join Wi-Fi or turn on Airplane Mode"; // F417: where no popup says it (Re-sign's own page)
 // B423: a wait paused because the app is in the background (LocalVPN.swift pause)
 export const APP_WAIT = `Waiting for ${NAME}`;
 // opened again with no network (Airplane Mode went on meanwhile): iOS starts no VPN without one
 export const NETWORK_WAIT = "Turn Airplane Mode off for a moment";
-export const AIRPLANE_OFF = "You can turn Airplane Mode off";
 export const CELL_LINE = "On cellular, check on Wi-Fi.";
 // B428a: a check can't connect there, so it doesn't try (and one that was refused and ends there says the same): no
 // Fix, no Pair Again, not kept as a Route Failure. Not set up yet: the test that finishes it is named.
@@ -590,10 +589,3 @@ export function rememberFailed(code) {
 }
 export const setRestoreVPN = (native, on) => native.call("vpn.setRestore", { on: Boolean(on) });
 
-// F415: iOS checks a new or regenerated provisioning profile online on an app's first launch; with no network then (or
-// one changing) it shows "Unable to Verify App" (R96). No app can run that check ahead, so every signed install's end
-// says what to do, as a grey line with no button (nav/progress.js page.help). An app run's: core/apprun.js firstLaunchHint.
-export const FIRST_LAUNCH_HINT = "If the first launch says Unable to Verify App, turn Airplane Mode off, make sure you're online, tap Cancel and open the app again.";
-export function sayFirstLaunch(page, text = FIRST_LAUNCH_HINT) {
-  if (text) page?.help?.(text, { label: "" });
-}

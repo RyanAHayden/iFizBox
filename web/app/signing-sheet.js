@@ -16,7 +16,6 @@
 //
 // The bridge comes from native.js nativeBridge(); an older shell without signing.inspect installs straight away as before.
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { sayFirstLaunch } from "./core/installroute.js"; // F415
 import { showSheet } from "./nav/sheet.js";
 import { showAlert } from "./nav/alert.js";
 import { liveHUD } from "./nav/hud.js";
@@ -174,7 +173,6 @@ export async function followInstall(_native, bundleId, h, { later = setTimeout, 
   h.set(SENT_TO_IOS);
   const cause = notLandedText(name, device);
   if (cause) h.page?.help?.(cause, { action: help });
-  sayFirstLaunch(h.page); // F415
   if (typeof h.finish === "function") h.finish({ status: SENT_TO_IOS });
   else later(h.hide, 1200);
   return null;

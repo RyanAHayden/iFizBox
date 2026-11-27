@@ -48,8 +48,6 @@ import { appRows, createAppRun, rowStatus, helperRow, summaryLine, runStatus, ru
 import { recordWhen } from "../core/apprun.js"; // B136
 import { HERE_PARALLEL } from "../core/apprun.js"; // F359
 import { selfClosing, promptUp } from "../core/apprun.js"; // F430
-import { firstLaunchHint } from "../core/apprun.js"; // F415
-import { sayFirstLaunch } from "../core/installroute.js"; // F415
 import { listedOf } from "../core/appqueue.js"; // F400
 import { apps as appStore, undoRecord } from "../core/installed.js"; // B170
 import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, HERE_CLOSING_LINE, waitHints } from "../signing/selfupdate.js";
@@ -539,10 +537,7 @@ export async function runAppRun(jobs, deps) {
     return { label: USE_SERVER, action: go };
   }
 
-  const sumUp = (text, hint) => {
-    summary.textContent = text;
-    if (hint) summary.append(el("div", "qr-hint", hint));
-  };
+  const sumUp = (text) => { summary.textContent = text; };
 
   async function end(wasCancel) {
     for (const r of rows) draw(r);
@@ -550,11 +545,9 @@ export async function runAppRun(jobs, deps) {
     const installed = rows.filter((r) => r.state === "installed");
     const bad = rows.filter((r) => r.state === "failed" || r.state === "cancelled");
     const text = summaryLine(rows);
-    const hint = wasCancel ? null : firstLaunchHint(rows); // F415: under the Apps list's summary, and in the Log
-    sumUp(text, hint);
+    sumUp(text);
     summary.hidden = false;
     line("step", text);
-    sayFirstLaunch(page, hint);
     const result = { ok: !bad.length, stopped: wasCancel, rows, installed: installed.length };
     if (!first) first = result;
     latest = result;
@@ -649,7 +642,7 @@ export async function runAppRun(jobs, deps) {
       line("error", SELF_UPDATE_FAILED[s], self.id);
       if (!giveBack(DIDNT_DOWNLOAD)) return byHand();
       const now = summaryLine(rows);
-      sumUp(now, firstLaunchHint(rows));
+      sumUp(now);
       page.bar({ left: closeB, right: retryAll });
       page.finish({ label: TRY_AGAIN_LABEL, status: now, title: "Not Updated", action: () => { retry(self.id); return true; } });
       comeBack();

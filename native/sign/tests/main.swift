@@ -306,6 +306,26 @@ test("sign with an explicit profile: renamed, extensions removed") {
                      info: f[a + "Info.plist"], resources: f[a + "_CodeSignature/CodeResources"], ents: true)
 }
 
+// B492: Keep Bundle IDs off, a typed bundle ID is the installed one; the profile's own (the sheet's pre-fill) signs the old way
+test("B492: a typed bundle ID is kept under an explicit profile") {
+    let profile = try Profile(try fixture("profile-explicit.mobileprovision"))
+    let out = work.appendingPathComponent("signed-typed.ipa")
+    let s = IPASigner(profile: profile, identity: identity)
+    s.options.keepBundleID = false
+    s.options.bundleID = "com.me.typed"
+    let app = try s.sign(fixtures.appendingPathComponent("rich.ipa"), to: out)
+    check(app.bundleID == "com.me.typed", "typed ID kept: \(app.bundleID)")
+    let f = try entries(out)
+    let info = try PropertyListSerialization.propertyList(from: f["Payload/Fixture.app/Info.plist"]!, format: nil) as? [String: Any]
+    check(info?["CFBundleIdentifier"] as? String == "com.me.typed", "Info.plist has the typed ID")
+    let sig = readSignature(f["Payload/Fixture.app/Fixture"]!)!
+    let e = try PropertyListSerialization.propertyList(from: sig.ents.subdata(in: 8..<sig.ents.count), format: nil) as? [String: Any]
+    check(e?["application-identifier"] as? String == "\(team).com.me.fixture", "entitlements keep the profile's App ID")
+    s.options.bundleID = "com.me.fixture"
+    let same = try s.sign(fixtures.appendingPathComponent("rich.ipa"), to: work.appendingPathComponent("signed-prefilled.ipa"))
+    check(same.bundleID == "com.me.fixture" && same.removed == ["PlugIns/Share.appex"], "pre-filled: the old way \(same.bundleID) \(same.removed)")
+}
+
 // F237 (R25): Keep Bundle IDs, the default. Info.plist and every code signature's identifier keep the app's own IDs;
 // the app and its extension carry the profile's App ID as application-identifier and keychain group.
 test("sign with an explicit profile, bundle ID kept") {

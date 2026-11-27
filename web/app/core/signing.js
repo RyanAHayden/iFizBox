@@ -9,7 +9,7 @@
 //
 // Everything here reads bytes (Uint8Array or ArrayBuffer) and never leaves the phone.
 
-import { AIRPLANE_ASK, AIRPLANE_OFF, AIRPLANE_TIMEOUT, APP_WAIT, NETWORK_WAIT } from "./installroute.js"; // F368
+import { AIRPLANE_ASK, AIRPLANE_TIMEOUT, APP_WAIT, NETWORK_WAIT } from "./installroute.js"; // F368
 import { DOMAIN, SIGN_HOST, NAME, BUNDLE_ID } from "../brand.js";
 import { isAts, ATS_TITLE, atsText, INSECURE_IPA_ALERT, insecureText } from "./insecureipa.js"; // B104
 import { signingPage } from "./signingpage.js"; // C15: the sideload build's page is Installation & Signing
@@ -422,7 +422,7 @@ export function deviceSummary(identity, { now = new Date(), locale, timeZone } =
 export const HANDOFF = "Handing to iOS", UPLOADING = "Uploading";
 const PHASES = { downloading: "Downloading", reading: "Reading", signing: "Signing", installing: "Installing",
   uploading: UPLOADING, handoff: HANDOFF, prompt: "Waiting for iOS",
-  here: "Connecting to this iPhone", airplane: AIRPLANE_ASK, airplaneOff: AIRPLANE_OFF, appWait: APP_WAIT, networkWait: NETWORK_WAIT };
+  here: "Connecting to this iPhone", airplane: AIRPLANE_ASK, airplaneOff: "Connecting to this iPhone", appWait: APP_WAIT, networkWait: NETWORK_WAIT };
 export function phaseLabel(ev) {
   const name = PHASES[ev?.phase];
   if (!name) return null;
