@@ -50,12 +50,15 @@ enum IDevice {
     private static let service = "ifizbox.idevice.pairing"
 
     static func savePairing(_ data: Data, kind: Kind) throws {
-        for k in [Kind.remotePairing, .lockdown] { deletePairing(k) } // one pairing at a time
-        let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
-                                kSecAttrAccount as String: kind.rawValue, kSecValueData as String: data,
-                                kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
-        let st = SecItemAdd(q as CFDictionary, nil)
+        // B507: nothing is deleted first, so a refused save leaves the kept pairing as it was
+        let item: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
+                                   kSecAttrAccount as String: kind.rawValue]
+        let value: [String: Any] = [kSecValueData as String: data,
+                                    kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
+        var st = SecItemUpdate(item as CFDictionary, value as CFDictionary)
+        if st == errSecItemNotFound { st = SecItemAdd(item.merging(value) { $1 } as CFDictionary, nil) }
         guard st == errSecSuccess else { throw Failure(code: "keychain", text: "could not keep the pairing (\(st))") }
+        deletePairing(kind == .remotePairing ? .lockdown : .remotePairing) // one pairing at a time
     }
 
     static func pairing() -> (kind: Kind, data: Data)? {
