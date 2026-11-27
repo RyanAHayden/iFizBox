@@ -69,12 +69,12 @@ async function staysOnHeld(native, held, original) {
 
 export async function withOwnAppId(job, params, sign, { native, discard = () => {}, log = () => {}, alert = null,
   session = liveSession, go = openSigning } = {}) {
-  const held = native?.call ? await pinnedProfile(native) : null;
-  if (!held) return sign();
+  // With no session nothing is asked of the shell first: only its refusal (a free profile's alone) matters.
+  const held = native?.call && await session() ? await pinnedProfile(native) : null;
   let failure = null; // why no profile could be handed in: the reason of a refusal that follows
   const live = async () => {
     const s = await session();
-    return s && s.teamId === held.team ? s : null;
+    return s && s.teamId === held?.team ? s : null;
   };
   const give = async (bundleId, original) => {
     const s = await live();
@@ -96,7 +96,7 @@ export async function withOwnAppId(job, params, sign, { native, discard = () => 
   const listed = typed || known(job?.id);
   // A Re-sign from the record keeps the installed bundle ID: only an app under an App ID of this team has one to renew.
   const resign = Boolean(params?.record);
-  if (listed && (!resign || same(freeAppId(listed, held.team), listed))) await give(listed, known(job?.id) ?? listed);
+  if (held && listed && (!resign || same(freeAppId(listed, held.team), listed))) await give(listed, known(job?.id) ?? listed);
 
   let r;
   try {
@@ -110,7 +110,7 @@ export async function withOwnAppId(job, params, sign, { native, discard = () => 
   }
   // The IPA's own bundle ID isn't the one listed: its App ID, then signed again.
   const real = known(r?.originalBundleId);
-  if (!typed && !resign && real) {
+  if (held && !typed && !resign && real) {
     const want = freeAppId(real, held.team);
     if (!same(want, freeAppId(listed ?? "", held.team)) && !same(r.bundleId, want) && await give(real, real)) {
       discard(r.token);
