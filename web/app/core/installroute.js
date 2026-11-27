@@ -4,9 +4,10 @@
 //             no server, iFizBox updates itself
 // Pure: the decision for one install from the idevice.status answer, the texts, and the pairing page's state.
 import { NAME, DOMAIN } from "../brand.js";
+import { KEYS } from "./storagekeys.js";
 
 export const ROUTE_KEY = "installRoute";
-export const STORAGE_KEY = "ifizbox." + ROUTE_KEY;
+export const STORAGE_KEY = KEYS.installRoute;
 
 // F300: This iPhone first, then the Signing Server (still the default). F372: one line each, as Installation &
 // Signing's rows show them beside the checkmark and the disclosure.
@@ -394,7 +395,7 @@ export function routeFailureOf(err, st = null) {
 
 // Kept in this browser's storage (it outlives a relaunch: the route stays broken until a check passes), and told to
 // the pages on screen with the "ifizbox:route-failure" event.
-export const FAILURE_KEY = "ifizbox.routeFailure";
+export const FAILURE_KEY = KEYS.routeFailure;
 const tell = () => { try { globalThis.dispatchEvent?.(new CustomEvent("ifizbox:route-failure")); } catch { /* no events here */ } };
 export function routeFailure(storage = globalThis.localStorage) {
   try {
@@ -522,7 +523,7 @@ export function serverFallback(err, route = { route: "idevice" }, st = null) {
 // Pair Again before an install fails: at most once a day, at launch or on coming back, and at each launch while a
 // failure is kept. A verify turns the built-in VPN on, which takes another VPN off and may not bring it back, so it
 // runs only where that can't hurt (quietCheckAllowed). screens/installroute.js quietPairingCheck runs it.
-export const QUIET_KEY = "ifizbox.quietPairingCheck"; // when the last one ran (ms)
+export const QUIET_KEY = KEYS.quietPairingCheck; // when the last one ran (ms)
 export const QUIET_EVERY = 24 * 60 * 60 * 1000;
 export function quietCheckDue({ launch = false, storage = globalThis.localStorage, now = Date.now() } = {}) {
   if (launch && routeFailure(storage)) return true;
@@ -554,7 +555,7 @@ export const restoreShown = (st) => ownVPN(st) && typeof st.vpn.restore === "boo
 // F420: what is left to do before the Shortcut can bring the VPN back. Shortcuts never says whether it was added, so the
 // page keeps it (`kept`): "0" a run didn't find it, "1" added since the last store run that passed, "2" that run passed;
 // null: never kept, so vpn.remembered alone says. "" once nothing is left, or the shell doesn't say `remembered`.
-export const RESTORE_KEY = "ifizbox.restoreShortcut";
+export const RESTORE_KEY = KEYS.restoreShortcut;
 export function restoreKept(storage = globalThis.localStorage) {
   try { const v = storage?.getItem(RESTORE_KEY); return ["0", "1", "2"].includes(v) ? v : null; } catch { return null; }
 }

@@ -27,6 +27,8 @@
 // which TrollStore borrows), altstore-pal (AltStore PAL's marketplace flows).
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { KEYS } from "./storagekeys.js";
+
 const OTHER_APPS = {
   altstore: "AltStore", "altstore-classic": "AltStore Classic", sidestore: "SideStore", feather: "Feather",
   ksign: "Ksign", esign: "ESign", scarlet: "Scarlet", gbox: "GBox", trollapps: "TrollApps", stikstore: "StikStore",
@@ -99,7 +101,7 @@ export function parseOtherLink(link) {
   return { app, scheme, action, url: action === "other" ? null : url };
 }
 
-const KEY = "ifizbox.otherLinks";
+const KEY = KEYS.otherLinks;
 export function otherLinksOn(storage = globalThis.localStorage) {
   try { return storage?.getItem(KEY) !== "off"; } catch { return true; }
 }

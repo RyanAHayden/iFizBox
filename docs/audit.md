@@ -20,6 +20,9 @@ they stay. Check here before removing or merging one.
 - Sizes: core/appqueue.js `sizeText`.
 - `str`/`httpUrl`: core/altstore.js. `missing`/`verificationError`: core/sources.js.
 - The jailbreak arch map: compat.js's `JAILBREAK_ARCH`.
+- Storage keys (`ifizbox.*`) are named in core/storagekeys.js (`KEYS`, `KEY_PREFIXES`, `PREFIX`); readers and writers
+  import them, and worker/src/udid.js does too. theme-boot.js is a classic script that spells its four keys itself;
+  core/storagekeys.test.js checks both rules.
 
 ## Kept on purpose
 
@@ -45,9 +48,11 @@ they stay. Check here before removing or merging one.
 - **The row-state lists `APP_STATES` (core/apprun.js) and `STATES` (core/installrun.js)**: nothing reads them, but
   each is the only full list of the states a run's rows go through; they stay as the modules' vocabulary.
 - **native/spike/web/meter.js `getPhase`**: unused, but part of a spike (see native/spike/ above).
-- **Exports used only inside their own module** (~200, e.g. guides.js's text constants, worker/src/index.js's
-  TTLs): the `export` is harmless and some are there for tests to reach; the scan above lists them with the
-  never-referenced ones, so check how often the name appears in its own file before deleting.
+- **Exports used only inside their own module** (about 220 exports in about 80 web/app modules, found by whole-word
+  name search; none imported by a test or another file): they stay. The app is plain ES modules with no build step,
+  so the `export` word changes nothing at run time, and removing it would touch some 80 files for no behaviour
+  change. Some are there for tests to reach (e.g. guides.js's text constants); worker/src/index.js's TTLs are the
+  same kind. Before deleting a name, check how often it appears in its own file.
 - **`.console`, `.console .navbar.sheet-bar`, `.console .bar-button` and `.console-log` in queue.css**: the
   console page is nav/progress.js's (`cls: "console progress-page"`) and a saved run's log uses `console-log`
   (screens/queue.js); the rest of that page's look is progress.css's `progress-*`.

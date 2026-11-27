@@ -28,12 +28,14 @@
 //                                              text, newest first, at most 50; [] when it isn't the feed
 //   storeReviews(id, { country, get, now }) -> Promise<[review]>, kept in memory a day per id; [] when it fails
 
+import { KEY_PREFIXES } from "./storagekeys.js";
+
 const str = (v) => (typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "");
 const httpsUrl = (u) => (/^https?:\/\//i.test(str(u)) ? str(u).replace(/^http:/i, "https:") : null);
 const BUNDLE = /^[A-Za-z0-9.-]{1,155}$/;
 
 export const LOOKUP_TTL = 7 * 24 * 3600 * 1000;
-const PREFIX = "ifizbox.applookup.";
+const PREFIX = KEY_PREFIXES.appLookup;
 
 const country = (c) => (/^[a-z]{2}$/.test(str(c).toLowerCase()) ? str(c).toLowerCase() : "us");
 

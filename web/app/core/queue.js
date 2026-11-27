@@ -24,6 +24,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { compareVersions, parseRelations, lowerId } from "./apt.js";
 import { NAME } from "../brand.js";
+import { KEYS } from "./storagekeys.js";
 
 export const MODES = ["install", "reinstall", "upgrade", "downgrade", "remove"];
 // Cydia's words for each mode (Localizable.strings INSTALL, REINSTALL, UPGRADE, DOWNGRADE, REMOVE).
@@ -249,7 +250,7 @@ export function needsRestart(stanzas) {
 
 // ---- console logs (Settings > Console Logs) ------------------------------------------------------------------
 
-export const LOG_KEY = "ifizbox.consoleLogs";
+export const LOG_KEY = KEYS.consoleLogs;
 const LOG_MAX = 20;           // runs kept, newest first
 const LOG_CHARS = 60_000;     // per run: the head and the tail of a longer one, with a note where it was cut
 

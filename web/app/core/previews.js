@@ -21,6 +21,8 @@
 //     The gallery's pictures: the source's own (`shots`) when it has any, else the HTML depiction's, else the
 //     GitHub repo's README and latest release. Cached per app (`key`) for a day in `store` (localStorage-like).
 
+import { KEY_PREFIXES } from "./storagekeys.js";
+
 const str = (v) => (typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "");
 const num = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : null);
 const isHttp = (u) => /^https?:\/\//i.test(str(u));
@@ -411,7 +413,7 @@ export function dedupeShots(list) {
 
 // ---- Loading (fetched text, cached per app) --------------------------------------------------------------------
 
-const PREVIEW_CACHE_PREFIX = "ifizbox.previews.";
+const PREVIEW_CACHE_PREFIX = KEY_PREFIXES.previews;
 const PREVIEW_CACHE_VERSION = 2;
 export const PREVIEW_TTL = 24 * 3600 * 1000;
 const memory = new Map();
@@ -704,7 +706,7 @@ export function betterDescription(field, fromDepiction) {
   return d && flat(d).length > flat(f).length ? d : f;
 }
 
-const DESC_CACHE_PREFIX = "ifizbox.depdesc.";
+const DESC_CACHE_PREFIX = KEY_PREFIXES.depDescription;
 const descriptions = new Map(); // url -> { at, text }
 
 export async function loadDepictionDescription(url, { text, store = globalThis.localStorage, now = Date.now() } = {}) {

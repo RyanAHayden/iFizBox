@@ -24,9 +24,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { NAME, BUNDLE_ID } from "../brand.js";
 import { nativeBridge } from "../native.js";
+import { KEYS } from "./storagekeys.js";
 
-export const PUSH_KEY = "ifizbox.push";
-export const WATCH_KEY = "ifizbox.push.watch"; // the last watch app-updates.js built, for enablePush
+export const PUSH_KEY = KEYS.push;
+export const WATCH_KEY = KEYS.pushWatch; // the last watch app-updates.js built, for enablePush
 
 export function pushState(storage = globalThis.localStorage) {
   try {
@@ -136,7 +137,7 @@ export async function enablePush(deps = {}) {
 // (offReason null, iOS notifications already allowed: no permission prompt at launch), Push turns itself on, unless
 // the user turned it off themselves (userTurnedOff, remembered by the switch) or it's on already. While the server has
 // no key it stays off, and turns on by itself the first launch after the key is there. -> {enabled, reason?}.
-export const USER_OFF_KEY = "ifizbox.push.userOff";
+export const USER_OFF_KEY = KEYS.pushUserOff;
 export function userTurnedOff(storage = globalThis.localStorage) {
   try { return storage?.getItem?.(USER_OFF_KEY) === "1"; } catch { return false; }
 }
@@ -212,7 +213,7 @@ export async function pushInfo(deps = {}) {
 // iFizBox's own update now keeps BUNDLE_ID when signed (websign-job.js, native SignOptions.keeps), so on a copy a
 // signer renamed it installs as a second iFizBox. Said once, before the first such install:
 //   await renamedUpdateNotice({ native, alert, storage }) -> "install" | "cancel"
-export const RENAMED_WARNED_KEY = "ifizbox.push.renamedWarned";
+export const RENAMED_WARNED_KEY = KEYS.pushRenamedWarned;
 export async function renamedUpdateNotice({ native = nativeBridge(), alert, storage = globalThis.localStorage } = {}) {
   let id = null;
   try { id = (await native?.call?.("push.status", {}))?.bundleId ?? null; } catch { return "install"; } // an older shell

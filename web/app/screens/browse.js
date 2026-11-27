@@ -14,6 +14,7 @@
 import { grouped, placeholder, el, segments, note, buttonZone } from "../nav/ui.js";
 import { createVList, withLetterHeaders } from "../nav/vlist.js";
 import { createSectionIndex } from "../nav/sectionindex.js";
+import { KEYS } from "../core/storagekeys.js";
 import { onPageOpen, onPageShow } from "../nav/pagestate.js";
 import { searchBar, pinned } from "../nav/searchbar.js"; // F426c
 import { listScope, refineOptions, byName, listNote } from "./listfilter.js";
@@ -779,7 +780,7 @@ export function swipeMessage(action, name, prev = null, labels = MODE_LABEL) {
 
 // The first-run hint plays once, for someone who has never queued anything (no flag, nothing queued, no console log
 // kept), on a phone that has a queue. B129: maybeHint no longer passes `reduce`: with Reduce Motion it fades instead.
-export const SWIPE_HINT_KEY = "ifizbox.swipeHint";
+export const SWIPE_HINT_KEY = KEYS.swipeHint;
 export function swipeHintDue({ seen = false, queued = 0, logs = 0, queue = false, reduce = false } = {}) {
   return queue && !seen && !queued && !logs && !reduce;
 }

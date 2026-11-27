@@ -15,8 +15,9 @@
 //                                           has no source: it counts as untrusted)
 //   unknownSourceAlert(host)             -> Add Source's second alert (Add & Trust / Add Source / Cancel)
 import { knownSafe, placeOf } from "./safe-sources.js";
+import { KEYS } from "./storagekeys.js";
 
-export const TRUST_KEY = "ifizbox.trustedSources";
+export const TRUST_KEY = KEYS.trustedSources;
 export const TRUST_LABEL = { safe: "Known Safe", trusted: "Trusted", unknown: "Unknown" };
 
 export function loadTrusted(storage) {

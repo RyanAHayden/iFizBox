@@ -21,6 +21,7 @@
 //   rememberSigned(storage, { ids, versions, sha256 })   F292: a signer's hash under every ID and version it may carry
 //   malwareHashes(list)                       -> the list's SHA-256s, for the signers' refuseSha256 (code "malware")
 import { deviceToken } from "./reviews.js";
+import { KEYS } from "./storagekeys.js";
 
 export const MALICIOUS_REASONS = [
   { id: "logins", label: "Steals Logins or Codes", detail: "Fake sign-ins, asks for an Apple ID, 2FA codes or passwords." },
@@ -112,7 +113,7 @@ export function malwareAlert(entry, name = "") {
 }
 
 // The IPA hashes this device saw (F292: both signers hash the IPA before signing it), so a report can carry one.
-export const HASH_KEY = "ifizbox.ipaHashes";
+export const HASH_KEY = KEYS.ipaHashes;
 const loadHashes = (storage) => {
   try { const v = JSON.parse(storage?.getItem(HASH_KEY) ?? "{}"); return v && typeof v === "object" ? v : {}; } catch { return {}; }
 };

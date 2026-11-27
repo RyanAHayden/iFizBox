@@ -21,6 +21,7 @@
 // A note: { id, text, guide } (guide: link to the guide, GUIDE_ROUTE).
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { targetBundleId } from "./websign.js";
+import { KEYS } from "./storagekeys.js";
 
 export const KEEP_KEY = "keepBundleId";
 export const GUIDE_ID = "keep-bundle-id";
@@ -34,7 +35,7 @@ export const keepOn = (get) => {
 // The same setting straight from storage (core/settings.js keeps it at ifizbox.keepBundleId as "true"/"false"), for
 // signing-client.js, which has no settings object.
 export const storedKeep = (storage = globalThis.localStorage) => {
-  try { return storage?.getItem?.(`ifizbox.${KEEP_KEY}`) !== "false"; } catch { return true; }
+  try { return storage?.getItem?.(KEYS.keepBundleId) !== "false"; } catch { return true; }
 };
 
 // Bridge params with Keep Bundle IDs: the job's own choice (Custom Install's switch) wins, else the global setting.
@@ -132,7 +133,7 @@ export function originalNote(name, { installed = false, ours = false } = {}) {
 //   rememberSiteSigned(storage, bundleId, { team, appId })
 //   resignNote(before, { team, appId }, name)          the warning when team or App ID changed, else null
 //   installWarningText(warnings)                       the sign job's warnings (websign-job.js result.warnings) as one message
-export const SITE_SIGNED_KEY = "ifizbox.siteSigned";
+export const SITE_SIGNED_KEY = KEYS.siteSigned;
 
 const siteSignedAll = (storage) => {
   try {

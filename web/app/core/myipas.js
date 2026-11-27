@@ -31,6 +31,7 @@ import { validBundleId } from "./signing.js";
 import { IPA_MAX } from "./websign.js";
 import { NAME } from "../brand.js";
 import { SELECT, DESELECT } from "./installed.js"; // F224: Manage's words, as Installed's (F222)
+import { KEYS } from "./storagekeys.js";
 
 export const MYIPAS = "myipas"; // the Installed tab's path segment for the library
 
@@ -126,7 +127,7 @@ export function optionsParams(info, edits = {}) {
 
 // ---- the website's library: links, on this device -----------------------------------------------------------
 
-const SITE_KEY = "ifizbox.myIpas";
+const SITE_KEY = KEYS.myIpas;
 
 export function siteEntries(storage = globalThis.localStorage) {
   let list = [];

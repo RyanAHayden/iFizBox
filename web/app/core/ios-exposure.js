@@ -24,6 +24,7 @@
 //   patchRow(patch, key)                    -> Changes' "Security Patch Available" row
 //   loadSnooze(storage), snoozePatch(storage, patch)   Later: until the next launch or a newer patch version
 import { compareVersions, parseVersion } from "./selfupdate.js";
+import { KEYS } from "./storagekeys.js";
 
 const NVD = (cve) => `https://nvd.nist.gov/vuln/detail/${cve}`;
 const CORUNA = "https://cloud.google.com/blog/topics/threat-intelligence/coruna-powerful-ios-exploit-kit";
@@ -145,7 +146,7 @@ export function exposureAlert(ex, { canOpenSettings = false } = {}) {
 // The Settings app's Software Update page (the sideload shell's app.openURL hands it to iOS).
 export const SOFTWARE_UPDATE_URL = "App-prefs:General&path=SOFTWARE_UPDATE_LINK";
 
-export const SEEN_KEY = "ifizbox.exposureSeen";
+export const SEEN_KEY = KEYS.exposureSeen;
 export function loadSeen(storage) {
   try { return storage?.getItem(SEEN_KEY) ?? null; } catch { return null; }
 }
@@ -195,7 +196,7 @@ export function patchRow(p, key = null) {
 }
 
 // Later: snoozed until the next launch (the session) or a newer patch version (kept per id).
-export const SNOOZE_KEY = "ifizbox.patchSnoozed";
+export const SNOOZE_KEY = KEYS.patchSnoozed;
 export function loadSnooze(storage) {
   try {
     const v = JSON.parse(storage?.getItem(SNOOZE_KEY) ?? "{}");

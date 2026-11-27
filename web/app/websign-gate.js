@@ -13,9 +13,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { showAlert } from "./nav/alert.js";
 import { NAME } from "./brand.js";
+import { KEYS } from "./core/storagekeys.js";
 
-export const ACCEPT_KEY = "ifizbox.websiteInstalls"; // "on" once the warning was accepted
-export const FIRST_KEY = "ifizbox.firstVisit"; // "later" (Not Now) | "installed" (iFizBox installed from here)
+export const ACCEPT_KEY = KEYS.websiteInstalls; // "on" once the warning was accepted
+export const FIRST_KEY = KEYS.firstVisit; //"later" (Not Now) | "installed" (iFizBox installed from here)
 
 const store = () => { try { return globalThis.localStorage ?? null; } catch { return null; } };
 const read = (storage, key) => { try { return storage?.getItem(key) ?? null; } catch { return null; } };

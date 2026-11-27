@@ -2,8 +2,10 @@
 // the connects it needs: "ask" (the popup, signing/cellular.js; the default), "shortcut" (Cellular Installs runs) or
 // "server" (the Signing Server, no popup). Pure: the choice, the page's group and the popup's texts. Kept in this
 // browser's storage, as is how the Shortcut's last run or check went (the shell's `added` is a check's only).
-export const CELLULAR_KEY = "ifizbox.onCellular";
-export const SHORTCUT_RAN_KEY = "ifizbox.cellularShortcut";
+import { KEYS } from "./storagekeys.js";
+
+export const CELLULAR_KEY = KEYS.onCellular;
+export const SHORTCUT_RAN_KEY = KEYS.cellularShortcut;
 export const ON_CELLULAR = "On Cellular";
 export const SHORTCUT_NAME = "Cellular Installs";
 export const CELLULAR_OPTIONS = [

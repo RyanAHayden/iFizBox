@@ -16,6 +16,7 @@
 import { grouped, el, placeholder, note } from "../nav/ui.js";
 import { format, settingsRoute, parse, rootOn } from "../router.js";
 import { getBackend } from "../backend.js";
+import { KEYS } from "../core/storagekeys.js";
 import { showAlert } from "../nav/alert.js";
 import { popupOpen, whenNoPopup } from "../nav/popups.js";
 import { sourceKey } from "../core/sources.js";
@@ -426,13 +427,13 @@ async function checkBuildOnce({ info = buildInfo, store = globalThis.localStorag
   const b = await info();
   if (!b?.commit) return false;
   let last;
-  try { last = store.getItem("ifizbox.webBuild"); } catch { return false; }
-  if (!last) { try { store.setItem("ifizbox.webBuild", b.commit); } catch { /* private mode */ } return false; }
+  try { last = store.getItem(KEYS.webBuild); } catch { return false; }
+  if (!last) { try { store.setItem(KEYS.webBuild, b.commit); } catch { /* private mode */ } return false; }
   if (last === b.commit) return false;
   // A popup that opens while the files download holds the page load itself too.
   const reloadPage = () => (busy() ? Promise.resolve(hold()) : Promise.resolve()).then(() => location.reload());
   const go = () => {
-    try { store.setItem("ifizbox.webBuild", b.commit); } catch { return false; }
+    try { store.setItem(KEYS.webBuild, b.commit); } catch { return false; }
     return refresh({ info: async () => b, reloadPage });
   };
   if (busy()) await hold();
