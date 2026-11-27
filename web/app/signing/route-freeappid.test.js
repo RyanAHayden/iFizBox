@@ -2,7 +2,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { installOnDevice, forgetRoute } from "./route.js";
-import { SIGN_IN_ROW, SIGN_IN_TITLE } from "./freeappid.js";
+import { SIGN_IN_ROW, SIGN_IN_TITLE, openFreeGroup } from "./freeappid.js";
+import { format, settingsRoute } from "../router.js";
 import { STORAGE_KEY } from "../core/installroute.js";
 import { b64encode } from "../core/gsa.js";
 
@@ -36,13 +37,14 @@ function portal() {
 function page() {
   const h = { cancelled: false, failure: null, hidden: false, lines: [], cancels: [],
     set: () => {}, hide: () => { h.hidden = true; }, done: () => {}, finish: () => {}, fail: (m) => { h.failure = m; },
-    onCancel: (f) => h.cancels.push(f), page: { raw: (l) => h.lines.push(l), step: () => {}, help: () => {} },
+    onCancel: (f) => h.cancels.push(f),
+    page: { raw: (l) => h.lines.push(l), step: () => {}, help: () => {}, close: () => { h.closed = true; } },
     tap: () => { h.cancelled = true; for (const f of h.cancels) f(); } };
   return h;
 }
-async function run(opts, { native, p = portal(), session, alert, go = () => {}, h = page() } = {}) {
+async function run(opts, { native, p = portal(), session, alert, openGroup, h = page() } = {}) {
   forgetRoute();
-  const ok = await installOnDevice(opts, { native, hud: () => h, alert: alert ?? (async () => ({ index: 0 })), go,
+  const ok = await installOnDevice(opts, { native, hud: () => h, alert: alert ?? (async () => ({ index: 0 })), openGroup,
     later: () => {}, follow: () => {}, session: session ?? (async () => ({ portal: p, teamId: TEAM })) });
   return { ok, p, h };
 }
@@ -95,18 +97,21 @@ test("an older shell without signing.inspect installs the url as before", async 
   assert.equal(sent(n, "signing.install")[0].url, "https://e.example/a.ipa");
 });
 
-test("app_id_taken with no session: only the queue's sign-in prompt, and Open goes to Signing", async () => {
+test("app_id_taken with no session: only the queue's sign-in prompt, and Open closes the progress page for the Free Apple ID group", async () => {
   const n = shell({ install: () => { throw taken(); } });
   const asked = [], went = [];
   const alert = async (o) => { asked.push(o.title); return { index: 1 }; };
-  const { ok, h } = await run({ url: "https://e.example/a.ipa", name: "A" },
-    { native: n, session: async () => null, alert, go: (path) => went.push(path) });
+  const h = page(), nav = {};
+  // the real openFreeGroup, with the page's path and its group stood in
+  const openGroup = (deps) => openFreeGroup({ ...deps, nav, path: () => ["signing", "certificate"], wait: async () => {},
+    show: () => { went.push([nav.hash, h.closed]); return true; } });
+  const { ok } = await run({ url: "https://e.example/a.ipa", name: "A" },
+    { native: n, session: async () => null, alert, openGroup, h });
   await new Promise((r) => setImmediate(r));
   assert.equal(ok, false);
   assert.deepEqual(asked, [SIGN_IN_TITLE]);
   assert.equal(h.failure, `${SIGN_IN_ROW}.`);
-  assert.deepEqual(went, [["signing"]]);
-  assert.equal(h.hidden, true);
+  assert.deepEqual(went, [[format(settingsRoute(["signing", "certificate"])).replace(/^#/, ""), true]]);
 });
 
 test("Cancel while the App ID is made: nothing is installed", async () => {
