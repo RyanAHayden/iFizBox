@@ -253,11 +253,15 @@ pub const PAIRS_ON_PHONE: u32 = 27;
 /// The app never reads the file by itself: where to pick it. `path` is in the app's container, and the Files app shows
 /// its Documents folder as On My iPhone > the app.
 fn import_hint(app: &str, path: &str) -> String {
-    let file = path.strip_prefix("Documents/").unwrap_or(path);
+    // Only a path under Documents has a place in the Files app to name.
+    let place = match path.strip_prefix("Documents/") {
+        Some(file) => format!("{file} (On My iPhone > {app})"),
+        None => path.to_string(),
+    };
     format!(
         "Put a pairing file in {app}, which {app} doesn't read by itself. To install apps on the iPhone, open {app} and go \
          to Settings > Installation & Signing > This iPhone, tap Pair This iPhone, then Import Pairing File, and pick \
-         {file} (On My iPhone > {app})."
+         {place}."
     )
 }
 
