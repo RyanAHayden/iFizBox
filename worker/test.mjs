@@ -1197,7 +1197,7 @@ import { appleRelay, relayTarget, MAX_REQUEST, MAX_REPLY } from "./src/apple-rel
     if (url.includes("GsService2/lookup")) return new Response(null, { status: 302, headers: { Location: "https://evil.example/" } });
     if (url.includes("listTeams")) return new Response(new Uint8Array(MAX_REPLY + 1), { status: 200 });
     if (url.includes("get_headers")) throw Object.assign(new Error("timed out"), { name: "TimeoutError" });
-    if (init.headers?.Upgrade === "websocket") return new Response("ws", { status: 200, headers: { "X-Ws": "1" } });
+    if (init.headers?.Upgrade === "websocket") return new Response("no", { status: 502 });
     return new Response("<plist/>", { status: 401, headers: { "Content-Type": "text/x-xml-plist", "Set-Cookie": "a=b", "X-Other": "1" } });
   };
   const relay = (path, init) => appleRelay(req(path, init), on, { fetcher });
@@ -1233,9 +1233,10 @@ import { appleRelay, relayTarget, MAX_REQUEST, MAX_REPLY } from "./src/apple-rel
   r = await relay("/apple/new.ani.sidestore.io/v3/get_headers", { method: "POST", body: "{}" });
   assert.equal(r.status, 504);
   assert.equal(r.headers.get("X-Relay-Status"), null); // the relay's own answer, not Apple's
-  // The anisette provisioning WebSocket is handed through (only that path, only GET).
+  // The anisette provisioning WebSocket goes to the server (only that path, only GET); one that won't open is a 502.
   r = await relay("/apple/new.ani.sidestore.io/v3/provisioning_session", { headers: { Upgrade: "websocket" } });
-  assert.equal(r.headers.get("X-Ws"), "1");
+  assert.equal(r.status, 502);
+  assert.equal((await r.json()).code, "upstream");
   assert.equal(calls.at(-1).url, "https://new.ani.sidestore.io/v3/provisioning_session");
   assert.equal((await relay("/apple/gsa.apple.com/grandslam/GsService2", { headers: { Upgrade: "websocket" } })).status, 403);
   // Routed by the Worker when on.
@@ -1264,6 +1265,118 @@ import { appleRelay, relayTarget, MAX_REQUEST, MAX_REPLY } from "./src/apple-rel
   assert.equal((await off("/apple/gsa.apple.com/grandslam/GsService2", { method: "POST", body: "x" })).status, 404); // the rest stays off
   assert.equal((await off("/apple/api.appstoreconnect.apple.com/v1/devices", { headers: { Origin: "https://evil.example" } })).status, 403);
   console.log("worker apple relay: ok");
+}
+
+// B498b: the provisioning WebSocket end to end: gsa.js's anisetteV3 through relayTransport and appleRelay to a mock
+// anisette server that drops its socket without a close frame right after its last message.
+import { anisetteV3, relayTransport, relayWsUrl, encodePlist, utf8 } from "../web/app/core/gsa.js";
+{
+  // One end of a socket, as a Worker has it: nothing is delivered before accept(), and everything arrives in order.
+  class End {
+    listeners = {}; queue = []; accepted = false; closed = false; sentClose = null;
+    addEventListener(type, f) { (this.listeners[type] ??= []).push(f); }
+    accept() { this.accepted = true; for (const [type, e] of this.queue.splice(0)) this.emit(type, e); }
+    emit(type, e) {
+      if (!this.accepted) return void this.queue.push([type, e]);
+      queueMicrotask(() => { for (const f of this.listeners[type] ?? []) f(e); });
+    }
+    send(data) { if (this.closed) throw new Error("closed"); this.peer.emit("message", { data }); }
+    close(code, reason) {
+      if (this.closed) return;
+      if (code === 1005 || code === 1006) throw new Error("reserved close code");
+      this.closed = true; this.sentClose = code; this.peer.emit("close", { code, reason });
+    }
+    drop() { this.closed = true; this.peer.emit("error", {}); this.peer.emit("close", { code: 1006, reason: "" }); }
+  }
+  const pair = () => { const a = new End(), b = new End(); a.peer = b; b.peer = a; return [a, b]; };
+  class Pair { constructor() { [this[0], this[1]] = pair(); } }
+
+  const got = []; // what reached the anisette server
+  let remote; // the server's end of the latest socket
+  const anisette = () => {
+    const [near, far] = pair();
+    remote = far;
+    far.accept();
+    const say = (m) => far.send(JSON.stringify(m));
+    far.addEventListener("message", ({ data }) => {
+      const m = JSON.parse(data);
+      got.push(Object.keys(m)[0]);
+      if (m.identifier) say({ result: "GiveStartProvisioningData" });
+      else if (m.spim) say({ result: "GiveEndProvisioningData", cpim: "CPIM" });
+      else { say({ result: "ProvisioningSuccess", adi_pb: "ADI" }); far.drop(); }
+    });
+    say({ result: "GiveIdentifier" }); // before the relay has called accept()
+    return { webSocket: near };
+  };
+  const xml = (o) => new Response(encodePlist(o), { headers: { "Content-Type": "text/x-xml-plist" } });
+  const json = (o) => new Response(JSON.stringify(o), { headers: { "Content-Type": "application/json" } });
+  const upstream = async (url, init) => {
+    if (init.headers?.Upgrade === "websocket") return anisette();
+    if (url.endsWith("/v3/client_info")) return json({ client_info: "<MacBookPro13,2> <macOS;10.12.6;16G29>", user_agent: "akd/1.0" });
+    if (url.endsWith("/v3/get_headers")) return json({ result: "Headers", "X-Apple-I-MD": "md", "X-Apple-I-MD-M": "mdm" });
+    return xml(url.endsWith("lookup") ? { urls: {} } : { Response: { spim: "SPIM", ptm: "PTM", tk: "TK" } });
+  };
+  const origin = "https://sign.example";
+  const hook = { fetcher: upstream, Pair, upgrade: (client) => ({ status: 101, webSocket: client }) };
+  const relayed = (path, init) => appleRelay(new Request(origin + path, init), { APPLE_RELAY: "1" }, hook);
+  let browserEnd;
+  const closes = [], errors = [];
+  class BrowserSocket { // the page's WebSocket: connects through the relay and takes the other end of its pair
+    constructor(url) {
+      relayed(new URL(url).pathname, { headers: { Upgrade: "websocket", Origin: origin } }).then((r) => {
+        assert.equal(r.status, 101);
+        browserEnd = r.webSocket;
+        browserEnd.addEventListener("message", (e) => this.onmessage?.(e));
+        browserEnd.addEventListener("error", (e) => { errors.push(e); this.onerror?.(e); });
+        browserEnd.addEventListener("close", (e) => { closes.push(e.code); this.onclose?.(e); });
+        browserEnd.accept();
+      }).catch((e) => this.onerror?.(e));
+    }
+    send(data) { browserEnd.send(data); }
+    close() { browserEnd?.close(1000); }
+  }
+  let saved;
+  const ani = anisetteV3({ transport: relayTransport({ fetcher: relayed }), servers: ["https://new.ani.sidestore.io"],
+    wsUrl: (s) => relayWsUrl(s, origin), WebSocketImpl: BrowserSocket, provisionTimeout: 5000,
+    storage: { load: () => null, save: (s) => { saved = s; } } });
+  const h = await ani.get();
+  assert.equal(h.headers["X-Apple-I-MD"], "md");
+  assert.equal(saved.adi_pb, "ADI");
+  assert.deepEqual(got, ["identifier", "spim", "ptm"]);
+  await new Promise((done) => setTimeout(done, 0));
+  assert.equal(errors.length, 0); // the server's drop reaches the page as a close, not an error
+
+  // Closes cross over both ways, with codes close() accepts; binary messages stay as they are.
+  const open = async () => {
+    const r = await relayed("/apple/new.ani.sidestore.io/v3/provisioning_session", { headers: { Upgrade: "websocket" } });
+    const page = r.webSocket, seen = [];
+    for (const type of ["message", "close"]) page.addEventListener(type, (e) => seen.push([type, e.data ?? e.code]));
+    page.accept();
+    return { page, seen, far: remote };
+  };
+  const settle = () => new Promise((done) => setTimeout(done, 0));
+  for (const [sent, expected] of [[1000, 1000], [4001, 4001]]) {
+    const { seen, far } = await open();
+    const bytes = utf8("bin").buffer;
+    far.send(bytes); far.close(sent);
+    await settle();
+    assert.deepEqual(seen.slice(1), [["message", bytes], ["close", expected]]);
+  }
+  {
+    const { seen, far } = await open();
+    far.drop();
+    await settle();
+    assert.deepEqual(seen.at(-1), ["close", 1011]);
+  }
+  {
+    const { page, far } = await open();
+    const closed = [];
+    far.addEventListener("close", (e) => closed.push(e.code));
+    page.close(1000);
+    await settle();
+    assert.deepEqual(closed, [1000]);
+  }
+  console.log("worker apple relay websocket: ok");
 }
 
 // F258: the setup command's code hand-off (src/setup.js): a finished upload gets a short code; the code reads back
