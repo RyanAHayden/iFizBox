@@ -19,7 +19,7 @@ const own = ["web/app/core/storagekeys.js", "web/app/theme-boot.js"];
 
 test("no ifizbox.* literal outside the key module", () => {
   assert.ok(files.length > 200, `${files.length} files scanned`);
-  // The host names worker/ makes up for its Cache API entries are not storage keys.
+  // `literals` leaves out the domain (ifizbox.com), which is no storage key.
   const found = files.filter((f) => !own.includes(relative(repo, f)))
     .flatMap((f) => literals(f).map((l) => `${relative(repo, f)}: ${l}`));
   assert.deepEqual(found, []);

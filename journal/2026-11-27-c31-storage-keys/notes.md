@@ -15,6 +15,8 @@ Left as literals:
 
 Exports: took the second option (kept `export`, explained in docs/audit.md) instead of removing it from the ~220
 names in ~80 modules. Removing it has no run-time effect, and the wide diff would collide with other tasks.
+The task's audit counted 164; a whole-word name search today finds 223 in 83 modules (not reconciled: the audit's
+method isn't recorded).
 
 Checks:
 - `node --test web/app`: 3852 passed, 0 failed.
