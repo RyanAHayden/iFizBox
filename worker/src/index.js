@@ -36,6 +36,7 @@
 //   GET  /api/fetch?url=&kind=ipa           F93: an IPA for the website's signer, streamed, up to MAX_UPLOAD_MB
 //   GET  /api/applookup?bundleId=&country=  F161: Apple's iTunes Search API lookup of one app by bundle ID (the
 //                                           app page's App Store details), its first result only; cached a day
+//   GET  /api/applookup-batch?bundleIds=a,b&country=  F455: App Store stars of up to 50 apps (src/applookup.js)
 //   GET  /api/appreviews?id=&country=       B37: Apple's customer-reviews RSS (JSON) for one App Store id, cached a day
 //   GET  /api/ipainfo?url=<IPA URL>          F160: MinimumOSVersion, UIDeviceFamily, bundle ID and version from the IPA's
 //                                           own Info.plist, read with Range requests (src/ipainfo.js); cached 30 days

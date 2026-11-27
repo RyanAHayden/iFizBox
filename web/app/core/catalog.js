@@ -29,9 +29,10 @@
 //   c.categories()                         -> Browse (F46): [{ name, count }] in BROWSE_CATEGORIES order, empty
 //                                             ones and (Not Jailbroken) tweak categories left out
 //   c.browse(category)                     -> [row] in that Browse category, sorted by name
-//   c.popular({ limit, ratings })          -> [row] ranked by the stars given here (`ratings`, { id: [average,
-//                                             count] }), then how many sources list it, then newest (rankPopular),
-//                                             each with `sources` (that count)
+//   c.popular({ limit, ratings, installs, store }) -> [row] in rankPopular's tiers (stars given here, `ratings`
+//                                             { id: [average, count] }; installs; App Store stars, `store`, by bundle
+//                                             ID; the rest), each with `sources` (how many list it)
+//   c.storeCandidates(limit)               -> F455: the bundle IDs popular's `store` is asked for
 //   c.collection(id)                       -> F154: [row] in Browse's collection `id` (COLLECTIONS)
 //   c.refine(rows, { section, source, installed, price, sort }) -> F426b: a list's [row] filtered with search()'s
 //                                             filters (no query) and sorted: "name", "newest" (the date popular()
@@ -203,10 +204,11 @@ export function mergeCategories(rows, { jailbroken = true } = {}) {
 
 // Popular: [{ row, sources, date, rating, installs }] -> rows, in tiers (F452): 1) more than MIN_TIER ratings here
 // (`rating`, core/sections.js ratingOf), by average then count; 2) more than MIN_TIER installs (the review server's
-// count), the most installed first; 3) the rest: rated first (F450), then by how many sources list them, then the
-// newest update (`date`, epoch ms; AltStore versions carry one, APT packages don't), then by name. At most `limit`.
+// count), the most installed first; 3) IPA apps with an App Store rating (F455; `store` { avg, count }), by average
+// then count; 4) the rest. Within a tier, ties (and all of tier 4): rated here first (F450), then by how many sources
+// list them, then the newest update (`date`, epoch ms; AltStore versions carry one, APT packages don't), then by
+// name. At most `limit`.
 export const MIN_TIER = 5;
-// F455: between 2 and the rest, 3) apps with an App Store rating (`store` { avg, count }), by average then count.
 const tierOf = (i) => (Number(i.rating?.count) > MIN_TIER ? 1 : Number(i.installs) > MIN_TIER ? 2 : i.store ? 3 : 4);
 export function rankPopular(items, limit = 50) {
   return [...items].sort((a, b) => tierOf(a) - tierOf(b) || (tierOf(a) === 2 ? Number(b.installs) - Number(a.installs) : 0)
@@ -1001,14 +1003,28 @@ export function createCatalog() {
   // The date popular() and refine()'s newest rank by: the candidate's AltStore version date; APT has none.
   const dateOf = (id) => entries(ALL).get(id)?.stanza.ipa?.versions?.[0]?.date ?? null;
 
-  function popular({ limit = 50, ratings = null, installs = null, store = null } = {}) {
+  // F455: an IPA app's real bundle ID, lower case (its row id may carry a `~name` suffix); null for a package.
+  const bundleOf = (id) => entries(ALL).get(id)?.app?.bundleIdentifier.toLowerCase() ?? null;
+  const listedIn = () => {
     const lists = [...sources].filter(([k]) => counts(k)).map(([, { byId }]) => byId);
+    return (id) => lists.reduce((n, byId) => n + (byId.has(id) ? 1 : 0), 0);
+  };
+
+  // `store`: App Store stars by bundle ID (core/applookup.js storeRatingsLoader).
+  function popular({ limit = 50, ratings = null, installs = null, store = null } = {}) {
+    const count = listedIn();
     const items = visibleOf(ALL).map((row) => ({
-      row, sources: lists.reduce((n, byId) => n + (byId.has(row.id) ? 1 : 0), 0),
-      date: dateOf(row.id), rating: ratingOf(ratings, row.id), installs: installs?.[row.id] ?? 0,
-      store: entries(ALL).get(row.id)?.app ? ratingOf(store, row.id.toLowerCase()) : null, // F455: IPA apps only
+      row, sources: count(row.id), date: dateOf(row.id), rating: ratingOf(ratings, row.id), installs: installs?.[row.id] ?? 0,
+      store: store && bundleOf(row.id) ? ratingOf(store, bundleOf(row.id)) : null,
     }));
     return rankPopular(items, limit).map(({ row, sources: n }) => ({ ...slim(row), sources: n }));
+  }
+
+  // F455: the bundle IDs whose App Store stars Popular asks for: the IPA apps listed by most sources, then newest.
+  function storeCandidates(limit = 200) {
+    const count = listedIn();
+    const items = visibleOf(ALL).filter((row) => bundleOf(row.id)).map((row) => ({ row, sources: count(row.id), date: dateOf(row.id) }));
+    return [...new Set(rankPopular(items, Infinity).map((i) => bundleOf(i.row.id)))].slice(0, limit);
   }
 
   // F450a: [id, url] of each id's http(s) SileoDepiction (rows don't carry it), for the Rating sort's fallback.
@@ -1225,7 +1241,7 @@ export function createCatalog() {
   }
 
   return { load, loadAlt, altSource, remove, setHidden, setHiddenAuthors, setBlocked, sections, list, search, author, package: pkg, history, has, versions, row, keys: () => [...sources.keys()],
-    categories, browse, popular, free, featured, collection: collectionRows, refine, roulette, depictionUrls,
+    categories, browse, popular, free, featured, collection: collectionRows, refine, roulette, depictionUrls, storeCandidates,
     setInstalled, installed, upgrades, setDevice, setIpaInfo, setFilters, setTweakVerdicts, setTweakKnown, shows,
     deps, aptProblems, queueInfo, runInfo };
 }
@@ -1244,7 +1260,7 @@ export function runCatalog(catalog, op, args = []) {
     installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice, setIpaInfo: catalog.setIpaInfo, setFilters: catalog.setFilters,
     setTweakVerdicts: catalog.setTweakVerdicts, setTweakKnown: catalog.setTweakKnown, shows: catalog.shows,
     categories: catalog.categories, browse: catalog.browse, popular: catalog.popular, free: catalog.free, featured: catalog.featured,
-    collection: catalog.collection, refine: catalog.refine, roulette: catalog.roulette, depictionUrls: catalog.depictionUrls,
+    collection: catalog.collection, refine: catalog.refine, roulette: catalog.roulette, depictionUrls: catalog.depictionUrls, storeCandidates: catalog.storeCandidates,
     deps: catalog.deps, aptProblems: catalog.aptProblems, queueInfo: catalog.queueInfo, runInfo: catalog.runInfo }[op];
   if (!f) throw new Error(`unknown catalog op ${op}`);
   return f(...args);

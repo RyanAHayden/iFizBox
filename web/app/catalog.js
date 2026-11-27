@@ -477,37 +477,23 @@ async function refineByRating(rows, { sort, ...filters }) {
   const [out, ours, mod] = await Promise.all([ask("refine", [rows, filters]), reviewRatings(), import("./core/ratingsort.js")]);
   return mod.rankByRating(out, await depictionRatings(out, ours, mod).catch(() => ours));
 }
-// F455: the App Store's stars for the apps Popular lists, one batch request per BATCH ids (the Worker's cache on the site,
-// Apple itself in the app). Kept per session, a miss too; no answer in RATINGS_WAIT = no stars this time (kept for the next).
-const storeKept = new Map(); // lower-case bundle id -> [average, count] | null
-let storeBusy = null;
-async function storeRatings(ids) {
-  const mod = await import("./core/applookup.js");
-  const want = [...new Set(ids.map((i) => i.toLowerCase()))].filter((i) => i.includes(".") && !storeKept.has(i));
-  if (want.length && !storeBusy) {
-    const backend = getBackend();
-    const c = mod.regionOf(globalThis.navigator?.language);
-    const get = (url) => (backend.kind === "http" ? globalThis.fetch(url).then((r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`)))) : backend.text(url));
-    const work = Promise.all(Array.from({ length: Math.ceil(want.length / mod.BATCH) }, async (_, n) => {
-      const part = want.slice(n * mod.BATCH, (n + 1) * mod.BATCH);
-      try {
-        const got = mod.parseBatch(await get(mod.batchLookupUrl(part, c, { direct: backend.kind !== "http" })));
-        for (const id of part) storeKept.set(id, got[id] ?? null);
-      } catch { /* not kept: asked again next time */ }
-    })).finally(() => { storeBusy = null; });
-    storeBusy = work;
-  }
-  if (storeBusy) await Promise.race([storeBusy, new Promise((done) => setTimeout(done, RATINGS_WAIT))]);
-  const found = {};
-  for (const [id, v] of storeKept) if (v) found[id] = v;
-  return found;
+// F455: the App Store's stars for the IPA apps (Popular's third tier): the Worker on the site, Apple itself in the app.
+let storeLoader = null;
+async function storeRatings() {
+  const ids = await ask("storeCandidates");
+  if (!ids.length) return {};
+  storeLoader ??= import("./core/applookup.js").then((m) => {
+    const backend = getBackend(), direct = backend.kind !== "http";
+    const get = direct ? (url) => backend.text(url) : (url) => globalThis.fetch(url).then((r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))));
+    return m.storeRatingsLoader({ get, direct, country: m.regionOf(globalThis.navigator?.language), store: globalThis.localStorage ?? null });
+  });
+  return (await storeLoader)(ids, RATINGS_WAIT);
 }
 async function popularByRating(opts) {
   const [ours, installs] = await Promise.all([reviewRatings(), installCounts()]);
   const mod = await import("./core/ratingsort.js");
   const wide = await ask("popular", [{ ...opts, limit: 200, ratings: ours, installs }]);
-  const ratings = await depictionRatings(wide, ours, mod).catch(() => ours);
-  const store = await storeRatings(wide.filter((r) => r.kind === "ipa" || !r.kind).map((r) => r.id)).catch(() => ({}));
+  const [ratings, store] = await Promise.all([depictionRatings(wide, ours, mod).catch(() => ours), storeRatings().catch(() => ({}))]);
   return ask("popular", [{ ...opts, ratings, installs, store }]);
 }
 

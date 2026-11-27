@@ -516,12 +516,14 @@ test("F455 popular: reviews > 5, installs > 5, then App Store rating (average, c
   ]).map((i) => i.row.name);
   assert.deepEqual(ranked, ["Reviewed", "Installed", "Store High Many", "Store High Few", "Own Few", "Store Low", "Tweak"]);
 });
-test("F455 popular(): store ratings count for IPA apps only, matched by lower-case bundle ID", () => {
+test("F455 popular(): store ratings count for IPA apps only, by the real bundle ID; storeCandidates lists them", () => {
   const c = createCatalog();
-  const apps = [{ name: "Alpha", bundleIdentifier: "com.X.Alpha", versions: [{ version: "1", downloadURL: "https://x.dev/a.ipa" }] },
-    { name: "Beta", bundleIdentifier: "com.x.beta", versions: [{ version: "1", downloadURL: "https://x.dev/b.ipa" }] }];
-  runCatalog(c, "loadAlt", ["alt:https://x.dev/s.json", JSON.stringify({ name: "S", apps }), null, null]);
+  const app = (name, id) => ({ name, bundleIdentifier: id, versions: [{ version: "1", downloadURL: `https://x.dev/${name}.ipa` }] });
+  runCatalog(c, "loadAlt", ["alt:https://x.dev/s.json", JSON.stringify({ name: "S", apps: [app("Alpha", "com.X.Alpha"), app("Beta", "com.x.beta"), app("Gamma", "com.x.beta")] }), null, null]);
+  c.load("j", "Package: com.x.tweak\nName: Tweak\nVersion: 1\nArchitecture: iphoneos-arm64\n");
+  assert.deepEqual(runCatalog(c, "storeCandidates", []).sort(), ["com.x.alpha", "com.x.beta"], "no tweak, no `~name` suffix, no repeat");
+  assert.equal(c.storeCandidates(1).length, 1);
   const names = (store) => c.popular({ store }).map((r) => r.name);
-  assert.deepEqual(names({ "com.x.alpha": [4, 100], "com.x.beta": [4.5, 100] }), ["Beta", "Alpha"]);
-  assert.deepEqual(names({ "com.x.alpha": [4, 100] }), ["Alpha", "Beta"]);
+  assert.deepEqual(names({ "com.x.alpha": [4, 100], "com.x.beta": [4.5, 100], "com.x.tweak": [5, 100] }), ["Beta", "Gamma", "Alpha", "Tweak"]);
+  assert.deepEqual(names({ "com.x.alpha": [4, 100] }), ["Alpha", "Beta", "Gamma", "Tweak"]);
 });
