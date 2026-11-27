@@ -3,12 +3,21 @@
 ## Result
 
 **No. Do not build it now.** An App Intent of ours ("Restore My VPN if due") in a Shortcut run by an automation
-(App: iFizBox, Closed) works as a mechanism, but every run that actually switches from the built-in VPN to another
-VPN ends with Set VPN's error after it has switched, and the automation posts a failure notification even with
-Notify off. That is the common case for this feature, so users would see an error each time it works.
-Today's Restore My VPN stays as the fallback.
+(App: iFizBox, Closed) works as a mechanism, but each captured run that switched from the built-in VPN to
+Tailscale (3 of 3, the only other VPN tried) ended with Set VPN's error after it had switched, and the automation
+posted a failure notification even with Notify off. That is the common case for this feature, so users would likely
+see an error each time it works. Today's Restore My VPN stays as the fallback.
 
-Measured on the iPhone 15 Pro, iOS 27, Wi-Fi only, no SIM service, on 2026-11-27.
+The task's three questions:
+
+- **Does Set VPN run silently from the automation? No.** No Shortcuts screen and no Allow prompt (after the
+  Shortcut's prompts were answered in a first foreground run), but the error 2 notification shows.
+- **Does Closed fire?** Home: yes. App switch: yes. Kill from the switcher: yes if iFizBox was in front (once the
+  switcher is dismissed); no if it was already in the background, where leaving had fired it.
+- **Does our intent run while the app is closed or killed and read the restore state? Yes**, shown with a probe
+  intent and a hand-written owed file; not with a state left by a real install.
+
+Measured on the iPhone 15 Pro, iOS 27 (only iOS measured), Wi-Fi only, no SIM service, on 2026-11-27.
 
 | # | Question | Answer | One line |
 |---|---|---|---|
@@ -16,7 +25,6 @@ Measured on the iPhone 15 Pro, iOS 27, Wi-Fi only, no SIM service, on 2026-11-27
 | 2 | Does the switch end cleanly | No | Every captured run that switched from the built-in VPN to another VPN ended with NEVPNErrorDomain error 2 after switching. |
 | 3 | What would change the answer | A way to stop Set VPN raising error 2 | None known. Catching the action's error inside the Shortcut was not tried. |
 | 4 | Effort to set up | About 14 taps and 2 typed searches | Plus first-run prompts. |
-| 5 | Versions | iOS 27 only | iOS below 27 was not measured. |
 
 ## Setup
 
@@ -76,17 +84,18 @@ Automation App: iFizBox, Closed. Each row is one trigger with the built-in VPN s
 - An intent that returns an empty String still counts as "has any value": Set VPN ran on a not-due answer.
   Returning a list ([String], empty when not due) works.
 - Stored content "own VPN" appears to be per Shortcut (inferred). A second Shortcut's Get returned "No VPN was passed"
-  after another Shortcut had stored it, and also before. The same Shortcut stored it and read it back. So the due
-  branch must sit inside the Restore My VPN Shortcut itself, not in a new Shortcut.
+  after another Shortcut had stored it, and also before. The same Shortcut stored it and read it back. So plan on the
+  due branch sitting inside the Restore My VPN Shortcut itself, not in a new Shortcut.
 - With two installed copies of iFizBox, the app picker shows two identical "iFizBox" rows.
 
 ## Design points if built later
 
+- Shape of the intent: "Restore My VPN if due", no parameters, does not open the app, returns `[String]`
+  (one item when due, empty otherwise). The Shortcut: that intent, If it has any value, get stored "own VPN",
+  Set VPN, end If, Nothing.
 - The intent must clear the owed file and withdraw the question the page shows (restore.due).
-- It must answer not due:
-  - while an install runs (LocalVPN.waiting, in the same process);
-  - while another VPN is up;
-  - during iFizBox's own trips to Shortcuts, because Closed fires on every leave.
+- It must answer not due while an install runs (LocalVPN.waiting, same process), while another VPN is up, and
+  during iFizBox's own trips to Shortcuts, because Closed fires on every leave.
 - RestoreDue.step holds the rules.
 - The intent sits before the stored content read.
 - Error 2 has to be solved before this is worth building.
