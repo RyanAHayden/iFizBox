@@ -143,3 +143,18 @@ test("dates and our review's cell: 'by name – Version – date', Anonymous wit
   assert.equal(reviewDate(0, now), null);
   assert.equal(ourReview({ id: "x", stars: 2, title: "", name: "", text: "", version: "" }, now).author, "Anonymous");
 });
+
+test("F452 installsApi: counts() reads the server's counts, count() posts once with the device token and never throws", async () => {
+  const { installsApi } = await import("./reviews.js");
+  const seen = [];
+  const api = installsApi({ base: "https://x", token: async () => "t".repeat(40), fetcher: async (u, init) => {
+    seen.push([u, init?.method, init?.headers?.["X-Review-Token"]]);
+    return { ok: true, json: async () => ({ enabled: true, counts: { "com.a": 7 } }) };
+  } });
+  assert.deepEqual(await api.counts(), { "com.a": 7 });
+  assert.equal(await api.count("com.a b"), true);
+  assert.deepEqual(seen[1], ["https://x/installs/com.a%20b", "POST", "t".repeat(40)]);
+  const down = installsApi({ token: async () => "t".repeat(40), fetcher: async () => { throw new Error("offline"); } });
+  assert.deepEqual(await down.counts(), {});
+  assert.equal(await down.count("com.a"), false);
+});
