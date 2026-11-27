@@ -59,7 +59,7 @@ import { queueWords, parseSimulation, mergePlans, jobIssues, lowerId, planForJob
 import { installQueue } from "./queue.js";
 import { NAME } from "./brand.js";
 import { encodeUrl } from "./core/urlencode.js";
-import { installsApi, reviewsApi, reviewsBase } from "./core/reviews.js";
+import { reviewsApi, reviewsBase } from "./core/reviews.js";
 import { updateFailures, failureFor, liveUpdate } from "./core/aptupdate.js";
 import { createKeepAwake } from "./core/keepawake.js";
 
@@ -270,7 +270,6 @@ export function createNativeBackend({ native = globalThis.ifizboxNative, sourceO
   }
   // F182: user reviews on the app's server (core/reviews.js), straight from the web view (CORS), as Account does.
   backend.reviews = reviewsApi({ base: reviewsBase("app") });
-  backend.installs = installsApi({ base: reviewsBase("app") }); // F452
   backend.keepAwake = (on) => awake.set(on); // F287
   backend.awake = awake;
   return Object.assign(backend, sources);
@@ -531,13 +530,10 @@ function linkedDebs(q, call) {
         r = await run(file);
       }
       staged.delete(j.id); // install-deb's file is removed once it ran
-      if ((r?.code ?? -1) === 0) installCounter.count(j.id).catch(() => {}); // F452: one count per device per package
       return { code: r?.code ?? -1, stdout: r?.stdout ?? "", stderr: r?.stderr ?? "" };
     },
   };
 }
-
-const installCounter = installsApi({ base: reviewsBase("app") }); // F452
 
 // F234: a queue row's download (backend.queueFetch above).
 let fetchTag = 0;

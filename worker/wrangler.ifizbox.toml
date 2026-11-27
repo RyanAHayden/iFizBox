@@ -4,7 +4,7 @@
 name = "ifizbox"
 main = "entry.js"   # src/index.js's handler without its test-only exports, which `wrangler dev` won't start with
 # The website: web/app/ served as static assets (index.html for app routes like /add).
-assets = { directory = "../web/app", binding = "ASSETS", not_found_handling = "single-page-application", run_worker_first = ["/sign/*", "/api/*", "/healthz", "/repo", "/repo/*", "/reviews/*", "/installs", "/installs/*", "/apple/*"] }
+assets = { directory = "../web/app", binding = "ASSETS", not_found_handling = "single-page-application", run_worker_first = ["/sign/*", "/api/*", "/healthz", "/repo", "/repo/*", "/reviews/*", "/apple/*"] }
 compatibility_date = "2026-11-01"
 routes = [
   # Custom domains: Cloudflare makes their DNS records and certificates (the zone needs no records of its own for them).
