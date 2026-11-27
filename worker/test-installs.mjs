@@ -66,6 +66,11 @@ assert.equal(await count("com.pad", { token: nth(999), ip: "203.0.113.10", at: n
 assert.equal(await count("com.other", { token: nth(999), ip: "203.0.113.10", at: now + 180000 }), 200);
 assert.equal(await count("com.pad", { token: nth(999), ip: "203.0.113.10", at: now + 120000 + 86400000 }), 200);
 
+// counts sent at once don't slip past the day's cap together
+const together = await Promise.all(Array.from({ length: INSTALL_DAILY_PER_PKG + 5 },
+  (_, i) => count("com.burst", { token: nth(i), ip: "203.0.113.12", at: now + 240000 })));
+assert.equal(together.filter((s) => s === 200).length, INSTALL_DAILY_PER_PKG);
+
 // a day per address, whatever the packages
 const full = { REVIEWS: d1() };
 let n = 0;

@@ -31,6 +31,7 @@ const SCHEMA = [
   "CREATE TABLE IF NOT EXISTS installs (pkg TEXT NOT NULL, device TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (pkg, device))",
   "CREATE TABLE IF NOT EXISTS install_writes (ip TEXT NOT NULL, pkg TEXT NOT NULL, at INTEGER NOT NULL)",
   "CREATE INDEX IF NOT EXISTS install_writes_ip ON install_writes (ip, at)",
+  "CREATE INDEX IF NOT EXISTS install_writes_at ON install_writes (at)", // the day-old rows' cleanup
 ];
 const ready = new WeakMap();
 function schema(db) {
@@ -43,11 +44,13 @@ const memory = rateLimiter({ rate: INSTALL_WRITES, writes: INSTALL_WRITES });
 async function allowCount(db, ip, pkg, now) {
   if (!memory.allow(ip, true, now)) return false;
   const day = now - 86400000;
-  const n = await db.prepare("SELECT COUNT(*) AS total, SUM(pkg = ?) AS same FROM install_writes WHERE ip = ? AND at > ?").bind(pkg, ip, day).first();
-  if (Number(n?.total ?? 0) >= INSTALL_DAILY || Number(n?.same ?? 0) >= INSTALL_DAILY_PER_PKG) return false;
-  await db.batch([db.prepare("INSERT INTO install_writes (ip, pkg, at) VALUES (?, ?, ?)").bind(ip, pkg, now),
+  // checked and written in one statement: an Upgrade All's counts arrive together and must not all pass one old total
+  const [added] = await db.batch([db.prepare(`INSERT INTO install_writes (ip, pkg, at) SELECT ?, ?, ?
+    WHERE (SELECT COUNT(*) FROM install_writes WHERE ip = ? AND at > ?) < ?
+    AND (SELECT COUNT(*) FROM install_writes WHERE ip = ? AND at > ? AND pkg = ?) < ?`)
+    .bind(ip, pkg, now, ip, day, INSTALL_DAILY, ip, day, pkg, INSTALL_DAILY_PER_PKG),
     db.prepare("DELETE FROM install_writes WHERE at <= ?").bind(day)]);
-  return true;
+  return Boolean(added.meta?.changes);
 }
 
 export async function installs(req, env = {}, { now = Date.now() } = {}) {
