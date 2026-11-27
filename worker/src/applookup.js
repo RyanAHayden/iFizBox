@@ -1,5 +1,5 @@
 // F455: App Store ratings for many apps at once (Popular's third tier). Apple's iTunes lookup takes a comma-separated
-// bundleId list; this answers { resultCount, results: [{ bundleId, averageUserRating, userRatingCount }] } for the ones
+// bundleId list; this answers { resultCount, results: [{ bundleId, trackName, averageUserRating, userRatingCount }] } for the ones
 // it knows, the whole list's answer cached at the edge a day like /api/applookup. One cache read and one write a
 // request, not one an app: the Cache API's calls per request are limited (50 on the free plan).
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -11,7 +11,8 @@ const json = (body, status = 200, extra = {}) => new Response(JSON.stringify(bod
   headers: { "Content-Type": "application/json", "X-Content-Type-Options": "nosniff", ...CORS, ...extra } });
 const fail = (code, error, status = 400) => json({ code, error }, status, { "Cache-Control": "no-store" });
 
-const slimOf = (r) => ({ bundleId: r.bundleId, averageUserRating: Number(r.averageUserRating) || 0, userRatingCount: Number(r.userRatingCount) || 0 });
+// F457: trackName, so Popular can tell the App Store's app from a modded one under its bundle ID.
+const slimOf = (r) => ({ bundleId: r.bundleId, trackName: typeof r.trackName === "string" ? r.trackName.slice(0, 200) : "", averageUserRating: Number(r.averageUserRating) || 0, userRatingCount: Number(r.userRatingCount) || 0 });
 
 export async function appLookupBatch(u, env = {}, { fetcher = fetch, cache = env.LOOKUP_CACHE ?? globalThis.caches?.default ?? null } = {}) {
   const ids = [...new Set((u.searchParams.get("bundleIds") ?? "").toLowerCase().split(",").filter(Boolean))].sort();
@@ -20,7 +21,7 @@ export async function appLookupBatch(u, env = {}, { fetcher = fetch, cache = env
     return fail("bad_request", `Send 1 to ${MAX_BATCH} bundleIds and a two-letter country.`);
   }
   const bundleId = ids.join(",");
-  const key = new Request(`https://applookup-batch.ifizbox.internal/${country}?${new URLSearchParams({ bundleIds: bundleId })}`);
+  const key = new Request(`https://applookup-batch.ifizbox.internal/v2/${country}?${new URLSearchParams({ bundleIds: bundleId })}`);
   const hit = cache ? await cache.match(key).catch(() => null) : null;
   if (hit) return hit;
   let body;

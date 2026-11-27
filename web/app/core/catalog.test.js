@@ -524,6 +524,14 @@ test("F455 popular(): store ratings count for IPA apps only, by the real bundle 
   assert.deepEqual(runCatalog(c, "storeCandidates", []).sort(), ["com.x.alpha", "com.x.beta"], "no tweak, no `~name` suffix, no repeat");
   assert.equal(c.storeCandidates(1).length, 1);
   const names = (store) => c.popular({ store }).map((r) => r.name);
-  assert.deepEqual(names({ "com.x.alpha": [4, 100], "com.x.beta": [4.5, 100], "com.x.tweak": [5, 100] }), ["Beta", "Gamma", "Alpha", "Tweak"]);
-  assert.deepEqual(names({ "com.x.alpha": [4, 100] }), ["Alpha", "Beta", "Gamma", "Tweak"]);
+  assert.deepEqual(names({ "com.x.alpha": [4, 100, "Alpha"], "com.x.beta": [4.5, 100, "Beta"], "com.x.tweak": [5, 100, "Tweak"] }), ["Beta", "Alpha", "Gamma", "Tweak"]);
+  assert.deepEqual(names({ "com.x.alpha": [4, 100, "Alpha"] }), ["Alpha", "Beta", "Gamma", "Tweak"]);
+});
+test("F457 popular(): a modded app doesn't borrow the App Store rating of the bundle ID it kept", () => {
+  const c = createCatalog();
+  const app = (name, id) => ({ name, bundleIdentifier: id, versions: [{ version: "1", downloadURL: `https://x.dev/${name}.ipa` }] });
+  runCatalog(c, "loadAlt", ["alt:https://x.dev/s.json", JSON.stringify({ name: "S", apps: [
+    app("Aardvark Mod", "com.x.gram"), app("Gram++", "com.x.gram"), app("Gram", "com.x.gram"), app("Zed", "com.x.zed")] }), null, null]);
+  const store = { "com.x.gram": [4.7, 1000, "Gram"], "com.x.zed": [3, 10, "Zed: Notes & Lists"] };
+  assert.deepEqual(c.popular({ store }).map((r) => r.name), ["Gram", "Zed", "Aardvark Mod", "Gram++"]);
 });

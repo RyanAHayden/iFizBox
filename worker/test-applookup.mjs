@@ -17,7 +17,7 @@ const call = (q, o = {}) => appLookupBatch(new URL("https://ifizbox.example/api/
 let r = await call("bundleIds=com.a.one,com.b.two,com.c.none&country=us");
 assert.equal(r.status, 200);
 assert.deepEqual((await r.json()).results, [
-  { bundleId: "com.a.one", averageUserRating: 4.5, userRatingCount: 120 }, { bundleId: "com.b.two", averageUserRating: 3, userRatingCount: 8 }]);
+  { bundleId: "com.a.one", trackName: "One", averageUserRating: 4.5, userRatingCount: 120 }, { bundleId: "com.b.two", trackName: "", averageUserRating: 3, userRatingCount: 8 }]);
 assert.deepEqual(asked, ["com.a.one,com.b.two,com.c.none"]); // one Apple request for the whole list
 assert.match(r.headers.get("Cache-Control"), /max-age=86400/);
 

@@ -60,6 +60,16 @@ export function ratingOf(ratings, id) {
   const avg = Array.isArray(v) ? Number(v[0]) : NaN;
   return Number.isFinite(avg) && avg > 0 ? { avg, count: Number(v[1]) || 0 } : null;
 }
+// F457: a modded app keeps the original's bundle ID, so the App Store's stars count only for an app named as the App
+// Store names it: the whole name or its first words ("Spotify Music" of "Spotify: Music and Podcasts"). "+" is part of
+// a word, so "Instagram++" isn't "Instagram". Here, not core/applookup.js: the catalog imports this module already,
+// and app.js's startup modules are capped.
+const nameWords = (s) => String(s ?? "").normalize("NFC").toLowerCase().replace(/['’]/g, "").split(/[^\p{L}\p{M}\p{N}+]+/u).filter(Boolean);
+export function isStoreName(appName, trackName) {
+  const app = nameWords(appName).join("");
+  let lead = "";
+  return app !== "" && nameWords(trackName).some((w) => (lead += w) === app);
+}
 // Rated before unrated, the highest average first, then the most ratings; 0 between two unrated or two equal.
 export function compareRatings(x, y) {
   if (x && y) return y.avg - x.avg || y.count - x.count;
