@@ -8,7 +8,9 @@
 //        -> {token, app: {name, bundleId, version, minimumOS, size, entitlements, permissions, extensions},
 //            icon (base64 PNG, may be Apple's CgBI form) | null, missing: [entitlement], signsAs, profileKind,
 //            appIdAs, keepBundleId, push, wildcard, profileAppId, profileGroups}   (params keepBundleId?: Keep Bundle IDs, absent on)
-//        + pinned, freeAppId (B502a: a free Apple ID's explicit profile, and the App ID the app needs, <id>.TEAMID)//   signing.install {url | token, name?, bundleId?, icon?, removeExtensions?, fixArm64e?, keepBundleId?} (stream as I6)
+//        + pinned, freeAppId (B502a: a free Apple ID's explicit profile, and the App ID the app needs, <id>.TEAMID)
+//   signing.addProfile {profile: base64} -> {appId, expires}: B502a1, keeps a free Apple ID's profile for one app
+//   signing.install {url | token, name?, bundleId?, icon?, removeExtensions?, fixArm64e?, keepBundleId?} (stream as I6)
 //        -> I6's reply + {fixedArm64e, expires}
 //   signing.progress {bundleId} (stream: {phase: "installing", progress}, {served: true} once iOS has the whole IPA)
 //                    -> {installed: true | false | null}
@@ -66,6 +68,9 @@ enum Sideload {
             appProfile(asked, original: original, held: held, certificate: certificate)
         }
         b.on("signing.inspect") { c in inspect(c) }
+        b.on("signing.addProfile") { c in // B502a1
+            SignBridge.run(c) { try addProfile(c.params["profile"] as? String ?? "") }
+        }
         b.on("signing.progress") { c in progress(c) }
         // B83: iFizBox's own update after the prompt (CloseForUpdate): streams {state} and answers the last one
         b.on("signing.selfUpdate") { c in
@@ -146,6 +151,16 @@ enum Sideload {
     static func appProfile(_ asked: String, original: String, held: Profile, certificate: Data) -> Profile {
         FreeAppID.profile(for: asked, original: original, held: held, kept: FreeAppID.kept(in: appProfilesDir),
                           certificate: certificate, records: records(), installed: { Workspace.isInstalled($0) })
+    }
+
+    static func addProfile(_ base64: String) throws -> [String: Any] {
+        guard let data = Data(base64Encoded: base64) else { throw SignError("bad_profile", "That isn't a provisioning profile.") }
+        guard let id = SignStore.identity(), let held = SignStore.profile() else {
+            throw SignError("no_identity", "Import a certificate in Settings > Signing first.")
+        }
+        let p = try FreeAppID.keep(data, held: held, certificate: KeychainIdentity(id).certificate, in: appProfilesDir)
+        let expires: Any = p.expires.map { ISO8601DateFormatter().string(from: $0) } ?? NSNull()
+        return ["appId": p.appID, "expires": expires]
     }
 
     static func inspect(_ c: Bridge.Call) {

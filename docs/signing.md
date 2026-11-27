@@ -252,9 +252,8 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   Tests: `native/sign/tests/sideload/main.swift` (a stub misagent), `web/app/core/freeroute.test.js`.
 - **Forget Free Apple ID** also removes the Keychain identity, but only when its certificate's serial is the Free Apple
   ID's; a certificate imported since stays.
-- **Names**: the App ID and profile are the website's (`<bundle ID>.<TEAMID>`, the app's own bundle ID). With Keep
-  Bundle IDs on, other apps keep their own bundle IDs and take that App ID only in their entitlements. iFizBox's own
-  update on a free profile is the exception (below).
+- **Names**: the App ID and profile are the website's (`<bundle ID>.<TEAMID>`, the app's own bundle ID). On a free profile
+  each app takes its own App ID whatever Keep Bundle IDs says (below), as iFizBox's own update does.
 - **The signer** keeps `get-task-allow` as the profile allows under Xcode's team profiles (named "iOS Team
   Provisioning Profile: …", or with `LocalProvision`), which is every free Apple ID profile: iOS refuses such an app
   signed with it false. Every other profile still signs apps that can't be debugged (`native/sign/Profile.swift`
@@ -267,20 +266,36 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
 - **iFizBox's own update on a free profile** is signed as `<bundle ID>.<TEAMID>` whatever Keep Bundle IDs says: the ID
   the Computer Install gave it (`web/app/signing/freeprofile.js`).
 - **One App ID per app on a free profile.** iOS installs an app signed with a free profile's explicit App ID only when
-  the app's bundle ID is that App ID (any other is refused, 0xe8008016). So an app on a free profile is signed as the
+  the app's bundle ID is that App ID (any other is refused, 0xe8008016). So an app on a free profile is signed as its own
   App ID whatever Keep Bundle IDs says, and its extensions are left out (`native/sign/Profile.swift` `pinsBundleID`,
   `native/sign/IPASigner.swift`). `native/sign/FreeAppID.swift` refuses an app (`app_id_taken`) when another installed
-  or recorded app already has that ID, since installing would replace that app and its data. iFizBox updating itself
+  or recorded app already has the App ID it would be signed as, since installing would replace that app and its data.
+  iFizBox updating itself
   and re-signing the same app are allowed. Re-sign refuses (`app_id_mismatch`) an app installed under another bundle
   ID, which would otherwise install a second copy. iOS 27 can't say whether an app is installed, so a recorded one counts
   until it is removed from Signed Apps.
 - **Per-app profiles.** The sideload app's shell keeps one free profile per app, in Application Support/Signing/AppProfiles,
   one file per App ID. A kept profile is a free explicit one of the held profile's team and certificate, not lapsed.
+  `signing.addProfile {profile}` (base64) keeps the profile the page hands in and answers its `appId` and `expires`.
   Signing under a free explicit profile uses the kept profile for `<bundle ID>.<TEAMID>` (the typed bundle ID if one was
   typed), so that app signs as its own App ID and sits beside other apps. With none kept for it, the app signs as the
   held profile's App ID, and a second such app is refused (`app_id_taken`). An app already installed under the held
-  profile's App ID stays there. Today only App Refresh puts profiles in the store, and it keeps the ones it was given,
-  so an app with no kept profile still signs as the setup's App ID. `signing.inspect` answers `pinned` and `freeAppId`.
+  profile's App ID stays there. `signing.inspect` answers `pinned` and `freeAppId`.
+- **Making each app's App ID.** Before the app queue signs an app under a free explicit profile (an install, an update
+  or a queued Re-sign), `web/app/signing/freeappid.js` (called by `signing/queue.js` `prepareOnDevice`) makes or reuses
+  the App ID `<bundle ID>.<TEAMID>` (`core/freeroute.js` `ensureAppId`), downloads its profile and hands it in with
+  `signing.addProfile`. The bundle ID is the typed one if one was typed, else the one the source, the library or the
+  record lists. An app already installed under the held profile's App ID stays there, and no App ID is made for it; a
+  queued Re-sign renews the App ID the app is installed under. If the IPA's own bundle ID differs from the one listed,
+  its App ID is made too and the app is downloaded and signed a second time. If Apple refuses (for example, 10 App IDs
+  a week), the sign still goes ahead; if the shell then refuses `app_id_taken`, the row shows Apple's reason.
+- **Apple's session** for those App IDs is kept in the page's memory only (`screens/free-apple-id.js` `freeSession`,
+  ended by `endFreeSession`), so after the app is relaunched there is none until the user signs in again (Use a Free
+  Apple ID > Sign In Again). With no session the sign goes ahead with whatever profile the shell already keeps, and
+  installs that need no App ID of their own still work. If the shell then refuses `app_id_taken`, a **Sign In Needed**
+  alert (**Cancel** / **Open**) goes to Signing, and the row says to sign in and install again.
+- **Outside the app queue**, an install (`signing.install`, such as Custom Install's progress page) makes no App ID.
+  App Refresh and Re-sign All don't make a lapsed App ID again first. Tests: `web/app/signing/freeappid.test.js`.
 
 ## Own provisioning profiles (App Store Connect API key)
 

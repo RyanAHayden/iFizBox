@@ -263,6 +263,10 @@ export function udidDetour(steps = {}, { udid = null, native = false, pending = 
   return { rows: [{ label: FIND_UDID, href, ...(pending ? { detail: "Waiting" } : {}) }], footer: pending ? UDID_WAITING : FREE_UDID_FOOTER };
 }
 
+// B502a1: Apple's session while the page has one (memory only), for each app's own App ID (signing/freeappid.js)
+export const freeSession = () => (flow.portal && flow.team?.teamId ? { portal: flow.portal, teamId: flow.team.teamId } : null);
+export const endFreeSession = () => { flow.portal = null; flow.session = null; }; // Apple ended it: Ready says Sign In Again
+
 function anisetteStore(store) {
   return { load: () => readJson(store, ANISETTE_KEY), save: (s) => writeJson(store, ANISETTE_KEY, s) };
 }

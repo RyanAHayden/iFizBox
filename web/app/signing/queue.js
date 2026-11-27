@@ -90,13 +90,18 @@ export async function prepareOnDevice(job, { tag, signal = null, progress = () =
   }
   try {
     // B104: an http link with no https twin asks first (askInsecure); Cancel ends the row as its stop does
-    const r = await askInsecure((extra) => abortable(native, "signing.prepare", { ...params, ...refusing(), ...extra }, (ev) => {
+    const sign = () => askInsecure((extra) => abortable(native, "signing.prepare", { ...params, ...refusing(), ...extra }, (ev) => {
       if (ev?.log) { log(ev.log); return; }
       // B152: the signer's own phase (reading, signing) goes along, so the run gives each its share of Signing
       // B262: the download's once-a-second {bytes, total, rate} go along too, for the row's MB of MB and MB/s
       const info = ev?.phase === "downloading" && ev.bytes != null ? { bytes: ev.bytes, total: ev.total, rate: ev.rate } : null;
       if (ev?.phase) progress(ev.phase === "downloading" ? "downloading" : "signing", Number(ev.progress) || 0, ev.phase, ...(info ? [info] : []));
     }, { tag, signal }), { alert, url: params?.url ?? null });
+    // B502a1: a free Apple ID: the app's own App ID and profile first (signing/freeappid.js)
+    const { withOwnAppId } = await import("./freeappid.js");
+    let shell = null;
+    try { shell = bridge(native); } catch { /* no bridge: signing.prepare says so */ }
+    const r = await withOwnAppId(job, params, sign, { native: shell, log, alert, discard: (token) => discardPrepared(token, native) });
     keepIpaHash(storageOf(), r, { bundleId: job?.bundleId ?? (typeof job?.id === "string" && !job.id.startsWith("library:") ? job.id : null), version: job?.version ?? null }); // F292
     return r;
   } catch (e) {

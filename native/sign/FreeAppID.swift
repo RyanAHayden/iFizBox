@@ -67,7 +67,7 @@ enum FreeAppID {
     }
 
     static func taken(by other: String) -> SignError {
-        let why = "A free Apple ID signs every app as one bundle ID, and \(other) has it, so this install would replace \(other)."
+        let why = "No App ID of its own was made for this app, and \(other) has the one it would be signed as, so this install would replace \(other)."
         if other == Brand.name { return SignError("app_id_taken", why) }
         return SignError("app_id_taken", why + " To install this app, delete \(other) and remove it from Signed Apps.")
     }
