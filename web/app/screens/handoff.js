@@ -142,7 +142,7 @@ export function shareItems(source, { app = false, appId = null, jailbroken = set
   if (add) items.push({ kind: "qr", label: "Add on Another Device", link: add });
   // F451: iFizBox's own link: a source's opens iFizBox offering to add it, an app's opens that app's page.
   const own = app ? appLink(appId, origin) : add;
-  if (own) items.push({ kind: "link", label: "Share iFizBox link", url: own, letter: "I", color: "#2a6be0" });
+  if (own) items.push({ kind: "link", label: `Share ${NAME} link`, url: own, letter: NAME.charAt(0).toUpperCase(), color: "#2a6be0" });
   // An app's page lists them too (user 2026-11-17): they add the app's source to that app.
   const apt = formatOf(source) === "apt";
   if (apt && !jailbroken) return items;
