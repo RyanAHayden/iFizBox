@@ -266,7 +266,7 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   failure says so and points to a certificate (Settings > Installation & Signing) or a Computer Install.
 - **iFizBox's own update on a free profile** is signed as `<bundle ID>.<TEAMID>` whatever Keep Bundle IDs says: the ID
   the Computer Install gave it (`web/app/signing/freeprofile.js`).
-- **One app at a time on a free profile.** iOS installs an app signed with a free profile's explicit App ID only when
+- **One App ID per app on a free profile.** iOS installs an app signed with a free profile's explicit App ID only when
   the app's bundle ID is that App ID (any other is refused, 0xe8008016). So an app on a free profile is signed as the
   App ID whatever Keep Bundle IDs says, and its extensions are left out (`native/sign/Profile.swift` `pinsBundleID`,
   `native/sign/IPASigner.swift`). `native/sign/FreeAppID.swift` refuses an app (`app_id_taken`) when another installed
@@ -274,6 +274,14 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   and re-signing the same app are allowed. Re-sign refuses (`app_id_mismatch`) an app installed under another bundle
   ID, which would otherwise install a second copy. iOS 27 can't say whether an app is installed, so a recorded one counts
   until it is removed from Signed Apps.
+- **Per-app profiles.** The sideload app's shell keeps one free profile per app. `signing.addProfile {profile: base64}`
+  takes one (only while the held profile is a free explicit one of the same team and certificate) and answers
+  `{appId, expires}`; it is kept in Application Support/Signing/AppProfiles, one file per App ID. Signing under a free
+  explicit profile uses the kept profile for `<bundle ID>.<TEAMID>` (the typed bundle ID if one was typed), so that app
+  signs as its own App ID and sits beside other apps. With none kept for it, the app signs as the held profile's App ID,
+  and a second such app is refused (`app_id_taken`). An app already installed under the held profile's App ID stays
+  there, and App Refresh keeps the profiles it was given. `signing.inspect` also answers `pinned` and `freeAppId`. The
+  app's page does not call `signing.addProfile` yet, so in the app every app still signs as the setup's App ID.
 
 ## Own provisioning profiles (App Store Connect API key)
 

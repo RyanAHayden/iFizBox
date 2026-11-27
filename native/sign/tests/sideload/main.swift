@@ -1064,4 +1064,75 @@ test("free Apple ID: signed as the App ID, replacing no other app (B502)") {
           "installed under its own ID: not re-signed as a second copy")
 }
 
+// B502a: each app has an App ID of its own, and the signer picks that app's profile.
+test("free Apple ID: each app signs with its own App ID's profile (B502a)") {
+    let now = Date(), day: TimeInterval = 86400, team = "TEAM123456", setup = "com.you.box.TEAM123456"
+    func profile(_ app: String, days: TimeInterval = 7, made: TimeInterval = 0, team t: String = "TEAM123456",
+                 certs: [Data]? = nil) throws -> Profile {
+        let d: [String: Any] = ["Name": "iOS Team Provisioning Profile: \(app)", "TeamIdentifier": [t],
+                                "CreationDate": now.addingTimeInterval(made * day), "ExpirationDate": now.addingTimeInterval((made + days) * day),
+                                "DeveloperCertificates": certs ?? [identity.certificate],
+                                "Entitlements": ["application-identifier": "\(t).\(app)", "get-task-allow": true,
+                                                 "keychain-access-groups": ["\(t).*"]]]
+        return try Profile(PropertyListSerialization.data(fromPropertyList: d, format: .xml, options: 0))
+    }
+    check(FreeAppID.appID(for: "com.a", team: team) == "com.a.\(team)", "suffixed")
+    check(FreeAppID.appID(for: "com.a.team123456", team: team) == "com.a.team123456", "not twice")
+
+    let held = try profile(setup)
+    let dir = work.appendingPathComponent("AppProfiles")
+    func keep(_ p: Profile, held h: Profile? = nil) throws { try FreeAppID.keep(p.data, held: h ?? held, certificate: identity.certificate, in: dir) }
+    let a = try profile("com.a.\(team)"), b = try profile("com.b.\(team)")
+    check(FreeAppID.kept(in: dir).isEmpty, "none yet")
+    try keep(profile("com.a.\(team)", made: -1))
+    try keep(a)
+    try keep(b)
+    check(FreeAppID.kept(in: dir).map(\.appID).sorted() == ["com.a.\(team)", "com.b.\(team)"], "one per App ID")
+    check(FreeAppID.kept(in: dir).first { $0.appID == a.appID }?.data == a.data, "the newer in place of the older")
+    check(throwsCode("bad_profile") { try keep(profile("*")) }, "a wildcard")
+    check(throwsCode("bad_profile") { try keep(profile("com.c", days: 365)) }, "a paid team's")
+    check(throwsCode("bad_profile") { try keep(profile("com.c", team: "OTHER12345")) }, "another team's")
+    check(throwsCode("bad_profile") { try keep(a, held: profile("*")) }, "the held one pins nothing")
+    check(throwsCode("cert_not_in_profile") { try keep(profile("com.c", certs: [try fixture("ca.der")])) }, "another certificate's")
+    check(throwsCode("profile_expired") { try keep(profile("com.c", made: -8)) }, "lapsed")
+
+    func rec(_ bundle: String, _ original: String) -> SignedRecord {
+        SignedRecord(bundleID: bundle, originalBundleID: original, name: "A", version: "1", url: "https://x.example/a.ipa", signed: now,
+                     expires: now.addingTimeInterval(day), options: .init(name: nil, bundleID: nil, icon: nil, removeExtensions: [], fixArm64e: false))
+    }
+    func pick(_ original: String, asked: String? = nil, held h: Profile? = nil, _ records: [SignedRecord] = [], installed: Bool? = nil) -> String {
+        FreeAppID.profile(for: asked ?? original, original: original, held: h ?? held, kept: FreeAppID.kept(in: dir),
+                          certificate: identity.certificate, records: records) { _ in installed }.appID
+    }
+    check(pick("com.a") == a.appID && pick("com.b") == b.appID, "each its own: \(pick("com.a")) \(pick("com.b"))")
+    check(pick("com.c") == setup, "none for it: the setup's")
+    check(pick("com.c", asked: "com.b") == b.appID, "a typed bundle ID's")
+    check(pick("com.you.box") == setup, "the setup's own app")
+    check(pick("com.a", [rec(setup, "com.a")], installed: nil) == setup, "installed under the setup's App ID: stays there")
+    check(pick("com.a", [rec(setup, "com.a")], installed: false) == a.appID, "deleted: its own")
+    check(pick("com.a", held: try profile("*")) == "*", "a wildcard is used as it is")
+
+    // two apps side by side: two bundle IDs, each under its own App ID
+    let original = try Inspect.ipa(fixtures.appendingPathComponent("edit.ipa")).bundleID
+    IPASigner.appProfile = { asked, original, held, certificate in
+        FreeAppID.profile(for: asked, original: original, held: held, kept: FreeAppID.kept(in: dir), certificate: certificate, records: []) { _ in nil }
+    }
+    IPASigner.idHolder = { bid, _ in bid == setup ? "Other App" : nil }
+    defer { IPASigner.appProfile = nil; IPASigner.idHolder = nil }
+    var ids: [String] = []
+    for (n, asked) in [nil, "com.second"].enumerated() as EnumeratedSequence<[String?]> {
+        let want = "\(asked ?? original).\(team)"
+        try keep(profile(want))
+        let s = IPASigner(profile: held, identity: identity)
+        s.options = try SignOptions(json: asked.map { ["bundleId": $0] } ?? [:])
+        let out = work.appendingPathComponent("own\(n).ipa")
+        let app = try s.sign(fixtures.appendingPathComponent("edit.ipa"), to: out)
+        let d = try Inspect.ipa(out)
+        check(app.bundleID == want && d.bundleID == want && s.profile.appID == want, "\(app.bundleID) \(d.bundleID) \(s.profile.appID)")
+        check(d.entitlements["application-identifier"] as? String == "\(team).\(want)", "entitlements \(d.entitlements)")
+        ids.append(app.bundleID)
+    }
+    check(Set(ids).count == 2, "side by side: \(ids)")
+}
+
 if failures == 0 { print("all passed") } else { print("\(failures) failed"); exit(1) }

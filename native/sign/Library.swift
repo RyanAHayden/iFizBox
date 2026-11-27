@@ -218,7 +218,9 @@ struct IPALibrary {
         let s = Signed(sourceSize: size, sourceModified: modified, certificate: IPALibrary.hex(sha1(certificate)),
                        options: opts.stored, bundleID: app.bundleID, originalBundleID: app.originalBundleID, name: app.name,
                        version: app.version, removed: app.removed, fixedArm64e: app.fixedArm64e, signed: signer.time,
-                       expires: expires, signer: app.stamp, certSerial: app.certSerial, appID: app.appID)
+                       // B502a: a free Apple ID's app may have signed with its own profile, not the one `expires` is from
+                       expires: signer.profile.pinsBundleID ? signer.profile.signatureExpiry(certificate: certificate) : expires,
+                       signer: app.stamp, certSerial: app.certSerial, appID: app.appID)
         dropSigned(file)
         try FileManager.default.moveItem(at: tmp, to: signedURL(file))
         try IPALibrary.encoder.encode(s).write(to: side(file, ".signed.json"), options: .atomic)
