@@ -18,8 +18,11 @@
 
 **Honest limit on the cause.** Locally the pass-through still delivered the last message before the 1006. What was seen through Cloudflare's edge was the last message missing. That the edge loses it in the pass-through is inference, not proven. If the message never reaches the Worker, the page now gets a close ("provisioning socket closed early") and B498's one retry covers it.
 
+**After the spec review.** Real workerd (the same harness, a mock sending only a close frame) passed close codes 1000-1003, 1007-1014, 3000 and 4999 through to the client unchanged, so close() refuses none of what closeCode lets through. Left as is: the error listener closes the other side with 1011 before any close event; an error means the connection failed, so there is no server close code to keep (reasoning, not tested with an error that carries one).
+
 **Not verified.**
 - The fix on Cloudflare's edge. That needs a deploy, which this task does not do (`wrangler dev --remote` also uploads). So the drop rate through ifizbox.com is unmeasured. R108 (open) measures it after the next release.
 - A real browser. The checks used Node's WebSocket.
 - A real Apple ID sign-in.
 - win.ani.sidestore.io.
+- Provisioning with every leg through wrangler dev. gsa.apple.com went through the deployed relay, see Check 1.
