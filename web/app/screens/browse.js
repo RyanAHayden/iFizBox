@@ -949,7 +949,7 @@ async function renderList(body, route, fetchRows, letters) {
 // F426c: pinned as Search's, with its scope bar and Filter button under the field (listfilter.js). `order` names the
 // list's own order in the panel's Sort; `oneKind` leaves the segments out.
 export async function renderSearchableList(body, route, fetchRows, { letters = false, headers = null, empty = "No packages.",
-  label = "Search this list", order = letters ? "Name" : "Default", oneKind = false } = {}) {
+  label = "Search this list", order = letters ? "Name" : "Default", oneKind = false, wide = null } = {}) {
   let rows = [];      // the list as it comes
   let refined = null; // its rows by the filters and sort, or null before the first load
   let turn = 0, loads = 0, list = null, index = null;
@@ -985,11 +985,21 @@ export async function renderSearchableList(body, route, fetchRows, { letters = f
     if (indexed && !index) index = createSectionIndex(results, list);
     else if (!indexed && index) { index.destroy(); index = null; }
   };
+  // B486: a list cut to its first `limit` (Popular's 50) filters the whole pool `wide.rows()` gives, then keeps the first
+  // `limit` of what passes, so a Source's packages are not only the ones that made the cut.
+  let pool = null;
+  const refineRows = async (opts) => {
+    const { sort, ...filters } = opts;
+    if (!wide || !Object.keys(filters).length) return catalog.refine(rows, opts);
+    pool ??= await wide.rows();
+    const kept = (await catalog.refine(pool, filters)).slice(0, wide.limit);
+    return sort ? catalog.refine(kept, { sort }) : kept;
+  };
   const refine = async (top = false) => {
     const mine = ++turn;
     const opts = refineOptions(scope.filters);
     try {
-      const rs = opts ? await catalog.refine(rows, opts) : rows;
+      const rs = opts ? await refineRows(opts) : rows;
       if (mine !== turn) return; // a newer choice won
       refined = rs;
     } catch (e) {
@@ -1005,6 +1015,7 @@ export async function renderSearchableList(body, route, fetchRows, { letters = f
       const got = await fetchRows();
       if (mine !== loads) return;
       rows = got;
+      pool = null;
     } catch (e) {
       if (mine === loads) fail(e);
       return;
