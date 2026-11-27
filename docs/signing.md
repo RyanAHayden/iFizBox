@@ -209,8 +209,9 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
 
 - **No relay.** The app asks Apple and the anisette server itself. Every HTTP request goes through the shell's
   `net.request` (`native/Sources/Paid.swift`: https, GET/POST/PUT, text bodies; PUT is the SMS-code request), so CORS
-  doesn't apply, and the Worker's relay refuses other origins anyway. The anisette provisioning WebSocket goes straight
-  to the anisette server (`wss://<server>/v3/provisioning_session`). Register This iPhone takes its UDID from the shell
+  doesn't apply, and the Worker's relay refuses other origins anyway. Each request to gsa.apple.com gets a session of
+  its own, so a fresh connection, as Apple answers a reused one with 5xx. The anisette provisioning WebSocket goes
+  straight to the anisette server (`wss://<server>/v3/provisioning_session`). Register This iPhone takes its UDID from the shell
   (`device.info`). See `screens/free-apple-id.js` (`nativeTransport`, `directWsUrl`).
 - **Ready** puts the certificate, its password and the 7-day profile into the Keychain as the app's signing identity
   (`signing.import`, as Select All Files does), so Install and re-signing on the phone use them. There is no Save for

@@ -91,7 +91,10 @@ enum Paid {
             req.setValue(v, forHTTPHeaderField: k)
         }
         if method != "GET", let body = c.params["body"] as? String { req.httpBody = Data(body.utf8) }
-        Apt.session.dataTask(with: req) { data, resp, err in
+        // GrandSlam answers a reused connection with 5xx: a session of its own, so a connection of its own.
+        let own = url.host?.lowercased() == "gsa.apple.com" ? URLSession(configuration: Apt.session.configuration) : nil
+        defer { own?.finishTasksAndInvalidate() } // lets the task below finish first
+        (own ?? Apt.session).dataTask(with: req) { data, resp, err in
             if let e = err as? URLError {
                 return Apt.reply(c, nil, "\(e.code == .timedOut ? "timeout" : "network"): \(e.localizedDescription)")
             }

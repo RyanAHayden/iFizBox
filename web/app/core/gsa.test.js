@@ -50,6 +50,20 @@ test("SRP: GrandSlam shape (SHA-256, 2048-bit, no username in x, s2k_fo) matches
   await assert.rejects(gsaPasswordKey("x", hx(v.salt), 10, "s2k_xx"), /Unsupported/);
 });
 
+// B498d: BariStore's vector (src/srp.rs, from a sign-in Apple accepted on a device): a = 07…07, salt 00..0f, password
+// key 42…42. M1 hashes H(N) xor H(PAD(g)); with g unpadded Apple answers -22406 to a right password.
+test("SRP: GrandSlam known answer, g padded in M1", async () => {
+  const B = hx(`5ed0b35d53a999d45bc4972fbcc70eed825fe30c1e47242189c5f40e2f17dbc745024eb2e6bd76dddf10fd7a6e20395bb9a4e596
+    700adb971b33fb1ae9beb8490d7124c481340eedd6737e1e74b1ab2b119c556dfc43bd482f9734b9c2a7621f92144a175ca321a54fd09b1b93bb89
+    b64f255473f0209d83d6e1522138db565113c1db3118d93f969e094e9012ee39352d354e30acd3d8e109f9b03d8424cd104634d62e0f64c836581
+    996adb663cbf61810e2e52879cc890657275663abc86c3559d348b95e65b06b208b0d836ca28e96c9ea35fde48b5ffdf42d9465db7f4f333762e1
+    2e44ff6c23964572dd7553a08a952723d2599c3a644e8a69e323e369`);
+  const r = await processReply({ a: bytesToBig(new Uint8Array(32).fill(7)), username: "someone@icloud.com",
+    password: new Uint8Array(32).fill(0x42), salt: Uint8Array.from({ length: 16 }, (_, i) => i), B });
+  assert.equal(hexOf(r.M1), "E3093018EAD5D2D94060F8234B5C54F40B0749F95DC0419099096F2E8B468ADC");
+  assert.equal(hexOf(r.S.slice(0, 32)), "3F705BECD05CBDBBC79B819DBD36ACE57CAB341E77BCC0FCC4699EA5A722B285");
+});
+
 test("plists: XML round trip, binary and JSON replies", () => {
   const v = { s: "a <&> b", n: 42, big: 2n ** 70n, t: true, f: false, d: new Uint8Array([1, 2, 255]), arr: ["x", 1, []], o: { e: {} } };
   const back = decodePlist(encodePlist(v));
@@ -494,6 +508,57 @@ test("anisette: a machine saved without its client info is the advertised one's"
   await ani.use("https://a.example", "advertised");
   assert.equal(r.provisioned.length, 1);
   assert.deepEqual([r.store.identifier, r.store.adi_pb], [saved.identifier, "OLD"]);
+});
+
+// B498d: a Windows-library server's machine gets hsc 434 (-22421) with resync data on its first sign-in.
+test("sign-in: hsc 434 resyncs the machine through the anisette server, then asks again", async () => {
+  const sim = new Uint8Array([1, 2, 3, 250]);
+  for (const data of [sim, b64encode(sim)]) { // <data> or <string> in the plist
+    const apple = fakeApple({ twoFactor: null }), gets = [], cpds = [];
+    const ok = (o) => ({ status: 200, headers: {}, body: utf8(JSON.stringify(o)) });
+    const transport = async (req) => {
+      const u = new URL(req.url);
+      if (u.pathname === "/v3/client_info") return ok({ client_info: OLD_MAC, user_agent: "ua" });
+      if (u.pathname === "/v3/get_headers") {
+        const body = JSON.parse(td.decode(req.body));
+        gets.push(body);
+        return ok({ result: "Headers", "X-Apple-I-MD": "md-value", "X-Apple-I-MD-M": body.sim ? "resynced" : "stale" });
+      }
+      if (u.pathname === "/grandslam/GsService2" && req.method === "POST") {
+        const r = decodePlist(req.body).Request;
+        cpds.push([r.o, r.cpd["X-Apple-I-MD-M"]]);
+        if (cpds.length === 1) return { status: 200, headers: {}, body: utf8(encodePlist({ Response: { Status: { ec: -22421, hsc: 434, "X-Apple-I-MD-DATA": data } } })) };
+      }
+      return apple.transport(req);
+    };
+    const saved = { identifier: b64encode(new Uint8Array(16)), adi_pb: "PB", server: "https://win.example", clientInfo: OLD_MAC };
+    const anisette = anisetteV3({ transport, servers: ["https://win.example"], storage: { load: () => saved } });
+    assert.equal((await new AppleIdSession({ transport, anisette }).login(EMAIL, PASSWORD)).step, "done");
+    assert.deepEqual(cpds.slice(0, 3), [["init", "stale"], ["init", "resynced"], ["complete", "resynced"]]);
+    const resync = gets.filter((g) => g.sim);
+    assert.equal(resync.length, 1);
+    assert.equal(resync[0].sim, b64encode(sim));
+    assert.equal(resync[0].adi_pb, "PB");
+    assert.match(resync[0].device_id, /^0{8}-0{4}-0{4}-0{4}-0{12}$/);
+    assert.match(resync[0].md_lu, /^[0-9a-f]{64}$/);
+  }
+});
+
+// B498d: GrandSlam answers reused connections with 5xx. Both transports that can choose ask for a fresh one.
+test("GrandSlam gets a fresh connection: the relay says close, the app uses a session of its own", async () => {
+  const { appleRelay } = await import("../../../worker/src/apple-relay.js");
+  const connection = async (path) => {
+    let sent;
+    await appleRelay(new Request(`https://site.example/apple/${path}`), { APPLE_RELAY: "1" },
+      { fetcher: async (url, init) => { sent = init.headers; return new Response("x"); } });
+    return sent.get("Connection");
+  };
+  assert.equal(await connection("gsa.apple.com/grandslam/GsService2/lookup"), "close");
+  assert.equal(await connection("new.ani.sidestore.io/v3/client_info"), null);
+  const { readFile } = await import("node:fs/promises");
+  const swift = await readFile(new URL("../../../native/Sources/Paid.swift", import.meta.url), "utf8");
+  assert.match(swift, /"gsa\.apple\.com" \? URLSession\(configuration: Apt\.session\.configuration\) : nil/);
+  assert.match(swift, /\(own \?\? Apt\.session\)\.dataTask\(with: req\)/);
 });
 
 test("sign-in: the code check signs in again with the same server and claim", async () => {
