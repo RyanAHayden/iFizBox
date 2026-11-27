@@ -111,7 +111,8 @@ iOS's install prompt.
 
 What leaves the browser: the IPA's address (to `/api/fetch`) and the signed app (to `/sign/upload`, for 10 minutes).
 The certificate, key and password never do, except inside iFizBox's own signed IPA with Bring My Certificate (that
-copy waits on the Worker for the same 10 minutes). With an App Store Connect API key added, the App Store Connect
+copy waits on the Worker for the same 10 minutes), and as the Free Apple ID record in a computer install's IPA, sealed
+with a key that stays in this browser (Free Apple ID, below). With an App Store Connect API key added, the App Store Connect
 calls and their JWT go through the Worker's pass-through to Apple ("Own provisioning profiles" below); the `.p8` stays
 in the browser.
 
@@ -153,18 +154,23 @@ The website's flow (`web/app/screens/free-apple-id.js`):
    every app signed with it stops until signed again. Cancel stops setup and revokes nothing.
 3. **Ready**: the team, certificate and profile dates, **Save for the App** (a `.zip` with the `.p12`, its password
    and the profile, which the app's Select All Files imports), **Download for a Computer Install**
-   (`screens/computer-install.js`), the Developer Mode + Trust note, Refresh Profile, and Forget Free Apple ID
+   (`screens/computer-install.js`; once an install has made a key, **Finish Setup** is the link that gives the app that
+   key), the Developer Mode + Trust note, Refresh Profile, and Forget Free Apple ID
    (removes the key and certificate from this browser; Apple's copy isn't revoked).
 
 **Download for a Computer Install** signs the newest release's IPA in the browser with the free identity
 (`runSignJob` with `free`: `freeEntitlements`; the bundle ID becomes `<id>.<TEAMID>`, extensions left out; the
-identity goes in as `ifizbox-identity.plist`, with the website's settings link; the Free Apple ID record goes in as
-`web/free-id.json`, which the sideload app takes on launch), uploads it (`/sign/upload`), and
-`POST /sign/setup` makes a code for its SHA-256 (the default bundle ID and pairing path). The code shows until it
-expires, with the two one-liners of sideload.md. **Make a New Code** re-uploads the same signed IPA. **Save the IPA**
-is the fallback for other tools. With the profile missing or expired, the group's row is Refresh Profile or Sign In
-Again, and its footer says so. The signed IPA and the code live only in the page's memory: a new profile or Forget
-Free Apple ID drops them.
+website's settings link goes in as `web/transfer.link`). The Free Apple ID record goes in as `web/free-id.json`, sealed
+(`core/websign.js` sealRecord: AES-GCM with a random 256-bit key, `{"v":1,"alg":"A256GCM","iv","data"}`). No
+`ifizbox-identity.plist` goes in: it would hold the same certificate and password in the clear. The key is made once
+and kept in this browser (localStorage `ifizbox.freeid.key`); it never goes to the Worker. The IPA is uploaded
+(`/sign/upload`), and `POST /sign/setup` makes a code for its SHA-256 (the default bundle ID and pairing path). The code
+shows until it expires, with the two one-liners of sideload.md. **Make a New Code** re-uploads the same signed IPA.
+**Finish Setup** is the link `ifizbox://free-id#<key>` (Safari never sends a fragment to a server), in the group
+headed After the Install. **Save the IPA** signs a second time, apart, with the record in the clear and
+`ifizbox-identity.plist`, for other tools; its finished page has a Save the IPA button. With the profile missing or
+expired, the group's row is Refresh Profile or Sign In Again, and its footer says so. The signed IPA and the code live
+only in the page's memory: a new profile or Forget Free Apple ID drops them.
 
 The setup makes the App ID and profile for the app itself (`BUNDLE_ID`, `brand.js`). The certificate (a `.p12`:
 the certificate in a plain bag, the key under PBES2 with PBKDF2-HMAC-SHA256 and AES-256-CBC, an HMAC-SHA256 MAC:
@@ -186,12 +192,13 @@ for); `freeExpiry` says "soon" 3 days before the 7-day profile ends
 What leaves the browser (the website's): every Apple and anisette request goes through the Worker's relay (allow-listed
 hosts and paths, no logging); in the sideload app there is no relay, and requests go straight to Apple and the anisette
 server. That relay path includes the Xcode app token and the developer-portal replies, but not the password or
-the private key. Only Download for a Computer Install sends the key out: inside the signed IPA, kept on the Worker for its
-10 minutes. Tests: `core/freeroute.test.js` (CSR checked with WebCrypto, the `.p12` opened by
+the private key. Download for a Computer Install sends the record out only sealed: in the signed IPA, with a key that
+stays in the browser and reaches the phone by Finish Setup's link, never through the Worker. Tests: `core/freeroute.test.js` (CSR checked with WebCrypto, the `.p12` opened by
 `checkP12Password` and decrypted back, a real zsign WebAssembly signing run with it, the checklist against a fake
 portal, the limit and Cancel), `screens/free-apple-id.test.js` (the alerts' effects, storage, the hand-off zip read
 back by the import's unzip, the relay check), `worker/test.mjs` (`/apple/status`). The computer install:
-`screens/computer-install.test.js` (the sign job, the code from the Worker with KV in memory, the block's states) and
+`screens/computer-install.test.js` (the key, Finish Setup's link, the code from the Worker with KV in memory, the block's
+states), `websign-job.test.js` (the uploaded IPA's `free-id.json` decrypts with the kept key, no identity plist in it) and
 `websign-free.test.js` (the free option's entitlements in zsign's own signature).
 
 **In the sideload app**
@@ -209,11 +216,13 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   (`signing.import`, as Select All Files does), so Install and re-signing on the phone use them. There is no Save for
   the App and no Download for a Computer Install. If the import fails, an alert says why, and a **Use for Signing**
   button tries again.
-- **After a computer install**: the signed app carries the Free Apple ID record (team, certificate serial, `.p12`, password,
-  profile, App ID) as `web/free-id.json`, next to `ifizbox-identity.plist`. On launch the app takes it into its own storage
-  (`adoptBundledFreeId` in `screens/free-apple-id.js`) when the Keychain's certificate has the same serial, once per file:
-  a Forget afterwards is not undone. So the Free Apple ID group shows right after a computer install, with Sign In Again
-  (Refresh Profile once signed in), and Home's expiry tile leads to it.
+- **After a computer install** (not finished yet: the app side that opens the sealed record is not built). The uploaded
+  IPA carries the Free Apple ID record as `web/free-id.json`, encrypted, and no `ifizbox-identity.plist`, so after a
+  computer install the app has no certificate until that side lands. Today `adoptBundledFreeId` (`screens/free-apple-id.js`)
+  takes only a plain record, as a Save the IPA copy carries it next to `ifizbox-identity.plist`: when the Keychain's
+  certificate has the same serial, once per file, so a Forget afterwards is not undone. Forget Free Apple ID also
+  removes the key from this browser; the next computer install makes a new one. Tests: `websign-job.test.js` and
+  `computer-install.test.js` (see Free Apple ID above).
 - **The weekly refresh** is Refresh Profile (or Sign In Again once Apple's session is gone): it makes a new profile and
   imports it again.
 - **Forget Free Apple ID** also removes the Keychain identity, but only when its certificate's serial is the Free Apple
