@@ -66,7 +66,7 @@ class Due(unittest.TestCase):
     def test_cancel_releases_at_once(self):
         """B490: a Cancel ends the copy and the reconnects, ours goes off with no linger, and a waiting look turns now."""
         idev = read("sideload", "idevice", "IDevice.swift", base=NATIVE)
-        self.assertIn("defer { LocalVPN.installEnded(cancelled: cancelled()) }", idev)
+        self.assertIn("defer { LocalVPN.installEnded(cancelled: cancelled() && !run.installSent) }", idev)
         self.assertIn("reconnecting: firstDrop != nil) && !cancelled() {", idev)
         self.assertEqual(idev.count("try run.checkCancelled()"), 3)  # each copy loop, and before installd is asked
         self.assertLess(idev.index("try run.checkCancelled() // B490"), idev.index("run.installSent = true"))

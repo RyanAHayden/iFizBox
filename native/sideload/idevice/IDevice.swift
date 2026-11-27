@@ -978,7 +978,8 @@ enum IDevice {
         var attempt = 0
         var firstDrop: Failure?
         LocalVPN.installBegan() // B395: its reconnects share one queue, so the VPN stays on through them
-        defer { LocalVPN.installEnded(cancelled: cancelled()) } // B490: after a Cancel, off with no linger
+        // B490: after a Cancel, off with no linger; once installd was asked, iOS installs it anyway: the linger stays
+        defer { LocalVPN.installEnded(cancelled: cancelled() && !run.installSent) }
         let wait = UUID() // F417a2: Cellular Installs keeps cellular data off until this connection is open
         defer { CellularShortcut.connected(wait) }
         let paused = { (p: LocalVPN.Pause) -> Void in // B423

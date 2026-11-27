@@ -64,7 +64,10 @@ after2 attempt drove by mistake (I set its Restore My VPN on, then back off). Fi
 ## Not verified
 
 - Cancel while installd is installing: not changed. iOS's own install goes on, and the hold ends when installd
-  answers (about 3 s for this app). Not timed.
+  answers (about 3 s for this app). Not timed. After the phone runs, the spec review's fix made such a Cancel keep
+  the 3 s linger (`cancelled() && !run.installSent`): the app installs anyway, and the next of a queue finds ours on.
+  That last edit was checked by builds and tests only, not on the phone.
+- IDevice.swift was not in the task's file list; it holds the cause (the copy ignored Cancel), so it changed here.
 - Cancel during the app wait or the airplane wait (pause): the code path ends at once and skips the linger, but it
   was not run on the phone (needs the app in the background or cellular).
 - The wake of a waiting look (`turnLater`): only the rules and text tests. In the phone runs no look was waiting
