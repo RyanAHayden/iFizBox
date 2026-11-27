@@ -268,3 +268,33 @@ test("the sheet on a free Apple ID's profile (pinned): no Keep Bundle ID switch 
   assert.equal(other.edits.keepBundleId, true);
   assert.match(other.footers, /bundle ID \(to install a second copy\)/);
 });
+
+test("B511: pinned, before the app's App ID is made: the row and footer say <bundle id>.<TEAMID>, and none is sent", async () => {
+  const held = "com.ryha.ifizbox.TEAM123456";
+  const own = "com.rileytestut.Delta.TEAM123456";
+  // signing.inspect with no profile for the app's own App ID yet: signsAs is still the held one
+  const info = { ...INFO, pinned: true, keepBundleId: false, signsAs: held, appIdAs: held, profileAppId: held, freeAppId: own };
+  const draw = (apps) => withDocument(async (doc) => {
+    const native = fakeNative({ "signing.inspect": info, "signing.installed": { apps } });
+    const ui = fakeUI();
+    let sent = null;
+    const done = inspectAndInstall({ url: "https://e.com/d.ipa" },
+      { native, hud: ui.hud, alert: ui.alert, install: (o) => { sent = o.params; return true; } });
+    for (let i = 0; i < 20 && !doc.body.querySelector(".ss-install"); i++) await tick();
+    const id = doc.body.querySelectorAll(".sign-value").map((n) => n.value).find((v) => v?.startsWith("com."));
+    const footers = doc.body.querySelectorAll(".group-footer").map((n) => n.textContent).join(" ");
+    await doc.body.querySelector(".ss-install").click();
+    await done;
+    return { id, footers, sent };
+  });
+  const fresh = await draw([]);
+  assert.equal(fresh.id, own);
+  assert.ok(fresh.footers.includes(`Your profile signs it as ${own}.`));
+  assert.ok(!fresh.footers.includes(held));
+  assert.deepEqual(fresh.sent, { token: "tok1" });
+  // an app already installed under the held App ID is updated there
+  const there = await draw([{ bundleId: held, originalBundleId: INFO.app.bundleId }]);
+  assert.equal(there.id, held);
+  assert.ok(there.footers.includes(`Your profile signs it as ${held}.`));
+  assert.deepEqual(there.sent, { token: "tok1" });
+});

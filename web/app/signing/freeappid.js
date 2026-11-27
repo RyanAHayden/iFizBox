@@ -75,7 +75,7 @@ function askSignIn(alert, go) {
 }
 
 // An app installed under the held profile's App ID stays there (FreeAppID.profile): no App ID is spent on it.
-async function staysOnHeld(native, held, original) {
+export async function staysOnHeld(native, held, original) {
   try {
     const apps = (await native.call("signing.installed", {}))?.apps ?? [];
     return apps.some((a) => same(a.bundleId, held.appId) && same(a.originalBundleId, original));

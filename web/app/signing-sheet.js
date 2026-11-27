@@ -44,6 +44,17 @@ function style() { loadStyle("signsheet.css"); }
 // An older shell answers "unknown method signing.inspect" (Bridge.swift).
 const unknownMethod = (e) => /unknown method/i.test(String(e?.message ?? e ?? ""));
 
+// B511: a free Apple ID's profile (pinned): until the app's own App ID (inspect's freeAppId) has a profile, signsAs is
+// the held one, but the install makes that App ID first (signing/freeappid.js withOwnAppId), so the sheet shows and
+// compares with the app's own. An app already installed under the held App ID stays there.
+export async function withRealId(info, native) {
+  const own = info?.freeAppId, held = info?.signsAs;
+  if (info?.pinned !== true || !own || !held || own.toLowerCase() === held.toLowerCase()) return info;
+  const { staysOnHeld } = await import("./signing/freeappid.js");
+  if (await staysOnHeld(native, { appId: held }, info.app?.bundleId)) return info;
+  return { ...info, signsAs: own, appIdAs: own };
+}
+
 export async function inspectAndInstall({ url, name = "", onInstalled = () => {}, listed = null },
   { native = nativeBridge(), hud = liveHUD, alert = showAlert, install = installOnDevice, sheet = openSignSheet, later = setTimeout } = {}) {
   const h = hud("Downloading");
@@ -59,6 +70,7 @@ export async function inspectAndInstall({ url, name = "", onInstalled = () => {}
     if (why.open === "signing") openSigning(); // B39: back to this page once it's set up
     return false;
   }
+  info = await withRealId(info, native); // B511
   h.hide();
   return new Promise((resolve) => {
     let started = false;
@@ -109,6 +121,7 @@ export async function inspectToQueue({ url, name = "", queue, listed = null },
     if (why.open === "signing") openSigning(); // B39: back to this page once it's set up
     return false;
   }
+  info = await withRealId(info, native); // B511
   h.hide();
   return new Promise((resolve) => {
     let queued = false;
