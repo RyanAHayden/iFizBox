@@ -185,9 +185,11 @@ export function openSignSheet(info, { onSign, onClose = () => {}, fallbackName =
   const app = info?.app ?? {};
   // F237: keepBundleId, the Keep Bundle ID switch below, starts as the global setting (inspect echoes what it got)
   const keep0 = typeof info?.keepBundleId === "boolean" ? info.keepBundleId : storedKeep();
-  const edits = { name: app.name || fallbackName, bundleId: signsAsFor(info, keep0), icon: null, removeExtensions: [], keepBundleId: keep0 };
-  // B502a2: a free Apple ID's profile (pinned): iOS installs the app only as its App ID, so there's no choice to show
+  // B502a2: a free Apple ID's profile (pinned): iOS installs the app only as its App ID, so there's no choice to show,
+  // and (B505) none to send: a false sent from here could be saved and then apply under another profile
   const pinned = info?.pinned === true;
+  const edits = { name: app.name || fallbackName, bundleId: signsAsFor(info, pinned ? undefined : keep0), icon: null, removeExtensions: [],
+    ...(pinned ? {} : { keepBundleId: keep0 }) };
   const box = el("div", "sheet-scroll page-body grouped sign-sheet");
 
   // The head: the icon, the name and what it signs as, like an App Store page's top.
@@ -273,7 +275,9 @@ export function openSignSheet(info, { onSign, onClose = () => {}, fallbackName =
     return s && s !== app.bundleId ? ` Your profile signs it as ${s}.` : "";
   };
   const asFoot = el("p", "group-footer", "");
-  const drawAs = () => { asFoot.textContent = `Change the name on the Home Screen, the bundle ID (to install a second copy) or the icon (made ${ICON_SIZE}×${ICON_SIZE}).${asText()}`; };
+  // pinned: a typed bundle ID doesn't make a second copy (docs/signing.md "Per-app profiles"), so it isn't offered
+  const changes = pinned ? "the name on the Home Screen or the icon" : "the name on the Home Screen, the bundle ID (to install a second copy) or the icon";
+  const drawAs = () => { asFoot.textContent = `Change ${changes} (made ${ICON_SIZE}×${ICON_SIZE}).${asText()}`; };
   drawAs();
   g.append(asFoot);
   box.append(g);

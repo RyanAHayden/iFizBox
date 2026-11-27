@@ -254,10 +254,17 @@ test("the sheet on a free Apple ID's profile (pinned): no Keep Bundle ID switch 
   assert.ok(!pinned.labels.includes("Keep Bundle ID"));
   assert.doesNotMatch(pinned.footers, /original|keeps its own ID|notifications/i);
   assert.equal(pinned.edits.bundleId, as);
-  assert.deepEqual(installParams(free, pinned.edits), { token: "tok1", keepBundleId: false }); // as inspect answered
+  // B505: no Keep Bundle ID choice is sent, so none is saved with the job or in the IPA's Sign Options
+  assert.ok(!("keepBundleId" in pinned.edits));
+  assert.deepEqual(installParams(free, pinned.edits), { token: "tok1" });
+  assert.equal(installedId(null, installParams(free, pinned.edits), free), as);
+  // B505: Install As offers no second copy, and still says what it signs as
+  assert.doesNotMatch(pinned.footers, /second copy|bundle ID \(/i);
+  assert.ok(pinned.footers.includes(`Change the name on the Home Screen or the icon (made 180×180). Your profile signs it as ${as}.`));
   // any other profile keeps the switch
   const other = await draw({ ...INFO, pinned: false, keepBundleId: true });
   assert.equal(other.keep, 1);
   assert.ok(other.labels.includes("Keep Bundle ID"));
   assert.equal(other.edits.keepBundleId, true);
+  assert.match(other.footers, /bundle ID \(to install a second copy\)/);
 });
