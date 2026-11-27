@@ -9,6 +9,9 @@ import { runSignJob, zsignCrash } from "./websign-job.js";
 import { parsePlist } from "./core/signing.js";
 import { joinPieces } from "./core/pieces.js";
 import { fakeStream, afterOpen } from "./stream.test-helper.js";
+import { sealRecord, openRecord, newRecordKey } from "./core/websign.js";
+import { KEYS } from "./core/storagekeys.js";
+import { signForComputer, recordKey } from "./screens/computer-install.js";
 
 const fx = (n) => new Uint8Array(readFileSync(new URL(`./core/fixtures/signing/${n}`, import.meta.url)));
 const P12 = fx("test.p12"), PROFILE = fx("test.mobileprovision");
@@ -99,6 +102,34 @@ test("B474: the computer install's Free Apple ID record lands as web/free-id.jso
   ({ create, seen } = fakeZsign());
   await runSignJob(create, job({ bring: { identity: true, freeId: rec } }));
   assert.equal([...seen.files.keys()].some((k) => k.includes("free-id")), false, "not another app");
+});
+
+test("F460: the uploaded computer install's free-id.json is ciphertext the kept key decrypts, and no key goes in clear", async () => {
+  const kv = new Map();
+  const store = { getItem: (k) => kv.get(k) ?? null, setItem: (k, v) => kv.set(k, String(v)) };
+  const rec = { teamId: "TEAM", serial: "AA", password: "hunter2", p12: Buffer.from(P12).toString("base64"),
+    profile: Buffer.from(PROFILE).toString("base64") };
+  const { create, seen } = fakeZsign({ plist: { CFBundleIdentifier: "com.ryha.ifizbox" }, appName: "iFizBox.app" });
+  const sealKey = recordKey(store);
+  await signForComputer({ p12: P12, profile: PROFILE, password: "hunter2" }, { record: rec, sealKey, download: async () => ZIP,
+    transfer: async () => null, worker: (j) => runSignJob(create, j) });
+  assert.equal(kv.get(KEYS.freeidKey), sealKey);
+  assert.equal(Buffer.from(sealKey, "base64url").length, 32);
+  const inApp = [...seen.files].filter(([path]) => path.startsWith("/w/app/"));
+  const file = text(seen.files.get("/w/app/Payload/iFizBox.app/web/free-id.json"));
+  assert.deepEqual(Object.keys(JSON.parse(file)), ["v", "alg", "iv", "data"]);
+  assert.equal(inApp.some(([path]) => path.includes("ifizbox-identity")), false, "the plist would hold the key in the clear");
+  for (const [path, data] of inApp) {
+    for (const secret of ["hunter2", rec.p12, sealKey]) assert.equal(text(data).includes(secret), false, path);
+  }
+  assert.deepEqual(await openRecord(file, sealKey), rec);
+  await assert.rejects(openRecord(file, newRecordKey()), "a wrong key");
+});
+
+test("F460: a sealed record keeps the identity plist out even when the identity is asked for", async () => {
+  const { create, seen } = fakeZsign({ plist: { CFBundleIdentifier: "com.ryha.ifizbox" }, appName: "iFizBox.app" });
+  await runSignJob(create, job({ bring: { identity: true, sealedFreeId: await sealRecord({ a: 1 }, newRecordKey()) } }));
+  assert.equal([...seen.files.keys()].some((k) => k.includes("ifizbox-identity")), false);
 });
 
 test("appBundleId wins over the IPA's own ID: an old-ID iFizBox IPA is signed as iFizBox and gets its bring files", async () => {
