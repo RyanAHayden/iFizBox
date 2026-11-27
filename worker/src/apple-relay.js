@@ -3,7 +3,7 @@
 // This forwards a request to a fixed allow-list of hosts and paths and nothing else:
 //
 //   <METHOD> /apple/<host>/<path>?<query>   ->  <METHOD> https://<host>/<path>?<query>
-//   GET /apple/<anisette host>/v3/provisioning_session with Upgrade: websocket  ->  the server's WebSocket, piped
+//   GET /apple/<anisette host>/v3/provisioning_session with Upgrade: websocket  ->  the server's WebSocket, forwarded
 //   GET /apple/status   ->  {"on":true} (F254: the Signing page shows Use a Free Apple ID only then; off it's a 404)
 //
 // Rules: only https to the hosts in ALLOW and their path patterns; GET, POST and PUT; the request body up to
@@ -96,7 +96,47 @@ async function readCapped(stream, cap) {
 export const relayOn = (env) => String(env?.APPLE_RELAY ?? "") === "1";
 export const STATUS_PATH = "/apple/status";
 
-export async function appleRelay(req, env = {}, { fetcher = fetch, timeout = TIMEOUT_MS } = {}) {
+// B498b: the provisioning WebSocket. The Worker holds both sockets and forwards each message itself. Handing the
+// server's 101 straight to the browser dropped the connection (close 1006) as the server sent its last message and
+// closed; here a message is sent on before the close that follows it, and the browser gets a proper close frame even
+// when the server drops without one.
+// A close code close() accepts: 1005 (none given) and 1006 (dropped) only ever describe a close, they can't be sent.
+const closeCode = (c) => (c === 1005 ? 1000 : (c >= 1000 && c <= 1003) || (c >= 1007 && c <= 1014) || (c >= 3000 && c <= 4999) ? c : 1011);
+function close(socket, code, reason) {
+  try { socket.close(closeCode(code), reason); } catch { /* closed already */ }
+}
+function pipe(from, to) {
+  from.addEventListener("message", (e) => { try { to.send(e.data); } catch { close(from, 1011); } });
+  from.addEventListener("close", (e) => { close(to, e.code, e.reason); close(from, e.code); }); // pass it on, and answer it
+  from.addEventListener("error", () => close(to, 1011));
+}
+// The 101 that hands `client` to the browser (a Worker's Response; Node's has no status 101, so the tests pass their own).
+const switching = (client) => new Response(null, { status: 101, webSocket: client });
+
+async function relaySocket(target, { fetcher, Pair, upgrade }) {
+  const where = `${target.host}${target.pathname}`;
+  let r;
+  try {
+    r = await fetcher(target.href, { headers: { Upgrade: "websocket" } });
+  } catch (e) {
+    return fail("upstream", `Couldn't reach ${where}${e?.message ? ` (${e.message})` : ""}.`, 502);
+  }
+  const server = r.webSocket;
+  if (!server) {
+    r.body?.cancel().catch(() => {});
+    return fail("upstream", `${where} didn't open a WebSocket (HTTP ${r.status}).`, 502);
+  }
+  const [client, browser] = Object.values(new Pair());
+  for (const s of [server, browser]) s.binaryType = "arraybuffer"; // newer compatibility dates hand out Blobs, which send() refuses
+  pipe(server, browser);
+  pipe(browser, server);
+  server.accept(); // after the listeners: the server's first message is already on its way
+  browser.accept();
+  return upgrade(client);
+}
+
+export async function appleRelay(req, env = {}, { fetcher = fetch, timeout = TIMEOUT_MS, Pair = globalThis.WebSocketPair,
+  upgrade = switching } = {}) {
   const u = new URL(req.url);
   const asc = u.pathname.startsWith(`/apple/${ASC_HOST}/`);
   if (!relayOn(env) && !asc) return fail("not_found", "The Apple relay is off on this server (APPLE_RELAY).", 404);
@@ -110,9 +150,8 @@ export async function appleRelay(req, env = {}, { fetcher = fetch, timeout = TIM
   if (!target) return fail("not_allowed", "That host or path isn't on the relay's list.", 403);
 
   if (ws) {
-    // Pass the anisette provisioning WebSocket through: the Worker connects and Cloudflare pipes the frames.
     if (req.method !== "GET") return fail("bad_method", "A WebSocket starts with GET.", 405);
-    return fetcher(target.href, { headers: { Upgrade: "websocket" } });
+    return relaySocket(target, { fetcher, Pair, upgrade });
   }
   if (!["GET", "POST", "PUT", ...(asc ? ["DELETE"] : [])].includes(req.method)) return fail("bad_method", "GET, POST or PUT only.", 405);
 
