@@ -608,7 +608,7 @@ export async function installCustom(job, { sc, follow = null, now = Date.now(), 
   if (params.token) job.options.token = null;
   const after = follow ?? (async (result, h) => (await import("../signing-sheet.js")).followInstall(native, result?.bundleId || job.options.signsAs || "", h));
   return sc.installOnDevice({ url: job.url, name: job.options.name || job.name || "", params,
-    ...(params.token ? { bundleId: job.id } : {}), // B502a1a: the look's token says no bundle ID of its own
+    ...(params.token ? { bundleId: job.bundleId || job.id } : {}), // B502a1a: the look's token says no bundle ID of its own
     after,...listedOf(job), ...(sc.isSelfIpa(job.url) ? { host: true } : {}) });
 }
 
