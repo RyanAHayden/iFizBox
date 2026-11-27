@@ -1,9 +1,10 @@
 // F161: an IPA app's App Store details, looked up by bundle ID on Apple's public iTunes Search API, and the app
-// page's Links group. Pure JS, no DOM: screens/altstore.js renderApp draws them. Only an app page that is opened
-// looks up (never a list). SPDX-License-Identifier: GPL-3.0-or-later
+// page's Links group. Pure JS, no DOM: screens/altstore.js renderApp draws them. Full details are looked up only for an
+// app page that is opened; a list (Popular, F455) asks for stars alone, in batches. SPDX-License-Identifier: GPL-3.0-or-later
 //
 //   lookupUrl(bundleId, country)          -> https://itunes.apple.com/lookup?bundleId=…&country=… (null: bad input)
 //   workerLookupUrl(bundleId, country)    -> /api/applookup?… (the website asks the Worker: cached at the edge a day)
+//   batchLookupUrl(ids, country, { direct }) / parseBatch(json | text) / storeRatingsLoader(...): F455, see below
 //   regionOf(locale)                      -> "gb" from "en-GB", else "us"
 //   parseLookup(json | text)              -> { trackViewUrl, developer, category, rating, ratingCount, screenshots,
 //                                              description, version, minimumOs, trackName } or null (not found)
@@ -45,6 +46,68 @@ export function lookupUrl(bundleId, c = "us") {
 export function workerLookupUrl(bundleId, c = "us", base = "") {
   if (!BUNDLE.test(str(bundleId))) return null;
   return `${base}/api/applookup?${new URLSearchParams({ bundleId: str(bundleId), country: country(c) })}`;
+}
+
+// F455: many apps' App Store stars at once (Popular's third tier). The Worker's /api/applookup-batch on the site, Apple
+// directly (the same comma-separated bundleId list) in the app; at most BATCH ids a request (Apple sends ~10 KB an app).
+export const BATCH = 50;
+export function batchLookupUrl(ids, c = "us", { base = "", direct = false } = {}) {
+  const list = [...new Set((ids ?? []).map(str))].filter((x) => BUNDLE.test(x)).sort().slice(0, BATCH);
+  if (!list.length) return null;
+  return direct ? `https://itunes.apple.com/lookup?${new URLSearchParams({ bundleId: list.join(","), country: country(c) })}`
+    : `${base}/api/applookup-batch?${new URLSearchParams({ bundleIds: list.join(","), country: country(c) })}`;
+}
+// A batch answer (JSON or text) -> { <bundle id, lower case>: [average, count] }, the rated apps only; null when it
+// isn't a lookup answer.
+export function parseBatch(input) {
+  let json = input;
+  if (typeof input === "string") { try { json = JSON.parse(input); } catch { return null; } }
+  if (!Array.isArray(json?.results)) return null;
+  const out = {};
+  for (const r of json.results) {
+    const avg = Number(r?.averageUserRating);
+    if (typeof r?.bundleId === "string" && Number.isFinite(avg) && avg > 0) out[r.bundleId.toLowerCase()] = [Math.min(5, avg), Number(r.userRatingCount) || 0];
+  }
+  return out;
+}
+
+export const STORE_RATINGS_TTL = 24 * 3600 * 1000;
+// -> load(bundleIds, wait ms) -> Promise<{ <bundle id, lower case>: [average, count] }>. get(url) -> Promise<text>.
+// An answer (an app with no stars too) is kept a day, in `store` (localStorage-like) across launches; a failed request
+// isn't kept. After `wait` it answers with what it has; the requests go on and are there next time.
+export function storeRatingsLoader({ get, country: c = "us", direct = false, store = null, now = () => Date.now() }) {
+  const key = `ifizbox.storeratings.${country(c)}`;
+  const kept = new Map(); // id -> [asked at, [average, count] | null]
+  const busy = new Map(); // id -> the request asking for it
+  const fresh = (id) => kept.has(id) && now() - kept.get(id)[0] < STORE_RATINGS_TTL;
+  try {
+    for (const [id, v] of Object.entries(JSON.parse(store?.getItem(key) ?? "{}"))) if (Array.isArray(v)) kept.set(id, v);
+  } catch { /* unreadable: ask again */ }
+  const save = () => {
+    try { store?.setItem(key, JSON.stringify(Object.fromEntries([...kept.keys()].filter(fresh).map((id) => [id, kept.get(id)])))); } catch { /* full or private: memory only */ }
+  };
+  async function ask(part) {
+    try {
+      const got = parseBatch(await get(batchLookupUrl(part, c, { direct })));
+      if (!got) return;
+      for (const id of part) kept.set(id, [now(), got[id] ?? null]);
+      save();
+    } catch { /* asked again next time */ } finally { for (const id of part) busy.delete(id); }
+  }
+  return async function load(bundleIds, wait = 3000) {
+    const ids = [...new Set(bundleIds.map((i) => str(i).toLowerCase()))].filter((i) => BUNDLE.test(i));
+    const want = ids.filter((i) => !fresh(i) && !busy.has(i)).sort();
+    for (let n = 0; n < want.length; n += BATCH) {
+      const part = want.slice(n, n + BATCH);
+      const work = ask(part);
+      for (const id of part) busy.set(id, work);
+    }
+    const waiting = [...new Set(ids.map((i) => busy.get(i)).filter(Boolean))];
+    let timer;
+    if (waiting.length) await Promise.race([Promise.all(waiting), new Promise((done) => { timer = setTimeout(done, wait); })]);
+    clearTimeout(timer);
+    return Object.fromEntries(ids.filter((i) => fresh(i) && kept.get(i)[1]).map((i) => [i, kept.get(i)[1]]));
+  };
 }
 
 // The device's region from its locale ("en-GB" -> "gb", "zh-Hant-TW" -> "tw"); "us" when it names none.
