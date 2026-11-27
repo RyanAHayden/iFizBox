@@ -240,8 +240,15 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   certificate serial is signed again, iFizBox last. An app iOS no longer has is dropped from the record, except while
   the app queue runs (`busy`): it may still be installing, so it is neither dropped nor signed again. An app that
   already lasts longer than a free profile (a paid certificate's) is left alone. Apple is asked once per run, one
-  profile per App ID. A profile iOS refuses is reported, not signed again. Code: `native/sign/Refresh.swift` (the
-  decisions), `signing.refresh` in `native/Sources/Sideload.swift`, `refreshApps` in `web/app/core/freeroute.js`.
+  profile per App ID. A profile iOS refuses is reported, not signed again. iFizBox's own profile is renewed too when
+  iFizBox has no signed record (it came from a Computer Install) and no other recorded app shares its App ID: the run
+  reads the profile embedded in iFizBox, and when that is a free one listing the current certificate (an expired one
+  counts too, since the new profile is what revives it) it installs the new profile for that App ID through misagent,
+  as AltStore refreshes itself. With no fresh profile for that App ID the log says so, and iFizBox is not signed again.
+  This needs the pairing (no misagent without it). `signing.installed` answers `own` ("TEAM.identifier" or null), so the
+  page fetches that profile and runs the refresh even with no recorded app. A deleted app no longer counts as sharing
+  the App ID. Code: `native/sign/Refresh.swift` (the decisions), `signing.refresh` and `signing.installed` (`own`) in
+  `native/Sources/Sideload.swift`, `refreshApps` in `web/app/core/freeroute.js`.
   Tests: `native/sign/tests/sideload/main.swift` (a stub misagent), `web/app/core/freeroute.test.js`.
 - **Forget Free Apple ID** also removes the Keychain identity, but only when its certificate's serial is the Free Apple
   ID's; a certificate imported since stays.

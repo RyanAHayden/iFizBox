@@ -961,6 +961,54 @@ test("free refresh: current certificate gets a profile install, an old one is re
     check(running.renew.map(\.record.bundleID) == ["com.a"] && running.resign.isEmpty, "and installs nothing iOS doesn't list")
 }
 
+// F462: the running app with no record (a Computer Install) gets its own profile from the refresh.
+test("free refresh: the app renews its own profile when it has no record (F462)") {
+    let now = Date(), day: TimeInterval = 86400, team = "TEAM123456", me = "com.you.box.TEAM123456"
+    func profile(_ app: String, uuid: String, certs: [Data] = [cert], made: TimeInterval = 0, days: TimeInterval = 7) throws -> Profile {
+        let d: [String: Any] = ["Name": "iOS Team Provisioning Profile: \(app)", "UUID": uuid, "TeamIdentifier": [team],
+                                "CreationDate": now.addingTimeInterval(made * day), "ExpirationDate": now.addingTimeInterval((made + days) * day),
+                                "Entitlements": ["application-identifier": "\(team).\(app)"], "DeveloperCertificates": certs,
+                                "ProvisionedDevices": ["00008110-000000000000000A"]]
+        return try Profile(PropertyListSerialization.data(fromPropertyList: d, format: .xml, options: 0))
+    }
+    func rec(_ bid: String, app: String) -> SignedRecord {
+        SignedRecord(bundleID: bid, originalBundleID: bid, name: bid, version: "1", url: "https://x.example/a.ipa", signed: now,
+                     expires: now.addingTimeInterval(day), options: .init(name: nil, bundleID: nil, icon: nil, removeExtensions: [], fixArm64e: false),
+                     appID: "\(team).\(app)", certSerial: ProfileRefresh.serial(cert))
+    }
+    // the embedded profile may have run out; the fresh one is for the same App ID
+    let embedded = try profile(me, uuid: "OLD", made: -8), fresh = try profile(me, uuid: "NEW")
+    func plan(_ records: [SignedRecord], _ embedded: Profile?, profiles: [Profile]? = nil, installed: Set<String>? = nil, busy: Bool = false) -> ProfileRefresh.Plan {
+        ProfileRefresh.plan(records, certificate: cert, profiles: profiles ?? [fresh], installed: installed, busy: busy,
+                            ownID: me, embedded: embedded, now: now)
+    }
+    let other = rec("com.other", app: "com.other")
+    let both = try profile("com.other", uuid: "OTHER-APP")
+    let misagent = StubMisagent()
+    var uploads: [String] = []
+    let out = ProfileRefresh.run(plan([other], embedded, profiles: [fresh, both]), misagent: misagent) { uploads += $0.map(\.bundleID) }
+    check(misagent.installed == [both.data, fresh.data], "the other app's, then its own: \(misagent.installed.count)")
+    check(out.ownRenewed == me && out.ownError == nil && uploads.isEmpty, "renewed, nothing signed: \(uploads)")
+    check(ProfileRefresh.ownAppID([], bundleID: me, embedded: embedded, certificate: cert) == "\(team).\(me)", "no record at all")
+
+    check(plan([rec(me, app: me)], embedded).own == nil, "it has a record")
+    check(plan([rec("com.shares", app: me)], embedded).own == nil, "another recorded app has the App ID")
+    check(plan([rec("com.shares", app: me)], embedded, installed: ["com.else"]).own != nil, "a deleted one doesn't")
+    check(plan([rec("com.shares", app: me)], embedded, installed: ["com.else"], busy: true).own == nil, "it may still be installing")
+    check(plan([], try profile(me, uuid: "C", certs: [try fixture("ca.der")])).own == nil, "signed with another certificate")
+    check(plan([], try profile(me, uuid: "P", days: 365)).own == nil, "a paid team's is left alone")
+    check(plan([], nil).own == nil, "no embedded profile")
+
+    let none = StubMisagent()
+    var said: [String] = []
+    let lapsed = ProfileRefresh.run(plan([], embedded, profiles: [both]), misagent: none, log: { said.append($0) }) { _ in }
+    check(none.installed.isEmpty && lapsed.ownRenewed == nil && said.contains { $0.hasPrefix("No new profile") }, "no fresh one: \(said)")
+    let refusing = StubMisagent()
+    refusing.refuses = true
+    let bad = ProfileRefresh.run(plan([], embedded), misagent: refusing) { _ in }
+    check(bad.ownRenewed == nil && bad.ownError != nil, "iOS refused it")
+}
+
 // B502: a free Apple ID's explicit profile: iOS installs an app only as the profile's App ID.
 test("free Apple ID: signed as the App ID, replacing no other app (B502)") {
     let now = Date(), day: TimeInterval = 86400, team = "TEAM123456", appID = "com.you.box.TEAM123456"

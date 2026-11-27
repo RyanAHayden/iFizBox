@@ -25,13 +25,15 @@
 //        signer: {version, groupFix, groupFixRevision, reach: {all: [version], groupFix: [version]}}}
 //        (B259: each record's `signer` is the stamp it was signed with, the top one this build's, with the apps each
 //        version reaches: SignerStamp.swift)
+//        own: "TEAM.identifier" | null (F462: iFizBox has no record, and a free Apple ID's refresh renews its profile)
 //   signing.openApp {bundleId}   -> {opened: true | false}: F155, launches an installed app (the progress page's Open)
 //   signing.forget {bundleId}    -> {apps}
 //   signing.isInstalled {bundleIds} -> {installed: {bundleId: true | false | null}}: B46, what iOS has now
 //   apps.isInstalled {bundleIds} -> the same, in every build (F219: the jailbreak build refuses signing.*)
 //   signing.resignAll (stream: {index, count, name, phase, progress}) -> {done: [bundleId], failed: [{bundleId, name, error}]}
 //   signing.refresh {profiles, route: "idevice"} (stream as resignAll) -> {renewed, done, failed}: F458, a free Apple
-//        ID's apps get the new profile through misagent; only the rest are signed again (refresh below)
+//        ID's apps get the new profile through misagent; only the rest are signed again (refresh below). F462: iFizBox
+//        with no record is in `renewed` too when its own profile went in
 //   signing.resign {bundleId} (stream and reply as resignAll, one app) -> F91's queue job "resign"; not_signed: when
 //        iFizBox has no record of that app (by installed or original bundle ID)
 //   signing.checkCertificate     -> {status: "good" | "revoked" | "unknown", checked, revokedAt?}
@@ -1222,6 +1224,20 @@ enum Sideload {
     // The apps still on the current certificate get the new profile through misagent, nothing signed or copied; the
     // others are signed again as Re-sign All does (iFizBox last). profiles: Apple's for other App IDs than the held
     // profile's. -> {renewed: [bundleId], done, failed}.
+    // F462: iFizBox with no record (a Computer Install) gets the new profile for its embedded one's App ID too.
+    static func embeddedProfile() -> Profile? {
+        Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision")
+            .flatMap { try? Data(contentsOf: $0) }.flatMap { try? Profile($0) }
+    }
+
+    // signing.installed's `own`: that App ID, so the page fetches its profile and runs a refresh with no recorded app.
+    // nil without the pairing, as there is no misagent then.
+    static func ownRefreshID(_ list: [SignedRecord]) -> String? {
+        guard let embedded = embeddedProfile(), embedded.isFree, let id = SignStore.identity(),
+              let certificate = try? KeychainIdentity(id).certificate, IDevice.pairing() != nil else { return nil }
+        return ProfileRefresh.ownAppID(list, bundleID: Bundle.main.bundleIdentifier, embedded: embedded, certificate: certificate)
+    }
+
     static func refresh(_ c: Bridge.Call) {
         guard let (id, profile) = ready(c) else { return }
         guard let servers = servers(c, allowHost: false) else { return Apt.reply(c, nil, noServer) }
@@ -1235,24 +1251,30 @@ enum Sideload {
             do { certificate = try KeychainIdentity(id).certificate } catch { return Apt.reply(c, nil, SignBridge.text(error)) }
             let fetched = (c.params["profiles"] as? [String] ?? []).compactMap { Data(base64Encoded: $0).flatMap { try? Profile($0) } }
             let list = records()
-            if list.isEmpty { return Apt.reply(c, nothing, nil) }
+            let me = Bundle.main.bundleIdentifier, embedded = embeddedProfile()
+            if list.isEmpty && ProfileRefresh.ownAppID(list, bundleID: me, embedded: embedded, certificate: certificate) == nil {
+                return Apt.reply(c, nothing, nil)
+            }
             IDevice.queue.async {
                 var again = Set<String>()
                 do {
                     let (plan, out) = try IDevice.withMisagent { installed, misagent -> (ProfileRefresh.Plan, ProfileRefresh.Outcome) in
                         // F459: `busy` is the page's app queue; SignJob covers a signing or serving the page doesn't know of
                         let busy = c.params["busy"] as? Bool == true || SignJob.current != nil
-                        let plan = ProfileRefresh.plan(list, certificate: certificate, profiles: [profile] + fetched, installed: installed, busy: busy)
+                        let plan = ProfileRefresh.plan(list, certificate: certificate, profiles: [profile] + fetched, installed: installed, busy: busy,
+                                                       ownID: me, embedded: embedded)
                         return (plan, ProfileRefresh.run(plan, misagent: misagent, log: log) { again = Set($0.map(\.bundleID)) })
                     }
                     SignBridge.queue.async {
                         for r in plan.gone { log("iOS doesn't have \(r.bundleID): it is no longer listed as signed") }
                         saveRecords(ProfileRefresh.updated(records(), plan: plan, result: out))
                         reschedule()
-                        let failed = out.failed.map { ["bundleId": $0.record.bundleID, "name": $0.record.name,
-                                                       "error": ($0.error as? IDevice.Failure)?.errorDescription ?? SignBridge.text($0.error)] as [String: Any] }
-                        let me = Bundle.main.bundleIdentifier
-                        resign(c, allowHost: false, renewed: out.renewed.map(\.record.bundleID), earlier: failed) { all in
+                        let why = { (e: Error) in (e as? IDevice.Failure)?.errorDescription ?? SignBridge.text(e) }
+                        var failed = out.failed.map { ["bundleId": $0.record.bundleID, "name": $0.record.name,
+                                                       "error": why($0.error)] as [String: Any] }
+                        if let e = out.ownError { failed.append(["bundleId": me ?? "", "name": Brand.name, "error": why(e)]) }
+                        let renewed = out.renewed.map(\.record.bundleID) + [out.ownRenewed].compactMap { $0 }
+                        resign(c, allowHost: false, renewed: renewed, earlier: failed) { all in
                             let rest = all.filter { again.contains($0.bundleID) }
                             return rest.filter { $0.bundleID != me } + rest.filter { $0.bundleID == me } // installd closes it
                         }
@@ -1433,6 +1455,7 @@ enum Sideload {
             out["next"] = ["expires": ISO8601DateFormatter().string(from: x), "apps": names]
         } else { out["next"] = NSNull() }
         out["signer"] = SignerStamp.currentJSON // B259: records with an older stamp are listed under Needs Re-sign
+        out["own"] = ownRefreshID(list) ?? NSNull() // F462
         return out
     }
 

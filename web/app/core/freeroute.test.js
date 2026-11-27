@@ -340,11 +340,11 @@ test("F458: one profile per other App ID of the team; none for the setup's own, 
   assert.deepEqual(portal.log, ["downloadProfile OTHER"]);
 });
 
-function refreshRig({ apps, reply = { renewed: ["b0"], done: [], failed: [] }, throws = null, busy }) {
+function refreshRig({ apps, own = null, reply = { renewed: ["b0"], done: [], failed: [] }, throws = null, busy }) {
   const calls = [], page = [], alerts = [];
   const native = { async call(method, params, onEvent) {
     calls.push([method, params]);
-    if (method === "signing.installed") return { apps };
+    if (method === "signing.installed") return { apps, own };
     if (throws) throw new Error(throws);
     onEvent?.({ log: "Installed the new profile" });
     return reply;
@@ -372,6 +372,19 @@ test("F458: with no recorded app nothing is asked of the shell or shown", async 
   assert.deepEqual(rig.calls.map((c) => c[0]), ["signing.installed"]);
   assert.deepEqual(rig.page, []);
   assert.equal(rig.alerts.length, 0);
+});
+
+test("F462: with no recorded app, the app's own App ID still gets a profile and a refresh", async () => {
+  const rig = refreshRig({ apps: [], own: `${TEAM}.com.other` });
+  await rig.run();
+  const [method, params] = rig.calls.at(-1);
+  assert.equal(method, "signing.refresh");
+  assert.equal(params.profiles.length, 1);
+  assert.equal(rig.page.at(-1), "Done");
+  // the setup's own App ID: its profile is the held one, nothing more to fetch
+  const held = refreshRig({ apps: [], own: `${TEAM}.com.x.${TEAM}` });
+  await held.run();
+  assert.deepEqual(held.calls.at(-1)[1].profiles, []);
 });
 
 test("F458: an app that couldn't be refreshed is named", async () => {
