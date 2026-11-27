@@ -218,7 +218,8 @@ enum SignAhead {
                                       version: app.version, url: url, signed: Date(),
                                       expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored,
                                       appID: app.appID, signer: app.stamp, // B259; B280: appID as signAndOpen's record
-                                      sha256: Sideload.keepOriginal(input, app: app, source: url, sha256: sha256, log: log)) // F343
+                                      sha256: Sideload.keepOriginal(input, app: app, source: url, sha256: sha256, log: log), // F343
+                                      certSerial: app.certSerial) // F458
             return (app, record, output)
         } catch {
             try? FileManager.default.removeItem(at: output)

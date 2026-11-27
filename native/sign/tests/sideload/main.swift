@@ -899,4 +899,62 @@ test("a downloaded IPA waits for the retry (F400)") {
     check((try FileManager.default.contentsOfDirectory(atPath: kept.path)).sorted() == ["com.a.ipa", "not.ours.pending"], "staged leftovers go")
 }
 
+// F458: a free Apple ID's refresh: new profiles through misagent; only what must be is signed again.
+final class StubMisagent: Misagent {
+    var installed: [Data] = []
+    var refuses = false
+    func install(_ profile: Data) throws {
+        if refuses { throw SignError("profile_failed", "no") }
+        installed.append(profile)
+    }
+}
+
+test("free refresh: current certificate gets a profile install, an old one is re-signed (F458)") {
+    let now = Date(), day: TimeInterval = 86400, team = "TEAM123456"
+    func profile(_ app: String, uuid: String, certs: [Data] = [cert], made: TimeInterval = 0, days: TimeInterval = 7) throws -> Profile {
+        let d: [String: Any] = ["Name": "iOS Team Provisioning Profile: \(app)", "UUID": uuid, "TeamIdentifier": [team],
+                                "CreationDate": now.addingTimeInterval(made * day), "ExpirationDate": now.addingTimeInterval((made + days) * day),
+                                "Entitlements": ["application-identifier": "\(team).\(app)"], "DeveloperCertificates": certs,
+                                "ProvisionedDevices": ["00008110-000000000000000A"]]
+        return try Profile(PropertyListSerialization.data(fromPropertyList: d, format: .xml, options: 0))
+    }
+    let current = ProfileRefresh.serial(cert), old = ProfileRefresh.serial(try fixture("ca.der"))
+    check(current != nil && old != nil && current != old, "two certificates: \(current ?? "nil") \(old ?? "nil")")
+    func rec(_ bid: String, _ serial: String?, app: String = "com.x", left: TimeInterval = 2) -> SignedRecord {
+        SignedRecord(bundleID: bid, originalBundleID: bid, name: bid, version: "1", url: "https://x.example/\(bid).ipa", signed: now,
+                     expires: now.addingTimeInterval(left * day), options: .init(name: nil, bundleID: nil, icon: nil, removeExtensions: [], fixArm64e: false),
+                     appID: "\(team).\(app)", certSerial: serial)
+    }
+    let records = [rec("com.a", current), rec("com.b", old), rec("com.shared", current), rec("com.lapsed", current, app: "com.gone"),
+                   rec("com.deleted", current), rec("com.unknown", nil), rec("com.paid", old, app: "com.paid", left: 300)]
+    let fresh = try profile("com.x", uuid: "NEW"), stale = try profile("com.x", uuid: "STALE", made: -3)
+    // a profile for the lapsed App ID that doesn't list this certificate renews nothing
+    let foreign = try profile("com.gone", uuid: "OTHER", certs: [try fixture("ca.der")])
+    let plan = ProfileRefresh.plan(records, certificate: cert, profiles: [stale, fresh, foreign],
+                                   installed: ["com.a", "com.b", "com.shared", "com.lapsed", "com.unknown", "com.paid"], now: now)
+    check(plan.gone.map(\.bundleID) == ["com.deleted"], "gone: \(plan.gone.map(\.bundleID))")
+    let misagent = StubMisagent()
+    var uploads: [String] = [] // what goes to installation_proxy: only through resign
+    let out = ProfileRefresh.run(plan, misagent: misagent) { uploads += $0.map(\.bundleID) }
+    check(misagent.installed == [fresh.data], "the newest profile, once for both apps: \(misagent.installed.count)")
+    check(out.renewed.map(\.record.bundleID) == ["com.a", "com.shared"], "renewed: \(out.renewed.map(\.record.bundleID))")
+    check(uploads == ["com.b", "com.lapsed", "com.unknown"], "signed again: \(uploads)")
+    check(out.failed.isEmpty, "none failed")
+
+    let after = ProfileRefresh.updated(records, plan: plan, result: out)
+    check(!after.contains { $0.bundleID == "com.deleted" }, "the deleted app is forgotten")
+    check(after.first { $0.bundleID == "com.a" }?.expires == fresh.expires, "com.a lasts as long as the new profile")
+    check(after.first { $0.bundleID == "com.b" }?.expires == records[1].expires, "com.b: its own signing sets it")
+    check(SignedRecords.decode(try SignedRecords.encode(after)).first?.certSerial == current, "the serial is stored")
+    check(rec("com.a", current).json["appId"] as? String == "\(team).com.x", "signing.installed names the App ID")
+
+    let refusing = StubMisagent()
+    refusing.refuses = true
+    var again: [String] = []
+    let bad = ProfileRefresh.run(plan, misagent: refusing) { again += $0.map(\.bundleID) }
+    check(bad.renewed.isEmpty && bad.failed.map(\.record.bundleID) == ["com.a", "com.shared"], "iOS refused the profile")
+    check(again == uploads, "a refused one isn't signed again")
+    check(ProfileRefresh.plan(records, certificate: cert, profiles: [fresh], installed: [], now: now).gone.isEmpty, "an empty app list forgets nothing")
+}
+
 if failures == 0 { print("all passed") } else { print("\(failures) failed"); exit(1) }

@@ -30,6 +30,8 @@
 //   signing.isInstalled {bundleIds} -> {installed: {bundleId: true | false | null}}: B46, what iOS has now
 //   apps.isInstalled {bundleIds} -> the same, in every build (F219: the jailbreak build refuses signing.*)
 //   signing.resignAll (stream: {index, count, name, phase, progress}) -> {done: [bundleId], failed: [{bundleId, name, error}]}
+//   signing.refresh {profiles, route: "idevice"} (stream as resignAll) -> {renewed, done, failed}: F458, a free Apple
+//        ID's apps get the new profile through misagent; only the rest are signed again (refresh below)
 //   signing.resign {bundleId} (stream and reply as resignAll, one app) -> F91's queue job "resign"; not_signed: when
 //        iFizBox has no record of that app (by installed or original bundle ID)
 //   signing.checkCertificate     -> {status: "good" | "revoked" | "unknown", checked, revokedAt?}
@@ -108,6 +110,7 @@ enum Sideload {
         PhoneID.register(b) // F236: device.udid, every build
         b.on("signing.resignAll") { c in resignAll(c) }
         b.on("signing.resign") { c in resignOne(c) }
+        b.on("signing.refresh") { c in refresh(c) } // F458: a free Apple ID's profiles through misagent
         b.on("signing.checkCertificate") { c in checkCertificate(c) }
         b.on("signing.remind") { c in
             SignBridge.run(c) {
@@ -631,7 +634,8 @@ enum Sideload {
                                   version: app.version, url: url, signed: Date(),
                                   expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored,
                                   appID: app.appID, signer: app.stamp, // B259
-                                  sha256: keepOriginal(input, app: app, source: url, sha256: sha256, log: log)) // F343
+                                  sha256: keepOriginal(input, app: app, source: url, sha256: sha256, log: log), // F343
+                                  certSerial: app.certSerial) // F458
         // F343: an install that fails drops the IPA staged for it; the one kept before stays
         let answered = { (r: Result<(SignedApp, SignedRecord), Error>) in
             if case .failure = r { SignBridge.queue.async { dropOriginal(app.bundleID, sha256: record.sha256) } }
@@ -1210,7 +1214,60 @@ enum Sideload {
         resign(c) { SignedRecords.only($0, bundleID: bid) }
     }
 
-    static func resign(_ c: Bridge.Call, allowHost: Bool = true, pick: @escaping ([SignedRecord]) -> [SignedRecord]) {
+    // F458: a free Apple ID's refresh (sign/Refresh.swift): signing.refresh {profiles: [base64], route: "idevice"}.
+    // The apps still on the current certificate get the new profile through misagent, nothing signed or copied; the
+    // others are signed again as Re-sign All does (iFizBox last). profiles: Apple's for other App IDs than the held
+    // profile's. -> {renewed: [bundleId], done, failed}.
+    static func refresh(_ c: Bridge.Call) {
+        guard let (id, profile) = ready(c) else { return }
+        guard let servers = servers(c, allowHost: false) else { return Apt.reply(c, nil, noServer) }
+        if refusesFree(c, profile, servers) { return }
+        let log = { (s: String) in c.emitOnMain([["log": s]]) }
+        SignBridge.queue.async {
+            let nothing: [String: Any] = ["renewed": [String](), "done": [String](), "failed": [[String: Any]]()]
+            // without the pairing there is no misagent, and no app was installed with this profile
+            guard profile.isFree, IDevice.pairing() != nil else { return Apt.reply(c, nothing, nil) }
+            let certificate: Data
+            do { certificate = try KeychainIdentity(id).certificate } catch { return Apt.reply(c, nil, SignBridge.text(error)) }
+            let fetched = (c.params["profiles"] as? [String] ?? []).compactMap { Data(base64Encoded: $0).flatMap { try? Profile($0) } }
+            var list = records()
+            // iFizBox itself from a computer install has no record: its profile is renewed too, nothing else
+            if let me = Bundle.main.bundleIdentifier, !list.contains(where: { $0.bundleID == me }),
+               let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
+               let own = (try? Data(contentsOf: url)).flatMap({ try? Profile($0) }), own.certificates.contains(certificate) {
+                list.append(SignedRecord(bundleID: me, originalBundleID: me, name: Brand.name, version: "", url: SelfIPA.url, signed: Date(),
+                                         expires: own.signatureExpiry(certificate: certificate), options: SignOptions().stored,
+                                         appID: "\(own.team).\(own.appID)", certSerial: ProfileRefresh.serial(certificate)))
+            }
+            if list.isEmpty { return Apt.reply(c, nothing, nil) }
+            IDevice.queue.async {
+                var again = Set<String>()
+                do {
+                    let (plan, out) = try IDevice.withMisagent { installed, misagent -> (ProfileRefresh.Plan, ProfileRefresh.Outcome) in
+                        let plan = ProfileRefresh.plan(list, certificate: certificate, profiles: [profile] + fetched, installed: installed)
+                        return (plan, ProfileRefresh.run(plan, misagent: misagent, log: log) { again = Set($0.map(\.bundleID)) })
+                    }
+                    SignBridge.queue.async {
+                        for r in plan.gone { log("iOS doesn't have \(r.bundleID): it is no longer listed as signed") }
+                        saveRecords(ProfileRefresh.updated(records(), plan: plan, result: out))
+                        reschedule()
+                        let failed = out.failed.map { ["bundleId": $0.record.bundleID, "name": $0.record.name,
+                                                       "error": ($0.error as? IDevice.Failure)?.errorDescription ?? SignBridge.text($0.error)] as [String: Any] }
+                        let me = Bundle.main.bundleIdentifier
+                        resign(c, allowHost: false, renewed: out.renewed.map(\.record.bundleID), earlier: failed) { all in
+                            let rest = all.filter { again.contains($0.bundleID) }
+                            return rest.filter { $0.bundleID != me } + rest.filter { $0.bundleID == me } // installd closes it
+                        }
+                    }
+                } catch {
+                    Apt.reply(c, nil, (error as? IDevice.Failure)?.errorDescription ?? SignBridge.text(error))
+                }
+            }
+        }
+    }
+
+    static func resign(_ c: Bridge.Call, allowHost: Bool = true, renewed: [String]? = nil, earlier: [[String: Any]] = [],
+                       pick: @escaping ([SignedRecord]) -> [SignedRecord]) {
         guard let (id, profile) = ready(c) else { return }
         // F91: iFizBox's own re-sign (signing.resign with `host: true`, one record) is hosted; Re-sign All never is.
         guard let servers = servers(c, allowHost: allowHost) else { return Apt.reply(c, nil, noServer) }
@@ -1218,12 +1275,14 @@ enum Sideload {
         let log = { (s: String) in c.emitOnMain([["log": s]]) }
         SignBridge.queue.async {
             let list = pick(records())
-            var done = [String](), failed = [[String: Any]]()
+            var done = [String](), failed = earlier
             var stopped = false // B65: signing.cancel (the page's Cancel, or its stall timeout) ends the whole run
             func step(_ i: Int) {
                 if stopped { return Apt.reply(c, nil, SignBridge.text(SignJob.cancelledError)) }
                 guard i < list.count else {
-                    return Apt.reply(c, ["done": done, "failed": failed], nil)
+                    var out: [String: Any] = ["done": done, "failed": failed]
+                    if let r = renewed { out["renewed"] = r } // F458: signing.refresh
+                    return Apt.reply(c, out, nil)
                 }
                 let r = list[i]
                 let job = SignJob.begin() // B65: what signing.cancel stops, one app at a time
