@@ -365,10 +365,10 @@ test("F458: the app asks the shell to refresh over This iPhone, with the other p
   assert.equal(rig.alerts.length, 0);
 });
 
-test("F458: with no recorded app the shell is still asked (iFizBox's own profile), quietly, even when it fails", async () => {
-  const rig = refreshRig({ apps: [], throws: "connect_failed: no" });
+test("F458: with no recorded app nothing is asked of the shell or shown", async () => {
+  const rig = refreshRig({ apps: [] });
   assert.equal(await rig.run(), null);
-  assert.equal(rig.calls.at(-1)[0], "signing.refresh");
+  assert.deepEqual(rig.calls.map((c) => c[0]), ["signing.installed"]);
   assert.deepEqual(rig.page, []);
   assert.equal(rig.alerts.length, 0);
 });

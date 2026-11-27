@@ -1230,15 +1230,7 @@ enum Sideload {
             let certificate: Data
             do { certificate = try KeychainIdentity(id).certificate } catch { return Apt.reply(c, nil, SignBridge.text(error)) }
             let fetched = (c.params["profiles"] as? [String] ?? []).compactMap { Data(base64Encoded: $0).flatMap { try? Profile($0) } }
-            var list = records()
-            // iFizBox itself from a computer install has no record: its profile is renewed too, nothing else
-            if let me = Bundle.main.bundleIdentifier, !list.contains(where: { $0.bundleID == me }),
-               let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
-               let own = (try? Data(contentsOf: url)).flatMap({ try? Profile($0) }), own.certificates.contains(certificate) {
-                list.append(SignedRecord(bundleID: me, originalBundleID: me, name: Brand.name, version: "", url: SelfIPA.url, signed: Date(),
-                                         expires: own.signatureExpiry(certificate: certificate), options: SignOptions().stored,
-                                         appID: "\(own.team).\(own.appID)", certSerial: ProfileRefresh.serial(certificate)))
-            }
+            let list = records()
             if list.isEmpty { return Apt.reply(c, nothing, nil) }
             IDevice.queue.async {
                 var again = Set<String>()

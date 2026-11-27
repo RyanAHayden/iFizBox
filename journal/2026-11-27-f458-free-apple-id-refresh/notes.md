@@ -5,8 +5,9 @@
   signed with the current certificate get the new profile through misagent over This iPhone's route
   (`com.apple.misagent.shim.remote`). Nothing is signed or copied for them. Apps on another certificate, whose App ID
   Apple no longer lists, or recorded without a certificate serial are signed again, iFizBox last. Apps iOS no longer
-  has are dropped from the record. Apps that already last longer than a free profile are left alone. iFizBox itself
-  from a computer install gets its profile renewed too.
+  has are dropped from the record. Apps that already last longer than a free profile are left alone (a paid
+  certificate's app is not cut to 7 days). iFizBox with no record (a computer install) is not refreshed on its own: taken
+  out after the spec review and filed as a follow-up, after the phone run (which had a record for iFizBox).
 - Model: BariStore's AGENTS.md "Refresh" section.
 - `native/sign/Refresh.swift` (new): `ProfileRefresh.plan` decides per app, `ProfileRefresh.run` installs each profile
   once and hands the rest to re-sign.

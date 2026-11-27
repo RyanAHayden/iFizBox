@@ -170,29 +170,29 @@ export async function otherProfiles({ portal, teamId, appIds = [], apps = [], ap
   return out;
 }
 
-// With no recorded app, iFizBox's own profile is still renewed, without a progress page or an alert.
+// With no recorded app there is nothing to do: no progress page, no connection.
 export async function refreshApps({ native, portal, teamId, appIds, appId, hud, alert }) {
-  let page = null, shown = false;
+  let page = null;
   const fail = async (message) => {
     page?.fail(message);
     await alert({ title: "Couldn't Refresh Apps", message, buttons: ["OK"], cancel: 0 });
   };
   try {
     const apps = (await native.call("signing.installed", {}))?.apps ?? [];
-    shown = apps.length > 0;
+    if (!apps.length) return null;
     const profiles = (await otherProfiles({ portal, teamId, appIds, apps, appId })).map(b64encode);
-    if (shown) page = hud("Refreshing Apps");
+    page = hud("Refreshing Apps");
     const r = await callWithStall(native, "signing.refresh", { profiles, route: "idevice" }, (ev) => {
       if (ev?.log) page?.page?.raw?.(ev.log);
       const t = resignLabel(ev);
       if (t) page?.set(t);
     });
     const failed = r?.failed ?? [];
-    if (failed.length && shown) await fail(failed.map((f) => `${f.name || f.bundleId}: ${f.error || "failed"}`).join("\n"));
-    else page?.done("Done");
+    if (failed.length) await fail(failed.map((f) => `${f.name || f.bundleId}: ${f.error || "failed"}`).join("\n"));
+    else page.done("Done");
     return r;
   } catch (e) {
-    if (shown) await fail(deviceError(e).message);
+    await fail(deviceError(e).message);
     return null;
   }
 }

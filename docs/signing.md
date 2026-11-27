@@ -235,8 +235,7 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   new profile for its App ID through the phone's misagent service over This iPhone's route (`com.apple.misagent.shim.remote`):
   nothing is signed or copied. An app on another certificate, whose App ID Apple no longer lists, or recorded without a
   certificate serial is signed again, iFizBox last. An app iOS no longer has is dropped from the record. An app that
-  already lasts longer than a free profile (a paid certificate's) is left alone. iFizBox itself, installed by a Computer
-  Install, gets its profile renewed too. Apple is asked once per run, one profile per App ID. A profile iOS refuses is
+  already lasts longer than a free profile (a paid certificate's) is left alone. Apple is asked once per run, one profile per App ID. A profile iOS refuses is
   reported, not signed again. Code: `native/sign/Refresh.swift` (the decisions), `signing.refresh` in
   `native/Sources/Sideload.swift`, `refreshApps` in `web/app/core/freeroute.js`. Tests: `native/sign/tests/sideload/main.swift`
   (a stub misagent), `web/app/core/freeroute.test.js`.
