@@ -49,12 +49,13 @@ const openLog = (failures, steps) => import("../screens/apprun.js").then((m) => 
 
 let current = null;
 
-export function showReloadFailure(failures, { text, ms, onInfo, ...opts } = {}) {
+// `steps` are for the log of a run that had no bar of its own.
+export function showReloadFailure(failures, { text, ms, onInfo, steps, ...opts } = {}) {
   const list = (failures ?? []).filter(Boolean);
   if (!list.length) return null;
   const up = current;
   const bar = up ?? showReloadBar("", opts);
-  bar.add(list, { text, ms, onInfo });
+  bar.add(list, { text, ms, onInfo, steps });
   if (!up) bar.hide();
   return bar;
 }
@@ -158,7 +159,7 @@ export function showReloadBar(text = "", { onCancel = null, doc = globalThis.doc
     if (gone) return;
     const asked = hidden;
     slide();
-    if (failed) (said.onInfo ?? openLog)([...failures], [...steps]);
+    if (failed) (said.onInfo ?? openLog)([...failures], steps.length ? [...steps] : [...(said.steps ?? [])]);
     else if (!asked) onCancel?.();
   });
   handle.set(text);

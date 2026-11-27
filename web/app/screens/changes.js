@@ -462,6 +462,7 @@ async function autoHttpNow(upgrades) {
 }
 
 const listFailure = (e) => ({ title: "Changes", detail: e?.message || String(e) });
+export const LOAD_FAILED_NOTE = "Changes couldn't be loaded. Tap Refresh to try again.";
 
 async function load() {
   const seq = ++state.seq;
@@ -476,7 +477,10 @@ async function load() {
     autoHttp = await autoHttpNow(upgrades).catch(() => new Set()); // B192
   } catch (e) {
     if (seq !== state.seq) return;
-    for (const v of views.all()) v.ph?.remove();
+    for (const v of views.all()) {
+      v.ph?.remove();
+      if (!state.data && v.note) { v.note.textContent = LOAD_FAILED_NOTE; v.note.hidden = false; } // nothing to keep: not blank
+    }
     showReloadFailure([listFailure(e)]); // F456: in the bar, never raw text on the page; the last list stays
     return;
   }
@@ -588,7 +592,7 @@ export async function reloadSources({ hud = state.ctx?.showHUD ?? showHUD, backe
     const rows = await backend().refreshSources(undefined, { filter: sourceFilter(settings.deviceType()) }); // F41
     await reload();
     const bad = refreshFailures(rows); // F456
-    if (bad.length) failed(bad);
+    if (bad.length) failed(bad, { steps: ["Reloading Data"] });
   } catch (e) {
     failed([listFailure(e)]);
   } finally {
