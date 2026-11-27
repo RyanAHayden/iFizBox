@@ -132,6 +132,11 @@ must be logged in (`tools/deploy.sh --check-auth`). A failed or empty read keeps
 A dry run doesn't run it. The live site has no `/api/tweaks.json` until the first release, which is why the tool reads
 D1 directly.
 
+The Donate page's counts (prompts, tokens, sessions, commits) work the same way. At each release, after the Tweak Index
+file, `publish.sh` runs `python3 tools/dev_stats.py` (10 minutes at most), which writes `web/app/core/devstats.js` from
+this machine's Claude Code transcripts, and that file goes into the version commit. A failed count keeps the committed
+file and doesn't stop the release. A dry run doesn't run it.
+
 ## Cutting one
 
 Do the simplify step in "Release notes" first, so the notes file exists. One command does all of it:
