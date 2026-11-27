@@ -10,9 +10,10 @@
 // Pure: everything that touches the network, the bridge or storage comes in through `deps`, so node tests drive
 // every path (selfupdate.test.js). essential-ui.js wires the real ones.
 import { GITHUB_REPO, NAME } from "../brand.js";
+import { KEYS } from "./storagekeys.js";
 
 export const RELEASES_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
-export const STORE_KEY = "ifizbox.selfupdate";
+export const STORE_KEY = KEYS.selfupdate;
 const NOTE_LINES = 4;
 
 // "v1.2.3", "1.2", "1.2.3-beta" -> [1, 2, 3] (missing parts are 0; anything after the numbers is ignored).
@@ -152,7 +153,7 @@ export async function checkForUpdates(deps) {
 //   recordSelfUpdate(storage, version, now)        kept for PENDING_TTL ms
 //   unfinishedSelfUpdate(storage, current, now)    -> the version that didn't land, or null; a landed or stale
 //                                                  record is dropped
-export const PENDING_KEY = "ifizbox.selfupdate.pending";
+export const PENDING_KEY = KEYS.selfupdatePending;
 export const PENDING_TTL = 24 * 60 * 60 * 1000;
 
 export function recordSelfUpdate(storage, version, now = Date.now()) {

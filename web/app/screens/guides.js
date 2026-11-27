@@ -15,6 +15,7 @@
 import { el, grouped, row, segmented } from "../nav/ui.js";
 import { go as navGo } from "../nav/go.js";
 import { format, settingsRoute, rootOn } from "../router.js";
+import { KEY_PREFIXES } from "../core/storagekeys.js";
 import { NAME } from "../brand.js";
 import { GUIDE_ID as KEEP_GUIDE } from "../core/keepid.js";
 import { UDID_HOW } from "../core/signing.js";
@@ -283,7 +284,7 @@ export const PASSWORD_TRANSCRIPT = [
 ];
 
 // Ticked steps, per guide: localStorage["ifizbox.guideSteps.<id>"] = JSON list of step numbers (from 1).
-const STEP_KEY = (id) => `ifizbox.guideSteps.${id}`;
+const STEP_KEY = (id) => KEY_PREFIXES.guideSteps + id;
 export function doneSteps(id, store = globalThis.localStorage) {
   try {
     const v = JSON.parse(store?.getItem(STEP_KEY(id)) || "[]");

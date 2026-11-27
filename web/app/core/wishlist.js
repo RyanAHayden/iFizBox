@@ -11,8 +11,9 @@
 //   wishCount(ids, installed)             // F125: Installed's Wish List row count: the wished ids not installed
 
 import { IdSet } from "./apt.js"; // B407: installed ids match ignoring case
+import { KEYS } from "./storagekeys.js";
 
-export const WISHLIST_KEY = "ifizbox.wishlist";
+export const WISHLIST_KEY = KEYS.wishlist;
 export const WISH_ADD = "Add to Wish List";
 export const WISH_REMOVE = "Remove from Wish List";
 export const WISH_EMPTY = "Packages you add from their page (Add to Wish List) show here until they are installed.";

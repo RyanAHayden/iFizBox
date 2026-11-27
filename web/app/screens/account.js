@@ -37,8 +37,9 @@ import { createSwitch } from "../nav/switch.js";
 import { NAME, DOMAIN } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
 import { nativeBridge } from "../native.js";
+import { KEYS } from "../core/storagekeys.js";
 
-const STATE_KEY = "ifizbox.account";
+const STATE_KEY = KEYS.account;
 
 // ---- where the key lives ----------------------------------------------------------------------------------------
 

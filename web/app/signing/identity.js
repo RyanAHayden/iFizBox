@@ -2,6 +2,7 @@
 import { browserSigning, localSigning, sleep } from "./common.js";
 import { readyStatus, statusReady } from "./device.js";
 import { confirmSoon, needsConfirm } from "./password.js";
+import { KEYS } from "../core/storagekeys.js";
 import { defaultServer, getServer, setServer } from "./common.js";
 export { defaultServer, getServer, setServer };
 
@@ -13,7 +14,7 @@ let staged = null;
 // (identityNow); warmed when this module loads on the website.
 let known = null;
 export const identityNow = () => known;
-const DB = "ifizbox-signing", STORE = "identity", KEY = "current", BRING_KEY = "ifizbox.bringCertificate";
+const DB = "ifizbox-signing", STORE = "identity", KEY = "current", BRING_KEY = KEYS.bringCertificate;
 
 function openDb() {
   return new Promise((resolve, reject) => {

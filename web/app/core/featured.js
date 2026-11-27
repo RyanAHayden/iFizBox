@@ -14,6 +14,8 @@
 // its titles are in the image). Every field from the repo is checked: images http(s) only, package names as dpkg
 // allows them, titles plain text (screens set them with textContent).
 
+import { KEY_PREFIXES } from "./storagekeys.js";
+
 const FEATURED_FILE = "sileo-featured.json";
 export const DEFAULT_ITEM_SIZE = { width: 263, height: 148 };
 const DEFAULT_RADIUS = 10;
@@ -91,7 +93,7 @@ export async function bannersInCatalog(banners, has) {
 export function createFeaturedStore({ getText, storage = globalThis.localStorage, ttl = TTL, now = () => Date.now() } = {}) {
   const mem = new Map();
   const inflight = new Map();
-  const skey = (url) => "ifizbox.featured:" + url;
+  const skey = (url) => KEY_PREFIXES.featured + url;
 
   function cached(url) {
     let e = mem.get(url);

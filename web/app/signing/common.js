@@ -3,6 +3,7 @@
 import { AIRPLANE_ON, APP_WAIT, NETWORK_WAIT } from "../core/installroute.js"; // F368
 import { detectMode } from "../core/settings.js";
 import { showAlert } from "../nav/alert.js";
+import { KEYS } from "../core/storagekeys.js";
 import { isInsecure, INSECURE_IPA_ALERT, INSTALL_ANYWAY } from "../core/insecureipa.js";
 import { malwareHashes, rememberSigned } from "../core/malicious.js";
 import { APP_SERVER, normalizeServer, LEGACY_SERVER, loggedBridge } from "../core/signing.js";
@@ -130,7 +131,7 @@ export const isSelfIpa = (url) => SELF_IPA.test(String(url ?? ""));
 
 // Settings > Signing's Signing Server. A saved website address (LEGACY_SERVER, the website's old signer) means the
 // default too.
-const SERVER_KEY = "ifizbox.signingServer";
+const SERVER_KEY = KEYS.signingServer;
 export function defaultServer() { return APP_SERVER; }
 export function getServer() {
   let saved = null;

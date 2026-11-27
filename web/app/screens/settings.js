@@ -18,6 +18,7 @@
 import { grouped, segmented } from "../nav/ui.js";
 import { format, parse, settingsRoute } from "../router.js";
 import { settings } from "../settings-store.js";
+import { KEYS } from "../core/storagekeys.js";
 import { createSwitch } from "../nav/switch.js";
 import { detectMode, themeState, paletteFor, DARK_THEME_KEY, SETTINGS, SIGNING_GROUPS } from "../core/settings.js";
 import { hooksOf } from "../core/settings.js"; // F202
@@ -367,7 +368,7 @@ function listPage(key) {
 // sample's nav bar); when a row edge falls within a row of that line the divider snaps to it, so no row is cut. The
 // first tap on a theme springs it up to half the screen. A drag wins over both, for this visit only: the position
 // lives in `split` below, which a theme list clears when it opens (nothing is stored).
-export const SPLIT_KEY = "ifizbox.themePreviewSplit"; // F215 stored the dragged position here; F230 removes it
+export const SPLIT_KEY = KEYS.themePreviewSplit; // F215 stored the dragged position here; F230 removes it
 export const SPLIT_PEEK = 100; // px: the grip (25) and the sample's nav bar (44), with a little of what is under it
 export const SPLIT_TAP = 0.5;
 export const SPLIT_MIN = 64; // px: the dragged preview keeps its divider and a bit of sample
@@ -1591,7 +1592,7 @@ async function refreshCertificate(el) {
 const CERTIFICATE_PARTS = ["certificate", "files", "profile", "account", "options", "free"];
 // Whether the certificate in use (signing.status's identity) is the Free Apple ID's set up in this app: the same serial
 // (free-apple-id.js FREE_KEY and sameSerial, read here so the page needs no free-apple-id.js to lay itself out).
-export const FREE_ID_KEY = "ifizbox.freeid";
+export const FREE_ID_KEY = KEYS.freeid;
 export function freeInUse(kept, store = globalThis.localStorage) {
   const n = (s) => String(s ?? "").replace(/[^0-9a-f]/gi, "").replace(/^0+/, "").toUpperCase();
   let saved = null;

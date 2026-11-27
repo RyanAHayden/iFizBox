@@ -24,6 +24,7 @@
 //   FIZL0's own source stays, as the user asked. Every `why` says what the source actually carries, read from its
 //   Packages or source.json on CHECKED with tools/recommended_check.py (which re-checks them all).
 import { NAME } from "../brand.js";
+import { KEYS } from "./storagekeys.js";
 
 export const CHECKED = "2026-11-18";
 
@@ -134,7 +135,7 @@ export function recommendedFor(recs, jailbreak) {
 }
 
 // The user's pick on Recommended (localStorage), else what was detected.
-const JAILBREAK_KEY = "ifizbox.jailbreakName";
+const JAILBREAK_KEY = KEYS.jailbreakName;
 export function savedJailbreak(storage = globalThis.localStorage) {
   try {
     const v = storage?.getItem(JAILBREAK_KEY);
@@ -146,7 +147,7 @@ export function saveJailbreak(id, storage = globalThis.localStorage) {
 }
 
 // F19 first run: the Sources tab shows a "Recommended for <jailbreak>" row until Recommended has been opened once.
-const FIRST_RUN_KEY = "ifizbox.recommendedSeen";
+const FIRST_RUN_KEY = KEYS.recommendedSeen;
 export function recommendedSeen(storage = globalThis.localStorage) {
   try { return storage?.getItem(FIRST_RUN_KEY) === "1"; } catch { return true; }
 }

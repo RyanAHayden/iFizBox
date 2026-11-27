@@ -16,6 +16,7 @@
 //   WEB_SIGNER_VERSION, webSignerStamp, webSignerNow, groupFixHash, signatureEnd   F342: the signer stamp and end a record keeps
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { parsePlist, parseProfile } from "./signing.js";
+import { KEYS } from "./storagekeys.js";
 
 export const IPA_MAX = 512 * 1024 * 1024; // the Worker's own cap (worker/src/index.js MAX_UPLOAD)
 
@@ -41,8 +42,8 @@ export const overSiteLimit = (size, max = IPA_MAX) => Number.isFinite(Number(siz
 //   isOutOfMemory(message)               zsign's error was memory (websign-job.js zsignCrash)
 // F435: a limit learned under the old signer (which held the whole IPA) lives under OLD_MEMORY_KEY; the streaming
 // signer signs far bigger apps, so that one is forgotten and the limit now lives under MEMORY_KEY.
-export const OLD_MEMORY_KEY = "ifizbox.signMemory";
-export const MEMORY_KEY = "ifizbox.signMemory.streaming";
+export const OLD_MEMORY_KEY = KEYS.signMemory;
+export const MEMORY_KEY = KEYS.signMemoryStreaming;
 const positive = (n) => (Number.isFinite(Number(n)) && Number(n) > 0 ? Math.round(Number(n)) : null);
 export function memoryLimit(storage) {
   try { storage?.removeItem?.(OLD_MEMORY_KEY); } catch { /* private mode */ }

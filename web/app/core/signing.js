@@ -777,7 +777,7 @@ function phaseLine(ev, seen) {
   return ev.count != null ? `${name} ${ev.name || "App"} (${Number(ev.index) + 1} of ${ev.count})` : name;
 }
 
-const LOGGED = Symbol("ifizbox.loggedBridge");
+const LOGGED = Symbol("loggedBridge");
 export function loggedBridge(native, store = sideloadLogs) {
   if (!native || typeof native.call !== "function" || native[LOGGED] || !store?.start) return native;
   const wrapped = Object.create(native);

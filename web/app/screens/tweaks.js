@@ -16,6 +16,7 @@
 import { el } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
+import { KEYS } from "../core/storagekeys.js";
 import { nativeBridge, hasNativeCall } from "../native.js";
 import { openIpaStore, memoryIpaStore } from "../core/myipas.js";
 import { prepareTweaks, tweakProblem, tweakKind, TWEAK_ACCEPT, ELLEKIT, checkElleKit, needsElleKit, withElleKit } from "../core/tweaks.js";
@@ -219,7 +220,7 @@ export function tweaksGroup({ bundleId = "", store = tweakStore, alert = showAle
 //   await signedRecordFor(bundleId)         the signing.installed record Add to App re-signs from, or null
 //   worksInGroup(stanza)                    the package page's group: "Works In" and Add to App…, filled once checked
 
-export const INFO_KEY = "ifizbox.tweakInfo";
+export const INFO_KEY = KEYS.tweakInfo;
 const INFO_MAX = 400;
 const INFO_V = 2; // B185: libraries and plain reasons
 const debKey = (st) => `${st?.package ?? ""}@${st?.version ?? ""}`;
@@ -810,7 +811,7 @@ export function pickSourceTweak({ bundleId, onPick, rows = sourceTweakRows, pkg 
 //   await lockedAlert(name)                 "<App> Is Locked", How to Get One
 //   await checkPickedIpa(file)              an IPA picked in Files: encrypted -> marked and the alert; -> the check
 
-export const ENC_KEY = "ifizbox.encryptedApps";
+export const ENC_KEY = KEYS.encryptedApps;
 function encSet(storage = globalThis.localStorage) {
   try { const a = JSON.parse(storage?.getItem(ENC_KEY) ?? "[]"); return new Set(Array.isArray(a) ? a : []); } catch { return new Set(); }
 }

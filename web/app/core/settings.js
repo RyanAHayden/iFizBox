@@ -29,6 +29,7 @@
 import { ARCHES, DEFAULT_ARCH, sameId } from "./apt.js";
 import { IOS_VERSIONS, JAILBREAK_ARCH } from "./compat.js";
 import { NAME } from "../brand.js";
+import { PREFIX, KEYS } from "./storagekeys.js";
 import { OLD_WAY_ALERT } from "./keepid.js";
 import { ROUTE_OPTIONS } from "./installroute.js";
 import { normalizeFilters, filterOn, isCustom as isCustomFilter, ALL_SOURCES } from "./sourcefilters.js"; // F382
@@ -327,27 +328,26 @@ export const SETTINGS = [
   },
 ];
 
-const PREFIX = "ifizbox.";
 // F285: selfUpdateAlerts as get() reads it, for app-updates.js, which has no settings store of its own.
 export function selfUpdateAlertsOn(storage = globalThis.localStorage) {
-  try { return storage?.getItem?.(PREFIX + "selfUpdateAlerts") !== "false"; } catch { return true; }
+  try { return storage?.getItem?.(KEYS.selfUpdateAlerts) !== "false"; } catch { return true; }
 }
 // F398: tweakIndexRefresh as get() reads it, for screens/tweaks.js.
 export function tweakIndexRefreshOn(storage = globalThis.localStorage) {
-  try { return storage?.getItem?.(PREFIX + "tweakIndexRefresh") !== "false"; } catch { return true; }
+  try { return storage?.getItem?.(KEYS.tweakIndexRefresh) !== "false"; } catch { return true; }
 }
-const HOLDS_KEY = PREFIX + "holds";
-const HIDDEN_SECTIONS_KEY = PREFIX + "hiddenSections";
-const AUTO_MARKED_KEY = PREFIX + "autoMarked";
-const RECENT_SEARCHES_KEY = PREFIX + "recentSearches";
-const HIDDEN_AUTHORS_KEY = PREFIX + "hiddenAuthors";
-const BLOCKED_KEY = PREFIX + "blockedPackages";
-const BLOCK_HOLDS_KEY = PREFIX + "blockHolds";
-const APP_HOLDS_KEY = PREFIX + "appHolds"; // B69: apps' Ignore Upgrades in the jailbreak app (no dpkg hold)
-const LAST_REFRESH_KEY = PREFIX + "lastRefresh"; // F270: pull to refresh's Last Updated
-const QUEUE_HINT_KEY = PREFIX + "queueHintHeld"; // F272: the Installed tab was held once; the queue's hint stops
-const IGNORED_VERSIONS_KEY = PREFIX + "ignoredVersions"; // F281: Ignore This Version, { id: version }
-const SOURCE_FILTERS_KEY = PREFIX + "sourceFilters"; // F382: Source Filters, core/sourcefilters.js
+const HOLDS_KEY = KEYS.holds;
+const HIDDEN_SECTIONS_KEY = KEYS.hiddenSections;
+const AUTO_MARKED_KEY = KEYS.autoMarked;
+const RECENT_SEARCHES_KEY = KEYS.recentSearches;
+const HIDDEN_AUTHORS_KEY = KEYS.hiddenAuthors;
+const BLOCKED_KEY = KEYS.blockedPackages;
+const BLOCK_HOLDS_KEY = KEYS.blockHolds;
+const APP_HOLDS_KEY = KEYS.appHolds; // B69: apps' Ignore Upgrades in the jailbreak app (no dpkg hold)
+const LAST_REFRESH_KEY = KEYS.lastRefresh; // F270: pull to refresh's Last Updated
+const QUEUE_HINT_KEY = KEYS.queueHintHeld; // F272: the Installed tab was held once; the queue's hint stops
+const IGNORED_VERSIONS_KEY = KEYS.ignoredVersions; // F281: Ignore This Version, { id: version }
+const SOURCE_FILTERS_KEY = KEYS.sourceFilters; // F382: Source Filters, core/sourcefilters.js
 
 // F100: Search's Recent table (from Zebra): the last RECENT_MAX queries, newest first, no duplicates (a query
 // already there moves to the top; case and surrounding spaces don't make a new one). Pure, for the tests.
@@ -479,13 +479,13 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
   if (!MODES.includes(mode)) throw new Error(`unknown mode ${mode}`);
   const store = safeStorage(storage);
   dropRetired(store);
-  if (mode === "site") store.remove(PREFIX + "style"); // C69: the website is iOS 6; an era stored there is cleared
+  if (mode === "site") store.remove(KEYS.style); // C69: the website is iOS 6; an era stored there is cleared
   // F37: a site visitor who picked an Architecture before Device existed keeps it as their device type; the app's
   // detected type becomes `arch` for getArch().
   const detected = mode === "jailbreak" ? bridgeArch(native) : null;
-  if (detected) store.set(PREFIX + "arch", detected);
-  if (mode === "site" && store.get(PREFIX + "device") == null && ARCHES.includes(store.get(PREFIX + "arch"))) {
-    store.set(PREFIX + "device", store.get(PREFIX + "arch"));
+  if (detected) store.set(KEYS.arch, detected);
+  if (mode === "site" && store.get(KEYS.device) == null && ARCHES.includes(store.get(KEYS.arch))) {
+    store.set(KEYS.device, store.get(KEYS.arch));
   }
   const listeners = new Set();
   iosListeners.add(() => { if (mode !== "site") notify("style", get("style")); });
@@ -615,7 +615,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
         return true;
       } catch {
         if (typeof undo === "boolean" && get("upgradeNotifications") === on) {
-          store.set(PREFIX + "upgradeNotifications", String(undo));
+          store.set(KEYS.upgradeNotifications, String(undo));
           notify("upgradeNotifications", undo);
         }
         return false;
@@ -993,8 +993,8 @@ export const DARK_PALETTES = byKey.get("darkTheme").options.map((o) => o.value);
 export const LIGHT_PALETTES = byKey.get("lightTheme").options.map((o) => o.value);
 export const DARK_DEFAULT = byKey.get("darkTheme").default;
 export const LIGHT_DEFAULT = byKey.get("lightTheme").default;
-export const DARK_THEME_KEY = "ifizbox.darkTheme";
-export const LIGHT_THEME_KEY = "ifizbox.lightTheme";
+export const DARK_THEME_KEY = KEYS.darkTheme;
+export const LIGHT_THEME_KEY = KEYS.lightTheme;
 export function paletteFor(theme, darkTheme, lightTheme) {
   if (theme !== "dark") return LIGHT_PALETTES.includes(lightTheme) ? lightTheme : LIGHT_DEFAULT;
   return DARK_PALETTES.includes(darkTheme) ? darkTheme : DARK_DEFAULT;
@@ -1017,7 +1017,7 @@ export function themeState({ style = "ios6", appearance, lightTheme, darkTheme, 
 // ios7.css's) and OLED Black (ios6.css's dark block, then ios7.css's). theme-boot.js keeps the same table.
 export const STYLES = byKey.get("style").options.map((o) => o.value);
 export const STYLE_DEFAULT = byKey.get("style").default;
-export const STYLE_KEY = "ifizbox.style";
+export const STYLE_KEY = KEYS.style;
 export const STYLE_PALETTES = { ios7: { light: "white", dark: "oled" }, ios13: { light: "white", dark: "oled" },
   ios26: { light: "white", dark: "oled" } };
 

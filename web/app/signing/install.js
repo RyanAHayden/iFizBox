@@ -2,6 +2,7 @@
 import { IFIZBOX_ID } from "../core/websign.js";
 import { storedKeep, originalState, originalNote } from "../core/keepid.js";
 import { showAlert } from "../nav/alert.js";
+import { KEYS } from "../core/storagekeys.js";
 import { NAME } from "../brand.js";
 import { listedOf } from "../core/appqueue.js"; // F400
 import { browserSigning, localSigning } from "./common.js";
@@ -71,7 +72,7 @@ export async function signAndInstall({ url, name = "", onInstalled = () => {}, b
 // so, once per app: Install (as asked; remembered, so the next Install of it goes straight on), Install a Copy (this
 // time the old way, a separate copy under the profile's ID beside the original) or Cancel. Nothing to say without a
 // bundle ID, with Keep Bundle IDs off (the old way replaces nothing), for iFizBox itself, or without a bridge.
-export const ORIGINAL_WARNED_KEY = "ifizbox.originalWarned";
+export const ORIGINAL_WARNED_KEY = KEYS.originalWarned;
 
 const warnedIds = (storage) => {
   try { const v = JSON.parse(storage?.getItem?.(ORIGINAL_WARNED_KEY) ?? "[]"); return Array.isArray(v) ? v : []; } catch { return []; }

@@ -9,6 +9,7 @@
 // { title, back (the back button's label above it; else the title), style: "grouped" | "plain", left: { label, onClick }, right: { label, onClick } | [several] } and `init(ctx)`,
 // run once at start (e.g. to set the tab's badge). ctx: { go, back, setBadge, showHUD }.
 import { detectMode } from "./core/settings.js";
+import { KEYS } from "./core/storagekeys.js";
 import { TABS, BAR_TABS, createRouter, format, parent, mounted, parse, mountLink, lazyFor, LAZY_TABS, TAB_TITLES } from "./router.js";
 import { load, loaded, mod, missing, loadAll, NotLoaded } from "./lazy.js";
 import { grouped, placeholder } from "./nav/ui.js";
@@ -553,11 +554,11 @@ askFromInstallLink(installLink, { install: () => home.installiFizBox() }).catch(
 // Only on the very first launch (user 2026-11-17: the website is rarely used after that).
 if (nativeBridge()) {
   let done = null;
-  try { done = localStorage.getItem("ifizbox.transferDone"); } catch { /* private */ }
+  try { done = localStorage.getItem(KEYS.transferDone); } catch { /* private */ }
   if (!done) fetch("transfer.link", { cache: "no-store" }).then((r) => (r.ok ? r.text() : null)).then(async (link) => {
     link = link?.trim();
     if (!link || !link.startsWith("ifizbox://import?")) return;
-    try { localStorage.setItem("ifizbox.transferDone", "1"); } catch { /* imports again next launch */ }
+    try { localStorage.setItem(KEYS.transferDone, "1"); } catch { /* imports again next launch */ }
     const { handleIncoming } = await import("./incoming.js");
     await handleIncoming(link);
   }).catch(() => {});
@@ -718,7 +719,7 @@ if (nativeBridge()) {
   appVersion().then((v) => {
     if (!v) return;
     let last = null;
-    try { last = localStorage.getItem("ifizbox.lastVersion"); localStorage.setItem("ifizbox.lastVersion", v); } catch { return; }
+    try { last = localStorage.getItem(KEYS.lastVersion); localStorage.setItem(KEYS.lastVersion, v); } catch { return; }
     if (last && last !== v) {
       // The icon badge counted this very update: clear it; Changes sets it again with what's still waiting (user 2026-11-18).
       // B158: through upgradeNotices, so a count Changes already took goes straight back on instead of staying 0.

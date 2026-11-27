@@ -26,6 +26,7 @@
 // or a CJK Extension B character is one character but two UTF-16 units).
 
 import { plainText } from "./plaintext.js";
+import { KEYS } from "./storagekeys.js";
 
 export const CANISTER = "https://api.canister.me/v2/jailbreak";
 const SEARCH_LIMIT = 50;
@@ -278,7 +279,7 @@ export function injectableWith(check, row) {
   return check({ package: row?.id, architecture: row?.arch, section: row?.section, tag: row?.tag, description: row?.description }); // B185: libraries
 }
 
-export const REPO_CACHE_KEY = "ifizbox.canisterRepos";
+export const REPO_CACHE_KEY = KEYS.canisterRepos;
 export const REPO_TTL = 7 * 24 * 3600 * 1000;
 const MISS_TTL = 24 * 3600 * 1000;
 const REPO_CACHE_MAX = 300;

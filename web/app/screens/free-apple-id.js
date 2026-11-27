@@ -43,10 +43,11 @@ import { MERGED_PAGE } from "../core/signingpage.js";
 import { computerInstallBlock, resetComputerInstall } from "./computer-install.js"; // F436
 import { loadStyle } from "../nav/motion.js";
 import { easeOut, TOP_MS } from "../nav/tabbar.js";
+import { KEYS } from "../core/storagekeys.js";
 
-export const FREE_KEY = "ifizbox.freeid";
-const ANISETTE_KEY = "ifizbox.freeid.anisette";
-const WAIT_KEY = "ifizbox.freeid.wait";
+export const FREE_KEY = KEYS.freeid;
+const ANISETTE_KEY = KEYS.freeidAnisette;
+const WAIT_KEY = KEYS.freeidWait;
 
 const local = (store) => {
   if (store !== undefined) return store;
@@ -111,7 +112,7 @@ export const forgetFreeIdentity = (store) => writeJson(store, FREE_KEY, null);
 // Refresh Profile. The signed app also carries the website's record (web/free-id.json, websign-job.js bring.freeId):
 // take it while the Keychain's certificate is that record's (same serial), once per file. True: taken.
 export const FREE_ID_URL = "free-id.json";
-const BUNDLED_KEY = "ifizbox.freeid.bundled";
+const BUNDLED_KEY = KEYS.freeidBundled;
 export async function adoptBundledFreeId({ native, store, fetcher = globalThis.fetch } = {}) {
   if (!native?.call) return false;
   try {
@@ -172,7 +173,7 @@ const flow = { open: false, view: "signin", email: "", busy: false, steps: {}, s
 //   keepFreeSession(s, store, now) / keptFreeSession(store, now) / dropFreeSession(store)
 //   udidDetour(steps, { udid, native, pending, can, href })   pure: the group under the checklist that offers
 //                                        Find This iPhone's UDID, or null
-export const FREE_SESSION_KEY = "ifizbox.freeid.session";
+export const FREE_SESSION_KEY = KEYS.freeidSession;
 const SESSION_MS = 30 * 60 * 1000;
 export function keepFreeSession({ token, adsid, team, email = "", expiry = null }, store, now = Date.now()) {
   if (!token || !adsid || !team?.teamId) return;
@@ -739,7 +740,7 @@ function style() { loadStyle("freeid.css"); }
 //                                        spec { back, title, groups: [{ header, rows: [{ label, detail, on, mark }],
 //                                        footer }], alert: { title, message, buttons, bold } }
 //   freeInstalled(store) / markFreeInstalled(store, on = true)
-export const INSTALLED_KEY = "ifizbox.freeid.installed";
+export const INSTALLED_KEY = KEYS.freeidInstalled;
 export const freeInstalled = (store) => readJson(store, INSTALLED_KEY) === true;
 export const markFreeInstalled = (store, on = true) => writeJson(store, INSTALLED_KEY, on ? true : null);
 

@@ -14,6 +14,7 @@
 // Everything lives in the HOSTED KV namespace under "udid:<c>" and expires with the TTL. The answer is only taken
 // for a challenge this Worker gave out, so a stranger can't fill KV.
 import { NAME, BUNDLE_ID } from "../../web/app/brand.js";
+import { KEYS } from "../../web/app/core/storagekeys.js";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type" };
@@ -156,4 +157,4 @@ export async function udid(req, env, { ttl = Math.max(60, Number(env.TTL) || 600
 <script>try { localStorage.setItem(${JSON.stringify(UDID_KEY)}, ${JSON.stringify(saved)}); } catch (e) {}</script>`);
 }
 
-export const UDID_KEY = "ifizbox.udid"; // the website's localStorage key (web/app/screens/signing.js reads it)
+export const UDID_KEY = KEYS.udid; // the website's localStorage key (web/app/screens/signing.js reads it)

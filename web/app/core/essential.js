@@ -19,6 +19,7 @@
 import { compareVersions, isNewer, parseVersion } from "./selfupdate.js";
 import { altKey, seedRecord } from "./altstore.js";
 import { NAME, DOMAIN } from "../brand.js";
+import { KEYS } from "./storagekeys.js";
 
 export const SELF_ID = "com.ryha.ifizbox";
 const SELF_NAME = NAME;
@@ -30,7 +31,7 @@ export const SELF_ALT_URL = `https://${DOMAIN}/repo/source.json`;
 export const SELF_SITE = `https://${DOMAIN}/`;
 export const MIN_FIELD = "x-ifizbox-minimum-version"; // the Release field, lower-cased as core/apt.js keeps them
 const LOCKED_TEXT = `${NAME}'s own source is built in and can't be removed.`;
-export const STORE_KEY = "ifizbox.essential";
+export const STORE_KEY = KEYS.essential;
 
 // core/sources.js sourceKey, repeated here so this file doesn't import sources.js (which imports altstore.js).
 const aptKey = (uri, dist = "./") => `deb:${uri}:${dist}`;

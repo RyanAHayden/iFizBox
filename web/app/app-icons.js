@@ -9,6 +9,7 @@
 // Cached in localStorage (each icon ~10 KB): the sheet draws them at once, offline too.
 
 import { getBackend } from "./backend.js";
+import { KEY_PREFIXES } from "./core/storagekeys.js";
 
 const gh = (org) => ({ url: `https://github.com/${org}.png?size=120` });
 export const APP_ICONS = {
@@ -21,7 +22,7 @@ export const APP_ICONS = {
   Zebra: gh("zbrateam"),
 };
 
-const KEY = "ifizbox.appicon.";
+const KEY = KEY_PREFIXES.appIcon;
 const MAX_AGE = 30 * 24 * 3600 * 1000;
 const SIZE = 114;
 

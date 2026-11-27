@@ -28,6 +28,8 @@
 // (ifizbox://authentication_success?… or ifizbox://payment/authentication_success?…) is read the same way, for a
 // vendor that lets the client name its own callback.
 
+import { KEY_PREFIXES } from "./storagekeys.js";
+
 const COMMERCIAL_TAG = "cydia::commercial";
 const CALLBACK_SCHEMES = ["sileo:", "ifizbox:"];
 const PKG = /^[a-z0-9][a-z0-9+._-]*$/i;
@@ -283,7 +285,7 @@ export function createPaymentClient({ base, request, device = () => ({}), creden
 //   adopt(vendor, token)   the account's token: kept unless this device signed in there itself -> whether taken
 //   drop(vendor)           a sign-out from another device: forgets the token here (no call to the vendor)
 //   decline(vendor)        the vendor turned the token down here: Sign In shows, the account isn't changed
-export const CREDENTIAL_PREFIX = "ifizbox.payment:";
+export const CREDENTIAL_PREFIX = KEY_PREFIXES.payment;
 export function createCredentialStore({ storage = globalThis.localStorage, secure = null } = {}) {
   const k = (vendor) => CREDENTIAL_PREFIX + vendor;
   const read = (vendor) => {

@@ -25,7 +25,9 @@
 // info: { minOSVersion: "15.0" | null, deviceFamily: [1, 2] | null, from: "ipa" | "appstore" | "text" | null, at, until? }
 // from null with ipaChecked means "checked, still unknown" (today's grey ?): the Range was refused, no Info.plist.
 
-const PREFIX = "ifizbox.ipainfo.";
+import { KEY_PREFIXES } from "./storagekeys.js";
+
+const PREFIX = KEY_PREFIXES.ipaInfo;
 const DAY = 86400000;
 export const UNKNOWN_TTL = 30 * DAY; // the IPA couldn't be read for good (no Range, no Info.plist): ask again in a month
 export const GUESS_TTL = DAY;         // the Worker didn't answer, a fallback did: try the IPA again tomorrow

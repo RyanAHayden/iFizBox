@@ -9,6 +9,7 @@
 import { plain, collapse, note } from "../nav/ui.js";
 import * as browse from "./browse.js";
 import { showAlert } from "../nav/alert.js";
+import { KEYS } from "../core/storagekeys.js";
 import { showShareFor } from "./handoff.js";
 import { showMenu, longPress, copyText, nativeHasUrl } from "../nav/menu.js";
 import { format } from "../router.js";
@@ -55,7 +56,7 @@ export const title = "Sources";
 // then counts the failures, and the page can be left while it runs. No count strip over the list: Cydia has none.
 // Each source's packages go to the catalog (Changes, Search) as soon as it has landed, not after the last one.
 
-export const TWEAK_HIDDEN_KEY = "ifizbox.hiddenTweakSources"; // F344a: kept, so a hidden source never shows first
+export const TWEAK_HIDDEN_KEY = KEYS.hiddenTweakSources; // F344a: kept, so a hidden source never shows first
 
 const state = {
   sources: null,   // the list as last loaded, sorted

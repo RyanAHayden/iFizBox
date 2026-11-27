@@ -27,6 +27,7 @@
 import { statusReady } from "../signing/device.js";
 import { normalizeServer } from "../core/signing.js";
 import { NAME, SIGN_HOST } from "../brand.js";
+import { KEYS } from "../core/storagekeys.js";
 import { loadStyle } from "../nav/motion.js";
 import { go as navGo } from "../nav/go.js";
 import { mod } from "../lazy.js";
@@ -259,8 +260,8 @@ export function deviceRows(device, { find = false } = {}) {
 //                                      again); calls onDone() once the UDID is saved. Idempotent across redraws
 //   canFindUdid(nav)                   an iPhone or iPad (where iOS takes a profile), not a computer
 //   udidPageSections({ pending, udid })   F316: the page Find This iPhone's UDID opens, one group per step
-export const UDID_KEY = "ifizbox.udid";
-const UDID_PENDING = "ifizbox.udid.pending";
+export const UDID_KEY = KEYS.udid;
+const UDID_PENDING = KEYS.udidPending;
 const local = (store) => {
   if (store !== undefined) return store;
   try { return globalThis.localStorage ?? null; } catch { return null; }
