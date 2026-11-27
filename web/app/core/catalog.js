@@ -1005,6 +1005,16 @@ export function createCatalog() {
     return rankPopular(items, limit).map(({ row, sources: n }) => ({ ...slim(row), sources: n }));
   }
 
+  // F450a: [id, url] of each id's http(s) SileoDepiction (rows don't carry it), for the Rating sort's fallback.
+  function depictionUrls(ids = []) {
+    const all = entries(ALL), out = [];
+    for (const id of ids) {
+      const url = String(all.get(id)?.stanza.sileodepiction ?? "").trim();
+      if (/^https?:\/\//i.test(url)) out.push([id, url]);
+    }
+    return out;
+  }
+
   // F124, Browse's Free Apps / Tweaks / Themes: the free rows of that kind (freeKind), by name. Tweaks and Themes
   // are empty while Not Jailbroken.
   function free(kind) {
@@ -1209,7 +1219,7 @@ export function createCatalog() {
   }
 
   return { load, loadAlt, altSource, remove, setHidden, setHiddenAuthors, setBlocked, sections, list, search, author, package: pkg, history, has, versions, row, keys: () => [...sources.keys()],
-    categories, browse, popular, free, featured, collection: collectionRows, refine, roulette,
+    categories, browse, popular, free, featured, collection: collectionRows, refine, roulette, depictionUrls,
     setInstalled, installed, upgrades, setDevice, setIpaInfo, setFilters, setTweakVerdicts, setTweakKnown, shows,
     deps, aptProblems, queueInfo, runInfo };
 }
@@ -1228,7 +1238,7 @@ export function runCatalog(catalog, op, args = []) {
     installed: catalog.installed, upgrades: catalog.upgrades, setDevice: catalog.setDevice, setIpaInfo: catalog.setIpaInfo, setFilters: catalog.setFilters,
     setTweakVerdicts: catalog.setTweakVerdicts, setTweakKnown: catalog.setTweakKnown, shows: catalog.shows,
     categories: catalog.categories, browse: catalog.browse, popular: catalog.popular, free: catalog.free, featured: catalog.featured,
-    collection: catalog.collection, refine: catalog.refine, roulette: catalog.roulette,
+    collection: catalog.collection, refine: catalog.refine, roulette: catalog.roulette, depictionUrls: catalog.depictionUrls,
     deps: catalog.deps, aptProblems: catalog.aptProblems, queueInfo: catalog.queueInfo, runInfo: catalog.runInfo }[op];
   if (!f) throw new Error(`unknown catalog op ${op}`);
   return f(...args);
