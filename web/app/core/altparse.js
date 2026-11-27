@@ -175,7 +175,29 @@ function parseNews(n) {
 // `<bundle id>~<name slug>` (~2, ~3 if that is taken too). `bundleIdentifier` stays the real one on every app.
 const nameSlug = (s) => str(s).normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
   .replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "") || "app";
-const entryKey = (app) => `${app.bundleIdentifier}\n${app.name.toLowerCase()}`;
+// A trailing bracketed part that holds a version number ("Facebook (Plus 1.0.9)", "App [v2.3]") is not a variant:
+// it is the same app's newer (or older) release, so the name's base stands for it. "(Duplicate)" and
+// "(Duplicate, iOS 15)" hold no version number and keep the whole name.
+const VERSIONED_TAIL = /^(.*\S)\s*(?:\([^()]*\)|\[[^[\]]*\])$/;
+const HAS_VERSION = /\bv?\d+(?:\.\d+)+\b|\bv\d+\b/i;
+function baseName(name) {
+  const m = VERSIONED_TAIL.exec(name);
+  if (!m) return name;
+  const tail = name.slice(m[1].length);
+  // "iOS 15.0" / "iPadOS 16.1" name a system version, not the app's own.
+  return HAS_VERSION.test(tail.replace(/\b(?:i|ipad|watch|tv|mac)?os\s*v?\d+(?:\.\d+)*/gi, "")) ? m[1] : name;
+}
+const entryKey = (app) => `${app.bundleIdentifier}\n${baseName(app.name).toLowerCase()}`;
+
+// Dotted version compare, newest first when positive for b.
+function cmpVersion(a, b) {
+  const pa = String(a).match(/\d+/g) ?? [], pb = String(b).match(/\d+/g) ?? [];
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (Number(pb[i]) || 0) - (Number(pa[i]) || 0);
+    if (d) return d;
+  }
+  return 0;
+}
 
 function variantId(app, seen) {
   if (!seen.has(app.bundleIdentifier)) return app.bundleIdentifier;
@@ -213,18 +235,35 @@ export function parseAltSource(input) {
   if (!looksLikeAltSource(json)) throw new Error("This JSON is not an AltStore source (it has no apps list).");
   const apps = [];
   const seen = new Set(); // app ids (catalog keys): the bundle id, or a variant's bundleid~name
+  const names = new Map(); // version -> the entry name it was listed under (merged versioned names only)
   const byName = new Map(); // bundle id + name -> app, for repeated entries (F42)
   for (const a of json.apps) {
     const app = parseApp(a);
     if (!app) continue;
     const same = byName.get(entryKey(app));
-    if (same) { mergeVersions(same, app.versions); continue; }
+    if (same) {
+      if (baseName(app.name) !== app.name || baseName(same.name) !== same.name) {
+        for (const v of app.versions) names.set(v, app.name);
+        for (const v of same.versions) if (!names.has(v)) names.set(v, same.name);
+        same.byVersion = true;
+      }
+      mergeVersions(same, app.versions); continue;
+    }
     app.id = variantId(app, seen);
     seen.add(app.id);
     byName.set(entryKey(app), app);
     apps.push(app);
   }
-  for (const app of apps) if (app.merged) { sortByDate(app.versions); delete app.merged; }
+  for (const app of apps) if (app.byVersion && !app.merged) delete app.byVersion;
+  for (const app of apps) if (app.merged) {
+    if (app.byVersion) {
+      // Entries that differ by a versioned bracket: newest version first, named by the newest entry's base name.
+      app.versions.sort((a, b) => cmpVersion(a.version, b.version));
+      app.name = baseName(names.get(app.versions[0]) ?? app.name);
+      delete app.byVersion;
+    } else sortByDate(app.versions);
+    delete app.merged;
+  }
   // What core/previews.js appGithub needs to tell a source's own repo from one carrying other people's IPAs:
   // the source's website and how many apps it lists. appStanza carries both onto the ipa next to sourceUrl.
   const website = httpUrl(json.website);
