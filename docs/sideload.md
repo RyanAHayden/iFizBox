@@ -471,7 +471,7 @@ rest:
   (before iOS 27) to use it over the built-in VPN; asks for the code (three tries); reads `GET /sign/setup/<code>`;
   downloads the signed IPA (size and, when the website sent one, SHA-256 checked); installs it with installation_proxy; then, before
   iOS 27, writes the pairing file into the app's container (house_arrest `VendContainer`, the path the website chose), which
-  the app takes at its next launch. The printed text still tells the person to pick it by hand (Import Pairing File); changing those words is a planned follow-up. From iOS 27 it writes nothing and
+  the app takes at its next launch. When the installed app is iFizBox and the file goes to `Documents/pairingFile.plist`, the printed text says the app picks it up itself; for another app or path it gives the by-hand Import Pairing File steps. From iOS 27 it writes nothing and
   says nothing about it, as the app pairs on the phone. Then it says what's left on the phone
   (Developer Mode, Trust the developer). The computer is trusted on every iOS, since the install needs it. It never asks for an
   Apple ID. `--check` only looks (found, trusted, Developer Mode), `--download-only` saves the IPA without an iPhone. The setup
@@ -514,8 +514,9 @@ over RemotePairing in under a second, with nothing of iFizBox's VPN on. Pairing 
 This iPhone pairs on the phone with a 6-digit code (Settings > Privacy & Security > Developer Mode > Pair with iFizBox),
 and the computer's pairing file is not used, so the setup writes none there. Before iOS 27, the setup writes the file
 into the app's folder (`Documents/pairingFile.plist`). The app takes it at its next launch, so nothing needs importing.
-The command's printed text still tells the person to pick the file by hand (Settings > Installation & Signing > This
-iPhone, Pair This iPhone, then Import Pairing File); changing those words is a planned follow-up. Import Pairing File
+The command prints the by-hand steps (Settings > Installation & Signing > This iPhone, Pair This iPhone, then Import
+Pairing File) only for another app or path. For iFizBox at `Documents/pairingFile.plist` it says the app picks the file
+up when it is opened, so nothing needs importing. Import Pairing File
 still brings in a file made another way. With no computer, Phone Setup does the pairing.
 
 **Jailbreak build**: the root helper's `install-ipa` installs an IPA through `LSApplicationWorkspace
@@ -548,7 +549,7 @@ From reading code, not from a phone:
   taking of a file at launch was checked on an iPhone 15 Pro (iOS 27.0.1) with a file put in Documents by hand. No
   lockdown record was tried on a phone before iOS 27 (the harness used stand-ins only).
 - The Files app showing `pairingFile.plist` (On My iPhone > iFizBox) and Import Pairing File before iOS 27, and on-phone
-  pairing after a free-profile Computer Install on iOS 27: not run on a phone. The in-app path the command prints
+  pairing after a free-profile Computer Install on iOS 27: not run on a phone. The in-app path the command prints for another app or path
   (Settings > Installation & Signing > This iPhone) was checked against the app's source, not on a screen, and no
-  setup run of the current command on a pre-27 phone has been made, so the printed hand-pick words are untested there. Whether the computer's record connects
+  setup run of the current command on a pre-27 phone has been made, so the printed words are untested there: the iFizBox words were checked only by the command's unit tests. Whether the computer's record connects
   over loopback on iOS 17.4 to 26 is not known.

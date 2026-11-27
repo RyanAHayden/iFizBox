@@ -395,6 +395,42 @@ fn before_ios_27_the_pairing_file_is_written_and_has_to_be_picked_in_the_app() {
     assert!(all.contains("pick pairingFile.plist (On My iPhone > LiveContainer)"), "{all}");
 }
 
+/// A code for this app itself (the website's computer install): its own container, the default place.
+fn own_app() -> Lookup {
+    Lookup { name: "Boxy".into(), ..lookup() }
+}
+
+fn said_before_ios_27(l: Lookup) -> String {
+    let (mut ui, mut net, mut dev) = (FakeUi::typing(&["ABCD-2345"]), FakeNet::ok(), FakeDev::ok("26.5"));
+    net.answers = VecDeque::from([Ok(l)]);
+    go(&[], &mut ui, &mut net, &mut dev).unwrap();
+    assert!(dev.log.iter().any(|l| l.starts_with("write")), "{:?}", dev.log);
+    ui.all()
+}
+
+#[test]
+fn before_ios_27_this_app_picks_its_pairing_file_up_when_opened() {
+    let all = said_before_ios_27(own_app());
+    assert!(all.contains("Boxy picks it up when you open it, so there's nothing to import."), "{all}");
+    assert!(!all.contains("Import Pairing File"), "{all}");
+    assert!(!all.contains("On My iPhone"), "{all}");
+}
+
+#[test]
+fn another_app_or_place_still_has_the_pairing_file_picked_by_hand() {
+    let mut elsewhere = own_app();
+    elsewhere.pairing.as_mut().unwrap().path = "Documents/other.plist".into();
+    let all = said_before_ios_27(elsewhere);
+    assert!(all.contains("pick other.plist (On My iPhone > Boxy)"), "{all}");
+    let mut other_container = own_app();
+    other_container.pairing.as_mut().unwrap().bundle_id = "com.example.other".into();
+    for l in [other_container, lookup()] {
+        let all = said_before_ios_27(l);
+        assert!(all.contains("Import Pairing File"), "{all}");
+        assert!(!all.contains("picks it up"), "{all}");
+    }
+}
+
 #[test]
 fn from_ios_27_no_pairing_file_is_written() {
     for ios in ["27.0", "28.1"] {
