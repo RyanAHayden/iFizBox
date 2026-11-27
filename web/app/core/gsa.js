@@ -334,7 +334,8 @@ export const XCODE_APP = "com.apple.gs.xcode.auth";
 export const USER_AGENT = "akd/1.0 CFNetwork/978.0.7 Darwin/18.7.0";
 export const XCODE_VERSION = "27.0 (27A5218g)";
 const AKD_USER_AGENT = "akd/1.0 CFNetwork/808.1.4"; // for a server that advertises no user_agent
-const CURRENT_MAC = { client_info: "<MacBookPro18,3> <macOS;26.6;25F84> <com.apple.AuthKit/1 (com.apple.akd/1.0)>",
+// Spelled "Mac OS X": Apple's front end answers "<macOS;26.6;…>" with a 503.
+const CURRENT_MAC = { client_info: "<MacBookPro18,3> <Mac OS X;26.6;25F84> <com.apple.AuthKit/1 (com.apple.akd/1.0)>",
   user_agent: "AuthKit/1 (Macintosh; OS X 26.6) (com.apple.akd/1.0)" };
 const NAMES_A_MAC = /<(macOS|Mac OS X);\d/;
 const identityKey = (server, clientInfo) => `${server}\n${clientInfo}`;

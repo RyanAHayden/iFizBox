@@ -376,7 +376,7 @@ test("anisette: a server on Apple's Android library is skipped before any provis
 
 // B498c: sign-in rotating servers x claims, against the fake GrandSlam behind two anisette servers.
 const OLD_MAC = "<MacBookPro13,3> <Mac OS X;10.12.6;16G29> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
-const NEW_MAC = "<MacBookPro18,3> <macOS;26.6;25F84> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
+const NEW_MAC = "<MacBookPro18,3> <Mac OS X;26.6;25F84> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
 const NEW_UA = "AuthKit/1 (Macintosh; OS X 26.6) (com.apple.akd/1.0)";
 
 // refuse(server, claim, op) -> 503 | -23782 | another ec | undefined (Apple takes it).
