@@ -10,6 +10,8 @@ Each round is one get() with a new machine. No Apple ID is used. A socket counts
 
 `stalled` counts provisioning that hit the 60 s time limit: a relay that stops forwarding without closing shows there, not in `dropped`. The drop rate is dropped / sockets, not ok (ok includes gsa.js's one retry).
 
+Counting limits: a socket the server closes before sending any message is not counted in `dropped`. It would show as a close code other than 1000 and a failed get(); neither happened, every socket closed 1000. In browser.mjs, a round that gets no answer within 150 s is printed as "no answer" and left out of the totals; none happened.
+
 ## Results
 
 Node run: `measure.mjs <repo> 20` (Node v26.12.0), every leg including gsa.apple.com through ifizbox.com. 20 rounds per server.
@@ -37,7 +39,7 @@ No drops seen. Keep the forwarding relay as it is; the forward-or-not decision w
 
 No follow-up task is filed for win.ani.sidestore.io. It is seventh of eight in the list, answers 502 quickly, and get() moves to the next server. One day of downtime is not reason to remove it.
 
-All runs were from one network, Cloudflare colo ATL, in one half hour.
+All runs were from one network, Cloudflare colo ATL, in one half hour. The time, the colo (from `curl https://ifizbox.com/cdn-cgi/trace`), the Chromium version and the direct checks (win.ani.sidestore.io's 502, mac-ani.jkcoxson.com's 200) were one-off curl commands run during the session; they are not in the raw logs.
 
 ## Not verified
 
@@ -47,3 +49,4 @@ All runs were from one network, Cloudflare colo ATL, in one half hour.
 - Real Apple ID sign-in (no Apple ID used).
 - The stall counter: it has never seen a stall, so it is untested.
 - Whether the old pass-through would still drop today was not re-measured; the comparison is with earlier B498 data.
+- Direct connections (without the relay) were not re-measured.
