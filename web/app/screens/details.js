@@ -17,6 +17,7 @@
 import { el, grouped } from "../nav/ui.js";
 import { rowIcon } from "../icons/rowicons.js";
 import { estimateLines, LINES, linkified } from "./description.js";
+import { MIN_TIER } from "../core/catalog.js";
 
 export const DETAILS_TITLE = "Details";
 export const PREVIEW_HEADER = "Preview";
@@ -143,4 +144,11 @@ export function footerGroup(text) {
   const f = grouped([{ footer: text }]);
   f.querySelector(".group-footer")?.classList.add("cy-foot");
   return f;
+}
+
+// F453: "N installs" under Information, from the review server's count (F452), only once the package has passed
+// MIN_TIER installs (the same minimum Popular uses). null: no line (no count yet, or the server keeps none).
+export function installsLine(count) {
+  const n = Number(count);
+  return Number.isFinite(n) && n > MIN_TIER ? `${n.toLocaleString("en-US")} installs` : null;
 }
