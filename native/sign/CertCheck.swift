@@ -141,6 +141,9 @@ struct SignedRecord: Codable, Equatable {
         // B247: the source's app it was signed from (SignOptions.credit), so Re-sign keeps it. Left out of ==: it
         // changes nothing in the signed IPA (My IPAs' "signed with its own options" check compares these).
         var credit: SourceCredit? = nil
+        // B509: true only in My IPAs' Sign Options saved with no Keep Bundle ID choice (keepBundleID nil there), apart
+        // from the pre-F237 nil. Records and signed copies never have it. Left out of ==.
+        var keepUnchosen: Bool? = nil
 
         static func == (a: StoredOptions, b: StoredOptions) -> Bool {
             a.name == b.name && a.bundleID == b.bundleID && a.icon == b.icon && a.removeExtensions == b.removeExtensions
@@ -172,7 +175,8 @@ extension SignOptions {
     init(_ s: SignedRecord.StoredOptions) {
         self.init()
         name = s.name; bundleID = s.bundleID; icon = s.icon; removeExtensions = s.removeExtensions; fixArm64e = s.fixArm64e
-        keepBundleID = s.keepBundleID ?? false
+        keepChosen = s.keepUnchosen != true
+        keepBundleID = s.keepBundleID ?? !keepChosen // B509: no choice is the default (on); a pre-F237 nil, the old way
         tweaks = s.tweaks
         credit = s.credit
     }

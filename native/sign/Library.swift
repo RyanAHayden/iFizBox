@@ -160,21 +160,28 @@ struct IPALibrary {
     }
 
     // F243: whether the user saved Sign Options for this IPA (library.options). Without, Keep Bundle IDs is the
-    // global setting the page sends (`keep`); with, the file's own switch (nil in one saved before F237: the old way).
+    // global setting the page sends (`keep`); with, the file's own switch (nil in one saved before F237: the old way),
+    // or the setting again when they were saved with no choice (B509, SignOptions.keepChosen).
     func hasOptions(_ file: String) -> Bool { FileManager.default.fileExists(atPath: side(file, ".options.json").path) }
 
-    // The options a sign of this IPA uses: its own, or the defaults with Keep Bundle IDs as `keep` (nil: on).
+    // The options a sign of this IPA uses: its own, with Keep Bundle IDs as `keep` (nil: on) where it has no choice.
     func options(_ file: String, keep: Bool?) -> SignOptions {
         var o = options(file)
-        if !hasOptions(file), let k = keep { o.keepBundleID = k }
+        if !hasOptions(file) || !o.keepChosen, let k = keep { o.keepBundleID = k }
         return o
     }
 
     // Keeps the options; a signed copy made with others no longer counts, so it goes.
     func setOptions(_ file: String, _ o: SignOptions) throws {
         _ = try url(file)
-        try IPALibrary.encoder.encode(o.stored).write(to: side(file, ".options.json"), options: .atomic)
-        if let s = rawSigned(file), s.options != o.stored { dropSigned(file) }
+        var saved = o.stored
+        if !o.keepChosen { saved.keepBundleID = nil; saved.keepUnchosen = true } // B509
+        try IPALibrary.encoder.encode(saved).write(to: side(file, ".options.json"), options: .atomic)
+        guard let s = rawSigned(file) else { return }
+        // B509: with no choice, either way of the copy still fits here; signed(_:keep:) checks it against the setting
+        var now = o.stored
+        if !o.keepChosen { now.keepBundleID = s.options.keepBundleID }
+        if s.options != now { dropSigned(file) }
     }
 
     // ---- the signed copy
@@ -282,8 +289,8 @@ struct IPALibrary {
     // ---- for the page
 
     // One IPA as library.list hands it to the page (web/app/core/myipas.js reads it).
-    // F243: options.keepBundleId is null without Sign Options of its own (the global setting decides); `keep` is that
-    // setting, for whether the signed copy counts.
+    // F243: options.keepBundleId is null without a saved choice (no Sign Options of its own, or B509: saved without
+    // one), so the global setting decides; `keep` is that setting, for whether the signed copy counts.
     func json(_ file: String, certificate: Data?, now: Date = Date(), keep: Bool? = nil) -> [String: Any] {
         guard let d = try? details(file) else { return ["file": file, "error": "gone"] }
         let iso = ISO8601DateFormatter()
@@ -294,7 +301,7 @@ struct IPALibrary {
         let o = options(file)
         j["options"] = ["name": o.name.map { $0 as Any } ?? NSNull(), "bundleId": o.bundleID.map { $0 as Any } ?? NSNull(), "icon": o.icon?.base64EncodedString() ?? NSNull(),
                         "removeExtensions": o.removeExtensions, "fixArm64e": o.fixArm64e,
-                        "keepBundleId": hasOptions(file) ? o.keepBundleID as Any : NSNull(),
+                        "keepBundleId": hasOptions(file) && o.keepChosen ? o.keepBundleID as Any : NSNull(),
                         "tweaks": (o.tweaks?.names ?? []) as Any] as [String: Any] // F288: the names only; the page keeps the files per app
         if let s = signed(file, certificate: certificate, now: now, keep: keep) {
             var sj: [String: Any] = ["at": iso.string(from: s.signed), "bundleId": s.bundleID, "name": s.name, "version": s.version,

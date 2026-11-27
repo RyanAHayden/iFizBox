@@ -753,6 +753,34 @@ test("F243: My IPAs' Sign follows Keep Bundle IDs") {
     try lib.delete(a)
 }
 
+// B509: Sign Options saved without keepBundleId (a free Apple ID's profile has no switch) hold no choice; the nil of
+// options saved before Keep Bundle IDs still means the old way.
+test("B509: Sign Options saved without a Keep Bundle ID choice follow the setting") {
+    let lib = IPALibrary(root: work.appendingPathComponent("lib509/Documents"), store: work.appendingPathComponent("lib509/Store"))
+    let a = try lib.add(fixtures.appendingPathComponent("rich.ipa"), name: "Rich.ipa", move: false)
+    let cert = identity.certificate
+    let saved = { (lib.json(a, certificate: cert)["options"] as? [String: Any])?["keepBundleId"] }
+    try lib.setOptions(a, try SignOptions(json: ["name": "Mine"]))
+    check(lib.hasOptions(a) && saved() is NSNull, "json: keepBundleId null")
+    check(lib.options(a, keep: nil).keepBundleID && !lib.options(a, keep: false).keepBundleID && lib.options(a, keep: true).keepBundleID,
+          "the global setting decides (absent: on)")
+    check(lib.options(a, keep: false).name == "Mine", "the other options stay")
+    let profile = try Profile(try fixture("profile.mobileprovision"))
+    let s = try lib.sign(a, signer: IPASigner(profile: profile, identity: identity), certificate: cert, expires: nil, work: work, keep: false)
+    check(s.options.keepBundleID == false && s.options.keepUnchosen == nil, "the copy records how it was signed")
+    try lib.setOptions(a, try SignOptions(json: ["name": "Mine"]))
+    check(lib.signed(a, certificate: cert, keep: false) != nil, "saved again unchanged: the copy stays")
+    check(lib.signed(a, certificate: cert) == nil, "setting on: not signed")
+    try lib.setOptions(a, try SignOptions(json: ["name": "Other"]))
+    check(lib.signed(a, certificate: cert, keep: false) == nil, "other options: the copy goes")
+    try lib.setOptions(a, try SignOptions(json: ["keepBundleId": true]))
+    check(saved() as? Bool == true && lib.options(a, keep: false).keepBundleID, "a choice is still saved")
+    // saved before Keep Bundle IDs: no keepBundleId key at all
+    try Data(#"{"fixArm64e":true,"removeExtensions":[]}"#.utf8).write(to: lib.store.appendingPathComponent(a + ".options.json"))
+    check(saved() as? Bool == false && !lib.options(a, keep: true).keepBundleID, "pre-F237 options: the old way")
+    try lib.delete(a)
+}
+
 // B229: the IPA queue signs a My IPAs file into a copy of its own (SignAhead.swift); keepSigned makes it the file's
 // signed copy when it was signed the way a sign here would, so the row reads Signed after that install.
 test("B229: My IPAs keeps the queue's signed copy") {
