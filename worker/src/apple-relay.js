@@ -160,6 +160,9 @@ export async function appleRelay(req, env = {}, { fetcher = fetch, timeout = TIM
   if (asc && req.headers.get("Authorization")) headers.set("Authorization", req.headers.get("Authorization"));
   const ua = req.headers.get("X-Relay-User-Agent");
   if (ua) headers.set("User-Agent", ua);
+  // GrandSlam answers a reused connection with 5xx: a fresh one per request. Node's fetch (node.mjs) does as told;
+  // Cloudflare's drops the header and pools as it likes.
+  if (target.host === "gsa.apple.com") headers.set("Connection", "close");
 
   let body;
   if (req.method !== "GET" && req.method !== "DELETE") {
