@@ -1428,7 +1428,8 @@ async function renderOptions(body, route, file) {
   ul.append(field("Name", ed.name, entry.name || "", (v) => { ed.name = v; }));
   ul.append(field("Bundle ID", ed.bundleId, entry.bundleId || "", (v) => { ed.bundleId = v; }, { inputMode: "url" }));
   ul.append(iconCell(ed, { iconPNG }));
-  g.append(ul, el("p", "group-footer", "Empty fields keep what the IPA has. A new bundle ID installs a second copy; your profile may still change it."));
+  // B510: appIdOnly, a typed bundle ID makes no second copy, so it isn't offered
+  g.append(ul, el("p", "group-footer", `Empty fields keep what the IPA has.${appIdOnly ? "" : " A new bundle ID installs a second copy; your profile may still change it."}`));
   body.append(g);
 
   const exts = entry.extensions ?? [];

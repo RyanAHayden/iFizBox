@@ -43,6 +43,9 @@ test("a free Apple ID's profile: no Keep Bundle ID switch or footer, and none sa
   assert.ok(p.labels.includes("arm64e Fix-Up"), "the page drew");
   assert.ok(!p.labels.includes("Keep Bundle ID"));
   assert.doesNotMatch(p.footers, /keeps its own ID|Keep Bundle IDs|separate copy/);
+  // B510: Install As offers no second copy
+  assert.match(p.footers, /Empty fields keep what the IPA has\./);
+  assert.doesNotMatch(p.footers, /second copy/);
   assert.ok(p.sent, "saved");
   assert.ok(!("keepBundleId" in p.sent));
   assert.ok(!("keepBundleId" in (await saveWith(FREE, { keepBundleId: null })).sent));
@@ -59,6 +62,7 @@ test("any other profile keeps the switch and saves it", async () => {
     const p = await saveWith(profile);
     assert.ok(p.labels.includes("Keep Bundle ID"));
     assert.match(p.footers, /keeps its own ID/);
+    assert.match(p.footers, /A new bundle ID installs a second copy/);
     assert.equal(p.sent.keepBundleId, true);
   }
 });
