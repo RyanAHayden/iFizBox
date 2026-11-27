@@ -92,8 +92,7 @@ import { depIndex, explain, explainApt } from "./deps.js";
 import { withIpaInfo } from "./ipainfo.js";
 import { IdMap, IdSet, sameId } from "./apt.js"; // B407: package names compare ignoring case
 import { needsRestart } from "./queue.js";
-import { ratingOf, compareRatings } from "./sections.js"; // F450
-import { isStoreName } from "./applookup.js"; // F457
+import { ratingOf, compareRatings, isStoreName } from "./sections.js"; // F450, F457
 import { packageKind } from "./progress.js";
 import { injectableFromFields, hintMatcher } from "./tweakfields.js"; // F302; C32: not tweaks.js, which pulls unpack.js in
 import { NO_SECTION, sectionName, simpleSection, parseAuthor, compareNames, SECTION_GROUPS, sectionGroup, APP_TWEAKS } from "./sections.js";

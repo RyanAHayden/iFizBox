@@ -8,7 +8,8 @@ Seen with six or more RyukGram variants on Instagram's rating.
 ## Decision (unattended)
 
 An app gets the App Store tier only when its name is the App Store's whole name or its first words
-(`isStoreName` in `web/app/core/applookup.js`). A `+` is part of a word, so "Instagram++" is not "Instagram".
+(`isStoreName` in `web/app/core/sections.js`). It was first in `core/applookup.js`; importing that from the catalog
+broke the 120 startup-module cap (`web/app/module-graph.test.js`), so it moved beside `ratingOf`. A `+` is part of a word, so "Instagram++" is not "Instagram".
 
 Not chosen: "one row per bundle ID gets the tier". That one row could still be a modded app.
 

@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BATCH, batchLookupUrl, isStoreName, parseBatch,storeRatingsLoader, STORE_RATINGS_TTL } from "./applookup.js";
+import { BATCH, batchLookupUrl, parseBatch, storeRatingsLoader, STORE_RATINGS_TTL } from "./applookup.js";
+import { isStoreName } from "./sections.js";
 
 const memStore = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, v) }; };
 const idsOf = (url) => { const q = new URL(url, "https://site.test").searchParams; return (q.get("bundleIds") ?? q.get("bundleId")).split(","); };

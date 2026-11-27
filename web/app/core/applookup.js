@@ -57,16 +57,6 @@ export function batchLookupUrl(ids, c = "us", { base = "", direct = false } = {}
   return direct ? `https://itunes.apple.com/lookup?${new URLSearchParams({ bundleId: list.join(","), country: country(c) })}`
     : `${base}/api/applookup-batch?${new URLSearchParams({ bundleIds: list.join(","), country: country(c) })}`;
 }
-// F457: a modded app keeps the original's bundle ID, so the App Store's stars count only for an app named as the App
-// Store names it: the whole name or its first words ("Spotify Music" of "Spotify: Music and Podcasts"). "+" is part of
-// a word, so "Instagram++" isn't "Instagram".
-const nameWords = (s) => str(s).normalize("NFC").toLowerCase().replace(/['’]/g, "").split(/[^\p{L}\p{M}\p{N}+]+/u).filter(Boolean);
-export function isStoreName(appName, trackName) {
-  const app = nameWords(appName).join("");
-  let lead = "";
-  return app !== "" && nameWords(trackName).some((w) => (lead += w) === app);
-}
-
 // A batch answer (JSON or text) -> { <bundle id, lower case>: [average, count, App Store name] }, the rated apps only;
 // null when it isn't a lookup answer.
 export function parseBatch(input) {
