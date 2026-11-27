@@ -436,10 +436,44 @@ function reviewRatings(now = Date.now()) {
   }
   return Promise.race([ratingsKept.ratings, new Promise((done) => setTimeout(done, RATINGS_WAIT, {}))]);
 }
+// F450a: a package with no rating here falls back to its depiction's (Sileo) stars. Per list at most DEPICTION_CAP
+// depictions are fetched, DEPICTION_PARALLEL at a time, each once per session (a miss is kept too); what isn't
+// back within DEPICTION_WAIT ranks unrated this time and is there next time.
+const DEPICTION_CAP = 100, DEPICTION_PARALLEL = 4, DEPICTION_WAIT = 4000;
+const depictionKept = new Map(); // id -> [average, count] | null
+const depictionBusy = new Set();
+async function depictionRatings(rows, ours, sort) {
+  const { ratingOf } = sort;
+  const ids = [...new Set(rows.map((r) => r.id))].filter((id) => !ratingOf(ours, id) && !depictionKept.has(id) && !depictionBusy.has(id)).slice(0, DEPICTION_CAP);
+  if (ids.length) {
+    const queue = (await ask("depictionUrls", [ids])).filter(([id]) => !depictionKept.has(id));
+    for (const id of ids) if (!queue.some(([q]) => q === id)) depictionKept.set(id, null);
+    queue.forEach(([id]) => depictionBusy.add(id));
+    const work = async () => {
+      for (let one = queue.shift(); one; one = queue.shift()) {
+        const [id, url] = one;
+        try { depictionKept.set(id, sort.depictionStars(JSON.parse(await getBackend().text(url)))); } catch { depictionKept.set(id, null); }
+        depictionBusy.delete(id);
+      }
+    };
+    const all = Promise.all(Array.from({ length: DEPICTION_PARALLEL }, work));
+    await Promise.race([all, new Promise((done) => setTimeout(done, DEPICTION_WAIT))]);
+  }
+  const found = {};
+  for (const r of rows) if (depictionKept.get(r.id)) found[r.id] = depictionKept.get(r.id);
+  return sort.withDepiction(ours, found);
+}
 async function refineByRating(rows, { sort, ...filters }) {
   // loaded only now: one module fewer at startup (app.js's import cap)
-  const [out, ratings, { rankByRating }] = await Promise.all([ask("refine", [rows, filters]), reviewRatings(), import("./core/ratingsort.js")]);
-  return rankByRating(out, ratings);
+  const [out, ours, mod] = await Promise.all([ask("refine", [rows, filters]), reviewRatings(), import("./core/ratingsort.js")]);
+  return mod.rankByRating(out, await depictionRatings(out, ours, mod).catch(() => ours));
+}
+async function popularByRating(opts) {
+  const ours = await reviewRatings();
+  const mod = await import("./core/ratingsort.js");
+  const wide = await ask("popular", [{ ...opts, limit: 200, ratings: ours }]);
+  const ratings = await depictionRatings(wide, ours, mod).catch(() => ours);
+  return ask("popular", [{ ...opts, ratings }]);
 }
 
 export const catalog = {
@@ -460,7 +494,7 @@ export const catalog = {
   author: (name) => ask("author", [name]),
   categories: () => ask("categories"), // F46: Home's Browse (core/catalog.js)
   browse: (category) => ask("browse", [category]),
-  popular: async (opts) => ask("popular", [{ ...opts, ratings: await reviewRatings() }]), // F450: best rated first
+  popular: (opts) => popularByRating(opts), // F450: best rated first
   // F124, Browse's lists (core/catalog.js): Free Apps / Tweaks / Themes, Featured (refs [{ key, id }]), and New or
   // Recently Updated (`kind` "new" | "updated") from the Changes tab's records; with no IndexedDB, from the
   // sources' own version dates only.

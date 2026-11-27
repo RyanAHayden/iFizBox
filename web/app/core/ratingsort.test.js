@@ -29,3 +29,15 @@ test("reviewsApi().ratings(): one GET /reviews; {} when the server keeps none or
   assert.deepEqual(await api(answer({ code: "x" }, false)).ratings(), {});
   assert.deepEqual(await api(async () => { throw new Error("offline"); }).ratings(), {});
 });
+
+test("depiction stars fill in for packages with none here; ours win", async () => {
+  const { depictionStars, withDepiction } = await import("./ratingsort.js");
+  const json = { class: "DepictionStackView", views: [{ class: "DepictionRatingView", rating: 4.2 }] };
+  assert.deepEqual(depictionStars(json), [4.2, 0]);
+  assert.equal(depictionStars({ views: [] }), null);
+  assert.equal(depictionStars(null), null);
+  const ratings = withDepiction({ a: [3, 5] }, { a: [5, 1], b: [4.2, 0], c: null });
+  assert.deepEqual(ratings, { a: [3, 5], b: [4.2, 0] });
+  const rows = [row("n", "Nope"), row("b", "Bee"), row("a", "Ay")];
+  assert.deepEqual(rankByRating(rows, ratings).map((r) => r.id), ["b", "a", "n"]);
+});
