@@ -28,9 +28,10 @@ enum ProfileRefresh {
 
     /// `profiles`: the fresh ones from Apple, one per App ID. `installed`: the user apps iOS lists, nil when it
     /// couldn't be asked (an empty list counts as that too: nothing is forgotten on it). An app that already lasts
-    /// longer than a fresh free profile would (a paid certificate's) is left as it is.
+    /// longer than a fresh free profile would (a paid certificate's) is left as it is. `busy` (F459): a task runs, so an
+    /// app iOS doesn't list may still be installing: it is left alone, neither forgotten nor signed again.
     static func plan(_ records: [SignedRecord], certificate: Data, profiles: [Profile], installed: Set<String>?,
-                     now: Date = Date()) -> Plan {
+                     busy: Bool = false, now: Date = Date()) -> Plan {
         var out = Plan()
         let current = serial(certificate)
         // only a free profile that this certificate can use; the latest to expire wins for an App ID
@@ -42,7 +43,10 @@ enum ProfileRefresh {
         }
         let latest = fresh.values.compactMap { $0.signatureExpiry(certificate: certificate) }.max()
         for r in records {
-            if let have = installed, !have.isEmpty, !have.contains(r.bundleID) { out.gone.append(r); continue }
+            if let have = installed, !have.isEmpty, !have.contains(r.bundleID) {
+                if !busy { out.gone.append(r) }
+                continue
+            }
             if r.certSerial != nil, r.certSerial == current, let id = r.appID, let p = fresh[id] {
                 out.renew.append(Renewal(record: r, profile: p, expires: p.signatureExpiry(certificate: certificate)))
             } else if let x = r.expires, let new = latest, x > new {

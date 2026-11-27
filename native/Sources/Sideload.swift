@@ -1236,7 +1236,9 @@ enum Sideload {
                 var again = Set<String>()
                 do {
                     let (plan, out) = try IDevice.withMisagent { installed, misagent -> (ProfileRefresh.Plan, ProfileRefresh.Outcome) in
-                        let plan = ProfileRefresh.plan(list, certificate: certificate, profiles: [profile] + fetched, installed: installed)
+                        // F459: `busy` is the page's app queue; SignJob covers a signing or serving the page doesn't know of
+                        let busy = c.params["busy"] as? Bool == true || SignJob.current != nil
+                        let plan = ProfileRefresh.plan(list, certificate: certificate, profiles: [profile] + fetched, installed: installed, busy: busy)
                         return (plan, ProfileRefresh.run(plan, misagent: misagent, log: log) { again = Set($0.map(\.bundleID)) })
                     }
                     SignBridge.queue.async {
