@@ -18,3 +18,4 @@ Nothing failed; no phone was used.
 - No phone used. The statements come from reading the code.
 - Files showing `pairingFile.plist` and importing it before iOS 27: not run.
 - On-phone pairing after a free-profile Computer Install on iOS 27 (through LocalDevVPN): not run.
+- Whether the computer's record connects over loopback on iOS 17.4 to 26: not known.

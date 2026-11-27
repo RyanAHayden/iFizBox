@@ -467,8 +467,9 @@ rest:
 - **The command** (`cli/`, on idevice, the commit `native/sideload/idevice/pin.env` pins; the steps and their words
   are `core/`, tested with fakes): finds the iPhone over USB (waits for it to be plugged in); makes sure the computer
   is trusted, reusing usbmuxd's pairing record when the iPhone takes it, else pairing (the iPhone asks Trust and its
-  passcode) and saving the record to usbmuxd, with `EnableWifiConnections` on for an app that imports the record (before iOS 27) to use it over the built-in VPN; asks for the code (three tries); reads `GET /sign/setup/<code>`; downloads the signed IPA (size and,
-  when the website sent one, SHA-256 checked); installs it with installation_proxy; writes the pairing file into
+  passcode) and saving the record to usbmuxd, with `EnableWifiConnections` on for an app that imports the record
+  (before iOS 27) to use it over the built-in VPN; asks for the code (three tries); reads `GET /sign/setup/<code>`;
+  downloads the signed IPA (size and, when the website sent one, SHA-256 checked); installs it with installation_proxy; writes the pairing file into
   the app's container (house_arrest `VendContainer`, the path the website chose), which the app never reads by itself
   (only Import Pairing File brings a file in); and says what's left on the phone
   (Developer Mode, Trust the developer). It never asks for an Apple ID. `--check` only looks (found, trusted,
@@ -522,4 +523,5 @@ From reading code, not from a phone:
   The app showed no Free Apple ID group after the setup, so Refresh Profile was out of reach. Not run on a Mac or on
   real Windows, or for a second week's refresh; the Microsoft Store link to the Apple Devices app is from memory.
 - The Files app showing `pairingFile.plist` (On My iPhone > iFizBox) and Import Pairing File before iOS 27, and on-phone
-  pairing after a free-profile Computer Install on iOS 27: not run on a phone.
+  pairing after a free-profile Computer Install on iOS 27: not run on a phone. Whether the computer's record connects
+  over loopback on iOS 17.4 to 26 is not known.
