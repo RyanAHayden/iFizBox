@@ -18,6 +18,7 @@ import { description, matchesArch, compareVersions } from "./apt.js";
 import { sectionName, isVisible, compareNames } from "./catalog.js";
 import { altKey, isAltKey, normalizeAltUrl, looksLikeAltUrl, seedRecord } from "./altstore.js";
 import { NAME } from "../brand.js";
+import { KEYS } from "./storagekeys.js";
 
 export const EXPORT_FILENAME = "ifizbox-sources.txt";
 
@@ -192,7 +193,7 @@ export function orderSources(list, order) {
   return [...known, ...all.filter((s) => !at.has(s.key))];
 }
 
-export const ORDER_KEY = "ifizbox.sourceOrder";
+export const ORDER_KEY = KEYS.sourceOrder;
 
 export function loadOrder(storage = globalThis.localStorage) {
   try {

@@ -20,9 +20,10 @@
 // core/previews.js sileoRatings gave. Text is always plain: the tab draws ours with textContent.
 import { ACCOUNT_BASE } from "./account.js";
 import { nativeBridge } from "../native.js";
+import { KEYS } from "./storagekeys.js";
 
 export const LIMITS = { title: 80, name: 30, text: 2000, version: 64 };
-export const TOKEN_KEY = "ifizbox.reviewToken";
+export const TOKEN_KEY = KEYS.reviewToken;
 const TOKEN = /^[A-Za-z0-9_-]{32,128}$/;
 const chars = (s) => [...String(s ?? "")].length;
 

@@ -29,12 +29,14 @@
 //                                              text, newest first, at most 50; [] when it isn't the feed
 //   storeReviews(id, { country, get, now }) -> Promise<[review]>, kept in memory a day per id; [] when it fails
 
+import { KEY_PREFIXES } from "./storagekeys.js";
+
 const str = (v) => (typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "");
 const httpsUrl = (u) => (/^https?:\/\//i.test(str(u)) ? str(u).replace(/^http:/i, "https:") : null);
 const BUNDLE = /^[A-Za-z0-9.-]{1,155}$/;
 
 export const LOOKUP_TTL = 7 * 24 * 3600 * 1000;
-const PREFIX = "ifizbox.applookup.";
+const PREFIX = KEY_PREFIXES.appLookup;
 
 const country = (c) => (/^[a-z]{2}$/.test(str(c).toLowerCase()) ? str(c).toLowerCase() : "us");
 
@@ -76,7 +78,7 @@ export const STORE_RATINGS_TTL = 24 * 3600 * 1000;
 // An answer (an app with no stars too) is kept a day, in `store` (localStorage-like) across launches; a failed request
 // isn't kept. After `wait` it answers with what it has; the requests go on and are there next time.
 export function storeRatingsLoader({ get, country: c = "us", direct = false, store = null, now = () => Date.now() }) {
-  const key = `ifizbox.storeratings.${country(c)}`;
+  const key = `${KEY_PREFIXES.storeRatings}${country(c)}`;
   const kept = new Map(); // id -> [asked at, [average, count] | null]
   const busy = new Map(); // id -> the request asking for it
   const fresh = (id) => kept.has(id) && now() - kept.get(id)[0] < STORE_RATINGS_TTL;

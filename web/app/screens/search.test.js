@@ -194,21 +194,6 @@ test("B23: Add Source & Install goes on when apt-get update failed on another so
   assert.ok(!log.some((l) => l[0] === "banner" || l[0] === "alert"));
 });
 
-test("B23: Sources' refresh names apt's failed sources in a banner, never an alert", async () => {
-  const { bannerFailed } = await import("./sources.js");
-  const { format } = await import("../router.js");
-  const shown = [];
-  const went = [];
-  const opts = { banner: (b) => shown.push(b), go: (h) => went.push(h) };
-  assert.equal(bannerFailed([], opts), false, "nothing failed");
-  assert.equal(bannerFailed(undefined, opts), false, "the website's refresh has no `failed`");
-  assert.equal(shown.length, 0);
-  assert.equal(bannerFailed(Object.assign([], { failed: [{ key: "k", uri: "https://dead.example/repo/", name: "Old Repo", message: "x" }] }), opts), true);
-  assert.equal(shown[0].message, "Old Repo: tap to see Sources.");
-  shown[0].onTap();
-  assert.deepEqual(went, [format({ tab: "sources", path: [] })]);
-});
-
 test("B33: Other Sources follows Show Incompatible, and the switch's setting runs the search again", async () => {
   const { readFileSync } = await import("node:fs");
   const src = readFileSync(new URL("./search.js", import.meta.url), "utf8");

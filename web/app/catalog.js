@@ -32,6 +32,7 @@ import { detectMode } from "./core/settings.js";
 import { splitIgnoredVersions } from "./core/appupdates.js";
 import { isGithubSource, githubSourceText } from "./core/github.js"; // F304
 import { nativeBridge } from "./native.js";
+import { displayName } from "./core/sources.js"; // F456
 
 export { ALL };
 
@@ -163,6 +164,18 @@ async function loadSource(source, arch, sig, { tweaks = false } = {}) {
   }
 }
 
+// F456: this load's failures among `sources` (`results`: key -> { error }): a repo whose packages didn't load or
+// parse. Left out: one whose refresh failed (its record has `error`, which the refresh reports), one never refreshed
+// yet (its first refresh reports it) and one only its own app can read.
+export function loadFailures(sources, results) {
+  const out = [];
+  for (const s of sources ?? []) {
+    const reason = results.get(s.key)?.error;
+    if (reason && s.updated && !s.error && !s.unsupported) out.push({ title: displayName(s), detail: String(reason) });
+  }
+  return out;
+}
+
 async function run() {
   const arch = getArch();
   const sources = await getBackend().sources();
@@ -174,6 +187,7 @@ async function run() {
     }
   }
   let reloaded = false;
+  const tried = []; // F456: the sources loaded this pass
   // F37: a phone without a jailbreak sees AltStore sources only; APT ones aren't fetched until the type changes.
   const appsOnly = device?.device.jailbreak === "none";
   // F302: except in the sideload app, where APT sources are Tweak Sources: their injectable tweaks only.
@@ -184,8 +198,11 @@ async function run() {
     const sig = signature(s, arch) + (isAltKey(s.key) ? `|${device?.device.ios ?? ""}` : "") + (tweaks ? "|tweaks" : "");
     if (loaded.get(s.key)?.sig === sig) return null;
     reloaded = true;
+    tried.push(s);
     return loadSource(s, arch, sig, { tweaks });
   }));
+  const bad = loadFailures(tried, loaded); // F456: said once: a source isn't loaded again until it changes
+  if (bad.length) for (const f of [...failListeners]) { try { f(bad); } catch { /* the load itself stands */ } }
   if (tweakSources) await watchTweakIndex(reloaded ? sources.filter((s) => !isAltKey(s.key)) : []); // B377
   if (reloaded) await recordSeen();
   if (reloaded) fireLoaded();
@@ -195,6 +212,7 @@ async function run() {
 // B98: told each time an ensure() put new or refreshed sources' packages in the worker, whoever asked for it (the
 // reload bar, a source page opened right after Add Source, Search), so an open Search runs its query again.
 const loadListeners = new Set();
+const failListeners = new Set(); // F456: told the repos that didn't load or parse, [{ title, detail }]
 function fireLoaded() {
   for (const f of [...loadListeners]) { try { f(); } catch { /* one listener's error stops no other */ } }
 }
@@ -572,4 +590,5 @@ export const catalog = {
   onChange: (f) => { changeListeners.add(f); return () => changeListeners.delete(f); },
   // B98: called after a load put new or refreshed sources in the catalog; returns unsubscribe.
   onLoaded: (f) => { loadListeners.add(f); return () => loadListeners.delete(f); },
+  onLoadFailed: (f) => { failListeners.add(f); return () => failListeners.delete(f); }, // F456
 };

@@ -22,9 +22,10 @@ import { showHUD } from "../nav/hud.js";
 import { storedUdid, startUdid, watchUdid } from "./signing.js";
 import { ascGuideHref, ASC_GUIDE_LINK } from "./guides.js";
 import { nativeBridge } from "../native.js";
+import { KEYS } from "../core/storagekeys.js";
 
-const KEY = "ifizbox.asc";
-const CACHE = "ifizbox.asc.profiles";
+const KEY = KEYS.asc;
+const CACHE = KEYS.ascProfiles;
 const ls = () => { try { return globalThis.localStorage ?? null; } catch { return null; } };
 const readJson = (k) => { try { return JSON.parse(ls()?.getItem(k) ?? "null"); } catch { return null; } };
 const writeJson = (k, v) => { try { v == null ? ls()?.removeItem(k) : ls()?.setItem(k, JSON.stringify(v)); } catch { /* blocked */ } };

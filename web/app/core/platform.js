@@ -13,7 +13,9 @@
 //
 // "Look Around Anyway" dismisses the page for good: DISMISS_KEY in localStorage.
 
-export const DISMISS_KEY = "ifizbox.notIphoneDismissed";
+import { KEYS } from "./storagekeys.js";
+
+export const DISMISS_KEY = KEYS.notIphoneDismissed;
 
 // The kind of device that can't install, or null when the normal app should run.
 // nav: navigator-like ({ userAgent, maxTouchPoints }); native: true inside the app's shell.

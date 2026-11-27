@@ -742,4 +742,14 @@ export function openRow(rows, lanes) {
   return { label: `Open ${r.name}`, action: () => { lanes.open(r); return false; } };
 }
 
+// F456: the reload bar's Show Info (nav/reloadbar.js): the installs' black log with the run's steps, then every
+// failure as a red line. Return closes it.
+export function openFailureLog(failures = [], steps = [], { open = openProgress } = {}) {
+  const page = open({ title: "Log" });
+  for (const s of steps) page.step(s);
+  for (const f of failures) page.error(f.title ? `${f.title}: ${f.detail}` : f.detail);
+  page.finish({ title: "Log" });
+  return page;
+}
+
 export { ended };

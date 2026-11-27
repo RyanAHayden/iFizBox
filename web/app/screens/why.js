@@ -13,6 +13,7 @@
 import { el, grouped } from "../nav/ui.js";
 import { format, settingsRoute } from "../router.js";
 import { NAME } from "../brand.js";
+import { KEYS } from "../core/storagekeys.js";
 import { rowIcon, homeTileCss, iconStyle } from "../icons/rowicons.js";
 
 export const WHY_ROUTE = { tab: "home", path: ["why"] };
@@ -176,7 +177,7 @@ export function render(body, { mode = "site", install = null, storage = globalTh
 // Where Home shows the Why tile (F306, user 2026-11-20): the website always; the installed apps (sideload and
 // jailbreak) only until the page has been opened once there (WHY_OPENED_KEY, kept in localStorage, which the app's
 // web view keeps across launches). After that the page is reached from Settings' About group (whyAboutSection).
-export const WHY_OPENED_KEY = `${NAME.toLowerCase()}.whyOpened`; // the lowercase name's storage prefix, from brand.js
+export const WHY_OPENED_KEY = KEYS.whyOpened;
 export const showsWhyTile = (mode, opened = false) => mode === "site" || !opened;
 export function whyOpened(storage = globalThis.localStorage) {
   try { return storage?.getItem(WHY_OPENED_KEY) === "1"; } catch { return false; }

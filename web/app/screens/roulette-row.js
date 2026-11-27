@@ -5,8 +5,9 @@
 // (localStorage["ifizbox.roulette"]).
 import { format } from "../router.js";
 import { dayKey, dayBefore } from "../core/catalog.js";
+import { KEYS } from "../core/storagekeys.js";
 
-export const ROULETTE_KEY = "ifizbox.roulette";
+export const ROULETTE_KEY = KEYS.roulette;
 
 // ---- the streak (pure) -------------------------------------------------------------------------------------
 

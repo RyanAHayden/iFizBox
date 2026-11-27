@@ -6,12 +6,13 @@ import { createParser } from "./core/parser.js";
 import { DEFAULT_ARCH, ARCHES } from "./core/apt.js";
 import { applyBuiltins, builtinSources } from "./core/essential.js";
 import { detectMode } from "./core/settings.js";
+import { KEYS } from "./core/storagekeys.js";
 
 // The architecture packages are listed for: rootless unless set to "iphoneos-arm" (rootful/palera1n rootful).
 // There is no settings screen yet; `localStorage["ifizbox.arch"]` holds it.
 export function getArch() {
   try {
-    const a = globalThis.localStorage?.getItem("ifizbox.arch");
+    const a = globalThis.localStorage?.getItem(KEYS.arch);
     return ARCHES.includes(a) ? a : DEFAULT_ARCH;
   } catch {
     return DEFAULT_ARCH;
@@ -22,7 +23,7 @@ export function getArch() {
 // says jailbroken; Not Jailbroken refuses adding one and leaves stored ones out (core/altstore.js aptAllowed).
 export function siteJailbroken(store = globalThis.localStorage) {
   try {
-    const d = store?.getItem("ifizbox.device");
+    const d = store?.getItem(KEYS.device);
     return Boolean(d) && d !== "none";
   } catch {
     return false;
