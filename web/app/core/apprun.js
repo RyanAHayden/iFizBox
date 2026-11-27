@@ -75,8 +75,7 @@
 // app (Downloading Delta 48 MB, Signed Delta, Asked iOS to install Delta, Installed Delta / the reason it failed);
 // percents only move the row's bar and the bottom status.
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { AIRPLANE_ON, AIRPLANE_OFF, APP_WAIT, NETWORK_WAIT } from "./installroute.js"; // F368
-import { FIRST_LAUNCH_HINT } from "./installroute.js"; // F415
+import { AIRPLANE_ON, APP_WAIT, NETWORK_WAIT } from "./installroute.js"; // F368
 import { runOrder, sizeText, SELF_ID } from "./appqueue.js";
 import { NAME } from "../brand.js";
 import { isNewer } from "./selfupdate.js"; // B159: staleSelf
@@ -296,7 +295,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       else if (phase === "airplane") log(r, "step", AIRPLANE_ON); // F368
       else if (phase === "appWait") log(r, "step", APP_WAIT); // B423
       else if (phase === "networkWait") log(r, "step", NETWORK_WAIT);
-      else if (phase === "airplaneOff") log(r, "step", "Connected to iOS"); // the status says it can go off (airplaneStatus)
+      else if (phase === "airplaneOff") log(r, "step", "Connected to iOS");
       else if (phase === "installing" && r.here) {
         log(r, "step", `Installing ${label(r)}`);
         if (isSelf(r)) log(r, "step", SELF_CLOSING); // B173: installd accepted it: the shell closes iFizBox now
@@ -748,13 +747,9 @@ export function summaryLine(rows) {
   return parts.length ? parts.map(([c, w]) => `${c} ${w}`).join(", ") : "Nothing to do";
 }
 
-// F368: what a run on This iPhone says about Airplane Mode: AIRPLANE_ON while a row waits for it; AIRPLANE_OFF once
-// every row still going has its connection (a row yet to connect would wait again); null otherwise
+// F368: what a run on This iPhone says about Airplane Mode: AIRPLANE_ON while a row waits for it; null otherwise
 export function airplaneStatus(rows) {
-  const going = rows.filter((r) => !ended(r));
-  if (going.some((r) => r.state === "installing" && r.phase === "airplane")) return AIRPLANE_ON;
-  const open = (r) => r.state === "installing" && r.here && (r.airplane === "off" || r.phase === "installing" || r.fraction > 0);
-  return going.length && rows.some((r) => r.airplane === "off") && going.every(open) ? AIRPLANE_OFF : null;
+  return rows.some((r) => !ended(r) && r.state === "installing" && r.phase === "airplane") ? AIRPLANE_ON : null;
 }
 
 export function runStatus(rows) {
@@ -849,8 +844,3 @@ function beforePrompt(row) {
   if (row.phase === "uploading") return UPLOADING;
   return row.local && row.phase !== "handoff" ? "Preparing" : HANDOFF;
 }
-
-// F415: a run's FIRST_LAUNCH_HINT: null unless an app signed with a profile installed (not the jailbreak's helper, which
-// needs no profile, and not our own IPA, whose page closes).
-export const firstLaunchHint = (rows) =>
-  (rows.some((r) => r.state === "installed" && r.mode !== "remove" && !helperRow(r) && !isSelf(r)) ? FIRST_LAUNCH_HINT : null);

@@ -163,12 +163,16 @@ test("sign with the user's edits") {
                                           "keychain-access-groups": ["x"]],
                            permissions: [], extensions: [], iconPath: nil, size: 0)
     check(wants.missing(from: profile) == ["com.apple.developer.healthkit"], "missing \(wants.missing(from: profile))")
-    // an unknown extension is refused; an explicit profile overrides the asked-for ID
+    // an unknown extension is refused; B492: Keep Bundle IDs off, an explicit profile keeps a typed ID other than its
+    // own (signed as kept), and its own ID (the sheet's pre-fill) signs the old way
     s.options = try SignOptions(json: ["removeExtensions": ["PlugIns/Nope.appex"]])
     check(throwsCode("bad_options") { _ = try s.sign(fixtures.appendingPathComponent("edit.ipa"), to: work.appendingPathComponent("x.ipa")) },
           "unknown extension")
     let explicit = IPASigner(profile: try Profile(fixture("profile-explicit.mobileprovision")), identity: identity)
     explicit.options = try SignOptions(json: ["bundleId": "com.me.asked", "keepBundleId": false])
+    let typed = try explicit.sign(fixtures.appendingPathComponent("edit.ipa"), to: work.appendingPathComponent("explicit-typed.ipa"))
+    check(typed.bundleID == "com.me.asked" && typed.removed.isEmpty, "typed \(typed.bundleID) \(typed.removed)")
+    explicit.options = try SignOptions(json: ["bundleId": "com.me.only", "keepBundleId": false])
     let e = try explicit.sign(fixtures.appendingPathComponent("edit.ipa"), to: work.appendingPathComponent("explicit.ipa"))
     check(e.bundleID == "com.me.only" && e.removed.sorted() == ["PlugIns/Share.appex", "PlugIns/Widget.appex"], "explicit \(e.bundleID) \(e.removed)")
     // F237: kept (the default), the typed ID stays in Info.plist, the profile's App ID goes in the entitlements,

@@ -151,7 +151,10 @@ final class IPASigner {
             throw SignError("bad_ipa", "The app has no bundle ID.")
         }
         // F237: kept, Info.plist keeps the ID and only the entitlements carry the profile's App ID (entID).
-        let keep = options.keeps(options.bundleID ?? oldID)
+        // B492: a bundle ID the user typed is kept too when the profile would sign the app as another one (the sheet
+        // pre-fills the profile's ID with Keep Bundle ID off, so an untouched field still signs the old way).
+        let typed = options.bundleID.map { (try? profile.bundleID(for: $0)) != $0 } ?? false
+        let keep = options.keeps(options.bundleID ?? oldID) || typed
         let imported = profile
         if keep, let auto = IPASigner.autoProfile, let made = try auto(options.bundleID ?? oldID, profile, identity.certificate, log) {
             profile = made

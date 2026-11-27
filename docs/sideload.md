@@ -319,7 +319,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   leaving and doesn't stop the wait. Out of the app 30 s (`awayGrace`) with the path still on cellular, the wait pauses
   (see below) and the VPN goes off; once Airplane Mode is on (not cellular) it is never dropped. The pause isn't part of
   the 5 minutes. Cancel or the timeout ends the install's hold, and the VPN goes off 3 s
-  later. Once the connection opens, the install emits `airplaneOff` and the page says "You can turn Airplane Mode off".
+  later. Once the connection opens, the install emits `airplaneOff` and the page goes on to the copy.
   A reconnect with cellular data back waits again.
   **Ask** (On Cellular, Ask Each Time; the default): while an install waits, the page shows the popup "You're on Cellular"
   with **Set Up Shortcut** (or **Use Shortcut** once it is set up, when Cellular Installs can run here), **Use Signing Server**

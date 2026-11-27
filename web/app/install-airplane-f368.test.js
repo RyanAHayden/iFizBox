@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { appRows, createAppRun, rowStatus, runStatus, rowProgress, airplaneStatus } from "./core/apprun.js";
-import { AIRPLANE_ON, AIRPLANE_OFF, AIRPLANE_TIMEOUT, APP_WAIT, NETWORK_WAIT, serverFallback, routeFailureOf } from "./core/installroute.js";
+import { AIRPLANE_ON, AIRPLANE_TIMEOUT, APP_WAIT, NETWORK_WAIT, serverFallback, routeFailureOf } from "./core/installroute.js";
 import { hereLabel } from "./signing/common.js";
 import { openPrepared, herePhase } from "./signing/queue.js";
 import { callWithStall } from "./core/signing.js";
@@ -45,7 +45,7 @@ test("Cancel on a row held for the other downloads ends it", async () => {
   assert.ok(rows.every((r) => r.state === "cancelled"));
 });
 
-test("the wait, then the line that it can go off, once every app is connected", () => {
+test("the wait, then no line about turning Airplane Mode off (B492)", () => {
   const [a, b] = appRows([job("a"), job("b")]);
   Object.assign(a, { state: "installing", phase: "airplane", here: true, airplane: "on" });
   Object.assign(b, { state: "signed" });
@@ -55,9 +55,8 @@ test("the wait, then the line that it can go off, once every app is connected", 
   Object.assign(a, { phase: "copying", airplane: "off", fraction: 0.4 });
   assert.equal(airplaneStatus([a, b]), null, "b has yet to connect");
   Object.assign(b, { state: "installing", phase: "copying", here: true, airplane: null, fraction: 0.1 });
-  assert.equal(runStatus([a, b]), AIRPLANE_OFF);
-  Object.assign(a, { state: "installed" });
-  assert.equal(runStatus([a, b]), AIRPLANE_OFF);
+  assert.equal(airplaneStatus([a, b]), null);
+  assert.doesNotMatch(runStatus([a, b]), /Airplane/);
 });
 
 test("B419: a row copying after a wait Wi-Fi ended says nothing about turning Airplane Mode off", () => {
@@ -93,6 +92,7 @@ test("openPrepared waits only on cellular", async () => {
 
 test("labels, and the wait running out", () => {
   assert.deepEqual(hereLabel({ here: "airplane" }), { label: AIRPLANE_ON });
+  assert.deepEqual(hereLabel({ here: "airplaneOff" }), { label: "Connecting to iPhone" }); // B492: no Airplane-off line
   assert.deepEqual(herePhase({ phase: "airplaneOff", progress: 0 }), { phase: "airplaneOff", fraction: 0 });
   const e = Object.assign(new Error("Airplane Mode wasn't turned on in 5 minutes"), { code: "airplane_timeout" });
   assert.equal(serverFallback(e), AIRPLANE_TIMEOUT);
