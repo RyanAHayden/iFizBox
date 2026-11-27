@@ -110,7 +110,7 @@ enum CellularShortcutBridge {
     private static func open(_ k: CellularShortcut.Kind) -> CellularShortcut.Verdict {
         let id = UUID().uuidString
         lock.lock(); runID = id; called = false; said = nil; lock.unlock()
-        guard let url = CellularShortcut.runURL(k, back: { "ifizbox://\(host)?id=\(id)&r=\($0)" }) else { return .failed("not_opened", nil) }
+        guard let url = CellularShortcut.runURL(k, back: { "\(CallbackScheme.current())://\(host)?id=\(id)&r=\($0)" }) else { return .failed("not_opened", nil) }
         // the page sees itself visible again a moment before iOS calls the app active, and refuses the open until then
         let t0 = Date()
         while !active(), Date().timeIntervalSince(t0) < 3 { Thread.sleep(forTimeInterval: 0.1) }
@@ -125,7 +125,7 @@ enum CellularShortcutBridge {
 
     /// ifizbox://cellular-installs?id=…&r=ok|error|cancel[&errorMessage=…], Shortcuts coming back. True when it was one.
     static func receive(_ url: URL) -> Bool {
-        guard url.scheme?.lowercased() == "ifizbox", url.host == host else { return false }
+        guard CallbackScheme.accepts(url.scheme), url.host == host else { return false }
         let q = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         let v = { (k: String) in q.first { $0.name == k }?.value }
         let error: String? = v("r") == "ok" ? nil : v("errorMessage") ?? (v("r") == "cancel" ? "canceled" : "the Shortcut failed")

@@ -208,6 +208,21 @@ final class IPASigner {
             }
             pl.removeValue(forKey: "UISupportedDevices")
             if dir == appDir { options.apply(toApp: &pl) }
+            if dir == appDir, let id = pl["CFBundleIdentifier"] as? String { // B491: an iFizBox copy's own callback scheme
+                var types = pl["CFBundleURLTypes"] as? [[String: Any]] ?? []
+                let all = types.flatMap { $0["CFBundleURLSchemes"] as? [String] ?? [] }.map { $0.lowercased() }
+                let own = "ifizbox-" + id.lowercased()
+                if all.contains("ifizbox") && !all.contains(own) {
+                    // drop another ID's own scheme (the IPA was signed under another ID before)
+                    types = types.map { t in
+                        var t = t
+                        t["CFBundleURLSchemes"] = (t["CFBundleURLSchemes"] as? [String] ?? []).filter { !$0.lowercased().hasPrefix("ifizbox-") }
+                        return t
+                    }
+                    types.append(["CFBundleURLName": id + ".callback", "CFBundleURLSchemes": [own]])
+                    pl["CFBundleURLTypes"] = types
+                }
+            }
             if !NSDictionary(dictionary: pl).isEqual(to: b.plist) {
                 changed[dir + "Info.plist"] = try PropertyListSerialization.data(fromPropertyList: pl, format: b.format, options: 0)
                 b.plist = pl

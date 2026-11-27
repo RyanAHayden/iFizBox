@@ -132,7 +132,7 @@ enum RestoreShortcutBridge {
     private static func open(_ k: RestoreShortcut.Kind) -> RestoreShortcut.Verdict {
         let id = UUID().uuidString
         lock.lock(); runID = id; called = false; said = nil; lock.unlock()
-        guard let url = RestoreShortcut.runURL(k, back: { "ifizbox://\(host)?id=\(id)&r=\($0)" }) else { return .failed("not_opened", nil) }
+        guard let url = RestoreShortcut.runURL(k, back: { "\(CallbackScheme.current())://\(host)?id=\(id)&r=\($0)" }) else { return .failed("not_opened", nil) }
         let sem = DispatchSemaphore(value: 0)
         var opened = false // written before the signal
         DispatchQueue.main.async {
@@ -144,7 +144,7 @@ enum RestoreShortcutBridge {
     /// ifizbox://restore-vpn?id=…&r=ok|error|cancel[&errorMessage=…], Shortcuts coming back. True when it was one. It
     /// judges nothing: its error is only told on.
     static func receive(_ url: URL) -> Bool {
-        guard url.scheme?.lowercased() == "ifizbox", url.host == host else { return false }
+        guard CallbackScheme.accepts(url.scheme), url.host == host else { return false }
         let q = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         let v = { (k: String) in q.first { $0.name == k }?.value }
         let error: String? = v("r") == "ok" ? nil : v("errorMessage") ?? (v("r") == "cancel" ? "canceled" : "the Shortcut failed")

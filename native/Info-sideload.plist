@@ -57,7 +57,7 @@
 	<key>CFBundleURLTypes</key><array>
 		<dict>
 			<key>CFBundleURLName</key><string>com.ryha.ifizbox</string>
-			<key>CFBundleURLSchemes</key><array><string>ifizbox</string></array>
+			<key>CFBundleURLSchemes</key><array><string>ifizbox</string><string>ifizbox-com.ryha.ifizbox</string></array>
 		</dict>
 		<!-- F83: other sideloaders' links, turned into iFizBox's own (web/app/core/otherlinks.js; App.swift OtherLink holds
 		     the same list). iOS gives a scheme to one app when several claim it. -->
