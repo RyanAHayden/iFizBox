@@ -147,7 +147,8 @@ The website's flow (`web/app/screens/free-apple-id.js`):
 2. **Setup runs by itself** as a checklist (`core/freeroute.js runSetup`): Register This iPhone (the UDID from Find
    This iPhone's UDID), Development Certificate (this browser's own if Apple still lists it as issued, else a new
    RSA key and CSR made in the browser, `core/freecert.js`), App ID (`<bundle ID>.<TEAMID>`: App IDs are unique
-   across Apple, so a free team's always carry the suffix and Keep Bundle IDs doesn't apply), Provisioning Profile
+   across Apple, so a free team's always carry the suffix and Keep Bundle IDs doesn't apply; an App ID lasts 7 days, so a
+   listed one is reused until it expires, and a new one is made only when it is missing or expired), Provisioning Profile
    (Apple's 7-day team profile for that App ID; it must list this iPhone). Each step shows a spinner, then a tick and
    a summary; steps not reached are grey. It stops to ask only at Apple's certificate limit: an alert lists the
    issued certificates (this site's first, SideStore's and other tools' last) to revoke one, with the warning that
@@ -234,8 +235,8 @@ Apple ID's (so Refresh Profile stays reachable). The jailbreak build never shows
   imports it again, then runs **App Refresh** on the apps installed with the Free Apple ID.
 - **App Refresh** runs after every setup in the app. An installed app still signed with the current certificate gets the
   new profile for its App ID through the phone's misagent service over This iPhone's route (`com.apple.misagent.shim.remote`):
-  nothing is signed or copied. An app on another certificate, whose App ID Apple no longer lists, or recorded without a
-  certificate serial is signed again, iFizBox last. An app iOS no longer has is dropped from the record. An app that
+  nothing is signed or copied. An app on another certificate, whose App ID Apple no longer lists or has expired (7 days
+  after it was made, so no new profile is asked for it), or recorded without a certificate serial is signed again, iFizBox last. An app iOS no longer has is dropped from the record. An app that
   already lasts longer than a free profile (a paid certificate's) is left alone. Apple is asked once per run, one profile per App ID. A profile iOS refuses is
   reported, not signed again. Code: `native/sign/Refresh.swift` (the decisions), `signing.refresh` in
   `native/Sources/Sideload.swift`, `refreshApps` in `web/app/core/freeroute.js`. Tests: `native/sign/tests/sideload/main.swift`

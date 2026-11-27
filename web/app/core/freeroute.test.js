@@ -4,7 +4,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { makeKey, makeCsr, makeP12, unpem, tlv, seq, oid, OIDS, certSpki, certSerial, sameKey, storedZip, crc32 } from "./freecert.js";
 import { runSetup, freeAppId, pickTeam, freeEntitlements, freeExpiry, FREE_EXPIRY_WARNING, setupError, SETUP_STEPS,
-  atCertLimit, otherTool, MACHINE_NAME, otherProfiles, refreshApps } from "./freeroute.js";
+  atCertLimit, otherTool, MACHINE_NAME, otherProfiles, refreshApps,
+  appIdExpired, ensureAppId, extensionAppId, appIdsFor, forgetDeleted } from "./freeroute.js";
 import { der, children, checkP12Password, oidString } from "./signing.js";
 import { unzipEntries } from "./certfiles.js";
 import { DevPortal, encodePlist } from "./gsa.js";
@@ -378,4 +379,55 @@ test("F458: an app that couldn't be refreshed is named", async () => {
   await rig.run();
   assert.equal(rig.alerts[0].title, "Couldn't Refresh Apps");
   assert.match(rig.alerts[0].message, /App 0: iOS said no/);
+});
+
+// ---- F459: App IDs as BariStore keeps them ----
+const at = new Date("2026-11-27T00:00:00Z");
+
+test("F459: an app deleted from the phone is forgotten; a running task or an empty list drops nothing", () => {
+  const records = [{ bundleId: "com.x.Kept" }, { bundleId: "com.x.deleted" }];
+  const r = forgetDeleted(records, ["com.x.kept", "com.apple.mobilesafari"]);
+  assert.deepEqual(r.records, [records[0]]);
+  assert.deepEqual(r.forgotten, [records[1]]);
+  for (const [list, opts] of [[[], {}], [null, {}], [undefined, {}], [["com.x.kept"], { busy: true }]]) {
+    assert.deepEqual(forgetDeleted(records, list, opts), { records, forgotten: [] });
+  }
+});
+
+test("F459: each extension gets its own App ID under the app's, reused next time", async () => {
+  const portal = fakePortal();
+  const extensions = [{ bundleId: "com.x.share", name: "Share" }, { bundleId: "com.x.widget" }];
+  const first = await appIdsFor({ portal, teamId: TEAM, bundleId: "com.x", extensions, now: at });
+  assert.deepEqual(first.extensions.map((x) => x.identifier), [`com.x.${TEAM}.share`, `com.x.${TEAM}.widget`]);
+  assert.ok([first.app, ...first.extensions].every((x) => x.made));
+  portal.log.length = 0;
+  const again = await appIdsFor({ portal, teamId: TEAM, bundleId: "com.x", extensions, now: at });
+  assert.ok([again.app, ...again.extensions].every((x) => !x.made));
+  assert.deepEqual(portal.log, ["listAppIds"]);
+  assert.equal(extensionAppId(`com.x.${TEAM}`, `com.x.${TEAM}.share`, "com.x"), `com.x.${TEAM}.share`);
+  const clash = await appIdsFor({ portal: fakePortal(), teamId: TEAM, bundleId: "com.x", extensions: [{ bundleId: "a.share" }, { bundleId: "b.share" }], now: at });
+  assert.deepEqual(clash.extensions.map((x) => x.identifier), [`com.x.${TEAM}.share`, `com.x.${TEAM}.share2`]);
+});
+
+test("F459: only a missing or expired App ID is registered; the limit is named", async () => {
+  const identifier = `com.x.${TEAM}`;
+  const live = { identifier, appIdId: "LIVE", expirationDate: "2026-11-28T00:00:00Z" };
+  const old = { identifier, appIdId: "OLD", expirationDate: "2026-11-26T00:00:00Z" };
+  assert.equal(appIdExpired(live, at), false);
+  assert.equal(appIdExpired(old, at), true);
+  assert.equal(appIdExpired({}, at), false);
+  const run = (portal, appIds) => ensureAppId({ portal, teamId: TEAM, appIds, identifier, now: at });
+  assert.deepEqual(await run(fakePortal(), [live]), { appId: live, made: false });
+  assert.equal((await run(fakePortal(), [old])).made, true);
+  const refuse = (error) => ({ addAppId: async () => { throw error; } });
+  await assert.rejects(run(refuse(new Error("not available")), [old]), /not available/);
+  await assert.rejects(run(refuse(Object.assign(new Error("full"), { code: 9401 })), []), (e) => e.kind === "appid-limit");
+});
+
+test("F459: a refresh fetches no profile for an expired App ID, so that app is signed again", async () => {
+  const portal = fakePortal();
+  const appIds = [{ identifier: "com.old", appIdId: "OLD", expirationDate: "2026-11-26T00:00:00Z" },
+    { identifier: "com.live", appIdId: "LIVE", expirationDate: "2026-11-28T00:00:00Z" }];
+  await otherProfiles({ portal, teamId: TEAM, appIds, appId: "none", apps: recorded(`${TEAM}.com.old`, `${TEAM}.com.live`), now: at });
+  assert.deepEqual(portal.log, ["downloadProfile LIVE"]);
 });
