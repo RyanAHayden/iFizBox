@@ -1184,11 +1184,11 @@ import { appleRelay, relayTarget, MAX_REQUEST, MAX_REPLY } from "./src/apple-rel
   assert.equal(tgt("/apple/developerservices2.apple.com/services/QH65B2/listTeams.action?clientId=XABBG36SBA"),
     "https://developerservices2.apple.com/services/QH65B2/listTeams.action?clientId=XABBG36SBA");
   assert.equal(tgt("/apple/developerservices2.apple.com/services/QH65B2/ios/addAppId.action"), "https://developerservices2.apple.com/services/QH65B2/ios/addAppId.action");
-  assert.equal(tgt("/apple/ani.sidestore.io/v3/get_headers"), "https://ani.sidestore.io/v3/get_headers");
+  assert.equal(tgt("/apple/new.ani.sidestore.io/v3/get_headers"), "https://new.ani.sidestore.io/v3/get_headers");
   for (const bad of ["/apple/evil.example/", "/apple/gsa.apple.com/", "/apple/gsa.apple.com/grandslam/GsService2/../x",
-    "/apple/idmsa.apple.com/appleauth/auth", "/apple/developerservices2.apple.com/services/v1/profiles", "/apple/ani.sidestore.io/v3/provisioning_session",
+    "/apple/idmsa.apple.com/appleauth/auth", "/apple/developerservices2.apple.com/services/v1/profiles", "/apple/new.ani.sidestore.io/v3/provisioning_session",
     "/apple/127.0.0.1/", "/apple/gsa.apple.com.evil.example/grandslam/GsService2", "/apple/gsa.apple.com"]) assert.equal(tgt(bad), null, bad);
-  assert.equal(tgt("/apple/ani.sidestore.io/v3/provisioning_session", { ws: true }), "https://ani.sidestore.io/v3/provisioning_session");
+  assert.equal(tgt("/apple/new.ani.sidestore.io/v3/provisioning_session", { ws: true }), "https://new.ani.sidestore.io/v3/provisioning_session");
   assert.equal(tgt("/apple/gsa.apple.com/grandslam/GsService2", { ws: true }), null);
 
   const calls = [];
@@ -1230,13 +1230,13 @@ import { appleRelay, relayTarget, MAX_REQUEST, MAX_REPLY } from "./src/apple-rel
   r = await relay("/apple/developerservices2.apple.com/services/QH65B2/listTeams.action");
   assert.equal(r.status, 502);
   assert.equal((await r.json()).code, "reply_too_large");
-  r = await relay("/apple/ani.sidestore.io/v3/get_headers", { method: "POST", body: "{}" });
+  r = await relay("/apple/new.ani.sidestore.io/v3/get_headers", { method: "POST", body: "{}" });
   assert.equal(r.status, 504);
   assert.equal(r.headers.get("X-Relay-Status"), null); // the relay's own answer, not Apple's
   // The anisette provisioning WebSocket is handed through (only that path, only GET).
-  r = await relay("/apple/ani.sidestore.io/v3/provisioning_session", { headers: { Upgrade: "websocket" } });
+  r = await relay("/apple/new.ani.sidestore.io/v3/provisioning_session", { headers: { Upgrade: "websocket" } });
   assert.equal(r.headers.get("X-Ws"), "1");
-  assert.equal(calls.at(-1).url, "https://ani.sidestore.io/v3/provisioning_session");
+  assert.equal(calls.at(-1).url, "https://new.ani.sidestore.io/v3/provisioning_session");
   assert.equal((await relay("/apple/gsa.apple.com/grandslam/GsService2", { headers: { Upgrade: "websocket" } })).status, 403);
   // Routed by the Worker when on.
   assert.equal((await w.fetch(req("/apple/evil.example/x"), { ...env, ...on })).status, 403);

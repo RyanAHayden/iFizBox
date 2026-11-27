@@ -317,8 +317,13 @@ export function relayWsUrl(server, origin = globalThis.location?.origin) {
 // Then each request: POST <server>/v3/get_headers {identifier, adi_pb}. X-Mme-Device-Id is the identifier as a UUID,
 // X-Apple-I-MD-LU hex SHA-256(identifier). (v1's one shared machine got -36607 and a locked Apple ID in R32: not used.)
 
-export const ANISETTE_SERVERS = ["https://ani.sidestore.io", "https://ani.sidestore.app", "https://ani.sidestore.zip",
-  "https://ani.846969.xyz", "https://new.ani.sidestore.io"];
+// In the order to try them, all on Apple's macOS or Windows library.
+export const ANISETTE_SERVERS = ["https://new.ani.sidestore.io", "https://mac-ani.jkcoxson.com", "https://ani.iloader.app",
+  "https://ani3.stikstore.app", "https://ani.jkcoxson.com", "https://ani2.stikstore.app", "https://win.ani.sidestore.io",
+  "https://anisette.lillq.me"];
+// A server on Apple's Android library still advertises one of these stock clients (or says Android); Apple refuses it
+// (-80046 at the token, 401 at finishMachineProvisioning), so it's never used.
+const ANDROID_CLIENT = /^\s*<MacBookPro13,2> <macOS;13\.1;22C65>|^\s*<MacBookPro15,1> <Mac OS X;10\.15\.2;19C57>|<Android;/;
 const BAG_URL = "https://gsa.apple.com/grandslam/GsService2/lookup";
 const MID_START = "https://gsa.apple.com/grandslam/MidService/startMachineProvisioning";
 const MID_FINISH = "https://gsa.apple.com/grandslam/MidService/finishMachineProvisioning";
@@ -331,7 +336,7 @@ const cpdOf = (h) => ({ bootstrap: true, icscrec: true, loc: "en_US", pbe: false
 
 // storage: { load() -> { identifier, adi_pb, server } | null, save(state) }: the caller keeps it private (IndexedDB).
 export function anisetteV3({ transport, servers = ANISETTE_SERVERS, storage, wsUrl = relayWsUrl, log = () => {},
-  WebSocketImpl = globalThis.WebSocket, provisionTimeout = 60000 }) {
+  WebSocketImpl = globalThis.WebSocket, provisionTimeout = 60000, retryDelay = 1000 }) {
   let state = storage?.load?.() ?? null;
   let info = null; // { client_info, user_agent } of state.server
   let urls = null;
@@ -348,6 +353,7 @@ export function anisetteV3({ transport, servers = ANISETTE_SERVERS, storage, wsU
   async function clientInfo(server) {
     const j = await json(`${server}/v3/client_info`);
     if (!j.client_info || !j.user_agent) throw new Error(`${server}: no client_info`);
+    if (ANDROID_CLIENT.test(j.client_info)) throw new Error(`${server} runs Apple's Android library, which Apple refuses`);
     return j;
   }
   async function midUrls() {
@@ -361,10 +367,16 @@ export function anisetteV3({ transport, servers = ANISETTE_SERVERS, storage, wsU
     return urls;
   }
   async function midCall(url, request) {
-    const r = await transport({ url, method: "POST", body: utf8(encodePlist({ Header: {}, Request: request })), headers: {
+    const send = async () => transport({ url, method: "POST", body: utf8(encodePlist({ Header: {}, Request: request })), headers: {
       "Content-Type": "text/x-xml-plist", Accept: "text/x-xml-plist", "User-Agent": info.user_agent, "X-MMe-Client-Info": info.client_info,
       "X-Xcode-Version": XCODE_VERSION, "X-Apple-App-Info": XCODE_APP, "X-Apple-I-MD-LU": await mdLu(), "X-Mme-Device-Id": deviceId(),
       "X-Apple-I-Client-Time": nowTime(), "X-Apple-Locale": "en_US", "X-Apple-I-TimeZone": "UTC" } });
+    let r = await send();
+    if (r.status === 503) { // Apple's throttle, often gone a moment later: once more
+      log(`anisette: ${new URL(url).pathname} HTTP 503, trying once more`);
+      await new Promise((done) => setTimeout(done, retryDelay));
+      r = await send();
+    }
     if (r.status !== 200) throw new Error(`${new URL(url).pathname} HTTP ${r.status}`);
     const p = decodePlist(r.body), resp = p.Response ?? p, st = resp.Status ?? {};
     if (st.ec) throw new Error(`${new URL(url).pathname}: ${st.em || "error"} [${st.ec}]`);
@@ -377,12 +389,15 @@ export function anisetteV3({ transport, servers = ANISETTE_SERVERS, storage, wsU
     log(`anisette: provisioning a new machine on ${server}`);
     return new Promise((resolve, reject) => {
       const ws = new WebSocketImpl(url);
-      let done = false;
+      let done = false, talked = false;
       const fail = (e) => { if (!done) { done = true; clearTimeout(timer); try { ws.close(); } catch { /* closed */ } reject(e); } };
       const timer = setTimeout(() => fail(new Error(`provisioning timed out (${provisionTimeout / 1000} s)`)), provisionTimeout);
-      ws.onerror = () => fail(new Error(`WebSocket error on ${url}`));
-      ws.onclose = () => fail(new Error("provisioning socket closed early"));
+      // dropped: the socket worked and then broke, so the same server is worth another go (a dead one isn't).
+      const lost = (message) => fail(Object.assign(new Error(message), { dropped: talked }));
+      ws.onerror = () => lost(`WebSocket error on ${url}`);
+      ws.onclose = () => lost("provisioning socket closed early");
       ws.onmessage = async (ev) => {
+        talked = true;
         try {
           const m = JSON.parse(typeof ev.data === "string" ? ev.data : td.decode(ev.data));
           log(`anisette: ${m.result}`);
@@ -418,7 +433,12 @@ export function anisetteV3({ transport, servers = ANISETTE_SERVERS, storage, wsU
     for (const s of [state.server, ...servers].filter((s, i, a) => s && a.indexOf(s) === i)) {
       try {
         if (state.adi_pb && s === state.server) { info = await clientInfo(s); return; }
-        await provision(s); return;
+        await provision(s).catch((e) => {
+          if (!e.dropped) throw e;
+          log(`anisette: ${e.message}, trying ${s} once more`);
+          return provision(s);
+        });
+        return;
       } catch (e) { last = e; log(`anisette: ${s} failed: ${e.message}`); }
     }
     throw new Error(`No anisette server could provision a machine (${last?.message})`);
@@ -457,7 +477,7 @@ const GS_URLS = {
   trustedDeviceSecondaryAuth: "https://gsa.apple.com/auth/verify/trusteddevice",
   validateCode: "https://gsa.apple.com/grandslam/GsService2/validate",
 };
-const CLIENT_INFO = "<MacBookPro13,2> <macOS;13.1;22C65> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
+const CLIENT_INFO = "<MacBookPro13,3> <Mac OS X;10.12.6;16G29> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
 function gsStatus(resp, step = null) {
   const st = resp?.Status ?? resp ?? {};
   if (st.ec && st.ec !== 0) throw new AppleIdError(st.em || `Apple error ${st.ec}`, { code: st.ec, step });
