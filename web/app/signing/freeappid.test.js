@@ -93,7 +93,7 @@ test("the IPA's bundle ID isn't the listed one: its App ID, and signed again", a
   assert.deepEqual([r.token, dropped], ["t2", ["t1"]]);
 });
 
-test("no session: app_id_taken shows one sign-in prompt, and Open goes to Signing", async () => {
+test("no session: app_id_taken shows one sign-in prompt, and Open is taken", async () => {
   const asked = [];
   let opened = 0, answer;
   const alert = (o) => { asked.push(o); return new Promise((ok) => { answer = ok; }); };

@@ -51,7 +51,7 @@ const liveSession = async () => {
 // while it goes on); then the page holding the Free Apple ID group opens (Certificate, or Signing where Installation &
 // Signing isn't one page) and slides to the group, which is drawn a moment after the page.
 export const SHOW_TRIES = 20;
-export async function openFreeGroup({ runPage, path, show,nav = globalThis.location, wait = (ms) => new Promise((ok) => setTimeout(ok, ms)) } = {}) {
+export async function openFreeGroup({ runPage, path, show, nav =globalThis.location, wait = (ms) => new Promise((ok) => setTimeout(ok, ms)) } = {}) {
   const page = (runPage ?? (await import("../screens/apprun.js")).runPage)();
   if (page?.busy) page.putAside(); else await page?.dismiss();
   const to = (path ?? (await import("../screens/settings.js")).freeIdPath)();
