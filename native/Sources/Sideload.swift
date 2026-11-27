@@ -9,6 +9,9 @@
 //            icon (base64 PNG, may be Apple's CgBI form) | null, missing: [entitlement], signsAs, profileKind,
 //            appIdAs, keepBundleId, push, wildcard, profileAppId, profileGroups}   (params keepBundleId?: Keep Bundle IDs, absent on)
 //        + pinned, freeAppId (B502a: a free Apple ID's explicit profile, and the App ID the app needs, <id>.TEAMID)
+//        + extensionAppIds: [{path, appId, name}] (F463c: the App IDs a free Apple ID's extensions sign as; params
+//        bundleId?, removeExtensions?). {token} instead of {url} -> {token, extensionAppIds} of that look, no download
+//        (signing.prepare answers missingExtensionAppIds: [appId], the ones left out for want of a profile)
 //   signing.addProfile {profile: base64} -> {appId, expires}: B502a1, keeps a free Apple ID's profile for one app
 //   signing.install {url | token, name?, bundleId?, icon?, removeExtensions?, fixArm64e?, keepBundleId?} (stream as I6)
 //        -> I6's reply + {fixedArm64e, expires}
@@ -166,8 +169,27 @@ enum Sideload {
         return ["appId": p.appID, "expires": expires]
     }
 
+    // F463c: the App IDs a free Apple ID's extensions sign as (FreeAppID.extensionsToSign, as the signer asks), for the
+    // page to make: [{path, appId, name}]. `params.bundleId`: the one typed; the extensions left out aren't listed.
+    private static func extensionAppIDs(_ d: AppDetails, held: Profile, params: [String: Any]) -> [[String: Any]] {
+        guard held.pinsBundleID else { return [] }
+        let typed = (params["bundleId"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        let app = FreeAppID.signsAs(for: typed ?? d.bundleID, original: d.bundleID, held: held, records: records(),
+                                    installed: { Workspace.isInstalled($0) })
+        let out = Set((params["removeExtensions"] as? [String] ?? []).map { $0.hasSuffix("/") ? String($0.dropLast()) : $0 })
+        return FreeAppID.extensionsToSign(app: app, original: d.bundleID, d.extensions.map { (path: $0.path, bundleID: $0.bundleID) })
+            .filter { !out.contains($0.path) }
+            .map { x in ["path": x.path, "appId": x.appID, "name": d.extensions.first { $0.path == x.path }?.name ?? ""] }
+    }
+
     static func inspect(_ c: Bridge.Call) {
         guard let (id, held) = ready(c) else { return }
+        if let tok = c.params["token"] as? String { // F463c: an IPA already looked at: nothing downloads
+            return SignBridge.queue.async {
+                guard let p = prepared[tok] else { return Apt.reply(c, nil, "gone: that IPA was looked at more than 15 minutes ago; start again") }
+                Apt.reply(c, ["token": tok, "extensionAppIds": extensionAppIDs(p.details, held: held, params: c.params)], nil)
+            }
+        }
         guard let url = Apt.httpURL(c.params["url"]) else { return Apt.reply(c, nil, "bad_url: not an http(s) URL") }
         let throttle = Throttle()
         let tok = SignBridge.token()
@@ -197,6 +219,7 @@ enum Sideload {
                     let freeAppID: Any = held.pinsBundleID ? FreeAppID.appID(for: d.bundleID, team: held.team) : NSNull()
                     let ids = (try? profile.signingIDs(for: d.bundleID, keep: o.keeps(d.bundleID))) ?? (bundleID: d.bundleID, entitlementsID: d.bundleID)
                     Apt.reply(c, ["token": tok, "app": d.json, "icon": icon, "missing": d.missing(from: profile),
+                                  "extensionAppIds": extensionAppIDs(d, held: held, params: c.params), // F463c
                                   "signsAs": ids.bundleID, "appIdAs": ids.entitlementsID, "keepBundleId": o.keepBundleID && !profile.pinsBundleID, // B502
                                   "push": profile.pushEnvironment ?? NSNull(), "wildcard": profile.isWildcard, "profileAppId": profile.appID,
                                   "pinned": held.pinsBundleID, "freeAppId": freeAppID, // B502a
@@ -677,7 +700,8 @@ enum Sideload {
                                   expires: used.signatureExpiry(certificate: identity.certificate), options: options.stored,
                                   appID: app.appID, signer: app.stamp, // B259
                                   sha256: keepOriginal(input, app: app, source: url, sha256: sha256, log: log), // F343
-                                  certSerial: app.certSerial) // F458
+                                  certSerial: app.certSerial, // F458
+                                  extensionAppIDs: app.extensionAppIDs) // F463c
         // F343: an install that fails drops the IPA staged for it; the one kept before stays
         let answered = { (r: Result<(SignedApp, SignedRecord), Error>) in
             if case .failure = r { SignBridge.queue.async { dropOriginal(app.bundleID, sha256: record.sha256) } }

@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { makeKey, makeCsr, makeP12, unpem, tlv, seq, oid, OIDS, certSpki, certSerial, sameKey, storedZip, crc32 } from "./freecert.js";
 import { runSetup, freeAppId, pickTeam, freeEntitlements, freeExpiry, FREE_EXPIRY_WARNING, setupError, SETUP_STEPS,
   atCertLimit, otherTool, MACHINE_NAME, otherProfiles, refreshApps,
-  appIdExpired, ensureAppId, extensionAppId, appIdsFor, forgetDeleted } from "./freeroute.js";
+  appIdExpired, ensureAppId, ensureExtensionAppIds, forgetDeleted } from "./freeroute.js";
 import { der, children, checkP12Password, oidString } from "./signing.js";
 import { unzipEntries } from "./certfiles.js";
 import { DevPortal, encodePlist } from "./gsa.js";
@@ -415,19 +415,28 @@ test("F459: an app deleted from the phone is forgotten; a running task or an emp
   }
 });
 
-test("F459: each extension gets its own App ID under the app's, reused next time", async () => {
+test("F463c: each extension the shell names gets that App ID, reused next time", async () => {
   const portal = fakePortal();
-  const extensions = [{ bundleId: "com.x.share", name: "Share" }, { bundleId: "com.x.widget" }];
-  const first = await appIdsFor({ portal, teamId: TEAM, bundleId: "com.x", extensions, now: at });
-  assert.deepEqual(first.extensions.map((x) => x.identifier), [`com.x.${TEAM}.share`, `com.x.${TEAM}.widget`]);
-  assert.ok([first.app, ...first.extensions].every((x) => x.made));
+  const extensions = [{ identifier: `com.x.${TEAM}.share`, name: "Share" }, { identifier: `com.x.${TEAM}.share2` }];
+  const first = await ensureExtensionAppIds({ portal, teamId: TEAM, appIds: [], extensions, now: at });
+  assert.deepEqual(first.map((x) => [x.identifier, x.made]), extensions.map((x) => [x.identifier, true]));
   portal.log.length = 0;
-  const again = await appIdsFor({ portal, teamId: TEAM, bundleId: "com.x", extensions, now: at });
-  assert.ok([again.app, ...again.extensions].every((x) => !x.made));
-  assert.deepEqual(portal.log, ["listAppIds"]);
-  assert.equal(extensionAppId(`com.x.${TEAM}`, `com.x.${TEAM}.share`, "com.x"), `com.x.${TEAM}.share`);
-  const clash = await appIdsFor({ portal: fakePortal(), teamId: TEAM, bundleId: "com.x", extensions: [{ bundleId: "a.share" }, { bundleId: "b.share" }], now: at });
-  assert.deepEqual(clash.extensions.map((x) => x.identifier), [`com.x.${TEAM}.share`, `com.x.${TEAM}.share2`]);
+  const again = await ensureExtensionAppIds({ portal, teamId: TEAM, appIds: first.map((x) => x.appId), extensions, now: at });
+  assert.ok(again.length === 2 && again.every((x) => !x.made));
+  assert.deepEqual(portal.log, []);
+});
+
+test("F463c: App Refresh's profiles include each recorded extension's; a lapsed extension App ID is made again", async () => {
+  const app = `com.old.${TEAM}`;
+  const calls = [];
+  const apps = [{ bundleId: app, name: "Old", appId: `${TEAM}.${app}`, extensionAppIds: [`${TEAM}.${app}.share`, `${TEAM}.${app}.widget`] }];
+  const listed = [{ identifier: app, appIdId: "APP" }, { identifier: `${app}.share`, appIdId: "SHARE" }];
+  const native = { call: async (m, p) => { calls.push([m, p]); return m === "signing.installed" ? { apps } : { failed: [] }; } };
+  await refreshApps({ native, portal: remakingPortal(), teamId: TEAM, appIds: listed, appId: `com.x.${TEAM}`,
+    hud: () => ({ set() {}, done() {}, fail() {}, page: { raw() {} } }), alert: async () => {} });
+  const [method, params] = calls.at(-1);
+  assert.equal(method, "signing.refresh");
+  assert.deepEqual(params.profiles.map(text), ["APP", "SHARE", `NEW-${app}.widget`]);
 });
 
 test("F459: only a missing or expired App ID is registered; the limit is named", async () => {

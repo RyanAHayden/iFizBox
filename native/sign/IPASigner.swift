@@ -18,6 +18,8 @@ struct SignedApp {
     var injected: [String] = []    // F288: load paths added to the app's executable (Tweaks.swift)
     var groupFix: String? = nil    // B259: the group fix dylib's hash (SignerStamp.hash) when the app got it
     var certSerial: String? = nil  // F458: the signing certificate's serial (ProfileRefresh.serial)
+    var extensionAppIDs: [String] = []        // F463c: a free Apple ID's extensions' application-identifiers (TEAM.id)
+    var missingExtensionAppIDs: [String] = [] // F463c: App IDs of extensions left out for want of a profile (no TEAM.)
 }
 
 final class IPASigner {
@@ -194,18 +196,18 @@ final class IPASigner {
 
         // F463: a free Apple ID's extensions: each signs with the profile of its own App ID, and takes that as its bundle ID
         var own = [String: Profile]() // extension folder -> its profile
+        var missing = [String]() // F463c: the App IDs the page has yet to make
         if profile.pinsBundleID, let pick = IPASigner.extensionProfile {
-            let found = bundles.keys.compactMap { dir -> (dir: String, id: String)? in
-                let rel = dir.dropFirst(appDir.count).split(separator: "/")
-                guard rel.count == 2, ["PlugIns", "Extensions"].contains(String(rel[0])), rel[1].hasSuffix(".appex"),
-                      let id = bundles[dir]?.plist["CFBundleIdentifier"] as? String else { return nil }
-                return (dir, id)
-            }.sorted { $0.dir.dropLast() < $1.dir.dropLast() }
-            let ids = FreeAppID.extensionIDs(app: newID, original: oldID, found.map(\.id))
-            for (x, id) in Swift.zip(found, ids) { // `zip` here is the IPA
-                guard let p = pick(id, profile, identity.certificate) else { continue }
-                own[x.dir] = p
-                log("\(x.dir.dropFirst(appDir.count).dropLast()): its own App ID \(p.team).\(p.appID)")
+            let found = bundles.keys.map { dir in
+                (path: String(dir.dropFirst(appDir.count).dropLast()), bundleID: bundles[dir]?.plist["CFBundleIdentifier"] as? String ?? "")
+            }
+            for x in FreeAppID.extensionsToSign(app: newID, original: oldID, found) {
+                if let p = pick(x.appID, profile, identity.certificate) {
+                    own[appDir + x.path + "/"] = p
+                    log("\(x.path): its own App ID \(p.team).\(p.appID)")
+                } else if !options.removeExtensions.contains(x.path) {
+                    missing.append(x.appID)
+                }
             }
         }
 
@@ -420,9 +422,11 @@ final class IPASigner {
                     } catch { log("No group fix in \(name): its executable couldn't take it") }
                 }
                 let ownID = own[dir]?.appID ?? (keep || id == newID ? entID : id)
-                let params = CodeSignParams(identifier: id, team: profile.team,
-                                            entitlements: isApp ? signing.entitlements(for: ownID, keptID: keep ? newID : nil,
-                                                                                         dataProtection: dataProtection) : nil,
+                var ents = isApp ? signing.entitlements(for: ownID, keptID: keep ? newID : nil, dataProtection: dataProtection) : nil
+                if own[dir] != nil, let e = ents { // F463c: it shares the app's keychain
+                    ents = FreeAppID.sharingKeychain(e, appGroup: "\(profile.team).\(entID)", allowed: signing.entitlements["keychain-access-groups"])
+                }
+                let params = CodeSignParams(identifier: id, team: profile.team, entitlements: ents,
                                             infoPlist: infoData, codeResources: resources)
                 let m = mode(exe, files)
                 files[exe] = try hold(try MachO.sign(consume data, params, identity, time: time), mode: m, sealed: dir != appDir)
@@ -466,7 +470,9 @@ final class IPASigner {
                          version: main.plist["CFBundleShortVersionString"] as? String ?? main.plist["CFBundleVersion"] as? String ?? "",
                          removed: removed.sorted(), fixedArm64e: fixedArm64e.sorted(), skipped: skipped.sorted(),
                          appID: "\(profile.team).\(entID)", injected: injected, groupFix: groupFix,
-                         certSerial: ProfileRefresh.serial(identity.certificate))
+                         certSerial: ProfileRefresh.serial(identity.certificate),
+                         extensionAppIDs: own.filter { bundles[$0.key] != nil }.values.map { "\($0.team).\($0.appID)" }.sorted(),
+                         missingExtensionAppIDs: missing)
     }
 
     private struct Read { let sha1: Data, sha256: Data, macho: Bool }

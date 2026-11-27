@@ -12,7 +12,12 @@ import Foundation
 protocol Misagent { func install(_ profile: Data) throws }
 
 enum ProfileRefresh {
-    struct Renewal { let record: SignedRecord; let profile: Profile; let expires: Date? }
+    /// F463c: `extensions`: the fresh profiles of its extensions' own App IDs; `lapsed`: the ones with none.
+    struct Renewal {
+        let record: SignedRecord; let profile: Profile; let expires: Date?
+        var extensions: [Profile] = []
+        var lapsed: [String] = []
+    }
 
     /// F462: the running app, installed by a Computer Install: no record, so its own profile is renewed from what it
     /// carries. `profile` nil: no fresh one for its App ID.
@@ -64,7 +69,12 @@ enum ProfileRefresh {
                 continue
             }
             if r.certSerial != nil, r.certSerial == current, let id = r.appID, let p = fresh[id] {
-                out.renew.append(Renewal(record: r, profile: p, expires: p.signatureExpiry(certificate: certificate)))
+                // F463c: the app and its extensions last as long as the first of their profiles to run out
+                let ids = r.extensionAppIDs ?? []
+                let extensions = ids.compactMap { fresh[$0] }
+                out.renew.append(Renewal(record: r, profile: p,
+                                         expires: ([p] + extensions).compactMap { $0.signatureExpiry(certificate: certificate) }.min(),
+                                         extensions: extensions, lapsed: ids.filter { fresh[$0] == nil }))
             } else if let x = r.expires, let new = latest, x > new {
                 continue
             } else {
@@ -91,16 +101,28 @@ enum ProfileRefresh {
     static func run(_ plan: Plan, misagent: Misagent, log: (String) -> Void = { _ in }, resign: ([SignedRecord]) -> Void) -> Outcome {
         var out = Outcome()
         var done: [String: Error?] = [:]
-        for r in plan.renew {
-            let key = r.profile.uuid.isEmpty ? r.profile.appID : r.profile.uuid
+        // each profile once; the error iOS gave for it, if any
+        func install(_ p: Profile) -> Error? {
+            let key = p.uuid.isEmpty ? p.appID : p.uuid
             if done[key] == nil {
                 do {
-                    try misagent.install(r.profile.data)
-                    log("Installed the new profile for \(r.profile.appID)")
+                    try misagent.install(p.data)
+                    log("Installed the new profile for \(p.appID)")
                     done[key] = .some(nil)
                 } catch { done[key] = .some(error) }
             }
-            if let error = done[key] ?? nil { out.failed.append((r.record, error)) } else { out.renewed.append(r) }
+            return done[key] ?? nil
+        }
+        for r in plan.renew {
+            // F463c: the app's, then its extensions'. One with no fresh profile fails the app's renewal (its expiry
+            // stays), as signing it again would only leave that extension out.
+            var failure = install(r.profile)
+            for p in r.extensions { let e = install(p); failure = failure ?? e }
+            for id in r.lapsed {
+                log("No new profile for \(id): that extension of \(r.record.shownName) isn't renewed")
+                failure = failure ?? SignError("no_profile", "No new profile for its extension \(id).")
+            }
+            if let error = failure { out.failed.append((r.record, error)) } else { out.renewed.append(r) }
         }
         if let own = plan.own {
             if let p = own.profile {

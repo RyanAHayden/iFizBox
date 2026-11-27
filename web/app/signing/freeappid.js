@@ -9,8 +9,10 @@
 //   await addAppProfile({ native, portal, teamId, bundleId, name })   -> { identifier, made }
 //   await withOwnAppId(job, params, sign, { native, discard, log, alert, session, go })
 //                                      `sign` (signing.prepare) with the app's profile handed in first. `discard(token)`
-//                                      frees a copy signed again because the IPA's bundle ID isn't the one listed.
-import { ensureAppId, freeAppId, setupError } from "../core/freeroute.js";
+//                                      frees a copy signed again because the IPA's bundle ID isn't the one listed, or
+//                                      (F463c) an extension had no profile. `job.extensions`: signing.inspect's.
+//   await addExtensionProfiles({ native, portal, teamId, extensions, name, log })   -> the identifiers handed in
+import { ensureAppId, ensureExtensionAppIds, freeAppId, setupError } from "../core/freeroute.js";
 import { b64encode } from "../core/gsa.js";
 import { format, settingsRoute } from "../router.js";
 
@@ -39,6 +41,39 @@ export async function addAppProfile({ native, portal, teamId, bundleId, name = n
   if (!data) throw new Error("Apple sent no profile.");
   await native.call("signing.addProfile", { profile: b64encode(new Uint8Array(data)) });
   return { identifier, made };
+}
+
+// F463c: the extensions' App IDs (`extensions`: [{ identifier, name }], the shell's) made or reused, their profiles
+// handed in. One that fails is logged and its extension left out; an ended session stops.
+export async function addExtensionProfiles({ native, portal, teamId, extensions = [], name = null, log = () => {} }) {
+  const given = [];
+  if (!extensions.length) return given;
+  const { appIds } = await portal.listAppIds(teamId);
+  for (const x of await ensureExtensionAppIds({ portal, teamId, appIds, extensions, name: name || "App", log })) {
+    try {
+      const data = (await portal.downloadProfile(teamId, x.appId.appIdId))?.encodedProfile;
+      if (!data) throw new Error("Apple sent no profile.");
+      await native.call("signing.addProfile", { profile: b64encode(new Uint8Array(data)) });
+      log(`${x.made ? "Made" : "Using"} the App ID ${x.identifier}`);
+      given.push(x.identifier);
+    } catch (e) {
+      if (e?.kind === "session") throw e;
+      log(`No profile for ${x.identifier}: ${e?.message ?? e}`);
+    }
+  }
+  return given;
+}
+
+// signing.inspect's extensionAppIds ([{ appId, name }]) as addExtensionProfiles takes them
+export const inspected = (list) => (list ?? []).map((x) => ({ identifier: x.appId, name: x.name }));
+
+// A recorded app's extensions' App IDs (signing.installed's extensionAppIds: "TEAM.identifier")
+async function recorded(native, team, bundleId) {
+  try {
+    const apps = (await native.call("signing.installed", {}))?.apps ?? [];
+    return (apps.find((a) => same(a.bundleId, bundleId))?.extensionAppIds ?? [])
+      .filter((id) => String(id).startsWith(`${team}.`)).map((id) => ({ identifier: id.slice(team.length + 1) }));
+  } catch { return []; }
 }
 
 export const liveSession = async () => {
@@ -107,11 +142,26 @@ export async function withOwnAppId(job, params, sign, { native, discard = () => 
     }
   };
 
+  // F463c: its extensions' profiles, handed in; never a reason to fail the sign (the shell leaves out one without)
+  const giveExtensions = async (list) => {
+    const s = list.length ? await live() : null;
+    if (!s) return 0;
+    try {
+      return (await addExtensionProfiles({ native, portal: s.portal, teamId: held.team, extensions: list, name: job?.name, log })).length;
+    } catch (e) {
+      if (e?.kind === "session") s.end?.();
+      log(`No App IDs for its extensions: ${e?.message ?? e}`);
+      return 0;
+    }
+  };
+
   const typed = known(params?.bundleId);
   const listed = typed || known(job?.id);
   // A Re-sign from the record keeps the installed bundle ID: only an app under an App ID of this team has one to renew.
   const resign = Boolean(params?.record);
   if (held && listed && (!resign || same(freeAppId(listed, held.team), listed))) await give(listed, known(job?.id) ?? listed);
+  // F463c: the extensions signing.inspect named (job.extensions), or the record's; with no App ID for the app, none
+  if (held && !failure) await giveExtensions(resign && listed ? await recorded(native, held.team, listed) : job?.extensions ?? []);
 
   let r;
   try {
@@ -131,6 +181,12 @@ export async function withOwnAppId(job, params, sign, { native, discard = () => 
       discard(r.token);
       r = await sign();
     }
+  }
+  // F463c: signing.prepare says which extensions it left out for want of a profile: their App IDs, then signed again
+  const missing = (held && r?.missingExtensionAppIds) || [];
+  if (await giveExtensions(missing.map((identifier) => ({ identifier })))) {
+    discard(r.token);
+    r = await sign();
   }
   return r;
 }

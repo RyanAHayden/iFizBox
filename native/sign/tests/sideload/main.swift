@@ -1179,14 +1179,67 @@ test("free Apple ID: an extension signs under its own App ID with its own profil
     check(try file("embedded.mobileprovision") == appProfile.data, "the app keeps its own")
     let ents = Inspect.entitlements(try file("PlugIns/Share.appex/Share")) ?? [:]
     check(ents["application-identifier"] as? String == "\(team).\(share)", "its App ID: \(ents)")
-    check(ents["keychain-access-groups"] as? [String] == ["\(team).\(share)"], "its group: \(ents)")
+    // F463c: the app's keychain group first, so what either one keeps the other reads
+    check(ents["keychain-access-groups"] as? [String] == ["\(team).\(app)", "\(team).\(share)"], "its groups: \(ents)")
     check(d.entitlements["application-identifier"] as? String == "\(team).\(app)", "the app's: \(d.entitlements)")
+    check(d.entitlements["keychain-access-groups"] as? [String] == ["\(team).\(app)"], "the app's group: \(d.entitlements)")
+    check(signed.extensionAppIDs == ["\(team).\(share)"], "recorded: \(signed.extensionAppIDs)")
+    check(signed.missingExtensionAppIDs == ["\(app).widget"], "asked of the page: \(signed.missingExtensionAppIDs)")
+    check(FreeAppID.sharingKeychain(["keychain-access-groups": ["T.x"]], appGroup: "T.app", allowed: ["T.x"])["keychain-access-groups"]
+          as? [String] == ["T.x"], "a group the profile doesn't allow isn't added")
+
+    // F463c: signing.inspect asks the same function: what the page is told is what the signer looks for
+    let looked = FreeAppID.extensionsToSign(app: app, original: try Inspect.ipa(ipa).bundleID,
+                                            try Inspect.ipa(ipa).extensions.map { (path: $0.path, bundleID: $0.bundleID) })
+    check(looked.map(\.appID) == asked.prefix(2).map { $0 }, "the same IDs: \(looked.map(\.appID))")
+    let more = FreeAppID.extensionsToSign(app: "com.x.T", original: "com.x", [("Watch/W.app", "com.x.watch"),
+        ("PlugIns/B.appex", "b.share"), ("Extensions/A.appex", "a.share"), ("PlugIns/None.appex", "")])
+    check(more.map(\.path) == ["Extensions/A.appex", "PlugIns/B.appex"] && more.map(\.appID) == ["com.x.T.share", "com.x.T.share2"],
+          "no Watch app, numbered in path order: \(more)")
+    check(FreeAppID.signsAs(for: "com.b", original: "com.x", held: appProfile, records: []) { _ in nil } == "com.b.\(team)", "a typed ID's")
 
     let left = IPASigner(profile: appProfile, identity: identity)
     left.options = try SignOptions(json: ["removeExtensions": ["PlugIns/Share.appex"]])
     let without = work.appendingPathComponent("extensions-removed.ipa")
     _ = try left.sign(ipa, to: without)
     check(try Inspect.ipa(without).extensions.isEmpty, "one the user left out stays out")
+}
+
+// F463c: App Refresh renews the extensions' profiles along with the app's.
+test("free refresh: an app's extensions get their new profiles too (F463c)") {
+    let now = Date(), day: TimeInterval = 86400, team = "TEAM123456"
+    func profile(_ app: String, made: TimeInterval = 0) throws -> Profile {
+        let d: [String: Any] = ["Name": "iOS Team Provisioning Profile: \(app)", "UUID": "\(app) \(made)", "TeamIdentifier": [team],
+                                "CreationDate": now.addingTimeInterval(made * day), "ExpirationDate": now.addingTimeInterval((made + 7) * day),
+                                "Entitlements": ["application-identifier": "\(team).\(app)"], "DeveloperCertificates": [cert],
+                                "ProvisionedDevices": ["00008110-000000000000000A"]]
+        return try Profile(PropertyListSerialization.data(fromPropertyList: d, format: .xml, options: 0))
+    }
+    var r = SignedRecord(bundleID: "com.a", originalBundleID: "com.a", name: "A", version: "1", url: "https://x.example/a.ipa", signed: now,
+                         expires: now.addingTimeInterval(day), options: .init(name: nil, bundleID: nil, icon: nil, removeExtensions: [], fixArm64e: false),
+                         appID: "\(team).com.a", certSerial: ProfileRefresh.serial(cert))
+    r.extensionAppIDs = ["\(team).com.a.share", "\(team).com.a.widget"]
+    check(r.json["extensionAppIds"] as? [String] == r.extensionAppIDs, "signing.installed names them")
+    check(SignedRecords.decode(try SignedRecords.encode([r])).first?.extensionAppIDs == r.extensionAppIDs, "stored")
+
+    // the widget's is a day older: the record lasts as long as the first to run out
+    let app = try profile("com.a"), share = try profile("com.a.share"), widget = try profile("com.a.widget", made: -1)
+    let plan = ProfileRefresh.plan([r], certificate: cert, profiles: [app, share, widget], installed: ["com.a"], now: now)
+    let misagent = StubMisagent()
+    var uploads: [String] = []
+    let out = ProfileRefresh.run(plan, misagent: misagent) { uploads += $0.map(\.bundleID) }
+    check(misagent.installed == [app.data, share.data, widget.data], "all three: \(misagent.installed.count)")
+    check(out.renewed.map(\.record.bundleID) == ["com.a"] && out.failed.isEmpty && uploads.isEmpty, "renewed, nothing signed")
+    check(ProfileRefresh.updated([r], plan: plan, result: out).first?.expires == widget.expires, "the widget's expiry")
+
+    let short = ProfileRefresh.plan([r], certificate: cert, profiles: [app, share], installed: ["com.a"], now: now)
+    let some = StubMisagent()
+    var said: [String] = []
+    let bad = ProfileRefresh.run(short, misagent: some, log: { said.append($0) }) { uploads += $0.map(\.bundleID) }
+    check(some.installed == [app.data, share.data], "the ones there are")
+    check(bad.renewed.isEmpty && bad.failed.map(\.record.bundleID) == ["com.a"] && uploads.isEmpty, "named as failed, not signed again")
+    check(said.contains { $0.hasPrefix("No new profile for \(team).com.a.widget") }, "said: \(said)")
+    check(ProfileRefresh.updated([r], plan: short, result: bad).first?.expires == r.expires, "its expiry stays")
 }
 
 if failures == 0 { print("all passed") } else { print("\(failures) failed"); exit(1) }

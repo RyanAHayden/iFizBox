@@ -38,10 +38,41 @@ enum FreeAppID {
     static func profile(for asked: String, original: String, held: Profile, kept: [Profile], certificate: Data,
                         records: [SignedRecord], installed: (String) -> Bool?, now: Date = Date()) -> Profile {
         guard held.pinsBundleID else { return held }
+        let want = signsAs(for: asked, original: original, held: held, records: records, installed: installed)
+        return usable(want, among: [held] + kept, held: held, certificate: certificate, now: now) ?? held
+    }
+
+    // The App ID an app signs as once its own profile is handed in (`profile` above picks it).
+    static func signsAs(for asked: String, original: String, held: Profile, records: [SignedRecord],
+                        installed: (String) -> Bool?) -> String {
         let there = records.contains { $0.bundleID == held.appID && $0.originalBundleID == original }
             && installed(held.appID) != false
-        let want = there ? held.appID : appID(for: asked, team: held.team)
-        return usable(want, among: [held] + kept, held: held, certificate: certificate, now: now) ?? held
+        return there ? held.appID : appID(for: asked, team: held.team)
+    }
+
+    // F463c: the extensions a free Apple ID can sign (.appex in PlugIns/ or Extensions/, with a bundle ID), each with
+    // the App ID it signs as under `app`. `found`: each one's path in the app ("PlugIns/X.appex") and its own bundle
+    // ID. The signer and signing.inspect both ask here, so the page makes exactly the IDs the signer looks for.
+    static func extensionsToSign(app: String, original: String, _ found: [(path: String, bundleID: String)]) -> [(path: String, appID: String)] {
+        let kept = found.filter { x in
+            let rel = x.path.split(separator: "/")
+            return rel.count == 2 && ["PlugIns", "Extensions"].contains(String(rel[0])) && rel[1].hasSuffix(".appex")
+                && !x.bundleID.isEmpty
+        }.sorted { $0.path < $1.path }
+        let ids = extensionIDs(app: app, original: original, kept.map(\.bundleID))
+        return Swift.zip(kept, ids).map { (path: $0.path, appID: $1) }
+    }
+
+    // F463c: an extension's keychain groups name only its own App ID, so it couldn't read what its app keeps in the
+    // keychain. The app's group goes first (new items go there, so the app reads them too), when the profile allows it.
+    static func sharingKeychain(_ entitlements: [String: Any], appGroup: String, allowed: Any?) -> [String: Any] {
+        guard let own = entitlements["keychain-access-groups"] as? [Any],
+              (allowed as? [Any] ?? []).compactMap({ $0 as? String })
+                  .contains(where: { $0 == appGroup || ($0.hasSuffix("*") && appGroup.hasPrefix(String($0.dropLast()))) })
+        else { return entitlements }
+        var e = entitlements
+        e["keychain-access-groups"] = [appGroup] + own.compactMap { $0 as? String }.filter { $0 != appGroup }
+        return e
     }
 
     // The name of the other app that has `bundleID`, or nil when signing `originalID` as it replaces nothing else.
@@ -59,7 +90,7 @@ enum FreeAppID {
     // F463: iOS wants an extension's ID to start with its app's, and a free profile pins it too, so each extension has
     // an App ID of its own: <the app's App ID>.<what the extension adds to the app's bundle ID>, two that would get one
     // ID numbered. `extensions`: their own bundle IDs, in Inspect's order; `original`: the app's own. The IDs in the
-    // same order, as core/freeroute.js appIdsFor.
+    // same order. The page makes the ones it is told (signing.inspect), never its own.
     static func extensionIDs(app: String, original: String, _ extensions: [String]) -> [String] {
         var taken = Set<String>()
         return extensions.map { ext in
