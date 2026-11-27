@@ -14,6 +14,9 @@ What changed:
   failure, cancel, discard or expiry.
 - `signAndOpen` in `native/Sources/Sideload.swift` (used by `signing.install` and Re-sign All) claims too while it installs.
 - Claims are only made for a profile that pins the bundle ID (a free Apple ID).
+- From the spec review: `Claims.add` itself refuses another app's claim under its lock, so two signings running at once
+  (the app queue's beside a `signing.install`) can't both take one App ID. Added after the phone check; unit tested and
+  compiled, not run on the phone.
 - A copy kept again after a failed install holds no claim: only the Signing Server can open it, and it refuses a free
   Apple ID.
 

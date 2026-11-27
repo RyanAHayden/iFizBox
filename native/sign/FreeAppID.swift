@@ -81,8 +81,14 @@ enum FreeAppID {
         private let lock = NSLock()
         private var copies = [UUID: SignedRecord]()
         var all: [SignedRecord] { lock.lock(); defer { lock.unlock() }; return Array(copies.values) }
-        func add(_ r: SignedRecord) -> UUID {
+        // Refused when another app's copy has claimed the ID meanwhile: two signings at once (the app queue's beside a
+        // signing.install) both pass the signer's check.
+        func add(_ r: SignedRecord) throws -> UUID {
             lock.lock(); defer { lock.unlock() }
+            if r.bundleID != r.originalBundleID,
+               let other = copies.values.first(where: { $0.bundleID == r.bundleID && $0.originalBundleID != r.originalBundleID }) {
+                throw FreeAppID.taken(by: other.shownName)
+            }
             let id = UUID()
             copies[id] = r
             return id

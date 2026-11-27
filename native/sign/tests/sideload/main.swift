@@ -1062,10 +1062,11 @@ test("free Apple ID: signed as the App ID, replacing no other app (B502)") {
     func claimed(_ original: String) -> String? {
         FreeAppID.holder(of: appID, for: original, own: "com.you.else", records: [], claimed: claims.all) { _ in false }
     }
-    let claim = claims.add(rec("com.a"))
+    let claim = try claims.add(rec("com.a"))
     check(claimed("com.b") == "Other App", "signed, not installed yet")
     check(claimed("com.a") == nil, "the same app signed again")
-    let again = claims.add(rec("com.a"))
+    check(throwsCode("app_id_taken") { _ = try claims.add(rec("com.b")) }, "two signings at once: the second claim is refused")
+    let again = try claims.add(rec("com.a"))
     claims.release(claim)
     check(claimed("com.b") == "Other App", "its other copy still has it")
     claims.release(again)
@@ -1075,7 +1076,7 @@ test("free Apple ID: signed as the App ID, replacing no other app (B502)") {
     IPASigner.idHolder = { bid, original in
         FreeAppID.holder(of: bid, for: original, own: "com.you.else", records: [], claimed: claims.all) { _ in false }
     }
-    let first = claims.add(rec("com.a"))
+    let first = try claims.add(rec("com.a"))
     check(throwsCode("app_id_taken") {
         _ = try IPASigner(profile: free, identity: identity).sign(fixtures.appendingPathComponent("edit.ipa"), to: work.appendingPathComponent("second.ipa"))
     }, "a copy not installed yet has the ID")

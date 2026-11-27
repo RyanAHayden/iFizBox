@@ -114,6 +114,7 @@ enum SignAhead {
             let signHeld = { (file: URL, mine: URL?) in
                 signer.async {
                     let signed: (SignedApp, SignedRecord, URL, String?)
+                    let claim: UUID?
                     let unsigned = { (e: Error) in
                         if let m = mine { try? FileManager.default.removeItem(at: m) }
                         fail(e)
@@ -128,9 +129,13 @@ enum SignAhead {
                         let (app, record, output) = try sign(file, url: source, id: id, profile: profile, options: Sideload.withOwnIcon(options, ownIcon, log: log), emit: emit, log: log, job: job,
                                                              sha256: sha) // F343
                         signed = (app, record, output, sha)
+                        // B512: here on `signer`, so the next app's signing already finds the App ID taken
+                        do { claim = profile.pinsBundleID ? try FreeAppID.claims.add(record) : nil } catch {
+                            try? FileManager.default.removeItem(at: output)
+                            Sideload.dropOriginal(app.bundleID, sha256: record.sha256)
+                            throw error
+                        }
                     } catch { return unsigned(error) }
-                    // B512: here on `signer`, so the next app's signing already finds the App ID taken
-                    let claim = profile.pinsBundleID ? FreeAppID.claims.add(signed.1) : nil
                     SignBridge.queue.async {
                         let (app, record, output, sha) = signed
                         keepInLibrary(c, output: output, app: app, record: record, options: options, id: id, log: log) // B229

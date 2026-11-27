@@ -703,7 +703,13 @@ enum Sideload {
                                   certSerial: app.certSerial, // F458
                                   extensionAppIDs: app.extensionAppIDs) // F463c
         // B512: its App ID is taken while it installs, before there is a record to say so
-        let claim = used.pinsBundleID ? FreeAppID.claims.add(record) : nil
+        let claim: UUID?
+        do { claim = used.pinsBundleID ? try FreeAppID.claims.add(record) : nil } catch {
+            try? FileManager.default.removeItem(at: output)
+            dropOriginal(app.bundleID, sha256: record.sha256)
+            opened(.failure(error)); served?(false)
+            return
+        }
         // F343: an install that fails drops the IPA staged for it; the one kept before stays
         let answered = { (r: Result<(SignedApp, SignedRecord), Error>) in
             FreeAppID.claims.release(claim) // B512: installed (recorded by now) or failed
