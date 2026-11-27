@@ -139,6 +139,8 @@ enum SignAhead {
                         if let x = record.expires { j["expires"] = ISO8601DateFormatter().string(from: x) }
                         j["device"] = PhoneID.check(profile).json
                         if let s = sha { j["sha256"] = s } // F292
+                        // F463c: extensions left out for want of a profile: the page makes these and signs again
+                        if !app.missingExtensionAppIDs.isEmpty { j["missingExtensionAppIds"] = app.missingExtensionAppIDs }
                         answer(j, nil)
                     }
                 }
@@ -219,7 +221,8 @@ enum SignAhead {
                                       expires: signer.profile.signatureExpiry(certificate: identity.certificate), options: options.stored, // B502a
                                       appID: app.appID, signer: app.stamp, // B259; B280: appID as signAndOpen's record
                                       sha256: Sideload.keepOriginal(input, app: app, source: url, sha256: sha256, log: log), // F343
-                                      certSerial: app.certSerial) // F458
+                                      certSerial: app.certSerial, // F458
+                                      extensionAppIDs: app.extensionAppIDs) // F463c
             return (app, record, output)
         } catch {
             try? FileManager.default.removeItem(at: output)

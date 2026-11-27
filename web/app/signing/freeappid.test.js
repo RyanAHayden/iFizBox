@@ -93,6 +93,47 @@ test("the IPA's bundle ID isn't the listed one: its App ID, and signed again", a
   assert.deepEqual([r.token, dropped], ["t2", ["t1"]]);
 });
 
+test("F463c: extensions left out for want of a profile get App IDs and profiles, and the app is signed again", async () => {
+  const app = `com.a.${TEAM}`, ids = [`${app}.share`, `${app}.widget`];
+  const n = shell(), p = portal(), dropped = [];
+  let signs = 0;
+  const r = await withOwnAppId({ id: "com.a", name: "A" }, { url: "u" }, async () => {
+    signs += 1;
+    return { token: `t${signs}`, bundleId: app, originalBundleId: "com.a", ...(signs === 1 ? { missingExtensionAppIds: ids } : {}) };
+  }, { native: n, session: session(p), discard: (t) => dropped.push(t) });
+  assert.deepEqual(p.made, [app, ...ids]);
+  assert.deepEqual(handed(n), [app, ...ids].map(profileOf));
+  assert.deepEqual([r.token, signs, dropped], ["t2", 2, ["t1"]]);
+});
+
+test("F463c: an extension Apple refuses is left out, the other kept; with none the first signed copy stands", async () => {
+  const app = `com.a.${TEAM}`, lines = [];
+  const refusing = (bad) => {
+    const p = portal(), add = p.addAppId;
+    p.addAppId = async (team, id) => { if (bad(id)) throw new Error("10 a week"); return add(team, id); };
+    return p;
+  };
+  let signs = 0;
+  const sign = async () => ({ token: `t${++signs}`, bundleId: app, originalBundleId: "com.a", missingExtensionAppIds: [`${app}.share`, `${app}.widget`] });
+  const n = shell();
+  await withOwnAppId({ id: "com.a" }, { url: "u" }, sign, { native: n, session: session(refusing((id) => id.endsWith(".share"))), log: (l) => lines.push(l) });
+  assert.deepEqual(handed(n), [app, `${app}.widget`].map(profileOf));
+  assert.equal(signs, 2);
+  assert.ok(lines.includes(`No App ID ${app}.share: 10 a week`));
+  signs = 0;
+  const r = await withOwnAppId({ id: "com.a" }, { url: "u" }, sign, { native: shell(), session: session(refusing((id) => id !== app)) });
+  assert.deepEqual([r.token, signs], ["t1", 1]);
+});
+
+test("F463c: a Re-sign hands in the recorded extensions' profiles before it signs", async () => {
+  const app = `com.a.${TEAM}`;
+  const n = shell({ apps: [{ bundleId: app, originalBundleId: "com.a", extensionAppIds: [`${TEAM}.${app}.share`] }] }), p = portal();
+  let before = 0;
+  await withOwnAppId({ id: app }, { record: app }, async () => { before = handed(n).length; return { done: [app] }; }, { native: n, session: session(p) });
+  assert.deepEqual(p.made, [app, `${app}.share`]);
+  assert.equal(before, 2);
+});
+
 test("no session: app_id_taken shows one sign-in prompt, and Open is taken", async () => {
   const asked = [];
   let opened = 0, answer;

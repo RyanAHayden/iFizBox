@@ -13,8 +13,8 @@
 //   pickTeam(teams)                      the free (Personal) team, else the first
 //   appIdExpired(appId, now)             F459: past its expirationDate (7 days after it was made)
 //   await ensureAppId({ portal, teamId, appIds, identifier, name, now })   -> { appId, made }: reused unless missing or expired
-//   extensionAppId(identifier, extensionBundleId, bundleId)                <app's App ID>.<ext>
-//   await appIdsFor({ portal, teamId, bundleId, appName, extensions, now })  -> { app, extensions }, each with its App ID
+//   await ensureExtensionAppIds({ portal, teamId, appIds, extensions, name, now, log })  -> those it has, each with
+//       its App ID (F463c: [{ identifier, name }], the identifiers the shell's)
 //   forgetDeleted(records, phoneApps, { busy, idOf })   -> { records, forgotten }: drops apps deleted from the phone
 //   await runSetup({ portal, teamId, phone, saved, bundleId, appName, onStep, askRevoke, make, app })
 //       `app` true in the app: summaries name no browser (reusedSummary)
@@ -123,29 +123,21 @@ export async function ensureAppId({ portal, teamId, appIds, identifier, name, no
   }
 }
 
-// iOS wants an extension's ID to start with its app's: <app's App ID>.<what the extension adds to the app's bundle ID>.
-export function extensionAppId(identifier, extensionBundleId, bundleId) {
-  const ext = String(extensionBundleId ?? "");
-  const under = [identifier, bundleId].find((p) => p && ext.toLowerCase().startsWith(`${p}.`.toLowerCase()));
-  return `${identifier}.${under ? ext.slice(under.length + 1) : ext.split(".").pop()}`;
-}
-
-// The app's App ID and one per extension ([{ bundleId, name }]), from one listAppIds.
-export async function appIdsFor({ portal, teamId, bundleId, appName = "App", extensions = [], now = new Date() }) {
-  const { appIds } = await portal.listAppIds(teamId);
-  const identifier = freeAppId(bundleId, teamId);
-  const app = { bundleId, identifier, ...await ensureAppId({ portal, teamId, appIds, identifier, name: appName, now }) };
+// F463c: one App ID per extension, made or reused. The identifiers are the shell's (signing.inspect's
+// extensionAppIds, signing.prepare's missingExtensionAppIds: native/sign/FreeAppID.swift), never worked out here, as a
+// different one leaves the extension out. One Apple refuses is logged and left out; an ended session stops.
+export async function ensureExtensionAppIds({ portal, teamId, appIds, extensions = [], name = "App", now = new Date(), log = () => {} }) {
   const out = [];
-  const taken = new Set();
   for (const x of extensions) {
-    const base = extensionAppId(identifier, x.bundleId, bundleId);
-    let id = base;
-    for (let n = 2; taken.has(id.toLowerCase()); n++) id = `${base}${n}`;
-    taken.add(id.toLowerCase());
-    const got = await ensureAppId({ portal, teamId, appIds, identifier: id, name: x.name || appName, now });
-    out.push({ bundleId: x.bundleId, identifier: id, ...got });
+    try {
+      const got = await ensureAppId({ portal, teamId, appIds, identifier: x.identifier, name: x.name || name, now });
+      out.push({ identifier: x.identifier, ...got });
+    } catch (e) {
+      if (e?.kind === "session") throw e;
+      log(`No App ID ${x.identifier}: ${e?.message ?? e}`);
+    }
   }
-  return { app, extensions: out };
+  return out;
 }
 
 // Apps deleted from the phone are forgotten, so no refresh installs one again (App Refresh does the same in the shell,
@@ -213,16 +205,27 @@ export async function runSetup({ portal, teamId, phone, saved = null, bundleId, 
 // has a profile to sign that app with; only ours (<bundle id>.<TEAMID>). One Apple refuses is logged and left out.
 export async function otherProfiles({ portal, teamId, appIds = [], apps = [], appId, now = new Date(), log = () => {} }) {
   const wanted = new Map();
+  const extensions = new Set(); // F463c: theirs end in what the extension adds, not in the team
+  const want = (full, name) => {
+    const s = String(full ?? "");
+    if (!s.startsWith(`${teamId}.`)) return null;
+    const id = s.slice(teamId.length + 1);
+    wanted.set(id, name || wanted.get(id));
+    return id;
+  };
   for (const a of apps) {
-    const id = String(a?.appId ?? "");
-    if (id.startsWith(`${teamId}.`)) wanted.set(id.slice(teamId.length + 1), a?.name || wanted.get(id.slice(teamId.length + 1)));
+    want(a?.appId, a?.name);
+    for (const x of a?.extensionAppIds ?? []) {
+      const id = want(x, a?.name);
+      if (id) extensions.add(id);
+    }
   }
   wanted.delete(appId);
   const out = [];
   for (const [identifier, name] of wanted) {
     let id = appIds.find((a) => a.identifier === identifier && !appIdExpired(a, now));
     if (!id) {
-      if (identifier.includes("*") || freeAppId(identifier, teamId) !== identifier) continue;
+      if (identifier.includes("*") || (!extensions.has(identifier) && freeAppId(identifier, teamId) !== identifier)) continue;
       try {
         ({ appId: id } = await ensureAppId({ portal, teamId, appIds, identifier, name: name || "App", now }));
         log(`Made the App ID ${identifier}`);

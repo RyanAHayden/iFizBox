@@ -127,6 +127,7 @@ struct SignedRecord: Codable, Equatable {
     var signer: SignerStamp? = nil // B259: the signer that made it; nil in records from before stamps (stale)
     var sha256: String? = nil     // F343: the IPA kept for Re-sign (OriginalIPA), as it came; nil when none is kept
     var certSerial: String? = nil // F458: the certificate it was signed with; nil in older records (signed again)
+    var extensionAppIDs: [String]? = nil // F463c: a free Apple ID's extensions' own (TEAM.id); nil when it has none
 
     struct StoredOptions: Codable, Equatable {
         var name: String?
@@ -158,6 +159,7 @@ struct SignedRecord: Codable, Equatable {
         if let t = options.tweaks, !t.names.isEmpty { j["tweaks"] = t.names } // F302a: Installed's "N Tweaks"
         if let s = signer { j["signer"] = s.json } // B259: Needs Re-sign compares it with signing.installed's own
         if let a = appID { j["appId"] = a } // F458: core/freeroute.js asks Apple for its profile
+        if let x = extensionAppIDs, !x.isEmpty { j["extensionAppIds"] = x } // F463c: and for each of these
         // B247: core/installed.js matches on it first; its name is the one shown (the user's rename wins)
         if var c = options.credit { c.name = shownName; j["credit"] = c.json }
         return j

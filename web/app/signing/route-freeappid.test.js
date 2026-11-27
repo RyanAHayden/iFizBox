@@ -73,11 +73,27 @@ test("Custom Install: the sheet's token isn't looked at again; a typed bundle ID
   let n = shell();
   let r = await run({ url: "https://e.example/a.ipa", name: "A", bundleId: "com.sheet", params: { token: "t" } }, { native: n });
   assert.deepEqual(r.p.made, [`com.sheet.${TEAM}`]);
-  assert.deepEqual(order(n), ["signing.addProfile", "signing.install"]);
+  assert.deepEqual(order(n), ["signing.inspect", "signing.addProfile", "signing.install"]);
+  assert.deepEqual(sent(n, "signing.inspect"), [{ token: "t" }]); // F463c: asked about that look, nothing downloaded
   n = shell();
   r = await run({ url: "https://e.example/a.ipa", name: "A", bundleId: "com.sheet", params: { token: "t", bundleId: "me.typed" } }, { native: n });
   assert.deepEqual(r.p.made, [`me.typed.${TEAM}`]);
   assert.equal(sent(n, "signing.install").length, 1);
+});
+
+test("F463c: signing.inspect's extension App IDs are made and their profiles handed in before the install", async () => {
+  const ext = `com.real.${TEAM}.share`;
+  const look = () => ({ token: "look", app: { bundleId: "com.real", name: "Real" }, extensionAppIds: [{ path: "PlugIns/Share.appex", appId: ext, name: "Share" }] });
+  const n = shell({ inspect: look });
+  const { p } = await run({ url: "https://e.example/a.ipa", name: "A" }, { native: n });
+  assert.deepEqual(p.made, [`com.real.${TEAM}`, ext]);
+  assert.deepEqual(sent(n, "signing.addProfile").map((x) => x.profile), [profileOf(`com.real.${TEAM}`), profileOf(ext)]);
+  assert.deepEqual(order(n), ["signing.inspect", "signing.addProfile", "signing.addProfile", "signing.install"]);
+  // the Custom Install's choices go with the question
+  const c = shell({ inspect: look });
+  await run({ url: "https://e.example/a.ipa", name: "A", bundleId: "com.real", params: { token: "t", removeExtensions: ["PlugIns/Widget.appex"] } }, { native: c });
+  assert.deepEqual(sent(c, "signing.inspect"), [{ token: "t", removeExtensions: ["PlugIns/Widget.appex"] }]);
+  assert.equal(sent(c, "signing.addProfile").length, 2);
 });
 
 test("no free profile: no look, no App ID, the url is installed", async () => {

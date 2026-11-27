@@ -259,6 +259,8 @@ async function ownAppId({ native, params, listed, name, bundleId, self, h, alert
   const live = session ?? free.liveSession;
   let sending = params;
   const job = { id: self ? IFIZBOX_ID : bundleId, name };
+  // F463c: what signing.inspect needs of the install's edits to name the extensions' App IDs
+  const choices = Object.fromEntries(["bundleId", "removeExtensions"].filter((k) => params[k]).map((k) => [k, params[k]]));
   if (!self && !params.token && params.url) {
     const s = await live();
     const held = s ? await free.pinnedProfile(n) : null;
@@ -266,14 +268,20 @@ async function ownAppId({ native, params, listed, name, bundleId, self, h, alert
       const { url, ...edits } = params;
       try {
         const info = await askInsecure((extra) => n.call("signing.inspect",
-          { ...withKeep({ url }), ...(listed ? { listed } : {}), ...extra }, onEvent), { alert, url });
+          { ...withKeep({ url }), ...choices, ...(listed ? { listed } : {}), ...extra }, onEvent), { alert, url });
         sending = { ...edits, token: info.token };
         job.id = info.app?.bundleId;
         job.name = name || info.app?.name;
+        job.extensions = free.inspected(info.extensionAppIds);
       } catch (e) {
         if (!/unknown method/i.test(String(e?.message ?? e))) throw e; // an older shell: install as before
       }
     }
+  } else if (!self && params.token && await live()) {
+    // F463c: a Custom Install's look: its extensions' App IDs, with the choices made since (nothing downloads)
+    try {
+      job.extensions = free.inspected((await n.call("signing.inspect", { token: params.token, ...choices }))?.extensionAppIds);
+    } catch { /* an older shell, or a look that ran out (signing.install says so) */ }
   }
   return {
     params: sending,
