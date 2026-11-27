@@ -14,3 +14,4 @@ export const SIGN_HOST = `sign.${DOMAIN}`;
 export const BUNDLE_ID = "com.ryha.ifizbox";
 export const PACKAGE = BUNDLE_ID; // the .deb's package name
 export const GITHUB_REPO = "RyanAHayden/iFizBox";
+export const KOFI_URL = "https://ko-fi.com/fizlo"; // F464: the Donate page's link

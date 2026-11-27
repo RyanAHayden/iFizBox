@@ -17,7 +17,7 @@ async function tap(box, target) {
 
 // F157: the website Not Jailbroken (the default here) shows the lite User Guides: no OpenSSH or Root Password rows.
 const OPEN = ["Settings", "Upgrading & Jailbreaking Help", "Frequently Asked Questions", "Copying Files to/from Device",
-  "Credits / Thank You", "Theme", "Notifications for Signed Apps"]; // F237's guide
+  "Credits / Thank You", "Donate", "Theme", "Notifications for Signed Apps"]; // F237's guide; F464: Donate
 const LOCKED = ["Find Extensions for Applications"]; // B295: More Sources is the green tile now, locked with the tiles
 
 test("F156: help, User Guides and Credits stay open on the locked Home; Find Extensions and Recommended Sources ask", async () => {

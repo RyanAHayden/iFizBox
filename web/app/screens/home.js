@@ -48,6 +48,7 @@ import { markiFizBoxInstalled, browsingLocked, askToBrowse } from "../websign-ga
 import { guideRows, JAILBREAK_INFO_URL, isLite } from "./guide-index.js";
 const guides = lazyNs("guides");
 import * as why from "./why.js"; // F303: Why <NAME> (#/home/why)
+import { DONATE_ROW, donateSections } from "./donate.js"; // F464: Donate (#/home/donate)
 import { NAME } from "../brand.js";
 import { rowIcon, PAGE_ICONS } from "../icons/rowicons.js";
 import { nativeBridge } from "../native.js";
@@ -163,13 +164,13 @@ export function homeLinks() {
       { label: "Find Extensions for Applications", href: SEARCH_HREF, chevron: true },
     ],
   }, { header: "User Guides", rows: guideRows(format, guidesLite()) },
-  { rows: [{ label: "Credits / Thank You", href: format({ tab: "home", path: ["credits"] }) }] }];
+  { rows: [{ label: "Credits / Thank You", href: format({ tab: "home", path: ["credits"] }) }, DONATE_ROW] }];
 }
 
 // F156: Home's link rows that stay open on the locked website (user 2026-11-18: "dont lock credits and thank you or
 // jailbreaking help"): Settings (F123), Upgrading & Jailbreaking Help, the User Guides and Credits / Thank You. They
 // need no install and help people get to one. Find Extensions and More Sources stay locked.
-const OPEN_WHILE_LOCKED = new Set(["settings", "help", "guides", "credits", "why"]); // F303: Why <NAME> too
+const OPEN_WHILE_LOCKED = new Set(["settings", "help", "guides", "credits", "donate", "why"]); // F303: Why <NAME> too; F464: Donate
 export function openWhileLocked(href) {
   if (!href?.startsWith?.("#/")) return false;
   const route = parse(href);
@@ -272,6 +273,7 @@ export function browsePage(path) {
 // unknown), `nav` its bar, `render` its page. nav() and render() below only look the route up here.
 const ROUTES = [
   { match: "credits", nav: () => ({ title: "Credits" }), render: (body) => renderCredits(body) },
+  { match: "donate", nav: () => ({ title: "Donate" }), render: (body) => { body.append(wrap(grouped(donateSections()))); } }, // F464
   { match: "guides", nav: (route) => guides.nav(route, guidesLite()), render: (body, route) => { guides.render(body, route, { lite: guidesLite() }); } }, // F157
   { match: "help", nav: () => ({ title: "Help" }), render: (body) => renderHelp(body) },
   { match: "why", nav: () => why.nav(), render: (body) => { why.render(body, { mode: settings.mode, install: () => installiFizBox() }); } }, // F303
@@ -918,6 +920,7 @@ function renderCredits(body) {
     { label: "Source Code", detail: "GitHub", chevron: true, onClick: () => window.open(REPO_URL, "_blank", "noopener") }];
   body.append(wrap(grouped([
     { header: NAME, rows, footer: "A package manager with the iOS 6 look, for modern iPhones, by Ryan Hayden (Fizlo)." },
+    { rows: [DONATE_ROW] }, // F464
     {
       header: "Special Thanks",
       rows: THANKS.map(([label, handle, url, gh, why]) => ({
