@@ -65,7 +65,9 @@ export async function forgetDeletedApps({ native, busy = defaultBusy } = {}) {
       await native.call("signing.forget", { bundleId: r.bundleId });
       gone.push(r.bundleId);
     }
-  } catch { /* not paired, no VPN, or the jailbreak app (signing.* is refused there) */ }
+  } catch (e) { // not paired, no VPN, or the jailbreak app (signing.* is refused there)
+    console.warn(`Deleted apps not forgotten: ${e?.message ?? e}`);
+  }
   return gone;
 }
 
