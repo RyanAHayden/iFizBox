@@ -21,7 +21,7 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Follow-ups
 
-- [ ] **V37** Release: bump the version where the project keeps it, per its versioning rules (agent-runner's: docs/SETUP.md#versions), move CHANGELOG.md's Unreleased entries under the new version heading, commit to main so the release workflow tags and publishes it. Check: the release workflow passed (gh run list) and gh release view shows the new tag | after: all | held: yes | moved: yes
+- [ ] **V37** Release: bump the version where the project keeps it, per its versioning rules (agent-runner's: docs/SETUP.md#versions), move CHANGELOG.md's Unreleased entries under the new version heading, commit to main so the release workflow tags and publishes it. Check: the release workflow passed (gh run list) and gh release view shows the new tag | after: all | moved: yes
 - [ ] **C76** (follow-up, low) The other IndexedDB stores still handle an ended transaction their own way: core/myipas.js and signing/identity.js show 'IndexedDB aborted' with no retry, and core/changes.js keeps its own copy of the retry; move all three onto idbRunner in core/cache.js (added by B497). Check: node --test web/app/core web/app/signing | files: web/app/core/cache.js, web/app/core/changes.js, web/app/core/changes.test.js, web/app/core/myipas.js, web/app/signing/identity.js | held: yes — asked to cancel after 6 min: if it was stopped, what was done is on the newest wip/C76 branch, go on from there
 ### Parked
 
