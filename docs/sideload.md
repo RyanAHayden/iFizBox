@@ -500,7 +500,8 @@ Open Minis is not on the App Store for now, so the website hides Install Without
 back, and does not fetch the setup script for it. Someone who already has Open Minis installed can still run that line
 by hand.
 
-1. Install LocalDevVPN from the App Store, and Open Minis if it is installed (or once it is on the App Store again). In Open Minis, allow Local Network and Notifications.
+1. Install LocalDevVPN from the App Store. Use Open Minis if the iPhone already has it, and allow it Local Network and
+   Notifications.
 2. Connect LocalDevVPN, and keep Wi-Fi on.
 3. In Open Minis, run that line with the code from the website.
 4. Developer Mode lists a "Pair with iFizBox" row while Open Minis runs in the background. The pairing code arrives as
