@@ -101,6 +101,14 @@
       ],
       "versions": [
         {
+          "version": "1.0.8",
+          "date": "2026-11-28T02:41:14Z",
+          "localizedDescription": "With a free Apple ID, each app and its extensions now get their own App IDs.\nFree Apple ID refresh keeps working after a week and renews a computer-installed iFizBox too.\nThe Free Apple ID page now lists your App IDs and when each one expires.\nAfter a computer setup, iFizBox now picks up the pairing by itself.",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v1.0.8/iFizBox.ipa",
+          "size": 31995347,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.0.7",
           "date": "2026-11-27T15:33:45Z",
           "localizedDescription": "Free Apple ID sign-in gets through more often, trying other ways when Apple turns it away.\nRefreshing a free Apple ID now renews your installed apps without installing them again.",
