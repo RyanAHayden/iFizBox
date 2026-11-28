@@ -7,7 +7,8 @@ import { createHash } from "node:crypto";
 import { computerSections, computerInstallBlock, signForComputer, makeCode, setupCommands, resetComputerInstall, codeFooter,
   COMPUTER_LABEL, COMPUTER_FOOTER, COMPUTER_OFF_FOOTER, CODE_EXPIRED_FOOTER, CODE_MISSING_FOOTER, SAVE_IPA_FOOTER,
   recordKey, finishSetupLink, finishSetupSection, FINISH_LABEL, FINISH_FOOTER, phoneSetupOffered, phoneSetupCommand, PHONE_HEADER,
-  PHONE_APPS_FOOTER, PHONE_LINE_FOOTER, PHONE_START_FOOTER, PHONE_SETUP_MARK, OPEN_MINIS_LINK } from "./computer-install.js";
+  PHONE_APPS_FOOTER, PHONE_LINE_FOOTER, PHONE_START_FOOTER, PHONE_SETUP_MARK, OPEN_MINIS_LINK,
+  OPEN_MINIS_ON_STORE } from "./computer-install.js";
 import { VPN_APP_LINK } from "../core/installroute.js";
 import { openRecord } from "../core/websign.js";
 import { KEYS } from "../core/storagekeys.js";
@@ -147,12 +148,38 @@ test("F465b: offered on iOS 27 and later, only once the published setup script h
   const { readFile } = await import("node:fs/promises");
   const script = await readFile(new URL("../../../tools/setup/install.sh.in", import.meta.url), "utf8");
   assert.ok(script.includes(PHONE_SETUP_MARK), "the script the next setup release publishes carries the mark");
-  assert.equal(phoneSetupOffered("27.0", script), true);
-  assert.equal(phoneSetupOffered("28", script), true);
-  assert.equal(phoneSetupOffered("26.4", script), false);
-  assert.equal(phoneSetupOffered(null, script), false);
-  assert.equal(phoneSetupOffered("27.0", "#!/bin/sh\n# the published script from before Phone Setup\n"), false);
+  assert.equal(phoneSetupOffered("27.0", script, true), true);
+  assert.equal(phoneSetupOffered("28", script, true), true);
+  assert.equal(phoneSetupOffered("26.4", script, true), false);
+  assert.equal(phoneSetupOffered(null, script, true), false);
+  assert.equal(phoneSetupOffered("27.0", "#!/bin/sh\n# the published script from before Phone Setup\n", true), false);
   assert.equal(phoneSetupCommand("ABCD-2345"), `wget -qO- https://${DOMAIN}/sign/setup.sh | sh -s -- ABCD-2345`);
+});
+
+test("F465b1: Open Minis is off the App Store, so Install Without a Computer is hidden", async () => {
+  assert.equal(OPEN_MINIS_ON_STORE, false);
+  assert.equal(phoneSetupOffered("27.0", PHONE_SETUP_MARK), false);
+  const saved = globalThis.document;
+  globalThis.document = fakeDocument();
+  try {
+    const asked = [];
+    const fetcher = async (url) => { asked.push(url); return { ok: true, text: async () => PHONE_SETUP_MARK }; };
+    const base = { id: {}, ask: async () => {}, save() {}, fix: { label: "Sign In Again", onClick() {} }, store: memory(),
+      ios: "27.0", fetcher };
+    resetComputerInstall({ signed: SIGNED, code: "ABCD-2345", until: Date.now() + 60_000 });
+    const coded = computerInstallBlock(base);
+    await tick();
+    for (const s of [PHONE_HEADER, "Open Minis", phoneSetupCommand("ABCD-2345")]) assert.ok(!coded.textContent.includes(s), s);
+    for (const c of setupCommands()) assert.ok(coded.textContent.includes(c.cmd), c.cmd);
+    resetComputerInstall();
+    const start = computerInstallBlock(base);
+    await tick();
+    assert.ok(start.textContent.includes(COMPUTER_FOOTER));
+    assert.deepEqual(asked, []);
+  } finally {
+    resetComputerInstall();
+    globalThis.document = saved;
+  }
 });
 
 test("F465b: the block shows Install Without a Computer beside the code, with Computer Install still there", async () => {
@@ -163,7 +190,7 @@ test("F465b: the block shows Install Without a Computer beside the code, with Co
     const asked = [];
     return Object.assign(async (url) => { asked.push(url); return { ok, text: async () => text }; }, { asked });
   };
-  const show = async (o) => { const box = computerInstallBlock({ ...base, ...o }); await tick(); return box; };
+  const show = async (o) => { const box = computerInstallBlock({ ...base, onStore: true, ...o }); await tick(); return box; };
   try {
     resetComputerInstall({ signed: SIGNED, code: "ABCD-2345", until: Date.now() + 60_000 });
     const fetcher = served(PHONE_SETUP_MARK);

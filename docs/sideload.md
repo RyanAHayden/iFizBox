@@ -452,7 +452,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
 
 **Free Apple ID: the one-time computer setup** (`tools/setup/`). iOS refuses a free-profile app from
 itms-services (error 111), so the first install of the free route needs a computer once, or on iOS 27 the iPhone
-itself (Phone Setup, below). The person signs in on
+itself (Phone Setup, below, while the website offers it). The person signs in on
 the website on the phone, the website signs the app and shows a short code, and one line on the computer does the
 rest:
 
@@ -496,8 +496,12 @@ Store app). The website's Ready page offers it as **Install Without a Computer**
 or later, and only once the published setup script has Phone Setup (a site deployed before that shows nothing new). It
 is not offered with an expired or missing profile. The group has the App Store links for Open Minis and LocalDevVPN,
 then the line `wget -qO- https://ifizbox.com/sign/setup.sh | sh -s -- <code>`, with the code the website shows.
+Open Minis is not on the App Store for now, so the website hides Install Without a Computer on every iPhone until it is
+back, and does not fetch the setup script for it. Someone who already has Open Minis installed can still run that line
+by hand.
 
-1. Install Open Minis and LocalDevVPN from the App Store. In Open Minis, allow Local Network and Notifications.
+1. Install LocalDevVPN from the App Store. Use Open Minis if the iPhone already has it, and allow it Local Network and
+   Notifications.
 2. Connect LocalDevVPN, and keep Wi-Fi on.
 3. In Open Minis, run that line with the code from the website.
 4. Developer Mode lists a "Pair with iFizBox" row while Open Minis runs in the background. The pairing code arrives as
@@ -521,7 +525,7 @@ into the app's folder (`Documents/pairingFile.plist`). The app takes it at its n
 The command prints the by-hand steps (Settings > Installation & Signing > This iPhone, Pair This iPhone, then Import
 Pairing File) only for another app or path. For iFizBox at `Documents/pairingFile.plist` it says the app picks the file
 up when it is opened, so nothing needs importing. Import Pairing File
-still brings in a file made another way. With no computer, Phone Setup does the pairing.
+still brings in a file made another way. With no computer, Phone Setup does the pairing (while the website offers it).
 
 **Jailbreak build**: the root helper's `install-ipa` installs an IPA through `LSApplicationWorkspace
 installApplication:withOptions:error:`, as AppSync's `appinst` does (`native/helper/README.md`). It needs AppSync
