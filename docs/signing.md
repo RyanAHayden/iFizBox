@@ -177,6 +177,14 @@ headed After the Install. **Save the IPA** signs a second time, apart, with the 
 expired, the group's row is Refresh Profile or Sign In Again, and its footer says so. The signed IPA and the code live
 only in the page's memory: a new profile or Forget Free Apple ID drops them.
 
+The Ready view's **App IDs** group (`web/app/screens/app-ids.js`) lists the account's App IDs as Apple lists them, each
+with the date it expires, first to expire first; an expired one reads Expired. It needs Apple's session: without one
+the group reads Not Signed In. Showing the view also forgets the recorded apps that are no longer on the phone. The
+app asks `signing.phoneApps`, which answers `{apps: [bundleId]}` with the user apps installation_proxy lists through
+the pairing, or `{apps: null}` when the phone is unpaired, doesn't answer, or a signing or install is running. Each
+recorded app missing from that list is dropped with `signing.forget {bundleId}`. Nothing is forgotten while the app
+queue or a run is busy, or on an empty or unknown list. The jailbreak app refuses `signing.*`, so it forgets nothing.
+
 The setup makes the App ID and profile for the app itself (`BUNDLE_ID`, `brand.js`). The certificate (a `.p12`:
 the certificate in a plain bag, the key under PBES2 with PBKDF2-HMAC-SHA256 and AES-256-CBC, an HMAC-SHA256 MAC:
 OpenSSL 3's defaults) is kept in localStorage (`ifizbox.freeid`) for its year, with the last profile and the team.
@@ -763,7 +771,8 @@ Plus the arm64e fix-up, the user's edits and tweak injection (below).
   and the edits). There is no IPA library: `signing.resignAll` downloads each again from its URL, signs it with the
   current certificate and the same edits, and installs them one after another (the next once iOS has fetched the
   previous IPA, or its link expired), answering which worked and which didn't. `signing.installed` lists the
-  records; `signing.forget {bundleId}` drops one.
+  records; `signing.forget {bundleId}` drops one. The Free Apple ID page also drops the recorded apps no longer on
+  the phone (`signing.phoneApps`, under Free Apple ID).
 - **Which source's app it is.** Several sources can list apps under one bundle ID (RyukGram and Instagram share
   `com.burbn.instagram`), and an IPA's Info.plist may name a variant after the app it changes. So signing from a
   source sends `credit: {name, source, sourceName, key}` (the source's app: its name there, the source's URL and name,

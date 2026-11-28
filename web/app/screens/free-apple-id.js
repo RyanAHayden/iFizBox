@@ -40,6 +40,7 @@ import { showAlert } from "../nav/alert.js";
 import { relayTransport, relayWsUrl, anisetteV3, AppleIdSession, DevPortal, signInAlert, b64encode, b64decode } from "../core/gsa.js";
 import { runSetup, refreshApps, pickTeam, setupError, SETUP_STEPS, otherTool, freeExpiry } from "../core/freeroute.js";
 import { progressHUD } from "../nav/progress.js"; // F458
+import { appIdsGroup, forgetDeletedApps } from "./app-ids.js"; // F463d
 import { storedZip } from "../core/freecert.js";
 import { parseProfile } from "../core/signing.js";
 import { storedUdid, udidPending, watchUdid, canFindUdid, FIND_UDID, UDID_PAGE, UDID_WAITING } from "./signing.js";
@@ -656,6 +657,7 @@ async function runSetupOnce(ctx, saved) {
       onStep: (s) => { flow.steps[s.id] = s; ctx.redraw(); }, askRevoke: (certs) => askRevoke(ctx, certs) });
     saveFreeIdentity({ ...r.identity, teamName: flow.team.name ?? null, profile: r.profile.data, appId: r.appId }, ctx.store);
     resetComputerInstall(); // F436: signed with the profile before this one
+    ctx.appIds = null; // F463d: asked again, as setup may have made one
     dropFreeSession(ctx.store); // B473
     flow.view = "ready";
     if (ctx.native) await keepInApp(ctx, loadFreeIdentity(ctx.store));
@@ -758,6 +760,7 @@ function download(bytes, name, type = "application/zip") {
 
 function signOut(ctx) {
   flow.session = null; flow.portal = null; flow.team = null; flow.steps = {}; flow.auth = null;
+  ctx.appIds = null; // F463d
   dropFreeSession(ctx.store); // B473
   flow.view = "signin";
   ctx.redraw();
@@ -777,6 +780,12 @@ function readyView(ctx, saved) {
   ];
   const setupDone = checklist(flow.steps).every((s) => s.state === "done");
   const out = [grouped(readySections(rows, setupDone ? flow.steps : {}))];
+  // F463d: the account's App IDs, asked once per page; apps deleted from the phone are forgotten then too
+  if (!ctx.appIds) {
+    ctx.appIds = appIdsGroup({ session: freeSession(), onSignedOut: () => { endFreeSession(); ctx.redraw(); } });
+    if (ctx.native) forgetDeletedApps({ native: ctx.native }).then((gone) => { if (gone.length) ctx.onChange(); });
+  }
+  out.push(ctx.appIds);
   const renew = () => (flow.portal ? setup(ctx) : signOut(ctx));
   const renewLabel = flow.portal ? "Refresh Profile" : "Sign In Again";
   if (ctx.native) {

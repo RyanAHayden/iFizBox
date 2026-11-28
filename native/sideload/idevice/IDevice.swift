@@ -1571,6 +1571,11 @@ enum IDevice {
         }
     }
 
+    /// F463d: the user apps iOS lists, so apps deleted from the phone are forgotten. Blocking; call it on `queue`.
+    static func phoneApps() throws -> Set<String> {
+        try watched("apps") { try userApps(try Session(watch: $0), watch: $0) }
+    }
+
     private static func userApps(_ s: Session, watch w: Watch) throws -> Set<String> {
         let ip = try s.installationProxy()
         defer { installation_proxy_client_free(ip) }
