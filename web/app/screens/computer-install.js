@@ -12,12 +12,14 @@
 //   await makeCode(signed, deps)         { code, until }: uploads it and asks for the code
 //   computerSections(state, now)         pure: what the block shows: { stage: "off" | "start" | "code" | "expired", footer }
 //   setupCommands()                      pure: [{ header, prompt, cmd, footer }], one per kind of computer
-//   phoneSetupOffered(ios, script)       pure (F465b): Install Without a Computer is offered: iOS 27 or later, and the
-//                                        published setup script has Phone Setup
+//   phoneSetupOffered(ios, script, onStore)  pure (F465b): Install Without a Computer is offered: Open Minis is on the
+//                                        App Store (OPEN_MINIS_ON_STORE, F465b1), iOS 27 or later, and the published
+//                                        setup script has Phone Setup
 //   phoneSetupCommand(code)              pure: the line for Open Minis
 //   computerInstallBlock({ id, record, expired, fix, ask, save, store })   the block; fix: { label, onClick } renews the profile;
 //                                        record: the Free Apple ID record the app takes on launch (B474, web/free-id.json);
-//                                        ios, fetcher: this iPhone's (the user agent's) and the page's fetch, for the tests
+//                                        ios, fetcher, onStore: this iPhone's (the user agent's), the page's fetch and
+//                                        OPEN_MINIS_ON_STORE, for the tests
 //   resetComputerInstall(next)           forget the signed IPA and code (another profile, or the identity forgotten);
 //                                        next: what the block holds instead (tests)
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -56,6 +58,9 @@ export const FINISH_URL = "ifizbox://free-id#";
 // F465b: Phone Setup (docs/sideload.md), the same setup command run on the iPhone inside Open Minis. It is offered only
 // once the published setup script has it (PHONE_SETUP_MARK, in tools/setup/install.sh.in): the site may be deployed
 // before the setup command is released.
+// F465b1: and only while Open Minis is on the App Store. It was not on 2026-11-27 (OPEN_MINIS_LINK answered App Not
+// Available), so the section is hidden. Back there: set this to true.
+export const OPEN_MINIS_ON_STORE = false;
 export const PHONE_HEADER = "Install Without a Computer";
 export const OPEN_MINIS = "Open Minis";
 export const OPEN_MINIS_LINK = "https://apps.apple.com/app/id6759188481";
@@ -66,7 +71,8 @@ export const PHONE_SETUP_MARK = "minis-bonjour";
 
 export const phoneSetupCommand = (code) => `wget -qO- https://${DOMAIN}/sign/setup.sh | sh -s -- ${code}`;
 const phoneIos = (ios) => Number.parseInt(ios, 10) >= 27;
-export const phoneSetupOffered = (ios, script) => phoneIos(ios) && String(script ?? "").includes(PHONE_SETUP_MARK);
+export const phoneSetupOffered = (ios, script, onStore = OPEN_MINIS_ON_STORE) =>
+  onStore && phoneIos(ios) && String(script ?? "").includes(PHONE_SETUP_MARK);
 
 // The published script, kept once read (per fetch); a fetch that got no script is tried again the next time.
 const published = new WeakMap();
@@ -234,7 +240,7 @@ async function savePlain(id, ask, record, save) {
 }
 
 export function computerInstallBlock({ id, record = null, expired = false, fix, ask, save, store,
-  ios = iosFromUserAgent(globalThis.navigator?.userAgent), fetcher = globalThis.fetch }) {
+  ios = iosFromUserAgent(globalThis.navigator?.userAgent), fetcher = globalThis.fetch, onStore = OPEN_MINIS_ON_STORE }) {
   const box = el("div", "free-computer");
   let timer = 0, phone = false;
   const draw = () => {
@@ -265,9 +271,9 @@ export function computerInstallBlock({ id, record = null, expired = false, fix, 
   };
   redraw = draw;
   draw();
-  if (!expired && phoneIos(ios)) {
+  if (!expired && onStore && phoneIos(ios)) {
     publishedScript(fetcher).then((script) => {
-      if (!phoneSetupOffered(ios, script)) return;
+      if (!phoneSetupOffered(ios, script, onStore)) return;
       phone = true;
       draw();
     });
