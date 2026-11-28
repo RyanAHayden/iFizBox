@@ -33,6 +33,8 @@
 //        own: "TEAM.identifier" | null (F462: iFizBox has no record, and a free Apple ID's refresh renews its profile)
 //   signing.openApp {bundleId}   -> {opened: true | false}: F155, launches an installed app (the progress page's Open)
 //   signing.forget {bundleId}    -> {apps}
+//   signing.phoneApps            -> {apps: [bundleId] | null}: F463d, the user apps installation_proxy lists; null:
+//        not paired, not answered, or a signing or install runs
 //   signing.isInstalled {bundleIds} -> {installed: {bundleId: true | false | null}}: B46, what iOS has now
 //   apps.isInstalled {bundleIds} -> the same, in every build (F219: the jailbreak build refuses signing.*)
 //   signing.resignAll (stream: {index, count, name, phase, progress}) -> {done: [bundleId], failed: [{bundleId, name, error}]}
@@ -105,6 +107,18 @@ enum Sideload {
                 saveRecords(records().filter { $0.bundleID != id })
                 reschedule()
                 return installedJSON()
+            }
+        }
+        // F463d: the user apps iOS lists through the pairing (installation_proxy), for the page to forget the deleted
+        // ones. null (nothing is forgotten): not paired, it couldn't be asked, or a signing or install runs.
+        b.on("signing.phoneApps") { c in
+            guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: not in the jailbreak app") }
+            let none: [String: Any] = ["apps": NSNull()]
+            guard IDevice.pairing() != nil, SignJob.current == nil else { return Apt.reply(c, none, nil) }
+            IDevice.queue.async {
+                let apps = try? IDevice.phoneApps()
+                guard let a = apps, SignJob.current == nil else { return Apt.reply(c, none, nil) }
+                Apt.reply(c, ["apps": a.sorted()], nil)
             }
         }
         // B46: whether iOS has each app now (LSApplicationWorkspace applicationIsInstalled:), so Installed's Remove
